@@ -10,7 +10,7 @@ You need Node.js 22 and Docker Desktop running.
 
 1. `npm install`
 2. `npm run db:start` starts a private copy of Supabase (database, logins, email catcher).
-3. Copy `.env.example` to `.env.local` and fill in the keys that `npx supabase status` prints.
+3. Copy `.env.example` to `.env.local`. Fill in the keys that `npx supabase status` prints, and generate an `ENCRYPTION_KEY` with the command shown in the file.
 4. `npm run db:reset` builds the database and loads the test data.
 5. `npm run dev`, then open http://127.0.0.1:3000
 
