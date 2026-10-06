@@ -67,6 +67,11 @@ export function ActionForm({
   );
 }
 
+/** For forms that manage their own action state but reuse the field components. */
+export function FormStateProvider({ state, children }: { state: FormState; children: React.ReactNode }) {
+  return <FormStateContext value={state}>{children}</FormStateContext>;
+}
+
 export function useFieldError(name: string): string | undefined {
   return useContext(FormStateContext).fieldErrors?.[name];
 }

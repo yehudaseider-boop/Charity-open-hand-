@@ -59,16 +59,55 @@
   and platform admins only. Every view is logged.
 - Suspended charities disappear from the directory and their page.
 
+## Guest checkout (milestone 3)
+
+- **Gateway:** Paystack (chosen by Yehuda). Everything goes through the adapter
+  in `src/lib/gateway`. A stand-in "test gateway" (no real money, refused on a
+  real server) is used to build and test locally.
+- **Paystack adapter not yet tested:** this session's network blocks
+  paystack.com and api.paystack.co. Points to confirm in test mode are marked
+  VERIFY in `src/lib/gateway/paystack.ts`.
+- **Split:** the charity's subaccount receives exactly the gift. The rest
+  goes to our main account, which pays Paystack's charge out of it.
+- **Fee formula:** total = (gift + our fee + VAT on our fee + gateway fixed
+  charge) / (1 - gateway percentage). If the gateway adds VAT on top of its
+  rates, its percentage and fixed charge are multiplied by 1.15 first. Which
+  case applies comes from the rate sheet (`gatewayRatesIncludeVat`).
+- **Rounding (agreed):** our 3% and VAT on it round to the nearest cent,
+  halves up. The total always rounds UP to the next cent, so we never net less
+  than our fee. The gateway part is the remainder, so the parts always add up.
+- **What's shown is what's charged:** fees are calculated on the server only.
+  If fees change between the donor's quote and payment, the donor is shown the
+  new total and must confirm again.
+- **Donations are refused** while the gateway rates are empty, and for
+  charities not connected to the gateway.
+- **Donor details:** stored with each donation exactly as typed (ID and tax
+  numbers encrypted, last 4 digits kept for display). An existing donor
+  record is never overwritten from a guest checkout, because anyone can type
+  any email address; only empty fields are filled.
+- **Payment confirmation:** the webhook signature is checked, each event is
+  stored once (repeats are ignored), and the payment is checked directly with
+  the gateway before it is marked paid. The amount must match to the cent.
+  The return page checks too, in case the webhook is late.
+- **Card-testing protection:** at most 5 checkout attempts per 10 minutes per
+  email and per IP address, plus a hidden field that bots fill in.
+- **Stubbed for later:** donor and charity emails (milestone 4), refunds and
+  chargebacks (admin screen, later), private note to self (needs accounts,
+  milestone 4), monthly giving (milestone 5).
+
 ## Open (ask Yehuda when reached)
 
 1. Gateway choice and rate sheet (percentage + fixed charge). Fields are empty.
 2. Whether the processing fee shown to donors includes VAT once VAT-registered.
 3. Platform name, domain, logo and colours.
-4. Rounding rule for fees (proposed at milestone 3).
+4. Rounding rule for fees: agreed (see Guest checkout).
 5. Supabase has no South African region; POPIA cross-border transfer for the attorney.
 6. Receipting mandate wording (attorney). For now charities upload a signed copy.
 7. Bank account verification through the gateway (milestone 3). Until then
    the admin checks the bank confirmation letter by eye.
-8. Is "NPO number or PBO number, at least one" the right rule for who may apply?
+8. Who may apply: "NPO number or PBO number, at least one". Confirmed by Yehuda.
 9. Emails to charities on approval or send-back arrive with the email provider (milestone 4).
 10. No screen yet for a platform admin to change an approved charity's bank details.
+11. Paystack rate sheet: percentage, fixed amount, and whether they include VAT.
+12. 18A for donors without an SA ID number (e.g. passport holders).
+13. Network access to paystack.com and api.paystack.co for this environment, and Paystack test keys.

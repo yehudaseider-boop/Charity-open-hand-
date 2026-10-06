@@ -26,6 +26,8 @@ export const platformConfig = {
      */
     gatewayPercent: null as string | null,
     gatewayFixedCents: null as number | null,
+    /** Do the rates above already include VAT? Also from the rate sheet. */
+    gatewayRatesIncludeVat: null as boolean | null,
   },
 
   /** Minimum gift (not a minimum fee). Confirmed: R30. */

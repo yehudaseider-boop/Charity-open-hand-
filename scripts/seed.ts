@@ -38,6 +38,7 @@ async function main() {
         ? percentToPpm(platformConfig.fees.gatewayPercent)
         : null,
       gateway_fixed_cents: platformConfig.fees.gatewayFixedCents,
+      gateway_rates_include_vat: platformConfig.fees.gatewayRatesIncludeVat,
       min_donation_cents: platformConfig.minDonationCents,
       vat_enabled: platformConfig.vat.enabled,
       vat_rate_ppm: percentToPpm(platformConfig.vat.ratePercent),
@@ -126,6 +127,13 @@ async function main() {
     ]).select("id, slug"),
   );
   const charity = (slug: string) => charities.find((c) => c.slug === slug)!.id;
+
+  // Connect the seed charities to the local test gateway.
+  for (const c of charities) {
+    await must(
+      db.from("charities").update({ gateway: "test", gateway_subaccount_ref: `test_acct_${c.id.slice(0, 8)}` }).eq("id", c.id),
+    );
+  }
 
   await must(
     db.from("charity_categories").insert([

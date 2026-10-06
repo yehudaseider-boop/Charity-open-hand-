@@ -9,10 +9,12 @@ import { charityBadges } from "@/lib/charities";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 import { formatDate } from "@/lib/dates";
+import { getGateway } from "@/lib/gateway";
 import { createClient } from "@/lib/supabase/server";
 import {
   addCharityAdmin,
   approveCharity,
+  connectToGateway,
   reinstateCharity,
   rejectCharity,
   revealBankAccount,
@@ -86,6 +88,22 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
                 submitLabel="Send back for changes" />
             </div>
           </div>
+        </Card>
+      ) : null}
+
+      {charity.status === "approved" ? (
+        <Card title="Payments">
+          {charity.gateway === getGateway().name && charity.gateway_subaccount_ref ? (
+            <p className="text-sm">Connected to the payment gateway. Account {charity.gateway_subaccount_ref}.</p>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-muted">
+                Not connected yet. Connecting registers the charity&apos;s bank account with the payment gateway so
+                gifts settle straight to it.
+              </p>
+              <SimpleForm action={connectToGateway.bind(null, id)} submitLabel="Connect to payment gateway" />
+            </>
+          )}
         </Card>
       ) : null}
 

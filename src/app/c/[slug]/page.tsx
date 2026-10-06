@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Badge } from "@/components/badge";
 import { Card } from "@/components/card";
 import { CharityBadges } from "@/components/charity-badges";
 import { canIssue18a } from "@/lib/charities";
+import { loadDonatableCharity } from "@/lib/donations/charity";
 import { publicImageUrl } from "@/lib/charity/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,6 +34,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
   const receipts = canIssue18a(charity);
+  const accepting = (await loadDonatableCharity(charity.slug))?.acceptingPayments ?? false;
   const categories = charity.charity_categories
     .map((cc) => cc.categories as unknown as { name_en: string } | null)
     .filter((c): c is { name_en: string } => c !== null);
@@ -62,13 +65,16 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
             <CharityBadges charity={charity} />
             {categories.map((c) => <Badge key={c.name_en}>{c.name_en}</Badge>)}
           </div>
-          <button
-            disabled
-            className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast opacity-60"
-            title="Online giving opens soon"
-          >
-            Donate (opening soon)
-          </button>
+          {accepting ? (
+            <Link
+              href={`/c/${charity.slug}/donate`}
+              className="block w-full rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast"
+            >
+              Donate
+            </Link>
+          ) : (
+            <p className="rounded-control bg-bg p-3 text-center text-sm text-muted">Online giving opens soon.</p>
+          )}
           <p className="text-xs text-muted">
             {receipts
               ? "Donations qualify for an s18A tax receipt, issued in this organisation's name."

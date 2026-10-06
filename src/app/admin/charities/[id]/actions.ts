@@ -6,6 +6,7 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { decrypt } from "@/lib/crypto";
+import { getGateway, GatewayError } from "@/lib/gateway";
 import type { FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -170,4 +171,49 @@ export async function addCharityAdmin(id: string, _prev: FormState, formData: Fo
   await logAudit({ actorUserId: admin.userId, action: "charity.admin_added", entityType: "charity", entityId: id, details: { email } });
   refresh(id);
   return { ok: true, message: `${email} can now sign in and manage this charity.` };
+}
+
+export async function connectToGateway(id: string, _prev: FormState): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  const { charity } = await loadCharityForManager(id);
+  if (charity.status !== "approved") return { ok: false, message: "Approve the charity first." };
+
+  const db = createAdminClient();
+  const { data: priv } = await db
+    .from("charity_private")
+    .select("bank_name, bank_account_holder, bank_account_number_encrypted, bank_branch_code")
+    .eq("charity_id", id)
+    .single();
+  if (!priv?.bank_account_number_encrypted || !priv.bank_name || !priv.bank_branch_code) {
+    return { ok: false, message: "Bank details are incomplete." };
+  }
+
+  const gateway = getGateway();
+  try {
+    const { accountRef } = await gateway.createCharityAccount({
+      charityId: id,
+      businessName: charity.legal_name_en,
+      bankName: priv.bank_name,
+      accountNumber: decrypt(priv.bank_account_number_encrypted),
+      branchCode: priv.bank_branch_code,
+      accountHolder: priv.bank_account_holder ?? charity.legal_name_en,
+    });
+    const { error } = await db
+      .from("charities")
+      .update({ gateway: gateway.name, gateway_subaccount_ref: accountRef })
+      .eq("id", id);
+    if (error) return { ok: false, message: error.message };
+    await logAudit({
+      actorUserId: admin.userId,
+      action: "charity.gateway_connected",
+      entityType: "charity",
+      entityId: id,
+      details: { gateway: gateway.name, account_ref: accountRef },
+    });
+  } catch (e) {
+    if (e instanceof GatewayError) return { ok: false, message: e.message };
+    throw e;
+  }
+  refresh(id, charity.slug);
+  return { ok: true, message: "Connected. The charity can now take donations." };
 }
