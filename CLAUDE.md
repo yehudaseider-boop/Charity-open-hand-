@@ -11,3 +11,11 @@
 - Every table has row-level security. Money and receipt writes are server-only (service role).
 - Hebrew text: `lang="he" dir="rtl"`. Check pages at 375px wide.
 - Run `npm test`, `npm run typecheck` and `npm run lint` before committing.
+
+# Phone app (apps/mobile)
+
+- Expo + Expo Router (routes in `apps/mobile/src/app`). Donor-facing; charity and admin screens stay on the website.
+- Design bible tokens live only in `apps/mobile/src/theme/tokens.ts`. Follow `apps/mobile/AGENTS.md` for Expo rules.
+- Fee maths is shared with the website: the app imports `src/lib/fees.ts` and `src/lib/money.ts` (keep them dependency-free).
+- `apps/mobile/src/config/fees.ts` holds SAMPLE gateway rates for mock screens only, labelled on screen. Never ship them.
+- Review screenshots: `npx expo export --platform web`, serve `dist`, open with `?preview=iphone`.
