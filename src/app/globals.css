@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Placeholder neutral theme until branding is chosen.
+ * To rebrand, change these values only; components use the tokens.
+ */
+:root {
+  --brand: #1f4e5f;
+  --brand-contrast: #ffffff;
+  --brand-soft: #e6eef1;
+  --accent: #b7791f;
+
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --text: #1c1c1a;
+  --text-muted: #5f5f5a;
+  --border: #e2e1dc;
+
+  --success: #2f6b3a;
+  --success-soft: #e5f1e7;
+  --warning: #8a5a00;
+  --warning-soft: #fbf0d9;
+  --danger: #a1312a;
+  --danger-soft: #f8e3e1;
+
+  --radius: 0.75rem;
+  --radius-sm: 0.5rem;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --radius-card: var(--radius);
+  --radius-control: var(--radius-sm);
+  --font-sans: var(--font-latin), var(--font-hebrew), system-ui, sans-serif;
+  --font-hebrew: var(--font-hebrew), var(--font-latin), system-ui, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Hebrew text: right-to-left with a Hebrew-first font stack. */
+[lang="he"] {
+  font-family: var(--font-hebrew);
+}
