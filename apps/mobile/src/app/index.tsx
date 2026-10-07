@@ -18,7 +18,7 @@ export default function Welcome() {
       <View style={styles.hero}>
         <PlaceholderImage subject="Shabbos table" rounded={false} labelPosition="top" labelOffset={insets.top + 16} style={StyleSheet.absoluteFill} />
         <LinearGradient
-          colors={["rgba(245,239,228,0)", "rgba(245,239,228,0.6)", colors.parchment]}
+          colors={["rgba(244,251,250,0)", "rgba(244,251,250,0.6)", colors.parchment]}
           locations={[0.35, 0.7, 1]}
           style={StyleSheet.absoluteFill}
         />

@@ -1,16 +1,16 @@
 /**
  * Design bible tokens. Every screen uses these and nothing else.
- * Palette is locked: one accent (pomegranate), olive for success only.
+ * Palette is locked: one accent (coral), teal for success only.
  */
 export const colors = {
-  parchment: "#F5EFE4", // screen background
-  surface: "#FBF8F2", // raised surface
-  ink: "#1F2724", // text and primary buttons
-  muted: "#6B6F68", // secondary text
-  hairline: "#E2D9C8", // borders
-  accent: "#8C2F2B", // pomegranate: active tab, progress, selection, key links
-  success: "#4F5B34", // olive: success only
-  onInk: "#FBF8F2", // text on ink buttons
+  parchment: "#F4FBFA", // screen background
+  surface: "#FFFFFF", // raised surface
+  ink: "#1B2B3A", // text and primary buttons
+  muted: "#5B6B78", // secondary text
+  hairline: "#D5E6E3", // borders
+  accent: "#E4472F", // coral: active tab, progress, selection, key links
+  success: "#168A66", // teal: success only
+  onInk: "#FFFFFF", // text on ink buttons
 } as const;
 
 export const fonts = {

@@ -37,7 +37,7 @@ export default function CharityDetail() {
       <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
         <View>
           <PlaceholderImage subject={charity.photo} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 16 / 9, minHeight: 240 }} />
-          <LinearGradient colors={["rgba(245,239,228,0)", colors.parchment]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={["rgba(244,251,250,0)", colors.parchment]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
         </View>
 
         <View style={styles.body}>
