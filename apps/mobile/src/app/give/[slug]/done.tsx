@@ -24,17 +24,23 @@ export default function Done() {
   const rise = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(rise, { toValue: 1, duration: 360, useNativeDriver: false }).start();
+    Animated.timing(rise, { toValue: 1, duration: 360, useNativeDriver: true }).start();
   }, [rise]);
 
-  if (!charity || !(cents > 0)) {
+  let fees: ReturnType<typeof calculateFees> | null = null;
+  try {
+    fees = calculateFees(cents, feeSettings);
+  } catch {
+    fees = null;
+  }
+
+  if (!charity || !fees) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 40, paddingHorizontal: space.gutter }]}>
         <EmptyState title="Nothing to show" body="This page appears after a gift." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
       </View>
     );
   }
-  const fees = calculateFees(cents, feeSettings);
   const year = taxYearFor(new Date());
   const yearEnd = taxYearRangeLabel(year).split(" to ")[1];
 

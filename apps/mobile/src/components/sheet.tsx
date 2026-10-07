@@ -9,7 +9,7 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
   const v = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(v, { toValue: visible ? 1 : 0, duration: 280, useNativeDriver: false }).start();
+    Animated.timing(v, { toValue: visible ? 1 : 0, duration: 280, useNativeDriver: true }).start();
   }, [visible, v]);
 
   if (!visible) return null;

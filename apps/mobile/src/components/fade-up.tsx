@@ -5,7 +5,7 @@ import { Animated, type ViewStyle } from "react-native";
 export function FadeUp({ index = 0, children, style }: { index?: number; children: React.ReactNode; style?: ViewStyle }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(v, { toValue: 1, duration: 320, delay: index * 50, useNativeDriver: false }).start();
+    Animated.timing(v, { toValue: 1, duration: 320, delay: index * 50, useNativeDriver: true }).start();
   }, [v, index]);
   return (
     <Animated.View

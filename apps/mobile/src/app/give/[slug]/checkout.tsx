@@ -49,7 +49,14 @@ export default function Checkout() {
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const fees = useMemo(() => (Number.isSafeInteger(cents) && cents > 0 ? calculateFees(cents, feeSettings) : null), [cents]);
+  // A link can carry any amount; calculateFees rejects non-whole, zero or below-minimum cents.
+  const fees = useMemo(() => {
+    try {
+      return calculateFees(cents, feeSettings);
+    } catch {
+      return null;
+    }
+  }, [cents]);
 
   if (!charity || !fees) {
     return (
