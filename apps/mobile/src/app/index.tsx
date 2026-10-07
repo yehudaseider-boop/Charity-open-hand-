@@ -4,7 +4,7 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
-import { LogoPlaceholder } from "@/components/logo-placeholder";
+import { Logo } from "@/components/logo";
 import { PlaceholderImage } from "@/components/placeholder-image";
 import { Text } from "@/components/text";
 import { colors, space } from "@/theme/tokens";
@@ -16,14 +16,14 @@ export default function Welcome() {
   return (
     <View style={styles.screen}>
       <View style={styles.hero}>
-        <PlaceholderImage subject="Shabbos table" rounded={false} labelPosition="top" labelOffset={insets.top + 16} style={StyleSheet.absoluteFill} />
+        <PlaceholderImage subject="Shabbos table" rounded={false} labelPosition="top" labelOffset={insets.top + 64} style={StyleSheet.absoluteFill} />
         <LinearGradient
           colors={["rgba(244,251,250,0)", "rgba(244,251,250,0.6)", colors.parchment]}
           locations={[0.35, 0.7, 1]}
           style={StyleSheet.absoluteFill}
         />
         <View style={[styles.logo, { top: insets.top + 12 }]}>
-          <LogoPlaceholder />
+          <Logo />
         </View>
       </View>
 
