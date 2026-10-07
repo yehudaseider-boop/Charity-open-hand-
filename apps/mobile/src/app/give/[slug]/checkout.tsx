@@ -112,7 +112,7 @@ export default function Checkout() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: insets.bottom + 32, gap: space.block }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {state === "error" ? (
           <View style={styles.banner} accessibilityRole="alert">
-            <Text style={{ fontFamily: "Assistant_600SemiBold", fontSize: 17, color: colors.danger }}>Payment didn&apos;t go through</Text>
+            <Text style={{ fontFamily: "Archivo_600SemiBold", fontSize: 17, color: colors.danger }}>Payment didn&apos;t go through</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>Nothing was charged. Check your card details and try again.</Text>
           </View>
         ) : null}
@@ -211,7 +211,7 @@ export default function Checkout() {
         <View style={styles.section}>
           <Text variant="h2" style={styles.sectionTitle}>Payment</Text>
           <View style={styles.payStub}>
-            <Text style={{ fontFamily: "Assistant_600SemiBold", fontSize: 17 }}>Card</Text>
+            <Text style={{ fontFamily: "Archivo_600SemiBold", fontSize: 17 }}>Card</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>You&apos;ll enter your card on the payment provider&apos;s secure page. We never see or store it.</Text>
           </View>
         </View>
@@ -239,7 +239,7 @@ function Row({ label, value, tag, strong }: { label: string; value: string; tag?
         <Text style={strong ? styles.strong : { fontSize: 17 }}>{label}</Text>
         {tag ? <Text variant="label" style={{ color: colors.danger }}>{tag}</Text> : null}
       </View>
-      <Text style={strong ? [styles.strong, { fontFamily: "FrankRuhlLibre_500Medium", fontSize: 26 }] : { fontSize: 17 }}>{value}</Text>
+      <Text style={strong ? [styles.strong, { fontFamily: "Archivo_800ExtraBold", fontSize: 26 }] : { fontSize: 17 }}>{value}</Text>
     </View>
   );
 }
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   summary: { gap: 12, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   rule: { height: 1, backgroundColor: colors.hairline },
-  strong: { fontFamily: "Assistant_700Bold", fontSize: 18 },
+  strong: { fontFamily: "Archivo_700Bold", fontSize: 18 },
   payStub: { gap: 4, padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, borderStyle: "dashed" },
   banner: { gap: 4, padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.surface },
 });

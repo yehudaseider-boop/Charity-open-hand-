@@ -46,7 +46,7 @@ export default function Receipts() {
       ) : (
         <>
           <View style={styles.notice}>
-            <Text style={{ fontSize: 17, fontFamily: "Assistant_600SemiBold" }}>Receipts arrive once a year</Text>
+            <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Receipts arrive once a year</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
               Each charity issues one 18A receipt covering all your gifts in a tax year (1 March to the end of February). Receipts for this tax year
               come after {currentEnd}.

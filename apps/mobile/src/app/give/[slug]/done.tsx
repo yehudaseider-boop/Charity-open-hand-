@@ -60,7 +60,7 @@ export default function Done() {
           <Text variant="amount">{rand(fees.amountCents)}</Text>
           <Text>
             {monthly ? "Every month to " : "To "}
-            <Text style={{ fontFamily: "Assistant_600SemiBold" }}>{charity.nameEn}</Text>
+            <Text style={{ fontFamily: "Archivo_600SemiBold" }}>{charity.nameEn}</Text>
           </Text>
           <Text variant="bodyMuted" style={{ fontSize: 16 }}>
             {monthly ? "Charged each month: " : "Charged: "}

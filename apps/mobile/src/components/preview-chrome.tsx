@@ -31,7 +31,7 @@ export function PreviewChrome({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   status: { position: "absolute", top: 0, left: 0, right: 0, height: 54, justifyContent: "flex-end", paddingLeft: 52, paddingBottom: 10 },
-  time: { fontFamily: "Assistant_600SemiBold", fontSize: 17, color: colors.ink },
+  time: { fontFamily: "Archivo_600SemiBold", fontSize: 17, color: colors.ink },
   homeWrap: { position: "absolute", bottom: 8, left: 0, right: 0, alignItems: "center" },
   home: { width: 134, height: 5, borderRadius: 3, backgroundColor: colors.ink },
 });

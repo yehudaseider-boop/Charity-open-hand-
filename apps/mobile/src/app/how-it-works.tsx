@@ -30,7 +30,7 @@ export default function HowItWorks() {
             <View key={s.title} style={styles.step}>
               <View style={styles.number}><Text style={styles.numberText}>{i + 1}</Text></View>
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={{ fontFamily: "Assistant_600SemiBold", fontSize: 18 }}>{s.title}</Text>
+                <Text style={{ fontFamily: "Archivo_600SemiBold", fontSize: 18 }}>{s.title}</Text>
                 <Text variant="bodyMuted">{s.body}</Text>
               </View>
             </View>
@@ -52,6 +52,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.parchment },
   step: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
   number: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
-  numberText: { fontFamily: "Assistant_700Bold", fontSize: 17, color: colors.onInk },
+  numberText: { fontFamily: "Archivo_700Bold", fontSize: 17, color: colors.onInk },
   promise: { flexDirection: "row", gap: 10, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
 });

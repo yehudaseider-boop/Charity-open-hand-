@@ -15,12 +15,15 @@ export const colors = {
 } as const;
 
 export const fonts = {
-  display: "FrankRuhlLibre_500Medium",
-  displayBold: "FrankRuhlLibre_700Bold",
-  body: "Assistant_400Regular",
-  bodyMedium: "Assistant_500Medium",
-  bodySemibold: "Assistant_600SemiBold",
-  bodyBold: "Assistant_700Bold",
+  display: "Archivo_800ExtraBold",
+  displayBold: "Archivo_900Black",
+  body: "Archivo_400Regular",
+  bodyMedium: "Archivo_500Medium",
+  bodySemibold: "Archivo_600SemiBold",
+  bodyBold: "Archivo_700Bold",
+  /** Hebrew text (Archivo has no Hebrew letters). */
+  hebrew: "Assistant_400Regular",
+  hebrewBold: "Assistant_700Bold",
 } as const;
 
 /** Type scale: body never below 16, labels never below 14, buttons 17 semibold. */

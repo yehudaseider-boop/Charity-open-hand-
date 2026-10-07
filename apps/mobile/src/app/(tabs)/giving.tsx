@@ -165,7 +165,7 @@ export default function Giving() {
                   {recurring.map((r, i) => (
                     <Pressable key={r.id} onPress={() => setOpen(r)} accessibilityRole="button" accessibilityLabel={`${r.charityName}, ${rand(r.cents)} a month, ${r.status}`} style={[styles.row, i > 0 && styles.divider]}>
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={{ fontSize: 17, fontFamily: "Assistant_600SemiBold" }}>{r.charityName}</Text>
+                        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
                           {r.status === "paused" ? "Paused" : `Next on ${ddmmyyyy(r.nextDate)}`}
                         </Text>
@@ -264,7 +264,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat} accessibilityLabel={`${label}: ${value}`}>
       <Text variant="label">{label}</Text>
-      <Text style={{ fontSize: 24, lineHeight: 30, fontFamily: "FrankRuhlLibre_500Medium" }}>{value}</Text>
+      <Text style={{ fontSize: 24, lineHeight: 30, fontFamily: "Archivo_800ExtraBold" }}>{value}</Text>
     </View>
   );
 }

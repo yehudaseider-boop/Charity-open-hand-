@@ -42,5 +42,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 4 },
   thumb: { width: 132, aspectRatio: 4 / 3, borderRadius: radius.control },
   rowText: { flex: 1, gap: 3 },
-  name: { fontFamily: "FrankRuhlLibre_500Medium", fontSize: 20, lineHeight: 25, color: colors.ink },
+  name: { fontFamily: "Archivo_800ExtraBold", fontSize: 20, lineHeight: 25, color: colors.ink },
 });

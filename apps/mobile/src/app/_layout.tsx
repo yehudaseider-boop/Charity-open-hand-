@@ -1,5 +1,12 @@
-import { Assistant_400Regular, Assistant_500Medium, Assistant_600SemiBold, Assistant_700Bold } from "@expo-google-fonts/assistant";
-import { FrankRuhlLibre_500Medium, FrankRuhlLibre_700Bold } from "@expo-google-fonts/frank-ruhl-libre";
+import {
+  Archivo_400Regular,
+  Archivo_500Medium,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+  Archivo_800ExtraBold,
+  Archivo_900Black,
+} from "@expo-google-fonts/archivo";
+import { Assistant_400Regular, Assistant_700Bold } from "@expo-google-fonts/assistant";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -13,11 +20,14 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    FrankRuhlLibre_500Medium,
-    FrankRuhlLibre_700Bold,
+    Archivo_400Regular,
+    Archivo_500Medium,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+    Archivo_800ExtraBold,
+    Archivo_900Black,
+    // Archivo has no Hebrew letters: Hebrew text uses Assistant.
     Assistant_400Regular,
-    Assistant_500Medium,
-    Assistant_600SemiBold,
     Assistant_700Bold,
   });
 

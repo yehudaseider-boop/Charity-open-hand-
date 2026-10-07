@@ -1,5 +1,5 @@
 import { Text as RNText, type TextProps, type TextStyle } from "react-native";
-import { type } from "@/theme/tokens";
+import { fonts, type } from "@/theme/tokens";
 
 type Variant = keyof typeof type;
 
@@ -14,7 +14,13 @@ export function HebrewText({ variant = "body", style, ...rest }: TextProps & { v
     <RNText
       {...rest}
       accessibilityLanguage="he"
-      style={[type[variant] as TextStyle, { writingDirection: "rtl", textAlign: "right" }, style]}
+      style={[
+        type[variant] as TextStyle,
+        { writingDirection: "rtl", textAlign: "right", fontFamily: HEADINGS.has(variant) ? fonts.hebrewBold : fonts.hebrew },
+        style,
+      ]}
     />
   );
 }
+
+const HEADINGS = new Set<Variant>(["hero", "h1", "h2", "amount"]);

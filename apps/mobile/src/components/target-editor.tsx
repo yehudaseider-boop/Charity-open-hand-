@@ -129,7 +129,7 @@ export function TargetEditor({
       )}
 
       <View style={styles.result}>
-        <Text style={{ fontSize: 17, fontFamily: "Assistant_600SemiBold" }}>Your target: {ok ? `${rand(target)} ${per}` : "R0"}</Text>
+        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Your target: {ok ? `${rand(target)} ${per}` : "R0"}</Text>
         {ok && period === "year" ? (
           <Text variant="bodyMuted" style={{ fontSize: 16 }}>
             About {rand(monthlyToReach(target, monthsLeft))} a month over the {monthsLeft} {monthsLeft === 1 ? "month" : "months"} left.
