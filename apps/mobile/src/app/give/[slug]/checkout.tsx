@@ -109,7 +109,7 @@ export default function Checkout() {
   return (
     <View style={styles.screen}>
       <TopBar title="Checkout" />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: insets.bottom + 32, gap: space.block }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: insets.bottom + 32, gap: space.block }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {state === "error" ? (
           <View style={styles.banner} accessibilityRole="alert">
             <Text style={{ fontFamily: "Assistant_600SemiBold", fontSize: 17, color: colors.accent }}>Payment didn&apos;t go through</Text>

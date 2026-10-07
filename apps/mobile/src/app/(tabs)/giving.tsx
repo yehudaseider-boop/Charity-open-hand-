@@ -2,23 +2,23 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button } from "@/components/button";
+import { Button, TextLink } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
-import { Field } from "@/components/field";
-import { CalendarIcon, ChevronIcon } from "@/components/icons";
+import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
-import { Segmented } from "@/components/segmented";
 import { Sheet } from "@/components/sheet";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
+import { TargetEditor, type Target } from "@/components/target-editor";
 import { Text } from "@/components/text";
-import { gifts, givenElsewhere, recurring as sampleRecurring, sampleMaaserTargetCents, type Gift, type Recurring } from "@/data/giving";
+import { gifts, givenElsewhere, recurring as sampleRecurring, sampleMaaserTarget, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, rand } from "@/lib/format";
-import { byCharity, groupByMonth, inGivingYear, maaserTargetCents, monthlyToReach, percentOf } from "@/lib/giving";
+import { byCharity, groupByMonth, inGivingYear, monthlyToReach, percentOf, totalBetween } from "@/lib/giving";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
 import { useScreenState } from "@/lib/screen-state";
-import { parseRandToCents, percentToPpm } from "@shared/money";
 import { colors, radius, space, touch, type } from "@/theme/tokens";
+
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** Screen 7: Giving, with maaser. */
 export default function Giving() {
@@ -26,7 +26,9 @@ export default function Giving() {
   const state = useScreenState();
   const p = useLocalSearchParams<{ demo?: string; sheet?: string }>();
   const newDonor = state === "empty";
-  const [targetCents, setTargetCents] = useState<number | null>(newDonor || p.demo === "first" ? null : sampleMaaserTargetCents);
+  const [target, setTarget] = useState<Target | null>(newDonor || p.demo === "first" ? null : sampleMaaserTarget);
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [recurring, setRecurring] = useState<Recurring[]>(newDonor ? [] : sampleRecurring);
   const [open, setOpen] = useState<Recurring | null>(sampleRecurring.find((r) => r.id === p.sheet) ?? null);
 
@@ -45,12 +47,20 @@ export default function Giving() {
   const charities = byCharity(yearGifts);
   const with18a = yearGifts.filter((g) => g.with18a).reduce((t, g) => t + g.cents, 0);
   const monthsLeft = monthsLeftInGivingYear(now, hYear);
-  const remaining = targetCents === null ? 0 : Math.max(0, targetCents - given);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const elsewhereMonth = newDonor ? 0 : totalBetween(givenElsewhere, monthStart, monthEndDate);
+  const byMonth = target?.period === "month";
+  const periodGiven = byMonth ? monthTotal + elsewhereMonth : given;
+  const periodElsewhere = byMonth ? elsewhereMonth : elsewhere;
+  const periodEnd = byMonth ? ddmmyyyy(monthEndDate) : yearEnd;
+  const periodLabel = byMonth ? `${monthNames[now.getMonth()]} ${now.getFullYear()}` : yearLabel;
+  const remaining = target === null ? 0 : Math.max(0, target.cents - periodGiven);
   const [openGift, setOpenGift] = useState<Gift | null>(null);
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
         <View>
           <Text variant="h1" accessibilityRole="header">Giving</Text>
           <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
@@ -66,29 +76,47 @@ export default function Giving() {
           <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => router.replace("/giving")} />
         ) : (
           <>
-            {targetCents === null ? (
-              <TargetSetup onSave={setTargetCents} />
+            {target === null || editing ? (
+              <TargetEditor
+                initial={target}
+                yearEnd={yearEnd}
+                monthsLeft={monthsLeft}
+                onSave={(t) => {
+                  setTarget(t);
+                  setEditing(false);
+                  setSaved(true);
+                }}
+                onCancel={target ? () => setEditing(false) : undefined}
+              />
             ) : (
               <View style={{ gap: 10 }}>
-                <MaaserProgress givenCents={given} targetCents={targetCents} yearEndLabel={yearEnd} yearLabel={yearLabel} />
+                <MaaserProgress givenCents={periodGiven} targetCents={target.cents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
+                {saved ? (
+                  <Text variant="label" style={{ paddingHorizontal: 4, color: colors.success }} accessibilityLiveRegion="polite">
+                    Target saved.
+                  </Text>
+                ) : null}
                 <Text variant="label" style={{ paddingHorizontal: 4 }}>
-                  Includes {rand(elsewhere)} you logged as given elsewhere this year. Only you see your target.
+                  Includes {rand(periodElsewhere)} you logged as given elsewhere this {target.period}. Only you see your target.
                 </Text>
+                <TextLink label="Change target" onPress={() => { setSaved(false); setEditing(true); }} />
               </View>
             )}
 
-            {targetCents !== null ? (
+            {target !== null && !editing ? (
               <View style={styles.card}>
                 <Text variant="label">Amount to give</Text>
                 {remaining > 0 ? (
                   <>
                     <Text variant="amount" style={{ fontSize: 36, lineHeight: 42 }}>{rand(remaining)}</Text>
                     <Text variant="bodyMuted">
-                      still to give by {yearEnd}. About {rand(monthlyToReach(remaining, monthsLeft))} a month over the {monthsLeft} {monthsLeft === 1 ? "month" : "months"} left.
+                      {byMonth
+                        ? `still to give by ${periodEnd}, the end of this month.`
+                        : `still to give by ${yearEnd}. About ${rand(monthlyToReach(remaining, monthsLeft))} a month over the ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left.`}
                     </Text>
                   </>
                 ) : (
-                  <Text style={{ fontSize: 17 }}>You&apos;ve reached your target for this year.</Text>
+                  <Text style={{ fontSize: 17 }}>You&apos;ve reached your target for this {target.period}.</Text>
                 )}
               </View>
             ) : null}
@@ -127,12 +155,6 @@ export default function Giving() {
                 </View>
               </View>
             ) : null}
-
-            <WorkOut
-              yearEnd={yearEnd}
-              monthsLeft={monthsLeft}
-              onUse={(cents) => setTargetCents(cents)}
-            />
 
             <View style={{ gap: 12 }}>
               <Text variant="h2" style={styles.heading}>Monthly gifts</Text>
@@ -256,93 +278,6 @@ function DetailRow({ label, value, divider }: { label: string; value: string; di
   );
 }
 
-/** Work out an amount to give from income and a percentage, and optionally keep it as the target. */
-function WorkOut({ yearEnd, monthsLeft, onUse }: { yearEnd: string; monthsLeft: number; onUse: (cents: number) => void }) {
-  const [income, setIncome] = useState("");
-  const [percent, setPercent] = useState<"10" | "20">("10");
-  const incomeCents = parseRandToCents(income);
-  const amount = incomeCents ? maaserTargetCents(incomeCents, percentToPpm(percent)) : null;
-
-  return (
-    <View style={styles.setup}>
-      <View style={{ gap: 6 }}>
-        <Text variant="h2" style={styles.heading}>Work out what to give</Text>
-        <Text variant="bodyMuted">Enter your income for the year, from Rosh Hashana to {yearEnd}. An estimate is fine.</Text>
-      </View>
-      <Field label="Income for this year" prefix="R" keyboardType="decimal-pad" value={income} onChangeText={setIncome} />
-      <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="Percentage">
-        {(["10", "20"] as const).map((v) => {
-          const selected = percent === v;
-          return (
-            <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setPercent(v)} style={[styles.pct, selected && styles.pctOn]}>
-              <Text style={[type.button, { color: selected ? colors.accent : colors.ink }]}>{v}%</Text>
-              <Text variant="label">{v === "10" ? "Maaser" : "Chomesh"}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View style={{ gap: 4 }}>
-        <Text style={{ fontSize: 17 }}>Amount to give: {amount ? rand(amount) : "R0"}</Text>
-        {amount ? <Text variant="bodyMuted">About {rand(monthlyToReach(amount, monthsLeft))} a month over the {monthsLeft} {monthsLeft === 1 ? "month" : "months"} left.</Text> : null}
-      </View>
-      <Button label="Use as my target" disabled={!amount} onPress={() => amount && onUse(amount)} style={!amount ? { opacity: 0.4 } : undefined} />
-    </View>
-  );
-}
-
-/** First run: the donor sets their own target for the year. */
-function TargetSetup({ onSave }: { onSave: (cents: number) => void }) {
-  const [mode, setMode] = useState<"percent" | "amount">("percent");
-  const [income, setIncome] = useState("");
-  const [percent, setPercent] = useState<"10" | "20">("10");
-  const [amount, setAmount] = useState("");
-
-  const incomeCents = parseRandToCents(income);
-  const target =
-    mode === "percent" ? (incomeCents ? maaserTargetCents(incomeCents, percentToPpm(percent)) : null) : parseRandToCents(amount);
-
-  return (
-    <View style={styles.setup}>
-      <View style={{ gap: 6 }}>
-        <Text variant="h2">Set your maaser target</Text>
-        <Text variant="bodyMuted">Choose what you want to give this year, from Rosh Hashana to Rosh Hashana. We&apos;ll track your gifts against it. Only you see this.</Text>
-      </View>
-      <Segmented
-        label="Target type"
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: "percent", label: "% of income" },
-          { value: "amount", label: "Fixed amount" },
-        ]}
-      />
-      {mode === "percent" ? (
-        <>
-          <Field label="Income for this year" prefix="R" keyboardType="decimal-pad" value={income} onChangeText={setIncome} helper="An estimate is fine. You can change it later." />
-          <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="Percentage">
-            {(["10", "20"] as const).map((v) => {
-              const selected = percent === v;
-              return (
-                <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setPercent(v)} style={[styles.pct, selected && styles.pctOn]}>
-                  <Text style={[type.button, { color: selected ? colors.accent : colors.ink }]}>{v}%</Text>
-                  <Text variant="label">{v === "10" ? "Maaser" : "Chomesh"}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : (
-        <Field label="Target for this year" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} />
-      )}
-      <View style={styles.result}>
-        <CalendarIcon color={colors.muted} />
-        <Text style={{ flex: 1, fontSize: 17 }}>Your target: {target ? rand(target) : "R0"}</Text>
-      </View>
-      <Button label="Save target" disabled={!target} onPress={() => target && onSave(target)} style={!target ? { opacity: 0.4 } : undefined} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.parchment },
   arc: { position: "absolute", right: -30, top: -6 },
@@ -354,8 +289,4 @@ const styles = StyleSheet.create({
   card: { gap: 6, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
   statRow: { flexDirection: "row", gap: 12 },
   stat: { flex: 1, gap: 4, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  setup: { gap: 18, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  pct: { flex: 1, minHeight: 64, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, alignItems: "center", justifyContent: "center", gap: 2, backgroundColor: colors.parchment },
-  pctOn: { borderColor: colors.accent, borderWidth: 1.5 },
-  result: { flexDirection: "row", alignItems: "center", gap: 10 },
 });

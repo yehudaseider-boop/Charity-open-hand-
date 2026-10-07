@@ -20,8 +20,8 @@ export const gifts: Gift[] = [
 /** "Given elsewhere" entries the donor logs by hand, for maaser. */
 export const givenElsewhere = [{ id: "e1", date: d(2026, 6, 10), recipient: "Shul appeal (cash)", cents: 72_000 }];
 
-/** The donor's own maaser target for the current tax year, in cents. */
-export const sampleMaaserTargetCents = 480_000;
+/** The donor's own maaser target: an amount per month or per year (Rosh Hashana to Rosh Hashana). */
+export const sampleMaaserTarget: { cents: number; period: "month" | "year" } = { cents: 40_000, period: "month" };
 
 export type Recurring = { id: string; charitySlug: string; charityName: string; cents: number; nextDate: Date; status: "active" | "paused" };
 

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharityCard } from "@/components/charity-card";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
+import { Logo } from "@/components/logo";
 import { SearchIcon } from "@/components/icons";
 import { EmptyState, ErrorState, LoadingList, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
@@ -34,6 +35,7 @@ export default function Discover() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
+        <View style={{ marginBottom: 14 }}><Logo width={112} /></View>
         <Text variant="h1" accessibilityRole="header">Discover</Text>
         <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
       </View>

@@ -15,16 +15,28 @@ function Corner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
   return <View style={[{ position: "absolute", width: s, height: s, borderColor: colors.accent, opacity: 0.6 }, edge]} />;
 }
 
-/** Component 3: maaser progress. Given vs target, one bar, one sentence. */
-export function MaaserProgress({ givenCents, targetCents, yearEndLabel, yearLabel }: { givenCents: number; targetCents: number; yearEndLabel: string; yearLabel: string }) {
+/** Component 3: maaser progress. Given vs target for the month or the year, one bar, one sentence. */
+export function MaaserProgress({
+  givenCents,
+  targetCents,
+  period,
+  periodLabel,
+  endLabel,
+}: {
+  givenCents: number;
+  targetCents: number;
+  period: "month" | "year";
+  periodLabel: string;
+  endLabel: string;
+}) {
   const ratio = targetCents > 0 ? Math.min(givenCents / targetCents, 1) : 0;
   const remaining = targetCents - givenCents;
   const sentence =
     remaining > 0
-      ? `${rand(remaining)} to go to reach your target by ${yearEndLabel}.`
+      ? `${rand(remaining)} to go to reach your target by ${endLabel}.`
       : remaining === 0
-        ? "You've reached your target for this year."
-        : `You've given ${rand(-remaining)} more than your target this year.`;
+        ? `You've reached your target for this ${period}.`
+        : `You've given ${rand(-remaining)} more than your target this ${period}.`;
 
   return (
     <View style={styles.block} accessibilityLabel={`Maaser: ${rand(givenCents)} given of ${rand(targetCents)}. ${sentence}`}>
@@ -32,8 +44,8 @@ export function MaaserProgress({ givenCents, targetCents, yearEndLabel, yearLabe
       <Corner pos="tr" />
       <Corner pos="bl" />
       <Corner pos="br" />
-      <Text variant="label">Maaser this year</Text>
-      <Text variant="label" style={{ marginTop: -8 }}>{yearLabel}</Text>
+      <Text variant="label">Maaser this {period}</Text>
+      <Text variant="label" style={{ marginTop: -8 }}>{periodLabel}</Text>
       <View style={styles.figures}>
         <Text variant="amount" style={{ fontSize: 44, lineHeight: 50 }}>{rand(givenCents)}</Text>
         <Text variant="bodyMuted" style={{ marginBottom: 6 }}>of {rand(targetCents)}</Text>

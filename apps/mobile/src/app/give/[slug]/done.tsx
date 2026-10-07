@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
 import { CheckIcon } from "@/components/icons";
+import { Logo } from "@/components/logo";
 import { EmptyState } from "@/components/states";
 import { Text } from "@/components/text";
 import { FEE_SETTINGS_ARE_SAMPLE, feeSettings } from "@/config/fees";
@@ -47,6 +48,7 @@ export default function Done() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24, paddingHorizontal: space.gutter, flexGrow: 1 }}>
       <Animated.View style={{ flex: 1, gap: space.block, opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }}>
+        <Logo width={112} />
         <View>
           <View style={styles.arc}><DottedArc size={260} opacity={0.5} /></View>
           <Text variant="hero" accessibilityRole="header" style={{ fontSize: 44, lineHeight: 50 }}>
