@@ -47,6 +47,6 @@ const styles = StyleSheet.create({
   knobOn: { alignSelf: "flex-end" },
   checkRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: touch - 8, paddingVertical: 4 },
   box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.muted, alignItems: "center", justifyContent: "center", marginTop: 1 },
-  boxOn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  boxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   tick: { width: 10, height: 6, borderLeftWidth: 2, borderBottomWidth: 2, borderColor: colors.onInk, transform: [{ rotate: "-45deg" }], marginTop: -2 },
 });

@@ -35,5 +35,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   link: { minHeight: touch, alignItems: "center", justifyContent: "center" },
-  linkText: { color: colors.ink, textDecorationLine: "underline", textDecorationColor: colors.hairline },
+  linkText: { color: colors.accent, textDecorationLine: "underline", textDecorationColor: colors.accent },
 });
