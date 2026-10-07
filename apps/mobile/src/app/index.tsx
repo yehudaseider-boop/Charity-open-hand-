@@ -1,4 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
@@ -37,7 +38,7 @@ export default function Welcome() {
           Your gift goes straight to the charity. No sign-up needed to give.
         </Text>
         <View style={styles.actions}>
-          <Button label="Find a charity" />
+          <Button label="Find a charity" onPress={() => router.push("/discover")} />
           <TextLink label="How it works" />
         </View>
       </View>

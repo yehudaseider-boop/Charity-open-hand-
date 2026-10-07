@@ -3,12 +3,13 @@ import { colors, radius, touch, type } from "@/theme/tokens";
 import { Text } from "./text";
 
 /** Primary button: ink fill, 17 px semibold, full width. */
-export function Button({ label, ...rest }: PressableProps & { label: string }) {
+export function Button({ label, style, ...rest }: Omit<PressableProps, "style"> & { label: string; style?: object }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(rest.disabled) }}
       {...rest}
-      style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }, style]}
     >
       <Text style={[type.button, { color: colors.onInk }]}>{label}</Text>
     </Pressable>

@@ -13,6 +13,7 @@ export function PlaceholderImage({
   rounded = true,
   labelPosition = "bottom",
   labelOffset = 12,
+  compact = false,
 }: {
   subject: string;
   style?: ViewStyle;
@@ -20,6 +21,8 @@ export function PlaceholderImage({
   labelPosition?: "top" | "bottom";
   /** Distance of the label from its edge (use the safe-area inset at the top of a screen). */
   labelOffset?: number;
+  /** Small thumbnails show a short "Placeholder" tag instead of the full label. */
+  compact?: boolean;
 }) {
   return (
     <View
@@ -31,8 +34,8 @@ export function PlaceholderImage({
       <View style={[styles.form, { width: "70%", height: "80%", left: "-12%", top: "-20%" }]} />
       <View style={[styles.form, { width: "55%", height: "65%", right: "-10%", bottom: "-18%", opacity: 0.5 }]} />
       <PaperGrain opacity={0.6} />
-      <View style={[styles.chip, labelPosition === "top" ? { top: labelOffset, right: 12 } : { bottom: labelOffset, left: 12 }]}>
-        <Text variant="label" style={{ color: colors.muted }}>Placeholder photo: {subject}</Text>
+      <View style={[styles.chip, labelPosition === "top" ? { top: labelOffset, right: 12 } : compact ? { bottom: 6, left: 6 } : { bottom: labelOffset, left: 12 }]}>
+        <Text variant="label" style={{ color: colors.muted }}>{compact ? "Placeholder" : `Placeholder photo: ${subject}`}</Text>
       </View>
     </View>
   );
