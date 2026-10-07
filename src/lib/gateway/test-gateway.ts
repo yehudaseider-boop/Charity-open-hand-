@@ -20,6 +20,20 @@ export function testGatewaySign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("hex");
 }
 
+/** The query keys the test checkout page signs, in order. */
+export const TEST_CHECKOUT_KEYS = ["reference", "total", "share", "account", "email", "return"] as const;
+
+/**
+ * Rebuild and check a signed test checkout. Returns the signed values, or
+ * null if anything was changed after we signed it.
+ */
+export function readSignedTestCheckout(get: (key: string) => string | null | undefined, sig: unknown) {
+  const params = new URLSearchParams();
+  for (const k of TEST_CHECKOUT_KEYS) params.set(k, get(k) ?? "");
+  if (typeof sig !== "string" || !safeEqual(sig, testGatewaySign(params.toString()))) return null;
+  return params;
+}
+
 function safeEqual(a: string, b: string) {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);

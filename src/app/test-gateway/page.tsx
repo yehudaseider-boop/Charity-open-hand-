@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getGateway } from "@/lib/gateway";
-import { testGatewaySign } from "@/lib/gateway/test-gateway";
+import { readSignedTestCheckout } from "@/lib/gateway/test-gateway";
 import { formatRand } from "@/lib/money";
 import { completeTestPayment } from "./actions";
 
@@ -11,11 +11,8 @@ export const metadata: Metadata = { title: "Test payment" };
 export default async function TestGatewayPage({ searchParams }: PageProps<"/test-gateway">) {
   if (getGateway().name !== "test") notFound();
   const sp = await searchParams;
-  const params = new URLSearchParams();
-  for (const k of ["reference", "total", "share", "account", "email", "return"]) {
-    params.set(k, typeof sp[k] === "string" ? (sp[k] as string) : "");
-  }
-  if (sp.sig !== testGatewaySign(params.toString())) notFound();
+  const params = readSignedTestCheckout((k) => (typeof sp[k] === "string" ? (sp[k] as string) : ""), sp.sig);
+  if (!params) notFound();
   const total = Number(params.get("total"));
   const share = Number(params.get("share"));
 
@@ -29,6 +26,7 @@ export default async function TestGatewayPage({ searchParams }: PageProps<"/test
       </dl>
       <form action={completeTestPayment} className="space-y-2">
         {[...params.entries()].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+        <input type="hidden" name="sig" value={String(sp.sig)} />
         <button name="outcome" value="success" className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast">
           Pay (simulate success)
         </button>

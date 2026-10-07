@@ -6,7 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /**
  * Payment notifications from the gateway.
  * 1. Check the signature (reject anything we can't verify).
- * 2. Store the event once (a repeat delivery is acknowledged and ignored).
+ * 2. Store the event once. A repeat delivery is acknowledged and ignored,
+ *    unless the first delivery never finished processing: then it is retried.
  * 3. Ask the gateway's API directly before marking anything paid.
  */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/webhooks/[gateway]">) {
@@ -31,11 +32,27 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/webhook
     )
     .select("id");
   if (error) return new NextResponse("Error", { status: 500 });
-  if (!stored?.length) return NextResponse.json({ ok: true, duplicate: true });
 
+  let eventRowId = stored?.[0]?.id;
+  if (!eventRowId) {
+    // Seen before. Only skip it if that delivery was fully processed; if it
+    // failed part-way (say the gateway's API was down), process it now.
+    const { data: earlier, error: lookupError } = await db
+      .from("gateway_events")
+      .select("id, processed_at")
+      .eq("gateway", gateway.name)
+      .eq("event_id", event.eventId)
+      .single();
+    if (lookupError || !earlier) return new NextResponse("Error", { status: 500 });
+    if (earlier.processed_at) return NextResponse.json({ ok: true, duplicate: true });
+    eventRowId = earlier.id;
+  }
+
+  // confirmPayment is safe to repeat: a donation only moves pending -> paid/failed once.
+  // If it throws, processed_at stays empty and the gateway's retry processes the event again.
   if (event.reference && (event.type === "payment_succeeded" || event.type === "payment_failed")) {
     await confirmPayment(event.reference);
   }
-  await db.from("gateway_events").update({ processed_at: new Date().toISOString() }).eq("id", stored[0].id);
+  await db.from("gateway_events").update({ processed_at: new Date().toISOString() }).eq("id", eventRowId);
   return NextResponse.json({ ok: true });
 }

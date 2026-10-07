@@ -60,6 +60,23 @@ describe("approved charity", () => {
     });
   });
 
+  it("can't replace its bank account by deleting and re-inserting its private details", async () => {
+    await scenario(noop, async () => {
+      await expect(run("delete from public.charity_private where charity_id = $1", [meals])).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+    await scenario(noop, async () => {
+      await expect(
+        run(
+          `insert into public.charity_private (charity_id, bank_name, bank_account_last4, bank_verified_at)
+           values ($1, 'Other Bank', '9999', now())`,
+          [meals],
+        ),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
   it("can't change its slug or QuickGive code", async () => {
     await scenario(noop, async () => {
       await expect(run("update public.charities set slug = 'x' where id = $1", [meals])).rejects.toThrow(

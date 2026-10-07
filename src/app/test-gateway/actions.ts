@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { getGateway } from "@/lib/gateway";
-import { testGatewaySign } from "@/lib/gateway/test-gateway";
+import { readSignedTestCheckout, testGatewaySign } from "@/lib/gateway/test-gateway";
 
 /**
  * The stand-in gateway's "server": sends a signed webhook to our own
@@ -11,10 +11,17 @@ import { testGatewaySign } from "@/lib/gateway/test-gateway";
  */
 export async function completeTestPayment(formData: FormData) {
   if (getGateway().name !== "test") throw new Error("Test gateway disabled");
-  const reference = String(formData.get("reference"));
-  const amount = Number(formData.get("total"));
+  // Only act on the exact checkout we signed: the reference, amount and
+  // return address can't be swapped for someone else's or an outside site.
+  const signed = readSignedTestCheckout((k) => {
+    const v = formData.get(k);
+    return typeof v === "string" ? v : "";
+  }, formData.get("sig"));
+  if (!signed) throw new Error("Test checkout signature is invalid");
+  const reference = signed.get("reference") ?? "";
+  const amount = Number(signed.get("total"));
   const outcome = formData.get("outcome") === "success" ? "success" : "failed";
-  const returnUrl = String(formData.get("return"));
+  const returnUrl = sameSiteReturn(signed.get("return") ?? "");
 
   const body = JSON.stringify({ id: randomUUID(), outcome, reference, amount });
   const site = process.env.SITE_URL ?? "http://127.0.0.1:3000";
@@ -25,4 +32,12 @@ export async function completeTestPayment(formData: FormData) {
   });
   if (!res.ok) throw new Error(`Webhook failed: ${res.status}`);
   redirect(returnUrl);
+}
+
+/** The return address, only if it is on this site; otherwise the home page. */
+function sameSiteReturn(url: string): string {
+  const site = process.env.SITE_URL ?? "";
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  if (site && (url === site || url.startsWith(`${site}/`))) return url;
+  return "/";
 }
