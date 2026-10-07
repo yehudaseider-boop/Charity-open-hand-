@@ -16,15 +16,15 @@ function Corner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
 }
 
 /** Component 3: maaser progress. Given vs target, one bar, one sentence. */
-export function MaaserProgress({ givenCents, targetCents, yearEndLabel }: { givenCents: number; targetCents: number; yearEndLabel: string }) {
+export function MaaserProgress({ givenCents, targetCents, yearEndLabel, yearLabel }: { givenCents: number; targetCents: number; yearEndLabel: string; yearLabel: string }) {
   const ratio = targetCents > 0 ? Math.min(givenCents / targetCents, 1) : 0;
   const remaining = targetCents - givenCents;
   const sentence =
     remaining > 0
       ? `${rand(remaining)} to go to reach your target by ${yearEndLabel}.`
       : remaining === 0
-        ? "You've reached your target for this tax year."
-        : `You've given ${rand(-remaining)} more than your target this tax year.`;
+        ? "You've reached your target for this year."
+        : `You've given ${rand(-remaining)} more than your target this year.`;
 
   return (
     <View style={styles.block} accessibilityLabel={`Maaser: ${rand(givenCents)} given of ${rand(targetCents)}. ${sentence}`}>
@@ -32,7 +32,8 @@ export function MaaserProgress({ givenCents, targetCents, yearEndLabel }: { give
       <Corner pos="tr" />
       <Corner pos="bl" />
       <Corner pos="br" />
-      <Text variant="label">Maaser this tax year</Text>
+      <Text variant="label">Maaser this year</Text>
+      <Text variant="label" style={{ marginTop: -8 }}>{yearLabel}</Text>
       <View style={styles.figures}>
         <Text variant="amount" style={{ fontSize: 44, lineHeight: 50 }}>{rand(givenCents)}</Text>
         <Text variant="bodyMuted" style={{ marginBottom: 6 }}>of {rand(targetCents)}</Text>
