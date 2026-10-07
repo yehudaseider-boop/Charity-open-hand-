@@ -6,7 +6,10 @@
   "build": {
     "production": {
       "autoIncrement": true,
-      "ios": { "resourceClass": "default" }
+      "ios": {
+        "resourceClass": "default"
+      },
+      "channel": "production"
     }
   },
   "submit": {

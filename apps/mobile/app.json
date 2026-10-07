@@ -42,6 +42,19 @@
       ],
       "expo-asset"
     ],
-    "scheme": "charityapp"
+    "scheme": "charityapp",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bb247170-f27b-4771-b143-41f5098c06bc"
+      }
+    },
+    "owner": "yehudaleib",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/bb247170-f27b-4771-b143-41f5098c06bc"
+    }
   }
 }
