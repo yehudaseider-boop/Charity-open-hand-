@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, type PressableProps } from "react-native";
 import { colors, radius, touch, type } from "@/theme/tokens";
 import { Text } from "./text";
 
-/** Primary button: ink fill, 17 px semibold, full width. */
+/** Primary button: accent fill, 17 px semibold, full width. */
 export function Button({ label, style, ...rest }: Omit<PressableProps, "style"> & { label: string; style?: object }) {
   return (
     <Pressable
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   primary: {
     minHeight: 56,
     borderRadius: radius.control,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
