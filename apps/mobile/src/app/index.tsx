@@ -39,7 +39,7 @@ export default function Welcome() {
         </Text>
         <View style={styles.actions}>
           <Button label="Find a charity" onPress={() => router.push("/discover")} />
-          <TextLink label="How it works" />
+          <TextLink label="How it works" onPress={() => router.push("/how-it-works")} />
         </View>
       </View>
     </View>

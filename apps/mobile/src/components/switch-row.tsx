@@ -28,12 +28,12 @@ export function CheckRow({ label, value, onChange, error }: { label: string; val
   return (
     <View style={{ gap: 4 }}>
       <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={() => onChange(!value)} style={styles.checkRow}>
-        <View style={[styles.box, value && styles.boxOn, error && !value ? { borderColor: colors.accent } : null]}>
+        <View style={[styles.box, value && styles.boxOn, error && !value ? { borderColor: colors.danger } : null]}>
           {value ? <View style={styles.tick} /> : null}
         </View>
         <Text style={{ flex: 1, fontSize: 16, lineHeight: 22 }}>{label}</Text>
       </Pressable>
-      {error && !value ? <Text variant="label" style={{ color: colors.accent, marginLeft: 36 }}>{error}</Text> : null}
+      {error && !value ? <Text variant="label" style={{ color: colors.danger, marginLeft: 36 }}>{error}</Text> : null}
     </View>
   );
 }

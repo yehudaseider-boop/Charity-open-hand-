@@ -1,6 +1,6 @@
 /**
  * Design bible tokens. Every screen uses these and nothing else.
- * Palette is locked: one accent (coral), teal for success only.
+ * Palette is locked: one accent (logo blue), teal for success, red for errors only.
  */
 export const colors = {
   parchment: "#F4FBFA", // screen background
@@ -8,7 +8,8 @@ export const colors = {
   ink: "#1B2B3A", // text and primary buttons
   muted: "#5B6B78", // secondary text
   hairline: "#D5E6E3", // borders
-  accent: "#E4472F", // coral: active tab, progress, selection, key links
+  accent: "#0653B1", // logo blue: buttons, links, active tab, progress, selection
+  danger: "#C23B2A", // errors and destructive actions only
   success: "#168A66", // teal: success only
   onInk: "#FFFFFF", // text on ink buttons
 } as const;

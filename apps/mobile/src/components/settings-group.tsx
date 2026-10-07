@@ -19,7 +19,7 @@ export function SettingsGroup({ title, cells }: { title?: string; cells: Cell[] 
             accessibilityLabel={c.value ? `${c.label}, ${c.value}` : c.label}
             style={({ pressed }) => [styles.cell, i > 0 && styles.divider, pressed && { backgroundColor: colors.parchment }]}
           >
-            <Text style={[styles.label, c.destructive && { color: colors.accent }]}>{c.label}</Text>
+            <Text style={[styles.label, c.destructive && { color: colors.danger }]}>{c.label}</Text>
             <View style={styles.right}>
               {c.value ? <Text variant="bodyMuted" style={{ fontSize: 16 }}>{c.value}</Text> : null}
               {c.destructive ? null : <ChevronIcon />}

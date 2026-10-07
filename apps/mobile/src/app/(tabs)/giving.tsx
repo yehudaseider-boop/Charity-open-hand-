@@ -232,7 +232,7 @@ export default function Giving() {
               }}
               style={styles.cancel}
             >
-              <Text style={[type.button, { color: colors.accent }]}>Cancel monthly gift</Text>
+              <Text style={[type.button, { color: colors.danger }]}>Cancel monthly gift</Text>
             </Pressable>
             <Text variant="label">Cancelling stops all future payments with the payment provider. Past gifts stay in your history.</Text>
           </View>

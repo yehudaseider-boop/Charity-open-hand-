@@ -112,7 +112,7 @@ export default function Checkout() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: insets.bottom + 32, gap: space.block }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {state === "error" ? (
           <View style={styles.banner} accessibilityRole="alert">
-            <Text style={{ fontFamily: "Assistant_600SemiBold", fontSize: 17, color: colors.accent }}>Payment didn&apos;t go through</Text>
+            <Text style={{ fontFamily: "Assistant_600SemiBold", fontSize: 17, color: colors.danger }}>Payment didn&apos;t go through</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>Nothing was charged. Check your card details and try again.</Text>
           </View>
         ) : null}
@@ -224,7 +224,7 @@ export default function Checkout() {
         <View style={{ gap: 10 }}>
           <Button label={submitting || state === "loading" ? "Please wait" : "Give"} onPress={give} disabled={submitting || state === "loading"} style={submitting || state === "loading" ? { opacity: 0.6 } : undefined} />
           {Object.keys(errors).length ? (
-            <Text variant="label" style={{ color: colors.accent, textAlign: "center" }} accessibilityLiveRegion="polite">Please check the highlighted fields.</Text>
+            <Text variant="label" style={{ color: colors.danger, textAlign: "center" }} accessibilityLiveRegion="polite">Please check the highlighted fields.</Text>
           ) : null}
         </View>
       </ScrollView>
@@ -237,7 +237,7 @@ function Row({ label, value, tag, strong }: { label: string; value: string; tag?
     <View style={styles.row}>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={strong ? styles.strong : { fontSize: 17 }}>{label}</Text>
-        {tag ? <Text variant="label" style={{ color: colors.accent }}>{tag}</Text> : null}
+        {tag ? <Text variant="label" style={{ color: colors.danger }}>{tag}</Text> : null}
       </View>
       <Text style={strong ? [styles.strong, { fontFamily: "FrankRuhlLibre_500Medium", fontSize: 26 }] : { fontSize: 17 }}>{value}</Text>
     </View>
@@ -255,5 +255,5 @@ const styles = StyleSheet.create({
   rule: { height: 1, backgroundColor: colors.hairline },
   strong: { fontFamily: "Assistant_700Bold", fontSize: 18 },
   payStub: { gap: 4, padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, borderStyle: "dashed" },
-  banner: { gap: 4, padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.accent, backgroundColor: colors.surface },
+  banner: { gap: 4, padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.surface },
 });

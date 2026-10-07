@@ -17,7 +17,7 @@ export function Field({
   return (
     <View style={styles.wrap}>
       <Text variant="label" style={{ color: colors.ink }}>{label}</Text>
-      <View style={[styles.box, error ? { borderColor: colors.accent } : null]}>
+      <View style={[styles.box, error ? { borderColor: colors.danger } : null]}>
         {prefix ? <Text style={styles.prefix}>{prefix}</Text> : null}
         <TextInput
           placeholderTextColor={colors.muted}
@@ -28,7 +28,7 @@ export function Field({
         />
       </View>
       {error ? (
-        <Text variant="label" style={{ color: colors.accent }} accessibilityLiveRegion="polite">{error}</Text>
+        <Text variant="label" style={{ color: colors.danger }} accessibilityLiveRegion="polite">{error}</Text>
       ) : helper ? (
         <Text variant="label">{helper}</Text>
       ) : null}
