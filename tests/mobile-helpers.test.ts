@@ -41,3 +41,24 @@ describe("app tax year (SARS)", () => {
     expect(taxYearRangeLabel(2028)).toBe("01/03/2027 to 29/02/2028");
   });
 });
+
+import { groupByMonth, maaserTargetCents, totalInTaxYear } from "../apps/mobile/src/lib/giving";
+
+describe("app giving helpers", () => {
+  const rows = [
+    { date: new Date(2026, 1, 28), cents: 100 }, // tax year 2026
+    { date: new Date(2026, 2, 1), cents: 200 }, // tax year 2027
+    { date: new Date(2026, 9, 2), cents: 300 }, // tax year 2027
+  ];
+  it("sums by SARS tax year", () => {
+    expect(totalInTaxYear(rows, 2027)).toBe(500);
+    expect(totalInTaxYear(rows, 2026)).toBe(100);
+  });
+  it("groups by month, newest first", () => {
+    expect(groupByMonth(rows).map((g) => g.label)).toEqual(["October 2026", "March 2026", "February 2026"]);
+  });
+  it("maaser target is the percentage of income", () => {
+    expect(maaserTargetCents(4_800_000, 100_000)).toBe(480_000); // 10% of R48 000
+    expect(maaserTargetCents(4_800_000, 200_000)).toBe(960_000); // 20% (chomesh)
+  });
+});

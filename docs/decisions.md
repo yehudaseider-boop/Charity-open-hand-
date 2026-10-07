@@ -111,3 +111,21 @@
 11. Paystack rate sheet: percentage, fixed amount, and whether they include VAT.
 12. 18A for donors without an SA ID number (e.g. passport holders).
 13. Network access to paystack.com and api.paystack.co for this environment, and Paystack test keys.
+
+## Phone app (apps/mobile)
+
+- Expo app for donors (iOS, Android, plus a web preview for review). Charity
+  and admin screens stay on the website.
+- Design bible: parchment, ink, one pomegranate accent, Frank Ruhl Libre and
+  Assistant. Primary buttons are ink; pomegranate is for selection, progress
+  and the active tab. App shows whole Rand as "R1 250"; money summaries show cents.
+- Fee maths is the website's own `src/lib/fees.ts`. The app's gateway rate is a
+  SAMPLE, labelled "Sample rate, not final" on screen, until the rate sheet arrives.
+- All screen data is fictional sample content; payment is a stub.
+- App identity for TestFlight: bundle ID `za.co.givingapp.app` (permanent),
+  display name "Giving (test)" (changeable), placeholder icon with no name.
+  Published under Yehuda's existing individual Apple Developer account for now;
+  transfer to the company's account later.
+- Open: Apple's App Review rules on charity donations inside apps (Apple Pay,
+  approved nonprofits, or paying in Safari) must be checked before external
+  testing or public release.
