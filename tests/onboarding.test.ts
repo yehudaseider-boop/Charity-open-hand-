@@ -13,7 +13,7 @@ let meals: string;
 
 beforeAll(async () => {
   await client.connect();
-  mealsAdmin = (await client.query("select id from auth.users where email = 'meals.admin@openhand.test'")).rows[0].id;
+  mealsAdmin = (await client.query("select id from auth.users where email = 'meals.admin@nedivlev.test'")).rows[0].id;
   meals = (await client.query("select id from public.charities where slug = 'northcliff-meals-fund'")).rows[0].id;
 });
 afterAll(() => client.end());

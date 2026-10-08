@@ -6,12 +6,16 @@
 export type CheckoutRequest = {
   /** Our reference for the payment (unique per donation). */
   reference: string;
-  /** What the donor pays, in cents. */
+  /** What the donor pays, in cents: the two lines below added together. */
   totalCents: number;
-  /** What the charity must receive, in cents (the gift). */
-  charityShareCents: number;
-  /** The charity's account at the gateway. */
-  charityAccountRef: string;
+  /** The separate line items, always recorded apart. */
+  lines: { charityCents: number; contributionCents: number };
+  /**
+   * The charity's own account at the gateway, only when this gateway splits
+   * payments (see `splitsPayments`). Null means the whole payment settles to
+   * NEDIV lev, which then owes the charity its line.
+   */
+  charityAccountRef: string | null;
   email: string;
   /** Where the donor returns after paying. */
   returnUrl: string;
@@ -51,6 +55,12 @@ export type CharityAccountRequest = {
 export interface PaymentGateway {
   /** Short name stored on donations and charities, e.g. "test". */
   readonly name: string;
+  /**
+   * Can this gateway pay the charity's line straight into the charity's own
+   * account (a split payment)? Never assumed: set per gateway only once it is
+   * confirmed for South African merchants.
+   */
+  readonly splitsPayments: boolean;
   /** Start a hosted checkout. Returns the page to send the donor to. */
   createCheckout(req: CheckoutRequest): Promise<{ redirectUrl: string }>;
   /** Ask the gateway directly whether a payment went through. */

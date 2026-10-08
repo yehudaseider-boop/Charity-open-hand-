@@ -14,15 +14,16 @@ export default async function TestGatewayPage({ searchParams }: PageProps<"/test
   const params = readSignedTestCheckout((k) => (typeof sp[k] === "string" ? (sp[k] as string) : ""), sp.sig);
   if (!params) notFound();
   const total = Number(params.get("total"));
-  const share = Number(params.get("share"));
+  const toCharity = Number(params.get("charity"));
+  const contribution = Number(params.get("contribution"));
 
   return (
     <div className="mx-auto max-w-sm space-y-4 rounded-card border-2 border-dashed border-warning bg-surface p-6">
       <p className="text-xs font-semibold uppercase tracking-wide text-warning">Test gateway: no real money</p>
       <h1 className="text-xl font-semibold">Pay {formatRand(total)}</h1>
       <dl className="space-y-1 text-sm">
-        <div className="flex justify-between"><dt className="text-muted">To charity account</dt><dd>{formatRand(share)}</dd></div>
-        <div className="flex justify-between"><dt className="text-muted">To platform</dt><dd>{formatRand(total - share)}</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">Donation to charity</dt><dd>{formatRand(toCharity)}</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">Contribution to NEDIV lev</dt><dd>{formatRand(contribution)}</dd></div>
       </dl>
       <form action={completeTestPayment} className="space-y-2">
         {[...params.entries()].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}

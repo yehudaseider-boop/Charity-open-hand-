@@ -4,13 +4,17 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/card";
 import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
+import { givingKinds } from "@/lib/donations/validation";
 import { formatRand } from "@/lib/money";
 import { DonateFlow } from "./donate-flow";
 
 export const metadata: Metadata = { title: "Donate" };
 
-export default async function DonatePage({ params }: PageProps<"/c/[slug]/donate">) {
+export default async function DonatePage({ params, searchParams }: PageProps<"/c/[slug]/donate">) {
   const { slug } = await params;
+  // The phone app sends the donor here with their maaser, chomesh or tzedaka choice already made.
+  const kind = (await searchParams).kind;
+  const initialKind = typeof kind === "string" && kind in givingKinds ? (kind as keyof typeof givingKinds) : undefined;
   const charity = await loadDonatableCharity(slug);
   if (!charity) notFound();
 
@@ -27,6 +31,8 @@ export default async function DonatePage({ params }: PageProps<"/c/[slug]/donate
           charityName={charity.name_en}
           receiptsAvailable={charity.receiptsAvailable}
           minimumLabel={formatRand(platformConfig.minDonationCents)}
+          contributionMinimumLabel={formatRand(platformConfig.minContributionCents)}
+          initialKind={initialKind}
         />
       ) : (
         <Card><p className="text-sm">{charity.name_en} isn&apos;t taking online donations yet.</p></Card>

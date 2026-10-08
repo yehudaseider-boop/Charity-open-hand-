@@ -1,6 +1,7 @@
 import "server-only";
 import { canIssue18a } from "@/lib/charities";
-import { getGateway } from "@/lib/gateway";
+import { platformConfig } from "@/config/platform";
+import { getGateway, type PaymentGateway } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /** A charity as checkout needs it, or null if it isn't public. */
@@ -12,9 +13,9 @@ export async function loadDonatableCharity(slug: string) {
     .eq("status", "approved")
     .maybeSingle();
   if (!data) return null;
-  let gatewayName: string | null = null;
+  let gateway: PaymentGateway | null = null;
   try {
-    gatewayName = getGateway().name;
+    gateway = getGateway();
   } catch (e) {
     // A misconfigured gateway must not take public pages down: show "not accepting" instead.
     console.error(e);
@@ -22,7 +23,15 @@ export async function loadDonatableCharity(slug: string) {
   return {
     ...data,
     receiptsAvailable: canIssue18a(data),
-    /** Connected to the active gateway, so it can take payments. */
-    acceptingPayments: gatewayName !== null && data.gateway === gatewayName && Boolean(data.gateway_subaccount_ref),
+    /**
+     * Can take payments now. Real gateways stay closed until it is decided who
+     * pays the gateway's charge; a splitting gateway also needs the charity's account.
+     */
+    acceptingPayments:
+      gateway !== null &&
+      (gateway.name === "test" || platformConfig.fees.gatewayChargePaidBy !== null) &&
+      (!gateway.splitsPayments || (data.gateway === gateway.name && Boolean(data.gateway_subaccount_ref))),
+    /** The charity's account at the gateway, used only when the gateway splits payments. */
+    splitAccountRef: gateway?.splitsPayments && data.gateway === gateway.name ? data.gateway_subaccount_ref : null,
   };
 }

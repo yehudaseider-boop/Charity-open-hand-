@@ -1,8 +1,10 @@
-# Open Hand
+# NEDIV lev
 
-Charity giving platform for the Johannesburg Jewish community. Direct-pay only:
-donors pay charities straight through the payment gateway; the platform never
-holds donor money. "Open Hand" is a placeholder name (see `src/config/platform.ts`).
+Charity giving platform for the Johannesburg Jewish community. Donors find
+charities in the phone app (`apps/mobile`) and pay only on the website. Each
+payment has two separate line items: the donation to the charity and an
+optional contribution to NEDIV lev. Whether the gateway pays the charity
+directly (split payment) or NEDIV lev pays charities out is still open.
 
 ## Running it on your computer
 
@@ -20,10 +22,10 @@ Test logins (sign in with the email; the link arrives in the email catcher):
 
 | Email | Role |
 |---|---|
-| admin@openhand.test | Platform admin |
-| meals.admin@openhand.test | Charity admin, Northcliff Meals Fund |
-| shul.admin@openhand.test | Charity admin, Glenhazel Shul Fund (non-s18A) |
-| donor@openhand.test | Donor with an account |
+| admin@nedivlev.test | Platform admin |
+| meals.admin@nedivlev.test | Charity admin, Northcliff Meals Fund |
+| shul.admin@nedivlev.test | Charity admin, Glenhazel Shul Fund (non-s18A) |
+| donor@nedivlev.test | Donor with an account |
 
 ## Checks
 

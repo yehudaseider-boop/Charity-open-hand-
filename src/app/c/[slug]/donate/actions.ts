@@ -15,7 +15,13 @@ export async function getQuote(slug: string, _prev: QuoteState, formData: FormDa
   if (!charity?.acceptingPayments) return { ok: false, message: "This charity can't take online donations right now." };
   const cents = parseRandToCents(String(formData.get("amount") ?? ""));
   if (cents === null) return { ok: false, message: "Enter an amount in Rand, for example 180 or 180.50." };
-  const result = await quoteDonation(charity.id, cents);
+  let contribution = 0;
+  if (formData.get("give_extra") === "on") {
+    const c = parseRandToCents(String(formData.get("contribution") ?? ""));
+    if (c === null) return { ok: false, message: "Enter your contribution in Rand, for example 10 or 25.50." };
+    contribution = c;
+  }
+  const result = quoteDonation(cents, contribution);
   return result.ok ? { ok: true, quote: result.quote } : { ok: false, message: result.message };
 }
 
@@ -29,6 +35,7 @@ export type CheckoutState = {
 export async function submitDonation(
   slug: string,
   giftCents: number,
+  contributionCents: number,
   shownTotalCents: number,
   _prev: CheckoutState,
   formData: FormData,
@@ -47,7 +54,7 @@ export async function submitDonation(
 
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-  const result = await startDonation({ charitySlug: slug, giftCents, shownTotalCents, input: parsed.data, ip });
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, input: parsed.data, ip });
   if (!result.ok) return result;
   redirect(result.redirectUrl);
 }

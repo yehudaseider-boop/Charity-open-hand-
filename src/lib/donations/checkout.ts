@@ -2,32 +2,37 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { platformConfig } from "@/config/platform";
 import { encrypt, last4 } from "@/lib/crypto";
-import { calculateFees, FeeError, type FeeBreakdown } from "@/lib/fees";
+import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import { formatRand } from "@/lib/money";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadDonatableCharity } from "./charity";
-import { loadFeeSettings } from "./fee-settings";
 import { checkDonorDetails, type CheckoutInput } from "./validation";
 
-export type Quote = FeeBreakdown;
+export type Quote = Pricing;
 
 export type QuoteResult =
   | { ok: true; quote: Quote }
   | { ok: false; message: string };
 
+const minimums = {
+  minDonationCents: platformConfig.minDonationCents,
+  minContributionCents: platformConfig.minContributionCents,
+};
+
 function feeErrorMessage(e: FeeError): string {
   if (e.code === "below_minimum") return `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.`;
-  if (e.code === "rates_missing") return "Online giving isn't open yet. Please check back soon.";
+  if (e.code === "contribution_below_minimum") {
+    return `The minimum contribution to ${platformConfig.appName} is ${formatRand(platformConfig.minContributionCents)}.`;
+  }
   return e.message;
 }
 
-/** Work out what the donor will pay. Server-side only; the browser never calculates fees. */
-export async function quoteDonation(charityId: string, giftCents: number): Promise<QuoteResult> {
-  const { settings } = await loadFeeSettings(charityId);
+/** Work out what the donor will pay: the donation plus any contribution. No fees. */
+export function quoteDonation(giftCents: number, contributionCents: number): QuoteResult {
   try {
-    return { ok: true, quote: calculateFees(giftCents, settings) };
+    return { ok: true, quote: priceDonation(giftCents, contributionCents, minimums) };
   } catch (e) {
     if (e instanceof FeeError) return { ok: false, message: feeErrorMessage(e) };
     throw e;
@@ -40,12 +45,13 @@ export type StartResult =
 
 /**
  * Record a pending donation and hand the donor to the gateway.
- * `shownTotalCents` is the total the donor saw: if fees changed in the
- * meantime we stop and show the new figures instead of charging something else.
+ * `shownTotalCents` is the total the donor saw: if it no longer matches we
+ * stop and show the figures again instead of charging something else.
  */
 export async function startDonation(args: {
   charitySlug: string;
   giftCents: number;
+  contributionCents: number;
   shownTotalCents: number;
   input: CheckoutInput;
   ip: string;
@@ -61,20 +67,11 @@ export async function startDonation(args: {
   const limited = await hitRateLimit("checkout", [`ip:${args.ip}`, `email:${args.input.email.toLowerCase()}`], 5, 10);
   if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
 
-  const { id: feeSettingsId, settings } = await loadFeeSettings(charity.id);
-  let fees: FeeBreakdown;
-  try {
-    fees = calculateFees(args.giftCents, settings);
-  } catch (e) {
-    if (e instanceof FeeError) return { ok: false, message: feeErrorMessage(e) };
-    throw e;
-  }
+  const quoted = quoteDonation(args.giftCents, args.contributionCents);
+  if (!quoted.ok) return { ok: false, message: quoted.message };
+  const fees = quoted.quote;
   if (fees.totalCents !== args.shownTotalCents) {
-    return {
-      ok: false,
-      message: `The processing fee has changed. The new total is ${formatRand(fees.totalCents)}. Please confirm again.`,
-      quote: fees,
-    };
+    return { ok: false, message: `The total is now ${formatRand(fees.totalCents)}. Please confirm again.`, quote: fees };
   }
 
   const v = args.input;
@@ -90,11 +87,11 @@ export async function startDonation(args: {
     donor_id: donorId,
     charity_id: charity.id,
     amount_cents: fees.amountCents,
-    platform_fee_cents: fees.platformFeeCents,
-    fee_vat_cents: fees.feeVatCents,
-    processing_charge_cents: fees.processingChargeCents,
+    contribution_cents: fees.contributionCents,
+    platform_fee_cents: 0,
+    fee_vat_cents: 0,
+    processing_charge_cents: 0,
     total_charged_cents: fees.totalCents,
-    fee_settings_id: feeSettingsId,
     status: "pending",
     gateway: gateway.name,
     gateway_ref: donationId,
@@ -142,8 +139,8 @@ export async function startDonation(args: {
     const { redirectUrl } = await gateway.createCheckout({
       reference: donationId,
       totalCents: fees.totalCents,
-      charityShareCents: fees.amountCents,
-      charityAccountRef: charity.gateway_subaccount_ref!,
+      lines: { charityCents: fees.amountCents, contributionCents: fees.contributionCents },
+      charityAccountRef: charity.splitAccountRef,
       email: v.email,
       returnUrl: `${site}/donate/return?reference=${donationId}`,
       description: `Donation to ${charity.name_en}`,

@@ -8,8 +8,7 @@
  */
 
 export const platformConfig = {
-  /** Placeholder until the real name is chosen. */
-  appName: "Open Hand",
+  appName: "NEDIV lev",
   appTagline: "Give to Johannesburg's Jewish community, simply.",
 
   locale: "en-ZA",
@@ -17,21 +16,27 @@ export const platformConfig = {
   currency: "ZAR",
 
   fees: {
-    /** Our platform fee, as a percentage of the gift. Confirmed: 3%. */
-    platformFeePercent: "3",
     /**
-     * The gateway's own charge, from its rate sheet. Deliberately empty until
-     * Yehuda supplies the real figures. Donations cannot be taken while these
-     * are null.
+     * No platform fee and no processing fee on donations (Yehuda, 08/10/2026).
+     * The donor may tick a box to give NEDIV lev a separate contribution.
+     *
+     * Who pays the gateway's own charge is NOT decided yet (the charity, out of
+     * its donation, or NEDIV lev). Real payments stay closed until it is; only
+     * the test gateway runs.
      */
+    gatewayChargePaidBy: null as "charity" | "nediv_lev" | null,
+    /** The gateway's charge, from its rate sheet. Empty until Yehuda supplies it. */
     gatewayPercent: null as string | null,
     gatewayFixedCents: null as number | null,
     /** Do the rates above already include VAT? Also from the rate sheet. */
     gatewayRatesIncludeVat: null as boolean | null,
   },
 
-  /** Minimum gift (not a minimum fee). Confirmed: R30. */
+  /** Minimum donation to a charity. Confirmed: R30. */
   minDonationCents: 3_000,
+
+  /** Minimum optional contribution to NEDIV lev, when the box is ticked. Confirmed: R10. */
+  minContributionCents: 1_000,
 
   vat: {
     /** Off until the company is VAT-registered. */

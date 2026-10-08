@@ -5,6 +5,7 @@ import { confirmPayment } from "@/lib/donations/confirm";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { givingKinds } from "@/lib/donations/validation";
+import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Thank you" };
@@ -18,7 +19,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const { data: d } = ref && outcome !== "not_found"
     ? await createAdminClient()
         .from("donations")
-        .select("amount_cents, total_charged_cents, paid_at, wants_18a, donation_giving_kinds(kind), charities(name_en, slug)")
+        .select("id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, donation_giving_kinds(kind), charities(name_en, slug)")
         .eq("gateway_ref", ref)
         .maybeSingle()
     : { data: null };
@@ -29,19 +30,27 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "paid" && d && charity) {
     return (
       <Card title="Thank you">
-        <p className="text-sm">
-          Your donation of <strong>{formatRand(d.amount_cents)}</strong> to <strong>{charity.name_en}</strong> has gone through.
-        </p>
-        <p className="mt-2 text-sm text-muted">
-          Charged {formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}.{" "}
-          {d.wants_18a ? "Your donation will be on your annual s18A receipt after the tax year closes." : null}
+        <dl className="space-y-1 text-sm">
+          <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
+          {Number(d.contribution_cents) > 0 ? (
+            <div className="flex justify-between gap-3"><dt>Contribution to NEDIV lev</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
+          ) : null}
+          <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
+          <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>
+        </dl>
+        <p className="mt-3 text-sm text-muted">
+          A confirmation is on its way to your email.{" "}
+          {d.wants_18a ? "This donation will be on your annual s18A receipt after the tax year closes." : null}
         </p>
         {givingKind && givingKind in givingKinds ? (
           <p className="mt-2 text-sm text-muted">
-            Counted as {givingKinds[givingKind as keyof typeof givingKinds].toLowerCase()} in your records.
+            Counted as {givingKinds[givingKind as keyof typeof givingKinds].toLowerCase()} in your NEDIV lev app.
           </p>
         ) : null}
-        <Link href={`/c/${charity.slug}`} className="mt-4 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
+        <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
+          Back to the NEDIV lev app
+        </a>
+        <Link href={`/c/${charity.slug}`} className="mt-3 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
       </Card>
     );
   }

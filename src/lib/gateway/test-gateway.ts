@@ -21,7 +21,7 @@ export function testGatewaySign(payload: string): string {
 }
 
 /** The query keys the test checkout page signs, in order. */
-export const TEST_CHECKOUT_KEYS = ["reference", "total", "share", "account", "email", "return"] as const;
+export const TEST_CHECKOUT_KEYS = ["reference", "total", "charity", "contribution", "account", "email", "return"] as const;
 
 /**
  * Rebuild and check a signed test checkout. Returns the signed values, or
@@ -42,13 +42,16 @@ function safeEqual(a: string, b: string) {
 
 export const testGateway: PaymentGateway = {
   name: "test",
+  /** Behaves like a gateway that cannot split, so that path is the one tested. */
+  splitsPayments: false,
 
   async createCheckout(req) {
     const params = new URLSearchParams({
       reference: req.reference,
       total: String(req.totalCents),
-      share: String(req.charityShareCents),
-      account: req.charityAccountRef,
+      charity: String(req.lines.charityCents),
+      contribution: String(req.lines.contributionCents),
+      account: req.charityAccountRef ?? "",
       email: req.email,
       return: req.returnUrl,
     });

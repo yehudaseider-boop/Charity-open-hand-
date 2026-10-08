@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Open Hand: project rules
+# NEDIV lev: project rules
 
 - The build brief is the source of truth; `docs/decisions.md` records changes and open questions.
 - Money is integer cents (bigint) in ZAR. Percentages are integer ppm. Never floats.

@@ -84,7 +84,7 @@ describe("the charity view", () => {
       expect(rows.map((r) => r.id)).toEqual([mine]);
       expect(rows[0]).toMatchObject({ first_name: "Sarah", last_name: "Levin", email: "sarah@x.test", amount_cents: "10000", id_number_last4: "9085" });
       const columns = Object.keys(rows[0]);
-      for (const hidden of ["platform_fee_cents", "fee_vat_cents", "processing_charge_cents", "total_charged_cents", "gateway", "gateway_ref", "giving_kind", "kind", "id_number_encrypted", "tax_reference_encrypted"]) {
+      for (const hidden of ["platform_fee_cents", "fee_vat_cents", "processing_charge_cents", "contribution_cents", "total_charged_cents", "gateway", "gateway_ref", "giving_kind", "kind", "id_number_encrypted", "tax_reference_encrypted"]) {
         expect(columns).not.toContain(hidden);
       }
     });

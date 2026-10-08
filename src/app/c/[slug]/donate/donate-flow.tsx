@@ -12,11 +12,14 @@ type Props = {
   charityName: string;
   receiptsAvailable: boolean;
   minimumLabel: string;
+  contributionMinimumLabel: string;
+  initialKind?: keyof typeof givingKinds;
 };
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind }: Props) {
   const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
+  const [giveExtra, setGiveExtra] = useState(false);
   const quote = quoteState.ok && !editingAmount ? quoteState.quote : undefined;
 
   return (
@@ -48,28 +51,65 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel 
             {quoting ? "…" : "Continue"}
           </button>
         </div>
-        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation.</p>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. {charityName} receives the full amount.</p>
+
+        <div className="space-y-2 rounded-control bg-bg p-3">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="give_extra"
+              className="mt-1"
+              checked={giveExtra}
+              onChange={(e) => {
+                setGiveExtra(e.target.checked);
+                setEditingAmount(true);
+              }}
+            />
+            <span>Also give to NEDIV lev, to help keep this platform running. Optional.</span>
+          </label>
+          {giveExtra ? (
+            <div>
+              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to NEDIV lev</label>
+              <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3">
+                <span className="text-muted">R</span>
+                <input
+                  id="contribution"
+                  name="contribution"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  required
+                  onChange={() => setEditingAmount(true)}
+                  className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted">Any amount, minimum {contributionMinimumLabel}. Paid together with your donation, kept separate from it.</p>
+            </div>
+          ) : null}
+        </div>
         {!quoteState.ok && quoteState.message ? <p role="status" className="text-sm text-danger">{quoteState.message}</p> : null}
       </form>
 
       {quote ? (
         <DetailsStep
-          key={`${quote.amountCents}-${quote.totalCents}`}
+          key={`${quote.amountCents}-${quote.contributionCents}`}
           slug={slug}
           charityName={charityName}
           receiptsAvailable={receiptsAvailable}
           initialQuote={quote}
+          initialKind={initialKind}
         />
       ) : null}
     </div>
   );
 }
 
-function Breakdown({ q }: { q: NonNullable<QuoteState["quote"]> }) {
+function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; charityName: string }) {
   return (
     <dl className="space-y-1 text-sm">
-      <div className="flex justify-between"><dt>Your donation</dt><dd>{formatRand(q.amountCents)}</dd></div>
-      <div className="flex justify-between"><dt>Processing fee</dt><dd>{formatRand(q.processingFeeLineCents)}</dd></div>
+      <div className="flex justify-between gap-3"><dt>Donation to {charityName}</dt><dd>{formatRand(q.amountCents)}</dd></div>
+      {q.contributionCents > 0 ? (
+        <div className="flex justify-between gap-3"><dt>Contribution to NEDIV lev</dt><dd>{formatRand(q.contributionCents)}</dd></div>
+      ) : null}
       <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Total</dt><dd>{formatRand(q.totalCents)}</dd></div>
     </dl>
   );
@@ -88,13 +128,14 @@ function Check({ name, children, error }: { name: string; children: React.ReactN
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
+function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initialKind }: {
   slug: string; charityName: string; receiptsAvailable: boolean; initialQuote: NonNullable<QuoteState["quote"]>;
+  initialKind?: keyof typeof givingKinds;
 }) {
   const [shownQuote, setShownQuote] = useState(initialQuote);
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData) => {
-      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.totalCents, prev, fd);
+      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, prev, fd);
       if (next.quote) setShownQuote(next.quote);
       return next;
     },
@@ -114,11 +155,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
           startTransition(() => dispatch(fd));
         }}
       >
-        <Breakdown q={shownQuote} />
-        <p className="text-xs text-muted">
-          {charityName} receives your full donation of {formatRand(shownQuote.amountCents)}. The processing fee covers card
-          costs and running this platform.
-        </p>
+        <Breakdown q={shownQuote} charityName={charityName} />
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Giving as</legend>
@@ -145,7 +182,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
           </>
         )}
         <TextField name="email" label="Email" type="email" required autoComplete="email" hint="Your confirmation goes here." />
-        <TextField name="phone" label="Phone" type="tel" required={want18a} autoComplete="tel" />
+        <TextField name="phone" label="Phone" type="tel" autoComplete="tel" hint="Optional." />
 
         {receiptsAvailable ? (
           <div className="space-y-3 rounded-control bg-bg p-3">
@@ -156,16 +193,12 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
             {want18a ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted">
-                  SARS requires these details on the receipt. {charityName} issues one receipt for all your donations each tax
-                  year.
+                  You&apos;ll get one 18A receipt for all your donations to {charityName} each tax year.
                 </p>
-                {org ? null : <TextField name="id_number" label="SA ID number" required inputMode="numeric" />}
-                <TextField name="tax_reference" label="Income tax reference number" inputMode="numeric" hint="If you have one." />
-                <TextField name="address_line1" label="Street address" required autoComplete="address-line1" />
-                <TextField name="address_line2" label="Unit or building" autoComplete="address-line2" />
-                <TextField name="suburb" label="Suburb" />
-                <TextField name="city" label="City" required autoComplete="address-level2" />
-                <TextField name="postal_code" label="Postal code" required inputMode="numeric" autoComplete="postal-code" />
+                {org ? null : (
+                  <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." />
+                )}
+                <TextField name="tax_reference" label="Income tax number" inputMode="numeric" hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
               </div>
             ) : null}
           </div>
@@ -180,12 +213,12 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
           <div className="flex flex-wrap gap-2">
             {Object.entries(givingKinds).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
-                <input type="radio" name="giving_kind" value={value} required />
+                <input type="radio" name="giving_kind" value={value} required defaultChecked={value === initialKind} />
                 {label}
               </label>
             ))}
           </div>
-          <p className="text-xs text-muted">For your own maaser records. Only you see this.</p>
+          <p className="text-xs text-muted">Counts towards your maaser and chomesh in the NEDIV lev app. Only you see this.</p>
           {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
         </fieldset>
 
@@ -200,7 +233,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
             I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
           </Check>
           <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
-            I agree that my details are shared with {charityName} so they can record my gift.
+            I agree that my details are shared with {charityName} so they can record my donation.
           </Check>
         </div>
 

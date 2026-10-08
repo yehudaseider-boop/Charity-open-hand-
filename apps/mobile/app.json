@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "NEDIV LEV",
+    "name": "NEDIV lev",
     "slug": "charity-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -42,7 +42,7 @@
       ],
       "expo-asset"
     ],
-    "scheme": "charityapp",
+    "scheme": "nedivlev",
     "extra": {
       "router": {},
       "eas": {

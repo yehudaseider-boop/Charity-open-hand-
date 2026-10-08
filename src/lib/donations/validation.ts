@@ -49,20 +49,18 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
 
   if (v.phone && !/^(\+27|0)\d{9}$/.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
 
+  // s18A details: an ID or income tax number only, for now. Address and phone
+  // are left out until Yehuda confirms what an s18A receipt must show.
   if (want18a) {
-    if (!v.phone) e.phone = "Needed for an 18A receipt";
-    if (!v.address_line1) e.address_line1 = "Needed for an 18A receipt";
-    if (!v.city) e.city = "Needed for an 18A receipt";
-    if (!v.postal_code || !/^\d{4}$/.test(v.postal_code)) e.postal_code = "Postal code is 4 digits";
     if (v.donor_type === "individual") {
-      if (!v.id_number) e.id_number = "Needed for an 18A receipt";
-      else if (!isValidSaIdNumber(v.id_number)) e.id_number = "That doesn't look like a valid SA ID number";
+      if (!v.id_number && !v.tax_reference) e.id_number = "Enter your SA ID number or income tax number";
+      if (v.id_number && !isValidSaIdNumber(v.id_number)) e.id_number = "That doesn't look like a valid SA ID number";
     }
     if (v.tax_reference && !/^\d{10}$/.test(v.tax_reference)) e.tax_reference = "Income tax numbers are 10 digits";
   }
 
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";
-  if (v.popia_consent !== "on") e.popia_consent = "Please agree so the charity can record your donation";
+  if (v.popia_consent !== "on") e.popia_consent = "Please agree so we can record your donation";
   return e;
 }
 

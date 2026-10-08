@@ -29,11 +29,11 @@ async function createUser(email: string, fullName: string) {
 }
 
 async function main() {
-  // Fees from config. Gateway rates stay null until the rate sheet arrives.
+  // Legacy fee row (no longer read by checkout: there is no platform fee).
   await must(
     db.from("fee_settings").insert({
       charity_id: null,
-      platform_fee_ppm: percentToPpm(platformConfig.fees.platformFeePercent),
+      platform_fee_ppm: 0,
       gateway_percent_ppm: platformConfig.fees.gatewayPercent
         ? percentToPpm(platformConfig.fees.gatewayPercent)
         : null,
@@ -149,17 +149,17 @@ async function main() {
       charities.map((c, i) => ({
         charity_id: c.id,
         contact_name: `Test Contact ${i + 1}`,
-        contact_email: `contact${i + 1}@openhand.test`,
+        contact_email: `contact${i + 1}@nedivlev.test`,
       })),
     ),
   );
 
   // People
-  const adminId = await createUser("admin@openhand.test", "Test Platform Admin");
+  const adminId = await createUser("admin@nedivlev.test", "Test Platform Admin");
   await must(db.from("profiles").update({ role: "platform_admin" }).eq("id", adminId));
 
-  const mealsAdmin = await createUser("meals.admin@openhand.test", "Test Meals Admin");
-  const shulAdmin = await createUser("shul.admin@openhand.test", "Test Shul Admin");
+  const mealsAdmin = await createUser("meals.admin@nedivlev.test", "Test Meals Admin");
+  const shulAdmin = await createUser("shul.admin@nedivlev.test", "Test Shul Admin");
   await must(
     db.from("charity_admins").insert([
       { charity_id: charity("northcliff-meals-fund"), user_id: mealsAdmin, role: "owner" },
@@ -168,11 +168,11 @@ async function main() {
   );
 
   // Donor 1: account holder, individual
-  const donorUser = await createUser("donor@openhand.test", "Test Donor");
+  const donorUser = await createUser("donor@nedivlev.test", "Test Donor");
   await must(
     db.from("donors").insert({
       user_id: donorUser,
-      email: "donor@openhand.test",
+      email: "donor@nedivlev.test",
       email_verified_at: now,
       donor_type: "individual",
       first_name: "Test",

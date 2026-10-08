@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 /**
- * The origin the visitor actually used (e.g. https://openhand.co.za), taken
+ * The origin the visitor actually used (e.g. https://example.co.za), taken
  * from the Host header. request.url can report "localhost" behind some
  * servers, which would send people to the wrong address and lose their login.
  */

@@ -15,8 +15,8 @@ async function signedCheckout() {
   const { redirectUrl } = await testGateway.createCheckout({
     reference: "11111111-1111-1111-1111-111111111111",
     totalCents: 3240,
-    charityShareCents: 3000,
-    charityAccountRef: "test_acct_1",
+    lines: { charityCents: 3000, contributionCents: 240 },
+    charityAccountRef: null,
     email: "donor@example.com",
     returnUrl: "/donate/return?reference=11111111-1111-1111-1111-111111111111",
     description: "Donation",
@@ -36,6 +36,7 @@ describe("test gateway checkout signature", () => {
     const { readSignedTestCheckout } = await import("@/lib/gateway/test-gateway");
     for (const [key, value] of [
       ["total", "1"],
+      ["contribution", "0"],
       ["reference", "22222222-2222-2222-2222-222222222222"],
       ["return", "https://evil.example/"],
     ]) {

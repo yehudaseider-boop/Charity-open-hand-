@@ -12,10 +12,10 @@ let donor: string, meals: string, mealsAdmin: string, shulAdmin: string;
 beforeAll(async () => {
   await client.connect();
   const one = async (sql: string) => (await client.query(sql)).rows[0].id as string;
-  donor = await one("select id from public.donors where email = 'donor@openhand.test'");
+  donor = await one("select id from public.donors where email = 'donor@nedivlev.test'");
   meals = await one("select id from public.charities where slug = 'northcliff-meals-fund'");
-  mealsAdmin = await one("select id from auth.users where email = 'meals.admin@openhand.test'");
-  shulAdmin = await one("select id from auth.users where email = 'shul.admin@openhand.test'");
+  mealsAdmin = await one("select id from auth.users where email = 'meals.admin@nedivlev.test'");
+  shulAdmin = await one("select id from auth.users where email = 'shul.admin@nedivlev.test'");
 });
 afterAll(() => client.end());
 
@@ -104,6 +104,40 @@ describe("checkout details", () => {
       expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(0); // raw table is closed to charities
       await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: shulAdmin, role: "authenticated" })]);
       expect((await run("select * from public.charity_donations")).rowCount).toBe(0);
+    });
+  });
+});
+
+describe("NEDIV lev contribution line", () => {
+  const insert = (amount: number, contribution: number, total: number) =>
+    run(
+      `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents,
+         contribution_cents, total_charged_cents, gateway, gateway_ref)
+       values ($1, $2, $3, 0, 0, $4, $5, 'test', gen_random_uuid()::text) returning id`,
+      [donor, meals, amount, contribution, total],
+    );
+
+  it("records the contribution separately and the total must add up", async () => {
+    await tx(async () => {
+      const { rows } = await insert(3000, 1000, 4000);
+      expect((await run("select amount_cents, contribution_cents from public.donations where id = $1", [rows[0].id])).rows[0])
+        .toEqual({ amount_cents: "3000", contribution_cents: "1000" });
+    });
+    await tx(async () => {
+      await expect(insert(3000, 1000, 3000)).rejects.toThrow(/split_adds_up/);
+    });
+    await tx(async () => {
+      await expect(insert(3000, -1, 2999)).rejects.toThrow(/contribution_cents/);
+    });
+  });
+
+  it("can't change the contribution once paid", async () => {
+    await tx(async () => {
+      const { rows } = await insert(3000, 1000, 4000);
+      await markPaid(rows[0].id);
+      await expect(
+        run("update public.donations set contribution_cents = 0, total_charged_cents = 3000 where id = $1", [rows[0].id]),
+      ).rejects.toThrow(/cannot change/);
     });
   });
 });

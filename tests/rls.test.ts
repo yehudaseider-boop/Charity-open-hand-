@@ -15,13 +15,13 @@ beforeAll(async () => {
   await client.connect();
   const q = async (sql: string, args: unknown[]) => (await client.query(sql, args)).rows[0]?.id as string;
   ids = {
-    admin: await q("select id from auth.users where email = $1", ["admin@openhand.test"]),
-    mealsAdmin: await q("select id from auth.users where email = $1", ["meals.admin@openhand.test"]),
-    shulAdmin: await q("select id from auth.users where email = $1", ["shul.admin@openhand.test"]),
-    donorUser: await q("select id from auth.users where email = $1", ["donor@openhand.test"]),
+    admin: await q("select id from auth.users where email = $1", ["admin@nedivlev.test"]),
+    mealsAdmin: await q("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
+    shulAdmin: await q("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    donorUser: await q("select id from auth.users where email = $1", ["donor@nedivlev.test"]),
     meals: await q("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
     shul: await q("select id from public.charities where slug = $1", ["glenhazel-shul-fund"]),
-    donor: await q("select id from public.donors where email = $1", ["donor@openhand.test"]),
+    donor: await q("select id from public.donors where email = $1", ["donor@nedivlev.test"]),
     company: await q("select id from public.donors where email = $1", ["accounts@testtrading.test"]),
   };
   if (Object.values(ids).some((v) => !v)) throw new Error("Seed data missing. Run npm run db:reset.");

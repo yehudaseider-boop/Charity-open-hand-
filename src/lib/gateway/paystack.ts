@@ -10,10 +10,11 @@ import { GatewayError, type PaymentGateway, type VerifiedTransaction, type Webho
  * every call must be checked in test mode before use. Points to verify are
  * marked VERIFY.
  *
- * Split: the charity's subaccount receives the gift; `transaction_charge`
- * (a flat amount per transaction) goes to our main account, and
- * `bearer: "account"` makes our main account pay Paystack's fee out of that
- * charge. So the charity gets exactly the gift. VERIFY in sandbox.
+ * Split: when the charity has a subaccount, its subaccount receives the
+ * donation line and `transaction_charge` (the NEDIV lev contribution) goes to
+ * our main account. Whether Paystack splits for South African merchants is an
+ * OPEN QUESTION, and so is who bears Paystack's own fee (`bearer`): it depends
+ * on who pays the gateway charge, which is not decided. VERIFY in sandbox.
  */
 
 const API = "https://api.paystack.co";
@@ -43,6 +44,8 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const paystackGateway: PaymentGateway = {
   name: "paystack",
+  /** OPEN QUESTION: not confirmed for South African merchants. Off until it is. */
+  splitsPayments: false,
 
   async createCheckout(req) {
     const data = await call<{ authorization_url: string }>("/transaction/initialize", {
@@ -53,10 +56,14 @@ export const paystackGateway: PaymentGateway = {
         currency: "ZAR",
         reference: req.reference,
         callback_url: req.returnUrl,
-        subaccount: req.charityAccountRef,
-        transaction_charge: req.totalCents - req.charityShareCents,
-        bearer: "account",
-        metadata: { description: req.description },
+        ...(req.charityAccountRef
+          ? { subaccount: req.charityAccountRef, transaction_charge: req.lines.contributionCents, bearer: "account" }
+          : {}),
+        metadata: {
+          description: req.description,
+          charity_cents: req.lines.charityCents,
+          contribution_cents: req.lines.contributionCents,
+        },
       }),
     });
     return { redirectUrl: data.authorization_url };
