@@ -8,8 +8,8 @@
  */
 
 export const platformConfig = {
-  /** Placeholder until the real name is chosen. */
-  appName: "Open Hand",
+  /** The platform name, as people read it. Matches the phone app and its logo. */
+  appName: "NEDIV lev",
   appTagline: "Give to Johannesburg's Jewish community, simply.",
 
   locale: "en-ZA",

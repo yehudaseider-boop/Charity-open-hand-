@@ -140,7 +140,7 @@
 
 1. Gateway choice and rate sheet (percentage + fixed charge). Fields are empty.
 2. Whether the processing fee shown to donors includes VAT once VAT-registered.
-3. Platform name, domain, logo and colours.
+3. Domain, and the website's logo and colours. The name is decided: NEDIV lev.
 4. Rounding rule for fees: agreed (see Guest checkout).
 5. Supabase has no South African region; POPIA cross-border transfer for the attorney.
 6. Receipting mandate wording (attorney). For now charities upload a signed copy.
@@ -183,7 +183,7 @@
   SAMPLE, labelled "Sample rate, not final" on screen, until the rate sheet arrives.
 - All screen data is fictional sample content; payment is a stub.
 - App identity for TestFlight: bundle ID `za.co.givingapp.app` (permanent),
-  display name "Giving (test)" (changeable), placeholder icon with no name.
+  display name "NEDIV LEV" in `app.json` (changeable).
   Published under Yehuda's existing individual Apple Developer account for now;
   transfer to the company's account later.
 - Open: Apple's App Review rules on charity donations inside apps (Apple Pay,
@@ -226,3 +226,16 @@
 - **Open:** how a charity admin who loses their phone gets their two-step reset (for now the
   platform admin deletes the factor in Supabase). A donor screen showing their own
   `giving_kind` will need to read it as the donor (allowed) or through the server.
+
+## Name (08/10/2026, decided by Yehuda)
+
+- The platform is called **NEDIV lev**, English only, no Hebrew version. The website now
+  uses it everywhere people read it (header, page titles, home page, receipts, emails),
+  through `appName` in `src/config/platform.ts`, matching the phone app.
+- Left as they were on purpose, because nobody reads them: the package names (`open-hand`),
+  the local database project id, comments at the top of older migrations and the
+  `@openhand.test` addresses on test accounts. Renaming the local project id would also
+  wipe everyone's local database.
+- Still open: the website's domain (a comment in `src/lib/request-origin.ts` uses
+  `openhand.co.za` only as an example) and the website's logo and colours, which are still
+  the placeholder teal.

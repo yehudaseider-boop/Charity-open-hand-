@@ -1,8 +1,8 @@
-# Open Hand
+# NEDIV lev
 
 Charity giving platform for the Johannesburg Jewish community. Direct-pay only:
 donors pay charities straight through the payment gateway; the platform never
-holds donor money. "Open Hand" is a placeholder name (see `src/config/platform.ts`).
+holds donor money. The name is set in one place: `src/config/platform.ts`.
 
 ## Running it on your computer
 
