@@ -57,7 +57,7 @@ export default function Account() {
           <View style={styles.prompt}>
             <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Keep your giving in one place</Text>
             <Text variant="bodyMuted">
-              You can give without an account. Create a free one with your email to see past gifts, track maaser, set up monthly gifts and get
+              You can give without an account. Create a free one with your email to see past donations, track maaser, set up monthly donations and get
               your tax pack. No password needed.
             </Text>
             <Button label="Create an account" onPress={() => setSignedIn(true)} />

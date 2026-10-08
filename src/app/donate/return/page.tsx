@@ -28,11 +28,11 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Card title="Thank you">
         <p className="text-sm">
-          Your gift of <strong>{formatRand(d.amount_cents)}</strong> to <strong>{charity.name_en}</strong> has gone through.
+          Your donation of <strong>{formatRand(d.amount_cents)}</strong> to <strong>{charity.name_en}</strong> has gone through.
         </p>
         <p className="mt-2 text-sm text-muted">
           Charged {formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}.{" "}
-          {d.wants_18a ? "Your gift will be on your annual s18A receipt after the tax year closes." : null}
+          {d.wants_18a ? "Your donation will be on your annual s18A receipt after the tax year closes." : null}
         </p>
         {d.giving_kind && d.giving_kind in givingKinds ? (
           <p className="mt-2 text-sm text-muted">

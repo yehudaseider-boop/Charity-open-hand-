@@ -99,7 +99,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
             <>
               <p className="mb-3 text-sm text-muted">
                 Not connected yet. Connecting registers the charity&apos;s bank account with the payment gateway so
-                gifts settle straight to it.
+                donations settle straight to it.
               </p>
               <SimpleForm action={connectToGateway.bind(null, id)} submitLabel="Connect to payment gateway" />
             </>

@@ -48,7 +48,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel 
             {quoting ? "…" : "Continue"}
           </button>
         </div>
-        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off gift.</p>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation.</p>
         {!quoteState.ok && quoteState.message ? <p role="status" className="text-sm text-danger">{quoteState.message}</p> : null}
       </form>
 
@@ -68,7 +68,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel 
 function Breakdown({ q }: { q: NonNullable<QuoteState["quote"]> }) {
   return (
     <dl className="space-y-1 text-sm">
-      <div className="flex justify-between"><dt>Your gift</dt><dd>{formatRand(q.amountCents)}</dd></div>
+      <div className="flex justify-between"><dt>Your donation</dt><dd>{formatRand(q.amountCents)}</dd></div>
       <div className="flex justify-between"><dt>Processing fee</dt><dd>{formatRand(q.processingFeeLineCents)}</dd></div>
       <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Total</dt><dd>{formatRand(q.totalCents)}</dd></div>
     </dl>
@@ -116,7 +116,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
       >
         <Breakdown q={shownQuote} />
         <p className="text-xs text-muted">
-          {charityName} receives your full gift of {formatRand(shownQuote.amountCents)}. The processing fee covers card
+          {charityName} receives your full donation of {formatRand(shownQuote.amountCents)}. The processing fee covers card
           costs and running this platform.
         </p>
 
@@ -156,7 +156,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
             {want18a ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted">
-                  SARS requires these details on the receipt. {charityName} issues one receipt for all your gifts each tax
+                  SARS requires these details on the receipt. {charityName} issues one receipt for all your donations each tax
                   year.
                 </p>
                 {org ? null : <TextField name="id_number" label="SA ID number" required inputMode="numeric" />}
@@ -171,12 +171,12 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
           </div>
         ) : (
           <p className="rounded-control bg-warning-soft p-3 text-xs text-warning">
-            {charityName} is not s18A-approved, so this gift won&apos;t get a tax receipt.
+            {charityName} is not s18A-approved, so this donation won&apos;t get a tax receipt.
           </p>
         )}
 
         <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">This gift is from</legend>
+          <legend className="text-sm font-medium">This donation is from</legend>
           <div className="flex flex-wrap gap-2">
             {Object.entries(givingKinds).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
@@ -194,7 +194,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
         <div className="space-y-2">
           <Check name="is_anonymous">
             Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
-            <span className="text-muted">{charityName} still sees your details, because it needs them to record your gift{receiptsAvailable ? " and issue your 18A receipt" : ""}.</span>
+            <span className="text-muted">{charityName} still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your 18A receipt" : ""}.</span>
           </Check>
           <Check name="age_confirmed" error={state.fieldErrors?.age_confirmed}>
             I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.

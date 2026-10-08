@@ -18,7 +18,7 @@ export type QuoteResult =
   | { ok: false; message: string };
 
 function feeErrorMessage(e: FeeError): string {
-  if (e.code === "below_minimum") return `The minimum gift is ${formatRand(platformConfig.minDonationCents)}.`;
+  if (e.code === "below_minimum") return `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.`;
   if (e.code === "rates_missing") return "Online giving isn't open yet. Please check back soon.";
   return e.message;
 }

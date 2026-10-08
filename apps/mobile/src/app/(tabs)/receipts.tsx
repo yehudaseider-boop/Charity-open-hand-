@@ -48,7 +48,7 @@ export default function Receipts() {
           <View style={styles.notice}>
             <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Receipts arrive once a year</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-              Each charity issues one 18A receipt covering all your gifts in a tax year (1 March to the end of February). Receipts for this tax year
+              Each charity issues one 18A receipt covering all your donations in a tax year (1 March to the end of February). Receipts for this tax year
               come after {currentEnd}.
             </Text>
           </View>
@@ -99,7 +99,7 @@ export default function Receipts() {
             <View style={styles.infoRow}>
               <InfoIcon />
               <Text variant="bodyMuted" style={{ flex: 1, fontSize: 16 }}>
-                {no18a.join(", ")} {no18a.length === 1 ? "doesn't" : "don't"} issue 18A receipts, so gifts to {no18a.length === 1 ? "it" : "them"} won&apos;t appear here.
+                {no18a.join(", ")} {no18a.length === 1 ? "doesn't" : "don't"} issue 18A receipts, so donations to {no18a.length === 1 ? "it" : "them"} won&apos;t appear here.
               </Text>
             </View>
           ) : null}

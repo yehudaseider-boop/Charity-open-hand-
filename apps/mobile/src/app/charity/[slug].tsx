@@ -55,8 +55,8 @@ export default function CharityDetail() {
           <View style={styles.note}>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
               {charity.issues18a
-                ? `Gifts qualify for one annual 18A tax receipt, issued in ${charity.nameEn}'s name after the tax year closes.`
-                : `${charity.nameEn} is not s18A-approved, so gifts don't get a tax receipt. You can still give.`}
+                ? `Donations qualify for one annual 18A tax receipt, issued in ${charity.nameEn}'s name after the tax year closes.`
+                : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
             </Text>
           </View>
           <Text variant="label" style={{ marginTop: 12 }}>Sample charity for design review</Text>

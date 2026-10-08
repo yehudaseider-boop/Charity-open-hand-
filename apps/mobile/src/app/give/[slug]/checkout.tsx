@@ -89,7 +89,7 @@ export default function Checkout() {
     }
     if (!kind) e.kind = "Choose maaser, chomesh or general tzedaka";
     if (!age) e.age = "You must be 18 or older to give";
-    if (!consent) e.consent = "Please agree so the charity can record your gift";
+    if (!consent) e.consent = "Please agree so the charity can record your donation";
     return e;
   }
 
@@ -122,7 +122,7 @@ export default function Checkout() {
         ) : null}
 
         <View style={{ gap: 4 }}>
-          <Text variant="label">{monthly ? "Monthly gift to" : "Gift to"}</Text>
+          <Text variant="label">{monthly ? "Monthly donation to" : "Donation to"}</Text>
           <Text variant="h2">{charity.nameEn}</Text>
         </View>
 
@@ -145,7 +145,7 @@ export default function Checkout() {
             <>
               <SwitchRow
                 label="I want an 18A receipt"
-                description={`One receipt a year from ${charity.nameEn}, covering all your gifts.`}
+                description={`One receipt a year from ${charity.nameEn}, covering all your donations.`}
                 value={want18a}
                 onChange={setWant18a}
               />
@@ -191,7 +191,7 @@ export default function Checkout() {
           <View style={[styles.section, { gap: 8 }]}>
             <Text variant="h2" style={styles.sectionTitle}>Your account</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-              Monthly gifts need a free account so you can pause or cancel any time. We&apos;ll email {email.trim() || "you"} a link to confirm it. No password needed.
+              Monthly donations need a free account so you can pause or cancel any time. We&apos;ll email {email.trim() || "you"} a link to confirm it. No password needed.
             </Text>
           </View>
         ) : null}
@@ -199,10 +199,10 @@ export default function Checkout() {
         {/* Maaser, chomesh or general tzedaka: the donor chooses every time. */}
         <View style={[styles.section, { gap: 12 }]}>
           <View style={{ gap: 4 }}>
-            <Text variant="h2" style={styles.sectionTitle}>This gift is from</Text>
+            <Text variant="h2" style={styles.sectionTitle}>This donation is from</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>It counts towards that total on your Giving page. Only you see this.</Text>
           </View>
-          <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="This gift is from">
+          <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="This donation is from">
             {(["maaser", "chomesh", "tzedaka"] as const).map((k) => {
               const selected = kind === k;
               return (
@@ -218,7 +218,7 @@ export default function Checkout() {
 
         {/* Summary */}
         <View style={styles.summary}>
-          <Row label={monthly ? "Gift each month" : "Gift"} value={randExact(fees.amountCents)} />
+          <Row label={monthly ? "Donation each month" : "Donation"} value={randExact(fees.amountCents)} />
           <Row
             label="Processing fee"
             value={randExact(fees.processingFeeLineCents)}
@@ -242,7 +242,7 @@ export default function Checkout() {
 
         <View style={{ gap: 4 }}>
           <CheckRow label="I'm 18 or older." value={age} onChange={setAge} error={shownErrors.age} />
-          <CheckRow label={`I agree my details are shared with ${charity.nameEn} so they can record my gift.`} value={consent} onChange={setConsent} error={shownErrors.consent} />
+          <CheckRow label={`I agree my details are shared with ${charity.nameEn} so they can record my donation.`} value={consent} onChange={setConsent} error={shownErrors.consent} />
         </View>
 
         <View style={{ gap: 10 }}>

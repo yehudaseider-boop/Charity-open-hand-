@@ -111,7 +111,7 @@ export default function Giving() {
                   </Text>
                 ) : null}
                 <Text variant="label" style={{ paddingHorizontal: 4 }}>
-                  General tzedaka doesn&apos;t count towards maaser or chomesh. Includes gifts you logged as given elsewhere. Only you see your targets.
+                  General tzedaka doesn&apos;t count towards maaser or chomesh. Includes donations you logged as given elsewhere. Only you see your targets.
                 </Text>
                 <TextLink label="Change targets" onPress={() => { setSaved(false); setEditing(true); }} />
               </View>
@@ -144,7 +144,7 @@ export default function Giving() {
                   <Stat label="This month" value={rand(monthTotal)} />
                 </View>
                 <View style={styles.statRow}>
-                  <Stat label="Gifts made" value={String(yearGifts.length)} />
+                  <Stat label="Donations made" value={String(yearGifts.length)} />
                   <Stat label="Charities" value={String(charities.length)} />
                 </View>
                 {charities.length > 0 ? (
@@ -180,9 +180,9 @@ export default function Giving() {
             ) : null}
 
             <View style={{ gap: 12 }}>
-              <Text variant="h2" style={styles.heading}>Monthly gifts</Text>
+              <Text variant="h2" style={styles.heading}>Monthly donations</Text>
               {recurring.length === 0 ? (
-                <Text variant="bodyMuted">No monthly gifts yet. Choose Monthly when you give to set one up.</Text>
+                <Text variant="bodyMuted">No monthly donations yet. Choose Monthly when you give to set one up.</Text>
               ) : (
                 <View style={styles.list}>
                   {recurring.map((r, i) => (
@@ -204,7 +204,7 @@ export default function Giving() {
             <View style={{ gap: 16 }}>
               <Text variant="h2" style={styles.heading}>History</Text>
               {myGifts.length === 0 ? (
-                <EmptyState title="No gifts yet" body="Gifts you make in the app appear here, and count towards your maaser." action={{ label: "Find a charity", onPress: () => router.push("/discover") }} />
+                <EmptyState title="No donations yet" body="Donations you make in the app appear here, and count towards your maaser." action={{ label: "Find a charity", onPress: () => router.push("/discover") }} />
               ) : (
                 groupByMonth(myGifts).map((g, gi) => (
                   <FadeUp key={g.label} index={gi} style={{ gap: 6 }}>
@@ -236,7 +236,7 @@ export default function Giving() {
         {open ? (
           <View style={{ gap: 18 }}>
             <View style={{ gap: 4 }}>
-              <Text variant="label">Monthly gift</Text>
+              <Text variant="label">Monthly donation</Text>
               <Text variant="h2">{open.charityName}</Text>
               <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "paused" ? "Paused" : `next on ${ddmmyyyy(open.nextDate)}`}</Text>
             </View>
@@ -255,9 +255,9 @@ export default function Giving() {
               }}
               style={styles.cancel}
             >
-              <Text style={[type.button, { color: colors.danger }]}>Cancel monthly gift</Text>
+              <Text style={[type.button, { color: colors.danger }]}>Cancel monthly donation</Text>
             </Pressable>
-            <Text variant="label">Cancelling stops all future payments with the payment provider. Past gifts stay in your history.</Text>
+            <Text variant="label">Cancelling stops all future payments with the payment provider. Past donations stay in your history.</Text>
           </View>
         ) : null}
       </Sheet>
@@ -266,7 +266,7 @@ export default function Giving() {
         {openGift ? (
           <View style={{ gap: 18 }}>
             <View style={{ gap: 4 }}>
-              <Text variant="label">Gift</Text>
+              <Text variant="label">Donation</Text>
               <Text variant="h2">{openGift.charityName}</Text>
               <Text variant="amount" style={{ fontSize: 36, lineHeight: 42 }}>{rand(openGift.cents)}</Text>
             </View>

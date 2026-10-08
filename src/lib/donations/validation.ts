@@ -62,7 +62,7 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   }
 
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";
-  if (v.popia_consent !== "on") e.popia_consent = "Please agree so the charity can record your gift";
+  if (v.popia_consent !== "on") e.popia_consent = "Please agree so the charity can record your donation";
   return e;
 }
 

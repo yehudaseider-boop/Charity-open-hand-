@@ -15,7 +15,7 @@ export default function Home() {
         </Link>
       </section>
       <p className="text-sm text-muted">
-        Your gift goes straight to the charity&apos;s own bank account. We never hold your money.
+        Your donation goes straight to the charity&apos;s own bank account. We never hold your money.
       </p>
       <p className="text-sm text-muted">
         Run a charity? <Link href="/apply" className="text-brand underline">List it for free</Link>.

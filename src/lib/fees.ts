@@ -73,7 +73,7 @@ export function calculateFees(giftCents: number, s: FeeSettings): FeeBreakdown {
     throw new FeeError("invalid_amount", "Enter a valid amount.");
   }
   if (giftCents < s.minDonationCents) {
-    throw new FeeError("below_minimum", "The gift is below the minimum.");
+    throw new FeeError("below_minimum", "The donation is below the minimum.");
   }
   if (!ratesConfigured(s)) {
     throw new FeeError("rates_missing", "Gateway rates have not been configured yet.");

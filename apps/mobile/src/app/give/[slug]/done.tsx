@@ -39,7 +39,7 @@ export default function Done() {
   if (!charity || !fees) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 40, paddingHorizontal: space.gutter }]}>
-        <EmptyState title="Nothing to show" body="This page appears after a gift." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
+        <EmptyState title="Nothing to show" body="This page appears after a donation." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
       </View>
     );
   }
@@ -70,13 +70,13 @@ export default function Done() {
         </View>
 
         <View style={styles.notes}>
-          <Note text={`${charity.nameEn} receives 100% of your gift.`} />
+          <Note text={`${charity.nameEn} receives 100% of your donation.`} />
           {p.kind === "maaser" || p.kind === "chomesh" || p.kind === "tzedaka" ? (
             <Note text={`Counted as ${givingKindLabels[p.kind].toLowerCase()} on your Giving page.`} />
           ) : null}
           {charity.issues18a ? (
             p.r18a === "1" ? (
-              <Note text={`Your gift will be on your annual 18A receipt, issued after the tax year ends on ${yearEnd}.`} />
+              <Note text={`Your donation will be on your annual 18A receipt, issued after the tax year ends on ${yearEnd}.`} />
             ) : (
               <Note text="You didn't ask for an 18A receipt this time. You can add your details later in Account." />
             )

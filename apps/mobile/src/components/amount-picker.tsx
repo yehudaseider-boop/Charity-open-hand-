@@ -35,7 +35,7 @@ export function AmountPicker({
   const error =
     touched && !check.ok && check.reason !== "empty"
       ? check.reason === "below_minimum"
-        ? `The minimum gift is ${rand(min)}.`
+        ? `The minimum donation is ${rand(min)}.`
         : "Enter an amount in Rand, for example 180."
       : undefined;
 
@@ -96,7 +96,7 @@ export function AmountPicker({
 
       {frequency === "monthly" ? (
         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-          Monthly gifts need a free account, so you can pause or cancel any time. We&apos;ll set it up at checkout.
+          Monthly donations need a free account, so you can pause or cancel any time. We&apos;ll set it up at checkout.
         </Text>
       ) : null}
 

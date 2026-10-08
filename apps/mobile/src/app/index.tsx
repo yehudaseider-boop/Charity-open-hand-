@@ -35,7 +35,7 @@ export default function Welcome() {
           Give to the causes that carry our community.
         </Text>
         <Text variant="bodyMuted" style={styles.support}>
-          Your gift goes straight to the charity. No sign-up needed to give.
+          Your donation goes straight to the charity. No sign-up needed to give.
         </Text>
         <View style={styles.actions}>
           <Button label="Find a charity" onPress={() => router.push("/discover")} />

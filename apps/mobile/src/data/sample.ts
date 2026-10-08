@@ -49,7 +49,7 @@ export const charities: Charity[] = [
     issues18a: true,
     about: [
       "Evening shiurim five nights a week, and a kollel for men who learn after work.",
-      "Gifts cover the stipends, the building and the seforim library.",
+      "Donations cover the stipends, the building and the seforim library.",
     ],
   },
   {
