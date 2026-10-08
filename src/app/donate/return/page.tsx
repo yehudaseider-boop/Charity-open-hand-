@@ -12,7 +12,8 @@ export const metadata: Metadata = { title: "Thank you" };
 
 /** Where the gateway sends the donor back. We check the payment ourselves. */
 export default async function DonateReturnPage({ searchParams }: PageProps<"/donate/return">) {
-  const { reference } = await searchParams;
+  const { reference, from } = await searchParams;
+  const fromApp = from === "app";
   const ref = typeof reference === "string" ? reference : "";
   const outcome = await confirmPayment(ref);
 
@@ -44,12 +45,14 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         </p>
         {givingKind && givingKind in givingKinds ? (
           <p className="mt-2 text-sm text-muted">
-            Counted as {givingKinds[givingKind as keyof typeof givingKinds].toLowerCase()} in your NEDIV lev app.
+            Counted as {givingKinds[givingKind as keyof typeof givingKinds].toLowerCase()} in your records.
           </p>
         ) : null}
-        <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
-          Back to the NEDIV lev app
-        </a>
+        {fromApp ? (
+          <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
+            Back to the NEDIV lev app
+          </a>
+        ) : null}
         <Link href={`/c/${charity.slug}`} className="mt-3 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
       </Card>
     );

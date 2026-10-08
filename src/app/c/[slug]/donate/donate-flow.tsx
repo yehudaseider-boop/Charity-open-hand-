@@ -14,9 +14,11 @@ type Props = {
   minimumLabel: string;
   contributionMinimumLabel: string;
   initialKind?: keyof typeof givingKinds;
+  /** The donor came from the phone app, so the confirmation offers a way back to it. */
+  fromApp: boolean;
 };
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind, fromApp }: Props) {
   const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
@@ -97,6 +99,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           receiptsAvailable={receiptsAvailable}
           initialQuote={quote}
           initialKind={initialKind}
+          fromApp={fromApp}
         />
       ) : null}
     </div>
@@ -128,14 +131,14 @@ function Check({ name, children, error }: { name: string; children: React.ReactN
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initialKind }: {
+function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initialKind, fromApp }: {
   slug: string; charityName: string; receiptsAvailable: boolean; initialQuote: NonNullable<QuoteState["quote"]>;
-  initialKind?: keyof typeof givingKinds;
+  initialKind?: keyof typeof givingKinds; fromApp: boolean;
 }) {
   const [shownQuote, setShownQuote] = useState(initialQuote);
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData) => {
-      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, prev, fd);
+      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, prev, fd);
       if (next.quote) setShownQuote(next.quote);
       return next;
     },

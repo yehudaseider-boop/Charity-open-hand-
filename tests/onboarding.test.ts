@@ -25,7 +25,7 @@ async function scenario(setup: () => Promise<void>, act: () => Promise<void>) {
     await setup();
     await client.query("set local role authenticated");
     await client.query("select set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify({ sub: mealsAdmin, role: "authenticated" }),
+      JSON.stringify({ sub: mealsAdmin, role: "authenticated", aal: "aal2" }),
     ]);
     await act();
   } finally {

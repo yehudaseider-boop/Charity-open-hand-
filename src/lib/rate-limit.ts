@@ -8,17 +8,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function hitRateLimit(bucket: string, keys: string[], limit: number, windowMinutes: number) {
   const db = createAdminClient();
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  // Record this attempt first, then count: parallel requests can't all slip under the limit.
+  const { error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key })));
+  if (error) throw error;
   for (const key of keys) {
-    const { count, error } = await db
+    const { count, error: countError } = await db
       .from("rate_limit_events")
       .select("id", { count: "exact", head: true })
       .eq("bucket", bucket)
       .eq("key", key)
       .gte("created_at", since);
-    if (error) throw error;
-    if ((count ?? 0) >= limit) return true;
+    if (countError) throw countError;
+    if ((count ?? 0) > limit) return true;
   }
-  const { error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key })));
-  if (error) throw error;
   return false;
 }

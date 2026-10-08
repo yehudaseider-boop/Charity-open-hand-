@@ -13,7 +13,9 @@ export const metadata: Metadata = { title: "Donate" };
 export default async function DonatePage({ params, searchParams }: PageProps<"/c/[slug]/donate">) {
   const { slug } = await params;
   // The phone app sends the donor here with their maaser, chomesh or tzedaka choice already made.
-  const kind = (await searchParams).kind;
+  const sp = await searchParams;
+  const kind = sp.kind;
+  const fromApp = sp.from === "app";
   const initialKind = typeof kind === "string" && kind in givingKinds ? (kind as keyof typeof givingKinds) : undefined;
   const charity = await loadDonatableCharity(slug);
   if (!charity) notFound();
@@ -33,6 +35,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           minimumLabel={formatRand(platformConfig.minDonationCents)}
           contributionMinimumLabel={formatRand(platformConfig.minContributionCents)}
           initialKind={initialKind}
+          fromApp={fromApp}
         />
       ) : (
         <Card><p className="text-sm">{charity.name_en} isn&apos;t taking online donations yet.</p></Card>

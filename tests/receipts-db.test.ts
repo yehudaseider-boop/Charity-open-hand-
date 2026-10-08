@@ -161,7 +161,7 @@ async function user(email: string) {
 }
 const asUser = async (id: string) => {
   await run("set local role authenticated");
-  await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: id, role: "authenticated" })]);
+  await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: id, role: "authenticated", aal: "aal2" })]);
 };
 
 describe("link_donors_to_user", () => {

@@ -41,7 +41,7 @@ async function as<T>(who: "anon" | string | null, fn: () => Promise<T>): Promise
     } else if (who) {
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: who, role: "authenticated" }),
+        JSON.stringify({ sub: who, role: "authenticated", aal: "aal2" }),
       ]);
     }
     return await fn();
@@ -170,7 +170,7 @@ describe("charity admin", () => {
       );
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.mealsAdmin, role: "authenticated" }),
+        JSON.stringify({ sub: ids.mealsAdmin, role: "authenticated", aal: "aal2" }),
       ]);
       const seen = await rows("select * from public.charity_donations");
       expect(seen.map((x) => x.id)).toEqual([donationId]);
@@ -184,7 +184,7 @@ describe("charity admin", () => {
       }
 
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated" }),
+        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated", aal: "aal2" }),
       ]);
       expect(await rows("select id from public.charity_donations")).toHaveLength(0);
     } finally {
@@ -202,11 +202,11 @@ describe("charity admin", () => {
       );
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.mealsAdmin, role: "authenticated" }),
+        JSON.stringify({ sub: ids.mealsAdmin, role: "authenticated", aal: "aal2" }),
       ]);
       expect(await rows("select * from public.donation_private_notes")).toHaveLength(0);
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.donorUser, role: "authenticated" }),
+        JSON.stringify({ sub: ids.donorUser, role: "authenticated", aal: "aal2" }),
       ]);
       expect(await rows("select * from public.donation_private_notes")).toHaveLength(1);
     } finally {
@@ -251,9 +251,9 @@ describe("money constraints", () => {
     });
   });
 
-  it("seeds fee settings from config with gateway rates empty", async () => {
+  it("seeds the legacy fee settings row with no platform fee and gateway rates empty", async () => {
     const [fees] = await rows("select * from public.fee_settings");
-    expect(fees.platform_fee_ppm).toBe(30_000);
+    expect(fees.platform_fee_ppm).toBe(0);
     expect(fees.min_donation_cents).toBe("3000");
     expect(fees.gateway_percent_ppm).toBeNull();
     expect(fees.gateway_fixed_cents).toBeNull();
@@ -319,11 +319,11 @@ describe("s18A receipts", () => {
       );
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated" }),
+        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated", aal: "aal2" }),
       ]);
       expect(await rows("select id from public.s18a_receipts")).toHaveLength(0);
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.donorUser, role: "authenticated" }),
+        JSON.stringify({ sub: ids.donorUser, role: "authenticated", aal: "aal2" }),
       ]);
       expect(await rows("select id from public.s18a_receipts")).toHaveLength(1);
     } finally {

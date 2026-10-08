@@ -79,7 +79,10 @@ export async function uploadImage(
   if (error) return { ok: false, message: error.message };
 
   const old = kind === "logo" ? charity.logo_path : charity.cover_path;
-  if (old) await createAdminClient().storage.from("charity-public").remove([old]);
+  // Only ever delete this charity's own files (the stored path could have been tampered with).
+  if (old && old.startsWith(`${charityId}/`) && !old.includes("..")) {
+    await createAdminClient().storage.from("charity-public").remove([old]);
+  }
   revalidate(charityId, charity.slug);
   return { ok: true, message: kind === "logo" ? "Logo updated." : "Cover image updated." };
 }

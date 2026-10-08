@@ -53,6 +53,8 @@ export async function startDonation(args: {
   giftCents: number;
   contributionCents: number;
   shownTotalCents: number;
+  /** Came from the phone app: the confirmation page then offers a way back. */
+  fromApp?: boolean;
   input: CheckoutInput;
   ip: string;
 }): Promise<StartResult> {
@@ -142,7 +144,7 @@ export async function startDonation(args: {
       lines: { charityCents: fees.amountCents, contributionCents: fees.contributionCents },
       charityAccountRef: charity.splitAccountRef,
       email: v.email,
-      returnUrl: `${site}/donate/return?reference=${donationId}`,
+      returnUrl: `${site}/donate/return?reference=${donationId}${args.fromApp ? "&from=app" : ""}`,
       description: `Donation to ${charity.name_en}`,
     });
     return { ok: true, redirectUrl };

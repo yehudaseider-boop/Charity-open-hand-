@@ -65,7 +65,7 @@ async function donation(c: string, d: string, o: { amount?: number; status?: str
 }
 const asUser = async (id: string, role = "authenticated") => {
   await run(`set local role ${role}`);
-  await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: id, role })]);
+  await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: id, role, aal: "aal2" })]);
 };
 const reset = () => run("reset role");
 

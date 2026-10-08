@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { quoteDonation, startDonation, type Quote } from "@/lib/donations/checkout";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { checkoutSchema, cleanPhone } from "@/lib/donations/validation";
+import { clientIp } from "@/lib/client-ip";
 import { formToObject } from "@/lib/form";
 import { parseRandToCents } from "@/lib/money";
 
@@ -37,6 +38,7 @@ export async function submitDonation(
   giftCents: number,
   contributionCents: number,
   shownTotalCents: number,
+  fromApp: boolean,
   _prev: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
@@ -53,8 +55,8 @@ export async function submitDonation(
   }
 
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, input: parsed.data, ip });
+  const ip = clientIp(h);
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, input: parsed.data, ip });
   if (!result.ok) return result;
   redirect(result.redirectUrl);
 }

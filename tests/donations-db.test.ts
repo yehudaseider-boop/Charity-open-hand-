@@ -93,16 +93,21 @@ describe("donation status", () => {
 describe("checkout details", () => {
   it("a charity admin reads them through the charity view, for their own charity only", async () => {
     await tx(async () => {
+      const unpaid = await pending();
       const id = await pending();
-      await run(
-        "insert into public.donation_checkout_details (donation_id, donor_type, email, first_name) values ($1, 'individual', 'x@test.test', 'X')",
-        [id],
-      );
+      for (const d of [unpaid, id]) {
+        await run(
+          "insert into public.donation_checkout_details (donation_id, donor_type, email, first_name) values ($1, 'individual', 'x@test.test', 'X')",
+          [d],
+        );
+      }
+      await markPaid(id);
       await run("set local role authenticated");
-      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: mealsAdmin, role: "authenticated" })]);
-      expect((await run("select * from public.charity_donations")).rowCount).toBe(1);
+      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: mealsAdmin, role: "authenticated", aal: "aal2" })]);
+      // Only the paid donation: people who abandoned checkout stay private.
+      expect((await run("select id from public.charity_donations")).rows.map((r) => r.id)).toEqual([id]);
       expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(0); // raw table is closed to charities
-      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: shulAdmin, role: "authenticated" })]);
+      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: shulAdmin, role: "authenticated", aal: "aal2" })]);
       expect((await run("select * from public.charity_donations")).rowCount).toBe(0);
     });
   });
@@ -138,6 +143,40 @@ describe("NEDIV lev contribution line", () => {
       await expect(
         run("update public.donations set contribution_cents = 0, total_charged_cents = 3000 where id = $1", [rows[0].id]),
       ).rejects.toThrow(/cannot change/);
+    });
+  });
+});
+
+describe("second step (authenticator code) in the database", () => {
+  it("gives an admin who only used the emailed link no admin rights", async () => {
+    await tx(async () => {
+      const id = await pending();
+      await markPaid(id);
+      const admin = (await run("select id from auth.users where email = 'admin@nedivlev.test'")).rows[0].id;
+      await run("set local role authenticated");
+      for (const [who, aal] of [[mealsAdmin, "aal1"], [admin, "aal1"], [mealsAdmin, undefined]] as const) {
+        await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: who, role: "authenticated", aal })]);
+        expect((await run("select id from public.charity_donations")).rowCount).toBe(0);
+        expect((await run("select charity_id from public.charity_private")).rowCount).toBe(0);
+        expect((await run("select public.is_charity_admin($1) as ok", [meals])).rows[0].ok).toBe(false);
+      }
+      // A platform admin without the code can't approve or badge a charity.
+      await run("reset role");
+      const before = (await run("select is_verified from public.charities where id = $1", [meals])).rows[0].is_verified;
+      await run("set local role authenticated");
+      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: admin, role: "authenticated", aal: "aal1" })]);
+      await run("savepoint try_update");
+      let refused = false;
+      try {
+        const r = await run("update public.charities set is_verified = not is_verified where id = $1", [meals]);
+        refused = r.rowCount === 0;
+      } catch {
+        refused = true;
+        await run("rollback to savepoint try_update");
+      }
+      expect(refused).toBe(true);
+      await run("reset role");
+      expect((await run("select is_verified from public.charities where id = $1", [meals])).rows[0].is_verified).toBe(before);
     });
   });
 });

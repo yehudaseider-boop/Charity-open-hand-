@@ -1,4 +1,5 @@
-import type { GivingKind } from "@/data/giving";
+// Relative import: the website's tests compile this file, where "@/" means the website.
+import type { GivingKind } from "../data/giving";
 
 /**
  * The website address, set with EXPO_PUBLIC_SITE_URL when we have a domain.

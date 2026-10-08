@@ -38,7 +38,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         <p className="mt-1 break-all text-sm text-muted">{viewer.email}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge>Donor</Badge>
-          {viewer.charities.length > 0 ? <Badge tone="brand">Charity admin</Badge> : null}
+          {viewer.managedCharityIds.length > 0 ? <Badge tone="brand">Charity admin</Badge> : null}
           {viewer.isPlatformAdmin ? <Badge tone="success">Platform admin</Badge> : null}
         </div>
       </section>
@@ -78,7 +78,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         )}
       </section>
 
-      {viewer.charities.length > 0 || viewer.isPlatformAdmin ? (
+      {viewer.managedCharityIds.length > 0 || viewer.isPlatformAdmin ? (
         <section className="rounded-card bg-surface border border-border p-5 space-y-3">
           <h2 className="font-semibold">Manage</h2>
           {viewer.charities.map((c) => (
@@ -86,6 +86,11 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
               <BilingualName en={c.name_en} he={c.name_he} />
             </Link>
           ))}
+          {viewer.managedCharityIds.length > 0 && viewer.charities.length === 0 ? (
+            <Link href="/charity-admin" className="block rounded-control border border-border p-3">
+              Your charities (you&apos;ll be asked for your authenticator code)
+            </Link>
+          ) : null}
           {viewer.isPlatformAdmin ? (
             <Link href="/admin" className="block rounded-control border border-border p-3">
               Platform admin

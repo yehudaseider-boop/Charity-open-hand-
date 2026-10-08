@@ -7,8 +7,10 @@ export type Viewer = {
   userId: string;
   email: string;
   isPlatformAdmin: boolean;
-  /** Charities this person administers. */
+  /** Charities this person administers (readable only after the second step). */
   charities: { id: string; name_en: string; name_he: string | null; status: string }[];
+  /** Ids of the charities this person administers, known even before the second step. */
+  managedCharityIds: string[];
 };
 
 /** The signed-in person and their roles, or null for a visitor. */
@@ -21,7 +23,7 @@ export async function getViewer(): Promise<Viewer | null> {
     supabase.from("profiles").select("role").eq("id", user.id).single(),
     supabase
       .from("charity_admins")
-      .select("charities(id, name_en, name_he, status)")
+      .select("charity_id, charities(id, name_en, name_he, status)")
       .eq("user_id", user.id),
   ]);
 
@@ -34,6 +36,7 @@ export async function getViewer(): Promise<Viewer | null> {
     email: user.email ?? "",
     isPlatformAdmin: profile?.role === "platform_admin",
     charities,
+    managedCharityIds: (memberships ?? []).map((m) => m.charity_id as string),
   };
 }
 
@@ -52,7 +55,7 @@ export async function requirePlatformAdmin(): Promise<Viewer> {
 
 export async function requireCharityAdmin(): Promise<Viewer> {
   const viewer = await requireViewer("/charity-admin");
-  if (viewer.charities.length === 0 && !viewer.isPlatformAdmin) redirect("/account?denied=charity");
+  if (viewer.managedCharityIds.length === 0 && !viewer.isPlatformAdmin) redirect("/account?denied=charity");
   await requireSecondStep("/charity-admin");
   return viewer;
 }

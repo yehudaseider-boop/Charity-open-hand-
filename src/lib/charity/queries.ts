@@ -1,5 +1,6 @@
 import "server-only";
 import { notFound } from "next/navigation";
+import { getViewer } from "@/lib/auth";
 import { requireSecondStep } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 import type { DocumentType } from "./validation";
@@ -25,6 +26,11 @@ export type CharityDocument = {
  */
 export async function loadCharityForManager(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  // Admins prove their second step first: until then the database shows them nothing.
+  const viewer = await getViewer();
+  if (viewer && (viewer.isPlatformAdmin || viewer.managedCharityIds.includes(id))) {
+    await requireSecondStep(`/charity-admin/${id}`);
+  }
   const supabase = await createClient();
   const [charity, priv, docs, cats] = await Promise.all([
     supabase.from("charities").select(CHARITY_FIELDS).eq("id", id).maybeSingle(),
@@ -42,8 +48,6 @@ export async function loadCharityForManager(id: string) {
   const { data: canManage } = await supabase.rpc("is_charity_admin", { target: id });
   const { data: isAdmin } = await supabase.rpc("is_platform_admin");
   if (!canManage && !isAdmin) notFound();
-  // Charity and platform admins must have passed their second step (authenticator code) in this sign-in.
-  await requireSecondStep(`/charity-admin/${id}`);
 
   return {
     charity: charity.data,

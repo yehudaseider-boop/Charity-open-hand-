@@ -2,10 +2,8 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-/** Same-site paths only, never an outside address. */
-export function safeNextPath(value: unknown, fallback = "/account"): string {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : fallback;
-}
+export { safeNextPath } from "@/lib/safe-path";
+import { safeNextPath } from "@/lib/safe-path";
 
 /**
  * Charity admins must have proved a second step (an authenticator-app code)

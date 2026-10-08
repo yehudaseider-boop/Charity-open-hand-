@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "@/lib/safe-path";
 import { linkDonorsToUser } from "@/lib/donors/link";
 import { requestOrigin } from "@/lib/request-origin";
 import { createClient } from "@/lib/supabase/server";
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
   const origin = requestOrigin(request);
   const code = searchParams.get("code");
   const nextParam = searchParams.get("next") ?? "/account";
-  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/account";
+  const next = safeNextPath(nextParam);
 
   if (code) {
     const supabase = await createClient();

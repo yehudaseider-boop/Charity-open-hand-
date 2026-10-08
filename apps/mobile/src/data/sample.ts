@@ -92,4 +92,3 @@ export function findCharity(slug: string | undefined): Charity | undefined {
 }
 
 /** Quick amounts, in cents. Multiples of chai (R18). */
-export const quickAmountsCents = [18_000, 36_000, 50_000, 100_000];
