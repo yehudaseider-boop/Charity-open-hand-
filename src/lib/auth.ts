@@ -46,12 +46,13 @@ export async function requireViewer(next = "/account"): Promise<Viewer> {
 export async function requirePlatformAdmin(): Promise<Viewer> {
   const viewer = await requireViewer("/admin");
   if (!viewer.isPlatformAdmin) redirect("/account?denied=admin");
+  await requireSecondStep("/admin");
   return viewer;
 }
 
 export async function requireCharityAdmin(): Promise<Viewer> {
   const viewer = await requireViewer("/charity-admin");
   if (viewer.charities.length === 0 && !viewer.isPlatformAdmin) redirect("/account?denied=charity");
-  if (!viewer.isPlatformAdmin) await requireSecondStep("/charity-admin");
+  await requireSecondStep("/charity-admin");
   return viewer;
 }

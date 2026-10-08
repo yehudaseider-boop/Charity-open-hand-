@@ -42,8 +42,8 @@ export async function loadCharityForManager(id: string) {
   const { data: canManage } = await supabase.rpc("is_charity_admin", { target: id });
   const { data: isAdmin } = await supabase.rpc("is_platform_admin");
   if (!canManage && !isAdmin) notFound();
-  // Charity admins must have passed their second step (authenticator code) in this sign-in.
-  if (!isAdmin) await requireSecondStep(`/charity-admin/${id}`);
+  // Charity and platform admins must have passed their second step (authenticator code) in this sign-in.
+  await requireSecondStep(`/charity-admin/${id}`);
 
   return {
     charity: charity.data,
