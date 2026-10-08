@@ -189,8 +189,16 @@
   It is enforced in the database too: charity admins see donations, monthly donations and
   receipts only with a two-step session (`aal2`). Turn on TOTP MFA in the hosted Supabase
   project's Auth settings before release (local `config.toml` already has it on).
-  Platform admins are not yet required to use it. Application and profile pages still open
-  with the emailed link alone.
+  Application and profile pages still open with the emailed link alone.
+- **Platform admins need two-step too (08/10/2026).** `is_platform_admin()` is true only for a
+  two-step session, so with the emailed link alone a platform admin has no admin powers in the
+  database, and every `/admin` page and action sends them to `/two-step` first.
+- **Two-step page** is `/two-step`, shared by charity and platform admins. At most 5 code
+  attempts per 15 minutes per account and per network address. Supabase itself refuses to
+  add a second authenticator app from a one-step session, so a stolen sign-in email alone
+  can't be used to get past the second step (tested).
+- **Sign-in return address:** only a path on this site; a backslash or control character
+  is refused, because browsers treat "/\\evil.example" as another site (`src/lib/safe-path.ts`).
 - **What a charity sees:** charity admins no longer read the `donations`, `donors` or
   `donation_checkout_details` tables directly. They read the `charity_donations` view: the
   donation, its status, the message, the anonymous flag and the donor details typed at

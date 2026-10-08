@@ -42,9 +42,26 @@ export async function requireViewer(next = "/account"): Promise<Viewer> {
   return viewer;
 }
 
-export async function requirePlatformAdmin(): Promise<Viewer> {
-  const viewer = await requireViewer("/admin");
+/** Where an admin completes the authenticator-app step, then returns to next. */
+export function twoStepPath(next: string) {
+  return `/two-step?next=${encodeURIComponent(next)}`;
+}
+
+/** Has this session completed the authenticator-app step? */
+export async function hasSecondFactor(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.currentLevel === "aal2";
+}
+
+/**
+ * A platform admin who has completed the authenticator-app step. Every admin
+ * page and action calls this first; the database checks the step again.
+ */
+export async function requirePlatformAdmin(next = "/admin"): Promise<Viewer> {
+  const viewer = await requireViewer(next);
   if (!viewer.isPlatformAdmin) redirect("/account?denied=admin");
+  if (!(await hasSecondFactor())) redirect(twoStepPath(next));
   return viewer;
 }
 

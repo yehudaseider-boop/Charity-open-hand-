@@ -2,12 +2,11 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { safeNextPath } from "@/lib/safe-path";
 import { createClient } from "@/lib/supabase/server";
 
 function safeNext(next: FormDataEntryValue | null): string {
-  const value = typeof next === "string" ? next : "";
-  // Only allow same-site paths, never an outside URL.
-  return value.startsWith("/") && !value.startsWith("//") ? value : "/account";
+  return safeNextPath(typeof next === "string" ? next : "");
 }
 
 export async function sendLoginLink(formData: FormData) {

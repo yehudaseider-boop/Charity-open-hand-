@@ -1,8 +1,11 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { logAudit } from "@/lib/audit";
 import { requireCharityAdmin } from "@/lib/auth";
+import { hitRateLimit } from "@/lib/rate-limit";
+import { safeAdminPath } from "@/lib/safe-path";
 import { createClient } from "@/lib/supabase/server";
 
 export type TwoStepState = {
@@ -12,11 +15,20 @@ export type TwoStepState = {
   enrolment?: { factorId: string; qrCode: string; secret: string };
 };
 
-/** Only back into the charity area, never an outside address. */
+/** Only back into the admin areas, never an outside address. */
 function safeNext(next: FormDataEntryValue | null): string {
-  const value = typeof next === "string" ? next : "";
-  return value.startsWith("/charity-admin/") && !value.startsWith("//") ? value : "/charity-admin";
+  return safeAdminPath(typeof next === "string" ? next : "");
 }
+
+/**
+ * Six digits is a million possibilities, so guessing must be slow: at most
+ * 5 tries per 15 minutes for each account and for each network address.
+ */
+async function tooManyTries(userId: string): Promise<boolean> {
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  return hitRateLimit("two_step_code", [`user:${userId}`, `ip:${ip}`], 5, 15);
+}
+const slowDown = "Too many tries. Please wait 15 minutes and try again.";
 
 function readCode(formData: FormData): string | null {
   const code = String(formData.get("code") ?? "").replace(/\s/g, "");
@@ -34,6 +46,7 @@ export async function setUpApp(prev: TwoStepState, formData: FormData): Promise<
   if (formData.get("step") === "confirm" && prev.enrolment) {
     const code = readCode(formData);
     if (!code) return { ...prev, ok: false, message: "Enter the 6-digit code from your app." };
+    if (await tooManyTries(viewer.userId)) return { ...prev, ok: false, message: slowDown };
     // Supabase only accepts a factor that belongs to the signed-in person.
     const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: prev.enrolment.factorId, code });
     if (error) {
@@ -55,9 +68,10 @@ export async function setUpApp(prev: TwoStepState, formData: FormData): Promise<
 
 /** Second step at sign-in, for someone who has already set up their app. */
 export async function verifyCode(_prev: TwoStepState, formData: FormData): Promise<TwoStepState> {
-  await requireCharityAdmin();
+  const viewer = await requireCharityAdmin();
   const code = readCode(formData);
   if (!code) return { ok: false, message: "Enter the 6-digit code from your app." };
+  if (await tooManyTries(viewer.userId)) return { ok: false, message: slowDown };
 
   const supabase = await createClient();
   const { data: factors } = await supabase.auth.mfa.listFactors();

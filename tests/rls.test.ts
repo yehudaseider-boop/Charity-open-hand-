@@ -32,7 +32,7 @@ afterAll(async () => {
 });
 
 /** Run fn in a rolled-back transaction, as an anonymous visitor or a signed-in user. */
-async function as<T>(who: "anon" | string | null, fn: () => Promise<T>): Promise<T> {
+async function as<T>(who: "anon" | string | null, fn: () => Promise<T>, aal: "aal1" | "aal2" = "aal1"): Promise<T> {
   await client.query("begin");
   try {
     if (who === "anon") {
@@ -41,7 +41,7 @@ async function as<T>(who: "anon" | string | null, fn: () => Promise<T>): Promise
     } else if (who) {
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: who, role: "authenticated" }),
+        JSON.stringify({ sub: who, role: "authenticated", aal }),
       ]);
     }
     return await fn();
@@ -206,11 +206,20 @@ describe("charity admin", () => {
 });
 
 describe("platform admin", () => {
+  it("has no admin powers until the second login step", async () => {
+    await as(ids.admin, async () => {
+      expect(await rows("select charity_id from public.charity_private")).toHaveLength(0);
+      expect(await rows("select id from public.fee_settings")).toHaveLength(0);
+      const r = await client.query("update public.charities set is_verified = false where id = $1", [ids.meals]);
+      expect(r.rowCount).toBe(0);
+    });
+  });
+
   it("sees every charity's private details and fee settings", async () => {
     await as(ids.admin, async () => {
       expect(await rows("select charity_id from public.charity_private")).toHaveLength(3);
       expect(await rows("select id from public.fee_settings")).toHaveLength(1);
-    });
+    }, "aal2");
   });
 });
 

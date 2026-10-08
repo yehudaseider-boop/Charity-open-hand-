@@ -1,17 +1,12 @@
 import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { platformConfig } from "@/config/platform";
-import { requireViewer, type Viewer } from "@/lib/auth";
+import { hasSecondFactor, requireViewer, twoStepPath, type Viewer } from "@/lib/auth";
 import { monthStart, taxYearFor } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import type { DonationFilters } from "./donation-filters";
 
 export type DashboardCharity = { id: string; name_en: string; name_he: string | null; status: string };
-
-/** Where a charity admin finishes the authenticator-app step. */
-export function twoStepPath(next: string) {
-  return `/charity-admin/two-step?next=${encodeURIComponent(next)}`;
-}
 
 /**
  * The signed-in person may see this charity's dashboard: they administer it
@@ -25,11 +20,10 @@ export async function requireCharityDashboard(id: string, path: string): Promise
   const charity = viewer.charities.find((c) => c.id === id);
   if (!charity && !viewer.isPlatformAdmin) notFound();
 
-  const supabase = await createClient();
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal?.currentLevel !== "aal2") redirect(twoStepPath(path));
+  if (!(await hasSecondFactor())) redirect(twoStepPath(path));
 
   if (charity) return { viewer, charity };
+  const supabase = await createClient();
   const { data } = await supabase.from("charities").select("id, name_en, name_he, status").eq("id", id).maybeSingle();
   if (!data) notFound();
   return { viewer, charity: data };

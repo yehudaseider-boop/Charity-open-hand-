@@ -203,10 +203,13 @@ describe("charity_donations view", () => {
     });
   });
 
-  it("lets a platform admin see any charity's donations", async () => {
+  it("lets a platform admin see any charity's donations, only after the second step", async () => {
     await tx(async () => {
       await donation();
       await actAs(ids.admin, "aal1");
+      expect(await rows("select id from public.charity_donations where charity_id = $1", [ids.meals])).toHaveLength(0);
+      expect(await rows("select id from public.donations")).toHaveLength(0);
+      await actAs(ids.admin, "aal2");
       expect(await rows("select id from public.charity_donations where charity_id = $1", [ids.meals])).toHaveLength(1);
     });
   });

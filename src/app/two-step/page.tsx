@@ -2,18 +2,19 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/card";
 import { requireCharityAdmin } from "@/lib/auth";
+import { safeAdminPath } from "@/lib/safe-path";
 import { createClient } from "@/lib/supabase/server";
 import { EnrolForm, VerifyForm } from "./forms";
 
 export const metadata: Metadata = { title: "Two-step sign-in" };
 
 /**
- * Charity admins see donor details, so their dashboard needs a second step
- * at sign-in: a code from an authenticator app on their phone.
+ * Charity and platform admins see donor details, so their areas need a
+ * second step at sign-in: a code from an authenticator app on their phone.
  */
-export default async function TwoStepPage({ searchParams }: PageProps<"/charity-admin/two-step">) {
+export default async function TwoStepPage({ searchParams }: PageProps<"/two-step">) {
   const { next: nextParam } = await searchParams;
-  const next = typeof nextParam === "string" && nextParam.startsWith("/charity-admin/") ? nextParam : "/charity-admin";
+  const next = safeAdminPath(typeof nextParam === "string" ? nextParam : "");
   await requireCharityAdmin();
 
   const supabase = await createClient();
@@ -35,7 +36,7 @@ export default async function TwoStepPage({ searchParams }: PageProps<"/charity-
       ) : (
         <Card title="Set up your authenticator app">
           <p className="mb-3 text-sm text-muted">
-            Your dashboard shows donors&apos; personal details, so it needs a second step when you sign in: a code from an
+            Admin pages show donors&apos; personal details, so it needs a second step when you sign in: a code from an
             app on your phone. You set this up once. After that you&apos;ll type a code each time you sign in.
           </p>
           <EnrolForm next={next} />
