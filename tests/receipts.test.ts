@@ -4,6 +4,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { buildReceiptDetails, type CharityRow, type DonorRow } from "@/lib/receipts/details";
+import { buildReceiptEmail } from "@/lib/receipts/email";
+import { getEmailTransport, maskEmail, type EmailMessage } from "@/lib/email";
 import { buildReceiptHtml, esc } from "@/lib/receipts/html";
 import { previewReceipts, runReceiptsJob, type IssuedReceipt, type ReceiptStore } from "@/lib/receipts/issue";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } from "@/lib/receipts/plan";
@@ -104,6 +106,7 @@ describe("the yearly job", () => {
   function fakeStore(donations: PlanDonation[]) {
     const issued: IssuedReceipt[] = [];
     const pdfs = new Map<string, Buffer>();
+    const emailed = new Set<string>();
     let seq = 0;
     const store: ReceiptStore = {
       listDonations: async () => donations,
@@ -117,8 +120,11 @@ describe("the yearly job", () => {
       },
       listIssuedWithoutPdf: async () => issued.filter((r) => !pdfs.has(r.id)),
       savePdf: async (r, pdf) => void pdfs.set(r.id, pdf),
+      listToEmail: async () => issued.filter((r) => pdfs.has(r.id) && !emailed.has(r.id)).map((r) => ({ ...r, email: "sarah@example.co.za" })),
+      readPdf: async (r) => pdfs.get(r.id)!,
+      markEmailed: async (r) => void emailed.add(r.id),
     };
-    return { store, issued, pdfs };
+    return { store, issued, pdfs, emailed };
   }
   const render = vi.fn(async () => Buffer.from("%PDF-test"));
   const base = { taxYear: 2027, today: "2027-03-10", now: new Date("2027-03-10T08:00:00Z") };
@@ -171,5 +177,102 @@ describe("the yearly job", () => {
     expect(list).toHaveLength(1);
     expect(list[0].reference).toMatch(/^PREVIEW-LTC-2027-0001$/);
     expect(issued).toHaveLength(0);
+  });
+});
+
+describe("emailing receipts", () => {
+  const base = { taxYear: 2027, today: "2027-03-10", now: new Date("2027-03-10T08:00:00Z"), mode: "issue" as const };
+  const render = async () => Buffer.from("%PDF-test");
+  const sentTo = () => {
+    const sent: EmailMessage[] = [];
+    const transport = { name: "test", send: async (m: EmailMessage) => void sent.push(m) };
+    return { sent, mailer: { transport, siteUrl: "https://example.co.za", platformName: "NEDIV lev" } };
+  };
+
+  function setup(donations: PlanDonation[]) {
+    const issued: IssuedReceipt[] = [];
+    const pdfs = new Map<string, Buffer>();
+    const emailed = new Set<string>();
+    const receipted = new Set<string>();
+    let seq = 0;
+    const store: ReceiptStore = {
+      listDonations: async () => donations,
+      listCharities: async () => [charity],
+      receiptedDonationIds: async () => receipted,
+      donorDetailsFor: async (ids) => ids.map((id) => ({ paidAt: donations.find((d) => d.id === id)!.paidAt!, amountCents: donations.find((d) => d.id === id)!.amountCents, donor })),
+      issue: async (r, c, details) => {
+        r.donationIds.forEach((id) => receipted.add(id));
+        const receipt = { id: `r${++seq}`, reference: `${c.quickgive_code}-${r.taxYear}-000${seq}`, charityId: r.charityId, details, pdfPath: null };
+        issued.push(receipt);
+        return receipt;
+      },
+      listIssuedWithoutPdf: async () => issued.filter((r) => !pdfs.has(r.id)),
+      savePdf: async (r, pdf) => void pdfs.set(r.id, pdf),
+      listToEmail: async () => issued.filter((r) => pdfs.has(r.id) && !emailed.has(r.id)).map((r) => ({ ...r, email: `donor-${r.id}@example.co.za` })),
+      readPdf: async (r) => pdfs.get(r.id)!,
+      markEmailed: async (r) => void emailed.add(r.id),
+    };
+    return { store, emailed };
+  }
+
+  it("emails each donor their receipt with the PDF attached, once", async () => {
+    const { store, emailed } = setup([don({ id: "a" }), don({ id: "b", donorId: "u2" })]);
+    const { sent, mailer } = sentTo();
+    const first = await runReceiptsJob({ store, render, ...base, mailer });
+    expect(first).toMatchObject({ issued: 2, emailed: 2, emailFailed: 0 });
+    expect(sent).toHaveLength(2);
+    expect(sent[0].attachments?.[0]).toMatchObject({ filename: "LTC-2027-0001.pdf", contentType: "application/pdf" });
+    expect(sent[0].subject).toBe("Your section 18A receipt LTC-2027-0001 from Linksfield Torah Learning Centre NPC");
+    expect(emailed.size).toBe(2);
+    // Running it again sends nothing more.
+    const again = await runReceiptsJob({ store, render, ...base, mailer });
+    expect(again.emailed).toBe(0);
+    expect(sent).toHaveLength(2);
+  });
+
+  it("sends no email unless asked to", async () => {
+    const { store } = setup([don({ id: "a" })]);
+    const s = await runReceiptsJob({ store, render, ...base });
+    expect(s).toMatchObject({ issued: 1, emailed: 0 });
+  });
+
+  it("one failed email does not stop the others, and is tried again next run", async () => {
+    const { store, emailed } = setup([don({ id: "a" }), don({ id: "b", donorId: "u2" })]);
+    const sent: string[] = [];
+    let fail = true;
+    const transport = { name: "test", send: async (m: EmailMessage) => { if (fail && m.to.includes("r1")) throw new Error("provider down"); sent.push(m.to); } };
+    const mailer = { transport, siteUrl: "https://example.co.za", platformName: "NEDIV lev" };
+    const first = await runReceiptsJob({ store, render, ...base, mailer });
+    expect(first).toMatchObject({ emailed: 1, emailFailed: 1 });
+    expect([...emailed]).toEqual(["r2"]);
+    fail = false;
+    const second = await runReceiptsJob({ store, render, ...base, mailer });
+    expect(second.emailed).toBe(1);
+    expect(emailed.size).toBe(2);
+  });
+
+  it("the email names the receipt and the total, and escapes names", () => {
+    const details = buildReceiptDetails({
+      charity, donor: { ...donor, first_name: "<b>Sarah</b>" },
+      donations: [{ paidAt: "2026-10-01T10:00:00Z", amountCents: 50_000 }, { paidAt: "2026-09-15T10:00:00Z", amountCents: 18_000 }],
+      taxYear: 2027, periodStart: "2026-03-01", periodEnd: "2027-02-28", issuedAt: new Date("2027-03-02T08:00:00Z"),
+    });
+    const m = buildReceiptEmail({ details, reference: "LTC-2027-0001", siteUrl: "https://example.co.za/", platformName: "NEDIV lev" });
+    expect(m.text).toContain("Total donated: R680.00");
+    expect(m.text).toContain("https://example.co.za/account");
+    expect(m.html).not.toContain("<b>Sarah</b>");
+    expect(m.html).toContain("&lt;b&gt;Sarah");
+  });
+});
+
+describe("email adapter", () => {
+  it("defaults to a console transport that only logs, with the address masked", () => {
+    expect(getEmailTransport({}).name).toBe("console");
+    expect(maskEmail("sarah@example.co.za")).toBe("s•••@example.co.za");
+  });
+  it("needs a key and a sender for Resend, and refuses unknown names", () => {
+    expect(() => getEmailTransport({ EMAIL_TRANSPORT: "resend" })).toThrow(/RESEND_API_KEY/);
+    expect(getEmailTransport({ EMAIL_TRANSPORT: "resend", RESEND_API_KEY: "k", EMAIL_FROM: "a@b.co.za" }).name).toBe("resend");
+    expect(() => getEmailTransport({ EMAIL_TRANSPORT: "carrier-pigeon" })).toThrow(/Unknown/);
   });
 });

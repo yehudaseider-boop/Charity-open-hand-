@@ -8,6 +8,8 @@
  * the next run.
  */
 import { taxYearRange } from "@/lib/dates";
+import type { EmailTransport } from "@/lib/email";
+import { buildReceiptEmail } from "./email";
 import { buildReceiptDetails, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
 
@@ -22,7 +24,14 @@ export interface ReceiptStore {
   issue(receipt: PlannedReceipt, charity: CharityRow, details: ReceiptDetails): Promise<IssuedReceipt>;
   listIssuedWithoutPdf(taxYear: number): Promise<IssuedReceipt[]>;
   savePdf(receipt: IssuedReceipt, pdf: Buffer): Promise<void>;
+  /** Issued receipts with a PDF that have not been emailed yet, with the donor's email address. */
+  listToEmail(taxYear: number): Promise<(IssuedReceipt & { email: string })[]>;
+  readPdf(receipt: IssuedReceipt): Promise<Buffer>;
+  markEmailed(receipt: IssuedReceipt): Promise<void>;
 }
+
+/** Sends receipts by email. Left out of a run unless asked for. */
+export type Mailer = { transport: EmailTransport; siteUrl: string; platformName: string };
 
 export type Renderer = (receipt: { details: ReceiptDetails; reference: string }) => Promise<Buffer>;
 
@@ -34,6 +43,8 @@ export type JobSummary = {
   planned: number;
   issued: number;
   pdfsMade: number;
+  emailed: number;
+  emailFailed: number;
   skippedByReason: Record<string, number>;
   /** Paid, 18A-requested donations that could not go on a receipt, for a person to look at. */
   needsAttention: Skipped[];
@@ -47,6 +58,8 @@ export async function runReceiptsJob(args: {
   today: string;
   now: Date;
   mode: JobMode;
+  /** If given, each receipt is emailed to the donor once its PDF exists. */
+  mailer?: Mailer;
 }): Promise<JobSummary> {
   const { store, taxYear } = args;
   const { start, end } = taxYearRange(taxYear);
@@ -65,6 +78,8 @@ export async function runReceiptsJob(args: {
     planned: receipts.length,
     issued: 0,
     pdfsMade: 0,
+    emailed: 0,
+    emailFailed: 0,
     skippedByReason: {},
     needsAttention: skipped.filter((s) => s.reason === "charity_cannot_issue" || s.reason === "mandate_after_payment"),
   };
@@ -97,6 +112,27 @@ export async function runReceiptsJob(args: {
   for (const missing of await store.listIssuedWithoutPdf(taxYear)) {
     await store.savePdf(missing, await args.render({ details: missing.details, reference: missing.reference }));
     summary.pdfsMade += 1;
+  }
+
+  // Email every receipt that has a PDF and has not been emailed. One failed
+  // email never stops the others; it is tried again on the next run.
+  if (args.mailer) {
+    for (const r of await store.listToEmail(taxYear)) {
+      try {
+        const pdf = await store.readPdf(r);
+        const mail = buildReceiptEmail({ details: r.details, reference: r.reference, siteUrl: args.mailer.siteUrl, platformName: args.mailer.platformName });
+        await args.mailer.transport.send({
+          to: r.email,
+          ...mail,
+          attachments: [{ filename: `${r.reference}.pdf`, content: pdf, contentType: "application/pdf" }],
+        });
+        await store.markEmailed(r);
+        summary.emailed += 1;
+      } catch (e) {
+        summary.emailFailed += 1;
+        console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
   }
   return summary;
 }
