@@ -44,3 +44,22 @@ export function donorName(d: { donor_type: string | null; first_name: string | n
 export function safeSearch(q: string): string {
   return q.replace(/[,()*%_\\"'.:]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
 }
+
+export const donationStatus = {
+  paid: { label: "Paid", tone: "success" },
+  pending: { label: "Pending", tone: "warning" },
+  failed: { label: "Failed", tone: "danger" },
+  refunded: { label: "Refunded", tone: "neutral" },
+  charged_back: { label: "Charged back", tone: "danger" },
+} as const;
+
+export type DonationStatus = keyof typeof donationStatus;
+
+export function isDonationStatus(s: string): s is DonationStatus {
+  return s in donationStatus;
+}
+
+/** Address lines as one text line, skipping empty parts. */
+export function addressLine(a: { address_line1?: string | null; address_line2?: string | null; suburb?: string | null; city?: string | null; postal_code?: string | null }): string {
+  return [a.address_line1, a.address_line2, a.suburb, a.city, a.postal_code].map((x) => x?.trim()).filter(Boolean).join(", ");
+}

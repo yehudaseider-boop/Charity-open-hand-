@@ -19,6 +19,9 @@ export default async function CharityAdminPage() {
             <BilingualName en={c.name_en} he={c.name_he} as="h2" className="font-semibold" />
             <div className="mt-2"><Badge tone={status.tone}>{status.label}</Badge></div>
             <div className="mt-4 flex flex-wrap gap-2 text-sm">
+              <Link href={`/charity-admin/${c.id}`} className="rounded-control bg-brand px-3 py-2 text-brand-contrast">
+                Dashboard
+              </Link>
               <Link href={`/charity-admin/${c.id}/application`} className="rounded-control border border-border px-3 py-2">
                 {c.status === "approved" || c.status === "suspended" ? "Registration details" : "Application"}
               </Link>

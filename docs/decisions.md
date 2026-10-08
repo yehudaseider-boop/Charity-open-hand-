@@ -189,3 +189,13 @@
 - Open: Apple's App Review rules on charity donations inside apps (Apple Pay,
   approved nonprofits, or paying in Safari) must be checked before external
   testing or public release.
+
+## Charity dashboard (09/10/2026)
+
+- Five day-one screens at `/charity-admin/[id]`: Overview, Donations (with detail), Donors, Receipts, and CSV downloads of donations and donors.
+- Charities read through `charity_donations` and the `charity_*` functions only. They never see fees, gateway data or the donor's maaser/chomesh/tzedaka choice.
+- Charity admins see donor name, contact and address as typed at checkout, and only the last 4 of ID and tax numbers. Anonymous donors are anonymous on public pages only.
+- CSV downloads are checked against `is_charity_admin`, rate limited (10 per 10 minutes per person) and audit logged. Cells that start with `=`, `+`, `-` or `@` are neutralised.
+- Receipts screen is read-only. Only platform admins withdraw and re-issue receipts.
+- Not yet decided: whether owner and admin roles see different things, 2FA for charity admins (recommended), team invites, and Hebrew or English on charity pages.
+- Not browser-tested here: the pages need a live Supabase. Verified by build, typecheck, lint and the database tests.
