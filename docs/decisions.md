@@ -197,5 +197,6 @@
 - Charity admins see donor name, contact and address as typed at checkout, and only the last 4 of ID and tax numbers. Anonymous donors are anonymous on public pages only.
 - CSV downloads are checked against `is_charity_admin`, rate limited (10 per 10 minutes per person) and audit logged. Cells that start with `=`, `+`, `-` or `@` are neutralised.
 - Receipts screen is read-only. Only platform admins withdraw and re-issue receipts.
-- Not yet decided: whether owner and admin roles see different things, 2FA for charity admins (recommended), team invites, and Hebrew or English on charity pages.
+- Decided by Yehuda (09/10/2026): owners and admins see the same things; no team invites for now (platform team adds charity admins); English only everywhere, no Hebrew version.
+- 2FA for charity admins: yes. Authenticator-app code (TOTP) is required once per sign-in before any charity page, action or CSV download (`/mfa`, `src/lib/mfa.ts`). TOTP must be switched on in the live Supabase project (Authentication, Multi-Factor). Platform admin 2FA (#4) is still awaiting go-ahead.
 - Not browser-tested here: the pages need a live Supabase. Verified by build, typecheck, lint and the database tests.

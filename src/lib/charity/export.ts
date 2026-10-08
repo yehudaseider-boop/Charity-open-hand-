@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
+import { hasSecondStep } from "@/lib/mfa";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +19,7 @@ export async function authoriseExport(id: string): Promise<{ userId: string } | 
     supabase.rpc("is_platform_admin"),
   ]);
   if (!manages && !isAdmin) return new NextResponse("Not found", { status: 404 });
+  if (!isAdmin && !(await hasSecondStep())) return new NextResponse("Please complete your second step first.", { status: 403 });
   if (await hitRateLimit("charity-export", [`user:${user.id}`], 10, 10)) {
     return new NextResponse("Too many downloads. Please wait a few minutes and try again.", { status: 429 });
   }

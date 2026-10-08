@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { requireSecondStep } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 
 export type Viewer = {
@@ -51,5 +52,6 @@ export async function requirePlatformAdmin(): Promise<Viewer> {
 export async function requireCharityAdmin(): Promise<Viewer> {
   const viewer = await requireViewer("/charity-admin");
   if (viewer.charities.length === 0 && !viewer.isPlatformAdmin) redirect("/account?denied=charity");
+  if (!viewer.isPlatformAdmin) await requireSecondStep("/charity-admin");
   return viewer;
 }
