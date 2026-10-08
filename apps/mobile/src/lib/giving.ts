@@ -23,6 +23,13 @@ export function groupByMonth<T extends { date: Date }>(rows: T[]): { label: stri
   return groups;
 }
 
+export const givingKindLabels = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "General tzedaka" } as const;
+
+/** Total of the rows marked with one kind of giving (maaser, chomesh or general tzedaka). */
+export function sumOfKind<T extends { cents: number; kind: string }>(rows: T[], kind: keyof typeof givingKindLabels): number {
+  return rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.cents, 0);
+}
+
 /** Maaser target from income and a percentage in ppm (10% = 100000), rounded to the nearest cent. */
 export function maaserTargetCents(incomeCents: number, percentPpm: number): number {
   return Math.round((incomeCents * percentPpm) / 1_000_000);

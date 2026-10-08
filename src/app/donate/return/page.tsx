@@ -4,6 +4,7 @@ import { Card } from "@/components/card";
 import { confirmPayment } from "@/lib/donations/confirm";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { givingKinds } from "@/lib/donations/validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Thank you" };
@@ -17,7 +18,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const { data: d } = ref && outcome !== "not_found"
     ? await createAdminClient()
         .from("donations")
-        .select("amount_cents, total_charged_cents, paid_at, wants_18a, charities(name_en, slug)")
+        .select("amount_cents, total_charged_cents, paid_at, wants_18a, giving_kind, charities(name_en, slug)")
         .eq("gateway_ref", ref)
         .maybeSingle()
     : { data: null };
@@ -33,6 +34,11 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           Charged {formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}.{" "}
           {d.wants_18a ? "Your gift will be on your annual s18A receipt after the tax year closes." : null}
         </p>
+        {d.giving_kind && d.giving_kind in givingKinds ? (
+          <p className="mt-2 text-sm text-muted">
+            Counted as {givingKinds[d.giving_kind as keyof typeof givingKinds].toLowerCase()} in your records.
+          </p>
+        ) : null}
         <Link href={`/c/${charity.slug}`} className="mt-4 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
       </Card>
     );

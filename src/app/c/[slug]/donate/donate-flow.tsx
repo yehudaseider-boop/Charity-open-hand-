@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { TextArea, TextField } from "@/components/forms/fields";
+import { givingKinds } from "@/lib/donations/validation";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
 
@@ -173,6 +174,20 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote }: {
             {charityName} is not s18A-approved, so this gift won&apos;t get a tax receipt.
           </p>
         )}
+
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">This gift is from</legend>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(givingKinds).map(([value, label]) => (
+              <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
+                <input type="radio" name="giving_kind" value={value} required />
+                {label}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted">For your own maaser records. Only you see this.</p>
+          {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
+        </fieldset>
 
         <TextArea name="message" label={`Message to ${charityName}`} rows={3} />
 

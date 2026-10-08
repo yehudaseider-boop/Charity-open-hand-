@@ -15,14 +15,17 @@ function Corner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
   return <View style={[{ position: "absolute", width: s, height: s, borderColor: colors.accent, opacity: 0.6 }, edge]} />;
 }
 
-/** Component 3: maaser progress. Given vs target for the month or the year, one bar, one sentence. */
+/** Component 3: maaser (or chomesh) progress. Given vs target for the month or the year, one bar, one sentence. */
 export function MaaserProgress({
+  title,
   givenCents,
   targetCents,
   period,
   periodLabel,
   endLabel,
 }: {
+  /** "Maaser" or "Chomesh". */
+  title: string;
   givenCents: number;
   targetCents: number;
   period: "month" | "year";
@@ -39,12 +42,12 @@ export function MaaserProgress({
         : `You've given ${rand(-remaining)} more than your target this ${period}.`;
 
   return (
-    <View style={styles.block} accessibilityLabel={`Maaser: ${rand(givenCents)} given of ${rand(targetCents)}. ${sentence}`}>
+    <View style={styles.block} accessibilityLabel={`${title}: ${rand(givenCents)} given of ${rand(targetCents)}. ${sentence}`}>
       <Corner pos="tl" />
       <Corner pos="tr" />
       <Corner pos="bl" />
       <Corner pos="br" />
-      <Text variant="label">Maaser this {period}</Text>
+      <Text variant="label">{title} this {period}</Text>
       <Text variant="label" style={{ marginTop: -8 }}>{periodLabel}</Text>
       <View style={styles.figures}>
         <Text variant="amount" style={{ fontSize: 44, lineHeight: 50 }}>{rand(givenCents)}</Text>

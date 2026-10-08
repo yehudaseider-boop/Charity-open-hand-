@@ -10,19 +10,11 @@ import { Segmented } from "./segmented";
 import { Text } from "./text";
 
 export type TargetPeriod = "month" | "year";
-export type Target = { cents: number; period: TargetPeriod };
+/** Maaser target, and a separate chomesh target for donors who keep chomesh (null = maaser only). */
+export type Target = { period: TargetPeriod; maaserCents: number; chomeshCents: number | null };
 
-type Pct = "10" | "20" | "other";
-
-/** A typed percentage as ppm, or null if it is not a number above 0 and below 100. */
-function pctToPpm(input: string): number | null {
-  try {
-    const ppm = percentToPpm(input.replace(",", "."));
-    return ppm > 0 ? ppm : null;
-  } catch {
-    return null;
-  }
-}
+/** Maaser is a tenth of income; chomesh is a further tenth (a fifth in all). */
+const TENTH_PPM = percentToPpm("10");
 
 /** Cents back to what a person would type: 40000 -> "400", 12345 -> "123.45". */
 function centsToInput(cents: number): string {
@@ -31,7 +23,7 @@ function centsToInput(cents: number): string {
   return c ? `${r}.${String(c).padStart(2, "0")}` : String(r);
 }
 
-/** Set or change the maaser target: from income and a percentage, or a fixed amount, per month or per year. */
+/** Set or change the maaser (and chomesh) targets: from income, or fixed amounts, per month or per year. */
 export function TargetEditor({
   initial,
   yearEnd,
@@ -45,36 +37,47 @@ export function TargetEditor({
   onSave: (t: Target) => void;
   onCancel?: () => void;
 }) {
-  const [mode, setMode] = useState<"percent" | "amount">(initial ? "amount" : "percent");
+  const [mode, setMode] = useState<"income" | "amount">(initial ? "amount" : "income");
   const [period, setPeriod] = useState<TargetPeriod>(initial?.period ?? "month");
+  const [keeps, setKeeps] = useState<"maaser" | "both">(initial && initial.chomeshCents === null ? "maaser" : initial ? "both" : "maaser");
   const [income, setIncome] = useState("");
-  const [pct, setPct] = useState<Pct>("10");
-  const [otherPct, setOtherPct] = useState("");
-  const [amount, setAmount] = useState(initial ? centsToInput(initial.cents) : "");
+  const [maaserAmount, setMaaserAmount] = useState(initial ? centsToInput(initial.maaserCents) : "");
+  const [chomeshAmount, setChomeshAmount] = useState(initial?.chomeshCents ? centsToInput(initial.chomeshCents) : "");
 
-  const ppm = pct === "other" ? pctToPpm(otherPct) : percentToPpm(pct);
   const incomeCents = parseRandToCents(income);
-  const amountCents = parseRandToCents(amount);
-  const target =
-    mode === "percent"
-      ? incomeCents && ppm
-        ? maaserTargetCents(incomeCents, ppm)
-        : null
-      : amountCents && amountCents > 0
-        ? amountCents
-        : null;
-  const ok = target !== null && target > 0;
+  const tenth = incomeCents ? maaserTargetCents(incomeCents, TENTH_PPM) : null;
+  const maaser = mode === "income" ? tenth : parseRandToCents(maaserAmount);
+  const chomesh = keeps === "both" ? (mode === "income" ? tenth : parseRandToCents(chomeshAmount)) : null;
+  const ok = Boolean(maaser && maaser > 0) && (keeps === "maaser" || Boolean(chomesh && chomesh > 0));
   const per = period === "month" ? "a month" : "a year";
 
   return (
     <View style={styles.card}>
       <View style={{ gap: 6 }}>
-        <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>{initial ? "Change your target" : "Set your maaser target"}</Text>
-        <Text variant="bodyMuted">Work it out from your income, or type the amount you want to give. Only you see this.</Text>
+        <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>{initial ? "Change your targets" : "Set your maaser target"}</Text>
+        <Text variant="bodyMuted">Maaser and chomesh are tracked separately. General tzedaka doesn&apos;t count towards either. Only you see this.</Text>
+      </View>
+
+      <View style={{ gap: 6 }}>
+        <Text variant="label" style={{ color: colors.ink }}>I keep</Text>
+        <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="I keep">
+          {([
+            ["maaser", "Maaser", "A tenth"],
+            ["both", "Maaser and chomesh", "A fifth in all"],
+          ] as const).map(([v, label, note]) => {
+            const selected = keeps === v;
+            return (
+              <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setKeeps(v)} style={[styles.choice, selected && styles.choiceOn]}>
+                <Text style={[type.button, { fontSize: 16, color: selected ? colors.accent : colors.ink, textAlign: "center" }]}>{label}</Text>
+                <Text variant="label">{note}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       <Segmented
-        label="Target per"
+        label="Targets per"
         value={period}
         onChange={setPeriod}
         options={[
@@ -88,57 +91,53 @@ export function TargetEditor({
         value={mode}
         onChange={setMode}
         options={[
-          { value: "percent", label: "My income" },
-          { value: "amount", label: "Fixed amount" },
+          { value: "income", label: "My income" },
+          { value: "amount", label: "Fixed amounts" },
         ]}
       />
 
-      {mode === "percent" ? (
+      {mode === "income" ? (
+        <Field
+          label={period === "month" ? "Income per month" : `Income for the year (to ${yearEnd})`}
+          prefix="R"
+          keyboardType="decimal-pad"
+          value={income}
+          onChangeText={setIncome}
+          helper={keeps === "both" ? "Maaser is 10% of this, and chomesh a further 10%." : "Maaser is 10% of this."}
+        />
+      ) : (
         <>
-          <Field
-            label={period === "month" ? "Income per month" : `Income for the year (to ${yearEnd})`}
-            prefix="R"
-            keyboardType="decimal-pad"
-            value={income}
-            onChangeText={setIncome}
-            helper="An estimate is fine. You can change it later."
-          />
-          <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="Percentage">
-            {(["10", "20", "other"] as const).map((v) => {
-              const selected = pct === v;
-              return (
-                <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setPct(v)} style={[styles.pct, selected && styles.pctOn]}>
-                  <Text style={[type.button, { color: selected ? colors.accent : colors.ink }]}>{v === "other" ? "Other" : `${v}%`}</Text>
-                  <Text variant="label">{v === "10" ? "Maaser" : v === "20" ? "Chomesh" : "Your %"}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {pct === "other" ? (
-            <Field
-              label="Your percentage"
-              keyboardType="decimal-pad"
-              value={otherPct}
-              onChangeText={setOtherPct}
-              error={otherPct && !ppm ? "Enter a percentage between 0 and 100, for example 15" : undefined}
-            />
+          <Field label={period === "month" ? "Maaser per month" : "Maaser for the year"} prefix="R" keyboardType="decimal-pad" value={maaserAmount} onChangeText={setMaaserAmount} />
+          {keeps === "both" ? (
+            <Field label={period === "month" ? "Chomesh per month" : "Chomesh for the year"} prefix="R" keyboardType="decimal-pad" value={chomeshAmount} onChangeText={setChomeshAmount} />
           ) : null}
         </>
-      ) : (
-        <Field label={period === "month" ? "Amount per month" : "Amount for the year"} prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} />
       )}
 
       <View style={styles.result}>
-        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Your target: {ok ? `${rand(target)} ${per}` : "R0"}</Text>
+        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>
+          Maaser: {maaser ? `${rand(maaser)} ${per}` : "R0"}
+        </Text>
+        {keeps === "both" ? (
+          <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>
+            Chomesh: {chomesh ? `${rand(chomesh)} ${per}` : "R0"}
+          </Text>
+        ) : null}
         {ok && period === "year" ? (
           <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-            About {rand(monthlyToReach(target, monthsLeft))} a month over the {monthsLeft} {monthsLeft === 1 ? "month" : "months"} left.
+            About {rand(monthlyToReach((maaser ?? 0) + (chomesh ?? 0), monthsLeft))} a month in all, over the {monthsLeft}{" "}
+            {monthsLeft === 1 ? "month" : "months"} left.
           </Text>
         ) : null}
       </View>
 
       <View style={{ gap: 4 }}>
-        <Button label="Save target" disabled={!ok} onPress={() => ok && onSave({ cents: target, period })} style={!ok ? { opacity: 0.4 } : undefined} />
+        <Button
+          label="Save targets"
+          disabled={!ok}
+          onPress={() => ok && maaser && onSave({ period, maaserCents: maaser, chomeshCents: keeps === "both" ? chomesh : null })}
+          style={!ok ? { opacity: 0.4 } : undefined}
+        />
         {onCancel ? <TextLink label="Cancel" onPress={onCancel} /> : null}
       </View>
     </View>
@@ -147,7 +146,7 @@ export function TargetEditor({
 
 const styles = StyleSheet.create({
   card: { gap: 18, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  pct: { flex: 1, minHeight: 64, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, alignItems: "center", justifyContent: "center", gap: 2, backgroundColor: colors.parchment },
-  pctOn: { borderColor: colors.accent, borderWidth: 1.5 },
+  choice: { flex: 1, minHeight: 64, paddingHorizontal: 8, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, alignItems: "center", justifyContent: "center", gap: 2, backgroundColor: colors.parchment },
+  choiceOn: { borderColor: colors.accent, borderWidth: 1.5 },
   result: { gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.parchment },
 });

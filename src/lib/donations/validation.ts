@@ -4,6 +4,9 @@ import { isValidSaIdNumber } from "@/lib/sa-id";
 const str = (max = 200) => z.string().max(max).optional();
 const yes = z.literal("on").optional();
 
+/** What a gift is counted as in the donor's own records. The donor must choose; there is no default. */
+export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "General tzedaka" } as const;
+
 /** Checkout form, as sent. Cross-field rules are applied in checkDonorDetails. */
 export const checkoutSchema = z.object({
   donor_type: z.enum(["individual", "company", "trust"]),
@@ -23,6 +26,7 @@ export const checkoutSchema = z.object({
   city: str(80),
   postal_code: str(4),
   message: str(500),
+  giving_kind: z.enum(["maaser", "chomesh", "tzedaka"], { error: "Choose maaser, chomesh or general tzedaka" }),
   is_anonymous: yes,
   age_confirmed: yes,
   popia_consent: yes,

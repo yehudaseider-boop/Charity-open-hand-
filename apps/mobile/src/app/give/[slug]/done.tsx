@@ -11,6 +11,7 @@ import { Text } from "@/components/text";
 import { FEE_SETTINGS_ARE_SAMPLE, feeSettings } from "@/config/fees";
 import { findCharity } from "@/data/sample";
 import { rand, randExact } from "@/lib/format";
+import { givingKindLabels } from "@/lib/giving";
 import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
 import { calculateFees } from "@shared/fees";
 import { colors, space } from "@/theme/tokens";
@@ -18,7 +19,7 @@ import { colors, space } from "@/theme/tokens";
 /** Screen 6: confirmation. Quiet and warm; the content rises in like a sheet. */
 export default function Done() {
   const insets = useSafeAreaInsets();
-  const p = useLocalSearchParams<{ slug: string; cents?: string; frequency?: string; name?: string; r18a?: string }>();
+  const p = useLocalSearchParams<{ slug: string; cents?: string; frequency?: string; name?: string; r18a?: string; kind?: string }>();
   const charity = findCharity(p.slug);
   const cents = Number(p.cents);
   const monthly = p.frequency === "monthly";
@@ -70,6 +71,9 @@ export default function Done() {
 
         <View style={styles.notes}>
           <Note text={`${charity.nameEn} receives 100% of your gift.`} />
+          {p.kind === "maaser" || p.kind === "chomesh" || p.kind === "tzedaka" ? (
+            <Note text={`Counted as ${givingKindLabels[p.kind].toLowerCase()} on your Giving page.`} />
+          ) : null}
           {charity.issues18a ? (
             p.r18a === "1" ? (
               <Note text={`Your gift will be on your annual 18A receipt, issued after the tax year ends on ${yearEnd}.`} />

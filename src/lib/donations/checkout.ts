@@ -101,6 +101,7 @@ export async function startDonation(args: {
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
+    giving_kind: v.giving_kind,
     popia_consent_at: now,
     age_confirmed_at: now,
   });

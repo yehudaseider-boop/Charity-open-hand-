@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { Field } from "@/components/field";
@@ -11,14 +11,16 @@ import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
 import { FEE_SETTINGS_ARE_SAMPLE, feeSettings } from "@/config/fees";
+import type { GivingKind } from "@/data/giving";
 import { findCharity } from "@/data/sample";
+import { givingKindLabels } from "@/lib/giving";
 import { randExact } from "@/lib/format";
 import { useScreenState } from "@/lib/screen-state";
 import { calculateFees } from "@shared/fees";
 import { isValidSaIdNumber } from "@shared/sa-id";
-import { colors, radius, space } from "@/theme/tokens";
+import { colors, radius, space, touch, type } from "@/theme/tokens";
 
-type Errors = Partial<Record<"name" | "email" | "idNumber" | "orgName" | "regNumber" | "taxRef" | "address" | "city" | "postal" | "phone" | "age" | "consent", string>>;
+type Errors = Partial<Record<"name" | "email" | "idNumber" | "orgName" | "regNumber" | "taxRef" | "address" | "city" | "postal" | "phone" | "age" | "consent" | "kind", string>>;
 
 /** Screen 5: checkout. Guest by default. */
 export default function Checkout() {
@@ -46,6 +48,7 @@ export default function Checkout() {
   const [phone, setPhone] = useState(demo.includes("18a") ? "082 555 1234" : "");
   const [age, setAge] = useState(filled);
   const [consent, setConsent] = useState(filled);
+  const [kind, setKind] = useState<GivingKind | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -84,6 +87,7 @@ export default function Checkout() {
       if (!/^\d{4}$/.test(postal.trim())) e.postal = "Postal code is 4 digits";
       if (!/^(\+27|0)\d{9}$/.test(phone.replace(/[\s()-]/g, ""))) e.phone = "Use a South African number, for example 082 123 4567";
     }
+    if (!kind) e.kind = "Choose maaser, chomesh or general tzedaka";
     if (!age) e.age = "You must be 18 or older to give";
     if (!consent) e.consent = "Please agree so the charity can record your gift";
     return e;
@@ -98,7 +102,7 @@ export default function Checkout() {
     setTimeout(() => {
       router.replace({
         pathname: "/give/[slug]/done",
-        params: { slug: charity!.slug, cents: String(cents), frequency: monthly ? "monthly" : "once", name: name.trim().split(" ")[0], r18a: can18a && want18a ? "1" : "0" },
+        params: { slug: charity!.slug, cents: String(cents), frequency: monthly ? "monthly" : "once", name: name.trim().split(" ")[0], r18a: can18a && want18a ? "1" : "0", kind: kind ?? "" },
       });
     }, 400);
   }
@@ -192,6 +196,26 @@ export default function Checkout() {
           </View>
         ) : null}
 
+        {/* Maaser, chomesh or general tzedaka: the donor chooses every time. */}
+        <View style={[styles.section, { gap: 12 }]}>
+          <View style={{ gap: 4 }}>
+            <Text variant="h2" style={styles.sectionTitle}>This gift is from</Text>
+            <Text variant="bodyMuted" style={{ fontSize: 16 }}>It counts towards that total on your Giving page. Only you see this.</Text>
+          </View>
+          <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="This gift is from">
+            {(["maaser", "chomesh", "tzedaka"] as const).map((k) => {
+              const selected = kind === k;
+              return (
+                <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setKind(k)} style={[styles.kind, selected && styles.kindOn]}>
+                  <View style={[styles.dot, selected && styles.dotOn]} />
+                  <Text style={[type.button, { fontSize: 17, color: selected ? colors.accent : colors.ink }]}>{givingKindLabels[k]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {shownErrors.kind ? <Text variant="label" style={{ color: colors.danger }}>{shownErrors.kind}</Text> : null}
+        </View>
+
         {/* Summary */}
         <View style={styles.summary}>
           <Row label={monthly ? "Gift each month" : "Gift"} value={randExact(fees.amountCents)} />
@@ -254,6 +278,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   rule: { height: 1, backgroundColor: colors.hairline },
   strong: { fontFamily: "Archivo_700Bold", fontSize: 18 },
+  kind: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: touch, paddingHorizontal: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
+  kindOn: { borderColor: colors.accent, borderWidth: 1.5 },
+  dot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: colors.muted },
+  dotOn: { borderColor: colors.accent, borderWidth: 6 },
   payStub: { gap: 4, padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, borderStyle: "dashed" },
   banner: { gap: 4, padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.surface },
 });

@@ -13,7 +13,7 @@ import { TargetEditor, type Target } from "@/components/target-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere, recurring as sampleRecurring, sampleMaaserTarget, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, rand } from "@/lib/format";
-import { byCharity, groupByMonth, inGivingYear, monthlyToReach, percentOf, totalBetween } from "@/lib/giving";
+import { byCharity, givingKindLabels, groupByMonth, inGivingYear, monthlyToReach, percentOf, sumOfKind } from "@/lib/giving";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
 import { useScreenState } from "@/lib/screen-state";
 import { colors, radius, space, touch, type } from "@/theme/tokens";
@@ -39,9 +39,7 @@ export default function Giving() {
   const yearLabel = `Rosh Hashana ${hYear}: ${ddmmyyyy(yearStart)} to ${yearEnd}`;
   const myGifts = newDonor ? [] : gifts;
   const yearGifts = inGivingYear(myGifts, hYear);
-  const elsewhere = newDonor ? 0 : inGivingYear(givenElsewhere, hYear).reduce((t, r) => t + r.cents, 0);
   const giftsTotal = yearGifts.reduce((t, g) => t + g.cents, 0);
-  const given = giftsTotal + elsewhere;
   const monthGifts = yearGifts.filter((g) => g.date.getMonth() === now.getMonth() && g.date.getFullYear() === now.getFullYear());
   const monthTotal = monthGifts.reduce((t, g) => t + g.cents, 0);
   const charities = byCharity(yearGifts);
@@ -49,13 +47,22 @@ export default function Giving() {
   const monthsLeft = monthsLeftInGivingYear(now, hYear);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const elsewhereMonth = newDonor ? 0 : totalBetween(givenElsewhere, monthStart, monthEndDate);
+  const stop = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const inMonth = <T extends { date: Date }>(rows: T[]) => rows.filter((r) => r.date >= monthStart && r.date < stop);
   const byMonth = target?.period === "month";
-  const periodGiven = byMonth ? monthTotal + elsewhereMonth : given;
-  const periodElsewhere = byMonth ? elsewhereMonth : elsewhere;
+  // Gifts and "given elsewhere" entries in the target's period, each marked maaser, chomesh or general tzedaka.
+  const periodRows = [
+    ...(byMonth ? monthGifts : yearGifts),
+    ...(newDonor ? [] : byMonth ? inMonth(givenElsewhere) : inGivingYear(givenElsewhere, hYear)),
+  ];
+  const maaserGiven = sumOfKind(periodRows, "maaser");
+  const chomeshGiven = sumOfKind(periodRows, "chomesh");
+  const tzedakaGiven = sumOfKind(periodRows, "tzedaka");
   const periodEnd = byMonth ? ddmmyyyy(monthEndDate) : yearEnd;
   const periodLabel = byMonth ? `${monthNames[now.getMonth()]} ${now.getFullYear()}` : yearLabel;
-  const remaining = target === null ? 0 : Math.max(0, target.cents - periodGiven);
+  const maaserLeft = target === null ? 0 : Math.max(0, target.maaserCents - maaserGiven);
+  const chomeshLeft = target?.chomeshCents ? Math.max(0, target.chomeshCents - chomeshGiven) : 0;
+  const remaining = maaserLeft + chomeshLeft;
   const [openGift, setOpenGift] = useState<Gift | null>(null);
 
   return (
@@ -90,16 +97,23 @@ export default function Giving() {
               />
             ) : (
               <View style={{ gap: 10 }}>
-                <MaaserProgress givenCents={periodGiven} targetCents={target.cents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
+                <MaaserProgress title="Maaser" givenCents={maaserGiven} targetCents={target.maaserCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
+                {target.chomeshCents ? (
+                  <MaaserProgress title="Chomesh" givenCents={chomeshGiven} targetCents={target.chomeshCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
+                ) : null}
+                <View style={styles.tzedakaRow}>
+                  <Text style={{ flex: 1, fontSize: 16 }}>General tzedaka this {target.period}</Text>
+                  <Text style={{ fontSize: 16, fontFamily: "Archivo_600SemiBold" }}>{rand(tzedakaGiven)}</Text>
+                </View>
                 {saved ? (
                   <Text variant="label" style={{ paddingHorizontal: 4, color: colors.success }} accessibilityLiveRegion="polite">
-                    Target saved.
+                    Targets saved.
                   </Text>
                 ) : null}
                 <Text variant="label" style={{ paddingHorizontal: 4 }}>
-                  Includes {rand(periodElsewhere)} you logged as given elsewhere this {target.period}. Only you see your target.
+                  General tzedaka doesn&apos;t count towards maaser or chomesh. Includes gifts you logged as given elsewhere. Only you see your targets.
                 </Text>
-                <TextLink label="Change target" onPress={() => { setSaved(false); setEditing(true); }} />
+                <TextLink label="Change targets" onPress={() => { setSaved(false); setEditing(true); }} />
               </View>
             )}
 
@@ -110,13 +124,14 @@ export default function Giving() {
                   <>
                     <Text variant="amount" style={{ fontSize: 36, lineHeight: 42 }}>{rand(remaining)}</Text>
                     <Text variant="bodyMuted">
+                      {target.chomeshCents ? `${rand(maaserLeft)} maaser and ${rand(chomeshLeft)} chomesh, ` : ""}
                       {byMonth
                         ? `still to give by ${periodEnd}, the end of this month.`
                         : `still to give by ${yearEnd}. About ${rand(monthlyToReach(remaining, monthsLeft))} a month over the ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left.`}
                     </Text>
                   </>
                 ) : (
-                  <Text style={{ fontSize: 17 }}>You&apos;ve reached your target for this {target.period}.</Text>
+                  <Text style={{ fontSize: 17 }}>You&apos;ve reached your {target.chomeshCents ? "targets" : "target"} for this {target.period}.</Text>
                 )}
               </View>
             ) : null}
@@ -152,6 +167,14 @@ export default function Giving() {
                     <Text style={{ flex: 1, fontSize: 17 }}>Without an 18A receipt</Text>
                     <Text style={{ fontSize: 17 }}>{rand(giftsTotal - with18a)}</Text>
                   </View>
+                </View>
+                <View style={styles.list}>
+                  {(["maaser", "chomesh", "tzedaka"] as const).map((k, i) => (
+                    <View key={k} style={[styles.row, i > 0 && styles.divider]}>
+                      <Text style={{ flex: 1, fontSize: 17 }}>{givingKindLabels[k]}</Text>
+                      <Text style={{ fontSize: 17 }}>{rand(sumOfKind(yearGifts, k))}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
             ) : null}
@@ -192,7 +215,7 @@ export default function Giving() {
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
                             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                              {ddmmyyyy(gift.date)}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No 18A"}
+                              {ddmmyyyy(gift.date)} · {givingKindLabels[gift.kind]}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No 18A"}
                             </Text>
                           </View>
                           <Text style={{ fontSize: 17 }}>{rand(gift.cents)}</Text>
@@ -249,6 +272,7 @@ export default function Giving() {
             </View>
             <View style={styles.list}>
               <DetailRow label="Date" value={ddmmyyyy(openGift.date)} />
+              <DetailRow label="Counted as" value={givingKindLabels[openGift.kind]} divider />
               <DetailRow label="Type" value={openGift.monthly ? "Monthly" : "Once-off"} divider />
               <DetailRow label="18A receipt" value={openGift.with18a ? "Yes" : "No"} divider />
             </View>
@@ -286,6 +310,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, minHeight: touch + 8 },
   divider: { borderTopWidth: 1, borderTopColor: colors.hairline },
   cancel: { minHeight: touch, alignItems: "center", justifyContent: "center" },
+  tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
   card: { gap: 6, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
   statRow: { flexDirection: "row", gap: 12 },
   stat: { flex: 1, gap: 4, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },

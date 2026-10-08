@@ -120,6 +120,17 @@
     A top-up balance wallet is a separate decision: it means holding donor funds and needs legal
     advice first (see `donations.funding_source`).
 
+## Maaser, chomesh and general tzedaka (08/10/2026, decided by Yehuda)
+
+- Every gift is marked maaser, chomesh or general tzedaka (`donations.giving_kind`).
+  The donor must choose at checkout; there is no default. Older rows stay empty.
+- Maaser and chomesh have separate targets and separate progress bars. General
+  tzedaka is shown on its own and counts towards neither.
+- Targets: from income (maaser 10%, chomesh a further 10%) or fixed amounts,
+  per month or per Rosh Hashana year. The earlier "other percentage" option is gone.
+- This is for the donor's own records only. It is not on receipts and charities
+  don't need it.
+
 ## Phone app (apps/mobile)
 
 - Expo app for donors (iOS, Android, plus a web preview for review). Charity
