@@ -25,7 +25,7 @@ export default function Discover() {
     return charities.filter(
       (c) =>
         (cause === "all" || c.causeId === cause) &&
-        (!q || c.nameEn.toLowerCase().includes(q) || c.nameHe.includes(query.trim()) || c.cause.toLowerCase().includes(q)),
+        (!q || c.nameEn.toLowerCase().includes(q) || c.cause.toLowerCase().includes(q) || c.area.toLowerCase().includes(q)),
     );
   }, [query, cause]);
 
@@ -46,7 +46,7 @@ export default function Discover() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search charities, in English or Hebrew"
+            placeholder="Search by name, cause or area"
             placeholderTextColor={colors.muted}
             accessibilityLabel="Search charities"
             returnKeyType="search"

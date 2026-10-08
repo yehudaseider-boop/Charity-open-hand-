@@ -200,3 +200,17 @@
 - Decided by Yehuda (09/10/2026): owners and admins see the same things; no team invites for now (platform team adds charity admins); English only everywhere, no Hebrew version.
 - 2FA for charity admins: yes. Authenticator-app code (TOTP) is required once per sign-in before any charity page, action or CSV download (`/mfa`, `src/lib/mfa.ts`). TOTP must be switched on in the live Supabase project (Authentication, Multi-Factor). Platform admins need it too (Yehuda, 09/10/2026), which settles #4.
 - Not browser-tested here: the pages need a live Supabase. Verified by build, typecheck, lint and the database tests.
+
+## Donation model and app hand-off (Yehuda, 08/10/2026)
+
+- Name is NEDIV lev everywhere. "Open Hand" is retired.
+- No platform fee and no processing fee. Donors may tick a box to add a contribution to NEDIV lev: any amount, minimum R10, unticked by default. Minimum donation stays R30.
+- The donation and the contribution are separate line items (`amount_cents`, `contribution_cents`), whether or not the gateway splits payments. Charities never see the contribution.
+- OPEN: who pays the gateway's own charge (the charity out of its donation, or NEDIV lev). Real gateways stay closed until decided (`platformConfig.fees.gatewayChargePaidBy`); only the test gateway runs.
+- OPEN: which gateway, and whether it splits payments for South African merchants. Both adapters have `splitsPayments: false` until confirmed.
+- App Store rule: the app never takes payments. It shows no amount to pay, card fields or pay button. "Give on our website" opens the phone's browser on `/c/[slug]/donate`, carrying the donor's maaser, chomesh or tzedaka choice (`?kind=`). Amount fields for maaser targets and calculators in the app are fine: no money moves.
+- The confirmation page shows amount, charity, contribution and reference (`NL-XXXXXXXX`), and a "Back to the NEDIV lev app" link (`nedivlev://giving`; a universal link once we have a domain). In Expo Go the custom link does not open the app; it needs a standalone build.
+- Giving history and maaser/chomesh stats come from the server, updated by the webhook. A donor signs into the app with the email they gave with, and every donation under that email appears. (Server side done; app sign-in and live data still to build.)
+- NEDIV lev issues the s18A receipts on the charity's behalf, as built.
+- s18A details asked: ID number or income tax number only. Address and phone left out until Yehuda confirms what an s18A receipt must show.
+- Monthly donations: not built yet; needs the gateway's recurring billing.

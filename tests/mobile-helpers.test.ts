@@ -1,23 +1,8 @@
 /** The phone app's pure helpers (apps/mobile/src/lib). */
 import { describe, expect, it } from "vitest";
-import { checkAmount } from "../apps/mobile/src/lib/amount";
+import { donateUrl } from "../apps/mobile/src/lib/website";
 import { rand, ddmmyyyy } from "../apps/mobile/src/lib/format";
 import { taxYearFor, taxYearRangeLabel } from "../apps/mobile/src/lib/tax-year";
-
-describe("app amount check (R30 minimum)", () => {
-  it.each([
-    ["30", { ok: true, cents: 3000 }],
-    ["180", { ok: true, cents: 18000 }],
-    ["1 250,50", { ok: true, cents: 125050 }],
-    ["29.99", { ok: false, reason: "below_minimum" }],
-    ["29", { ok: false, reason: "below_minimum" }],
-    ["", { ok: false, reason: "empty" }],
-    ["abc", { ok: false, reason: "invalid" }],
-    ["0", { ok: false, reason: "invalid" }],
-  ])("%s", (input, expected) => {
-    expect(checkAmount(input, 3000)).toEqual(expected);
-  });
-});
 
 describe("app Rand format", () => {
   it("drops cents on whole Rand, keeps them otherwise", () => {
@@ -60,5 +45,19 @@ describe("app giving helpers", () => {
   it("maaser target is the percentage of income", () => {
     expect(maaserTargetCents(4_800_000, 100_000)).toBe(480_000); // 10% of R48 000
     expect(maaserTargetCents(4_800_000, 200_000)).toBe(960_000); // 20% (chomesh)
+  });
+});
+
+describe("app hand-off to the website", () => {
+  it("opens the charity's donation page with the giving kind chosen in the app", () => {
+    expect(donateUrl("https://example.co.za", "northcliff-meals-fund", "chomesh")).toBe(
+      "https://example.co.za/c/northcliff-meals-fund/donate?kind=chomesh&from=app",
+    );
+    expect(donateUrl("https://example.co.za/", "a b", "maaser")).toBe("https://example.co.za/c/a%20b/donate?kind=maaser&from=app");
+  });
+  it("refuses a website address that isn't https", () => {
+    expect(donateUrl("http://example.co.za", "x", "tzedaka")).toBeNull();
+    expect(donateUrl("", "x", "tzedaka")).toBeNull();
+    expect(donateUrl(undefined, "x", "tzedaka")).toBeNull();
   });
 });

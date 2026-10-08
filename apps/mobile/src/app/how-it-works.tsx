@@ -5,15 +5,13 @@ import { Button } from "@/components/button";
 import { CheckIcon } from "@/components/icons";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
-import { feeSettings } from "@/config/fees";
-import { rand } from "@/lib/format";
 import { colors, radius, space } from "@/theme/tokens";
 
 const steps = [
-  { title: "Find a charity", body: "Search by name or cause, in English or Hebrew. Every charity page shows whether it issues 18A receipts." },
-  { title: "Choose your amount", body: `Give once or every month. The minimum donation is ${rand(feeSettings.minDonationCents)}. You don't need an account to give once.` },
-  { title: "Give securely", body: "You pay on the payment provider's secure page. We never see or store your card details." },
-  { title: "Get your receipt", body: "If the charity issues 18A receipts, you get one annual receipt from the charity covering all your donations to it." },
+  { title: "Find a charity", body: "Search by name, cause or area. Every charity page shows whether it issues 18A receipts." },
+  { title: "Give on our website", body: "Choose maaser, chomesh or general tzedaka here, then tap Give. Our website opens, where you enter the amount and pay securely. We never see or store your card details." },
+  { title: "Back in the app", body: "Sign in with the email you gave with. Every donation, and your maaser and chomesh, shows up here." },
+  { title: "Get your receipt", body: "If the charity issues 18A receipts, you get one annual receipt covering all your donations to it." },
 ];
 
 /** How it works: four plain steps, then the fee promise. */
@@ -39,7 +37,7 @@ export default function HowItWorks() {
 
         <View style={styles.promise}>
           <View style={{ marginTop: 3 }}><CheckIcon /></View>
-          <Text style={{ flex: 1, fontSize: 17 }}>The charity receives 100% of your donation. A processing fee is added on top, and you see the total before you pay.</Text>
+          <Text style={{ flex: 1, fontSize: 17 }}>The charity receives 100% of your donation. There is no fee. You can choose to add a contribution to NEDIV lev.</Text>
         </View>
 
         <Button label="Find a charity" onPress={() => router.push("/discover")} />

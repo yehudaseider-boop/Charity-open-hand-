@@ -18,8 +18,11 @@ export type Charity = {
   nameHe: string;
   cause: string; // one line
   causeId: string;
+  /** Suburb or area it serves. */
+  area: string;
   photo: string; // placeholder subject
   issues18a: boolean;
+  /** [what it does, how donations are used] */
   about: [string, string];
   featured?: boolean;
 };
@@ -31,6 +34,7 @@ export const charities: Charity[] = [
     nameHe: "קרן ארוחות נורת'קליף",
     cause: "Weekly Shabbos parcels for families in need",
     causeId: "food",
+    area: "Northcliff",
     photo: "food parcels being packed",
     issues18a: true,
     featured: true,
@@ -45,6 +49,7 @@ export const charities: Charity[] = [
     nameHe: "מרכז לימוד תורה לינקספילד",
     cause: "Evening shiurim and a kollel for working men",
     causeId: "torah",
+    area: "Linksfield",
     photo: "a lit study hall",
     issues18a: true,
     about: [
@@ -58,6 +63,7 @@ export const charities: Charity[] = [
     nameHe: "קרן בית הכנסת גלנהייזל",
     cause: "Upkeep of the shul building and grounds",
     causeId: "shuls",
+    area: "Glenhazel",
     photo: "a shul entrance",
     issues18a: false,
     about: [
@@ -71,6 +77,7 @@ export const charities: Charity[] = [
     nameHe: "ביקור חולים סנדטון",
     cause: "Meals and visits for patients and their families",
     causeId: "medical",
+    area: "Sandton",
     photo: "a hospital corridor",
     issues18a: true,
     about: [

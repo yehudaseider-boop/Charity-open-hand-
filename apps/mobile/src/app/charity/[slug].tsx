@@ -3,24 +3,24 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AmountPicker } from "@/components/amount-picker";
 import { Button } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
 import { BackIcon, HeartIcon } from "@/components/icons";
 import { PlaceholderImage } from "@/components/placeholder-image";
 import { Sheet } from "@/components/sheet";
+import { GiveSheet } from "@/components/give-sheet";
 import { EmptyState } from "@/components/states";
 import { Status18a } from "@/components/status-18a";
 import { HebrewText, Text } from "@/components/text";
 import { causes, findCharity } from "@/data/sample";
 import { colors, space, touch } from "@/theme/tokens";
 
-/** Screen 3: charity detail. Screen 4 (amount sheet) rises over it. */
+/** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
 export default function CharityDetail() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ slug: string; sheet?: string; amount?: string; saved?: string }>();
+  const params = useLocalSearchParams<{ slug: string; sheet?: string; saved?: string }>();
   const charity = findCharity(params.slug);
-  const [sheetOpen, setSheetOpen] = useState(params.sheet === "amount");
+  const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const [saved, setSaved] = useState(params.saved === "1");
 
   if (!charity) {
@@ -48,14 +48,17 @@ export default function CharityDetail() {
           <View style={{ marginTop: 6 }}><Status18a issues18a={charity.issues18a} /></View>
 
           <View style={styles.paras}>
+            <Text variant="label">{charity.area}</Text>
+            <Text variant="label" style={{ color: colors.ink }}>What they do</Text>
             <Text>{charity.about[0]}</Text>
+            <Text variant="label" style={{ color: colors.ink, marginTop: 6 }}>How your donation is used</Text>
             <Text>{charity.about[1]}</Text>
           </View>
 
           <View style={styles.note}>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
               {charity.issues18a
-                ? `Donations qualify for one annual 18A tax receipt, issued in ${charity.nameEn}'s name after the tax year closes.`
+                ? `Donations qualify for one annual 18A tax receipt, issued on ${charity.nameEn}'s behalf after the tax year closes.`
                 : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
             </Text>
           </View>
@@ -85,14 +88,7 @@ export default function CharityDetail() {
       </View>
 
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)}>
-        <AmountPicker
-          charityName={charity.nameEn}
-          initialCustom={params.amount}
-          onContinue={(cents, frequency) => {
-            setSheetOpen(false);
-            router.push({ pathname: "/give/[slug]/checkout", params: { slug: charity.slug, cents: String(cents), frequency } });
-          }}
-        />
+        <GiveSheet charityName={charity.nameEn} slug={charity.slug} />
       </Sheet>
     </View>
   );
