@@ -95,6 +95,36 @@
   chargebacks (admin screen, later), private note to self (needs accounts,
   milestone 4), monthly giving (milestone 5).
 
+## s18A receipts job (08/10/2026, built, switched off)
+
+- **One annual receipt** per donor, per charity, per SARS tax year, covering every
+  paid donation that asked for an 18A receipt. Issued after the tax year closes.
+  The amount is the gift only, never the processing fee. (Attorney to confirm: T5, T6.)
+- **Who qualifies:** charity has s18A approval and a signed mandate, and the mandate
+  was signed before the donation was paid. Refunded, charged-back, pending and
+  failed donations never count. These rules are enforced inside the database function
+  `issue_s18a_receipt`, not only in the job, which issues one receipt in one transaction
+  (number, receipt and donation links together, or nothing).
+- **Receipt number:** `<QuickGive code>-<tax year>-<4 digit running number>`, for example
+  `LTC-2027-0042`. The running number is per charity and never reused. Sample format; change if wanted.
+- **Printed on the receipt:** charity legal name (English and Hebrew), NPO, PBO and s18A
+  numbers and address; donor name, address, registration number, and the last 4 digits only
+  of ID and tax numbers; each donation's date and amount; the total; the wording. The whole
+  snapshot is stored with the receipt, so the PDF can be made again exactly.
+- **Wording is a DRAFT** (`src/config/receipts.ts`) until the attorney confirms it (L4, T4).
+  Real receipts are refused until `RECEIPT_WORDING_CONFIRMED=yes` and `RECEIPTS_ENABLED=yes`.
+- **PDF:** the receipt is a web page printed by headless Chrome (handles Hebrew), with
+  fonts embedded. Stored privately in the `receipts` bucket, PDF only, 2 MB limit.
+- **How it runs:** by a person from the command line, never from the website:
+  `npm run receipts -- 2027` (dry run), `-- 2027 --preview=./out` (DRAFT PDFs), `-- 2027 --issue`.
+  Safe to run again: no double receipts, and a receipt whose PDF failed gets it next run.
+- **Late payments:** a donation paid in the tax year but confirmed after its receipt was
+  issued is not on that receipt. The job lists paid donations it could not receipt so a
+  person can look. Void and re-issue is allowed by the database; no screen for it yet.
+- **Not built yet:** emailing the receipt (needs the email provider), the donor's Receipts
+  tab on the website, charity and admin screens, void and re-issue screen, full ID number
+  printing (needs the attorney's answer first).
+
 ## Open (ask Yehuda when reached)
 
 1. Gateway choice and rate sheet (percentage + fixed charge). Fields are empty.
