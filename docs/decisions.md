@@ -111,6 +111,14 @@
 11. Paystack rate sheet: percentage, fixed amount, and whether they include VAT.
 12. 18A for donors without an SA ID number (e.g. passport holders).
 13. Network access to paystack.com and api.paystack.co for this environment, and Paystack test keys.
+14. Phone wallets (Apple Pay and Google Pay), chosen by Yehuda (08/10/2026). Not a stored-value
+    balance: we do not hold donors' money. Nothing is built yet. To confirm with Paystack:
+    whether Apple Pay and Google Pay are offered to South African (ZAR) merchants, whether they
+    appear on Paystack's hosted checkout page (the adapter uses it) or need Paystack's inline
+    checkout on our own domain, and what domain verification Apple requires. The adapter does not
+    restrict payment channels today, so wallets show up if Paystack enables them for the account.
+    A top-up balance wallet is a separate decision: it means holding donor funds and needs legal
+    advice first (see `donations.funding_source`).
 
 ## Phone app (apps/mobile)
 
