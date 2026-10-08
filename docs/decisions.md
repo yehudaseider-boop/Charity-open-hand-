@@ -223,7 +223,21 @@
 - Legal details are locked while an application is under review.
 - Rate limiting no longer trusts the client-typed IP. Set `CLIENT_IP_HEADER` once hosting is chosen (#3).
 - Still open from the review:
-  - Approved charities' gateway reference and mandate document path are readable by the public API (low risk); move to a public view later.
-  - A donor who signs in sees the checkout details of every donation made with their email, including ones someone else typed. Inherent in linking by email; revisit with Yosef under POPIA.
+  - A donor who signs in sees every donation and receipt made under their email, including one someone else gave using that address. Inherent in linking by email (the confirmation and receipt emails go to that address anyway); revisit with Yosef under POPIA.
   - "1,000" is refused as an amount on purpose: in SA it can mean R1 or R1 000. The donor sees "Enter an amount in Rand, for example 180 or 180.50."
   - The app uses the phone's own time zone for dates; fine in South Africa, to fix before any overseas use.
+
+## Privacy lanes (08/10/2026)
+
+Who sees what, enforced in the database and tested in `tests/privacy-db.test.ts`:
+
+| Who | Sees | Never sees |
+|---|---|---|
+| The public | Approved charities' public profile | Gateway references, mandate file, rejection reasons, any donor or donation |
+| A donor | Their own donations, giving kind, monthly donations, receipts, maaser records | What was typed at checkout (ID/tax numbers, fingerprints), anything of other donors or charities' private side |
+| A charity admin (with code) | Their own charity; donors who paid them: name, contact, amount, message, 18A yes/no | Fees, NEDIV lev contributions, gateway data, maaser/chomesh choice, any part of ID or tax numbers, other charities, abandoned checkouts |
+| A platform admin (with code) | Everything needed to run the platform | Card details (never stored); ID and tax numbers only encrypted |
+| The server only | Gateway events, receipt numbering, rate limits, writes to money and receipts | |
+
+- No client role may truncate, add triggers or reference tables.
+- Charity document records can only point at files in that charity's own folder.

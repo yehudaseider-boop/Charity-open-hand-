@@ -208,7 +208,10 @@ export async function removeDocument(charityId: string, documentId: string): Pro
   const supabase = await createClient();
   const { error } = await supabase.from("charity_documents").delete().eq("id", documentId);
   if (error) throw error;
-  await createAdminClient().storage.from("charity-documents").remove([doc.storage_path]);
+  // Only ever this charity's own files (the database also refuses any other path).
+  if (doc.storage_path.startsWith(`${charityId}/`) && !doc.storage_path.includes("..")) {
+    await createAdminClient().storage.from("charity-documents").remove([doc.storage_path]);
+  }
   revalidatePath(`/charity-admin/${charityId}/application`);
 }
 

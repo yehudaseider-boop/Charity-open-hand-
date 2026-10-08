@@ -97,7 +97,7 @@ describe("approved charity", () => {
       async () => {
         await run(
           `insert into public.charity_documents (charity_id, document_type, storage_path, file_name)
-           values ($1, 'bank_confirmation', 'x/y.pdf', 'y.pdf')`,
+           values ($1::uuid, 'bank_confirmation', $1::text || '/y.pdf', 'y.pdf')`,
           [meals],
         );
       },

@@ -1,0 +1,186 @@
+/**
+ * Privacy lanes: what each kind of person can and cannot read, checked the
+ * way the API would see them (database role + signed-in claims).
+ * Needs the local Supabase, seeded.
+ */
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
+
+const client = new pg.Client({
+  connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+});
+const run = (sql: string, args: unknown[] = []) => client.query(sql, args);
+let ids: Record<string, string>;
+
+beforeAll(async () => {
+  await client.connect();
+  const one = async (sql: string, a: unknown[]) => (await run(sql, a)).rows[0].id as string;
+  ids = {
+    donorUser: await one("select id from auth.users where email = $1", ["donor@nedivlev.test"]),
+    donor: await one("select id from public.donors where email = $1", ["donor@nedivlev.test"]),
+    mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
+    shulAdmin: await one("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
+  };
+});
+afterAll(() => client.end());
+
+async function tx(fn: () => Promise<void>) {
+  await run("begin");
+  try {
+    await fn();
+  } finally {
+    await run("rollback");
+  }
+}
+async function as(who: "anon" | string) {
+  await run("reset role");
+  if (who === "anon") {
+    await run("set local role anon");
+    await run(`select set_config('request.jwt.claims', '{"role":"anon"}', true)`);
+  } else {
+    await run("set local role authenticated");
+    await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: who, role: "authenticated", aal: "aal2" })]);
+  }
+}
+/** Expect a statement to be refused outright, without breaking the transaction. */
+async function denied(sql: string, args: unknown[] = []) {
+  await run("savepoint p");
+  await expect(run(sql, args)).rejects.toThrow(/permission denied/);
+  await run("rollback to savepoint p");
+}
+/** A paid donation from the seeded donor to Meals, with typed details and a recurring row. */
+async function paidDonation() {
+  await run("reset role");
+  const { rows } = await run(
+    `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, contribution_cents,
+       total_charged_cents, gateway, gateway_ref, status, paid_at, tax_year, wants_18a)
+     values ($1, $2, 18000, 0, 0, 2000, 20000, 'test', gen_random_uuid()::text, 'paid', now(), 2027, true) returning id`,
+    [ids.donor, ids.meals],
+  );
+  const id = rows[0].id as string;
+  await run(
+    `insert into public.donation_checkout_details (donation_id, donor_type, email, first_name, id_number_last4, receipt_identity)
+     values ($1, 'individual', 'donor@nedivlev.test', 'Dina', '9087', 'fingerprint')`,
+    [id],
+  );
+  await run("insert into public.donation_giving_kinds (donation_id, kind) values ($1, 'maaser')", [id]);
+  await run(
+    `insert into public.recurring_donations (donor_id, charity_id, amount_cents, gateway, gateway_subscription_ref, gateway_customer_ref)
+     values ($1, $2, 18000, 'test', 'SUB_secret', 'CUS_secret')`,
+    [ids.donor, ids.meals],
+  );
+  return id;
+}
+
+describe("the public (not signed in)", () => {
+  it("sees charity profiles, but never gateway or mandate details", async () => {
+    await tx(async () => {
+      await as("anon");
+      expect((await run("select name_en, is_s18a from public.charities where id = $1", [ids.meals])).rowCount).toBe(1);
+      await denied("select gateway_subaccount_ref from public.charities");
+      await denied("select mandate_document_path from public.charities");
+      await denied("select rejection_reason from public.charities");
+      await denied("select * from public.charities");
+    });
+  });
+
+  it("can't read any donation, donor, receipt or server table", async () => {
+    await tx(async () => {
+      await as("anon");
+      for (const t of ["donations", "donors", "donation_checkout_details", "donation_giving_kinds", "s18a_receipts", "recurring_donations", "charity_private", "charity_donations", "gateway_events", "receipt_counters", "rate_limit_events", "audit_log", "profiles"]) {
+        await denied(`select 1 from public.${t} limit 1`);
+      }
+    });
+  });
+});
+
+describe("a donor", () => {
+  it("sees their own donations, giving kind and monthly donations, but not the checkout details table", async () => {
+    await tx(async () => {
+      const id = await paidDonation();
+      await as(ids.donorUser);
+      expect((await run("select id from public.donations where id = $1", [id])).rowCount).toBe(1);
+      expect((await run("select kind from public.donation_giving_kinds where donation_id = $1", [id])).rows[0].kind).toBe("maaser");
+      expect((await run("select id from public.recurring_donations where donor_id = $1", [ids.donor])).rowCount).toBeGreaterThan(0);
+      // What was typed at checkout (ID number, fingerprint) stays with the server.
+      expect((await run("select * from public.donation_checkout_details where donation_id = $1", [id])).rowCount).toBe(0);
+      // And nothing of charities' private side.
+      expect((await run("select * from public.charity_donations")).rowCount).toBe(0);
+      expect((await run("select * from public.charity_private")).rowCount).toBe(0);
+    });
+  });
+
+  it("can't truncate or write money tables", async () => {
+    await tx(async () => {
+      await as(ids.donorUser);
+      await denied("truncate public.donations");
+      await denied("update public.donations set amount_cents = 1");
+      await denied("insert into public.s18a_receipts (charity_id, receipt_number, donor_id, tax_year, amount_cents, details) values ($1, 1, $2, 2027, 1, '{}')", [ids.meals, ids.donor]);
+    });
+  });
+});
+
+describe("a charity admin", () => {
+  it("sees who gave to their charity, without fees, contribution, giving kind, ID or tax numbers", async () => {
+    await tx(async () => {
+      const id = await paidDonation();
+      await as(ids.mealsAdmin);
+      const rows = (await run("select * from public.charity_donations where id = $1", [id])).rows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ first_name: "Dina", amount_cents: "18000" });
+      for (const hidden of ["contribution_cents", "total_charged_cents", "platform_fee_cents", "gateway", "gateway_ref", "kind", "id_number_last4", "tax_reference_last4", "id_number_encrypted", "receipt_identity"]) {
+        expect(Object.keys(rows[0])).not.toContain(hidden);
+      }
+      // The raw tables stay closed.
+      expect((await run("select * from public.donations where id = $1", [id])).rowCount).toBe(0);
+      expect((await run("select * from public.donation_checkout_details where donation_id = $1", [id])).rowCount).toBe(0);
+      expect((await run("select * from public.donation_giving_kinds where donation_id = $1", [id])).rowCount).toBe(0);
+      expect((await run("select * from public.recurring_donations where charity_id = $1", [ids.meals])).rowCount).toBe(0);
+      expect((await run("select * from public.donors")).rowCount).toBe(0);
+      // Not even their own charity's gateway reference.
+      await denied("select gateway_subaccount_ref from public.charities where id = $1", [ids.meals]);
+    });
+  });
+
+  it("sees nothing of another charity", async () => {
+    await tx(async () => {
+      const id = await paidDonation();
+      await as(ids.shulAdmin);
+      expect((await run("select * from public.charity_donations where id = $1", [id])).rowCount).toBe(0);
+      expect((await run("select * from public.charity_private where charity_id = $1", [ids.meals])).rowCount).toBe(0);
+      expect((await run("select * from public.charity_documents where charity_id = $1", [ids.meals])).rowCount).toBe(0);
+      expect((await run("select * from public.s18a_receipts where charity_id = $1", [ids.meals])).rowCount).toBe(0);
+      await run("savepoint p");
+      await expect(run("select * from public.charity_donor_list($1)", [ids.meals])).rejects.toThrow(/Not allowed/);
+      await run("rollback to savepoint p");
+    });
+  });
+});
+
+describe("leftovers are gone", () => {
+  it("has no helper that lets a charity probe whether someone gave to it", async () => {
+    const { rowCount } = await run("select 1 from pg_proc where proname = 'donor_gave_to_my_charity'");
+    expect(rowCount).toBe(0);
+  });
+});
+
+describe("charity documents", () => {
+  it("can only point at files in the charity's own folder", async () => {
+    await tx(async () => {
+      await run("reset role");
+      const other = "00000000-0000-0000-0000-000000000001";
+      await run("savepoint p");
+      await expect(
+        run("insert into public.charity_documents (charity_id, document_type, storage_path, file_name) values ($1, 'npo_certificate', $2, 'x.pdf')", [ids.meals, `${other}/bank.pdf`]),
+      ).rejects.toThrow(/charity_documents_own_folder/);
+      await run("rollback to savepoint p");
+      await run("savepoint q");
+      await expect(
+        run("insert into public.charity_documents (charity_id, document_type, storage_path, file_name) values ($1, 'npo_certificate', $2, 'x.pdf')", [ids.meals, `${ids.meals}/../${other}/bank.pdf`]),
+      ).rejects.toThrow(/charity_documents_own_folder/);
+      await run("rollback to savepoint q");
+      await run("insert into public.charity_documents (charity_id, document_type, storage_path, file_name) values ($1, 'npo_certificate', $2, 'x.pdf')", [ids.meals, `${ids.meals}/npo.pdf`]);
+    });
+  });
+});

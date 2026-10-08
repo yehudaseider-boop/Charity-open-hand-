@@ -71,8 +71,6 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {d.email ? <Row label="Email"><a href={`mailto:${d.email}`} className="text-brand underline">{d.email}</a></Row> : null}
           {d.phone ? <Row label="Phone">{d.phone}</Row> : null}
           {addressLine(d) ? <Row label="Address">{addressLine(d)}</Row> : null}
-          {d.id_number_last4 ? <Row label="ID number">•••• {d.id_number_last4}</Row> : null}
-          {d.tax_reference_last4 ? <Row label="Income tax number">•••• {d.tax_reference_last4}</Row> : null}
         </dl>
       </Card>
 

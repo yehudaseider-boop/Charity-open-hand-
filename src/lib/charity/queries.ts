@@ -2,6 +2,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { requireSecondStep } from "@/lib/mfa";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { DocumentType } from "./validation";
 
@@ -32,8 +33,17 @@ export async function loadCharityForManager(id: string) {
     await requireSecondStep(`/charity-admin/${id}`);
   }
   const supabase = await createClient();
+  // Confirm management rights before reading anything private.
+  const [{ data: canManage }, { data: isAdmin }] = await Promise.all([
+    supabase.rpc("is_charity_admin", { target: id }),
+    supabase.rpc("is_platform_admin"),
+  ]);
+  if (!canManage && !isAdmin) notFound();
+
   const [charity, priv, docs, cats] = await Promise.all([
-    supabase.from("charities").select(CHARITY_FIELDS).eq("id", id).maybeSingle(),
+    // Gateway and mandate fields are closed to every client, so the server reads
+    // the charity row itself, now that it knows this person manages it.
+    createAdminClient().from("charities").select(CHARITY_FIELDS).eq("id", id).maybeSingle(),
     supabase.from("charity_private").select(PRIVATE_FIELDS).eq("charity_id", id).maybeSingle(),
     supabase
       .from("charity_documents")
@@ -44,10 +54,6 @@ export async function loadCharityForManager(id: string) {
   ]);
   if (charity.error) throw charity.error;
   if (!charity.data) notFound();
-  // Public visitors can read approved charities, so also confirm management rights.
-  const { data: canManage } = await supabase.rpc("is_charity_admin", { target: id });
-  const { data: isAdmin } = await supabase.rpc("is_platform_admin");
-  if (!canManage && !isAdmin) notFound();
 
   return {
     charity: charity.data,
