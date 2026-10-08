@@ -101,7 +101,6 @@ export async function startDonation(args: {
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
-    giving_kind: v.giving_kind,
     popia_consent_at: now,
     age_confirmed_at: now,
   });
@@ -132,6 +131,11 @@ export async function startDonation(args: {
       : {}),
   });
   if (details.error) throw details.error;
+
+  // The donor's own choice (maaser, chomesh or general tzedaka). Kept in a table
+  // only the donor can read: charities never see it.
+  const kind = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: v.giving_kind });
+  if (kind.error) throw kind.error;
 
   try {
     const site = process.env.SITE_URL ?? "";

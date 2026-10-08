@@ -160,22 +160,33 @@ describe("charity admin", () => {
     });
   });
 
-  it("sees donors and donations for their charity only", async () => {
+  it("sees donations for their charity only, through the charity view, and no longer reads the raw tables", async () => {
     await client.query("begin");
     try {
-      await insertDonation(ids.company, ids.meals);
+      const donationId = await insertDonation(ids.company, ids.meals);
+      await client.query(
+        "insert into public.donation_checkout_details (donation_id, donor_type, email, organisation_name) values ($1, 'company', 'a@test.test', 'Test Trading')",
+        [donationId],
+      );
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
         JSON.stringify({ sub: ids.mealsAdmin, role: "authenticated" }),
       ]);
-      expect(await rows("select id from public.donations")).toHaveLength(1);
-      expect((await rows("select id from public.donors")).map((x) => x.id)).toEqual([ids.company]);
+      const seen = await rows("select * from public.charity_donations");
+      expect(seen.map((x) => x.id)).toEqual([donationId]);
+      // The raw tables are closed to a charity admin (donors and platform admins only).
+      expect(await rows("select id from public.donations")).toHaveLength(0);
+      expect(await rows("select id from public.donors")).toHaveLength(0);
+      expect(await rows("select * from public.donation_checkout_details")).toHaveLength(0);
+      // Fees, gateway data and the giving kind are not in the view.
+      for (const hidden of ["platform_fee_cents", "fee_vat_cents", "processing_charge_cents", "total_charged_cents", "gateway", "gateway_ref", "giving_kind"]) {
+        expect(Object.keys(seen[0])).not.toContain(hidden);
+      }
 
       await client.query("select set_config('request.jwt.claims', $1, true)", [
         JSON.stringify({ sub: ids.shulAdmin, role: "authenticated" }),
       ]);
-      expect(await rows("select id from public.donations")).toHaveLength(0);
-      expect(await rows("select id from public.donors")).toHaveLength(0);
+      expect(await rows("select id from public.charity_donations")).toHaveLength(0);
     } finally {
       await client.query("rollback");
     }

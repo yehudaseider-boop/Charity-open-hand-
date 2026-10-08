@@ -169,8 +169,8 @@
   tzedaka is shown on its own and counts towards neither.
 - Targets: from income (maaser 10%, chomesh a further 10%) or fixed amounts,
   per month or per Rosh Hashana year. The earlier "other percentage" option is gone.
-- This is for the donor's own records only. It is not on receipts and charities
-  don't need it.
+- This is for the donor's own records only. It is not on receipts, and charities cannot read it:
+  it lives in `donation_giving_kinds`, readable only by the donor (08/10/2026: moved out of `donations`).
 
 ## Phone app (apps/mobile)
 

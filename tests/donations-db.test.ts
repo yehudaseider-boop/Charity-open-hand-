@@ -91,7 +91,7 @@ describe("donation status", () => {
 });
 
 describe("checkout details", () => {
-  it("are visible to that charity's admin, not another charity's", async () => {
+  it("a charity admin reads them through the charity view, for their own charity only", async () => {
     await tx(async () => {
       const id = await pending();
       await run(
@@ -100,9 +100,10 @@ describe("checkout details", () => {
       );
       await run("set local role authenticated");
       await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: mealsAdmin, role: "authenticated" })]);
-      expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(1);
+      expect((await run("select * from public.charity_donations")).rowCount).toBe(1);
+      expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(0); // raw table is closed to charities
       await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: shulAdmin, role: "authenticated" })]);
-      expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(0);
+      expect((await run("select * from public.charity_donations")).rowCount).toBe(0);
     });
   });
 });
