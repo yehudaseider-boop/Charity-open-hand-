@@ -13,3 +13,9 @@ export function donateUrl(site: string | undefined, slug: string, kind: GivingKi
   if (!site || !site.startsWith("https://")) return null;
   return `${site.replace(/\/+$/, "")}/c/${encodeURIComponent(slug)}/donate?kind=${kind}&from=app`;
 }
+
+/** Any page on the website (privacy, terms, account), or null until the site is live. */
+export function siteUrl(site: string | undefined, path: string): string | null {
+  if (!site || !site.startsWith("https://") || !path.startsWith("/")) return null;
+  return `${site.replace(/\/+$/, "")}${path}`;
+}

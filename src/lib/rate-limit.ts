@@ -21,5 +21,7 @@ export async function hitRateLimit(bucket: string, keys: string[], limit: number
     if (countError) throw countError;
     if ((count ?? 0) > limit) return true;
   }
+  // IP addresses and emails here are kept for about a day (Privacy Policy).
+  await db.from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString());
   return false;
 }

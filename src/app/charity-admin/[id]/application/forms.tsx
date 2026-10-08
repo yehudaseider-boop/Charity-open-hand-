@@ -89,9 +89,35 @@ export function UploadForm({ action, showMandateDate }: { action: Action; showMa
   );
 }
 
-export function SubmitForm({ action }: { action: (state: FormState) => Promise<FormState> }) {
+/** The declarations a charity makes when it submits (stored with the policy version). */
+export const charityDeclarations = [
+  ["declare_authority", "I am authorised to act for this organisation."],
+  ["declare_true", "The information and documents we have given are true and correct."],
+  ["declare_terms", "We agree to the Terms and Privacy Policy, including the section for charities."],
+  ["declare_donor_data", "We will use donors' information only to record donations and thank donors, keep it secure under POPIA, and never sell or share it."],
+] as const;
+
+export function SubmitForm({ action }: { action: (state: FormState, formData: FormData) => Promise<FormState> }) {
   return (
     <ActionForm action={action} submitLabel="Submit for review"
-      confirm="Submit now? You won't be able to change your details or bank account while we review them." />
+      confirm="Submit now? You won't be able to change your details or bank account while we review them.">
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Declarations</legend>
+        {charityDeclarations.map(([name, text]) => (
+          <label key={name} className="flex items-start gap-2 text-sm">
+            <input type="checkbox" name={name} required className="mt-1" />
+            <span>
+              {text}
+              {name === "declare_terms" ? (
+                <>
+                  {" "}
+                  <a href="/terms" target="_blank" className="text-brand underline">Read the Terms</a>
+                </>
+              ) : null}
+            </span>
+          </label>
+        ))}
+      </fieldset>
+    </ActionForm>
   );
 }

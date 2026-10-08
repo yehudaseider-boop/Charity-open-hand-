@@ -241,3 +241,16 @@ Who sees what, enforced in the database and tested in `tests/privacy-db.test.ts`
 
 - No client role may truncate, add triggers or reference tables.
 - Charity document records can only point at files in that charity's own folder.
+
+## POPIA and legal touchpoints (08/10/2026)
+
+- `/privacy` and `/terms` are DRAFTS for Yosef, shown with a draft notice until `legalConfig.reviewedByLegal` is true. Footer links on every page; the app links to both from Account.
+- Every agreement is stored with its version (`consents` table, `legalConfig.policyVersion`):
+  - Account: anyone signing in must tick "I agree to the Terms and Privacy Policy" and "I am 18 or older" once per version (`/agree`). Changing the version asks everyone again.
+  - Donation: the donor's consent line links the Terms and Privacy Policy, covers sharing with the charity and keeping the maaser/chomesh choice privately; stored per donation.
+  - Charity application: four declarations on submitting (authority, true information, terms, POPIA handling of donor information); stored with the person and charity.
+- Data rights: signed-in people can download everything we hold (`/account/data/export`) and ask to correct, delete or stop use of their information. Requests go to `/admin/requests`; the Information Officer is emailed (no personal details in the email) once an address is set.
+- Rate-limit records (IP addresses, emails) are cleared after about a day.
+- No marketing, no tracking or analytics cookies, no selling of data.
+
+To be supplied before going live (`src/config/legal.ts`): company name, registration number, address, Information Officer name and email, privacy email. For Yosef: refund policy, retention period for tax records, payment and service providers and where they store data, limits of liability, the full charity agreement, and whether a required maaser/chomesh/tzedaka choice is valid consent for special personal information. Also: the Information Officer must be registered with the Information Regulator.

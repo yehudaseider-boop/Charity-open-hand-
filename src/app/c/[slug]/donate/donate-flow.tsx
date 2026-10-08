@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
+import { TermsAndPrivacyLinks } from "@/components/legal";
 import { TextArea, TextField } from "@/components/forms/fields";
 import { givingKinds } from "@/lib/donations/validation";
 import { formatRand } from "@/lib/money";
@@ -236,7 +237,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initi
             I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
           </Check>
           <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
-            I agree that my details are shared with {charityName} so they can record my donation.
+            I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my
+            donation. NEDIV lev keeps my maaser, chomesh or tzedaka choice privately, for my own records.
           </Check>
         </div>
 

@@ -184,3 +184,33 @@ describe("charity documents", () => {
     });
   });
 });
+
+describe("agreements and privacy requests", () => {
+  it("each person reads only their own, and nobody can write or forge them directly", async () => {
+    await tx(async () => {
+      await run("reset role");
+      await run("insert into public.consents (kind, policy_version, user_id) values ('account', 'v-test', $1), ('account', 'v-test', $2)", [ids.donorUser, ids.mealsAdmin]);
+      await run("insert into public.data_requests (user_id, kind, details) values ($1, 'delete', 'please'), ($2, 'correct', 'typo')", [ids.donorUser, ids.mealsAdmin]);
+
+      await as(ids.donorUser);
+      expect((await run("select user_id from public.consents where policy_version = 'v-test'")).rows.map((r) => r.user_id)).toEqual([ids.donorUser]);
+      expect((await run("select user_id from public.data_requests")).rows.map((r) => r.user_id)).toEqual([ids.donorUser]);
+      await denied("insert into public.consents (kind, policy_version, user_id) values ('account', 'forged', $1)", [ids.donorUser]);
+      await denied("update public.data_requests set status = 'done'");
+      await denied("delete from public.consents");
+
+      await as("anon");
+      await denied("select 1 from public.consents");
+      await denied("select 1 from public.data_requests");
+    });
+  });
+
+  it("refuses an agreement record that doesn't say who or what it is for", async () => {
+    await tx(async () => {
+      await run("reset role");
+      await run("savepoint p");
+      await expect(run("insert into public.consents (kind, policy_version) values ('account', 'v')")).rejects.toThrow(/consent_has_subject/);
+      await run("rollback to savepoint p");
+    });
+  });
+});

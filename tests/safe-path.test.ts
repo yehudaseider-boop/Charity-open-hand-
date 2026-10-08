@@ -27,3 +27,14 @@ describe("clientIp", () => {
     expect(clientIp(h({ "x-forwarded-for": "1.1.1.1" }), { CLIENT_IP_HEADER: "x-real-ip" })).toBe("unknown");
   });
 });
+
+import { siteUrl } from "../apps/mobile/src/lib/website";
+
+describe("app links to the website's legal pages", () => {
+  it("builds https links only", () => {
+    expect(siteUrl("https://example.co.za/", "/privacy")).toBe("https://example.co.za/privacy");
+    expect(siteUrl("http://example.co.za", "/privacy")).toBeNull();
+    expect(siteUrl(undefined, "/terms")).toBeNull();
+    expect(siteUrl("https://example.co.za", "privacy")).toBeNull();
+  });
+});

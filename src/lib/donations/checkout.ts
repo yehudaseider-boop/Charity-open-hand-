@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
@@ -136,6 +137,10 @@ export async function startDonation(args: {
       : {}),
   });
   if (details.error) throw details.error;
+
+  // What the donor agreed to, and which version of the Terms and Privacy Policy they saw.
+  const consent = await db.from("consents").insert({ kind: "donation", policy_version: legalConfig.policyVersion, donation_id: donationId });
+  if (consent.error) throw consent.error;
 
   // The donor's own choice (maaser, chomesh or general tzedaka). Kept in a table
   // only the donor can read: charities never see it.

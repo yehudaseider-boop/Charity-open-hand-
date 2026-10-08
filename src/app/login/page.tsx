@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { TermsAndPrivacyLinks } from "@/components/legal";
 import { sendLoginLink } from "./actions";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -39,6 +40,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">
             Email me a sign-in link
           </button>
+          <p className="text-xs text-muted">
+            The first time you sign in you&apos;ll be asked to agree to <TermsAndPrivacyLinks />.
+          </p>
         </form>
       )}
     </div>

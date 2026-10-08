@@ -1,12 +1,13 @@
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
 import { SettingsGroup } from "@/components/settings-group";
 import { Text } from "@/components/text";
 import { sampleDonor } from "@/data/giving";
+import { SITE_URL, siteUrl } from "@/lib/website";
 import { colors, radius, space } from "@/theme/tokens";
 
 /** Screen 9: Account. Guest by default; ?demo=signedin shows a signed-in donor. */
@@ -15,10 +16,16 @@ export default function Account() {
   const p = useLocalSearchParams<{ demo?: string }>();
   const [signedIn, setSignedIn] = useState(p.demo === "signedin");
 
+  // Legal pages live on the website (one source of truth). Apple requires a
+  // privacy policy link in the app, and a way to start deleting your account.
+  const open = (path: string) => () => {
+    const url = siteUrl(SITE_URL, path);
+    if (url) Linking.openURL(url).catch(() => undefined);
+  };
   const support = [
-    { label: "Language", value: "English" },
     { label: "Help" },
-    { label: "Privacy and legal" },
+    { label: "Privacy Policy", onPress: open("/privacy") },
+    { label: "Terms", onPress: open("/terms") },
   ];
 
   return (
@@ -50,6 +57,13 @@ export default function Account() {
             ]}
           />
           <SettingsGroup title="App" cells={support} />
+          <SettingsGroup
+            title="Your information"
+            cells={[
+              { label: "Download my information", onPress: open("/account/data") },
+              { label: "Delete my account", onPress: open("/account/data") },
+            ]}
+          />
           <SettingsGroup cells={[{ label: "Sign out", destructive: true, onPress: () => setSignedIn(false) }]} />
         </>
       ) : (

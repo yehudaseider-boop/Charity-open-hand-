@@ -99,6 +99,11 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         </section>
       ) : null}
 
+      <Link href="/account/data" className="block rounded-card border border-border bg-surface p-5 text-sm">
+        <span className="font-semibold">Your information</span>
+        <span className="block text-muted">Download it, or ask us to correct or delete it</span>
+      </Link>
+
       <form action="/auth/signout" method="post">
         <button className="text-sm text-muted underline">Sign out</button>
       </form>

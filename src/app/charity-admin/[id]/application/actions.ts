@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
+import { legalConfig } from "@/config/legal";
 import { requireViewer } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { loadCharityForManager } from "@/lib/charity/queries";
@@ -215,8 +216,12 @@ export async function removeDocument(charityId: string, documentId: string): Pro
   revalidatePath(`/charity-admin/${charityId}/application`);
 }
 
-export async function submitApplication(charityId: string, _prev: FormState): Promise<FormState> {
+export async function submitApplication(charityId: string, _prev: FormState, formData?: FormData): Promise<FormState> {
   const viewer = await requireViewer();
+  const declarationNames = ["declare_authority", "declare_true", "declare_terms", "declare_donor_data"];
+  if (!formData || declarationNames.some((n) => formData.get(n) !== "on")) {
+    return { ok: false, message: "Please tick all four declarations to submit." };
+  }
   const { data, locked } = await loadEditable(charityId);
   if (locked) return locked;
   const checklist = applicationChecklist({
@@ -235,6 +240,10 @@ export async function submitApplication(charityId: string, _prev: FormState): Pr
     .select("id");
   const fail = refusal(error, rows);
   if (fail) return fail;
+  const consent = await createAdminClient()
+    .from("consents")
+    .insert({ kind: "charity_declarations", policy_version: legalConfig.policyVersion, user_id: viewer.userId, charity_id: charityId });
+  if (consent.error) throw consent.error;
   await logAudit({
     actorUserId: viewer.userId,
     action: "charity.application_submitted",

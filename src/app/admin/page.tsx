@@ -28,6 +28,10 @@ export default async function AdminPage() {
         <p className="font-semibold">s18A receipts</p>
         <p className="text-sm text-muted">See issued receipts and withdraw one if it is wrong</p>
       </Link>
+      <Link href="/admin/requests" className="block rounded-card border border-border bg-surface p-5">
+        <p className="font-semibold">Privacy requests</p>
+        <p className="text-sm text-muted">People asking to correct, delete or stop use of their information</p>
+      </Link>
       <Card title="Charities by status">
         <ul className="space-y-1 text-sm">
           {(Object.keys(statusLabels) as CharityStatus[]).map((s) => (
