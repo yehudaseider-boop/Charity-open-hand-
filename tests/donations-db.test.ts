@@ -91,7 +91,7 @@ describe("donation status", () => {
 });
 
 describe("checkout details", () => {
-  it("are visible to that charity's admin, not another charity's", async () => {
+  it("reach that charity's admin through the dashboard view only, never another charity's", async () => {
     await tx(async () => {
       const id = await pending();
       await run(
@@ -99,10 +99,12 @@ describe("checkout details", () => {
         [id],
       );
       await run("set local role authenticated");
-      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: mealsAdmin, role: "authenticated" })]);
-      expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(1);
-      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: shulAdmin, role: "authenticated" })]);
+      const claims = (sub: string) => JSON.stringify({ sub, role: "authenticated", aal: "aal2" });
+      await run("select set_config('request.jwt.claims', $1, true)", [claims(mealsAdmin)]);
       expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(0);
+      expect((await run("select first_name from public.charity_donations where id = $1", [id])).rows).toEqual([{ first_name: "X" }]);
+      await run("select set_config('request.jwt.claims', $1, true)", [claims(shulAdmin)]);
+      expect((await run("select * from public.charity_donations where id = $1", [id])).rowCount).toBe(0);
     });
   });
 });

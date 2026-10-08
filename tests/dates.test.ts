@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime, taxYearFor, taxYearLabel, taxYearRange } from "@/lib/dates";
+import { formatDate, formatDateTime, formatMonth, monthStart, taxYearFor, taxYearLabel, taxYearRange } from "@/lib/dates";
 
 describe("formatDate", () => {
   it("uses dd/mm/yyyy", () => {
@@ -35,5 +35,25 @@ describe("taxYearRange", () => {
   });
   it("labels", () => {
     expect(taxYearLabel(2027)).toBe("Tax year 2027 (01/03/2026 to 28/02/2027)");
+  });
+});
+
+describe("monthStart", () => {
+  it("is midnight on the 1st in Johannesburg", () => {
+    expect(monthStart("2026-10-08T09:00:00Z")).toBe("2026-10-01T00:00:00+02:00");
+  });
+  it("uses SA time at the boundary", () => {
+    // 22:30 UTC on 30 Sept is already 1 October in Johannesburg.
+    expect(monthStart("2026-09-30T22:30:00Z")).toBe("2026-10-01T00:00:00+02:00");
+  });
+  it("goes back across a year end", () => {
+    expect(monthStart("2026-02-10T12:00:00+02:00", 2)).toBe("2025-12-01T00:00:00+02:00");
+    expect(monthStart("2026-10-08T12:00:00+02:00", 11)).toBe("2025-11-01T00:00:00+02:00");
+  });
+});
+
+describe("formatMonth", () => {
+  it("names the month", () => {
+    expect(formatMonth("2026-10-01")).toBe("Oct 2026");
   });
 });

@@ -160,22 +160,23 @@ describe("charity admin", () => {
     });
   });
 
-  it("sees donors and donations for their charity only", async () => {
+  it("sees their own charity's donations through the dashboard view only", async () => {
     await client.query("begin");
     try {
       await insertDonation(ids.company, ids.meals);
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.mealsAdmin, role: "authenticated" }),
+        JSON.stringify({ sub: ids.mealsAdmin, role: "authenticated", aal: "aal2" }),
       ]);
-      expect(await rows("select id from public.donations")).toHaveLength(1);
-      expect((await rows("select id from public.donors")).map((x) => x.id)).toEqual([ids.company]);
-
-      await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated" }),
-      ]);
+      // The raw tables hold donor-only details, so charities never read them directly.
       expect(await rows("select id from public.donations")).toHaveLength(0);
       expect(await rows("select id from public.donors")).toHaveLength(0);
+      expect((await rows("select donor_id from public.charity_donations")).map((x) => x.donor_id)).toEqual([ids.company]);
+
+      await client.query("select set_config('request.jwt.claims', $1, true)", [
+        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated", aal: "aal2" }),
+      ]);
+      expect(await rows("select id from public.charity_donations")).toHaveLength(0);
     } finally {
       await client.query("rollback");
     }

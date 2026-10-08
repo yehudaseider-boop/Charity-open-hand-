@@ -60,3 +60,32 @@ export function taxYearLabel(taxYear: number): string {
   const fmt = (iso: string) => iso.split("-").reverse().join("/");
   return `Tax year ${taxYear} (${fmt(start)} to ${fmt(end)})`;
 }
+
+/** The platform time zone's offset from UTC at a moment, e.g. "+02:00". */
+function zoneOffset(date: Date): string {
+  const name = new Intl.DateTimeFormat("en-GB", { timeZone, timeZoneName: "longOffset" })
+    .formatToParts(date)
+    .find((p) => p.type === "timeZoneName")?.value;
+  const match = /GMT([+-]\d{2}:\d{2})/.exec(name ?? "");
+  return match ? match[1] : "+00:00";
+}
+
+/** Midnight at the start of a calendar day in Johannesburg, as an ISO timestamp. */
+export function zonedMidnight(year: number, month: number, day: number): string {
+  const ymd = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return `${ymd}T00:00:00${zoneOffset(new Date(`${ymd}T12:00:00Z`))}`;
+}
+
+/** Start of the calendar month (Johannesburg) that a moment falls in, moved back monthsBack months. */
+export function monthStart(date: Date | string, monthsBack = 0): string {
+  const { year, month } = zonedParts(new Date(date));
+  const index = year * 12 + (month - 1) - monthsBack;
+  return zonedMidnight(Math.floor(index / 12), (index % 12) + 1, 1);
+}
+
+/** "2026-10-01" -> "Oct 2026". */
+export function formatMonth(isoDate: string): string {
+  const [year, month] = isoDate.split("-").map(Number);
+  const name = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" }).format(Date.UTC(year, month - 1, 1));
+  return `${name} ${year}`;
+}

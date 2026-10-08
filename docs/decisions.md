@@ -178,3 +178,32 @@
 - Open: Apple's App Review rules on charity donations inside apps (Apple Pay,
   approved nonprofits, or paying in Safari) must be checked before external
   testing or public release.
+
+## Charity dashboard (08/10/2026, first part)
+
+- **Day one, decided by Yehuda:** Overview and Donations. Donors, receipts, exports, monthly
+  donations, payouts and campaigns screens come later.
+- **Team:** every charity admin is added and removed by the platform admin. No Team screen.
+- **Owner and admin see the same dashboard.**
+- **Two-step sign-in is required** for the dashboard (an authenticator app, Supabase TOTP).
+  It is enforced in the database too: charity admins see donations, monthly donations and
+  receipts only with a two-step session (`aal2`). Turn on TOTP MFA in the hosted Supabase
+  project's Auth settings before release (local `config.toml` already has it on).
+  Platform admins are not yet required to use it. Application and profile pages still open
+  with the emailed link alone.
+- **What a charity sees:** charity admins no longer read the `donations`, `donors` or
+  `donation_checkout_details` tables directly. They read the `charity_donations` view: the
+  donation, its status, the message, the anonymous flag and the donor details typed at
+  checkout, with ID and tax numbers as last 4 digits only. Never `giving_kind`, encrypted
+  numbers, the donor's account link, date of birth or the gateway reference. Tested in
+  `tests/charity-dashboard-db.test.ts`, including a second charity's admin and direct queries.
+- **Anonymous:** the dashboard says what the checkout says: the name doesn't appear on public
+  pages, campaign lists or live totals, and the charity still sees the details.
+- **Figures:** amounts are the donation only, never the processing fee. Totals count paid
+  donations; refunded and charged-back ones are shown separately and left out. Months and
+  dates are Johannesburg time. "Donors" counts each donor identity once per tax year.
+- **Donor search** is kept in a 30-minute cookie for that page, not in the address, so names
+  and emails stay out of browser history and server logs. Other filters are in the address.
+- **Open:** how a charity admin who loses their phone gets their two-step reset (for now the
+  platform admin deletes the factor in Supabase). A donor screen showing their own
+  `giving_kind` will need to read it as the donor (allowed) or through the server.
