@@ -21,8 +21,8 @@ function Wrapper({ name, label, hint, required, children }: Base & { children: R
         {required ? null : <span className="font-normal text-muted"> (optional)</span>}
       </label>
       {children}
-      {hint && !error ? <p className="text-xs text-muted">{hint}</p> : null}
-      {error ? <p className="text-xs text-danger">{error}</p> : null}
+      {hint && !error ? <p id={`${name}-hint`} className="text-xs text-muted">{hint}</p> : null}
+      {error ? <p id={`${name}-error`} role="alert" className="text-xs text-danger">{error}</p> : null}
     </div>
   );
 }
@@ -52,6 +52,7 @@ export function TextField({
         defaultValue={defaultValue ?? ""}
         required={base.required}
         aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${base.name}-error` : base.hint ? `${base.name}-hint` : undefined}
         inputMode={inputMode}
         autoComplete={autoComplete}
         {...(hebrew ? { lang: "he", dir: "rtl" } : {})}
@@ -77,6 +78,7 @@ export function TextArea({
         defaultValue={defaultValue ?? ""}
         required={base.required}
         aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${base.name}-error` : base.hint ? `${base.name}-hint` : undefined}
         {...(hebrew ? { lang: "he", dir: "rtl" } : {})}
         className={inputClass}
       />
@@ -98,6 +100,7 @@ export function SelectField({
         defaultValue={defaultValue ?? ""}
         required={base.required}
         aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${base.name}-error` : base.hint ? `${base.name}-hint` : undefined}
         className={inputClass}
       >
         <option value="" disabled>
@@ -124,6 +127,7 @@ export function FileField({ accept, ...base }: Base & { accept: string }) {
         accept={accept}
         required={base.required}
         aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${base.name}-error` : base.hint ? `${base.name}-hint` : undefined}
         className="block w-full text-sm file:mr-3 file:rounded-control file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:text-brand"
       />
     </Wrapper>

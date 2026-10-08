@@ -12,7 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "Donations" };
 
 const PAGE = 25;
-const filters = ["all", "paid", "pending", "failed", "refunded", "charged_back"] as const;
+// Only donations that went through: abandoned and failed checkouts stay private (see the charity_donations view).
+const filters = ["all", "paid", "refunded", "charged_back"] as const;
 
 export default async function DonationsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/donations">) {
   const { id } = await params;

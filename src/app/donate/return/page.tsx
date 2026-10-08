@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/card";
+import { KeepChecking } from "./keep-checking";
 import { confirmPayment } from "@/lib/donations/confirm";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
@@ -70,7 +71,8 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "pending" || outcome === "review") {
     return (
       <Card title="We're confirming your payment">
-        <p className="text-sm">This can take a minute. Refresh this page shortly. Please don&apos;t pay again.</p>
+        <p className="text-sm">This can take a minute. Please don&apos;t pay again.</p>
+        <KeepChecking />
       </Card>
     );
   }

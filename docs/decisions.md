@@ -214,3 +214,16 @@
 - NEDIV lev issues the s18A receipts on the charity's behalf, as built.
 - s18A details asked: ID number or income tax number only. Address and phone left out until Yehuda confirms what an s18A receipt must show.
 - Monthly donations: not built yet; needs the gateway's recurring billing.
+
+## Code review fixes (08/10/2026)
+
+- Admin rights now need the authenticator second step in the database itself (`has_second_step()` checks the session's `aal2`), not only in the website.
+- One s18A receipt per person: donations carry a keyed fingerprint of the s18A identity typed at checkout, so people sharing an email are never merged.
+- Charities only see donor details for paid, refunded and charged-back donations.
+- Legal details are locked while an application is under review.
+- Rate limiting no longer trusts the client-typed IP. Set `CLIENT_IP_HEADER` once hosting is chosen (#3).
+- Still open from the review:
+  - Approved charities' gateway reference and mandate document path are readable by the public API (low risk); move to a public view later.
+  - A donor who signs in sees the checkout details of every donation made with their email, including ones someone else typed. Inherent in linking by email; revisit with Yosef under POPIA.
+  - "1,000" is refused as an amount on purpose: in SA it can mean R1 or R1 000. The error asks for "1000" or "1 000".
+  - The app uses the phone's own time zone for dates; fine in South Africa, to fix before any overseas use.
