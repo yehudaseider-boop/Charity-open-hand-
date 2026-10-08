@@ -32,3 +32,17 @@ describe("field encryption", () => {
     expect(last4("6281 2345 678")).toBe("5678");
   });
 });
+
+describe("receipt identity fingerprint", () => {
+  it("is the same for the same person however the number is typed, and never contains the number", async () => {
+    const { receiptIdentity } = await import("@/lib/crypto");
+    const a = receiptIdentity({ donorType: "individual", idNumber: "800101 5009 087" });
+    expect(a).toBe(receiptIdentity({ donorType: "individual", idNumber: "8001015009087" }));
+    expect(a).not.toContain("8001015009087");
+    expect(a).not.toBe(receiptIdentity({ donorType: "individual", idNumber: "8001015009088" }));
+    expect(receiptIdentity({ donorType: "individual", taxReference: "0123456789" })).not.toBe(a);
+    expect(receiptIdentity({ donorType: "company", registrationNumber: "2020/123456/07" })).toBe(
+      receiptIdentity({ donorType: "company", registrationNumber: "2020 123456 07" }),
+    );
+  });
+});

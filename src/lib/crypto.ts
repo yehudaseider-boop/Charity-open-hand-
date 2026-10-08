@@ -1,5 +1,5 @@
 import "server-only";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "node:crypto";
 
 /**
  * Field encryption for sensitive values (bank account numbers, ID numbers,
@@ -39,4 +39,20 @@ export function decrypt(stored: string): string {
 /** Last 4 characters, for masked display ("•••• 1234"). */
 export function last4(value: string): string {
   return value.replace(/\s/g, "").slice(-4);
+}
+
+/**
+ * A keyed fingerprint of the s18A identity a donor typed (never the number
+ * itself), so receipts can tell two people apart who share an email address.
+ * Same person, same number: same fingerprint.
+ */
+export function receiptIdentity(v: { donorType: string; idNumber?: string; taxReference?: string; registrationNumber?: string }): string {
+  const clean = (s?: string) => (s ?? "").replace(/[\s/-]/g, "").toUpperCase();
+  const basis =
+    v.donorType === "individual"
+      ? clean(v.idNumber)
+        ? `id:${clean(v.idNumber)}`
+        : `tax:${clean(v.taxReference)}`
+      : `reg:${clean(v.registrationNumber)}`;
+  return createHmac("sha256", key()).update(`receipt-identity|${v.donorType}|${basis}`).digest("base64url");
 }

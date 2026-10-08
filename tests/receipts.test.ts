@@ -22,7 +22,7 @@ const donor: DonorRow = {
   id_number_last4: "9085", tax_reference_last4: null,
 };
 const don = (o: Partial<PlanDonation>): PlanDonation => ({
-  id: "d1", charityId: "c1", donorId: "u1", taxYear: 2027, amountCents: 50_000, status: "paid", wants18a: true,
+  id: "d1", charityId: "c1", donorId: "u1", donorIdentity: "", taxYear: 2027, amountCents: 50_000, status: "paid", wants18a: true,
   paidAt: "2026-10-01T10:00:00Z", ...o,
 });
 
@@ -35,6 +35,17 @@ describe("who gets a receipt", () => {
     expect(receipts).toHaveLength(2);
     expect(receipts.find((r) => r.donorId === "u1")).toMatchObject({ donationIds: ["a", "b"], totalCents: 68_000 });
     expect(receipts.find((r) => r.donorId === "u2")?.totalCents).toBe(3_000);
+  });
+
+  it("never merges two people who share an email (same donor record, different s18A identity)", () => {
+    const { receipts } = plan([
+      don({ id: "alice", donorIdentity: "id-alice", amountCents: 500_000 }),
+      don({ id: "mallory", donorIdentity: "id-mallory", amountCents: 3_000 }),
+      don({ id: "alice2", donorIdentity: "id-alice", amountCents: 10_000 }),
+    ]);
+    expect(receipts).toHaveLength(2);
+    expect(receipts.find((r) => r.donorIdentity === "id-alice")).toMatchObject({ donationIds: ["alice", "alice2"], totalCents: 510_000 });
+    expect(receipts.find((r) => r.donorIdentity === "id-mallory")).toMatchObject({ donationIds: ["mallory"], totalCents: 3_000 });
   });
 
   it("keeps different charities apart for the same donor", () => {

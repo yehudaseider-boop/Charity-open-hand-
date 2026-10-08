@@ -1,7 +1,8 @@
 /**
  * Working out which annual s18A receipts are due. Pure: no database, no clock.
  *
- * One receipt per donor, per charity, per SARS tax year, covering every paid
+ * One receipt per person (donor record plus the s18A identity typed at
+ * checkout, so people sharing an email are never merged), per charity, per SARS tax year, covering every paid
  * donation that asked for an 18A receipt. The amount is the donations' gift
  * amounts only, never the processing fee.
  */
@@ -10,6 +11,8 @@ export type PlanDonation = {
   id: string;
   charityId: string;
   donorId: string;
+  /** Fingerprint of the s18A identity typed with this donation ("" if none). */
+  donorIdentity: string;
   taxYear: number;
   amountCents: number;
   status: string;
@@ -26,6 +29,7 @@ export type PlanCharity = {
 export type PlannedReceipt = {
   charityId: string;
   donorId: string;
+  donorIdentity: string;
   taxYear: number;
   donationIds: string[];
   totalCents: number;
@@ -64,8 +68,8 @@ export function planReceipts(args: {
     if (!charity || !charityCanIssue(charity)) { skip("charity_cannot_issue"); continue; }
     if (new Date(charity.mandateSignedAt!).getTime() > new Date(d.paidAt).getTime()) { skip("mandate_after_payment"); continue; }
 
-    const key = `${d.charityId}|${d.donorId}`;
-    const g = groups.get(key) ?? { charityId: d.charityId, donorId: d.donorId, taxYear: args.taxYear, donationIds: [], totalCents: 0 };
+    const key = `${d.charityId}|${d.donorId}|${d.donorIdentity}`;
+    const g = groups.get(key) ?? { charityId: d.charityId, donorId: d.donorId, donorIdentity: d.donorIdentity, taxYear: args.taxYear, donationIds: [], totalCents: 0 };
     g.donationIds.push(d.id);
     g.totalCents += d.amountCents;
     groups.set(key, g);

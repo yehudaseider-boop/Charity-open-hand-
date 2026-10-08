@@ -253,3 +253,22 @@ describe("withdrawing and emailing a receipt", () => {
     });
   });
 });
+
+describe("one receipt per person, not per email", () => {
+  it("refuses to put two s18A identities on one receipt, and allows one receipt each", async () => {
+    await tx(async () => {
+      const c = await charity();
+      const d = await donor();
+      const a = await donation(c, d);
+      const b = await donation(c, d);
+      await run("insert into public.donation_checkout_details (donation_id, donor_type, email, receipt_identity) values ($1, 'individual', 'x@x.test', 'alice'), ($2, 'individual', 'x@x.test', 'mallory')", [a, b]);
+      await run("savepoint mix");
+      await expect(run("select * from public.issue_s18a_receipt($1, $2, 2027, $3::uuid[], 'LTC', '{}'::jsonb, 'alice')", [c, d, [a, b]])).rejects.toThrow(/not eligible/);
+      await run("rollback to savepoint mix");
+      const ra = await run("select * from public.issue_s18a_receipt($1, $2, 2027, $3::uuid[], 'LTC', '{}'::jsonb, 'alice')", [c, d, [a]]);
+      const rb = await run("select * from public.issue_s18a_receipt($1, $2, 2027, $3::uuid[], 'LTC', '{}'::jsonb, 'mallory')", [c, d, [b]]);
+      expect(ra.rows[0].amount_cents).toBe("50000");
+      expect(rb.rows[0].amount_cents).toBe("50000");
+    });
+  });
+});

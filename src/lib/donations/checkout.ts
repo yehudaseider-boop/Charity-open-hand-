@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { platformConfig } from "@/config/platform";
-import { encrypt, last4 } from "@/lib/crypto";
+import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import { formatRand } from "@/lib/money";
@@ -117,6 +117,12 @@ export async function startDonation(args: {
     phone: v.phone ?? null,
     ...(want18a
       ? {
+          receipt_identity: receiptIdentity({
+            donorType: v.donor_type,
+            idNumber: v.id_number,
+            taxReference: v.tax_reference,
+            registrationNumber: v.registration_number,
+          }),
           id_number_encrypted: v.id_number ? encrypt(v.id_number.replace(/\s/g, "")) : null,
           id_number_last4: v.id_number ? last4(v.id_number) : null,
           tax_reference_encrypted: v.tax_reference ? encrypt(v.tax_reference) : null,

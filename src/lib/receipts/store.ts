@@ -16,13 +16,19 @@ async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: T[
   }
 }
 
+/** The embedded checkout details' identity fingerprint, "" when there is none. */
+function identityOf(embed: unknown): string {
+  const row = Array.isArray(embed) ? embed[0] : embed;
+  return ((row as { receipt_identity?: string | null } | null | undefined)?.receipt_identity ?? "") || "";
+}
+
 export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
   return {
     async listDonations(taxYear) {
       const rows = await all<Record<string, unknown>>((from, to) =>
         db
           .from("donations")
-          .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at")
+          .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at, donation_checkout_details(receipt_identity)")
           .eq("tax_year", taxYear)
           .eq("status", "paid")
           .eq("wants_18a", true)
@@ -34,6 +40,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
           id: r.id as string,
           charityId: r.charity_id as string,
           donorId: r.donor_id as string,
+          donorIdentity: identityOf(r.donation_checkout_details),
           taxYear: r.tax_year as number,
           amountCents: Number(r.amount_cents),
           status: r.status as string,
@@ -96,6 +103,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         p_donation_ids: r.donationIds,
         p_number_prefix: charity.quickgive_code,
         p_details: details,
+        p_donor_identity: r.donorIdentity,
       });
       if (error) throw new Error(`Could not issue receipt: ${error.message}`);
       const row = (data as { receipt_id: string; receipt_reference: string }[])[0];
