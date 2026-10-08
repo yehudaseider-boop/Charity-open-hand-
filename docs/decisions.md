@@ -121,9 +121,20 @@
 - **Late payments:** a donation paid in the tax year but confirmed after its receipt was
   issued is not on that receipt. The job lists paid donations it could not receipt so a
   person can look. Void and re-issue is allowed by the database; no screen for it yet.
-- **Not built yet:** emailing the receipt (needs the email provider), the donor's Receipts
-  tab on the website, charity and admin screens, void and re-issue screen, full ID number
-  printing (needs the attorney's answer first).
+- **Donors see their receipts:** the Account page lists a donor's receipts with a PDF
+  download (60 second signed link, logged, only for issued receipts). Donors are linked to
+  an account when they sign in with the emailed link (`link_donors_to_user`): it fills in
+  only donors that have no account yet, and never takes one from another account.
+  A donor must sign in with the email address they gave with.
+- **Emailing:** `--email` on the job sends each donor their receipt (PDF attached) once
+  (`s18a_receipts.emailed_at`); a failed email is retried on the next run and never stops
+  the others. Email goes through an adapter (`src/lib/email`): `console` (default, only logs
+  a masked address) or `resend` (written to Resend's published API, NOT yet tested against it).
+- **Void and re-issue:** platform admins withdraw a receipt on `/admin/receipts` (reason
+  required, logged, never deleted). Then running the job again issues a replacement.
+  The charity dashboard (separate piece of work) will show receipts to charities.
+- **Not built yet:** full ID number printing (needs the attorney's answer), receipt emails
+  in Hebrew, and automatically linking the replacement to the withdrawn receipt (`replaced_by_id`).
 
 ## Open (ask Yehuda when reached)
 

@@ -154,3 +154,102 @@ describe("issue_s18a_receipt", () => {
     }
   });
 });
+
+async function user(email: string) {
+  const { id } = await one("insert into auth.users (id, email, aud, role) values (gen_random_uuid(), $1, 'authenticated', 'authenticated') returning id", [email]);
+  return id as string;
+}
+const asUser = async (id: string) => {
+  await run("set local role authenticated");
+  await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: id, role: "authenticated" })]);
+};
+
+describe("link_donors_to_user", () => {
+  it("links donors that used the address, whatever the capital letters, and says how many", async () => {
+    await tx(async () => {
+      const email = `link-${Date.now()}@Example.co.za`;
+      const u = await user(email.toLowerCase());
+      await run(`insert into public.donors (email, donor_type, age_confirmed_18_at, popia_consent_at) values ($1, 'individual', now(), now())`, [email]);
+      await run(`insert into public.donors (email, donor_type, organisation_name, registration_number, age_confirmed_18_at, popia_consent_at) values ($1, 'company', 'Co', '2020/1', now(), now())`, [email.toUpperCase()]);
+      const n = (await one("select public.link_donors_to_user($1, $2) as n", [u, email.toLowerCase()])).n;
+      expect(n).toBe(2);
+      const linked = await run("select user_id, email_verified_at from public.donors where user_id = $1", [u]);
+      expect(linked.rows).toHaveLength(2);
+      expect(linked.rows.every((r) => r.email_verified_at)).toBe(true);
+    });
+  });
+
+  it("never takes a donor away from the account it already belongs to", async () => {
+    await tx(async () => {
+      const email = `owned-${Date.now()}@example.co.za`;
+      const first = await user(`first-${Date.now()}@example.co.za`);
+      const second = await user(email);
+      await run(`insert into public.donors (email, donor_type, user_id, age_confirmed_18_at, popia_consent_at) values ($1, 'individual', $2, now(), now())`, [email, first]);
+      expect((await one("select public.link_donors_to_user($1, $2) as n", [second, email])).n).toBe(0);
+      expect((await one("select user_id from public.donors where email = $1", [email])).user_id).toBe(first);
+    });
+  });
+
+  it("can only be called by the server", async () => {
+    for (const role of ["authenticated", "anon"]) {
+      await tx(async () => {
+        const u = await user(`who-${role}-${Date.now()}@example.co.za`);
+        await run(`set local role ${role}`);
+        await expect(run("select public.link_donors_to_user($1, 'a@b.co.za')", [u])).rejects.toThrow(/permission denied/);
+      });
+    }
+  });
+});
+
+describe("who can read a receipt", () => {
+  it("its donor can, a stranger cannot", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor();
+      const owner = await user(`owner-${Date.now()}@example.co.za`);
+      const stranger = await user(`stranger-${Date.now()}@example.co.za`);
+      await run("update public.donors set user_id = $1 where id = $2", [owner, d]);
+      const receipt = (await issue(c, d, [await donation(c, d)])).rows[0];
+
+      await asUser(owner);
+      expect((await run("select id from public.s18a_receipts where id = $1", [receipt.receipt_id])).rows).toHaveLength(1);
+      await run("reset role");
+      await asUser(stranger);
+      expect((await run("select id from public.s18a_receipts where id = $1", [receipt.receipt_id])).rows).toHaveLength(0);
+    });
+  });
+});
+
+describe("withdrawing and emailing a receipt", () => {
+  it("a voided receipt keeps its record and can no longer be changed", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor();
+      const r = (await issue(c, d, [await donation(c, d)])).rows[0];
+      await run("update public.s18a_receipts set status = 'void', voided_at = now(), void_reason = 'wrong address' where id = $1", [r.receipt_id]);
+      expect((await one("select status, void_reason from public.s18a_receipts where id = $1", [r.receipt_id]))).toEqual({ status: "void", void_reason: "wrong address" });
+      await run("savepoint s");
+      await expect(run("update public.s18a_receipts set pdf_path = 'x' where id = $1", [r.receipt_id])).rejects.toThrow(/void receipt cannot be changed/);
+      await run("rollback to savepoint s");
+      await expect(run("delete from public.s18a_receipts where id = $1", [r.receipt_id])).rejects.toThrow(/never deleted/);
+    });
+  });
+
+  it("a void needs a reason", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor();
+      const r = (await issue(c, d, [await donation(c, d)])).rows[0];
+      await expect(run("update public.s18a_receipts set status = 'void' where id = $1", [r.receipt_id])).rejects.toThrow(/void_has_reason/);
+    });
+  });
+
+  it("the emailed time can be recorded, but not the numbers or amount", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor();
+      const r = (await issue(c, d, [await donation(c, d)])).rows[0];
+      await run("update public.s18a_receipts set emailed_at = now() where id = $1", [r.receipt_id]);
+      expect((await one("select emailed_at from public.s18a_receipts where id = $1", [r.receipt_id])).emailed_at).not.toBeNull();
+      await run("savepoint s");
+      await expect(run("update public.s18a_receipts set amount_cents = 1 where id = $1", [r.receipt_id])).rejects.toThrow(/immutable/);
+      await run("rollback to savepoint s");
+    });
+  });
+});

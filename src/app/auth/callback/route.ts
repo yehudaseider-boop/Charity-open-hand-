@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { linkDonorsToUser } from "@/lib/donors/link";
 import { requestOrigin } from "@/lib/request-origin";
 import { safeNextPath } from "@/lib/safe-path";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +14,18 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}${next}`);
+    if (!error) {
+      // Signing in proves they own this email address: attach their past donations.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          await linkDonorsToUser(user.id, user.email);
+        } catch (e) {
+          console.error(e instanceof Error ? e.message : e); // never block signing in
+        }
+      }
+      return NextResponse.redirect(`${origin}${next}`);
+    }
   }
   return NextResponse.redirect(`${origin}/login?error=link`);
 }
