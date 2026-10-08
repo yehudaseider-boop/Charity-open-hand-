@@ -225,5 +225,5 @@
 - Still open from the review:
   - Approved charities' gateway reference and mandate document path are readable by the public API (low risk); move to a public view later.
   - A donor who signs in sees the checkout details of every donation made with their email, including ones someone else typed. Inherent in linking by email; revisit with Yosef under POPIA.
-  - "1,000" is refused as an amount on purpose: in SA it can mean R1 or R1 000. The error asks for "1000" or "1 000".
+  - "1,000" is refused as an amount on purpose: in SA it can mean R1 or R1 000. The donor sees "Enter an amount in Rand, for example 180 or 180.50."
   - The app uses the phone's own time zone for dates; fine in South Africa, to fix before any overseas use.
