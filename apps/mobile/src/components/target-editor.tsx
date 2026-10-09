@@ -6,6 +6,7 @@ import { parseRandToCents, percentToPpm } from "@shared/money";
 import { colors, radius, type } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
+import { InfoButton } from "./info-button";
 import { Segmented } from "./segmented";
 import { Text } from "./text";
 
@@ -59,7 +60,10 @@ export function TargetEditor({
       </View>
 
       <View style={{ gap: 6 }}>
-        <Text variant="label" style={{ color: colors.ink }}>I keep</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+          <Text variant="label" style={{ color: colors.ink }}>I keep</Text>
+          <InfoButton terms={["maaser", "chomesh", "givingYear"]} label="maaser and chomesh" />
+        </View>
         <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="I keep">
           {([
             ["maaser", "Maaser", "A tenth"],

@@ -7,5 +7,5 @@
       "@shared/*": ["../../src/lib/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "../../src/lib/fees.ts", "../../src/lib/money.ts", "../../src/lib/sa-id.ts", "../../src/lib/policy.ts"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "../../src/lib/fees.ts", "../../src/lib/money.ts", "../../src/lib/sa-id.ts", "../../src/lib/policy.ts", "../../src/lib/glossary.ts"]
 }

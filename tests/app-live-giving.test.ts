@@ -130,3 +130,19 @@ describe("monthly donations waiting for the payment provider", () => {
     expect(rows.map((r) => [r.id, r.syncing])).toEqual([["r1", true], ["r3", true]]);
   });
 });
+
+import { glossary } from "../src/lib/glossary";
+
+describe("glossary", () => {
+  it("explains every term in plain sentences, with no guessed tax figures", () => {
+    for (const [key, entry] of Object.entries(glossary)) {
+      expect(entry.title, key).toBeTruthy();
+      expect(entry.body.length, key).toBeGreaterThan(0);
+      for (const p of entry.body) {
+        expect(p.trim().endsWith("."), `${key}: ${p}`).toBe(true);
+        expect(p, key).not.toMatch(/\d+%/); // limits come from SARS, never typed in here
+        expect(p, key).not.toMatch(/—/);
+      }
+    }
+  });
+});

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Info } from "@/components/info";
 import { platformConfig } from "@/config/platform";
 import { initials } from "@/lib/charity/initials";
 import { publicImageUrl } from "@/lib/charity/queries";
@@ -50,6 +51,7 @@ export default async function Home() {
             </li>
           ))}
         </ol>
+        <Info terms={["tzedaka", "maaser", "chomesh", "s18a"]} label="maaser, chomesh or s18A" />
       </section>
 
       {charities && charities.length > 0 ? (

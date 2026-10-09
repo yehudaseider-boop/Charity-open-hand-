@@ -10,6 +10,7 @@ import { charities } from "@/data/sample";
 import { gifts, receipts } from "@/data/giving";
 import { ddmmyyyy, rand } from "@/lib/format";
 import { Button } from "@/components/button";
+import { InfoButton } from "@/components/info-button";
 import { useAccount } from "@/lib/account";
 import { SITE_URL, siteUrl } from "@/lib/website";
 import { useScreenState } from "@/lib/screen-state";
@@ -56,7 +57,10 @@ export default function Receipts() {
       ) : (
         <>
           <View style={styles.notice}>
-            <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Receipts arrive once a year</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Receipts arrive once a year</Text>
+              <InfoButton terms={["s18a"]} />
+            </View>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
               You get one 18A receipt per charity, covering all your donations to it in a tax year (1 March to the end of February). Receipts for this tax year
               come after {currentEnd}.

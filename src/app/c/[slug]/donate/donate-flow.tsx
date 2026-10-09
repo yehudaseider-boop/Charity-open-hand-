@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
+import { Info } from "@/components/info";
 import { TermsAndPrivacyLinks } from "@/components/legal";
 import { TextArea, TextField } from "@/components/forms/fields";
 import { givingKinds } from "@/lib/donations/validation";
@@ -194,6 +195,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initi
               <input type="checkbox" name="wants_18a" className="mt-1" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
               <span>I want an 18A tax receipt</span>
             </label>
+            <Info terms={["s18a"]} label="an s18A receipt" />
             {want18a ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted">
@@ -223,6 +225,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initi
             ))}
           </div>
           <p className="text-xs text-muted">Counts towards your maaser and chomesh in the NEDIV lev app. Only you see this.</p>
+          <Info terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
           {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
         </fieldset>
 

@@ -7,6 +7,7 @@ import { parseRandToCents } from "@shared/money";
 import { colors, radius, type } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
+import { InfoButton } from "./info-button";
 import { Text } from "./text";
 
 /** Log income (for maaser). It stays on this phone only. */
@@ -62,7 +63,10 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
       <Field label="Given to" value={recipient} onChangeText={setRecipient} maxLength={120} error={errors.recipient} helper="For example: Shul appeal (cash)" />
       <Field label="Date given (dd/mm/yyyy)" value={date} onChangeText={setDate} keyboardType="numbers-and-punctuation" error={errors.date} />
       <View style={{ gap: 6 }}>
-        <Text variant="label" style={{ color: colors.ink }}>This counts as</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+          <Text variant="label" style={{ color: colors.ink }}>This counts as</Text>
+          <InfoButton terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
+        </View>
         <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="This counts as">
           {(Object.keys(givingKindLabels) as GivingKind[]).map((k) => {
             const selected = kind === k;

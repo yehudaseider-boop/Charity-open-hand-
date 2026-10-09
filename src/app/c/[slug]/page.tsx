@@ -5,6 +5,7 @@ import { cache } from "react";
 import { Badge } from "@/components/badge";
 import { Card } from "@/components/card";
 import { CharityBadges } from "@/components/charity-badges";
+import { Info } from "@/components/info";
 import { canIssue18a } from "@/lib/charities";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { initials } from "@/lib/charity/initials";
@@ -87,6 +88,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
               : "This organisation is not s18A-approved, so donations do not get a tax receipt."}{" "}
             NEDIV lev charges no fee on donations.
           </p>
+          <Info terms={["s18a"]} label="an s18A receipt" />
         </div>
       </div>
 

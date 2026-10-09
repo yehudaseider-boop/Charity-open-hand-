@@ -278,3 +278,8 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 - Charity pages: cover, logo (or initials), area, "What they do" and a new "How your donation is used" field the charity fills in (`charities.funds_use_en`, public).
 - Home page: welcome, how it works, a few charities, the app.
 - Wording: we say "NEDIV lev charges no fee on donations", never "the charity gets your full donation", until it is decided who bears the payment provider's charge.
+
+## Plain-English explanations (09/10/2026)
+
+- Small "i" buttons explain tzedaka, maaser, chomesh, general tzedaka, the Rosh Hashana giving year and s18A receipts, for donors who don't know the terms. One shared text (`src/lib/glossary.ts`) is used by the app and the website.
+- The text stays general and sends personal questions (e.g. maaser before or after tax) to the donor's Rabbi. It quotes no tax percentages: "up to a limit set by SARS". Wording is a draft for Yehuda to check.

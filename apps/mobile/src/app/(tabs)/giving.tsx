@@ -10,6 +10,7 @@ import { MaaserProgress } from "@/components/maaser-progress";
 import { Sheet } from "@/components/sheet";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
+import { InfoButton } from "@/components/info-button";
 import { TargetEditor, type Target } from "@/components/target-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleMaaserTarget, type Gift, type Recurring } from "@/data/giving";
@@ -169,7 +170,8 @@ export default function Giving() {
                   <MaaserProgress title="Chomesh" givenCents={chomeshGiven} targetCents={target.chomeshCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
                 ) : null}
                 <View style={styles.tzedakaRow}>
-                  <Text style={{ flex: 1, fontSize: 16 }}>General tzedaka this {target.period}</Text>
+                  <Text style={{ flexShrink: 1, fontSize: 16 }}>General tzedaka this {target.period}</Text>
+                  <View style={{ flex: 1 }}><InfoButton terms={["generalTzedaka"]} /></View>
                   <Text style={{ fontSize: 16, fontFamily: "Archivo_600SemiBold" }}>{rand(tzedakaGiven)}</Text>
                 </View>
                 {saved ? (
@@ -206,7 +208,10 @@ export default function Giving() {
             {/* Your records: income (kept on this phone) and giving made elsewhere. */}
             {preview || signedIn ? (
               <View style={{ gap: 12 }}>
-                <Text variant="h2" style={styles.heading}>Your records</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Text variant="h2" style={styles.heading}>Your records</Text>
+                  <InfoButton terms={["maaser", "chomesh", "generalTzedaka", "givingYear"]} label="maaser, chomesh and the giving year" />
+                </View>
                 {income.length > 0 && target !== null ? (
                   <View style={styles.card}>
                     <Text variant="label">Owed from your income, {byMonth ? "this month" : "this giving year"}</Text>

@@ -5,6 +5,7 @@ import { givingKindLabels } from "@/lib/giving";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, radius, type } from "@/theme/tokens";
 import { Button } from "./button";
+import { InfoButton } from "./info-button";
 import { Text } from "./text";
 
 /**
@@ -21,7 +22,10 @@ export function GiveSheet({ charityName, slug }: { charityName: string; slug: st
     <View style={{ gap: 18 }}>
       <View style={{ gap: 6 }}>
         <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Give to {charityName}</Text>
-        <Text variant="bodyMuted">What does this donation count as? Only you see this.</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text variant="bodyMuted" style={{ flexShrink: 1 }}>What does this donation count as? Only you see this.</Text>
+          <InfoButton terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
+        </View>
       </View>
 
       <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="This donation counts as">
