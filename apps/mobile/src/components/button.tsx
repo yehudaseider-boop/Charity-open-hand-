@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, type PressableProps } from "react-native";
+import { haptic } from "@/lib/haptics";
 import { colors, radius, touch, type } from "@/theme/tokens";
 import { Text } from "./text";
 
@@ -9,6 +10,10 @@ export function Button({ label, style, ...rest }: Omit<PressableProps, "style"> 
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(rest.disabled) }}
       {...rest}
+      onPress={(e) => {
+        haptic.press();
+        rest.onPress?.(e);
+      }}
       style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }, style]}
     >
       <Text style={[type.button, { color: colors.onInk }]}>{label}</Text>

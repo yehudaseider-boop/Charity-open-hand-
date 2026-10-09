@@ -5,7 +5,7 @@
 /** Where the money for a gift comes from: maaser, chomesh, or general tzedaka. The donor chooses at checkout. */
 export type GivingKind = "maaser" | "chomesh" | "tzedaka";
 
-export type Gift = { id: string; date: Date; charitySlug: string; charityName: string; cents: number; monthly: boolean; with18a: boolean; kind: GivingKind };
+export type Gift = { id: string; date: Date; charitySlug: string; charityName: string; cents: number; monthly: boolean; with18a: boolean; kind: GivingKind; /** The charity's own thank-you note, if it wrote one. */ thankYou?: string };
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 

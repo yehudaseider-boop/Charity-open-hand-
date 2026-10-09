@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { colors, touch } from "@/theme/tokens";
+import { haptic } from "@/lib/haptics";
 import { Text } from "./text";
 
 /** A setting that is on or off, with one line explaining it. */
@@ -9,7 +10,10 @@ export function SwitchRow({ label, description, value, onChange }: { label: stri
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
       accessibilityLabel={label}
-      onPress={() => onChange(!value)}
+      onPress={() => {
+        haptic.tap();
+        onChange(!value);
+      }}
       style={styles.row}
     >
       <View style={{ flex: 1, gap: 2 }}>
@@ -27,7 +31,10 @@ export function SwitchRow({ label, description, value, onChange }: { label: stri
 export function CheckRow({ label, value, onChange, error }: { label: string; value: boolean; onChange: (v: boolean) => void; error?: string }) {
   return (
     <View style={{ gap: 4 }}>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={() => onChange(!value)} style={styles.checkRow}>
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={() => {
+        haptic.tap();
+        onChange(!value);
+      }} style={styles.checkRow}>
         <View style={[styles.box, value && styles.boxOn, error && !value ? { borderColor: colors.danger } : null]}>
           {value ? <View style={styles.tick} /> : null}
         </View>

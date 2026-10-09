@@ -1,10 +1,11 @@
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { POLICY_VERSION } from "@shared/policy";
 import type { Gift, GivingKind, Receipt, Recurring } from "@/data/giving";
 import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
-import { toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
+import { secureStorage } from "./secure-storage";
+import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
 
 /**
@@ -21,7 +22,8 @@ import { supabase } from "./supabase";
  */
 export type AccountStatus = "preview" | "loading" | "signed-out" | "agreeing" | "signed-in";
 
-type Live = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: Elsewhere[]; loadedAt: Date };
+/** `fromCache`: what the phone saved last time, shown until fresh data arrives (or while offline). */
+type Live = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: Elsewhere[]; loadedAt: Date; fromCache?: boolean };
 type Result = { ok: true } | { ok: false; message: string };
 
 type AccountValue = {
@@ -30,6 +32,9 @@ type AccountValue = {
   live: Live | null;
   loadError: boolean;
   refreshing: boolean;
+  /** Donations that arrived since the donor last looked: the app thanks them. */
+  arrived: Gift[];
+  dismissArrived(): void;
   sendCode(email: string): Promise<{ ok: true } | { ok: false; message: string }>;
   verifyCode(email: string, code: string): Promise<{ ok: true } | { ok: false; message: string }>;
   agree(): Promise<{ ok: true } | { ok: false; message: string }>;
@@ -63,7 +68,7 @@ async function loadLive(userId: string): Promise<Live> {
   const [donations, kinds, recurring, receipts] = await Promise.all([
     db
       .from("donations")
-      .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en)")
+      .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en)")
       .in("donor_id", donorIds)
       .eq("status", "paid")
       .order("paid_at", { ascending: false })
@@ -86,6 +91,29 @@ async function loadLive(userId: string): Promise<Live> {
   };
 }
 
+/** Which donations this phone has already shown the donor (ids only, on the phone). */
+const seenKey = (userId: string) => `nediv-lev.seen.${userId}`;
+async function loadSeen(userId: string): Promise<Seen | null> {
+  try {
+    const raw = await secureStorage.getItem(seenKey(userId));
+    const v = raw ? (JSON.parse(raw) as Partial<Seen>) : null;
+    if (!v || !Array.isArray(v.ids)) return null;
+    return { ids: v.ids.filter((x): x is string => typeof x === "string"), since: typeof v.since === "string" ? v.since : null };
+  } catch {
+    return null;
+  }
+}
+async function saveSeen(userId: string, seen: Seen): Promise<void> {
+  try {
+    await secureStorage.setItem(seenKey(userId), JSON.stringify(seen));
+  } catch {
+    // Not saved: at worst a thank-you shows again.
+  }
+}
+
+/** The last giving loaded, on this phone only (secure storage), so the app opens instantly and works offline. */
+const cacheKey = (userId: string) => `nediv-lev.giving.${userId}`;
+
 async function hasAgreed(userId: string): Promise<boolean> {
   const { data } = await supabase!
     .from("consents")
@@ -103,6 +131,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [live, setLive] = useState<Live | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [arrived, setArrived] = useState<Gift[]>([]);
+  const lastCached = useRef<string | null>(null);
 
   const settle = useCallback(async (s: Session | null) => {
     setSession(s);
@@ -129,14 +159,39 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     try {
       // Donations given with this email before signing up join the account.
       await supabase.rpc("link_my_donations");
-      setLive(await loadLive(session.user.id));
+      const next = await loadLive(session.user.id);
+      setLive(next);
       setLoadError(false);
+      // Only write when the giving itself changed (not just the time it was loaded).
+      const unchanged = toCache({ ...next, loadedAt: new Date(0) });
+      if (unchanged !== lastCached.current) {
+        lastCached.current = unchanged;
+        secureStorage.setItem(cacheKey(session.user.id), toCache(next)).catch(() => undefined);
+      }
+      // Thank the donor for anything new since they last looked, then remember it as seen.
+      const seen = await loadSeen(session.user.id);
+      const fresh = newArrivals(next.gifts, seen);
+      if (fresh.length) setArrived((a) => [...a, ...fresh.filter((f) => !a.some((x) => x.id === f.id))]);
+      await saveSeen(session.user.id, seenFrom(next.gifts));
     } catch {
       setLoadError(true);
     } finally {
       setRefreshing(false);
     }
   }, [session, status]);
+
+  // Show what the phone saved last time straight away; fresh data replaces it.
+  useEffect(() => {
+    if (status !== "signed-in" || !session) return;
+    const userId = session.user.id;
+    secureStorage
+      .getItem(cacheKey(userId))
+      .then((raw) => {
+        const cached = fromCache(raw);
+        if (cached) setLive((l) => l ?? { ...cached, fromCache: true });
+      })
+      .catch(() => undefined);
+  }, [status, session]);
 
   // Load once signed in, and again each time the app comes back to the front.
   useEffect(() => {
@@ -155,6 +210,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       live,
       loadError,
       refreshing,
+      arrived,
+      dismissArrived: () => setArrived([]),
       async sendCode(email) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
@@ -174,6 +231,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       },
       refresh,
       async signOut() {
+        // Nothing of theirs stays on the phone once they sign out.
+        if (session) await secureStorage.removeItem(cacheKey(session.user.id)).catch(() => undefined);
+        lastCached.current = null;
         await supabase?.auth.signOut();
         setLive(null);
       },
@@ -205,7 +265,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
       },
     }),
-    [status, session, live, loadError, refreshing, refresh],
+    [status, session, live, loadError, refreshing, refresh, arrived],
   );
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;

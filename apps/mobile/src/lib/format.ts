@@ -16,6 +16,11 @@ export function ddmmyyyy(d: Date): string {
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
+/** 24-hour time, as South Africans write it: "14:05". */
+export function hhmm(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 /** Rand with cents always shown, for money summaries: "R180.00", "R16.05". */
 export function randExact(cents: number): string {
   return formatRand(cents);

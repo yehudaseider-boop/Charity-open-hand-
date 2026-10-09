@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { colors, radius, touch, type } from "@/theme/tokens";
+import { haptic } from "@/lib/haptics";
 import { Text } from "./text";
 
 /** Two or three mutually exclusive options. Selected uses ink. */
@@ -23,7 +24,10 @@ export function Segmented<T extends string>({
             key={o.value}
             accessibilityRole="radio"
             accessibilityState={{ selected }}
-            onPress={() => onChange(o.value)}
+            onPress={() => {
+              if (!selected) haptic.tap();
+              onChange(o.value);
+            }}
             style={[styles.option, selected && styles.selected]}
           >
             <Text style={[type.button, { fontSize: 16, color: selected ? colors.onInk : colors.ink }]}>{o.label}</Text>

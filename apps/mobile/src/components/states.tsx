@@ -1,6 +1,7 @@
 import { StyleSheet, View } from "react-native";
 import { colors, radius, space } from "@/theme/tokens";
 import { Button } from "./button";
+import { ddmmyyyy, hhmm } from "@/lib/format";
 import { Text } from "./text";
 
 /** Loading: quiet placeholder blocks in the hairline colour, no spinners. */
@@ -45,3 +46,14 @@ export function ErrorState({ body, onRetry }: { body: string; onRetry: () => voi
 const styles = StyleSheet.create({
   box: { alignItems: "center", gap: 10, paddingVertical: 40, paddingHorizontal: 8 },
 });
+
+/** Shown while offline: the screen is the giving the phone saved last time. */
+export function OfflineNote({ savedAt }: { savedAt: Date }) {
+  return (
+    <View accessibilityRole="alert" style={{ padding: 12, borderRadius: radius.control, backgroundColor: colors.accentSoft }}>
+      <Text style={{ fontSize: 15, lineHeight: 21 }}>
+        No connection. Showing what was saved on {ddmmyyyy(savedAt)} at {hhmm(savedAt)}.
+      </Text>
+    </View>
+  );
+}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { GivingKind } from "@/data/giving";
 import { givingKindLabels } from "@/lib/giving";
+import { haptic } from "@/lib/haptics";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, radius, type } from "@/theme/tokens";
 import { Button } from "./button";
@@ -32,7 +33,10 @@ export function GiveSheet({ charityName, slug }: { charityName: string; slug: st
         {(Object.keys(givingKindLabels) as GivingKind[]).map((k) => {
           const selected = kind === k;
           return (
-            <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setKind(k)} style={[styles.choice, selected && styles.choiceOn]}>
+            <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => {
+              haptic.tap();
+              setKind(k);
+            }} style={[styles.choice, selected && styles.choiceOn]}>
               <Text style={[type.button, { fontSize: 17, color: selected ? colors.accent : colors.ink }]}>{givingKindLabels[k]}</Text>
             </Pressable>
           );

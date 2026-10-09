@@ -8,7 +8,7 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
 export function ProfileForm({ action, charity, categories, selected }: {
   action: Action;
-  charity: { name_en: string; description_en: string | null; funds_use_en: string | null; website: string | null };
+  charity: { name_en: string; description_en: string | null; funds_use_en: string | null; thank_you_en: string | null; website: string | null };
   categories: { id: string; name_en: string }[];
   selected: string[];
 }) {
@@ -19,6 +19,8 @@ export function ProfileForm({ action, charity, categories, selected }: {
         hint="A few sentences donors read first. Who you help and how." />
       <TextArea name="funds_use_en" label="How donations are used" defaultValue={charity.funds_use_en}
         hint="What a donation pays for, for example Shabbos parcels for families or a teacher's salary. Specific is best." />
+      <TextArea name="thank_you_en" label="Thank-you note to donors" defaultValue={charity.thank_you_en}
+        hint="Shown in the NEDIV lev app when a donation to you arrives. Up to 300 characters, in your own words." />
       <TextField name="website" label="Website" type="url" defaultValue={charity.website} hint="For example https://example.org.za" />
       <CheckboxGroup name="category_ids" label="Categories"
         options={categories.map((c) => ({ value: c.id, label: c.name_en }))} defaultValues={selected} />

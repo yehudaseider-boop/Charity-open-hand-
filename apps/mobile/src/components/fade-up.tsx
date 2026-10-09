@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Animated, type ViewStyle } from "react-native";
+import { reduceMotion } from "@/lib/motion";
 
 /** Motion 2: soft fade-up as list items appear. */
 export function FadeUp({ index = 0, children, style }: { index?: number; children: React.ReactNode; style?: ViewStyle }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reduceMotion()) return v.setValue(1);
     Animated.timing(v, { toValue: 1, duration: 320, delay: index * 50, useNativeDriver: true }).start();
   }, [v, index]);
   return (

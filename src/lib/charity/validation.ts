@@ -73,6 +73,7 @@ export const profileSchema = z.object({
   name_en: required("Display name", 120),
   description_en: optional(3000),
   funds_use_en: optional(1500),
+  thank_you_en: optional(300),
   website: z
     .url({ protocol: /^https?$/, error: "Enter a full web address, starting with https://" })
     .optional(),

@@ -1,6 +1,8 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, type ColorValue } from "react-native";
+import { ThankYou } from "@/components/thank-you";
+import { haptic } from "@/lib/haptics";
 import { AccountIcon, DiscoverIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { colors, fonts } from "@/theme/tokens";
 
@@ -13,9 +15,13 @@ const label = (title: string) =>
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   return (
+    <>
     <Tabs
+      screenListeners={{ tabPress: () => haptic.tap() }}
       screenOptions={{
         headerShown: false,
+        // A soft cross-fade between tabs rather than a hard cut.
+        animation: "fade",
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.hairline, height: 62 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom + 4 },
@@ -27,5 +33,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="receipts" options={{ title: "Receipts", tabBarLabel: label("Receipts"), tabBarIcon: ({ color }) => <ReceiptsIcon color={String(color)} /> }} />
       <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: label("Account"), tabBarIcon: ({ color }) => <AccountIcon color={String(color)} /> }} />
     </Tabs>
+    <ThankYou />
+    </>
   );
 }

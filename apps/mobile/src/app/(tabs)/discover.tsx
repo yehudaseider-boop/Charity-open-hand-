@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, LoadingList, SkeletonBlock } from "@/components
 import { Text } from "@/components/text";
 import { causes, charities } from "@/data/sample";
 import { useScreenState } from "@/lib/screen-state";
+import { DayGreeting, SeasonalCard } from "@/components/day-greeting";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
 /** Screen 2: Discover. */
@@ -36,6 +37,7 @@ export default function Discover() {
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
         <View style={{ marginBottom: 14 }}><Logo width={112} /></View>
+        <View style={{ marginBottom: 6 }}><DayGreeting /></View>
         <Text variant="h1" accessibilityRole="header">Discover</Text>
         <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
       </View>
@@ -53,6 +55,7 @@ export default function Discover() {
             style={styles.searchInput}
           />
         </View>
+        <View style={{ marginTop: 14 }}><SeasonalCard /></View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} accessibilityRole="tablist">

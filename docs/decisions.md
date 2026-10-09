@@ -283,3 +283,12 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 
 - Small "i" buttons explain tzedaka, maaser, chomesh, general tzedaka, the Rosh Hashana giving year and s18A receipts, for donors who don't know the terms. One shared text (`src/lib/glossary.ts`) is used by the app and the website.
 - The text stays general and sends personal questions (e.g. maaser before or after tax) to the donor's Rabbi. It quotes no tax percentages: "up to a limit set by SARS". Wording is a draft for Yehuda to check.
+
+## Making the app feel like ours (09/10/2026)
+
+- **Jewish calendar:** the app greets by the day (Good Shabbos, Shavua tov, Chag sameach, Shana tova, Gmar chasima tova, Happy Chanukah, Freilichen Purim) and shows the Hebrew date, using diaspora Yom Tov. Seasonal cards in Elul, before Purim (matanos l'evyonim) and before Pesach (maos chitim). The calendar is our own arithmetic, checked against Hebcal for every day from 2020 to 2035. `isQuietTime()` (Shabbos and Yom Tov, from noon the day before) is ready for when the app sends notifications: none are sent then.
+- **Thank-you moment:** when a new donation reaches the app, it thanks the donor (amount, charity, date, and whether it counts as maaser, chomesh or tzedaka), with the charity's own short thank-you note if it wrote one (`charities.thank_you_en`, up to 300 characters, set on the charity's profile page, public). Which donations were already shown is kept on the phone (ids only), so a thank-you shows once.
+- **Maaser milestone:** when the target is reached the Giving tab says so, with "Tizku l'mitzvos."
+- **First-open welcome:** three short screens (what NEDIV lev is, giving happens on our website, an optional maaser target). Skippable, shown once per phone.
+- **Small touches:** gentle vibrations on buttons, choices and tabs; soft fades between tabs; animations switched off when the phone asks for less motion; larger text honoured (big headings capped so they still fit); screen-reader labels checked.
+- **Offline:** the last giving loaded is kept in the phone's secure storage for the signed-in person, so the app opens straight to it and still shows history without signal ("No connection. Showing what was saved on dd/mm/yyyy at hh:mm."). It is deleted when they sign out.

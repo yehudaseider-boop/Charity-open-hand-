@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
+import { DayGreeting } from "@/components/day-greeting";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
 import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
 import { Sheet } from "@/components/sheet";
-import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
 import { InfoButton } from "@/components/info-button";
 import { TargetEditor, type Target } from "@/components/target-editor";
@@ -130,6 +131,7 @@ export default function Giving() {
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
         <View>
           <Text variant="h1" accessibilityRole="header">Giving</Text>
+          <DayGreeting />
           <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
         </View>
 
@@ -143,6 +145,7 @@ export default function Giving() {
           <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => (preview ? router.replace("/giving") : account.refresh())} />
         ) : (
           <>
+            {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
             {!preview && !signedIn ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
@@ -200,7 +203,12 @@ export default function Giving() {
                     </Text>
                   </>
                 ) : (
-                  <Text style={{ fontSize: 17 }}>You&apos;ve reached your {target.chomeshCents ? "targets" : "target"} for this {target.period}.</Text>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: "Archivo_700Bold", color: colors.success }}>
+                      You&apos;ve given your {target.chomeshCents ? "maaser and chomesh" : "maaser"} for this {target.period}.
+                    </Text>
+                    <Text variant="bodyMuted">Tizku l&apos;mitzvos.</Text>
+                  </View>
                 )}
               </View>
             ) : null}

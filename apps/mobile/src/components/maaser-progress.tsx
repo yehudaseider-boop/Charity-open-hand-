@@ -42,7 +42,7 @@ export function MaaserProgress({
         : `You've given ${rand(-remaining)} more than your target this ${period}.`;
 
   return (
-    <View style={styles.block} accessibilityLabel={`${title}: ${rand(givenCents)} given of ${rand(targetCents)}. ${sentence}`}>
+    <View style={styles.block} accessible accessibilityLabel={`${title}: ${rand(givenCents)} given of ${rand(targetCents)}. ${sentence}`}>
       <Corner pos="tl" />
       <Corner pos="tr" />
       <Corner pos="bl" />

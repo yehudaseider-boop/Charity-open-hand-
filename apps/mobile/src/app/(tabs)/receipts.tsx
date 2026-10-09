@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
 import { DownloadIcon, InfoIcon, ShareIcon } from "@/components/icons";
-import { ErrorState, SkeletonBlock } from "@/components/states";
+import { ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { charities } from "@/data/sample";
 import { gifts, receipts } from "@/data/giving";
@@ -56,6 +56,7 @@ export default function Receipts() {
         <ErrorState body="We couldn't load your receipts. Check your connection and try again." onRetry={() => (preview ? router.replace("/receipts") : account.refresh())} />
       ) : (
         <>
+          {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
           <View style={styles.notice}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
               <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Receipts arrive once a year</Text>

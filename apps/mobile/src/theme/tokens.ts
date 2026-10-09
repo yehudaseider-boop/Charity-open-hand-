@@ -9,6 +9,7 @@ export const colors = {
   muted: "#5B6B78", // secondary text
   hairline: "#D5E6E3", // borders
   accent: "#0653B1", // logo blue: buttons, links, active tab, progress, selection
+  accentSoft: "#E7F0FB", // pale logo blue: gentle highlight cards
   danger: "#C23B2A", // errors and destructive actions only
   success: "#168A66", // teal: success only
   onInk: "#FFFFFF", // text on ink buttons

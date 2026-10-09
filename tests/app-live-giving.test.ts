@@ -1,6 +1,6 @@
 /** The app's mapping from the donor's own database rows to what the Giving and Receipts screens show. */
 import { describe, expect, it } from "vitest";
-import { cleanCode, looksLikeEmail, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
+import { cleanCode, fromCache, looksLikeEmail, newArrivals, seenFrom, toCache, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
 
 const charity = { slug: "meals", name_en: "Meals Fund" };
 const row = (o: Partial<DonationRow>): DonationRow => ({
@@ -144,5 +144,58 @@ describe("glossary", () => {
         expect(p, key).not.toMatch(/—/);
       }
     }
+  });
+});
+
+
+describe("thanking for new donations", () => {
+  const g = (id: string, day: number) => toGifts([row({ id, paid_at: `2026-10-${String(day).padStart(2, "0")}T08:00:00Z` })], [])[0];
+
+  it("celebrates nothing the first time, so history isn't treated as new", () => {
+    expect(newArrivals([g("a", 1), g("b", 2)], null)).toEqual([]);
+  });
+
+  it("finds only donations that arrived since last time, oldest first", () => {
+    const seen = seenFrom([g("a", 1), g("b", 2)]);
+    expect(newArrivals([g("a", 1), g("b", 2), g("d", 5), g("c", 4)], seen).map((x) => x.id)).toEqual(["c", "d"]);
+    expect(newArrivals([g("a", 1), g("b", 2)], seen)).toEqual([]);
+  });
+
+  it("remembers only the newest 200, without re-thanking older ones", () => {
+    const many = Array.from({ length: 250 }, (_, i) => g(`x${i}`, 1 + (i % 28)));
+    const seen = seenFrom(many);
+    expect(seen.ids).toHaveLength(200);
+    expect(newArrivals(many, seen)).toEqual([]);
+  });
+
+  it("carries the charity's own thank-you note", () => {
+    const [gift] = toGifts([row({ charities: { slug: "m", name_en: "Meals Fund", thank_you_en: "Thank you from all of us." } })], []);
+    expect(gift.thankYou).toBe("Thank you from all of us.");
+  });
+});
+
+describe("giving saved on the phone for offline use", () => {
+  const live = {
+    gifts: [{ id: "a", date: new Date("2026-09-01T08:00:00Z"), charitySlug: "meals", charityName: "Meals Fund", cents: 18000, monthly: false, with18a: true, kind: "maaser" as const, thankYou: "Thank you" }],
+    recurring: [{ id: "r", charitySlug: "meals", charityName: "Meals Fund", cents: 5000, nextDate: null, status: "paused" as const, syncing: true }],
+    receipts: [{ id: "x", taxYear: 2027, charityName: "Meals Fund", number: "MF-1", cents: 18000, issued: new Date("2026-09-02T08:00:00Z") }],
+    elsewhere: [{ id: "e", date: new Date("2026-08-01T00:00:00Z"), recipient: "Shul appeal", cents: 3600, kind: "chomesh" as const }],
+    loadedAt: new Date("2026-09-03T10:15:00Z"),
+  };
+
+  it("comes back exactly as it went in, dates included", () => {
+    expect(fromCache(toCache(live))).toEqual(live);
+  });
+
+  it("treats anything missing, old or tampered with as no cache", () => {
+    expect(fromCache(null)).toBeNull();
+    expect(fromCache("not json")).toBeNull();
+    expect(fromCache(JSON.stringify({ ...JSON.parse(toCache(live)), v: 0 }))).toBeNull();
+    const bad = JSON.parse(toCache(live));
+    bad.gifts[0].cents = 180.5;
+    expect(fromCache(JSON.stringify(bad))).toBeNull();
+    const badDate = JSON.parse(toCache(live));
+    badDate.receipts[0].issued = "yesterday";
+    expect(fromCache(JSON.stringify(badDate))).toBeNull();
   });
 });

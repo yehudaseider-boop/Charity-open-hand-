@@ -6,6 +6,7 @@ import { parseRandToCents, percentToPpm } from "@shared/money";
 import { colors, radius, type } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
+import { haptic } from "@/lib/haptics";
 import { InfoButton } from "./info-button";
 import { Segmented } from "./segmented";
 import { Text } from "./text";
@@ -31,12 +32,16 @@ export function TargetEditor({
   monthsLeft,
   onSave,
   onCancel,
+  cancelLabel = "Cancel",
+  title,
 }: {
   initial: Target | null;
   yearEnd: string;
   monthsLeft: number;
   onSave: (t: Target) => void;
   onCancel?: () => void;
+  cancelLabel?: string;
+  title?: string;
 }) {
   const [mode, setMode] = useState<"income" | "amount">(initial ? "amount" : "income");
   const [period, setPeriod] = useState<TargetPeriod>(initial?.period ?? "month");
@@ -55,7 +60,7 @@ export function TargetEditor({
   return (
     <View style={styles.card}>
       <View style={{ gap: 6 }}>
-        <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>{initial ? "Change your targets" : "Set your maaser target"}</Text>
+        <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>{title ?? (initial ? "Change your targets" : "Set your maaser target")}</Text>
         <Text variant="bodyMuted">Maaser and chomesh are tracked separately. General tzedaka doesn&apos;t count towards either. Only you see this.</Text>
       </View>
 
@@ -71,7 +76,10 @@ export function TargetEditor({
           ] as const).map(([v, label, note]) => {
             const selected = keeps === v;
             return (
-              <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setKeeps(v)} style={[styles.choice, selected && styles.choiceOn]}>
+              <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => {
+                haptic.tap();
+                setKeeps(v);
+              }} style={[styles.choice, selected && styles.choiceOn]}>
                 <Text style={[type.button, { fontSize: 16, color: selected ? colors.accent : colors.ink, textAlign: "center" }]}>{label}</Text>
                 <Text variant="label">{note}</Text>
               </Pressable>
@@ -142,7 +150,7 @@ export function TargetEditor({
           onPress={() => ok && maaser && onSave({ period, maaserCents: maaser, chomeshCents: keeps === "both" ? chomesh : null })}
           style={!ok ? { opacity: 0.4 } : undefined}
         />
-        {onCancel ? <TextLink label="Cancel" onPress={onCancel} /> : null}
+        {onCancel ? <TextLink label={cancelLabel} onPress={onCancel} /> : null}
       </View>
     </View>
   );

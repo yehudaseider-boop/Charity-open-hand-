@@ -30,6 +30,7 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
       name_en: v.name_en,
       description_en: v.description_en ?? null,
       funds_use_en: v.funds_use_en ?? null,
+      thank_you_en: v.thank_you_en ?? null,
       website: v.website ?? null,
     })
     .eq("id", charityId)

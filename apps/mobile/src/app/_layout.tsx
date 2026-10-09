@@ -43,7 +43,11 @@ export default function RootLayout() {
       <AccountProvider>
         <PreviewChrome>
           <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.parchment } }} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.parchment }, animation: "slide_from_right" }}>
+            {/* The welcome hands over to the tabs with a fade, not a push: there is nothing to go back to. */}
+            <Stack.Screen name="index" options={{ animation: "fade" }} />
+            <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+          </Stack>
         </PreviewChrome>
       </AccountProvider>
     </SafeAreaProvider>
