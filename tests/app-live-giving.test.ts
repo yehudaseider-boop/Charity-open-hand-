@@ -184,7 +184,10 @@ describe("giving saved on the phone for offline use", () => {
   };
 
   it("comes back exactly as it went in, dates included", () => {
-    expect(fromCache(toCache(live))).toEqual(live);
+    // Thank-you notes aren't kept in the saved copy (they're only shown for new donations).
+    const gift: Partial<(typeof live.gifts)[0]> = { ...live.gifts[0] };
+    delete gift.thankYou;
+    expect(fromCache(toCache(live))).toEqual({ ...live, gifts: [gift] });
   });
 
   it("treats anything missing, old or tampered with as no cache", () => {
@@ -197,5 +200,14 @@ describe("giving saved on the phone for offline use", () => {
     const badDate = JSON.parse(toCache(live));
     badDate.receipts[0].issued = "yesterday";
     expect(fromCache(JSON.stringify(badDate))).toBeNull();
+  });
+});
+
+describe("saved copy size", () => {
+  it("keeps the newest 500 donations", () => {
+    const many = Array.from({ length: 600 }, (_, i) => ({ id: `g${i}`, date: new Date(2026, 0, 1, 0, i), charitySlug: "m", charityName: "M", cents: 100, monthly: false, with18a: false, kind: "tzedaka" as const }));
+    const back = fromCache(toCache({ gifts: many, recurring: [], receipts: [], elsewhere: [], loadedAt: new Date() }))!;
+    expect(back.gifts).toHaveLength(500);
+    expect(back.gifts[0].id).toBe("g599");
   });
 });

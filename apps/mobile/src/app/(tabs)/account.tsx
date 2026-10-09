@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Linking, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
@@ -10,7 +10,7 @@ import { SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { sampleDonor } from "@/data/giving";
 import { useAccount } from "@/lib/account";
-import { SITE_URL, siteUrl } from "@/lib/website";
+import { openSite } from "@/lib/open-site";
 import { colors, radius, space } from "@/theme/tokens";
 
 /**
@@ -27,12 +27,9 @@ export default function Account() {
 
   // Legal pages live on the website (one source of truth). Apple requires a
   // privacy policy link in the app, and a way to start deleting your account.
-  const open = (path: string) => () => {
-    const url = siteUrl(SITE_URL, path);
-    if (url) Linking.openURL(url).catch(() => undefined);
-  };
+  const open = (path: string) => () => openSite(path);
   const support = [
-    { label: "Help" },
+    { label: "How NEDIV lev works", onPress: () => router.push("/how-it-works") },
     { label: "Privacy Policy", onPress: open("/privacy") },
     { label: "Terms", onPress: open("/terms") },
   ];

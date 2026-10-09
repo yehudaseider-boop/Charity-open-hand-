@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import { router } from "expo-router";
+import { StyleSheet, View } from "react-native";
 import { dayLine, greeting, seasonalAppeal } from "@/lib/jewish-calendar";
 import { colors, radius } from "@/theme/tokens";
 import { Text } from "./text";
@@ -22,10 +21,10 @@ export function SeasonalCard() {
   const appeal = seasonalAppeal(useNow());
   if (!appeal) return null;
   return (
-    <Pressable onPress={() => router.push("/discover")} accessibilityRole="button" accessibilityHint="Find a charity" style={styles.card}>
+    <View accessible style={styles.card}>
       <Text style={styles.cardTitle}>{appeal.title}</Text>
       <Text variant="bodyMuted">{appeal.body}</Text>
-    </Pressable>
+    </View>
   );
 }
 

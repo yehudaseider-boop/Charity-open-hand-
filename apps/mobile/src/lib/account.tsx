@@ -54,6 +54,19 @@ export function useAccount(): AccountValue {
   return v;
 }
 
+/** The server hands out at most 1 000 rows at a time: read page by page (up to 5 000). */
+async function allPages<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < 5000; from += 1000) {
+    const { data, error } = await page(from, from + 999);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+
 async function loadLive(userId: string): Promise<Live> {
   const db = supabase!;
   // Only this person's own donor records: never anything an admin role could see.
@@ -61,20 +74,24 @@ async function loadLive(userId: string): Promise<Live> {
   if (e1) throw e1;
   const donorIds = (donors ?? []).map((d) => d.id as string);
   // Giving logged by hand belongs to the account itself, not to a donor record.
-  const elsewhere = await db.from("external_giving_entries").select("id, entry_date, recipient_text, amount_cents, kind").eq("user_id", userId).order("entry_date", { ascending: false }).limit(2000);
-  if (elsewhere.error) throw elsewhere.error;
-  const loggedElsewhere = toElsewhere((elsewhere.data ?? []) as unknown as ElsewhereRow[]);
+  const elsewhere = await allPages<ElsewhereRow>((a, b) =>
+    db.from("external_giving_entries").select("id, entry_date, recipient_text, amount_cents, kind").eq("user_id", userId).order("entry_date", { ascending: false }).order("id").range(a, b),
+  );
+  const loggedElsewhere = toElsewhere(elsewhere);
   if (donorIds.length === 0) return { gifts: [], recurring: [], receipts: [], elsewhere: loggedElsewhere, loadedAt: new Date() };
 
-  const [donations, kinds, recurring, receipts] = await Promise.all([
-    db
-      .from("donations")
-      .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en)")
-      .in("donor_id", donorIds)
-      .eq("status", "paid")
-      .order("paid_at", { ascending: false })
-      .limit(2000),
-    db.from("donation_giving_kinds").select("donation_id, kind"),
+  const [donations, recurring, receipts] = await Promise.all([
+    // Each donation carries its own maaser/chomesh/tzedaka choice.
+    allPages<DonationRow & { donation_giving_kinds: { kind: string } | { kind: string }[] | null }>((a, b) =>
+      db
+        .from("donations")
+        .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en), donation_giving_kinds(kind)")
+        .in("donor_id", donorIds)
+        .eq("status", "paid")
+        .order("paid_at", { ascending: false })
+        .order("id")
+        .range(a, b),
+    ),
     db.from("recurring_donations").select("id, amount_cents, status, needs_gateway_sync, next_charge_at, charities(slug, name_en)").in("donor_id", donorIds),
     db
       .from("s18a_receipts")
@@ -82,9 +99,13 @@ async function loadLive(userId: string): Promise<Live> {
       .in("donor_id", donorIds)
       .order("issued_at", { ascending: false }),
   ]);
-  for (const r of [donations, kinds, recurring, receipts]) if (r.error) throw r.error;
+  for (const r of [recurring, receipts]) if (r.error) throw r.error;
+  const kinds: KindRow[] = donations.flatMap((d) => {
+    const k = Array.isArray(d.donation_giving_kinds) ? d.donation_giving_kinds[0] : d.donation_giving_kinds;
+    return k ? [{ donation_id: d.id, kind: k.kind }] : [];
+  });
   return {
-    gifts: toGifts((donations.data ?? []) as unknown as DonationRow[], (kinds.data ?? []) as KindRow[]),
+    gifts: toGifts(donations, kinds),
     recurring: toRecurring((recurring.data ?? []) as unknown as RecurringRow[]),
     receipts: toReceipts((receipts.data ?? []) as unknown as ReceiptRow[]),
     elsewhere: loggedElsewhere,
@@ -115,14 +136,16 @@ async function saveSeen(userId: string, seen: Seen): Promise<void> {
 /** The last giving loaded, on this phone only (secure storage), so the app opens instantly and works offline. */
 const cacheKey = (userId: string) => `nediv-lev.giving.${userId}`;
 
-async function hasAgreed(userId: string): Promise<boolean> {
-  const { data } = await supabase!
+/** true / false, or null when we couldn't find out (e.g. offline). */
+async function hasAgreed(userId: string): Promise<boolean | null> {
+  const { data, error } = await supabase!
     .from("consents")
     .select("id")
     .eq("user_id", userId)
     .eq("kind", "account")
     .eq("policy_version", POLICY_VERSION)
     .limit(1);
+  if (error) return null;
   return Boolean(data && data.length > 0);
 }
 
@@ -134,65 +157,113 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [arrived, setArrived] = useState<Gift[]>([]);
   const lastCached = useRef<string | null>(null);
+  // Each sign-in check gets a number; a slow answer for an older one is ignored.
+  const settleRun = useRef(0);
+  const agreedFor = useRef<string | null>(null);
+  const lastUser = useRef<string | null>(null);
 
   const settle = useCallback(async (s: Session | null) => {
+    const run = ++settleRun.current;
     setSession(s);
     if (!s) {
+      agreedFor.current = null;
       setLive(null);
+      setLoadError(false);
+      setArrived([]);
       setStatus("signed-out");
       return;
     }
-    setStatus((await hasAgreed(s.user.id)) ? "signed-in" : "agreeing");
+    // Someone else signed in: nothing of the last person's stays on screen.
+    if (lastUser.current && lastUser.current !== s.user.id) {
+      setLive(null);
+      setLoadError(false);
+      setArrived([]);
+    }
+    lastUser.current = s.user.id;
+    // Already checked for this person in this session: nothing to ask again.
+    if (agreedFor.current === s.user.id) return setStatus("signed-in");
+    const agreed = await hasAgreed(s.user.id);
+    if (run !== settleRun.current) return;
+    if (agreed === false) return setStatus("agreeing");
+    // Agreed, or we couldn't check (offline): show their giving. The website
+    // still asks for agreement before anything is saved there.
+    if (agreed) agreedFor.current = s.user.id;
+    setStatus("signed-in");
   }, []);
 
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => settle(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      // A routine token refresh is the same person: no need to re-check anything.
+      if (event === "TOKEN_REFRESHED") return setSession(s);
       settle(s);
     });
     return () => sub.subscription.unsubscribe();
   }, [settle]);
 
+  const userId = session?.user.id ?? null;
+  // Whose data the screens may show right now. A load that finishes after
+  // sign-out (or after someone else signs in) is thrown away.
+  const currentUser = useRef<string | null>(null);
+  currentUser.current = status === "signed-in" ? userId : null;
+  const inFlight = useRef<Promise<void> | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!supabase || !session || status !== "signed-in") return;
+    if (!supabase || !userId || status !== "signed-in") return;
+    // One load at a time: callers share the one already running.
+    if (inFlight.current) return inFlight.current;
+    const uid = userId;
+    const mine = () => currentUser.current === uid;
+    const job = (async () => {
     setRefreshing(true);
     try {
       // Donations given with this email before signing up join the account.
-      await supabase.rpc("link_my_donations");
-      const next = await loadLive(session.user.id);
+      await supabase!.rpc("link_my_donations");
+      const next = await loadLive(uid);
+      if (!mine()) return;
       setLive(next);
       setLoadError(false);
       // Only write when the giving itself changed (not just the time it was loaded).
       const unchanged = toCache({ ...next, loadedAt: new Date(0) });
       if (unchanged !== lastCached.current) {
         lastCached.current = unchanged;
-        secureStorage.setItem(cacheKey(session.user.id), toCache(next)).catch(() => undefined);
+        await secureStorage.setItem(cacheKey(uid), toCache(next)).catch(() => undefined);
+        // Signed out while that was being written: take it off the phone again.
+        if (!mine()) await secureStorage.removeItem(cacheKey(uid)).catch(() => undefined);
       }
       // Thank the donor for anything new since they last looked, then remember it as seen.
-      const seen = await loadSeen(session.user.id);
+      const seen = await loadSeen(uid);
+      if (!mine()) return;
       const fresh = newArrivals(next.gifts, seen);
       if (fresh.length) setArrived((a) => [...a, ...fresh.filter((f) => !a.some((x) => x.id === f.id))]);
-      await saveSeen(session.user.id, seenFrom(next.gifts));
+      await saveSeen(uid, seenFrom(next.gifts));
     } catch {
-      setLoadError(true);
+      if (mine()) setLoadError(true);
     } finally {
       setRefreshing(false);
     }
-  }, [session, status]);
+    })();
+    inFlight.current = job;
+    try {
+      await job;
+    } finally {
+      inFlight.current = null;
+    }
+  }, [userId, status]);
 
   // Show what the phone saved last time straight away; fresh data replaces it.
   useEffect(() => {
-    if (status !== "signed-in" || !session) return;
-    const userId = session.user.id;
+    if (status !== "signed-in" || !userId) return;
+    const uid = userId;
     secureStorage
-      .getItem(cacheKey(userId))
+      .getItem(cacheKey(uid))
       .then((raw) => {
         const cached = fromCache(raw);
-        if (cached) setLive((l) => l ?? { ...cached, fromCache: true });
+        if (cached && currentUser.current === uid) setLive((l) => l ?? { ...cached, fromCache: true });
       })
       .catch(() => undefined);
-  }, [status, session]);
+  }, [status, userId]);
 
   // Load once signed in, and again each time the app comes back to the front.
   useEffect(() => {
@@ -228,6 +299,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
         const { error } = await supabase.rpc("agree_to_policy", { p_version: POLICY_VERSION });
         if (error) return { ok: false, message: "We couldn't save that. Please try again." };
+        agreedFor.current = session.user.id;
         setStatus("signed-in");
         return { ok: true };
       },
@@ -238,6 +310,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         lastCached.current = null;
         await supabase?.auth.signOut();
         setLive(null);
+        setLoadError(false);
+        setArrived([]);
       },
       async addElsewhere(e) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };

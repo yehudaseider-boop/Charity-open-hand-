@@ -72,12 +72,13 @@ export function ChevronIcon({ size = 18, color = colors.muted }: IconProps) {
 }
 
 export function HeartIcon({ size = 22, color = colors.ink, filled = false }: IconProps & { filled?: boolean }) {
-  // "Saved" is shown by colour, not by filling, to keep the set outline-only.
+  // Saved: filled solid blue, so it's clear at a glance.
   return (
     <Svg {...base(size)}>
       <Path
         d="M12 19.5s-7.5-4.4-7.5-9.6A4.1 4.1 0 0112 7.6a4.1 4.1 0 017.5 2.3c0 5.2-7.5 9.6-7.5 9.6z"
         {...stroke(filled ? colors.accent : color)}
+        fill={filled ? colors.accent : "none"}
       />
     </Svg>
   );

@@ -14,7 +14,7 @@ import { Text } from "./text";
  * so it lands in the right place in their maaser and chomesh. No default.
  * The amount and payment are entered on the website only.
  */
-export function GiveSheet({ charityName, slug }: { charityName: string; slug: string }) {
+export function GiveSheet({ charityName, slug, onDone }: { charityName: string; slug: string; onDone?: () => void }) {
   const [kind, setKind] = useState<GivingKind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const url = kind ? donateUrl(SITE_URL, slug, kind) : null;
@@ -52,6 +52,7 @@ export function GiveSheet({ charityName, slug }: { charityName: string; slug: st
             if (!url) return;
             try {
               await Linking.openURL(url);
+              onDone?.();
             } catch {
               setError("We couldn't open your browser. Please try again.");
             }

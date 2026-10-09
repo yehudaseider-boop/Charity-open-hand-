@@ -111,7 +111,7 @@ export default function Discover() {
         ) : results.length === 0 ? (
           <EmptyState
             title="No charities found"
-            body={`Nothing matches "${query.trim()}". Try another name or a different cause.`}
+            body={query.trim() ? `Nothing matches "${query.trim()}". Try another name or a different cause.` : "No charities in this cause yet. Try another one."}
             action={{ label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } }}
           />
         ) : (

@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
@@ -41,6 +41,16 @@ export default function Welcome() {
   useEffect(() => {
     if (!forced) hasBeenWelcomed().then(setSeen);
   }, [forced]);
+
+  // Android's back button steps back through the welcome rather than closing the app.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (step <= 1) return false;
+      setStep(step - 1);
+      return true;
+    });
+    return () => sub.remove();
+  }, [step]);
 
   if (seen === null) return <View style={styles.screen} />;
   if (seen) return <Redirect href="/discover" />;

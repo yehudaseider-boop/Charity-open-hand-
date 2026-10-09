@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Linking, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useAccount } from "@/lib/account";
 import { cleanCode, looksLikeEmail } from "@/lib/live-giving";
-import { SITE_URL, siteUrl } from "@/lib/website";
+import { openSite } from "@/lib/open-site";
 import { colors, radius, type } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
@@ -72,10 +72,7 @@ export function Agree() {
   const [age, setAge] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const open = (path: string) => {
-    const url = siteUrl(SITE_URL, path);
-    if (url) Linking.openURL(url).catch(() => undefined);
-  };
+  const open = (path: string) => openSite(path);
 
   return (
     <View style={styles.card}>

@@ -33,14 +33,14 @@ async function tx(fn: () => Promise<void>) {
     await run("rollback");
   }
 }
-async function as(who: "anon" | string) {
+async function as(who: "anon" | string, method = "otp") {
   await run("reset role");
   if (who === "anon") {
     await run("set local role anon");
     await run(`select set_config('request.jwt.claims', '{"role":"anon"}', true)`);
   } else {
     await run("set local role authenticated");
-    await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: who, role: "authenticated", aal: "aal2" })]);
+    await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: who, role: "authenticated", aal: "aal2", amr: [{ method, timestamp: 0 }] })]);
   }
 }
 /** Expect a statement to be refused outright, without breaking the transaction. */
@@ -238,6 +238,10 @@ describe("signing in from the app", () => {
       const mine = await guestDonor("Gila@Example.co.za");
       const other = await guestDonor("someone.else@example.co.za");
       const u = await newUser("gila@example.co.za", true);
+      // Signed in with a password (e.g. someone who signed up with this address): nothing joins.
+      await as(u, "password");
+      expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(0);
+      // Signed in with the emailed code: proof they read that inbox.
       await as(u);
       expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(1);
       await run("reset role");

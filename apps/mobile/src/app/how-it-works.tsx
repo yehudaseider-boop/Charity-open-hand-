@@ -19,7 +19,7 @@ export default function HowItWorks() {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
-      <TopBar title="How it works" fallback="/" />
+      <TopBar title="How it works" fallback="/discover" />
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.md, paddingBottom: insets.bottom + 32, gap: space.block }}>
         <Text variant="h1" accessibilityRole="header">Generosity made simple.</Text>
 
@@ -40,7 +40,7 @@ export default function HowItWorks() {
           <Text style={{ flex: 1, fontSize: 17 }}>NEDIV lev charges no fee on donations. You can choose to add a contribution to NEDIV lev.</Text>
         </View>
 
-        <Button label="Find a charity" onPress={() => router.push("/discover")} />
+        <Button label="Find a charity" onPress={() => router.navigate("/discover")} />
       </ScrollView>
     </View>
   );

@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useRef, useState } from "react";
+import { Animated, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
@@ -15,6 +15,7 @@ import { Text } from "@/components/text";
 import { ddmmyyyy } from "@/lib/format";
 import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
+import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
 import { colors, radius, space, touch } from "@/theme/tokens";
 
@@ -25,6 +26,7 @@ export default function CharityDetail() {
   const { live, charity, failed, retry } = useCharity(params.slug);
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const savedList = useSaved();
+  const pop = useRef(new Animated.Value(1)).current;
 
   if (charity === undefined) {
     return (
@@ -128,14 +130,21 @@ export default function CharityDetail() {
         <Pressable
           onPress={() => {
             haptic.press();
+            // A small pop as the heart fills (skipped when the phone asks for less motion).
+            if (!saved && !reduceMotion()) {
+              pop.setValue(0.6);
+              Animated.spring(pop, { toValue: 1, friction: 4, useNativeDriver: true }).start();
+            }
             savedList.toggle(charity.slug);
           }}
           accessibilityRole="button"
           accessibilityLabel={saved ? "Remove from your charities" : "Save to your charities"}
           accessibilityState={{ selected: saved }}
-          style={styles.round}
+          style={[styles.round, saved && styles.roundOn]}
         >
-          <HeartIcon filled={saved} />
+          <Animated.View style={{ transform: [{ scale: pop }] }}>
+            <HeartIcon filled={saved} size={24} />
+          </Animated.View>
         </Pressable>
       </View>
 
@@ -145,7 +154,7 @@ export default function CharityDetail() {
       </View>
 
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)}>
-        <GiveSheet charityName={charity.nameEn} slug={charity.slug} />
+        <GiveSheet charityName={charity.nameEn} slug={charity.slug} onDone={() => setSheetOpen(false)} />
       </Sheet>
     </View>
   );
@@ -163,5 +172,6 @@ const styles = StyleSheet.create({
   note: { marginTop: space.block, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.hairline },
   topBar: { position: "absolute", left: space.gutter, right: space.gutter, flexDirection: "row", justifyContent: "space-between" },
   round: { width: touch, height: touch, borderRadius: touch / 2, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.hairline },
+  roundOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   giveBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.gutter, paddingTop: 12, backgroundColor: colors.parchment, borderTopWidth: 1, borderTopColor: colors.hairline },
 });

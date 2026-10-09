@@ -132,7 +132,12 @@ export function seenFrom(gifts: Gift[]): Seen {
 export type Cached = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: { id: string; date: Date; recipient: string; cents: number; kind: GivingKind }[]; loadedAt: Date };
 
 export function toCache(live: Cached): string {
-  return JSON.stringify({ v: 1, ...live });
+  // Kept small: the newest 500 donations, without the charities' thank-you notes.
+  const gifts = [...live.gifts]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 500)
+    .map(({ thankYou: _note, ...g }) => g);
+  return JSON.stringify({ v: 1, ...live, gifts });
 }
 
 export function fromCache(raw: string | null): Cached | null {

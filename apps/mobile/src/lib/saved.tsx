@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAccount } from "./account";
 import { mergeSaved } from "./live-charities";
 import { secureStorage } from "./secure-storage";
@@ -27,7 +27,7 @@ async function loadDevice(): Promise<string[]> {
     return [];
   }
 }
-const saveDevice = (slugs: string[]) => secureStorage.setItem(DEVICE_KEY, JSON.stringify(slugs)).catch(() => undefined);
+const saveDevice = (slugs: string[]) => secureStorage.setItem(DEVICE_KEY, JSON.stringify(slugs));
 
 async function loadAccount(userId: string): Promise<string[]> {
   const { data, error } = await supabase!
@@ -84,30 +84,44 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
     };
   }, [userId]);
 
+  // The current list, so quick taps build on each other rather than on an old copy.
+  const current = useRef<string[]>([]);
+  current.current = slugs;
+  const writes = useRef(Promise.resolve());
+
   const toggle = useCallback(
     async (slug: string) => {
-      const was = slugs.includes(slug);
-      const next = was ? slugs.filter((s) => s !== slug) : mergeSaved(slugs, [slug]);
-      setSlugs(next);
-      try {
-        if (userId && supabase) {
-          if (was) {
-            const { data } = await supabase.from("charities").select("id").eq("slug", slug).maybeSingle();
-            if (data) {
-              const { error } = await supabase.from("favourites").delete().eq("user_id", userId).eq("charity_id", data.id);
+      const was = current.current.includes(slug);
+      const apply = (list: string[], save: boolean) => (save ? mergeSaved(list.filter((s) => s !== slug), [slug]) : list.filter((s) => s !== slug));
+      current.current = apply(current.current, !was);
+      setSlugs(current.current);
+      // Saves go one after another, in the order they were tapped.
+      const job = writes.current.then(async () => {
+        try {
+          if (userId && supabase) {
+            if (was) {
+              const { data, error } = await supabase.from("charities").select("id").eq("slug", slug).maybeSingle();
               if (error) throw error;
+              if (data) {
+                const del = await supabase.from("favourites").delete().eq("user_id", userId).eq("charity_id", data.id);
+                if (del.error) throw del.error;
+              }
+            } else {
+              await addToAccount(userId, [slug]);
             }
           } else {
-            await addToAccount(userId, [slug]);
+            await saveDevice(current.current);
           }
-        } else {
-          await saveDevice(next);
+        } catch {
+          // Not saved: undo just this one.
+          current.current = apply(current.current, was);
+          setSlugs(current.current);
         }
-      } catch {
-        setSlugs(slugs); // Not saved: put it back as it was.
-      }
+      });
+      writes.current = job;
+      await job;
     },
-    [slugs, userId],
+    [userId],
   );
 
   const value = useMemo<SavedValue>(() => ({ slugs, isSaved: (s) => slugs.includes(s), toggle }), [slugs, toggle]);

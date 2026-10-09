@@ -7,7 +7,7 @@ export function FadeUp({ index = 0, children, style }: { index?: number; childre
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduceMotion()) return v.setValue(1);
-    Animated.timing(v, { toValue: 1, duration: 320, delay: index * 50, useNativeDriver: true }).start();
+    Animated.timing(v, { toValue: 1, duration: 320, delay: Math.min(index, 8) * 50, useNativeDriver: true }).start();
   }, [v, index]);
   return (
     <Animated.View

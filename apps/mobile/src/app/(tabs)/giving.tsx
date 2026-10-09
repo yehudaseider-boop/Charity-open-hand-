@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { DayGreeting } from "@/components/day-greeting";
@@ -26,6 +26,7 @@ import { useDirectory } from "@/lib/directory";
 import { savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
+import { confirmThen, notify } from "@/lib/open-site";
 import { loadTarget, saveTarget } from "@/lib/targets";
 import { colors, radius, space, touch, type } from "@/theme/tokens";
 
@@ -39,20 +40,48 @@ export default function Giving() {
   const signedIn = account.status === "signed-in";
   const demoState = useScreenState();
   // Live: the screen's state comes from the account; preview keeps the design-review states.
-  const state = preview ? demoState : signedIn && !account.live ? "loading" : account.loadError && !account.live ? "error" : "ready";
+  const state = preview
+    ? demoState
+    : account.status === "loading"
+      ? "loading"
+      : account.loadError && !account.live
+        ? "error"
+        : signedIn && !account.live
+          ? "loading"
+          : "ready";
   const p = useLocalSearchParams<{ demo?: string; sheet?: string }>();
   const newDonor = preview ? demoState === "empty" : !signedIn;
   const [target, setTarget] = useState<Target | null>(!preview || newDonor || p.demo === "first" ? null : sampleMaaserTarget);
   // Targets are personal and stay on this phone (in its secure storage), never on our servers.
+  const [targetLoaded, setTargetLoaded] = useState(preview);
   useEffect(() => {
     if (preview) return;
-    loadTarget().then((t) => t && setTarget(t));
+    let live = true;
+    loadTarget().then((t) => {
+      if (!live) return;
+      if (t) setTarget(t);
+      setTargetLoaded(true);
+    });
+    return () => {
+      live = false;
+    };
   }, [preview]);
-  // Income (for maaser) stays on this phone only.
+  // Income (for maaser) stays on this phone only. Nothing is logged until the saved log has loaded.
   const [income, setIncome] = useState<IncomeEntry[]>([]);
+  const [incomeLoaded, setIncomeLoaded] = useState(preview);
   useEffect(() => {
-    if (!preview) loadIncome().then(setIncome);
+    if (preview) return;
+    let live = true;
+    loadIncome().then((rows) => {
+      if (!live) return;
+      setIncome(rows);
+      setIncomeLoaded(true);
+    });
+    return () => {
+      live = false;
+    };
   }, [preview]);
+  const [busy, setBusy] = useState(false);
   const [previewElsewhere, setPreviewElsewhere] = useState<Elsewhere[]>(newDonor ? [] : sampleElsewhere);
   const [logging, setLogging] = useState<"income" | "elsewhere" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -74,7 +103,8 @@ export default function Giving() {
   const elsewhere: Elsewhere[] = preview ? previewElsewhere : (account.live?.elsewhere ?? []);
   const yearGifts = inGivingYear(myGifts, hYear);
   const giftsTotal = yearGifts.reduce((t, g) => t + g.cents, 0);
-  const monthGifts = yearGifts.filter((g) => g.date.getMonth() === now.getMonth() && g.date.getFullYear() === now.getFullYear());
+  // The whole calendar month, even the days before Rosh Hashana, as for income and giving elsewhere.
+  const monthGifts = myGifts.filter((g) => g.date.getMonth() === now.getMonth() && g.date.getFullYear() === now.getFullYear());
   const monthTotal = monthGifts.reduce((t, g) => t + g.cents, 0);
   const charities = byCharity(yearGifts);
   const with18a = yearGifts.filter((g) => g.with18a).reduce((t, g) => t + g.cents, 0);
@@ -105,6 +135,7 @@ export default function Giving() {
   const periodIncome = incomeBetween(income, periodFrom, periodTo);
   const owed = owedFromIncome(periodIncome, Boolean(target?.chomeshCents));
   const addIncome = (e: { cents: number; date: string; note: string }) => {
+    if (!incomeLoaded) return;
     const next = [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...e }, ...income].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     setIncome(next);
     saveIncome(next);
@@ -115,8 +146,22 @@ export default function Giving() {
     setIncome(next);
     saveIncome(next);
   };
-  const confirmRemove = (what: string, go: () => void) =>
-    Alert.alert(`Remove this ${what}?`, "This can't be undone.", [{ text: "Keep it", style: "cancel" }, { text: "Remove", style: "destructive", onPress: go }]);
+  const confirmRemove = (what: string, go: () => void) => confirmThen(`Remove this ${what}?`, "This can't be undone.", "Remove", go);
+  const removeElsewhereEntry = (id: string) => {
+    if (preview) return setPreviewElsewhere((rows) => rows.filter((r) => r.id !== id));
+    account.removeElsewhere(id).then((r) => {
+      if (!r.ok) notify("Not removed", r.message);
+    });
+  };
+  const changeRecurring = async (id: string, status: "active" | "paused" | "cancelled") => {
+    if (busy) return;
+    setBusy(true);
+    const r = await account.setRecurringStatus(id, status);
+    setBusy(false);
+    setConfirmCancel(false);
+    setRecurringError(r.ok ? null : r.message);
+    if (r.ok) setOpen(null);
+  };
   const saveElsewhere = async (e: { cents: number; date: string; recipient: string; kind: "maaser" | "chomesh" | "tzedaka" }): Promise<string | null> => {
     if (preview) {
       setPreviewElsewhere((rows) => [{ id: `p${Date.now()}`, date: isoToDate(e.date), recipient: e.recipient, cents: e.cents, kind: e.kind }, ...rows]);
@@ -159,7 +204,9 @@ export default function Giving() {
                 <Button label="Sign in" onPress={() => router.push("/account")} />
               </View>
             ) : null}
-            {target === null || editing ? (
+            {!targetLoaded ? (
+              <SkeletonBlock height={190} />
+            ) : target === null || editing ? (
               <TargetEditor
                 initial={target}
                 yearEnd={yearEnd}
@@ -266,7 +313,7 @@ export default function Giving() {
                 ) : null}
 
                 <View style={{ flexDirection: "row", gap: 10 }}>
-                  <View style={{ flex: 1 }}><Button label="Log income" onPress={() => setLogging("income")} /></View>
+                  <View style={{ flex: 1 }}><Button label="Log income" disabled={!incomeLoaded} onPress={() => setLogging("income")} /></View>
                   <View style={{ flex: 1 }}><Button label="Log giving elsewhere" onPress={() => setLogging("elsewhere")} /></View>
                 </View>
 
@@ -275,7 +322,7 @@ export default function Giving() {
                     <Text variant="label">Income log (on this phone only)</Text>
                     <View style={styles.list}>
                       {income.slice(0, 12).map((e, i) => (
-                        <Pressable key={e.id} onLongPress={() => confirmRemove("income entry", () => removeIncome(e.id))} accessibilityRole="button" accessibilityHint="Press and hold to remove" accessibilityLabel={`${rand(e.cents)}, ${ddmmyyyy(isoToDate(e.date))}${e.note ? `, ${e.note}` : ""}`} style={[styles.row, i > 0 && styles.divider]}>
+                        <Pressable key={e.id} onLongPress={() => confirmRemove("income entry", () => removeIncome(e.id))} accessibilityRole="button" accessibilityHint="Press and hold to remove" accessibilityActions={[{ name: "delete", label: "Remove" }]} onAccessibilityAction={(ev) => ev.nativeEvent.actionName === "delete" && confirmRemove("income entry", () => removeIncome(e.id))} accessibilityLabel={`${rand(e.cents)}, ${ddmmyyyy(isoToDate(e.date))}${e.note ? `, ${e.note}` : ""}`} style={[styles.row, i > 0 && styles.divider]}>
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{e.note || "Income"}</Text>
                             <Text variant="bodyMuted" style={{ fontSize: 16 }}>{ddmmyyyy(isoToDate(e.date))}</Text>
@@ -295,7 +342,9 @@ export default function Giving() {
                       {elsewhere.slice(0, 12).map((e, i) => (
                         <Pressable
                           key={e.id}
-                          onLongPress={() => confirmRemove("entry", () => (preview ? setPreviewElsewhere((rows) => rows.filter((r) => r.id !== e.id)) : void account.removeElsewhere(e.id)))}
+                          onLongPress={() => confirmRemove("entry", () => removeElsewhereEntry(e.id))}
+                          accessibilityActions={[{ name: "delete", label: "Remove" }]}
+                          onAccessibilityAction={(ev) => ev.nativeEvent.actionName === "delete" && confirmRemove("entry", () => removeElsewhereEntry(e.id))}
                           accessibilityRole="button"
                           accessibilityHint="Press and hold to remove"
                           accessibilityLabel={`${e.recipient}, ${rand(e.cents)}, ${ddmmyyyy(e.date)}, ${givingKindLabels[e.kind]}`}
@@ -369,6 +418,9 @@ export default function Giving() {
               )}
             </View>
 
+            {/* Signed out (live): there is no history to show yet, so no empty sections. */}
+            {preview || signedIn ? (
+            <>
             <View style={{ gap: 12 }}>
               <Text variant="h2" style={styles.heading}>Monthly donations</Text>
               {recurring.length === 0 ? (
@@ -417,6 +469,8 @@ export default function Giving() {
                 ))
               )}
             </View>
+            </>
+            ) : null}
             {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample giving history for design review</Text> : null}
             {signedIn && account.live ? (
               <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(account.live.loadedAt)}. Pull down to refresh.</Text>
@@ -440,26 +494,15 @@ export default function Giving() {
                 ) : confirmCancel ? (
                   <View style={{ gap: 10 }}>
                     <Text style={{ fontSize: 17 }}>Cancel this monthly donation for good? You would need to set up a new one to give monthly again.</Text>
-                    <Button
-                      label="Yes, cancel it"
-                      onPress={async () => {
-                        const r = await account.setRecurringStatus(open.id, "cancelled");
-                        setConfirmCancel(false);
-                        setRecurringError(r.ok ? null : r.message);
-                        if (r.ok) setOpen(null);
-                      }}
-                    />
+                    <Button label={busy ? "Cancelling…" : "Yes, cancel it"} disabled={busy} onPress={() => changeRecurring(open.id, "cancelled")} />
                     <TextLink label="Keep it" onPress={() => setConfirmCancel(false)} />
                   </View>
                 ) : (
                   <>
                     <Button
-                      label={open.status === "paused" ? "Resume" : "Pause"}
-                      onPress={async () => {
-                        const r = await account.setRecurringStatus(open.id, open.status === "paused" ? "active" : "paused");
-                        setRecurringError(r.ok ? null : r.message);
-                        if (r.ok) setOpen(null);
-                      }}
+                      label={busy ? "Saving…" : open.status === "paused" ? "Resume" : "Pause"}
+                      disabled={busy}
+                      onPress={() => changeRecurring(open.id, open.status === "paused" ? "active" : "paused")}
                     />
                     <Pressable accessibilityRole="button" onPress={() => setConfirmCancel(true)} style={styles.cancel}>
                       <Text style={[type.button, { color: colors.danger }]}>Cancel monthly donation</Text>

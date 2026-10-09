@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
@@ -12,7 +12,8 @@ import { ddmmyyyy, rand } from "@/lib/format";
 import { Button } from "@/components/button";
 import { InfoButton } from "@/components/info-button";
 import { useAccount } from "@/lib/account";
-import { SITE_URL, siteUrl } from "@/lib/website";
+import { notify, openSite } from "@/lib/open-site";
+import { useDirectory } from "@/lib/directory";
 import { useScreenState } from "@/lib/screen-state";
 import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
 import { colors, radius, space, touch } from "@/theme/tokens";
@@ -24,7 +25,16 @@ export default function Receipts() {
   const preview = account.status === "preview";
   const signedIn = account.status === "signed-in";
   const demoState = useScreenState();
-  const state = preview ? demoState : signedIn && !account.live ? "loading" : account.loadError && !account.live ? "error" : "ready";
+  const state = preview
+    ? demoState
+    : account.status === "loading"
+      ? "loading"
+      : account.loadError && !account.live
+        ? "error"
+        : signedIn && !account.live
+          ? "loading"
+          : "ready";
+  const directory = useDirectory();
   const current = taxYearFor(new Date());
   const currentEnd = taxYearRangeLabel(current).split(" to ")[1];
 
@@ -38,7 +48,7 @@ export default function Receipts() {
     ? []
     : preview
       ? [...new Set(myGifts.filter((g) => !charities.find((c) => c.slug === g.charitySlug)?.issues18a).map((g) => g.charityName))]
-      : [];
+      : [...new Set(myGifts.filter((g) => directory.data?.charities.find((c) => c.slug === g.charitySlug)?.issues18a === false).map((g) => g.charityName))];
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
@@ -99,7 +109,11 @@ export default function Receipts() {
                         <Pressable
                           accessibilityRole="button"
                           accessibilityLabel={`Share receipt from ${r.charityName}`}
-                          onPress={() => Share.share({ message: `18A receipt ${r.number} from ${r.charityName}, tax year ${y}` })}
+                          onPress={() =>
+                            Share.share({ message: `s18A receipt${r.number ? ` ${r.number}` : ""} from ${r.charityName}, tax year ${y}` }).catch(() =>
+                              notify("Couldn't share", "Sharing isn't available here."),
+                            )
+                          }
                           style={styles.iconBtn}
                         >
                           <ShareIcon />
@@ -109,8 +123,8 @@ export default function Receipts() {
                           accessibilityLabel={`Download receipt from ${r.charityName}`}
                           onPress={() => {
                             // The PDF is handed out by the website, after it checks who is asking.
-                            const url = preview ? null : siteUrl(SITE_URL, `/receipts/${r.id}`);
-                            if (url) Linking.openURL(url).catch(() => undefined);
+                            if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF on our website.");
+                            openSite(`/receipts/${r.id}`);
                           }}
                           style={styles.iconBtn}
                         >
