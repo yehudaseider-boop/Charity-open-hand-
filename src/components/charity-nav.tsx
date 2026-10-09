@@ -10,6 +10,7 @@ const tabs = [
   { href: "/receipts", label: "Receipts" },
   { href: "/application", label: "Registration" },
   { href: "/profile", label: "Public profile" },
+  { href: "/updates", label: "Photos and updates" },
 ];
 
 /** Tabs across the top of every page for one charity. */

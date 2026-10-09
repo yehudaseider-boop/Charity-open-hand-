@@ -9,7 +9,8 @@ import { Info } from "@/components/info";
 import { canIssue18a } from "@/lib/charities";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { initials } from "@/lib/charity/initials";
-import { publicImageUrl } from "@/lib/charity/queries";
+import { loadStories, publicImageUrl } from "@/lib/charity/queries";
+import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 
 const loadCharity = cache(async (slug: string) => {
@@ -36,7 +37,8 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
   const receipts = canIssue18a(charity);
-  const accepting = (await loadDonatableCharity(charity.slug))?.acceptingPayments ?? false;
+  const [donatable, { photos, updates }] = await Promise.all([loadDonatableCharity(charity.slug), loadStories(charity.id, 5)]);
+  const accepting = donatable?.acceptingPayments ?? false;
   const categories = charity.charity_categories
     .map((cc) => cc.categories as unknown as { name_en: string } | null)
     .filter((c): c is { name_en: string } => c !== null);
@@ -101,6 +103,40 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
       {charity.funds_use_en ? (
         <Card title="How your donation is used">
           <p className="whitespace-pre-line text-[0.95rem] leading-relaxed">{charity.funds_use_en}</p>
+        </Card>
+      ) : null}
+
+      {updates.length ? (
+        <Card title="Latest from them">
+          <ul className="space-y-4">
+            {updates.map((u) => {
+              const photo = publicImageUrl(u.photo_path);
+              return (
+                <li key={u.id} className="space-y-2">
+                  <p className="text-xs text-muted">{formatDate(u.created_at)}</p>
+                  <p className="whitespace-pre-line text-[0.95rem] leading-relaxed">{u.body_en}</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {photo ? <img src={photo} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-card border border-border object-cover" /> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      ) : null}
+
+      {photos.length ? (
+        <Card title="Photos">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {photos.map((p) => (
+              <li key={p.id}>
+                <figure className="space-y-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} loading="lazy" className="aspect-square w-full rounded-card border border-border object-cover" />
+                  {p.caption_en ? <figcaption className="text-xs text-muted">{p.caption_en}</figcaption> : null}
+                </figure>
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
 

@@ -292,3 +292,11 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 - **First-open welcome:** three short screens (what NEDIV lev is, giving happens on our website, an optional maaser target). Skippable, shown once per phone.
 - **Small touches:** gentle vibrations on buttons, choices and tabs; soft fades between tabs; animations switched off when the phone asks for less motion; larger text honoured (big headings capped so they still fit); screen-reader labels checked.
 - **Offline:** the last giving loaded is kept in the phone's secure storage for the signed-in person, so the app opens straight to it and still shows history without signal ("No connection. Showing what was saved on dd/mm/yyyy at hh:mm."). It is deleted when they sign out.
+
+## Real photos and updates from charities (09/10/2026)
+
+- Charities add up to 12 photos (with an optional caption of up to 120 characters) and post short updates (up to 500 characters, with an optional photo) from a new "Photos and updates" tab in their dashboard. Both are public once the charity is approved, on its website page and in the app.
+- They publish straight away; NEDIV lev admins can remove any. Nothing is edited in place: remove and post again. Who posted is kept for us and never shown publicly.
+- The dashboard asks charities to post only photos they may share and never to show a family who receives help without consent. OPEN for Yosef: whether charity uploads need anything more under POPIA (e.g. a line in the charity agreement).
+- The app now reads the live charity directory (approved charities only) when connected; until then it shows the sample charities. Charities without a cover photo show their initials instead of a placeholder.
+- The target editor says "I give" (maaser, or maaser and chomesh), not "I keep".

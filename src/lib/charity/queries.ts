@@ -77,3 +77,16 @@ export function publicImageUrl(path: string | null): string | null {
   if (!path) return null;
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/charity-public/${path}`;
 }
+
+export type CharityPhoto = { id: string; storage_path: string; caption_en: string | null; created_at: string };
+export type CharityUpdate = { id: string; body_en: string; photo_path: string | null; created_at: string };
+
+/** A charity's photos (oldest first) and latest updates, read under row-level security. */
+export async function loadStories(charityId: string, updatesLimit = 20) {
+  const supabase = await createClient();
+  const [photos, updates] = await Promise.all([
+    supabase.from("charity_photos").select("id, storage_path, caption_en, created_at").eq("charity_id", charityId).order("created_at"),
+    supabase.from("charity_updates").select("id, body_en, photo_path, created_at").eq("charity_id", charityId).order("created_at", { ascending: false }).limit(updatesLimit),
+  ]);
+  return { photos: (photos.data ?? []) as CharityPhoto[], updates: (updates.data ?? []) as CharityUpdate[] };
+}

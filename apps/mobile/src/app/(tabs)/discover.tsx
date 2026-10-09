@@ -9,7 +9,9 @@ import { Logo } from "@/components/logo";
 import { SearchIcon } from "@/components/icons";
 import { EmptyState, ErrorState, LoadingList, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
-import { causes, charities } from "@/data/sample";
+import { useDirectory } from "@/lib/directory";
+import { haptic } from "@/lib/haptics";
+import { inCause } from "@/lib/live-charities";
 import { useScreenState } from "@/lib/screen-state";
 import { DayGreeting, SeasonalCard } from "@/components/day-greeting";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
@@ -17,7 +19,13 @@ import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 /** Screen 2: Discover. */
 export default function Discover() {
   const insets = useSafeAreaInsets();
-  const state = useScreenState();
+  const demoState = useScreenState();
+  const directory = useDirectory();
+  const { live } = directory;
+  // Live: the state comes from loading the directory; preview keeps the design-review states.
+  const state = !live ? demoState : directory.data ? "ready" : directory.failed ? "error" : "loading";
+  const charities = directory.data?.charities ?? [];
+  const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
   const [query, setQuery] = useState(state === "empty" ? "Bnei Akiva" : "");
   const [cause, setCause] = useState("all");
 
@@ -25,12 +33,13 @@ export default function Discover() {
     const q = query.trim().toLowerCase();
     return charities.filter(
       (c) =>
-        (cause === "all" || c.causeId === cause) &&
+        inCause(c, cause) &&
         (!q || c.nameEn.toLowerCase().includes(q) || c.cause.toLowerCase().includes(q) || c.area.toLowerCase().includes(q)),
     );
-  }, [query, cause]);
+  }, [query, cause, charities]);
 
   const featured = !query && cause === "all" ? results.find((c) => c.featured) : undefined;
+  const noneYet = live && charities.length === 0;
   const rest = results.filter((c) => c !== featured);
 
   return (
@@ -66,7 +75,10 @@ export default function Discover() {
               key={c.id}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              onPress={() => setCause(c.id)}
+              onPress={() => {
+                haptic.tap();
+                setCause(c.id);
+              }}
               style={styles.filter}
             >
               <Text style={[styles.filterText, selected && { color: colors.ink, fontFamily: fonts.bodySemibold }]}>{c.label}</Text>
@@ -83,7 +95,9 @@ export default function Discover() {
             <LoadingList count={2} imageHeight={99} />
           </View>
         ) : state === "error" ? (
-          <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => router.replace("/discover")} />
+          <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => (live ? directory.retry() : router.replace("/discover"))} />
+        ) : noneYet ? (
+          <EmptyState title="Charities are on their way" body="The first charities are joining NEDIV lev. Check back soon." />
         ) : results.length === 0 ? (
           <EmptyState
             title="No charities found"
@@ -94,17 +108,17 @@ export default function Discover() {
           <View style={{ gap: space.block }}>
             {featured ? (
               <FadeUp index={0}>
-                <CharityCard charity={featured} featured />
+                <CharityCard charity={featured} featured live={live} />
               </FadeUp>
             ) : null}
             <View style={{ gap: 20 }}>
               {rest.map((c, i) => (
                 <FadeUp key={c.slug} index={i + 1}>
-                  <CharityCard charity={c} />
+                  <CharityCard charity={c} live={live} />
                 </FadeUp>
               ))}
             </View>
-            <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities for design review</Text>
+            {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities for design review</Text>}
           </View>
         )}
       </View>

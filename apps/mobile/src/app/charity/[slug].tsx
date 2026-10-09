@@ -1,28 +1,43 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
 import { BackIcon, HeartIcon } from "@/components/icons";
-import { PlaceholderImage } from "@/components/placeholder-image";
+import { CharityImage } from "@/components/charity-image";
 import { Sheet } from "@/components/sheet";
 import { GiveSheet } from "@/components/give-sheet";
-import { EmptyState } from "@/components/states";
+import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { Status18a } from "@/components/status-18a";
 import { Text } from "@/components/text";
-import { causes, findCharity } from "@/data/sample";
-import { colors, space, touch } from "@/theme/tokens";
+import { ddmmyyyy } from "@/lib/format";
+import { causeList, useCharity } from "@/lib/directory";
+import { colors, radius, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
 export default function CharityDetail() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ slug: string; sheet?: string; saved?: string }>();
-  const charity = findCharity(params.slug);
+  const { live, charity, failed, retry } = useCharity(params.slug);
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const [saved, setSaved] = useState(params.saved === "1");
 
+  if (charity === undefined) {
+    return (
+      <View style={[styles.screen, { paddingTop: insets.top + 40, paddingHorizontal: space.gutter, gap: space.block }]}>
+        {failed ? (
+          <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retry} />
+        ) : (
+          <>
+            <SkeletonBlock height={220} />
+            <SkeletonBlock height={120} />
+          </>
+        )}
+      </View>
+    );
+  }
   if (!charity) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 40, paddingHorizontal: space.gutter }]}>
@@ -30,13 +45,15 @@ export default function CharityDetail() {
       </View>
     );
   }
-  const causeLabel = causes.find((c) => c.id === charity.causeId)?.label;
+  const causeLabel = causeList().find((c) => c.id === charity.causeId)?.label;
+  const photos = charity.photos ?? [];
+  const updates = charity.updates ?? [];
 
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
         <View>
-          <PlaceholderImage subject={charity.photo} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 16 / 9, minHeight: 240 }} />
+          <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 16 / 9, minHeight: 240 }} />
           <LinearGradient colors={["rgba(244,251,250,0)", colors.parchment]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
         </View>
 
@@ -47,12 +64,47 @@ export default function CharityDetail() {
           <View style={{ marginTop: 6 }}><Status18a issues18a={charity.issues18a} /></View>
 
           <View style={styles.paras}>
-            <Text variant="label">{charity.area}</Text>
-            <Text variant="label" style={{ color: colors.ink }}>What they do</Text>
-            <Text>{charity.about[0]}</Text>
-            <Text variant="label" style={{ color: colors.ink, marginTop: 6 }}>How your donation is used</Text>
-            <Text>{charity.about[1]}</Text>
+            {charity.area ? <Text variant="label">{charity.area}</Text> : null}
+            {charity.about[0] ? (
+              <>
+                <Text variant="label" style={{ color: colors.ink }}>What they do</Text>
+                <Text>{charity.about[0]}</Text>
+              </>
+            ) : null}
+            {charity.about[1] ? (
+              <>
+                <Text variant="label" style={{ color: colors.ink, marginTop: 6 }}>How your donation is used</Text>
+                <Text>{charity.about[1]}</Text>
+              </>
+            ) : null}
           </View>
+
+          {updates.length ? (
+            <View style={styles.section}>
+              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">Latest from them</Text>
+              {updates.map((u) => (
+                <View key={u.id} style={styles.update}>
+                  <Text variant="label">{ddmmyyyy(u.date)}</Text>
+                  <Text>{u.body}</Text>
+                  {u.photoUrl ? <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} /> : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {photos.length ? (
+            <View style={styles.section}>
+              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">Photos</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: space.gutter }} style={{ marginRight: -space.gutter }}>
+                {photos.map((ph) => (
+                  <View key={ph.id} style={{ width: 220, gap: 6 }}>
+                    <Image source={{ uri: ph.url }} style={styles.photo} resizeMode="cover" accessibilityLabel={ph.caption ?? `Photo from ${charity.nameEn}`} />
+                    {ph.caption ? <Text variant="label" numberOfLines={2}>{ph.caption}</Text> : null}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
 
           <View style={styles.note}>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
@@ -61,7 +113,7 @@ export default function CharityDetail() {
                 : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
             </Text>
           </View>
-          <Text variant="label" style={{ marginTop: 12 }}>Sample charity for design review</Text>
+          {live ? null : <Text variant="label" style={{ marginTop: 12 }}>Sample charity for design review</Text>}
         </View>
       </ScrollView>
 
@@ -98,6 +150,10 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: space.gutter, marginTop: -24, gap: 4 },
   arc: { position: "absolute", right: -50, top: -40 },
   paras: { gap: 14, marginTop: space.block },
+  section: { marginTop: space.block, gap: 12 },
+  update: { gap: 6, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
+  updatePhoto: { width: "100%", aspectRatio: 4 / 3, borderRadius: radius.control, marginTop: 4, backgroundColor: colors.hairline },
+  photo: { width: 220, aspectRatio: 1, borderRadius: radius.card, backgroundColor: colors.hairline },
   note: { marginTop: space.block, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.hairline },
   topBar: { position: "absolute", left: space.gutter, right: space.gutter, flexDirection: "row", justifyContent: "space-between" },
   round: { width: touch, height: touch, borderRadius: touch / 2, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.hairline },

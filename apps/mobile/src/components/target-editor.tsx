@@ -66,10 +66,10 @@ export function TargetEditor({
 
       <View style={{ gap: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-          <Text variant="label" style={{ color: colors.ink }}>I keep</Text>
+          <Text variant="label" style={{ color: colors.ink }}>I give</Text>
           <InfoButton terms={["maaser", "chomesh", "givingYear"]} label="maaser and chomesh" />
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="I keep">
+        <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="I give">
           {([
             ["maaser", "Maaser", "A tenth"],
             ["both", "Maaser and chomesh", "A fifth in all"],

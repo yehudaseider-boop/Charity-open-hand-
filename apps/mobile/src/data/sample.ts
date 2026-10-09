@@ -25,7 +25,16 @@ export type Charity = {
   /** [what it does, how donations are used] */
   about: [string, string];
   featured?: boolean;
+  /** Live charities can be in several causes. */
+  causeIds?: string[];
+  /** Real images from the charity, once it has uploaded them. */
+  coverUrl?: string | null;
+  photos?: CharityPhoto[];
+  updates?: CharityUpdate[];
 };
+
+export type CharityPhoto = { id: string; url: string; caption: string | null };
+export type CharityUpdate = { id: string; date: Date; body: string; photoUrl: string | null };
 
 export const charities: Charity[] = [
   {
@@ -38,6 +47,10 @@ export const charities: Charity[] = [
     photo: "food parcels being packed",
     issues18a: true,
     featured: true,
+    updates: [
+      { id: "u1", date: new Date(2026, 9, 2), body: "Thursday night packing went late this week. Thank you to everyone who came to help.", photoUrl: null },
+      { id: "u2", date: new Date(2026, 8, 18), body: "Yom Tov parcels went out before Sukkos. Every family on our list received one.", photoUrl: null },
+    ],
     about: [
       "Every Thursday, volunteers pack Shabbos food parcels for families across Northcliff and surrounds who are going through a hard time.",
       "Parcels are delivered quietly to the door, and families are referred by rabbonim and social workers who know them.",

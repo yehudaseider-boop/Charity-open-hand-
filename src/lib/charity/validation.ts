@@ -97,3 +97,8 @@ export const IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 export function normalisePhone(v: string | undefined) {
   return v?.replace(/[\s()-]/g, "");
 }
+
+/** A short update from a charity, and a photo caption. */
+export const updateSchema = z.object({ body_en: z.string().min(1, "Write your update").max(500, "Keep it to 500 characters") });
+export const photoSchema = z.object({ caption_en: optional(120) });
+export const MAX_PHOTOS = 12;

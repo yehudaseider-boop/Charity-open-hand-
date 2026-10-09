@@ -2,21 +2,21 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { Charity } from "@/data/sample";
 import { colors, radius } from "@/theme/tokens";
-import { PlaceholderImage } from "./placeholder-image";
+import { CharityImage } from "./charity-image";
 import { Status18a } from "./status-18a";
 import { Text } from "./text";
 
 /** Component 1: photo-led charity card (4:3 photo). */
-export function CharityCard({ charity, featured = false }: { charity: Charity; featured?: boolean }) {
+export function CharityCard({ charity, featured = false, live = false }: { charity: Charity; featured?: boolean; live?: boolean }) {
   const open = () => router.push(`/charity/${charity.slug}`);
   if (featured) {
     return (
       <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured`} style={styles.featured}>
-        <PlaceholderImage subject={charity.photo} style={{ aspectRatio: 4 / 3, width: "100%" }} />
+        <CharityImage charity={charity} live={live} style={{ aspectRatio: 4 / 3, width: "100%" }} />
         <View style={styles.featuredText}>
           <Text variant="label" style={{ color: colors.accent }}>Featured</Text>
           <Text variant="h1" style={{ fontSize: 28, lineHeight: 34 }}>{charity.nameEn}</Text>
-          <Text variant="bodyMuted">{charity.area} · {charity.cause}</Text>
+          <Text variant="bodyMuted">{[charity.area, charity.cause].filter(Boolean).join(" · ")}</Text>
           <Status18a issues18a={charity.issues18a} />
         </View>
       </Pressable>
@@ -24,7 +24,7 @@ export function CharityCard({ charity, featured = false }: { charity: Charity; f
   }
   return (
     <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={charity.nameEn} style={styles.row}>
-      <PlaceholderImage subject={charity.photo} compact style={styles.thumb} />
+      <CharityImage charity={charity} live={live} compact style={styles.thumb} />
       <View style={styles.rowText}>
         <Text style={styles.name}>{charity.nameEn}</Text>
         <Text variant="label">{charity.area}</Text>
