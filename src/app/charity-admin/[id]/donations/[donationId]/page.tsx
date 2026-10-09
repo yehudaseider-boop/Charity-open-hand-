@@ -9,6 +9,7 @@ import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queri
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDateTime } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { donationReference } from "@/lib/donations/reference";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Donation" };
@@ -58,7 +59,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {d.charged_back_at ? <Row label="Charged back">{formatDateTime(d.charged_back_at)}</Row> : null}
           {d.tax_year ? <Row label="Tax year">{d.tax_year}</Row> : null}
           <Row label="s18A receipt requested">{d.wants_18a ? "Yes" : "No"}</Row>
-          <Row label="Reference">{d.id}</Row>
+          <Row label="Reference">{donationReference(d.id)}</Row>
         </dl>
       </Card>
 
@@ -90,7 +91,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
             {receipts.map((r) => (
               <li key={r.id}>
                 {r.reference}{" "}
-                {r.status === "void" ? <Badge tone="warning">Withdrawn</Badge> : r.pdf_path ? <Link href={`/receipts/${r.id}`} className="text-brand underline">Download PDF</Link> : <span className="text-muted">PDF on its way</span>}
+                {r.status === "void" ? <Badge tone="warning">Withdrawn</Badge> : r.pdf_path ? <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">Download PDF</Link> : <span className="text-muted">PDF on its way</span>}
               </li>
             ))}
           </ul>

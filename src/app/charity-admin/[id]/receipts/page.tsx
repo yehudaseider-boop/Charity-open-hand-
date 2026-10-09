@@ -32,7 +32,7 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
       {canIssue18a(charity) ? (
         <Notice>
           One receipt is issued for each donor, once a year, after the tax year ends. The current tax year ({taxYearLabel(taxYear.taxYear)}) ends on {formatDate(taxYear.end)}.
-          Each receipt lists that donor&apos;s paid donations to you and shows the donations only, not the processing fee.
+          Each receipt lists that donor&apos;s paid donations to you and shows the donations only, not any contribution to NEDIV lev.
         </Notice>
       ) : (
         <Notice tone="warning">
@@ -56,7 +56,7 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
                   {r.status === "void" ? (
                     <Badge tone="warning">Withdrawn</Badge>
                   ) : r.pdf_path ? (
-                    <div><Link href={`/receipts/${r.id}`} className="text-brand underline">Download PDF</Link></div>
+                    <div><Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">Download PDF</Link></div>
                   ) : (
                     <Badge>PDF on its way</Badge>
                   )}

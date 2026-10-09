@@ -8,6 +8,7 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { decrypt } from "@/lib/crypto";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import type { FormState } from "@/lib/form";
+import { isUuid } from "@/lib/ids";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function refresh(id: string, slug?: string) {
@@ -20,6 +21,13 @@ function refresh(id: string, slug?: string) {
 /** A date the charity typed (yyyy-mm-dd), as midnight in Johannesburg. */
 function saMidnight(date: string) {
   return `${date}T00:00:00+02:00`;
+}
+
+
+/** Log the real error for us; show the admin a plain message. */
+function failed(error: unknown): FormState {
+  console.error(error);
+  return { ok: false, message: "That didn't save. Please try again." };
 }
 
 export async function approveCharity(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -58,8 +66,10 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
     update.mandate_document_path = mandate.storage_path;
   }
 
-  const { error } = await createAdminClient().from("charities").update(update).eq("id", id);
-  if (error) return { ok: false, message: error.message };
+  // Only if nobody else decided in the meantime.
+  const { data, error } = await createAdminClient().from("charities").update(update).eq("id", id).eq("status", "pending_review").select("id");
+  if (error) return failed(error);
+  if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({
     actorUserId: admin.userId,
     action: "charity.approved",
@@ -83,11 +93,14 @@ export async function rejectCharity(id: string, _prev: FormState, formData: Form
   const reason = reasonFrom(formData);
   if (!reason) return { ok: false, fieldErrors: { reason: "Explain what the charity needs to fix" } };
 
-  const { error } = await createAdminClient()
+  const { data, error } = await createAdminClient()
     .from("charities")
     .update({ status: "rejected", rejection_reason: reason })
-    .eq("id", id);
-  if (error) return { ok: false, message: error.message };
+    .eq("id", id)
+    .eq("status", "pending_review")
+    .select("id");
+  if (error) return failed(error);
+  if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.rejected", entityType: "charity", entityId: id, details: { reason } });
   refresh(id);
   return { ok: true, message: "Sent back to the charity." };
@@ -100,11 +113,14 @@ export async function suspendCharity(id: string, _prev: FormState, formData: For
   const reason = reasonFrom(formData);
   if (!reason) return { ok: false, fieldErrors: { reason: "Give a reason for the record" } };
 
-  const { error } = await createAdminClient()
+  const { data, error } = await createAdminClient()
     .from("charities")
     .update({ status: "suspended", rejection_reason: reason })
-    .eq("id", id);
-  if (error) return { ok: false, message: error.message };
+    .eq("id", id)
+    .eq("status", "approved")
+    .select("id");
+  if (error) return failed(error);
+  if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.suspended", entityType: "charity", entityId: id, details: { reason } });
   refresh(id, charity.slug);
   return { ok: true, message: "Suspended. The charity is hidden and can't receive donations." };
@@ -114,11 +130,14 @@ export async function reinstateCharity(id: string, _prev: FormState): Promise<Fo
   const admin = await requirePlatformAdmin();
   const { charity } = await loadCharityForManager(id);
   if (charity.status !== "suspended") return { ok: false, message: "Only suspended charities can be reinstated." };
-  const { error } = await createAdminClient()
+  const { data, error } = await createAdminClient()
     .from("charities")
     .update({ status: "approved", rejection_reason: null })
-    .eq("id", id);
-  if (error) return { ok: false, message: error.message };
+    .eq("id", id)
+    .eq("status", "suspended")
+    .select("id");
+  if (error) return failed(error);
+  if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.reinstated", entityType: "charity", entityId: id });
   refresh(id, charity.slug);
   return { ok: true, message: "Reinstated." };
@@ -134,7 +153,7 @@ export async function revokeS18a(id: string, _prev: FormState, formData: FormDat
     .from("charities")
     .update({ is_s18a: false, s18a_confirmed_at: null })
     .eq("id", id);
-  if (error) return { ok: false, message: error.message };
+  if (error) return failed(error);
   await logAudit({ actorUserId: admin.userId, action: "charity.s18a_revoked", entityType: "charity", entityId: id, details: { reason } });
   refresh(id, charity.slug);
   return { ok: true, message: "s18A status removed. No new receipts will be issued." };
@@ -142,6 +161,7 @@ export async function revokeS18a(id: string, _prev: FormState, formData: FormDat
 
 export async function revealBankAccount(id: string, _prev: FormState): Promise<FormState> {
   const admin = await requirePlatformAdmin();
+  if (!isUuid(id)) return { ok: false, message: "Unknown charity." };
   const { data, error } = await createAdminClient()
     .from("charity_private")
     .select("bank_account_number_encrypted")
@@ -154,6 +174,7 @@ export async function revealBankAccount(id: string, _prev: FormState): Promise<F
 
 export async function addCharityAdmin(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requirePlatformAdmin();
+  if (!isUuid(id)) return { ok: false, message: "Unknown charity." };
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, fieldErrors: { email: "Enter a valid email" } };
 
@@ -167,7 +188,7 @@ export async function addCharityAdmin(id: string, _prev: FormState, formData: Fo
   const { error } = await db
     .from("charity_admins")
     .upsert({ charity_id: id, user_id: profile.id, role: "admin" }, { onConflict: "charity_id,user_id", ignoreDuplicates: true });
-  if (error) return { ok: false, message: error.message };
+  if (error) return failed(error);
   await logAudit({ actorUserId: admin.userId, action: "charity.admin_added", entityType: "charity", entityId: id, details: { email } });
   refresh(id);
   return { ok: true, message: `${email} can now sign in and manage this charity.` };
@@ -202,7 +223,7 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
       .from("charities")
       .update({ gateway: gateway.name, gateway_subaccount_ref: accountRef })
       .eq("id", id);
-    if (error) return { ok: false, message: error.message };
+    if (error) return failed(error);
     await logAudit({
       actorUserId: admin.userId,
       action: "charity.gateway_connected",

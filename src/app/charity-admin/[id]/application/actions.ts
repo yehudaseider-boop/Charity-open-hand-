@@ -20,6 +20,7 @@ import {
 import { encrypt, last4 } from "@/lib/crypto";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isRealDocument } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
 
 const saved: FormState = { ok: true, message: "Saved." };
@@ -165,6 +166,7 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
   if (!(DOCUMENT_MIME as readonly string[]).includes(file.type)) {
     return { ok: false, fieldErrors: { file: "Upload a PDF, JPG or PNG" } };
   }
+  if (!(await isRealDocument(file))) return { ok: false, fieldErrors: { file: "That file isn't a PDF, JPG or PNG" } };
   if (type === "receipting_mandate") {
     if (!signedOn || !/^\d{4}-\d{2}-\d{2}$/.test(signedOn)) {
       return { ok: false, fieldErrors: { signed_on: "Enter the date the mandate was signed" } };
@@ -180,7 +182,10 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
   const upload = await supabase.storage
     .from("charity-documents")
     .upload(path, file, { contentType: file.type, upsert: false });
-  if (upload.error) return { ok: false, message: `Upload failed: ${upload.error.message}` };
+  if (upload.error) {
+    console.error(upload.error);
+    return { ok: false, message: "The upload didn't work. Please try again." };
+  }
 
   const { error } = await supabase.from("charity_documents").insert({
     charity_id: charityId,
@@ -192,7 +197,8 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
   });
   if (error) {
     await createAdminClient().storage.from("charity-documents").remove([path]);
-    return { ok: false, message: error.message };
+    console.error(error);
+    return { ok: false, message: /submitted/.test(error.message) ? "Documents can't be added once the application is submitted." : "That didn't save. Please try again." };
   }
   revalidatePath(`/charity-admin/${charityId}/application`);
   return { ok: true, message: "Uploaded." };

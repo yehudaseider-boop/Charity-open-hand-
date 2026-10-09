@@ -87,6 +87,6 @@ ${d.donor.address.map((x) => `<div class="muted">${esc(x)}</div>`).join("")}
 </table>
 
 <p class="statement">${esc(d.wording.statement)}</p>
-<div class="foot">Issued through ${esc(args.platformName)} on behalf of ${esc(d.charity.legal_name_en)}. Amounts are the donations only, not the processing fee.</div>
+<div class="foot">Issued through ${esc(args.platformName)} on behalf of ${esc(d.charity.legal_name_en)}. Amounts are the donations only.</div>
 </body></html>`;
 }

@@ -61,7 +61,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                     {r.status === "void" ? (
                       <Badge tone="warning">Withdrawn</Badge>
                     ) : r.pdf_path ? (
-                      <Link href={`/receipts/${r.id}`} className="text-brand underline">Download PDF</Link>
+                      <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">Download PDF</Link>
                     ) : (
                       <span className="text-muted">PDF on its way</span>
                     )}
@@ -82,7 +82,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         <section className="rounded-card bg-surface border border-border p-5 space-y-3">
           <h2 className="font-semibold">Manage</h2>
           {viewer.charities.map((c) => (
-            <Link key={c.id} href="/charity-admin" className="block rounded-control border border-border p-3">
+            <Link key={c.id} href={`/charity-admin/${c.id}`} className="block rounded-control border border-border p-3">
               <BilingualName en={c.name_en} he={c.name_he} />
             </Link>
           ))}

@@ -79,8 +79,9 @@ describe("approved charity", () => {
 
   it("can't change its slug or QuickGive code", async () => {
     await scenario(noop, async () => {
+      // Refused outright: charities have no right to that column at all.
       await expect(run("update public.charities set slug = 'x' where id = $1", [meals])).rejects.toThrow(
-        /Only a platform admin/,
+        /permission denied|Only a platform admin/,
       );
     });
   });
@@ -103,7 +104,7 @@ describe("approved charity", () => {
       },
       async () => {
         await expect(run("delete from public.charity_documents where charity_id = $1", [meals])).rejects.toThrow(
-          /cannot be changed or removed/,
+          /cannot be (added, )?changed or removed/,
         );
       },
     );

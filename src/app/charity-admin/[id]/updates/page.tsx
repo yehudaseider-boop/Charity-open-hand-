@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card } from "@/components/card";
+import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager, loadStories, publicImageUrl } from "@/lib/charity/queries";
 import { MAX_PHOTOS } from "@/lib/charity/validation";
@@ -42,7 +43,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border border-border object-cover" /> : null}
                   <form action={removeUpdate.bind(null, id, u.id)}>
-                    <button className="text-xs text-danger underline">Remove</button>
+                    <RemoveButton what={`the update from ${formatDate(u.created_at)}`} />
                   </form>
                 </li>
               );
@@ -60,7 +61,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
                 <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} className="aspect-square w-full rounded-card border border-border object-cover" />
                 {p.caption_en ? <p className="text-xs text-muted">{p.caption_en}</p> : null}
                 <form action={removePhoto.bind(null, id, p.id)}>
-                  <button className="text-xs text-danger underline">Remove</button>
+                  <RemoveButton what={p.caption_en ? `the photo "${p.caption_en}"` : "this photo"} />
                 </form>
               </li>
             ))}

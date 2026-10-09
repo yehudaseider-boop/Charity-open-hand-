@@ -16,7 +16,7 @@ export function buildReceiptEmail(args: { details: ReceiptDetails; reference: st
     `Thank you for your donations to ${charity}. Your section 18A receipt for ${d.period} is attached.`,
     "",
     `Receipt number: ${reference}`,
-    `Total donated: ${formatRand(total)} (the donations only, not the processing fee)`,
+    `Total donated: ${formatRand(total)} (the donations only)`,
     "",
     `You can also download it any time from your account: ${account}`,
     "",
@@ -24,7 +24,7 @@ export function buildReceiptEmail(args: { details: ReceiptDetails; reference: st
   ].join("\n");
   const html = `<p>Dear ${esc(greeting)},</p>
 <p>Thank you for your donations to <strong>${esc(charity)}</strong>. Your section 18A receipt for ${esc(d.period)} is attached.</p>
-<p>Receipt number: <strong>${esc(reference)}</strong><br>Total donated: <strong>${esc(formatRand(total))}</strong> (the donations only, not the processing fee)</p>
+<p>Receipt number: <strong>${esc(reference)}</strong><br>Total donated: <strong>${esc(formatRand(total))}</strong> (the donations only)</p>
 <p>You can also download it any time from <a href="${esc(account)}">your account</a>.</p>
 <p>${esc(args.platformName)}, on behalf of ${esc(charity)}</p>`;
   return { subject, text, html };

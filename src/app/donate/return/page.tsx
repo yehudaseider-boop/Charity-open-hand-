@@ -16,7 +16,11 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const { reference, from } = await searchParams;
   const fromApp = from === "app";
   const ref = typeof reference === "string" ? reference : "";
-  const outcome = await confirmPayment(ref);
+  // If the payment provider can't be reached, say we're still confirming rather than showing an error page.
+  const outcome = await confirmPayment(ref).catch((e) => {
+    console.error(e);
+    return "pending" as const;
+  });
 
   const { data: d } = ref && outcome !== "not_found"
     ? await createAdminClient()
@@ -58,17 +62,24 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       </Card>
     );
   }
-  if (outcome === "failed" && charity) {
+  if (outcome === "failed") {
     return (
       <Card title="Payment didn't go through">
         <p className="text-sm">Nothing was charged. You can try again.</p>
-        <Link href={`/c/${charity.slug}/donate`} className="mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
+        <Link href={charity ? `/c/${charity.slug}/donate` : "/charities"} className="mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
           Try again
         </Link>
       </Card>
     );
   }
-  if (outcome === "pending" || outcome === "review") {
+  if (outcome === "review") {
+    return (
+      <Card title="We're checking this payment">
+        <p className="text-sm">Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
+      </Card>
+    );
+  }
+  if (outcome === "pending") {
     return (
       <Card title="We're confirming your payment">
         <p className="text-sm">This can take a minute. Please don&apos;t pay again.</p>
@@ -78,7 +89,8 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   }
   return (
     <Card title="Donation not found">
-      <p className="text-sm text-muted">We couldn&apos;t find that donation.</p>
+      <p className="text-sm text-muted">We couldn&apos;t find that donation. If you were charged, your confirmation email has the reference.</p>
+      <Link href="/charities" className="mt-4 inline-block text-sm text-brand underline">Find a charity</Link>
     </Card>
   );
 }

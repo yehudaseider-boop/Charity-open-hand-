@@ -85,7 +85,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       </nav>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted">{q || status !== "all" ? "No donations match." : "No donations yet. They appear here as soon as someone starts one."}</p>
+        <p className="text-sm text-muted">{q || status !== "all" ? "No donations match." : "No donations yet. They appear here once a payment goes through."}</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((d) => {

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const steps = [
   { title: "Find a charity", body: "Browse registered charities by name, cause or area." },
-  { title: "Give in a minute", body: `Choose an amount (from ${formatRand(platformConfig.minDonationCents).replace(/\.00$/, "")}) and pay securely. NEDIV lev charges no fee on donations.` },
+  { title: "Give in a minute", body: `Choose an amount (from ${formatRand(platformConfig.minDonationCents)}) and pay securely. NEDIV lev charges no fee on donations.` },
   { title: "Keep track", body: "Mark each donation as maaser, chomesh or tzedaka. If you ask for one, your s18A receipt comes once a year." },
 ];
 

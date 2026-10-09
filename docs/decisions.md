@@ -306,3 +306,20 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 - Discover shows every approved charity. The heart on a charity saves it; saved charities show as "Your charities" at the top of Discover and on the Giving tab, newest first, one tap from the charity's Give button.
 - Signed in: saved on the account (the `favourites` table, readable and changeable only by its owner), so they show on any phone. Signed out: saved on the phone and added to the account when the person signs in.
 - Saved charities are already part of "Download my data" and are deleted with the account.
+
+## Full code and bug check (09/10/2026)
+
+Five reviewers (app screens, app logic, website pages, website server code, database) plus an automated click-through of every app screen and every public website page, and a test donation from start to finish.
+
+Fixed:
+- **Security:** someone could sign up with a password using a guest donor's email and claim their giving history. Joining past donations now needs a sign-in by emailed code or link, and email confirmation is on. Also: private notes only on your own donations; database functions not callable by everyone; issued receipts and paid donations fully fixed; no documents added after submission; sign-in links built from SITE_URL, not request headers; uploads checked by their content, not just their claimed type; admin decisions can't collide; rate limits on sign-in links, charity applications and updates.
+- **App:** Giving/Receipts stuck loading after a failed first load; offline sign-in asking for consent again; the last person's data reappearing after sign-out; heart taps undoing each other; phone storage writes that could be left half-done; month totals missing days before Rosh Hashana; income log that could be wiped; donors with more than 1 000 donations; bottom sheets (Android back, tab bar, keyboard); dead buttons (Help, website links, seasonal card); heart now fills blue.
+- **Website:** wording that mentioned a processing fee we don't charge (dashboard, receipts, receipt emails); donate form losing details when the amount changed; duplicate field ids; branded error and not-found pages; admin navigation; charity and donor see the same donation reference; donations while signed in join the account straight away; thank-you page handles a provider outage and a payment under review.
+
+Still open (need a decision or the payment provider):
+- Refunds and chargebacks from the provider are recorded but not yet acted on (status and receipt). Built with the gateway choice.
+- If a charity loses s18A status, do donations made while it had it still get receipts? (Today: no.)
+- Should an approved charity's name change need our review?
+- Income log, targets and saved charities (signed out) belong to the phone, not the person: on a shared phone the next person sees them. Keep, or clear on sign-out?
+- Dates use the phone's time zone; a donor abroad could see a donation on the previous day.
+- On iPhone, the Keychain keeps sign-in and income after the app is deleted.

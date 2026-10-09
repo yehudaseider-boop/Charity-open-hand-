@@ -54,6 +54,13 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
   const badges = charityBadges(charity);
   const hasMandateDoc = documents.some((d) => d.document_type === "receipting_mandate");
 
+  // A misconfigured gateway must not take this page down.
+  let gatewayName: string | null = null;
+  try {
+    gatewayName = getGateway().name;
+  } catch (e) {
+    console.error(e);
+  }
   return (
     <div className="space-y-4">
       <div>
@@ -93,7 +100,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
 
       {charity.status === "approved" ? (
         <Card title="Payments">
-          {charity.gateway === getGateway().name && charity.gateway_subaccount_ref ? (
+          {charity.gateway === gatewayName && charity.gateway_subaccount_ref ? (
             <p className="text-sm">Connected to the payment gateway. Account {charity.gateway_subaccount_ref}.</p>
           ) : (
             <>

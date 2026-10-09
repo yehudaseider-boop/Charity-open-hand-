@@ -24,7 +24,9 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
   const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
-  const quote = quoteState.ok && !editingAmount ? quoteState.quote : undefined;
+  // The details form stays on screen (and keeps what the donor typed) while they
+  // change the amount; it just can't be paid until the new amount is confirmed.
+  const quote = quoteState.ok ? quoteState.quote : undefined;
 
   return (
     <div className="space-y-4">
@@ -52,7 +54,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             />
           </div>
           <button disabled={quoting} className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60">
-            {quoting ? "…" : "Continue"}
+            {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
         <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. No NEDIV lev fee.</p>
@@ -95,11 +97,11 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
 
       {quote ? (
         <DetailsStep
-          key={`${quote.amountCents}-${quote.contributionCents}`}
+          stale={editingAmount}
+          quote={quote}
           slug={slug}
           charityName={charityName}
           receiptsAvailable={receiptsAvailable}
-          initialQuote={quote}
           initialKind={initialKind}
           fromApp={fromApp}
         />
@@ -133,11 +135,17 @@ function Check({ name, children, error }: { name: string; children: React.ReactN
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initialKind, fromApp }: {
-  slug: string; charityName: string; receiptsAvailable: boolean; initialQuote: NonNullable<QuoteState["quote"]>;
+function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialKind, fromApp }: {
+  slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
   initialKind?: keyof typeof givingKinds; fromApp: boolean;
 }) {
-  const [shownQuote, setShownQuote] = useState(initialQuote);
+  // A new amount from the form above replaces the shown one; so does a corrected one from the server.
+  const [shownQuote, setShownQuote] = useState(quote);
+  const [lastQuote, setLastQuote] = useState(quote);
+  if (quote !== lastQuote) {
+    setLastQuote(quote);
+    setShownQuote(quote);
+  }
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData) => {
       const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, prev, fd);
@@ -193,13 +201,13 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initi
           <div className="space-y-3 rounded-control bg-bg p-3">
             <label className="flex items-start gap-2 text-sm font-medium">
               <input type="checkbox" name="wants_18a" className="mt-1" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
-              <span>I want an 18A tax receipt</span>
+              <span>I want an s18A tax receipt</span>
             </label>
             <Info terms={["s18a"]} label="an s18A receipt" />
             {want18a ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted">
-                  You&apos;ll get one 18A receipt for all your donations to {charityName} each tax year.
+                  You&apos;ll get one s18A receipt for all your donations to {charityName} each tax year.
                 </p>
                 {org ? null : (
                   <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." />
@@ -234,7 +242,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initi
         <div className="space-y-2">
           <Check name="is_anonymous">
             Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
-            <span className="text-muted">{charityName} still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your 18A receipt" : ""}.</span>
+            <span className="text-muted">{charityName} still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
           </Check>
           <Check name="age_confirmed" error={state.fieldErrors?.age_confirmed}>
             I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
@@ -248,7 +256,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, initialQuote, initi
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
 
-        <button disabled={pending} className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast disabled:opacity-60">
+        {stale ? <p role="status" className="text-sm text-muted">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
+        <button disabled={pending || stale} className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast disabled:opacity-60">
           {pending ? "Please wait…" : `Pay ${formatRand(shownQuote.totalCents)}`}
         </button>
         {state.message ? <p role="status" className="text-sm text-danger">{state.message}</p> : null}

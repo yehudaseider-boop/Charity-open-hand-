@@ -52,7 +52,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const receipts = canIssue18a(charity);
   const chart = [...monthly].reverse();
   const max = Math.max(1, ...chart.map((m) => m.amountCents));
-  const attention = all.pending_count + all.failed_count + all.refunded_count + all.charged_back_count;
+  // Only what the charity can open in its donations list (unpaid attempts are not shown to charities).
+  const attention = all.refunded_count + all.charged_back_count;
 
   return (
     <div className="space-y-4">
@@ -65,15 +66,13 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         <Stat label="Donors" value={String(all.donor_count)} note="who have given" />
       </div>
       <p className="text-xs text-muted">
-        Amounts are the donations only. The donor also pays a processing fee on top, which is not yours and not shown here.
+        Amounts are the donations only. Any contribution a donor chose to add for NEDIV lev is not included.
         {" "}{taxYearLabel(taxYear.taxYear)}.
       </p>
 
       {attention > 0 ? (
         <Card title="Worth a look">
           <ul className="space-y-1 text-sm">
-            {all.pending_count > 0 ? <li>{plural(all.pending_count, "donation")} started but not paid yet</li> : null}
-            {all.failed_count > 0 ? <li>{plural(all.failed_count, "donation")} that failed</li> : null}
             {all.refunded_count > 0 ? <li>{plural(all.refunded_count, "donation")} refunded ({formatRand(all.refunded_cents)})</li> : null}
             {all.charged_back_count > 0 ? <li>{plural(all.charged_back_count, "donation")} charged back</li> : null}
           </ul>

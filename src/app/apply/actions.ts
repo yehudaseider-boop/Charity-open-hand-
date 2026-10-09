@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { requireViewer } from "@/lib/auth";
 import { randomCode, slugify } from "@/lib/charity/slug";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
+import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const startSchema = z.object({
@@ -17,6 +18,9 @@ export async function startApplication(_prev: FormState, formData: FormData): Pr
   const viewer = await requireViewer("/apply");
   const parsed = startSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
+  if (await hitRateLimit("charity-apply", [`user:${viewer.userId}`], 3, 24 * 60)) {
+    return { ok: false, message: "You've started several applications today. Please finish one, or try again tomorrow." };
+  }
 
   const db = createAdminClient();
   const base = slugify(parsed.data.name_en);

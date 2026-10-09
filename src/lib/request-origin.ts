@@ -1,12 +1,17 @@
 import type { NextRequest } from "next/server";
 
 /**
- * The origin the visitor actually used (e.g. https://example.co.za), taken
- * from the Host header. request.url can report "localhost" behind some
- * servers, which would send people to the wrong address and lose their login.
+ * The site's own address, for links we send people to (sign-in emails,
+ * redirects after sign-in). Taken from SITE_URL, never from request headers,
+ * which a visitor can set to point a sign-in link at someone else's site.
+ * Without SITE_URL (local development) it falls back to the request.
  */
+export function siteOrigin(fallback?: string): string {
+  const site = process.env.SITE_URL?.replace(/\/+$/, "");
+  if (site && /^https?:\/\//.test(site)) return site;
+  return fallback ?? "";
+}
+
 export function requestOrigin(request: NextRequest): string {
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  const proto = request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "");
-  return host ? `${proto}://${host}` : request.nextUrl.origin;
+  return siteOrigin(request.nextUrl.origin);
 }

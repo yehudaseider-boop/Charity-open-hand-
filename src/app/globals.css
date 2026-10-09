@@ -52,5 +52,7 @@
 body {
   background: var(--bg);
   color: var(--text);
+  /* Long words or references wrap instead of pushing the page sideways on a phone. */
+  overflow-wrap: anywhere;
 }
 

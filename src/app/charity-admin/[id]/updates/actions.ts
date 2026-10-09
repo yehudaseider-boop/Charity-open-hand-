@@ -7,6 +7,9 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { IMAGE_MIME, MAX_PHOTOS, MAX_UPLOAD_BYTES, photoSchema, updateSchema } from "@/lib/charity/validation";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isUuid } from "@/lib/ids";
+import { isRealImage } from "@/lib/charity/file-check";
+import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 function revalidate(charityId: string, slug: string) {
@@ -19,12 +22,17 @@ async function uploadIfAny(charityId: string, folder: "photos" | "updates", form
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return required ? { error: { ok: false, fieldErrors: { file: "Choose a photo" } } as FormState } : { path: null };
   if (file.size > MAX_UPLOAD_BYTES) return { error: { ok: false, fieldErrors: { file: "Photos must be 5 MB or smaller" } } as FormState };
-  if (!(IMAGE_MIME as readonly string[]).includes(file.type)) return { error: { ok: false, fieldErrors: { file: "Upload a JPG, PNG or WebP photo" } } as FormState };
+  if (!(IMAGE_MIME as readonly string[]).includes(file.type) || !(await isRealImage(file))) {
+    return { error: { ok: false, fieldErrors: { file: "Upload a JPG, PNG or WebP photo" } } as FormState };
+  }
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
   const path = `${charityId}/${folder}/${crypto.randomUUID()}.${ext}`;
   const supabase = await createClient();
   const up = await supabase.storage.from("charity-public").upload(path, file, { contentType: file.type });
-  if (up.error) return { error: { ok: false, message: `Upload failed: ${up.error.message}` } as FormState };
+  if (up.error) {
+    console.error(up.error);
+    return { error: { ok: false, message: "The upload didn't work. Please try again." } as FormState };
+  }
   return { path };
 }
 
@@ -40,6 +48,9 @@ export async function postUpdate(charityId: string, _prev: FormState, formData: 
   const { charity } = await loadCharityForManager(charityId);
   const parsed = updateSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
+  if (await hitRateLimit("charity-update", [`charity:${charityId}`], 20, 24 * 60)) {
+    return { ok: false, message: "That's a lot of updates for one day. Please post again tomorrow." };
+  }
   const photo = await uploadIfAny(charityId, "updates", formData, false);
   if ("error" in photo) return photo.error!;
 
@@ -56,6 +67,7 @@ export async function postUpdate(charityId: string, _prev: FormState, formData: 
 
 export async function removeUpdate(charityId: string, updateId: string): Promise<void> {
   const viewer = await requireViewer();
+  if (!isUuid(updateId)) return;
   const { charity } = await loadCharityForManager(charityId);
   const supabase = await createClient();
   const { data, error } = await supabase.from("charity_updates").delete().eq("id", updateId).eq("charity_id", charityId).select("photo_path");
@@ -67,7 +79,7 @@ export async function removeUpdate(charityId: string, updateId: string): Promise
 }
 
 export async function addPhoto(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  await requireViewer();
+  const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
   const parsed = photoSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
@@ -82,17 +94,20 @@ export async function addPhoto(charityId: string, _prev: FormState, formData: Fo
     await removeFile(charityId, photo.path);
     return { ok: false, message: /up to 12/.test(error.message) ? `You can have up to ${MAX_PHOTOS} photos. Remove one first.` : "We couldn't add that photo. Please try again." };
   }
+  await logAudit({ actorUserId: viewer.userId, action: "charity.photo_added", entityType: "charity", entityId: charityId });
   revalidate(charityId, charity.slug);
   return { ok: true, message: "Photo added." };
 }
 
 export async function removePhoto(charityId: string, photoId: string): Promise<void> {
-  await requireViewer();
+  const viewer = await requireViewer();
+  if (!isUuid(photoId)) return;
   const { charity } = await loadCharityForManager(charityId);
   const supabase = await createClient();
   const { data, error } = await supabase.from("charity_photos").delete().eq("id", photoId).eq("charity_id", charityId).select("storage_path");
   if (error) throw error;
   if (!data?.length) return;
   await removeFile(charityId, data[0].storage_path);
+  await logAudit({ actorUserId: viewer.userId, action: "charity.photo_removed", entityType: "charity", entityId: charityId });
   revalidate(charityId, charity.slug);
 }

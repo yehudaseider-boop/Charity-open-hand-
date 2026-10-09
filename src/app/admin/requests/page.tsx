@@ -37,7 +37,7 @@ export default async function PrivacyRequestsPage() {
               </p>
               {r.details ? <p className="whitespace-pre-wrap text-muted">{r.details}</p> : null}
               <form action={closeRequest.bind(null, r.id)} className="space-y-2">
-                <textarea name="response" rows={2} maxLength={2000} placeholder="Reply to the person" className="w-full rounded-control border border-border bg-surface px-3 py-2" />
+                <textarea name="response" rows={2} maxLength={2000} aria-label="Reply to the person" placeholder="Reply to the person" className="w-full rounded-control border border-border bg-surface px-3 py-2" />
                 <div className="flex gap-2">
                   <button name="status" value="done" className="rounded-control bg-brand px-3 py-2 text-brand-contrast">Mark done</button>
                   <button name="status" value="declined" className="rounded-control border border-border px-3 py-2">Decline</button>

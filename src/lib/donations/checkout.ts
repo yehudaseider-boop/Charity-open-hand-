@@ -7,7 +7,9 @@ import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import { formatRand } from "@/lib/money";
 import { hitRateLimit } from "@/lib/rate-limit";
+import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
 import { checkDonorDetails, type CheckoutInput } from "./validation";
 
@@ -81,6 +83,17 @@ export async function startDonation(args: {
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
   const db = createAdminClient();
   const donorId = await findOrCreateDonor(v, want18a);
+  // Signed in with this same (confirmed) email: the donation joins their account now,
+  // not at their next sign-in. Never for a different address.
+  try {
+    const { data } = await (await createClient()).auth.getUser();
+    const user = data.user;
+    if (user?.email && user.email_confirmed_at && user.email.toLowerCase() === v.email.toLowerCase()) {
+      await linkDonorsToUser(user.id, user.email);
+    }
+  } catch (e) {
+    console.error(e);
+  }
   const now = new Date().toISOString();
   const donationId = randomUUID();
   const gateway = getGateway();
