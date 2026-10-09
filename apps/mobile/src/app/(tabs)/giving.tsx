@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
@@ -9,16 +9,18 @@ import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
 import { Sheet } from "@/components/sheet";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
+import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
 import { TargetEditor, type Target } from "@/components/target-editor";
 import { Text } from "@/components/text";
-import { gifts, givenElsewhere, recurring as sampleRecurring, sampleMaaserTarget, type Gift, type Recurring } from "@/data/giving";
+import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleMaaserTarget, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, rand } from "@/lib/format";
 import { byCharity, givingKindLabels, groupByMonth, inGivingYear, monthlyToReach, percentOf, sumOfKind } from "@/lib/giving";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
 import { useAccount } from "@/lib/account";
-import { loadTarget, saveTarget } from "@/lib/targets";
+import { loadIncome, saveIncome } from "@/lib/income-store";
+import { dateToIso, incomeBetween, isoToDate, owedFromIncome, type Elsewhere, type IncomeEntry } from "@/lib/ledger";
 import { useScreenState } from "@/lib/screen-state";
-import { SITE_URL, siteUrl } from "@/lib/website";
+import { loadTarget, saveTarget } from "@/lib/targets";
 import { colors, radius, space, touch, type } from "@/theme/tokens";
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -40,6 +42,15 @@ export default function Giving() {
     if (preview) return;
     loadTarget().then((t) => t && setTarget(t));
   }, [preview]);
+  // Income (for maaser) stays on this phone only.
+  const [income, setIncome] = useState<IncomeEntry[]>([]);
+  useEffect(() => {
+    if (!preview) loadIncome().then(setIncome);
+  }, [preview]);
+  const [previewElsewhere, setPreviewElsewhere] = useState<Elsewhere[]>(newDonor ? [] : sampleElsewhere);
+  const [logging, setLogging] = useState<"income" | "elsewhere" | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [recurringError, setRecurringError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [sampleRecurringState, setRecurring] = useState<Recurring[]>(newDonor ? [] : sampleRecurring);
@@ -52,7 +63,7 @@ export default function Giving() {
   const yearEnd = ddmmyyyy(yearEndDate);
   const yearLabel = `Rosh Hashana ${hYear}: ${ddmmyyyy(yearStart)} to ${yearEnd}`;
   const myGifts = preview ? (newDonor ? [] : gifts) : (account.live?.gifts ?? []);
-  const elsewhere = preview && !newDonor ? givenElsewhere : [];
+  const elsewhere: Elsewhere[] = preview ? previewElsewhere : (account.live?.elsewhere ?? []);
   const yearGifts = inGivingYear(myGifts, hYear);
   const giftsTotal = yearGifts.reduce((t, g) => t + g.cents, 0);
   const monthGifts = yearGifts.filter((g) => g.date.getMonth() === now.getMonth() && g.date.getFullYear() === now.getFullYear());
@@ -79,6 +90,35 @@ export default function Giving() {
   const chomeshLeft = target?.chomeshCents ? Math.max(0, target.chomeshCents - chomeshGiven) : 0;
   const remaining = maaserLeft + chomeshLeft;
   const [openGift, setOpenGift] = useState<Gift | null>(null);
+
+  // Income logged in the target's period: a tenth is maaser, and a further tenth chomesh if kept.
+  const periodFrom = byMonth ? dateToIso(monthStart) : dateToIso(yearStart);
+  const periodTo = byMonth ? dateToIso(monthEndDate) : dateToIso(yearEndDate);
+  const periodIncome = incomeBetween(income, periodFrom, periodTo);
+  const owed = owedFromIncome(periodIncome, Boolean(target?.chomeshCents));
+  const addIncome = (e: { cents: number; date: string; note: string }) => {
+    const next = [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...e }, ...income].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    setIncome(next);
+    saveIncome(next);
+    setLogging(null);
+  };
+  const removeIncome = (id: string) => {
+    const next = income.filter((e) => e.id !== id);
+    setIncome(next);
+    saveIncome(next);
+  };
+  const confirmRemove = (what: string, go: () => void) =>
+    Alert.alert(`Remove this ${what}?`, "This can't be undone.", [{ text: "Keep it", style: "cancel" }, { text: "Remove", style: "destructive", onPress: go }]);
+  const saveElsewhere = async (e: { cents: number; date: string; recipient: string; kind: "maaser" | "chomesh" | "tzedaka" }): Promise<string | null> => {
+    if (preview) {
+      setPreviewElsewhere((rows) => [{ id: `p${Date.now()}`, date: isoToDate(e.date), recipient: e.recipient, cents: e.cents, kind: e.kind }, ...rows]);
+      setLogging(null);
+      return null;
+    }
+    const r = await account.addElsewhere(e);
+    if (r.ok) setLogging(null);
+    return r.ok ? null : r.message;
+  };
 
   return (
     <View style={styles.screen}>
@@ -163,6 +203,99 @@ export default function Giving() {
               </View>
             ) : null}
 
+            {/* Your records: income (kept on this phone) and giving made elsewhere. */}
+            {preview || signedIn ? (
+              <View style={{ gap: 12 }}>
+                <Text variant="h2" style={styles.heading}>Your records</Text>
+                {income.length > 0 && target !== null ? (
+                  <View style={styles.card}>
+                    <Text variant="label">Owed from your income, {byMonth ? "this month" : "this giving year"}</Text>
+                    <Text variant="bodyMuted">You logged {rand(periodIncome)}. A tenth is maaser{target.chomeshCents ? ", and a further tenth is chomesh" : ""}.</Text>
+                    <View style={styles.list}>
+                      <View style={styles.row}>
+                        <Text style={{ flex: 1, fontSize: 17 }}>Maaser owed</Text>
+                        <Text style={{ fontSize: 17 }}>{rand(owed.maaserCents)}</Text>
+                      </View>
+                      <View style={[styles.row, styles.divider]}>
+                        <Text style={{ flex: 1, fontSize: 17 }}>Maaser given</Text>
+                        <Text style={{ fontSize: 17 }}>{rand(maaserGiven)}</Text>
+                      </View>
+                      <View style={[styles.row, styles.divider]}>
+                        <Text style={{ flex: 1, fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Maaser still to give</Text>
+                        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{rand(Math.max(0, owed.maaserCents - maaserGiven))}</Text>
+                      </View>
+                      {target.chomeshCents ? (
+                        <>
+                          <View style={[styles.row, styles.divider]}>
+                            <Text style={{ flex: 1, fontSize: 17 }}>Chomesh owed</Text>
+                            <Text style={{ fontSize: 17 }}>{rand(owed.chomeshCents)}</Text>
+                          </View>
+                          <View style={[styles.row, styles.divider]}>
+                            <Text style={{ flex: 1, fontSize: 17 }}>Chomesh given</Text>
+                            <Text style={{ fontSize: 17 }}>{rand(chomeshGiven)}</Text>
+                          </View>
+                          <View style={[styles.row, styles.divider]}>
+                            <Text style={{ flex: 1, fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Chomesh still to give</Text>
+                            <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{rand(Math.max(0, owed.chomeshCents - chomeshGiven))}</Text>
+                          </View>
+                        </>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : income.length > 0 ? (
+                  <Text variant="bodyMuted">Set a maaser target above to see what your income means for maaser.</Text>
+                ) : null}
+
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <View style={{ flex: 1 }}><Button label="Log income" onPress={() => setLogging("income")} /></View>
+                  <View style={{ flex: 1 }}><Button label="Log giving elsewhere" onPress={() => setLogging("elsewhere")} /></View>
+                </View>
+
+                {income.length > 0 ? (
+                  <View style={{ gap: 6 }}>
+                    <Text variant="label">Income log (on this phone only)</Text>
+                    <View style={styles.list}>
+                      {income.slice(0, 12).map((e, i) => (
+                        <Pressable key={e.id} onLongPress={() => confirmRemove("income entry", () => removeIncome(e.id))} accessibilityRole="button" accessibilityHint="Press and hold to remove" accessibilityLabel={`${rand(e.cents)}, ${ddmmyyyy(isoToDate(e.date))}${e.note ? `, ${e.note}` : ""}`} style={[styles.row, i > 0 && styles.divider]}>
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <Text style={{ fontSize: 17 }}>{e.note || "Income"}</Text>
+                            <Text variant="bodyMuted" style={{ fontSize: 16 }}>{ddmmyyyy(isoToDate(e.date))}</Text>
+                          </View>
+                          <Text style={{ fontSize: 17 }}>{rand(e.cents)}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text variant="label">Press and hold an entry to remove it.</Text>
+                  </View>
+                ) : null}
+
+                {elsewhere.length > 0 ? (
+                  <View style={{ gap: 6 }}>
+                    <Text variant="label">Given elsewhere</Text>
+                    <View style={styles.list}>
+                      {elsewhere.slice(0, 12).map((e, i) => (
+                        <Pressable
+                          key={e.id}
+                          onLongPress={() => confirmRemove("entry", () => (preview ? setPreviewElsewhere((rows) => rows.filter((r) => r.id !== e.id)) : void account.removeElsewhere(e.id)))}
+                          accessibilityRole="button"
+                          accessibilityHint="Press and hold to remove"
+                          accessibilityLabel={`${e.recipient}, ${rand(e.cents)}, ${ddmmyyyy(e.date)}, ${givingKindLabels[e.kind]}`}
+                          style={[styles.row, i > 0 && styles.divider]}
+                        >
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <Text style={{ fontSize: 17 }}>{e.recipient}</Text>
+                            <Text variant="bodyMuted" style={{ fontSize: 16 }}>{ddmmyyyy(e.date)} · {givingKindLabels[e.kind]}</Text>
+                          </View>
+                          <Text style={{ fontSize: 17 }}>{rand(e.cents)}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text variant="label">These count towards your maaser and chomesh. Press and hold an entry to remove it.</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
             {myGifts.length > 0 ? (
               <View style={{ gap: 12 }}>
                 <Text variant="h2" style={styles.heading}>This year in numbers</Text>
@@ -209,7 +342,7 @@ export default function Giving() {
             <View style={{ gap: 12 }}>
               <Text variant="h2" style={styles.heading}>Monthly donations</Text>
               {recurring.length === 0 ? (
-                <Text variant="bodyMuted">No monthly donations yet. Choose Monthly when you give to set one up.</Text>
+                <Text variant="bodyMuted">No monthly donations yet. Monthly giving is coming soon.</Text>
               ) : (
                 <View style={styles.list}>
                   {recurring.map((r, i) => (
@@ -217,7 +350,7 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {r.status === "paused" ? "Paused" : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
                       <Text style={{ fontSize: 17 }}>{rand(r.cents)}/month</Text>
@@ -262,24 +395,53 @@ export default function Giving() {
         )}
       </ScrollView>
 
-      <Sheet visible={open !== null} onClose={() => setOpen(null)}>
+      <Sheet visible={open !== null} onClose={() => { setOpen(null); setConfirmCancel(false); setRecurringError(null); }}>
         {open ? (
           <View style={{ gap: 18 }}>
             <View style={{ gap: 4 }}>
               <Text variant="label">Monthly donation</Text>
               <Text variant="h2">{open.charityName}</Text>
-              <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "paused" ? "Paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
+              <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "cancelled" ? "cancellation requested" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
             </View>
             {!preview ? (
               <>
-                <Button
-                  label="Manage on our website"
-                  onPress={() => {
-                    const url = siteUrl(SITE_URL, "/account");
-                    if (url) Linking.openURL(url).catch(() => undefined);
-                  }}
-                />
-                <Text variant="label">Pausing or cancelling a monthly donation is done on our website, with the payment provider.</Text>
+                {open.status === "cancelled" ? (
+                  <Text>Cancellation requested. It is confirmed once the payment provider has stopped it.</Text>
+                ) : confirmCancel ? (
+                  <View style={{ gap: 10 }}>
+                    <Text style={{ fontSize: 17 }}>Cancel this monthly donation for good? You would need to set up a new one to give monthly again.</Text>
+                    <Button
+                      label="Yes, cancel it"
+                      onPress={async () => {
+                        const r = await account.setRecurringStatus(open.id, "cancelled");
+                        setConfirmCancel(false);
+                        setRecurringError(r.ok ? null : r.message);
+                        if (r.ok) setOpen(null);
+                      }}
+                    />
+                    <TextLink label="Keep it" onPress={() => setConfirmCancel(false)} />
+                  </View>
+                ) : (
+                  <>
+                    <Button
+                      label={open.status === "paused" ? "Resume" : "Pause"}
+                      onPress={async () => {
+                        const r = await account.setRecurringStatus(open.id, open.status === "paused" ? "active" : "paused");
+                        setRecurringError(r.ok ? null : r.message);
+                        if (r.ok) setOpen(null);
+                      }}
+                    />
+                    <Pressable accessibilityRole="button" onPress={() => setConfirmCancel(true)} style={styles.cancel}>
+                      <Text style={[type.button, { color: colors.danger }]}>Cancel monthly donation</Text>
+                    </Pressable>
+                  </>
+                )}
+                {recurringError ? <Text style={{ color: colors.danger }}>{recurringError}</Text> : null}
+                <Text variant="label">
+                  {open.syncing
+                    ? "Your change is saved and waiting for the payment provider to apply it."
+                    : "Your change is saved here and then passed to the payment provider, which takes the monthly payments. Past donations stay in your history."}
+                </Text>
               </>
             ) : (
             <>
@@ -305,6 +467,11 @@ export default function Giving() {
             )}
           </View>
         ) : null}
+      </Sheet>
+
+      <Sheet visible={logging !== null} onClose={() => setLogging(null)}>
+        {logging === "income" ? <IncomeForm onSave={addIncome} onCancel={() => setLogging(null)} /> : null}
+        {logging === "elsewhere" ? <ElsewhereForm onSave={saveElsewhere} onCancel={() => setLogging(null)} /> : null}
       </Sheet>
 
       <Sheet visible={openGift !== null} onClose={() => setOpenGift(null)}>

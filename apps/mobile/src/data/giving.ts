@@ -35,7 +35,7 @@ export const sampleMaaserTarget: { period: "month" | "year"; maaserCents: number
   chomeshCents: 60_000,
 };
 
-export type Recurring = { id: string; charitySlug: string; charityName: string; cents: number; nextDate: Date | null; status: "active" | "paused" };
+export type Recurring = { id: string; charitySlug: string; charityName: string; cents: number; nextDate: Date | null; status: "active" | "paused" | "cancelled"; /** A change is saved and waiting for the payment provider to apply it. */ syncing?: boolean };
 
 export const recurring: Recurring[] = [
   { id: "r1", charitySlug: "linksfield-torah-centre", charityName: "Linksfield Torah Learning Centre", cents: 50_000, nextDate: d(2026, 11, 1), status: "active" },

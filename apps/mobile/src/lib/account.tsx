@@ -2,7 +2,8 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 import { POLICY_VERSION } from "@shared/policy";
-import type { Gift, Receipt, Recurring } from "@/data/giving";
+import type { Gift, GivingKind, Receipt, Recurring } from "@/data/giving";
+import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
 import { toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
 
@@ -20,7 +21,8 @@ import { supabase } from "./supabase";
  */
 export type AccountStatus = "preview" | "loading" | "signed-out" | "agreeing" | "signed-in";
 
-type Live = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; loadedAt: Date };
+type Live = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: Elsewhere[]; loadedAt: Date };
+type Result = { ok: true } | { ok: false; message: string };
 
 type AccountValue = {
   status: AccountStatus;
@@ -33,6 +35,9 @@ type AccountValue = {
   agree(): Promise<{ ok: true } | { ok: false; message: string }>;
   refresh(): Promise<void>;
   signOut(): Promise<void>;
+  addElsewhere(e: { cents: number; date: string; recipient: string; kind: GivingKind }): Promise<Result>;
+  removeElsewhere(id: string): Promise<Result>;
+  setRecurringStatus(id: string, status: "active" | "paused" | "cancelled"): Promise<Result>;
 };
 
 const AccountContext = createContext<AccountValue | null>(null);
@@ -49,7 +54,11 @@ async function loadLive(userId: string): Promise<Live> {
   const { data: donors, error: e1 } = await db.from("donors").select("id").eq("user_id", userId);
   if (e1) throw e1;
   const donorIds = (donors ?? []).map((d) => d.id as string);
-  if (donorIds.length === 0) return { gifts: [], recurring: [], receipts: [], loadedAt: new Date() };
+  // Giving logged by hand belongs to the account itself, not to a donor record.
+  const elsewhere = await db.from("external_giving_entries").select("id, entry_date, recipient_text, amount_cents, kind").eq("user_id", userId).order("entry_date", { ascending: false }).limit(2000);
+  if (elsewhere.error) throw elsewhere.error;
+  const loggedElsewhere = toElsewhere((elsewhere.data ?? []) as unknown as ElsewhereRow[]);
+  if (donorIds.length === 0) return { gifts: [], recurring: [], receipts: [], elsewhere: loggedElsewhere, loadedAt: new Date() };
 
   const [donations, kinds, recurring, receipts] = await Promise.all([
     db
@@ -60,7 +69,7 @@ async function loadLive(userId: string): Promise<Live> {
       .order("paid_at", { ascending: false })
       .limit(2000),
     db.from("donation_giving_kinds").select("donation_id, kind"),
-    db.from("recurring_donations").select("id, amount_cents, status, next_charge_at, charities(slug, name_en)").in("donor_id", donorIds),
+    db.from("recurring_donations").select("id, amount_cents, status, needs_gateway_sync, next_charge_at, charities(slug, name_en)").in("donor_id", donorIds),
     db
       .from("s18a_receipts")
       .select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en")
@@ -72,6 +81,7 @@ async function loadLive(userId: string): Promise<Live> {
     gifts: toGifts((donations.data ?? []) as unknown as DonationRow[], (kinds.data ?? []) as KindRow[]),
     recurring: toRecurring((recurring.data ?? []) as unknown as RecurringRow[]),
     receipts: toReceipts((receipts.data ?? []) as unknown as ReceiptRow[]),
+    elsewhere: loggedElsewhere,
     loadedAt: new Date(),
   };
 }
@@ -166,6 +176,33 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       async signOut() {
         await supabase?.auth.signOut();
         setLive(null);
+      },
+      async addElsewhere(e) {
+        if (!supabase || !session) return { ok: false, message: "Please sign in again." };
+        const { error } = await supabase.from("external_giving_entries").insert({
+          user_id: session.user.id,
+          amount_cents: e.cents,
+          entry_date: e.date,
+          recipient_text: e.recipient,
+          kind: e.kind,
+        });
+        if (error) return { ok: false, message: "We couldn't save that. Please try again." };
+        await refresh();
+        return { ok: true };
+      },
+      async removeElsewhere(id) {
+        if (!supabase || !session) return { ok: false, message: "Please sign in again." };
+        const { error } = await supabase.from("external_giving_entries").delete().eq("id", id).eq("user_id", session.user.id);
+        if (error) return { ok: false, message: "We couldn't remove that. Please try again." };
+        await refresh();
+        return { ok: true };
+      },
+      async setRecurringStatus(id, status) {
+        if (!supabase || !session) return { ok: false, message: "Please sign in again." };
+        const { error } = await supabase.rpc("set_my_recurring_status", { p_id: id, p_status: status });
+        if (error) return { ok: false, message: "We couldn't change that. Please try again." };
+        await refresh();
+        return { ok: true };
       },
     }),
     [status, session, live, loadError, refreshing, refresh],

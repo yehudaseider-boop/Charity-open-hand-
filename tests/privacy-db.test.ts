@@ -283,3 +283,77 @@ describe("signing in from the app", () => {
     });
   });
 });
+
+describe("giving made elsewhere", () => {
+  it("is private to the person who logged it, and needs a valid choice and amount", async () => {
+    await tx(async () => {
+      await as(ids.donorUser);
+      await run("insert into public.external_giving_entries (user_id, amount_cents, entry_date, recipient_text, kind) values ($1, 72000, '2026-06-10', 'Shul appeal (cash)', 'maaser')", [ids.donorUser]);
+      expect((await run("select kind from public.external_giving_entries")).rows.map((r) => r.kind)).toEqual(["maaser"]);
+
+      await as(ids.mealsAdmin);
+      expect((await run("select 1 from public.external_giving_entries")).rowCount).toBe(0);
+      await run("savepoint p");
+      await expect(run("insert into public.external_giving_entries (user_id, amount_cents, entry_date, recipient_text, kind) values ($1, 100, '2026-06-10', 'Forged', 'maaser')", [ids.donorUser])).rejects.toThrow(/row-level security/);
+      await run("rollback to savepoint p");
+
+      await as(ids.donorUser);
+      for (const [cents, kind, who] of [[0, "maaser", "x"], [-5, "maaser", "x"], [100, "other", "x"], [100, "maaser", ""]] as const) {
+        await run("savepoint q");
+        await expect(run("insert into public.external_giving_entries (user_id, amount_cents, entry_date, recipient_text, kind) values ($1, $2, '2026-06-10', $3, $4)", [ids.donorUser, cents, who, kind])).rejects.toThrow();
+        await run("rollback to savepoint q");
+      }
+    });
+  });
+});
+
+describe("pausing and cancelling a monthly donation", () => {
+  async function monthly() {
+    await run("reset role");
+    const { rows } = await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents) values ($1, $2, 50000) returning id", [ids.donor, ids.meals]);
+    return rows[0].id as string;
+  }
+  const state = async (id: string) => {
+    await run("reset role");
+    return (await run("select status, needs_gateway_sync, paused_at is not null as paused, cancelled_at is not null as cancelled from public.recurring_donations where id = $1", [id])).rows[0];
+  };
+
+  it("lets the donor pause, resume and cancel, and flags each change for the payment provider", async () => {
+    await tx(async () => {
+      const id = await monthly();
+      expect(await state(id)).toMatchObject({ status: "active", needs_gateway_sync: false });
+      await as(ids.donorUser);
+      await run("select public.set_my_recurring_status($1, 'paused')", [id]);
+      expect(await state(id)).toMatchObject({ status: "paused", paused: true, needs_gateway_sync: true });
+      await as(ids.donorUser);
+      await run("select public.set_my_recurring_status($1, 'active')", [id]);
+      expect(await state(id)).toMatchObject({ status: "active", paused: false });
+      await as(ids.donorUser);
+      await run("select public.set_my_recurring_status($1, 'cancelled')", [id]);
+      expect(await state(id)).toMatchObject({ status: "cancelled", cancelled: true });
+      // A cancelled monthly donation can't be brought back.
+      await as(ids.donorUser);
+      await run("savepoint p");
+      await expect(run("select public.set_my_recurring_status($1, 'active')", [id])).rejects.toThrow(/cannot be set/);
+      await run("rollback to savepoint p");
+    });
+  });
+
+  it("refuses anyone else, visitors, direct edits and made-up statuses", async () => {
+    await tx(async () => {
+      const id = await monthly();
+      await as(ids.mealsAdmin);
+      await run("savepoint a");
+      await expect(run("select public.set_my_recurring_status($1, 'cancelled')", [id])).rejects.toThrow(/not found/);
+      await run("rollback to savepoint a");
+      await as(ids.donorUser);
+      await run("savepoint b");
+      await expect(run("select public.set_my_recurring_status($1, 'failed')", [id])).rejects.toThrow(/Unknown status/);
+      await run("rollback to savepoint b");
+      await denied("update public.recurring_donations set status = 'cancelled' where id = $1", [id]);
+      await as("anon");
+      await denied("select public.set_my_recurring_status($1, 'cancelled')", [id]);
+      expect((await state(id)).status).toBe("active");
+    });
+  });
+});

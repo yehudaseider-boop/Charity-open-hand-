@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
-import { Animated, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, space } from "@/theme/tokens";
 
 /** Motion 1: a bottom sheet that rises over the current screen. */
 export function Sheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const v = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -28,7 +29,10 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
           ]}
         >
           <View style={styles.grabber} />
-          {children}
+          {/* Tall forms scroll inside the sheet instead of running off a small screen. */}
+          <ScrollView style={{ maxHeight: height * 0.7 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
     </View>

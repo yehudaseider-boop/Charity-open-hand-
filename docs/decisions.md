@@ -264,3 +264,9 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 - Pausing or cancelling a monthly donation, and downloading a receipt PDF, are done on the website.
 - Until the live database exists the app runs in preview mode with sample data.
 - To switch on: set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (and `EXPO_PUBLIC_SITE_URL`) in the EAS "preview" and "production" environments, and change the Supabase "Magic Link" email template to include the code (`{{ .Token }}`). Build with `--clear` after changing them: the bundler caches old values.
+
+## Income, giving elsewhere, and monthly donation controls in the app (09/10/2026)
+
+- **Income log (for maaser):** stays on the phone only, in its secure storage, never sent to our servers. A tenth of the income logged in the target's period is maaser owed, and a further tenth chomesh if the donor keeps it (same tenths as the target editor). The server's encrypted `maaser_income_entries` table is left unused. Trade-off: no sync between phones, and deleting the app deletes the log. To sync across devices later, income would need to be encrypted before it leaves the phone.
+- **Giving elsewhere** (cash, shul appeals, other charities): saved on the donor's account (`external_giving_entries`, visible only to them) with their own maaser/chomesh/tzedaka choice, and counted towards those totals. Entries are removed by pressing and holding.
+- **Pausing, resuming and cancelling a monthly donation** from the app, through `set_my_recurring_status()`: only the owner, only active-to-paused, paused-to-active, or either to cancelled (cancelled is final). Each change sets `needs_gateway_sync`, and the app says "requested" until the server has told the payment provider. NOT BUILT: the call to the payment provider, and monthly donations themselves (the donation form is once-off only). Both come with the gateway choice. Until then no monthly donation exists to pause.

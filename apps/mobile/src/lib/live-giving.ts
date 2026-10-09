@@ -18,6 +18,7 @@ export type RecurringRow = {
   id: string;
   amount_cents: number | string;
   status: string;
+  needs_gateway_sync?: boolean;
   next_charge_at: string | null;
   charities: { slug: string; name_en: string } | { slug: string; name_en: string }[] | null;
 };
@@ -62,7 +63,8 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
 
 export function toRecurring(rows: RecurringRow[]): Recurring[] {
   return rows
-    .filter((r) => r.status === "active" || r.status === "paused")
+    // Cancelled ones only show while the payment provider hasn't yet stopped them.
+    .filter((r) => r.status === "active" || r.status === "paused" || (r.status === "cancelled" && r.needs_gateway_sync === true))
     .map((r) => {
       const c = one(r.charities);
       return {
@@ -71,7 +73,8 @@ export function toRecurring(rows: RecurringRow[]): Recurring[] {
         charityName: c?.name_en ?? "Charity",
         cents: Number(r.amount_cents),
         nextDate: r.next_charge_at ? new Date(r.next_charge_at) : null,
-        status: r.status as "active" | "paused",
+        status: r.status as "active" | "paused" | "cancelled",
+        syncing: r.needs_gateway_sync === true,
       };
     });
 }
