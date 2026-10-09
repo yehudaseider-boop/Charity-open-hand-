@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PreviewChrome } from "@/components/preview-chrome";
+import { AccountProvider } from "@/lib/account";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync();
@@ -39,10 +40,12 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <PreviewChrome>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.parchment } }} />
-      </PreviewChrome>
+      <AccountProvider>
+        <PreviewChrome>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.parchment } }} />
+        </PreviewChrome>
+      </AccountProvider>
     </SafeAreaProvider>
   );
 }

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
@@ -15,7 +15,10 @@ import { gifts, givenElsewhere, recurring as sampleRecurring, sampleMaaserTarget
 import { ddmmyyyy, rand } from "@/lib/format";
 import { byCharity, givingKindLabels, groupByMonth, inGivingYear, monthlyToReach, percentOf, sumOfKind } from "@/lib/giving";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
+import { useAccount } from "@/lib/account";
+import { loadTarget, saveTarget } from "@/lib/targets";
 import { useScreenState } from "@/lib/screen-state";
+import { SITE_URL, siteUrl } from "@/lib/website";
 import { colors, radius, space, touch, type } from "@/theme/tokens";
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -23,21 +26,33 @@ const monthNames = ["January", "February", "March", "April", "May", "June", "Jul
 /** Screen 7: Giving, with maaser. */
 export default function Giving() {
   const insets = useSafeAreaInsets();
-  const state = useScreenState();
+  const account = useAccount();
+  const preview = account.status === "preview";
+  const signedIn = account.status === "signed-in";
+  const demoState = useScreenState();
+  // Live: the screen's state comes from the account; preview keeps the design-review states.
+  const state = preview ? demoState : signedIn && !account.live ? "loading" : account.loadError && !account.live ? "error" : "ready";
   const p = useLocalSearchParams<{ demo?: string; sheet?: string }>();
-  const newDonor = state === "empty";
-  const [target, setTarget] = useState<Target | null>(newDonor || p.demo === "first" ? null : sampleMaaserTarget);
+  const newDonor = preview ? demoState === "empty" : !signedIn;
+  const [target, setTarget] = useState<Target | null>(!preview || newDonor || p.demo === "first" ? null : sampleMaaserTarget);
+  // Targets are personal and stay on this phone (in its secure storage), never on our servers.
+  useEffect(() => {
+    if (preview) return;
+    loadTarget().then((t) => t && setTarget(t));
+  }, [preview]);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [recurring, setRecurring] = useState<Recurring[]>(newDonor ? [] : sampleRecurring);
-  const [open, setOpen] = useState<Recurring | null>(sampleRecurring.find((r) => r.id === p.sheet) ?? null);
+  const [sampleRecurringState, setRecurring] = useState<Recurring[]>(newDonor ? [] : sampleRecurring);
+  const recurring = preview ? sampleRecurringState : (account.live?.recurring ?? []);
+  const [open, setOpen] = useState<Recurring | null>(preview ? (sampleRecurring.find((r) => r.id === p.sheet) ?? null) : null);
 
   const now = new Date();
   const hYear = hebrewYearFor(now);
   const { start: yearStart, end: yearEndDate } = givingYearRange(hYear);
   const yearEnd = ddmmyyyy(yearEndDate);
   const yearLabel = `Rosh Hashana ${hYear}: ${ddmmyyyy(yearStart)} to ${yearEnd}`;
-  const myGifts = newDonor ? [] : gifts;
+  const myGifts = preview ? (newDonor ? [] : gifts) : (account.live?.gifts ?? []);
+  const elsewhere = preview && !newDonor ? givenElsewhere : [];
   const yearGifts = inGivingYear(myGifts, hYear);
   const giftsTotal = yearGifts.reduce((t, g) => t + g.cents, 0);
   const monthGifts = yearGifts.filter((g) => g.date.getMonth() === now.getMonth() && g.date.getFullYear() === now.getFullYear());
@@ -53,7 +68,7 @@ export default function Giving() {
   // Gifts and "given elsewhere" entries in the target's period, each marked maaser, chomesh or general tzedaka.
   const periodRows = [
     ...(byMonth ? monthGifts : yearGifts),
-    ...(newDonor ? [] : byMonth ? inMonth(givenElsewhere) : inGivingYear(givenElsewhere, hYear)),
+    ...(byMonth ? inMonth(elsewhere) : inGivingYear(elsewhere, hYear)),
   ];
   const maaserGiven = sumOfKind(periodRows, "maaser");
   const chomeshGiven = sumOfKind(periodRows, "chomesh");
@@ -67,7 +82,11 @@ export default function Giving() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
         <View>
           <Text variant="h1" accessibilityRole="header">Giving</Text>
           <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
@@ -80,9 +99,16 @@ export default function Giving() {
             <SkeletonBlock height={200} />
           </View>
         ) : state === "error" ? (
-          <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => router.replace("/giving")} />
+          <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => (preview ? router.replace("/giving") : account.refresh())} />
         ) : (
           <>
+            {!preview && !signedIn ? (
+              <View style={styles.card}>
+                <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
+                <Text variant="bodyMuted">Sign in with the email you give with. Every donation shows up here, and counts towards your maaser and chomesh.</Text>
+                <Button label="Sign in" onPress={() => router.push("/account")} />
+              </View>
+            ) : null}
             {target === null || editing ? (
               <TargetEditor
                 initial={target}
@@ -90,6 +116,7 @@ export default function Giving() {
                 monthsLeft={monthsLeft}
                 onSave={(t) => {
                   setTarget(t);
+                  if (!preview) saveTarget(t);
                   setEditing(false);
                   setSaved(true);
                 }}
@@ -190,7 +217,7 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {r.status === "paused" ? "Paused" : `Next on ${ddmmyyyy(r.nextDate)}`}
+                          {r.status === "paused" ? "Paused" : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
                       <Text style={{ fontSize: 17 }}>{rand(r.cents)}/month</Text>
@@ -204,7 +231,7 @@ export default function Giving() {
             <View style={{ gap: 16 }}>
               <Text variant="h2" style={styles.heading}>History</Text>
               {myGifts.length === 0 ? (
-                <EmptyState title="No donations yet" body="Donations you make in the app appear here, and count towards your maaser." action={{ label: "Find a charity", onPress: () => router.push("/discover") }} />
+                <EmptyState title="No donations yet" body="Donations you make on our website appear here once the payment goes through, and count towards your maaser." action={{ label: "Find a charity", onPress: () => router.push("/discover") }} />
               ) : (
                 groupByMonth(myGifts).map((g, gi) => (
                   <FadeUp key={g.label} index={gi} style={{ gap: 6 }}>
@@ -227,7 +254,10 @@ export default function Giving() {
                 ))
               )}
             </View>
-            {myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample giving history for design review</Text> : null}
+            {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample giving history for design review</Text> : null}
+            {signedIn && account.live ? (
+              <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(account.live.loadedAt)}. Pull down to refresh.</Text>
+            ) : null}
           </>
         )}
       </ScrollView>
@@ -238,8 +268,21 @@ export default function Giving() {
             <View style={{ gap: 4 }}>
               <Text variant="label">Monthly donation</Text>
               <Text variant="h2">{open.charityName}</Text>
-              <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "paused" ? "Paused" : `next on ${ddmmyyyy(open.nextDate)}`}</Text>
+              <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "paused" ? "Paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
             </View>
+            {!preview ? (
+              <>
+                <Button
+                  label="Manage on our website"
+                  onPress={() => {
+                    const url = siteUrl(SITE_URL, "/account");
+                    if (url) Linking.openURL(url).catch(() => undefined);
+                  }}
+                />
+                <Text variant="label">Pausing or cancelling a monthly donation is done on our website, with the payment provider.</Text>
+              </>
+            ) : (
+            <>
             <Button
               label={open.status === "paused" ? "Resume" : "Pause"}
               onPress={() => {
@@ -258,6 +301,8 @@ export default function Giving() {
               <Text style={[type.button, { color: colors.danger }]}>Cancel monthly donation</Text>
             </Pressable>
             <Text variant="label">Cancelling stops all future payments with the payment provider. Past donations stay in your history.</Text>
+            </>
+            )}
           </View>
         ) : null}
       </Sheet>

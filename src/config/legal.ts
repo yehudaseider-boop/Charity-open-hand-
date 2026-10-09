@@ -4,6 +4,8 @@
  * draft notice until `reviewedByLegal` is true. Never fill these in by guess:
  * Yehuda supplies them, Yosef signs off the wording.
  */
+import { POLICY_VERSION } from "@/lib/policy";
+
 export const legalConfig = {
   /** Registered company name, e.g. "... (Pty) Ltd". */
   companyName: null as string | null,
@@ -16,12 +18,8 @@ export const legalConfig = {
   /** Where people send privacy requests and complaints. */
   privacyEmail: null as string | null,
 
-  /**
-   * Version of the Terms and Privacy Policy. Every agreement is stored with
-   * the version it was given for; changing this asks signed-in people to agree
-   * again on their next visit.
-   */
-  policyVersion: "2026-10-08-draft",
+  /** Version of the Terms and Privacy Policy (set in src/lib/policy.ts, shared with the app). */
+  policyVersion: POLICY_VERSION,
 
   /** Set to true only once Yosef has approved the wording. */
   reviewedByLegal: false,

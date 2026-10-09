@@ -254,3 +254,13 @@ Who sees what, enforced in the database and tested in `tests/privacy-db.test.ts`
 - No marketing, no tracking or analytics cookies, no selling of data.
 
 To be supplied before going live (`src/config/legal.ts`): company name, registration number, address, Information Officer name and email, privacy email. For Yosef: refund policy, retention period for tax records, payment and service providers and where they store data, limits of liability, the full charity agreement, and whether a required maaser/chomesh/tzedaka choice is valid consent for special personal information. Also: the Information Officer must be registered with the Information Regulator.
+
+## Live giving history in the app (09/10/2026)
+
+- Donors sign in inside the app with a 6-digit code emailed to them (no password, no website round trip), then agree to the Terms and Privacy Policy once per version, as on the website. The session is kept in the phone's secure storage (Keychain / Keystore).
+- The app reads only the donor's own rows through row-level security, with the public key: paid donations, their maaser/chomesh/tzedaka choice, monthly donations and issued receipts. It writes nothing except two checked database functions: `link_my_donations()` (joins donations given with that confirmed email) and `agree_to_policy()`.
+- Giving history is written only by the server when the payment provider confirms a payment. The app re-reads when it opens, comes back to the front (e.g. returning from the website after donating), or the donor pulls down to refresh.
+- Maaser/chomesh targets stay on the phone (secure storage), never on our servers.
+- Pausing or cancelling a monthly donation, and downloading a receipt PDF, are done on the website.
+- Until the live database exists the app runs in preview mode with sample data.
+- To switch on: set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (and `EXPO_PUBLIC_SITE_URL`) in the EAS "preview" and "production" environments, and change the Supabase "Magic Link" email template to include the code (`{{ .Token }}`). Build with `--clear` after changing them: the bundler caches old values.

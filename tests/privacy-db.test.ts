@@ -214,3 +214,72 @@ describe("agreements and privacy requests", () => {
     });
   });
 });
+
+describe("signing in from the app", () => {
+  async function newUser(email: string, confirmed: boolean) {
+    await run("reset role");
+    const { rows } = await run(
+      "insert into auth.users (id, email, email_confirmed_at) values (gen_random_uuid(), $1, $2) returning id",
+      [email, confirmed ? new Date().toISOString() : null],
+    );
+    return rows[0].id as string;
+  }
+  async function guestDonor(email: string) {
+    await run("reset role");
+    const { rows } = await run(
+      "insert into public.donors (email, donor_type, age_confirmed_18_at, popia_consent_at) values ($1, 'individual', now(), now()) returning id",
+      [email],
+    );
+    return rows[0].id as string;
+  }
+
+  it("joins donations given with a confirmed email to that account, and nobody else's", async () => {
+    await tx(async () => {
+      const mine = await guestDonor("Gila@Example.co.za");
+      const other = await guestDonor("someone.else@example.co.za");
+      const u = await newUser("gila@example.co.za", true);
+      await as(u);
+      expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(1);
+      await run("reset role");
+      const owners = (await run("select id, user_id from public.donors where id = any($1)", [[mine, other]])).rows;
+      expect(owners.find((r) => r.id === mine)?.user_id).toBe(u);
+      expect(owners.find((r) => r.id === other)?.user_id).toBeNull();
+    });
+  });
+
+  it("does nothing for an unconfirmed email, and never takes a donor record an account already has", async () => {
+    await tx(async () => {
+      await guestDonor("pending@example.co.za");
+      const unconfirmed = await newUser("pending@example.co.za", false);
+      await as(unconfirmed);
+      expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(0);
+
+      // A donor record already claimed by one account stays with it.
+      const claimed = await guestDonor("claimed@example.co.za");
+      const first = await newUser("claimed@example.co.za", true);
+      await as(first);
+      expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(1);
+      await run("reset role");
+      await run("update auth.users set email = 'second-' || email where id = $1", [first]);
+      const second = await newUser("claimed@example.co.za", true);
+      await as(second);
+      expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(0);
+      await run("reset role");
+      expect((await run("select user_id from public.donors where id = $1", [claimed])).rows[0].user_id).toBe(first);
+    });
+  });
+
+  it("records the app's agreement for the signed-in person only, and not for visitors", async () => {
+    await tx(async () => {
+      await as(ids.donorUser);
+      await run("select public.agree_to_policy('2026-10-08-draft')");
+      expect((await run("select count(*)::int as n from public.consents where user_id = $1 and policy_version = '2026-10-08-draft'", [ids.donorUser])).rows[0].n).toBeGreaterThan(0);
+      await run("savepoint p");
+      await expect(run("select public.agree_to_policy('<script>')")).rejects.toThrow(/Unknown policy version/);
+      await run("rollback to savepoint p");
+      await as("anon");
+      await denied("select public.agree_to_policy('2026-10-08-draft')");
+      await denied("select public.link_my_donations()");
+    });
+  });
+});

@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
@@ -9,6 +9,9 @@ import { Text } from "@/components/text";
 import { charities } from "@/data/sample";
 import { gifts, receipts } from "@/data/giving";
 import { ddmmyyyy, rand } from "@/lib/format";
+import { Button } from "@/components/button";
+import { useAccount } from "@/lib/account";
+import { SITE_URL, siteUrl } from "@/lib/website";
 import { useScreenState } from "@/lib/screen-state";
 import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
 import { colors, radius, space, touch } from "@/theme/tokens";
@@ -16,18 +19,25 @@ import { colors, radius, space, touch } from "@/theme/tokens";
 /** Screen 8: Receipts. Annual 18A receipts, grouped by tax year. */
 export default function Receipts() {
   const insets = useSafeAreaInsets();
-  const state = useScreenState();
+  const account = useAccount();
+  const preview = account.status === "preview";
+  const signedIn = account.status === "signed-in";
+  const demoState = useScreenState();
+  const state = preview ? demoState : signedIn && !account.live ? "loading" : account.loadError && !account.live ? "error" : "ready";
   const current = taxYearFor(new Date());
   const currentEnd = taxYearRangeLabel(current).split(" to ")[1];
 
-  const empty = state === "empty";
-  const myReceipts = empty ? [] : receipts;
+  const empty = preview ? state === "empty" : !signedIn;
+  const myReceipts = preview ? (empty ? [] : receipts) : (account.live?.receipts ?? []);
+  const myGifts = preview ? gifts : (account.live?.gifts ?? []);
   const years = [...new Set(myReceipts.map((r) => r.taxYear))].sort((a, b) => b - a);
 
   // Charities in the donor's history that never issue 18A receipts.
   const no18a = empty
     ? []
-    : [...new Set(gifts.filter((g) => !charities.find((c) => c.slug === g.charitySlug)?.issues18a).map((g) => g.charityName))];
+    : preview
+      ? [...new Set(myGifts.filter((g) => !charities.find((c) => c.slug === g.charitySlug)?.issues18a).map((g) => g.charityName))]
+      : [];
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
@@ -42,18 +52,23 @@ export default function Receipts() {
           <SkeletonBlock height={150} />
         </View>
       ) : state === "error" ? (
-        <ErrorState body="We couldn't load your receipts. Check your connection and try again." onRetry={() => router.replace("/receipts")} />
+        <ErrorState body="We couldn't load your receipts. Check your connection and try again." onRetry={() => (preview ? router.replace("/receipts") : account.refresh())} />
       ) : (
         <>
           <View style={styles.notice}>
             <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Receipts arrive once a year</Text>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-              Each charity issues one 18A receipt covering all your donations in a tax year (1 March to the end of February). Receipts for this tax year
+              You get one 18A receipt per charity, covering all your donations to it in a tax year (1 March to the end of February). Receipts for this tax year
               come after {currentEnd}.
             </Text>
           </View>
 
-          {years.length === 0 ? (
+          {!preview && !signedIn ? (
+            <View style={{ gap: 12, alignItems: "center", paddingVertical: 24 }}>
+              <Text variant="h2" style={{ textAlign: "center" }}>Sign in to see your receipts</Text>
+              <Button label="Sign in" onPress={() => router.push("/account")} />
+            </View>
+          ) : years.length === 0 ? (
             <View style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
               <Text variant="h2" style={{ textAlign: "center" }}>No receipts yet</Text>
               <Text variant="bodyMuted" style={{ textAlign: "center" }}>
@@ -84,7 +99,16 @@ export default function Receipts() {
                         >
                           <ShareIcon />
                         </Pressable>
-                        <Pressable accessibilityRole="button" accessibilityLabel={`Download receipt from ${r.charityName}`} style={styles.iconBtn}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Download receipt from ${r.charityName}`}
+                          onPress={() => {
+                            // The PDF is handed out by the website, after it checks who is asking.
+                            const url = preview ? null : siteUrl(SITE_URL, `/receipts/${r.id}`);
+                            if (url) Linking.openURL(url).catch(() => undefined);
+                          }}
+                          style={styles.iconBtn}
+                        >
                           <DownloadIcon />
                         </Pressable>
                       </View>
@@ -103,7 +127,7 @@ export default function Receipts() {
               </Text>
             </View>
           ) : null}
-          {years.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample receipts for design review</Text> : null}
+          {preview && years.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample receipts for design review</Text> : null}
         </>
       )}
     </ScrollView>
