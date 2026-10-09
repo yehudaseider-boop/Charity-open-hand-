@@ -323,3 +323,7 @@ Still open (need a decision or the payment provider):
 - Income log, targets and saved charities (signed out) belong to the phone, not the person: on a shared phone the next person sees them. Keep, or clear on sign-out?
 - Dates use the phone's time zone; a donor abroad could see a donation on the previous day.
 - On iPhone, the Keychain keeps sign-in and income after the app is deleted.
+
+## Expo Go preview link (09/10/2026)
+
+- One permanent link for the preview: `exp://u.expo.dev/bb247170-f27b-4771-b143-41f5098c06bc?channel-name=preview`. It follows the "preview" channel (linked to the "preview" branch), so Expo Go loads the newest published update instead of a fixed one. No new QR code per update.
