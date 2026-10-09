@@ -13,6 +13,8 @@ export const causes: Cause[] = [
 ];
 
 export type Charity = {
+  /** Database id (live charities only). */
+  id?: string;
   slug: string;
   nameEn: string;
   nameHe: string;

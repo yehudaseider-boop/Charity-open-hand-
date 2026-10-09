@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { imageUrl, inCause, oneLiner, toCauses, toCharity, toPhotos, toUpdates, type CharityRow } from "../apps/mobile/src/lib/live-charities";
+import { imageUrl, inCause, mergeSaved, savedCharities, oneLiner, toCauses, toCharity, toPhotos, toUpdates, type CharityRow } from "../apps/mobile/src/lib/live-charities";
 
 const base = "https://example.supabase.co";
 const row = (o: Partial<CharityRow> = {}): CharityRow => ({
@@ -50,5 +50,17 @@ describe("live charity directory in the app", () => {
     const [u] = toUpdates([{ id: "u", body_en: "Hello", photo_path: null, created_at: "2026-10-01T08:00:00Z" }], base);
     expect(u).toMatchObject({ body: "Hello", photoUrl: null });
     expect(u.date.toISOString()).toBe("2026-10-01T08:00:00.000Z");
+  });
+});
+
+describe("saved charities", () => {
+  it("joins the phone's list to the account's, newest first, without repeats", () => {
+    expect(mergeSaved(["a", "b"], ["c", "a"])).toEqual(["c", "a", "b"]);
+    expect(mergeSaved([], [])).toEqual([]);
+  });
+
+  it("keeps the saved order and drops charities no longer listed", () => {
+    const list = [toCharity(row({ slug: "x" }), base), toCharity(row({ slug: "y" }), base)];
+    expect(savedCharities(["y", "gone", "x"], list).map((c) => c.slug)).toEqual(["y", "x"]);
   });
 });

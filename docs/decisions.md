@@ -300,3 +300,9 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 - The dashboard asks charities to post only photos they may share and never to show a family who receives help without consent. OPEN for Yosef: whether charity uploads need anything more under POPIA (e.g. a line in the charity agreement).
 - The app now reads the live charity directory (approved charities only) when connected; until then it shows the sample charities. Charities without a cover photo show their initials instead of a placeholder.
 - The target editor says "I give" (maaser, or maaser and chomesh), not "I keep".
+
+## Saved charities (09/10/2026)
+
+- Discover shows every approved charity. The heart on a charity saves it; saved charities show as "Your charities" at the top of Discover and on the Giving tab, newest first, one tap from the charity's Give button.
+- Signed in: saved on the account (the `favourites` table, readable and changeable only by its owner), so they show on any phone. Signed out: saved on the phone and added to the account when the person signs in.
+- Saved charities are already part of "Download my data" and are deleted with the account.

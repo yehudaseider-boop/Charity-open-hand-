@@ -11,7 +11,9 @@ import { EmptyState, ErrorState, LoadingList, SkeletonBlock } from "@/components
 import { Text } from "@/components/text";
 import { useDirectory } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
-import { inCause } from "@/lib/live-charities";
+import { inCause, savedCharities } from "@/lib/live-charities";
+import { useSaved } from "@/lib/saved";
+import { SavedRow } from "@/components/saved-row";
 import { useScreenState } from "@/lib/screen-state";
 import { DayGreeting, SeasonalCard } from "@/components/day-greeting";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
@@ -25,6 +27,7 @@ export default function Discover() {
   // Live: the state comes from loading the directory; preview keeps the design-review states.
   const state = !live ? demoState : directory.data ? "ready" : directory.failed ? "error" : "loading";
   const charities = directory.data?.charities ?? [];
+  const saved = savedCharities(useSaved().slugs, charities);
   const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
   const [query, setQuery] = useState(state === "empty" ? "Bnei Akiva" : "");
   const [cause, setCause] = useState("all");
@@ -66,6 +69,13 @@ export default function Discover() {
         </View>
         <View style={{ marginTop: 14 }}><SeasonalCard /></View>
       </View>
+
+      {saved.length && !query ? (
+        <View style={{ marginTop: space.block, gap: 12 }}>
+          <Text variant="h2" style={{ fontSize: 22, lineHeight: 28, paddingHorizontal: space.gutter }} accessibilityRole="header">Your charities</Text>
+          <SavedRow charities={saved} live={live} />
+        </View>
+      ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} accessibilityRole="tablist">
         {causes.map((c) => {

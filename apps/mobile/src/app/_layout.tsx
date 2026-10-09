@@ -15,6 +15,7 @@ import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PreviewChrome } from "@/components/preview-chrome";
 import { AccountProvider } from "@/lib/account";
+import { SavedProvider } from "@/lib/saved";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync();
@@ -41,6 +42,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AccountProvider>
+      <SavedProvider>
         <PreviewChrome>
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.parchment }, animation: "slide_from_right" }}>
@@ -49,6 +51,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
           </Stack>
         </PreviewChrome>
+      </SavedProvider>
       </AccountProvider>
     </SafeAreaProvider>
   );

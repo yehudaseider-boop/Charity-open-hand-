@@ -14,6 +14,8 @@ import { Status18a } from "@/components/status-18a";
 import { Text } from "@/components/text";
 import { ddmmyyyy } from "@/lib/format";
 import { causeList, useCharity } from "@/lib/directory";
+import { haptic } from "@/lib/haptics";
+import { useSaved } from "@/lib/saved";
 import { colors, radius, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
@@ -22,7 +24,7 @@ export default function CharityDetail() {
   const params = useLocalSearchParams<{ slug: string; sheet?: string; saved?: string }>();
   const { live, charity, failed, retry } = useCharity(params.slug);
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
-  const [saved, setSaved] = useState(params.saved === "1");
+  const savedList = useSaved();
 
   if (charity === undefined) {
     return (
@@ -47,6 +49,7 @@ export default function CharityDetail() {
   }
   const causeLabel = causeList().find((c) => c.id === charity.causeId)?.label;
   const photos = charity.photos ?? [];
+  const saved = savedList.isSaved(charity.slug);
   const updates = charity.updates ?? [];
 
   return (
@@ -123,9 +126,12 @@ export default function CharityDetail() {
           <BackIcon />
         </Pressable>
         <Pressable
-          onPress={() => setSaved((s) => !s)}
+          onPress={() => {
+            haptic.press();
+            savedList.toggle(charity.slug);
+          }}
           accessibilityRole="button"
-          accessibilityLabel={saved ? "Remove from Giving" : "Save to Giving"}
+          accessibilityLabel={saved ? "Remove from your charities" : "Save to your charities"}
           accessibilityState={{ selected: saved }}
           style={styles.round}
         >

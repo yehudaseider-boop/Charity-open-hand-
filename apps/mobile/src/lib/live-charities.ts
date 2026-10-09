@@ -41,6 +41,7 @@ export function oneLiner(text: string | null, max = 90): string {
 export function toCharity(row: CharityRow, base: string): Charity {
   const causeIds = (row.charity_categories ?? []).map((c) => c.category_id);
   return {
+    id: row.id,
     slug: row.slug,
     nameEn: row.name_en,
     nameHe: "",
@@ -74,4 +75,18 @@ export function toUpdates(rows: UpdateRow[], base: string): CharityUpdate[] {
 
 export function inCause(c: Charity, cause: string): boolean {
   return cause === "all" || c.causeId === cause || (c.causeIds ?? []).includes(cause);
+}
+
+/**
+ * Saved charities, newest first, without repeats. Used when someone who saved
+ * charities on this phone signs in: those join the ones already on their account.
+ */
+export function mergeSaved(account: string[], device: string[]): string[] {
+  return [...new Set([...device, ...account])];
+}
+
+/** Saved slugs in order, as charities from the directory (ones no longer listed drop out). */
+export function savedCharities(slugs: string[], directory: Charity[]): Charity[] {
+  const bySlug = new Map(directory.map((c) => [c.slug, c]));
+  return slugs.flatMap((s) => bySlug.get(s) ?? []);
 }

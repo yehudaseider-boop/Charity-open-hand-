@@ -130,3 +130,22 @@ describe("charity photos and updates", () => {
     });
   });
 });
+
+describe("saved charities (favourites)", () => {
+  it("each person sees and changes only their own", async () => {
+    await tx(async () => {
+      await as(ids.donorUser, "aal1");
+      await run("insert into public.favourites (user_id, charity_id) values ($1, $2)", [ids.donorUser, ids.meals]);
+      expect((await run("select count(*)::int as n from public.favourites")).rows[0].n).toBe(1);
+      await refused("insert into public.favourites (user_id, charity_id) values ($1, $2)", [ids.shulAdmin, ids.meals], /row-level security/);
+
+      await as(ids.shulAdmin);
+      expect((await run("select count(*)::int as n from public.favourites")).rows[0].n).toBe(0);
+      await run("delete from public.favourites where user_id = $1", [ids.donorUser]);
+      await as("anon");
+      await refused("select * from public.favourites", [], /permission denied/);
+      await as(ids.donorUser, "aal1");
+      expect((await run("select count(*)::int as n from public.favourites")).rows[0].n).toBe(1);
+    });
+  });
+});

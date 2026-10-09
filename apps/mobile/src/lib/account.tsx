@@ -29,6 +29,7 @@ type Result = { ok: true } | { ok: false; message: string };
 type AccountValue = {
   status: AccountStatus;
   email: string | null;
+  userId: string | null;
   live: Live | null;
   loadError: boolean;
   refreshing: boolean;
@@ -207,6 +208,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     () => ({
       status,
       email: session?.user.email ?? null,
+      userId: session?.user.id ?? null,
       live,
       loadError,
       refreshing,

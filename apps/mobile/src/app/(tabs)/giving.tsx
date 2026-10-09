@@ -22,6 +22,10 @@ import { useAccount } from "@/lib/account";
 import { loadIncome, saveIncome } from "@/lib/income-store";
 import { dateToIso, incomeBetween, isoToDate, owedFromIncome, type Elsewhere, type IncomeEntry } from "@/lib/ledger";
 import { useScreenState } from "@/lib/screen-state";
+import { useDirectory } from "@/lib/directory";
+import { savedCharities } from "@/lib/live-charities";
+import { useSaved } from "@/lib/saved";
+import { SavedRow } from "@/components/saved-row";
 import { loadTarget, saveTarget } from "@/lib/targets";
 import { colors, radius, space, touch, type } from "@/theme/tokens";
 
@@ -59,6 +63,8 @@ export default function Giving() {
   const recurring = preview ? sampleRecurringState : (account.live?.recurring ?? []);
   const [open, setOpen] = useState<Recurring | null>(preview ? (sampleRecurring.find((r) => r.id === p.sheet) ?? null) : null);
 
+  const directory = useDirectory();
+  const savedList = savedCharities(useSaved().slugs, directory.data?.charities ?? []);
   const now = new Date();
   const hYear = hebrewYearFor(now);
   const { start: yearStart, end: yearEndDate } = givingYearRange(hYear);
@@ -351,6 +357,17 @@ export default function Giving() {
                 </View>
               </View>
             ) : null}
+
+            <View style={{ gap: 12 }}>
+              <Text variant="h2" style={styles.heading}>Your charities</Text>
+              {savedList.length ? (
+                <View style={{ marginHorizontal: -space.gutter }}>
+                  <SavedRow charities={savedList} live={directory.live} />
+                </View>
+              ) : (
+                <Text variant="bodyMuted">Tap the heart on a charity to keep it here, ready to give.</Text>
+              )}
+            </View>
 
             <View style={{ gap: 12 }}>
               <Text variant="h2" style={styles.heading}>Monthly donations</Text>
