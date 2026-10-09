@@ -11,7 +11,7 @@ import { Sheet } from "@/components/sheet";
 import { GiveSheet } from "@/components/give-sheet";
 import { EmptyState } from "@/components/states";
 import { Status18a } from "@/components/status-18a";
-import { HebrewText, Text } from "@/components/text";
+import { Text } from "@/components/text";
 import { causes, findCharity } from "@/data/sample";
 import { colors, space, touch } from "@/theme/tokens";
 
@@ -44,7 +44,6 @@ export default function CharityDetail() {
           <View style={styles.arc}><DottedArc size={180} opacity={0.4} /></View>
           {causeLabel ? <Text variant="label" style={{ color: colors.accent }}>{causeLabel}</Text> : null}
           <Text variant="h1" accessibilityRole="header">{charity.nameEn}</Text>
-          <HebrewText variant="h2" style={{ color: colors.muted }}>{charity.nameHe}</HebrewText>
           <View style={{ marginTop: 6 }}><Status18a issues18a={charity.issues18a} /></View>
 
           <View style={styles.paras}>

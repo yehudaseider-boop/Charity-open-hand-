@@ -16,11 +16,9 @@ export function OrganisationForm({ action, charity }: {
 }) {
   return (
     <ActionForm action={action} submitLabel="Save">
-      <TextField name="name_en" label="Name donors will see (English)" required defaultValue={charity.name_en} />
-      <TextField name="name_he" label="Name in Hebrew" hebrew defaultValue={charity.name_he} />
+      <TextField name="name_en" label="Name donors will see" required defaultValue={charity.name_en} />
       <TextField name="legal_name_en" label="Registered legal name" required defaultValue={charity.legal_name_en}
         hint="Exactly as on your NPO or PBO documents. This appears on s18A receipts." />
-      <TextField name="legal_name_he" label="Registered legal name in Hebrew" hebrew defaultValue={charity.legal_name_he} />
       <TextField name="npo_number" label="NPO number" defaultValue={charity.npo_number} hint="For example 123-456 NPO" />
       <TextField name="pbo_number" label="PBO reference number" defaultValue={charity.pbo_number}
         hint="Enter an NPO number, a PBO number, or both." />

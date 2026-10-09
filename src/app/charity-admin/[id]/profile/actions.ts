@@ -28,9 +28,8 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     .from("charities")
     .update({
       name_en: v.name_en,
-      name_he: v.name_he ?? null,
       description_en: v.description_en ?? null,
-      description_he: v.description_he ?? null,
+      funds_use_en: v.funds_use_en ?? null,
       website: v.website ?? null,
     })
     .eq("id", charityId)

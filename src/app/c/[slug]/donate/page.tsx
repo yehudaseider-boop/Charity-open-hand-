@@ -25,7 +25,6 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
       <div>
         <Link href={`/c/${charity.slug}`} className="text-sm text-muted">← {charity.name_en}</Link>
         <h1 className="mt-1 text-xl font-semibold">Give to {charity.name_en}</h1>
-        {charity.name_he ? <p lang="he" dir="rtl" className="text-muted">{charity.name_he}</p> : null}
       </div>
       {charity.acceptingPayments ? (
         <DonateFlow

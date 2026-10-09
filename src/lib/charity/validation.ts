@@ -71,13 +71,8 @@ export const bankSchema = z.object({
 
 export const profileSchema = z.object({
   name_en: required("Display name", 120),
-  name_he: hebrew(120),
   description_en: optional(3000),
-  description_he: z
-    .string()
-    .max(3000)
-    .refine((v) => /[֐-׿]/.test(v), "Use Hebrew letters here, or leave it empty")
-    .optional(),
+  funds_use_en: optional(1500),
   website: z
     .url({ protocol: /^https?$/, error: "Enter a full web address, starting with https://" })
     .optional(),

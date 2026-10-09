@@ -3,12 +3,13 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { BilingualName } from "@/components/bilingual-name";
 import { CharityBadges } from "@/components/charity-badges";
+import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Charities" };
 
-/** Keep only letters (English and Hebrew), digits, spaces and apostrophes. */
+/** Keep only letters, digits, spaces and apostrophes. */
 function cleanQuery(q: unknown): string {
   return typeof q === "string" ? q.replace(/[^\p{L}\p{N}\s']/gu, " ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
 }
@@ -25,13 +26,13 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
   // Row-level security only returns approved charities to the public.
   let query = supabase
     .from("charities")
-    .select("id, slug, name_en, name_he, description_en, logo_path, is_verified, is_s18a, mandate_signed_at, charity_categories(category_id)")
+    .select("id, slug, name_en, description_en, logo_path, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(category_id)")
     .eq("status", "approved")
     .order("name_en");
   if (q) {
     // Quoted so spaces are safe; cleanQuery has already removed quotes and commas.
     const like = `"%${q}%"`;
-    query = query.or(`name_en.ilike.${like},name_he.ilike.${like},legal_name_en.ilike.${like},description_en.ilike.${like}`);
+    query = query.or(`name_en.ilike.${like},legal_name_en.ilike.${like},description_en.ilike.${like},suburb.ilike.${like},city.ilike.${like}`);
   }
   if (category) {
     const { data: links } = await supabase.from("charity_categories").select("charity_id").eq("category_id", category.id);
@@ -55,7 +56,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
           name="q"
           type="search"
           defaultValue={q}
-          placeholder="Search in English or Hebrew"
+          placeholder="Search by name or area"
           className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
         />
         <button className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
@@ -84,10 +85,15 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
               <Link href={`/c/${c.slug}`} className="flex gap-3 rounded-card border border-border bg-surface p-4">
                 {logo ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logo} alt="" className="h-12 w-12 shrink-0 rounded-control border border-border object-cover" />
-                ) : null}
+                  <img src={logo} alt="" className="h-14 w-14 shrink-0 rounded-control border border-border object-cover" />
+                ) : (
+                  <div aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-control bg-brand-soft font-bold text-brand">
+                    {initials(c.name_en)}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
-                  <BilingualName en={c.name_en} he={c.name_he} as="h2" className="font-semibold" />
+                  <BilingualName en={c.name_en} as="h2" className="text-lg font-semibold" />
+                  {c.suburb || c.city ? <p className="text-sm text-muted">{[c.suburb, c.city].filter(Boolean).join(", ")}</p> : null}
                   {c.description_en ? <p className="mt-2 line-clamp-2 text-sm text-muted">{c.description_en}</p> : null}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <CharityBadges charity={c} />

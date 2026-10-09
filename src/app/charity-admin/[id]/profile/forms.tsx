@@ -8,16 +8,17 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
 export function ProfileForm({ action, charity, categories, selected }: {
   action: Action;
-  charity: { name_en: string; name_he: string | null; description_en: string | null; description_he: string | null; website: string | null };
-  categories: { id: string; name_en: string; name_he: string | null }[];
+  charity: { name_en: string; description_en: string | null; funds_use_en: string | null; website: string | null };
+  categories: { id: string; name_en: string }[];
   selected: string[];
 }) {
   return (
     <ActionForm action={action} submitLabel="Save profile">
-      <TextField name="name_en" label="Name (English)" required defaultValue={charity.name_en} />
-      <TextField name="name_he" label="Name (Hebrew)" hebrew defaultValue={charity.name_he} />
-      <TextArea name="description_en" label="About your organisation (English)" defaultValue={charity.description_en} />
-      <TextArea name="description_he" label="About your organisation (Hebrew)" hebrew defaultValue={charity.description_he} />
+      <TextField name="name_en" label="Name" required defaultValue={charity.name_en} />
+      <TextArea name="description_en" label="What you do" defaultValue={charity.description_en}
+        hint="A few sentences donors read first. Who you help and how." />
+      <TextArea name="funds_use_en" label="How donations are used" defaultValue={charity.funds_use_en}
+        hint="What a donation pays for, for example Shabbos parcels for families or a teacher's salary. Specific is best." />
       <TextField name="website" label="Website" type="url" defaultValue={charity.website} hint="For example https://example.org.za" />
       <CheckboxGroup name="category_ids" label="Categories"
         options={categories.map((c) => ({ value: c.id, label: c.name_en }))} defaultValues={selected} />

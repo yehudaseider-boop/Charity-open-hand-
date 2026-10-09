@@ -37,7 +37,7 @@ export default function HowItWorks() {
 
         <View style={styles.promise}>
           <View style={{ marginTop: 3 }}><CheckIcon /></View>
-          <Text style={{ flex: 1, fontSize: 17 }}>The charity receives 100% of your donation. There is no fee. You can choose to add a contribution to NEDIV lev.</Text>
+          <Text style={{ flex: 1, fontSize: 17 }}>NEDIV lev charges no fee on donations. You can choose to add a contribution to NEDIV lev.</Text>
         </View>
 
         <Button label="Find a charity" onPress={() => router.push("/discover")} />

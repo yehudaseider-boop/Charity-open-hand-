@@ -7,6 +7,7 @@ import { Card } from "@/components/card";
 import { CharityBadges } from "@/components/charity-badges";
 import { canIssue18a } from "@/lib/charities";
 import { loadDonatableCharity } from "@/lib/donations/charity";
+import { initials } from "@/lib/charity/initials";
 import { publicImageUrl } from "@/lib/charity/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,7 +16,7 @@ const loadCharity = cache(async (slug: string) => {
   const { data } = await supabase
     .from("charities")
     .select(
-      "id, slug, name_en, name_he, legal_name_en, description_en, description_he, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, is_verified, is_s18a, mandate_signed_at, charity_categories(categories(name_en, name_he))",
+      "id, slug, name_en, legal_name_en, description_en, funds_use_en, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(categories(name_en))",
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -39,6 +40,9 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
     .map((cc) => cc.categories as unknown as { name_en: string } | null)
     .filter((c): c is { name_en: string } => c !== null);
 
+  const area = [charity.suburb, charity.city].filter(Boolean).join(", ");
+  const monogram = initials(charity.name_en);
+
   return (
     <article className="space-y-4">
       <div className="overflow-hidden rounded-card border border-border bg-surface">
@@ -46,19 +50,21 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt="" className="aspect-[3/1] w-full object-cover" />
         ) : (
-          <div className="aspect-[3/1] w-full bg-brand-soft" />
+          <div className="aspect-[3/1] w-full bg-gradient-to-br from-brand-soft to-bg" />
         )}
-        <div className="space-y-3 p-5">
-          <div className="flex items-start gap-3">
+        <div className="space-y-4 p-5">
+          <div className="flex items-end gap-3">
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt="" className="-mt-12 h-16 w-16 shrink-0 rounded-card border-2 border-surface bg-surface object-cover" />
-            ) : null}
-            <div className="min-w-0">
-              <h1 className="text-xl font-semibold">{charity.name_en}</h1>
-              {charity.name_he ? (
-                <p lang="he" dir="rtl" className="text-lg text-muted">{charity.name_he}</p>
-              ) : null}
+              <img src={logo} alt="" className="-mt-14 h-20 w-20 shrink-0 rounded-card border-4 border-surface bg-surface object-cover" />
+            ) : (
+              <div aria-hidden className="-mt-14 flex h-20 w-20 shrink-0 items-center justify-center rounded-card border-4 border-surface bg-brand text-2xl font-bold text-brand-contrast">
+                {monogram}
+              </div>
+            )}
+            <div className="min-w-0 pb-1">
+              <h1 className="text-2xl font-bold leading-tight">{charity.name_en}</h1>
+              {area ? <p className="text-sm text-muted">{area}</p> : null}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -68,7 +74,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
           {accepting ? (
             <Link
               href={`/c/${charity.slug}/donate`}
-              className="block w-full rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast"
+              className="block w-full rounded-control bg-brand px-4 py-3 text-center text-lg font-semibold text-brand-contrast"
             >
               Donate
             </Link>
@@ -77,18 +83,22 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
           )}
           <p className="text-xs text-muted">
             {receipts
-              ? "Donations qualify for an s18A tax receipt, issued in this organisation's name."
-              : "This organisation is not s18A-approved, so donations do not get a tax receipt."}
+              ? "Donations qualify for one annual s18A tax receipt, issued on this organisation's behalf."
+              : "This organisation is not s18A-approved, so donations do not get a tax receipt."}{" "}
+            NEDIV lev charges no fee on donations.
           </p>
         </div>
       </div>
 
-      {charity.description_en || charity.description_he ? (
-        <Card title="About">
-          {charity.description_en ? <p className="whitespace-pre-line text-sm">{charity.description_en}</p> : null}
-          {charity.description_he ? (
-            <p lang="he" dir="rtl" className="mt-3 whitespace-pre-line text-sm">{charity.description_he}</p>
-          ) : null}
+      {charity.description_en ? (
+        <Card title="What they do">
+          <p className="whitespace-pre-line text-[0.95rem] leading-relaxed">{charity.description_en}</p>
+        </Card>
+      ) : null}
+
+      {charity.funds_use_en ? (
+        <Card title="How your donation is used">
+          <p className="whitespace-pre-line text-[0.95rem] leading-relaxed">{charity.funds_use_en}</p>
         </Card>
       ) : null}
 

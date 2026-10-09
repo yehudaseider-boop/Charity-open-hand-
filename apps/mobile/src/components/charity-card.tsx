@@ -4,7 +4,7 @@ import type { Charity } from "@/data/sample";
 import { colors, radius } from "@/theme/tokens";
 import { PlaceholderImage } from "./placeholder-image";
 import { Status18a } from "./status-18a";
-import { HebrewText, Text } from "./text";
+import { Text } from "./text";
 
 /** Component 1: photo-led charity card (4:3 photo). */
 export function CharityCard({ charity, featured = false }: { charity: Charity; featured?: boolean }) {
@@ -16,8 +16,7 @@ export function CharityCard({ charity, featured = false }: { charity: Charity; f
         <View style={styles.featuredText}>
           <Text variant="label" style={{ color: colors.accent }}>Featured</Text>
           <Text variant="h1" style={{ fontSize: 28, lineHeight: 34 }}>{charity.nameEn}</Text>
-          <HebrewText variant="h2" style={{ fontSize: 20, lineHeight: 26, color: colors.muted }}>{charity.nameHe}</HebrewText>
-          <Text variant="bodyMuted">{charity.cause}</Text>
+          <Text variant="bodyMuted">{charity.area} · {charity.cause}</Text>
           <Status18a issues18a={charity.issues18a} />
         </View>
       </Pressable>
@@ -28,7 +27,7 @@ export function CharityCard({ charity, featured = false }: { charity: Charity; f
       <PlaceholderImage subject={charity.photo} compact style={styles.thumb} />
       <View style={styles.rowText}>
         <Text style={styles.name}>{charity.nameEn}</Text>
-        <HebrewText variant="bodyMuted" style={{ fontSize: 16 }}>{charity.nameHe}</HebrewText>
+        <Text variant="label">{charity.area}</Text>
         <Text variant="bodyMuted" numberOfLines={2}>{charity.cause}</Text>
         <Status18a issues18a={charity.issues18a} />
       </View>

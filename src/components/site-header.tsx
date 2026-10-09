@@ -7,8 +7,9 @@ export async function SiteHeader() {
   return (
     <header className="bg-surface border-b border-border">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-        <Link href="/" className="text-lg font-semibold text-brand">
-          {platformConfig.appName}
+        <Link href="/" aria-label={`${platformConfig.appName} home`} className="shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt={platformConfig.appName} width={168} height={28} className="h-7 w-auto" />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
           <Link href="/charities" className="hover:text-brand">Charities</Link>

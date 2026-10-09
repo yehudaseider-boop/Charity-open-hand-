@@ -17,8 +17,6 @@ function Rows({ rows }: { rows: Row[] }) {
   );
 }
 
-const he = (v: string | null) => (v ? <span lang="he" dir="rtl">{v}</span> : null);
-
 export function OrganisationSummary({ c }: {
   c: {
     name_en: string; name_he: string | null; legal_name_en: string; legal_name_he: string | null;
@@ -30,9 +28,7 @@ export function OrganisationSummary({ c }: {
   return (
     <Rows rows={[
       ["Display name", c.name_en],
-      ["Hebrew name", he(c.name_he)],
       ["Legal name", c.legal_name_en],
-      ["Legal name (Hebrew)", he(c.legal_name_he)],
       ["NPO number", c.npo_number],
       ["PBO reference", c.pbo_number],
       ["s18A reference", c.s18a_reference],

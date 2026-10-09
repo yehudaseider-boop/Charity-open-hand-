@@ -54,7 +54,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "…" : "Continue"}
           </button>
         </div>
-        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. {charityName} receives the full amount.</p>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. No NEDIV lev fee.</p>
 
         <div className="space-y-2 rounded-control bg-bg p-3">
           <label className="flex items-start gap-2 text-sm">

@@ -270,3 +270,11 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 - **Income log (for maaser):** stays on the phone only, in its secure storage, never sent to our servers. A tenth of the income logged in the target's period is maaser owed, and a further tenth chomesh if the donor keeps it (same tenths as the target editor). The server's encrypted `maaser_income_entries` table is left unused. Trade-off: no sync between phones, and deleting the app deletes the log. To sync across devices later, income would need to be encrypted before it leaves the phone.
 - **Giving elsewhere** (cash, shul appeals, other charities): saved on the donor's account (`external_giving_entries`, visible only to them) with their own maaser/chomesh/tzedaka choice, and counted towards those totals. Entries are removed by pressing and holding.
 - **Pausing, resuming and cancelling a monthly donation** from the app, through `set_my_recurring_status()`: only the owner, only active-to-paused, paused-to-active, or either to cancelled (cancelled is final). Each change sets `needs_gateway_sync`, and the app says "requested" until the server has told the payment provider. NOT BUILT: the call to the payment provider, and monthly donations themselves (the donation form is once-off only). Both come with the gateway choice. Until then no monthly donation exists to pause.
+
+## Website polish (09/10/2026)
+
+- Website matches the app: logo blue, ink text, soft blue-green page, Archivo font, NEDIV lev logo in the header, app icon as the site icon.
+- English only on the website and in the app: Hebrew names and descriptions are no longer asked for or shown (the database columns stay, unused).
+- Charity pages: cover, logo (or initials), area, "What they do" and a new "How your donation is used" field the charity fills in (`charities.funds_use_en`, public).
+- Home page: welcome, how it works, a few charities, the app.
+- Wording: we say "NEDIV lev charges no fee on donations", never "the charity gets your full donation", until it is decided who bears the payment provider's charge.

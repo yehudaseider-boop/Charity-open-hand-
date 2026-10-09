@@ -56,9 +56,7 @@ export async function saveOrganisation(charityId: string, _prev: FormState, form
     .from("charities")
     .update({
       name_en: v.name_en,
-      name_he: v.name_he ?? null,
       legal_name_en: v.legal_name_en,
-      legal_name_he: v.legal_name_he ?? null,
       npo_number: v.npo_number ?? null,
       pbo_number: v.pbo_number ?? null,
       s18a_reference: v.s18a_reference ?? null,

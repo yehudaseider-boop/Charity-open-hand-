@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { DocumentType } from "./validation";
 
 export const CHARITY_FIELDS =
-  "id, slug, quickgive_code, name_en, name_he, legal_name_en, legal_name_he, description_en, description_he, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, address_line1, address_line2, suburb, city, postal_code, status, rejection_reason, is_verified, verified_at, is_s18a, s18a_confirmed_at, mandate_signed_at, mandate_document_path, gateway, gateway_subaccount_ref, approved_at, created_at, updated_at";
+  "id, slug, quickgive_code, name_en, name_he, legal_name_en, legal_name_he, description_en, description_he, funds_use_en, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, address_line1, address_line2, suburb, city, postal_code, status, rejection_reason, is_verified, verified_at, is_s18a, s18a_confirmed_at, mandate_signed_at, mandate_document_path, gateway, gateway_subaccount_ref, approved_at, created_at, updated_at";
 
 export const PRIVATE_FIELDS =
   "charity_id, contact_name, contact_email, contact_phone, bank_name, bank_account_holder, bank_account_last4, bank_branch_code, bank_verified_at";
