@@ -3,12 +3,14 @@ import { formatPpmAsPercent, formatRand, parseRandToCents, percentToPpm } from "
 
 describe("formatRand", () => {
   it.each([
-    [0, "R0.00"],
+    [0, "R0"],
     [5, "R0.05"],
-    [3_000, "R30.00"],
-    [125_000, "R1 250.00"],
+    [3_000, "R30"],
+    [125_000, "R1 250"],
+    [125_050, "R1 250.50"],
+    [3_050, "R30.50"],
     [123_456_789, "R1 234 567.89"],
-    [-5_000, "-R50.00"],
+    [-5_000, "-R50"],
   ])("%i cents -> %s", (cents, expected) => {
     expect(formatRand(cents)).toBe(expected);
   });

@@ -101,8 +101,8 @@ describe("receipt contents", () => {
 
   it("prints amounts in Rand, escapes everything, and marks drafts", () => {
     const html = buildReceiptHtml({ details: { ...details, donor: { ...details.donor, name: '<script>alert("x")</script>' } }, reference: "LTC-2027-0001", draft: true, platformName: "Nadiv Lev" });
-    expect(html).toContain("R680.00");
-    expect(html).toContain("R180.00");
+    expect(html).toContain("R680");
+    expect(html).toContain("R180");
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("DRAFT, NOT A TAX RECEIPT");
@@ -269,7 +269,7 @@ describe("emailing receipts", () => {
       taxYear: 2027, periodStart: "2026-03-01", periodEnd: "2027-02-28", issuedAt: new Date("2027-03-02T08:00:00Z"),
     });
     const m = buildReceiptEmail({ details, reference: "LTC-2027-0001", siteUrl: "https://example.co.za/", platformName: "Nadiv Lev" });
-    expect(m.text).toContain("Total donated: R680.00");
+    expect(m.text).toContain("Total donated: R680");
     expect(m.text).toContain("https://example.co.za/account");
     expect(m.html).not.toContain("<b>Sarah</b>");
     expect(m.html).toContain("&lt;b&gt;Sarah");

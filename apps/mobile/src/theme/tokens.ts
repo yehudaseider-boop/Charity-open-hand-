@@ -18,6 +18,7 @@ export const colors = {
   accentSoft: "#FBE9E4", // pale coral tint for gentle highlight cards (ink text on it)
   coral: "#E5604B", // the accent: heart, big type, logo dot (3.2:1: large or graphic only)
   honey: "#F2B84B", // highlights and chart accent (indigo on it 7.6:1)
+  honeySoft: "#FBF0D3", // pale honey tint for highlight cards (ink or indigo text on it)
   sage: "#4F8A73", // s18A badge icon and outline, progress (3.7:1: graphics only)
   successText: "#2F6B55", // darker sage for small success text (5.8:1)
   danger: "#A32818", // errors and destructive actions only (6.8:1)

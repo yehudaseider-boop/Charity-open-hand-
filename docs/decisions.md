@@ -355,5 +355,10 @@ Applied the Nadiv Lev brand kit (`NEDIV_lev_brand_kit.pdf`) to the app and the w
 - **Type:** Fraunces 600 for page titles and headlines (20 px and up only), Inter 400, 500 and 600 for everything else, Inter 600 with tabular figures for amounts. Heebo for any Hebrew. Archivo and Assistant are removed.
 - **Logo and icons:** the wordmark with the coral dot (concept 1) and the cream N with the coral dot on indigo (icon A), made from Inter so they can be redrawn at any size. Files: `public/brand/` (SVG, cream, one-colour indigo), `public/logo.png`, the app and favicon PNGs. The final logo files in the kit are still to confirm (kit open decision 1).
 - **s18A badges:** two badges the same shape and size, "s18A receipts" with a sage outline and tick and "No s18A receipt" with a stone outline and dash, both with ink text. "18A" in text is now "s18A".
-- **Kept as they were (your answer):** Rand amounts stay R1 250.00 with cents. The kit's no-cents rule is not applied.
-- **Not done yet:** receipts and emails (still to be restyled), and the kit's open decisions: entity line for footer and receipts, the fee sentence on the donate page, trademark and domain.
+- **Rand:** see the follow-up below.
+- **Not done yet:** the donation confirmation email is still plain text, and the kit's open decisions: entity line for footer and receipts, the fee sentence on the donate page, trademark and domain.
+
+## Rand without cents, and honey (11/10/2026)
+
+- Yehuda reversed the earlier choice: Rand follow the brand kit everywhere (app, website, emails, receipts): `R1 250` and `R30` when the cents are zero, `R34.57` and `R1 250.50` when they are not. One function does it (`formatRand`), so they can't drift apart. CSV exports for spreadsheets keep `1250.00`, which is what a spreadsheet needs. `CLAUDE.md` updated.
+- Honey (#F2B84B) is now used for highlights: the seasonal card on Discover, the "You've given your maaser" message, and the bars in the charity dashboard's monthly chart. Indigo or ink text on it, never coral. A pale honey tint (#FBF0D3) is derived for the card backgrounds.

@@ -4,7 +4,10 @@
 
 const PPM_SCALE = 1_000_000n;
 
-/** Format cents as South African Rand: 125000 -> "R1 250.00". */
+/**
+ * Format cents as South African Rand, as the brand kit writes it: whole Rand
+ * without cents ("R1 250", "R30"), anything with cents shows both ("R34.57", "R1 250.50").
+ */
 export function formatRand(cents: number | bigint): string {
   const value = BigInt(cents);
   const negative = value < 0n;
@@ -12,7 +15,7 @@ export function formatRand(cents: number | bigint): string {
   const rands = (abs / 100n).toString();
   const rem = (abs % 100n).toString().padStart(2, "0");
   const grouped = rands.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return `${negative ? "-" : ""}R${grouped}.${rem}`;
+  return `${negative ? "-" : ""}R${grouped}${rem === "00" ? "" : `.${rem}`}`;
 }
 
 /**

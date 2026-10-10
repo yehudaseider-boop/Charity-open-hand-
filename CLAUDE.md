@@ -5,7 +5,7 @@
 - The build brief is the source of truth; `docs/decisions.md` records changes and open questions.
 - Money is integer cents (bigint) in ZAR. Percentages are integer ppm. Never floats.
 - Fee, VAT, minimum and tax-year values live only in `src/config/platform.ts`.
-- Display: `R1 250.00`, dd/mm/yyyy, SA English, Johannesburg time.
+- Display: `R1 250` and `R30` (no cents when they are zero), `R34.57` when there are cents, dd/mm/yyyy, SA English, Johannesburg time.
 - Never invent a fee or rate. Gateway rates stay null until Yehuda supplies them.
 - Nothing outside the gateway adapter may reference a specific gateway.
 - Every table has row-level security. Money and receipt writes are server-only (service role).

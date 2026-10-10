@@ -14,6 +14,7 @@
   --accent: #c4442f;
   --coral: #e5604b; /* the accent: heart, big type, logo dot */
   --honey: #f2b84b;
+  --honey-soft: #fbf0d3;
   --sage: #4f8a73; /* graphics only */
 
   --bg: #fbf6ec; /* cream */
@@ -41,6 +42,7 @@
   --color-accent: var(--accent);
   --color-coral: var(--coral);
   --color-honey: var(--honey);
+  --color-honey-soft: var(--honey-soft);
   --color-sage: var(--sage);
   --color-bg: var(--bg);
   --color-surface: var(--surface);

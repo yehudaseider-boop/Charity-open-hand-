@@ -263,11 +263,11 @@ export default function Giving() {
                     </Text>
                   </>
                 ) : (
-                  <View style={{ gap: 4 }}>
-                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.successText }}>
+                  <View style={{ gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.honeySoft, borderWidth: 1, borderColor: colors.honey }}>
+                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.indigo }}>
                       You&apos;ve given your {target.chomeshCents ? "maaser and chomesh" : "maaser"} for this {target.period}.
                     </Text>
-                    <Text variant="bodyMuted">Tizku l&apos;mitzvos.</Text>
+                    <Text style={{ fontSize: 16, lineHeight: 24, color: colors.ink }}>Tizku l&apos;mitzvos.</Text>
                   </View>
                 )}
               </View>

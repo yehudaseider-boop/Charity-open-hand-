@@ -39,6 +39,6 @@ function useNow(): Date {
 
 const styles = StyleSheet.create({
   hello: { fontFamily: fonts.bodySemibold, fontSize: 18, color: colors.indigo },
-  card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: colors.hairline },
+  card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.honeySoft, borderWidth: 1, borderColor: colors.honey },
   cardTitle: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.ink },
 });

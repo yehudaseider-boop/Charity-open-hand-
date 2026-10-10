@@ -15,15 +15,15 @@ describe("confirmation email", () => {
   it("shows the donation, reference and no contribution line when there is none", () => {
     const m = confirmationEmail({ ...base, contributionCents: 0 });
     expect(m.subject).toContain("NL-3F9A2C71");
-    expect(m.text).toContain("Donation to Meals Fund: R180.00");
+    expect(m.text).toContain("Donation to Meals Fund: R180");
     expect(m.text).not.toContain("Contribution");
     expect(m.text).toContain("08/10/2026");
   });
 
   it("shows the contribution as its own line", () => {
     const m = confirmationEmail({ ...base, contributionCents: 2_500, totalCents: 20_500 });
-    expect(m.text).toContain("Contribution to Nadiv Lev: R25.00");
-    expect(m.text).toContain("Total paid: R205.00");
+    expect(m.text).toContain("Contribution to Nadiv Lev: R25");
+    expect(m.text).toContain("Total paid: R205");
   });
 });
 
