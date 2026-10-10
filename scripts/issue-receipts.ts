@@ -20,7 +20,7 @@ import { receiptsEnabled } from "../src/config/receipts";
 import { formatDate, taxYearFor } from "../src/lib/dates";
 import { buildReceiptHtml } from "../src/lib/receipts/html";
 import { previewReceipts, runReceiptsJob } from "../src/lib/receipts/issue";
-import { htmlToPdf, loadFontCss } from "../src/lib/receipts/pdf";
+import { htmlToPdf, loadFontCss, loadLogoSvg } from "../src/lib/receipts/pdf";
 import { supabaseReceiptStore } from "../src/lib/receipts/store";
 
 async function main() {
@@ -41,10 +41,11 @@ async function main() {
 
   if (previewDir) {
     const fontCss = loadFontCss();
+    const logoSvg = loadLogoSvg();
     mkdirSync(previewDir, { recursive: true });
     const list = await previewReceipts({ store, taxYear, now });
     for (const r of list) {
-      const html = buildReceiptHtml({ details: r.details, reference: r.reference, draft: true, fontCss, platformName: platformConfig.appName });
+      const html = buildReceiptHtml({ details: r.details, reference: r.reference, draft: true, fontCss, platformName: platformConfig.appName, logoSvg });
       writeFileSync(join(previewDir, `${r.reference}.pdf`), await htmlToPdf(html));
     }
     console.log(`Wrote ${list.length} DRAFT receipts to ${previewDir}. Nothing was issued.`);
@@ -55,6 +56,7 @@ async function main() {
     throw new Error("Receipts are switched off. Set RECEIPTS_ENABLED=yes and RECEIPT_WORDING_CONFIRMED=yes (after the attorney confirms the wording).");
   }
   const fontCss = issue ? loadFontCss() : "";
+  const logoSvg = issue ? loadLogoSvg() : undefined;
   const summary = await runReceiptsJob({
     store,
     taxYear,
@@ -63,7 +65,7 @@ async function main() {
     mode: issue ? "issue" : "dry-run",
     mailer: email ? { transport: getEmailTransport(), siteUrl: process.env.SITE_URL ?? "", platformName: platformConfig.appName } : undefined,
     render: async ({ details, reference }) =>
-      htmlToPdf(buildReceiptHtml({ details, reference, fontCss, platformName: platformConfig.appName })),
+      htmlToPdf(buildReceiptHtml({ details, reference, fontCss, platformName: platformConfig.appName, logoSvg })),
   });
   console.log(JSON.stringify(summary, null, 2));
   if (!issue) console.log(`This was a dry run. Nothing was written. (Current tax year: ${taxYearFor(now)}.)`);

@@ -65,7 +65,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {d.donor_type !== "individual" ? <Badge>{d.donor_type === "company" ? "Company" : "Trust"}</Badge> : null}
-                    {d.wants_18a ? <Badge tone="brand">18A requested</Badge> : null}
+                    {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                     {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
                   </div>
                 </div>

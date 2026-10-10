@@ -3,8 +3,8 @@
  *
  * One receipt per person (donor record plus the s18A identity typed at
  * checkout, so people sharing an email are never merged), per charity, per SARS tax year, covering every paid
- * donation that asked for an 18A receipt. The amount is the donations' gift
- * amounts only, never a contribution to NEDIV lev.
+ * donation that asked for an s18A receipt. The amount is the donations' gift
+ * amounts only, never a contribution to Nadiv Lev.
  */
 
 export type PlanDonation = {

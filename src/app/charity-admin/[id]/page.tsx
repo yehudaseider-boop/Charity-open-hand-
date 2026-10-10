@@ -66,7 +66,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         <Stat label="Donors" value={String(all.donor_count)} note="who have given" />
       </div>
       <p className="text-xs text-muted">
-        Amounts are the donations only. Any contribution a donor chose to add for NEDIV lev is not included.
+        Amounts are the donations only. Any contribution a donor chose to add for Nadiv Lev is not included.
         {" "}{taxYearLabel(taxYear.taxYear)}.
       </p>
 
@@ -108,7 +108,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                     <span>{formatRand(m.amountCents)} <span className="text-muted">({plural(m.donationCount, "donation")})</span></span>
                   </div>
                   <div className="mt-1 h-2 rounded-full bg-bg" aria-hidden>
-                    <div className="h-2 rounded-full bg-brand" style={{ width: `${Math.max(2, Math.round((m.amountCents / max) * 100))}%` }} />
+                    <div className="h-2 rounded-full bg-sage" style={{ width: `${Math.max(2, Math.round((m.amountCents / max) * 100))}%` }} />
                   </div>
                 </li>
               );

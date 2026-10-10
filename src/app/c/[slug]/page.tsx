@@ -66,7 +66,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
               </div>
             )}
             <div className="min-w-0 pb-1">
-              <h1 className="text-2xl font-bold leading-tight">{charity.name_en}</h1>
+              <h1 className="text-2xl font-semibold leading-tight">{charity.name_en}</h1>
               {area ? <p className="text-sm text-muted">{area}</p> : null}
             </div>
           </div>
@@ -88,7 +88,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
             {receipts
               ? "Donations qualify for one annual s18A tax receipt, issued on this organisation's behalf."
               : "This organisation is not s18A-approved, so donations do not get a tax receipt."}{" "}
-            NEDIV lev charges no fee on donations.
+            Nadiv Lev charges no fee on donations.
           </p>
           <Info terms={["s18a"]} label="an s18A receipt" />
         </div>

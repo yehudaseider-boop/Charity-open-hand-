@@ -47,5 +47,5 @@ export function CharityImage({
 const styles = StyleSheet.create({
   box: { backgroundColor: colors.accentSoft, overflow: "hidden" },
   centre: { alignItems: "center", justifyContent: "center" },
-  initials: { fontFamily: fonts.bodySemibold, fontSize: 48, color: colors.accent, letterSpacing: 1 },
+  initials: { fontFamily: fonts.bodySemibold, fontSize: 48, color: colors.indigo, letterSpacing: 1 },
 });

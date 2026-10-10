@@ -28,7 +28,7 @@ import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
 import { confirmThen, notify } from "@/lib/open-site";
 import { loadTarget, saveTarget } from "@/lib/targets";
-import { colors, radius, space, touch, type } from "@/theme/tokens";
+import { colors, fonts, radius, space, tabular, touch, type } from "@/theme/tokens";
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -235,10 +235,10 @@ export default function Giving() {
                 <View style={styles.tzedakaRow}>
                   <Text style={{ flexShrink: 1, fontSize: 16 }}>General tzedaka this {target.period}</Text>
                   <View style={{ flex: 1 }}><InfoButton terms={["generalTzedaka"]} /></View>
-                  <Text style={{ fontSize: 16, fontFamily: "Archivo_600SemiBold" }}>{rand(tzedakaGiven)}</Text>
+                  <Text style={{ fontSize: 16, fontFamily: fonts.bodySemibold }}>{rand(tzedakaGiven)}</Text>
                 </View>
                 {saved ? (
-                  <Text variant="label" style={{ paddingHorizontal: 4, color: colors.success }} accessibilityLiveRegion="polite">
+                  <Text variant="label" style={{ paddingHorizontal: 4, color: colors.successText }} accessibilityLiveRegion="polite">
                     Targets saved.
                   </Text>
                 ) : null}
@@ -264,7 +264,7 @@ export default function Giving() {
                   </>
                 ) : (
                   <View style={{ gap: 4 }}>
-                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: "Archivo_700Bold", color: colors.success }}>
+                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.successText }}>
                       You&apos;ve given your {target.chomeshCents ? "maaser and chomesh" : "maaser"} for this {target.period}.
                     </Text>
                     <Text variant="bodyMuted">Tizku l&apos;mitzvos.</Text>
@@ -294,8 +294,8 @@ export default function Giving() {
                         <Text style={{ fontSize: 17 }}>{rand(maaserGiven)}</Text>
                       </View>
                       <View style={[styles.row, styles.divider]}>
-                        <Text style={{ flex: 1, fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Maaser still to give</Text>
-                        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{rand(Math.max(0, owed.maaserCents - maaserGiven))}</Text>
+                        <Text style={{ flex: 1, fontSize: 17, fontFamily: fonts.bodySemibold }}>Maaser still to give</Text>
+                        <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{rand(Math.max(0, owed.maaserCents - maaserGiven))}</Text>
                       </View>
                       {target.chomeshCents ? (
                         <>
@@ -308,8 +308,8 @@ export default function Giving() {
                             <Text style={{ fontSize: 17 }}>{rand(chomeshGiven)}</Text>
                           </View>
                           <View style={[styles.row, styles.divider]}>
-                            <Text style={{ flex: 1, fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Chomesh still to give</Text>
-                            <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{rand(Math.max(0, owed.chomeshCents - chomeshGiven))}</Text>
+                            <Text style={{ flex: 1, fontSize: 17, fontFamily: fonts.bodySemibold }}>Chomesh still to give</Text>
+                            <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{rand(Math.max(0, owed.chomeshCents - chomeshGiven))}</Text>
                           </View>
                         </>
                       ) : null}
@@ -395,11 +395,11 @@ export default function Giving() {
                 ) : null}
                 <View style={styles.list}>
                   <View style={styles.row}>
-                    <Text style={{ flex: 1, fontSize: 17 }}>With an 18A receipt</Text>
+                    <Text style={{ flex: 1, fontSize: 17 }}>With an s18A receipt</Text>
                     <Text style={{ fontSize: 17 }}>{rand(with18a)}</Text>
                   </View>
                   <View style={[styles.row, styles.divider]}>
-                    <Text style={{ flex: 1, fontSize: 17 }}>Without an 18A receipt</Text>
+                    <Text style={{ flex: 1, fontSize: 17 }}>Without an s18A receipt</Text>
                     <Text style={{ fontSize: 17 }}>{rand(giftsTotal - with18a)}</Text>
                   </View>
                 </View>
@@ -437,7 +437,7 @@ export default function Giving() {
                   {recurring.map((r, i) => (
                     <Pressable key={r.id} onPress={() => setOpen(r)} accessibilityRole="button" accessibilityLabel={`${r.charityName}, ${rand(r.cents)} a month, ${r.status}`} style={[styles.row, i > 0 && styles.divider]}>
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>{r.charityName}</Text>
+                        <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
                           {r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
@@ -464,7 +464,7 @@ export default function Giving() {
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
                             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                              {ddmmyyyy(gift.date)} · {givingKindLabels[gift.kind]}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No 18A"}
+                              {ddmmyyyy(gift.date)} · {givingKindLabels[gift.kind]}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No s18A"}
                             </Text>
                           </View>
                           <Text style={{ fontSize: 17 }}>{rand(gift.cents)}</Text>
@@ -566,7 +566,7 @@ export default function Giving() {
               <DetailRow label="Date" value={ddmmyyyy(openGift.date)} />
               <DetailRow label="Counted as" value={givingKindLabels[openGift.kind]} divider />
               <DetailRow label="Type" value={openGift.monthly ? "Monthly" : "Once-off"} divider />
-              <DetailRow label="18A receipt" value={openGift.with18a ? "Yes" : "No"} divider />
+              <DetailRow label="s18A receipt" value={openGift.with18a ? "Yes" : "No"} divider />
             </View>
             <Button label="Close" onPress={() => setOpenGift(null)} />
           </View>
@@ -580,7 +580,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat} accessibilityLabel={`${label}: ${value}`}>
       <Text variant="label">{label}</Text>
-      <Text style={{ fontSize: 24, lineHeight: 30, fontFamily: "Archivo_800ExtraBold" }}>{value}</Text>
+      <Text style={{ fontSize: 24, lineHeight: 30, ...tabular, color: colors.indigo }}>{value}</Text>
     </View>
   );
 }

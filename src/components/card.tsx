@@ -22,7 +22,7 @@ export function Card({
 
 export function Notice({ tone = "neutral", children }: { tone?: "neutral" | "success" | "warning" | "danger"; children: React.ReactNode }) {
   const cls = {
-    neutral: "bg-brand-soft text-brand",
+    neutral: "bg-brand-soft text-indigo",
     success: "bg-success-soft text-success",
     warning: "bg-warning-soft text-warning",
     danger: "bg-danger-soft text-danger",

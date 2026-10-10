@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "NEDIV lev",
+    "name": "Nadiv Lev",
     "slug": "charity-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#F4FBFA",
+        "backgroundColor": "#1F2A5E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -37,7 +37,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 160,
           "resizeMode": "contain",
-          "backgroundColor": "#F4FBFA"
+          "backgroundColor": "#FBF6EC"
         }
       ],
       "expo-asset",

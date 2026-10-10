@@ -71,7 +71,7 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
 }
 
 const styles = StyleSheet.create({
-  backdrop: { backgroundColor: "rgba(27,43,58,0.35)" },
+  backdrop: { backgroundColor: "rgba(31,42,94,0.35)" },
   anchor: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.surface,

@@ -57,7 +57,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
-        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. No NEDIV lev fee.</p>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. No Nadiv Lev fee.</p>
 
         <div className="space-y-2 rounded-control bg-bg p-3">
           <label className="flex items-start gap-2 text-sm">
@@ -71,11 +71,11 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                 setEditingAmount(true);
               }}
             />
-            <span>Also give to NEDIV lev, to help keep this platform running. Optional.</span>
+            <span>Also give to Nadiv Lev, to help keep this platform running. Optional.</span>
           </label>
           {giveExtra ? (
             <div>
-              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to NEDIV lev</label>
+              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Nadiv Lev</label>
               <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3">
                 <span className="text-muted">R</span>
                 <input
@@ -115,7 +115,7 @@ function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; ch
     <dl className="space-y-1 text-sm">
       <div className="flex justify-between gap-3"><dt>Donation to {charityName}</dt><dd>{formatRand(q.amountCents)}</dd></div>
       {q.contributionCents > 0 ? (
-        <div className="flex justify-between gap-3"><dt>Contribution to NEDIV lev</dt><dd>{formatRand(q.contributionCents)}</dd></div>
+        <div className="flex justify-between gap-3"><dt>Contribution to Nadiv Lev</dt><dd>{formatRand(q.contributionCents)}</dd></div>
       ) : null}
       <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Total</dt><dd>{formatRand(q.totalCents)}</dd></div>
     </dl>
@@ -232,7 +232,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
               </label>
             ))}
           </div>
-          <p className="text-xs text-muted">Counts towards your maaser and chomesh in the NEDIV lev app. Only you see this.</p>
+          <p className="text-xs text-muted">Counts towards your maaser and chomesh in the Nadiv Lev app. Only you see this.</p>
           <Info terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
           {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
         </fieldset>
@@ -249,7 +249,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           </Check>
           <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
             I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my
-            donation. NEDIV lev keeps my maaser, chomesh or tzedaka choice privately, for my own records.
+            donation. Nadiv Lev keeps my maaser, chomesh or tzedaka choice privately, for my own records.
           </Check>
         </div>
 

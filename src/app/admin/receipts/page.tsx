@@ -37,7 +37,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
           <Link
             key={t}
             href={`/admin/receipts?status=${t}`}
-            className={`rounded-full border px-3 py-1.5 ${t === status ? "border-brand bg-brand-soft text-brand" : "border-border"}`}
+            className={`rounded-full border px-3 py-1.5 ${t === status ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
           >
             {t === "issued" ? "Issued" : "Withdrawn"}
           </Link>

@@ -69,9 +69,9 @@ export function ThankYou() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(27,43,58,0.45)", justifyContent: "center", padding: space.gutter },
+  backdrop: { flex: 1, backgroundColor: "rgba(31,42,94,0.45)", justifyContent: "center", padding: space.gutter },
   card: { gap: 16, padding: 24, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center", alignItems: "stretch" },
-  badge: { alignSelf: "center", width: 72, height: 72, borderRadius: 36, backgroundColor: colors.success, alignItems: "center", justifyContent: "center" },
+  badge: { alignSelf: "center", width: 72, height: 72, borderRadius: 36, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },
   body: { fontSize: 17, lineHeight: 25, textAlign: "center", color: colors.ink },
   note: { gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.accentSoft },
 });

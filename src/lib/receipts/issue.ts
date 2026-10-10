@@ -46,7 +46,7 @@ export type JobSummary = {
   emailed: number;
   emailFailed: number;
   skippedByReason: Record<string, number>;
-  /** Paid, 18A-requested donations that could not go on a receipt, for a person to look at. */
+  /** Paid, s18A-requested donations that could not go on a receipt, for a person to look at. */
   needsAttention: Skipped[];
 };
 

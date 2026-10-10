@@ -49,7 +49,7 @@ export function InfoButton({ terms, label }: { terms: GlossaryTerm[]; label?: st
 
 const styles = StyleSheet.create({
   button: { minWidth: touch * 0.6, minHeight: touch * 0.6, alignItems: "center", justifyContent: "center" },
-  backdrop: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(27,43,58,0.45)" },
+  backdrop: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(31,42,94,0.45)" },
   center: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, justifyContent: "center", padding: space.gutter },
   card: { gap: 18, padding: 22, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center" },
 });

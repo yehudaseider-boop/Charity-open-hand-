@@ -15,7 +15,7 @@ export async function startEnrol(): Promise<EnrolState> {
   for (const f of factors?.all ?? []) {
     if (f.factor_type === "totp" && f.status === "unverified") await supabase.auth.mfa.unenroll({ factorId: f.id });
   }
-  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `NEDIV lev ${Date.now()}` });
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `Nadiv Lev ${Date.now()}` });
   if (error || !data) return { error: "We couldn't start the set-up. Please try again." };
   return { factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret };
 }

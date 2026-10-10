@@ -138,7 +138,7 @@ export function FileField({ accept, ...base }: Base & { accept: string }) {
         required={base.required}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : base.hint ? `${id}-hint` : undefined}
-        className="block w-full text-sm file:mr-3 file:rounded-control file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:text-brand"
+        className="block w-full text-sm file:mr-3 file:rounded-control file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:text-indigo"
       />
     </Wrapper>
   );

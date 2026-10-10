@@ -31,7 +31,7 @@ async function charity(over: { s18a?: boolean; mandate?: string | null } = {}) {
   const { id } = await one(
     `insert into public.charities (slug, quickgive_code, name_en, legal_name_en, status, is_s18a, s18a_reference, mandate_signed_at)
      values ($1, $2, 'Test', 'Test NPC', 'approved', $3, $4, $5) returning id`,
-    [`t-${n}-${Date.now()}`, `T${n}${String(Date.now()).slice(-5)}`, over.s18a ?? true, (over.s18a ?? true) ? "18A/1" : null, mandate],
+    [`t-${n}-${Date.now()}`, `T${n}${String(Date.now()).slice(-5)}`, over.s18a ?? true, (over.s18a ?? true) ? "s18A/1" : null, mandate],
   );
   return id as string;
 }

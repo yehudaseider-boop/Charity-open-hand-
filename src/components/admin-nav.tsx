@@ -10,7 +10,7 @@ const tabs = [
   { href: "/admin/requests", label: "Privacy requests" },
 ];
 
-/** Tabs across the top of every NEDIV lev admin page. */
+/** Tabs across the top of every Nadiv Lev admin page. */
 export function AdminNav() {
   const pathname = usePathname();
   return (
@@ -22,7 +22,7 @@ export function AdminNav() {
             key={t.href}
             href={t.href}
             aria-current={active ? "page" : undefined}
-            className={`shrink-0 rounded-full border px-3 py-1.5 ${active ? "border-brand bg-brand-soft text-brand" : "border-border"}`}
+            className={`shrink-0 rounded-full border px-3 py-1.5 ${active ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
           >
             {t.label}
           </Link>

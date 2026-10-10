@@ -13,7 +13,7 @@ export type CheckoutRequest = {
   /**
    * The charity's own account at the gateway, only when this gateway splits
    * payments (see `splitsPayments`). Null means the whole payment settles to
-   * NEDIV lev, which then owes the charity its line.
+   * Nadiv Lev, which then owes the charity its line.
    */
   charityAccountRef: string | null;
   email: string;

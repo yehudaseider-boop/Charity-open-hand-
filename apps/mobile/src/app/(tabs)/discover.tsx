@@ -107,7 +107,7 @@ export default function Discover() {
         ) : state === "error" ? (
           <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => (live ? directory.retry() : router.replace("/discover"))} />
         ) : noneYet ? (
-          <EmptyState title="Charities are on their way" body="The first charities are joining NEDIV lev. Check back soon." />
+          <EmptyState title="Charities are on their way" body="The first charities are joining Nadiv Lev. Check back soon." />
         ) : results.length === 0 ? (
           <EmptyState
             title="No charities found"

@@ -17,18 +17,18 @@ import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/he
 import { useAccount } from "@/lib/account";
 import { saveTarget } from "@/lib/targets";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
-import { colors, radius, space, touch, type } from "@/theme/tokens";
+import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 
 const STEPS = 3;
 
 const how = [
-  { title: "Find a charity here", body: "See what each charity does and whether it issues 18A receipts." },
+  { title: "Find a charity here", body: "See what each charity does and whether it issues s18A receipts." },
   { title: "Give on our website", body: "Tap Give and our website opens. You choose the amount and pay there securely." },
   { title: "It all comes back to the app", body: "Sign in with the email you gave with. Your donations, receipts, maaser and chomesh show up here." },
 ];
 
 /**
- * First open: three short screens (what NEDIV lev is, how giving works, an
+ * First open: three short screens (what Nadiv Lev is, how giving works, an
  * optional maaser target). Skippable, and shown once per phone.
  * `?welcome=1&step=2` shows it again for design review.
  */
@@ -89,7 +89,7 @@ export default function Welcome() {
         <View style={styles.hero}>
           <PlaceholderImage subject="Shabbos table" rounded={false} labelPosition="top" labelOffset={insets.top + 64} style={StyleSheet.absoluteFill} />
           <LinearGradient
-            colors={["rgba(244,251,250,0)", "rgba(244,251,250,0.6)", colors.parchment]}
+            colors={["rgba(251,246,236,0)", "rgba(251,246,236,0.6)", colors.parchment]}
             locations={[0.35, 0.7, 1]}
             style={StyleSheet.absoluteFill}
           />
@@ -139,7 +139,7 @@ export default function Welcome() {
                     <Text style={styles.numberText}>{i + 1}</Text>
                   </View>
                   <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ fontFamily: "Archivo_600SemiBold", fontSize: 18 }}>{s.title}</Text>
+                    <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 18 }}>{s.title}</Text>
                     <Text variant="bodyMuted">{s.body}</Text>
                   </View>
                 </View>
@@ -149,7 +149,7 @@ export default function Welcome() {
               <View style={{ marginTop: 3 }}>
                 <CheckIcon />
               </View>
-              <Text style={{ flex: 1, fontSize: 17 }}>NEDIV lev charges no fee on donations.</Text>
+              <Text style={{ flex: 1, fontSize: 17 }}>Nadiv Lev charges no fee on donations.</Text>
             </View>
             <View style={{ flex: 1 }} />
             <View style={styles.actions}>
@@ -198,6 +198,6 @@ const styles = StyleSheet.create({
   dotOn: { width: 24, backgroundColor: colors.accent },
   step: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
   number: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
-  numberText: { fontFamily: "Archivo_700Bold", fontSize: 17, color: colors.onInk },
+  numberText: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.onInk },
   promise: { flexDirection: "row", gap: 10, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
 });

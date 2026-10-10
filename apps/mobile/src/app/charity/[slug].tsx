@@ -59,12 +59,12 @@ export default function CharityDetail() {
       <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
         <View>
           <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 16 / 9, minHeight: 240 }} />
-          <LinearGradient colors={["rgba(244,251,250,0)", colors.parchment]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={["rgba(251,246,236,0)", colors.parchment]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
         </View>
 
         <View style={styles.body}>
           <View style={styles.arc}><DottedArc size={180} opacity={0.4} /></View>
-          {causeLabel ? <Text variant="label" style={{ color: colors.accent }}>{causeLabel}</Text> : null}
+          {causeLabel ? <Text variant="label" style={{ color: colors.indigo }}>{causeLabel}</Text> : null}
           <Text variant="h1" accessibilityRole="header">{charity.nameEn}</Text>
           <View style={{ marginTop: 6 }}><Status18a issues18a={charity.issues18a} /></View>
 
@@ -114,7 +114,7 @@ export default function CharityDetail() {
           <View style={styles.note}>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
               {charity.issues18a
-                ? `Donations qualify for one annual 18A tax receipt, issued on ${charity.nameEn}'s behalf after the tax year closes.`
+                ? `Donations qualify for one annual s18A tax receipt, issued on ${charity.nameEn}'s behalf after the tax year closes.`
                 : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
             </Text>
           </View>
@@ -172,6 +172,6 @@ const styles = StyleSheet.create({
   note: { marginTop: space.block, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.hairline },
   topBar: { position: "absolute", left: space.gutter, right: space.gutter, flexDirection: "row", justifyContent: "space-between" },
   round: { width: touch, height: touch, borderRadius: touch / 2, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.hairline },
-  roundOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  roundOn: { borderColor: colors.coral, backgroundColor: colors.accentSoft },
   giveBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.gutter, paddingTop: 12, backgroundColor: colors.parchment, borderTopWidth: 1, borderTopColor: colors.hairline },
 });

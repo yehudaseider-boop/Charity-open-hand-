@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, View } from "react-native";
-import { colors, touch } from "@/theme/tokens";
+import { colors, fonts, touch } from "@/theme/tokens";
 import { haptic } from "@/lib/haptics";
 import { Text } from "./text";
 
@@ -47,7 +47,7 @@ export function CheckRow({ label, value, onChange, error }: { label: string; val
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 16, minHeight: touch, paddingVertical: 6 },
-  label: { fontFamily: "Archivo_600SemiBold", fontSize: 17, lineHeight: 23, color: colors.ink },
+  label: { fontFamily: fonts.bodySemibold, fontSize: 17, lineHeight: 23, color: colors.ink },
   track: { width: 50, height: 30, borderRadius: 15, backgroundColor: colors.hairline, padding: 3, justifyContent: "center" },
   trackOn: { backgroundColor: colors.accent },
   knob: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surface },

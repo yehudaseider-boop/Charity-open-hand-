@@ -8,7 +8,7 @@
  */
 
 export const platformConfig = {
-  appName: "NEDIV lev",
+  appName: "Nadiv Lev",
   appTagline: "Give to Johannesburg's Jewish community, simply.",
 
   locale: "en-ZA",
@@ -18,10 +18,10 @@ export const platformConfig = {
   fees: {
     /**
      * No platform fee and no processing fee on donations (Yehuda, 08/10/2026).
-     * The donor may tick a box to give NEDIV lev a separate contribution.
+     * The donor may tick a box to give Nadiv Lev a separate contribution.
      *
      * Who pays the gateway's own charge is NOT decided yet (the charity, out of
-     * its donation, or NEDIV lev). Real payments stay closed until it is; only
+     * its donation, or Nadiv Lev). Real payments stay closed until it is; only
      * the test gateway runs.
      */
     gatewayChargePaidBy: null as "charity" | "nediv_lev" | null,
@@ -35,7 +35,7 @@ export const platformConfig = {
   /** Minimum donation to a charity. Confirmed: R30. */
   minDonationCents: 3_000,
 
-  /** Minimum optional contribution to NEDIV lev, when the box is ticked. Confirmed: R10. */
+  /** Minimum optional contribution to Nadiv Lev, when the box is ticked. Confirmed: R10. */
   minContributionCents: 1_000,
 
   vat: {

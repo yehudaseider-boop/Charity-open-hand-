@@ -33,7 +33,7 @@ export default async function AdminCharitiesPage({ searchParams }: PageProps<"/a
           <Link
             key={t}
             href={`/admin/charities?status=${t}`}
-            className={`shrink-0 rounded-full border px-3 py-1.5 ${t === status ? "border-brand bg-brand-soft text-brand" : "border-border"}`}
+            className={`shrink-0 rounded-full border px-3 py-1.5 ${t === status ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
           >
             {statusLabels[t].label}
           </Link>

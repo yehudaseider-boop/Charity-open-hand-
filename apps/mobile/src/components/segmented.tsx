@@ -3,7 +3,7 @@ import { colors, radius, touch, type } from "@/theme/tokens";
 import { haptic } from "@/lib/haptics";
 import { Text } from "./text";
 
-/** Two or three mutually exclusive options. Selected uses ink. */
+/** Two or three mutually exclusive options. Selected uses indigo. */
 export function Segmented<T extends string>({
   options,
   value,
@@ -41,5 +41,5 @@ export function Segmented<T extends string>({
 const styles = StyleSheet.create({
   track: { flexDirection: "row", borderWidth: 1, borderColor: colors.hairline, borderRadius: radius.control, padding: 4, gap: 4, backgroundColor: colors.parchment },
   option: { flex: 1, minHeight: touch - 4, borderRadius: radius.control - 4, alignItems: "center", justifyContent: "center" },
-  selected: { backgroundColor: colors.ink },
+  selected: { backgroundColor: colors.indigo },
 });

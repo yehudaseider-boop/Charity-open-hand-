@@ -11,7 +11,7 @@ import { GatewayError, type PaymentGateway, type VerifiedTransaction, type Webho
  * marked VERIFY.
  *
  * Split: when the charity has a subaccount, its subaccount receives the
- * donation line and `transaction_charge` (the NEDIV lev contribution) goes to
+ * donation line and `transaction_charge` (the Nadiv Lev contribution) goes to
  * our main account. Whether Paystack splits for South African merchants is an
  * OPEN QUESTION, and so is who bears Paystack's own fee (`bearer`): it depends
  * on who pays the gateway charge, which is not decided. VERIFY in sandbox.

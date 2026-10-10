@@ -21,7 +21,7 @@ export function confirmationEmail(d: {
     `Thank you. Your donation to ${d.charityName} has gone through.`,
     "",
     `Donation to ${d.charityName}: ${formatRand(d.amountCents)}`,
-    ...(d.contributionCents > 0 ? [`Contribution to NEDIV lev: ${formatRand(d.contributionCents)}`] : []),
+    ...(d.contributionCents > 0 ? [`Contribution to Nadiv Lev: ${formatRand(d.contributionCents)}`] : []),
     `Total paid: ${formatRand(d.totalCents)} on ${formatDate(d.paidAt)}`,
     `Reference: ${ref}`,
     "",
@@ -29,9 +29,9 @@ export function confirmationEmail(d: {
       ? "This donation will be on your annual s18A receipt, which we send after the tax year closes at the end of February."
       : "You did not ask for an s18A receipt for this donation.",
     "",
-    "You can see all your donations, and your maaser and chomesh, in the NEDIV lev app. Sign in with this email address.",
+    "You can see all your donations, and your maaser and chomesh, in the Nadiv Lev app. Sign in with this email address.",
     "",
-    "NEDIV lev",
+    "Nadiv Lev",
   ];
   return { subject: `Your donation to ${d.charityName} (${ref})`, text: lines.join("\n") };
 }

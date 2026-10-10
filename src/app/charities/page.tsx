@@ -43,7 +43,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
 
   const nameOf = new Map(categories.map((c) => [c.id, c.name_en]));
   const chip = (active: boolean) =>
-    `shrink-0 rounded-full border px-3 py-1.5 text-sm ${active ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface"}`;
+    `shrink-0 rounded-full border px-3 py-1.5 text-sm ${active ? "border-brand bg-brand-soft text-indigo" : "border-border bg-surface"}`;
 
   return (
     <div className="space-y-4">
@@ -87,7 +87,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={logo} alt="" className="h-14 w-14 shrink-0 rounded-control border border-border object-cover" />
                 ) : (
-                  <div aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-control bg-brand-soft font-bold text-brand">
+                  <div aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-control bg-brand-soft font-bold text-indigo">
                     {initials(c.name_en)}
                   </div>
                 )}

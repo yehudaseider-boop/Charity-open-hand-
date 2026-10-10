@@ -53,7 +53,7 @@ export async function GET() {
   };
 
   const body = {
-    about: "Everything NEDIV lev holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are UTC.",
+    about: "Everything Nadiv Lev holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are UTC.",
     downloaded_at: new Date().toISOString(),
     account: profile.data,
     donor_details: (donors.data ?? []).map(({ id_number_encrypted, tax_reference_encrypted, ...d }) => ({
@@ -82,7 +82,7 @@ export async function GET() {
   return new NextResponse(JSON.stringify(body, null, 2), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="my-nediv-lev-information.json"',
+      "Content-Disposition": 'attachment; filename="my-nadiv-lev-information.json"',
       "Cache-Control": "no-store",
     },
   });

@@ -13,7 +13,7 @@ import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } fr
 const charity: PlanCharity & CharityRow = {
   id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", quickgive_code: "LTC",
   legal_name_en: "Linksfield Torah Learning Centre NPC", legal_name_he: "מרכז לימוד תורה",
-  npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "18A/2026/1",
+  npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "s18A/2026/1",
   address_line1: "1 Test Road", address_line2: null, suburb: "Linksfield", city: "Johannesburg", postal_code: "2192",
 };
 const donor: DonorRow = {
@@ -100,7 +100,7 @@ describe("receipt contents", () => {
   });
 
   it("prints amounts in Rand, escapes everything, and marks drafts", () => {
-    const html = buildReceiptHtml({ details: { ...details, donor: { ...details.donor, name: '<script>alert("x")</script>' } }, reference: "LTC-2027-0001", draft: true, platformName: "NEDIV lev" });
+    const html = buildReceiptHtml({ details: { ...details, donor: { ...details.donor, name: '<script>alert("x")</script>' } }, reference: "LTC-2027-0001", draft: true, platformName: "Nadiv Lev" });
     expect(html).toContain("R680.00");
     expect(html).toContain("R180.00");
     expect(html).not.toContain("<script>");
@@ -108,7 +108,7 @@ describe("receipt contents", () => {
     expect(html).toContain("DRAFT, NOT A TAX RECEIPT");
     expect(html).toContain('lang="he" dir="rtl"');
     expect(html).toContain("•••• 9085");
-    expect(buildReceiptHtml({ details, reference: "LTC-2027-0001", platformName: "NEDIV lev" })).not.toContain("DRAFT");
+    expect(buildReceiptHtml({ details, reference: "LTC-2027-0001", platformName: "Nadiv Lev" })).not.toContain("DRAFT");
     expect(esc(`a&b"c'`)).toBe("a&amp;b&quot;c&#39;");
   });
 });
@@ -197,7 +197,7 @@ describe("emailing receipts", () => {
   const sentTo = () => {
     const sent: EmailMessage[] = [];
     const transport = { name: "test", send: async (m: EmailMessage) => void sent.push(m) };
-    return { sent, mailer: { transport, siteUrl: "https://example.co.za", platformName: "NEDIV lev" } };
+    return { sent, mailer: { transport, siteUrl: "https://example.co.za", platformName: "Nadiv Lev" } };
   };
 
   function setup(donations: PlanDonation[]) {
@@ -252,7 +252,7 @@ describe("emailing receipts", () => {
     const sent: string[] = [];
     let fail = true;
     const transport = { name: "test", send: async (m: EmailMessage) => { if (fail && m.to.includes("r1")) throw new Error("provider down"); sent.push(m.to); } };
-    const mailer = { transport, siteUrl: "https://example.co.za", platformName: "NEDIV lev" };
+    const mailer = { transport, siteUrl: "https://example.co.za", platformName: "Nadiv Lev" };
     const first = await runReceiptsJob({ store, render, ...base, mailer });
     expect(first).toMatchObject({ emailed: 1, emailFailed: 1 });
     expect([...emailed]).toEqual(["r2"]);
@@ -268,7 +268,7 @@ describe("emailing receipts", () => {
       donations: [{ paidAt: "2026-10-01T10:00:00Z", amountCents: 50_000 }, { paidAt: "2026-09-15T10:00:00Z", amountCents: 18_000 }],
       taxYear: 2027, periodStart: "2026-03-01", periodEnd: "2027-02-28", issuedAt: new Date("2027-03-02T08:00:00Z"),
     });
-    const m = buildReceiptEmail({ details, reference: "LTC-2027-0001", siteUrl: "https://example.co.za/", platformName: "NEDIV lev" });
+    const m = buildReceiptEmail({ details, reference: "LTC-2027-0001", siteUrl: "https://example.co.za/", platformName: "Nadiv Lev" });
     expect(m.text).toContain("Total donated: R680.00");
     expect(m.text).toContain("https://example.co.za/account");
     expect(m.html).not.toContain("<b>Sarah</b>");

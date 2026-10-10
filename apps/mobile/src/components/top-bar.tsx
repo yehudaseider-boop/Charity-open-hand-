@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, space, touch } from "@/theme/tokens";
+import { colors, fonts, space, touch } from "@/theme/tokens";
 import { BackIcon } from "./icons";
 import { Text } from "./text";
 
@@ -27,5 +27,5 @@ export function TopBar({ title, fallback = "/discover" }: { title: string; fallb
 const styles = StyleSheet.create({
   bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.gutter - 12, paddingBottom: 4, backgroundColor: colors.parchment },
   back: { width: touch, height: touch, alignItems: "center", justifyContent: "center" },
-  title: { fontFamily: "Archivo_600SemiBold", fontSize: 17, color: colors.ink },
+  title: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.ink },
 });

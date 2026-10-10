@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const steps = [
   { title: "Find a charity", body: "Browse registered charities by name, cause or area." },
-  { title: "Give in a minute", body: `Choose an amount (from ${formatRand(platformConfig.minDonationCents)}) and pay securely. NEDIV lev charges no fee on donations.` },
+  { title: "Give in a minute", body: `Choose an amount (from ${formatRand(platformConfig.minDonationCents)}) and pay securely. Nadiv Lev charges no fee on donations.` },
   { title: "Keep track", body: "Mark each donation as maaser, chomesh or tzedaka. If you ask for one, your s18A receipt comes once a year." },
 ];
 
@@ -25,7 +25,7 @@ export default async function Home() {
   return (
     <div className="space-y-8">
       <section className="rounded-card bg-gradient-to-br from-brand-soft to-surface border border-border p-6 sm:p-8">
-        <h1 className="text-3xl font-bold leading-tight sm:text-4xl">{platformConfig.appTagline}</h1>
+        <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">{platformConfig.appTagline}</h1>
         <p className="mt-3 text-muted">
           Give to registered charities in a few taps, keep your maaser and chomesh in one place, and get your s18A receipts
           without chasing anyone.
@@ -70,7 +70,7 @@ export default async function Home() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={logo} alt="" className="h-12 w-12 shrink-0 rounded-control border border-border object-cover" />
                     ) : (
-                      <div aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control bg-brand-soft font-bold text-brand">
+                      <div aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control bg-brand-soft font-bold text-indigo">
                         {initials(c.name_en)}
                       </div>
                     )}

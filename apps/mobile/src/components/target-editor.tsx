@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { rand } from "@/lib/format";
 import { maaserTargetCents, monthlyToReach } from "@/lib/giving";
 import { parseRandToCents, percentToPpm } from "@shared/money";
-import { colors, radius, type } from "@/theme/tokens";
+import { colors, fonts, radius, type } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
 import { haptic } from "@/lib/haptics";
@@ -127,11 +127,11 @@ export function TargetEditor({
       )}
 
       <View style={styles.result}>
-        <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>
+        <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>
           Maaser: {maaser ? `${rand(maaser)} ${per}` : "R0"}
         </Text>
         {keeps === "both" ? (
-          <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>
+          <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>
             Chomesh: {chomesh ? `${rand(chomesh)} ${per}` : "R0"}
           </Text>
         ) : null}

@@ -39,7 +39,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
-            <div className="flex justify-between gap-3"><dt>Contribution to NEDIV lev</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
+            <div className="flex justify-between gap-3"><dt>Contribution to Nadiv Lev</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
           ) : null}
           <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
           <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>
@@ -55,7 +55,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         ) : null}
         {fromApp ? (
           <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
-            Back to the NEDIV lev app
+            Back to the Nadiv Lev app
           </a>
         ) : null}
         <Link href={`/c/${charity.slug}`} className="mt-3 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>

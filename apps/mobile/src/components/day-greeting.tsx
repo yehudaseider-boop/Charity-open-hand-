@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { dayLine, greeting, seasonalAppeal } from "@/lib/jewish-calendar";
-import { colors, radius } from "@/theme/tokens";
+import { colors, fonts, radius } from "@/theme/tokens";
 import { Text } from "./text";
 
 /** "Good Shabbos" / "Chag sameach" and today's Hebrew date, refreshed while the app is open. */
@@ -38,7 +38,7 @@ function useNow(): Date {
 }
 
 const styles = StyleSheet.create({
-  hello: { fontFamily: "Archivo_700Bold", fontSize: 18, color: colors.accent },
+  hello: { fontFamily: fonts.bodySemibold, fontSize: 18, color: colors.indigo },
   card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: colors.hairline },
-  cardTitle: { fontFamily: "Archivo_700Bold", fontSize: 17, color: colors.ink },
+  cardTitle: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.ink },
 });

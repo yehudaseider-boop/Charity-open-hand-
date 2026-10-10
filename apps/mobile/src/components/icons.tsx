@@ -72,13 +72,13 @@ export function ChevronIcon({ size = 18, color = colors.muted }: IconProps) {
 }
 
 export function HeartIcon({ size = 22, color = colors.ink, filled = false }: IconProps & { filled?: boolean }) {
-  // Saved: filled solid blue, so it's clear at a glance.
+  // Saved: filled solid coral (the brand accent), so it's clear at a glance.
   return (
     <Svg {...base(size)}>
       <Path
         d="M12 19.5s-7.5-4.4-7.5-9.6A4.1 4.1 0 0112 7.6a4.1 4.1 0 017.5 2.3c0 5.2-7.5 9.6-7.5 9.6z"
-        {...stroke(filled ? colors.accent : color)}
-        fill={filled ? colors.accent : "none"}
+        {...stroke(filled ? colors.coral : color)}
+        fill={filled ? colors.coral : "none"}
       />
     </Svg>
   );
@@ -101,7 +101,7 @@ export function DownloadIcon({ size = 20, color = colors.ink }: IconProps) {
   );
 }
 
-export function CheckIcon({ size = 18, color = colors.success }: IconProps) {
+export function CheckIcon({ size = 18, color = colors.sage }: IconProps) {
   return (
     <Svg {...base(size)}>
       <Path d="M5 12.5l4.2 4.2L19 7" {...stroke(color)} />

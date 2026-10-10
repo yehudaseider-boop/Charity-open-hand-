@@ -1,12 +1,6 @@
-import {
-  Archivo_400Regular,
-  Archivo_500Medium,
-  Archivo_600SemiBold,
-  Archivo_700Bold,
-  Archivo_800ExtraBold,
-  Archivo_900Black,
-} from "@expo-google-fonts/archivo";
-import { Assistant_400Regular, Assistant_700Bold } from "@expo-google-fonts/assistant";
+import { Fraunces_600SemiBold } from "@expo-google-fonts/fraunces";
+import { Heebo_400Regular, Heebo_600SemiBold } from "@expo-google-fonts/heebo";
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from "@expo-google-fonts/inter";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -22,16 +16,15 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    Archivo_400Regular,
-    Archivo_500Medium,
-    Archivo_600SemiBold,
-    Archivo_700Bold,
-    Archivo_800ExtraBold,
-    Archivo_900Black,
-    // Archivo has no Hebrew letters: Hebrew text uses Assistant.
-    Assistant_400Regular,
-    Assistant_700Bold,
+    Fraunces_600SemiBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    // Hebrew text (e.g. a charity's Hebrew name) is set in Heebo, beside Inter.
+    Heebo_400Regular,
+    Heebo_600SemiBold,
   });
+
 
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync();

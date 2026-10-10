@@ -16,9 +16,9 @@ import { notify, openSite } from "@/lib/open-site";
 import { useDirectory } from "@/lib/directory";
 import { useScreenState } from "@/lib/screen-state";
 import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
-import { colors, radius, space, touch } from "@/theme/tokens";
+import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
-/** Screen 8: Receipts. Annual 18A receipts, grouped by tax year. */
+/** Screen 8: Receipts. Annual s18A receipts, grouped by tax year. */
 export default function Receipts() {
   const insets = useSafeAreaInsets();
   const account = useAccount();
@@ -43,7 +43,7 @@ export default function Receipts() {
   const myGifts = preview ? gifts : (account.live?.gifts ?? []);
   const years = [...new Set(myReceipts.map((r) => r.taxYear))].sort((a, b) => b - a);
 
-  // Charities in the donor's history that never issue 18A receipts.
+  // Charities in the donor's history that never issue s18A receipts.
   const no18a = empty
     ? []
     : preview
@@ -69,11 +69,11 @@ export default function Receipts() {
           {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
           <View style={styles.notice}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Text style={{ fontSize: 17, fontFamily: "Archivo_600SemiBold" }}>Receipts arrive once a year</Text>
+              <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>Receipts arrive once a year</Text>
               <InfoButton terms={["s18a"]} />
             </View>
             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-              You get one 18A receipt per charity, covering all your donations to it in a tax year (1 March to the end of February). Receipts for this tax year
+              You get one s18A receipt per charity, covering all your donations to it in a tax year (1 March to the end of February). Receipts for this tax year
               come after {currentEnd}.
             </Text>
           </View>
@@ -87,7 +87,7 @@ export default function Receipts() {
             <View style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
               <Text variant="h2" style={{ textAlign: "center" }}>No receipts yet</Text>
               <Text variant="bodyMuted" style={{ textAlign: "center" }}>
-                When you give with an 18A receipt, your first one appears here after the tax year closes.
+                When you give with an s18A receipt, your first one appears here after the tax year closes.
               </Text>
             </View>
           ) : (
@@ -142,7 +142,7 @@ export default function Receipts() {
             <View style={styles.infoRow}>
               <InfoIcon />
               <Text variant="bodyMuted" style={{ flex: 1, fontSize: 16 }}>
-                {no18a.join(", ")} {no18a.length === 1 ? "doesn't" : "don't"} issue 18A receipts, so donations to {no18a.length === 1 ? "it" : "them"} won&apos;t appear here.
+                {no18a.join(", ")} {no18a.length === 1 ? "doesn't" : "don't"} issue s18A receipts, so donations to {no18a.length === 1 ? "it" : "them"} won&apos;t appear here.
               </Text>
             </View>
           ) : null}

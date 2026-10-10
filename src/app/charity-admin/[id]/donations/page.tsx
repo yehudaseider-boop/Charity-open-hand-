@@ -77,7 +77,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
           <Link
             key={f}
             href={href({ status: f })}
-            className={`shrink-0 rounded-full border px-3 py-1.5 ${f === status ? "border-brand bg-brand-soft text-brand" : "border-border"}`}
+            className={`shrink-0 rounded-full border px-3 py-1.5 ${f === status ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
           >
             {f === "all" ? "All" : donationStatus[f].label}
           </Link>
@@ -99,7 +99,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
                       <p className="text-muted">{formatDate(d.paid_at ?? d.created_at)}</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         <Badge tone={s.tone}>{s.label}</Badge>
-                        {d.wants_18a ? <Badge tone="brand">18A requested</Badge> : null}
+                        {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                         {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
                       </div>
                     </div>

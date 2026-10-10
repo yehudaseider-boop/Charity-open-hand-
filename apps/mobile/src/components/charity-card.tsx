@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { Charity } from "@/data/sample";
-import { colors, radius } from "@/theme/tokens";
+import { colors, fonts, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { Status18a } from "./status-18a";
 import { Text } from "./text";
@@ -14,7 +14,7 @@ export function CharityCard({ charity, featured = false, live = false }: { chari
       <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured`} style={styles.featured}>
         <CharityImage charity={charity} live={live} style={{ aspectRatio: 4 / 3, width: "100%" }} />
         <View style={styles.featuredText}>
-          <Text variant="label" style={{ color: colors.accent }}>Featured</Text>
+          <Text variant="label" style={{ color: colors.indigo }}>Featured</Text>
           <Text variant="h1" style={{ fontSize: 28, lineHeight: 34 }}>{charity.nameEn}</Text>
           <Text variant="bodyMuted">{[charity.area, charity.cause].filter(Boolean).join(" · ")}</Text>
           <Status18a issues18a={charity.issues18a} />
@@ -41,5 +41,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 4 },
   thumb: { width: 132, aspectRatio: 4 / 3, borderRadius: radius.control },
   rowText: { flex: 1, gap: 3 },
-  name: { fontFamily: "Archivo_800ExtraBold", fontSize: 20, lineHeight: 25, color: colors.ink },
+  name: { fontFamily: fonts.display, fontSize: 20, lineHeight: 25, color: colors.ink },
 });

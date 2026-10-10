@@ -1,5 +1,5 @@
 const tones = {
-  brand: "bg-brand-soft text-brand",
+  brand: "bg-brand-soft text-indigo",
   success: "bg-success-soft text-success",
   warning: "bg-warning-soft text-warning",
   danger: "bg-danger-soft text-danger",

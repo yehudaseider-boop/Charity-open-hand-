@@ -44,7 +44,7 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   } else {
     if (!v.organisation_name) e.organisation_name = "Enter the registered name";
     if (!v.contact_person) e.contact_person = "Enter a contact person";
-    if (want18a && !v.registration_number) e.registration_number = "Needed for an 18A receipt";
+    if (want18a && !v.registration_number) e.registration_number = "Needed for an s18A receipt";
   }
 
   if (v.phone && !/^(\+27|0)\d{9}$/.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";

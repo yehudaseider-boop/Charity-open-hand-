@@ -22,10 +22,15 @@ export function buildReceiptEmail(args: { details: ReceiptDetails; reference: st
     "",
     `${args.platformName}, on behalf of ${charity}`,
   ].join("\n");
-  const html = `<p>Dear ${esc(greeting)},</p>
-<p>Thank you for your donations to <strong>${esc(charity)}</strong>. Your section 18A receipt for ${esc(d.period)} is attached.</p>
-<p>Receipt number: <strong>${esc(reference)}</strong><br>Total donated: <strong>${esc(formatRand(total))}</strong> (the donations only)</p>
-<p>You can also download it any time from <a href="${esc(account)}">your account</a>.</p>
-<p>${esc(args.platformName)}, on behalf of ${esc(charity)}</p>`;
+  const site = args.siteUrl.replace(/\/$/, "");
+  // White background, indigo text, the wordmark at the top and one deep-coral button.
+  const html = `<div style="background:#ffffff;color:#1f2a5e;font-family:Inter,Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
+<p style="margin:0 0 24px"><img src="${esc(site)}/logo.png" alt="${esc(args.platformName)}" width="150" style="display:block;height:auto;border:0"></p>
+<p style="margin:0 0 16px">Dear ${esc(greeting)},</p>
+<p style="margin:0 0 16px">Thank you for your donations to <strong>${esc(charity)}</strong>. Your section 18A receipt for ${esc(d.period)} is attached.</p>
+<p style="margin:0 0 24px">Receipt number: <strong>${esc(reference)}</strong><br>Total donated: <strong>${esc(formatRand(total))}</strong> (the donations only)</p>
+<p style="margin:0 0 24px"><a href="${esc(account)}" style="display:inline-block;background:#c4442f;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:12px">Download it from your account</a></p>
+<p style="margin:0;color:#6a6e80;font-size:14px">${esc(args.platformName)}, on behalf of ${esc(charity)}</p>
+</div>`;
   return { subject, text, html };
 }

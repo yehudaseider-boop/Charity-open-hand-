@@ -42,7 +42,7 @@ export const recurring: Recurring[] = [
   { id: "r2", charitySlug: "sandton-bikur-cholim", charityName: "Sandton Bikur Cholim", cents: 18_000, nextDate: d(2026, 10, 15), status: "paused" },
 ];
 
-/** Annual 18A receipts already issued (closed tax years only). Amounts are the sum of that year's 18A gifts. */
+/** Annual s18A receipts already issued (closed tax years only). Amounts are the sum of that year's s18A gifts. */
 export type Receipt = { id: string; taxYear: number; charityName: string; number: string; cents: number; issued: Date };
 
 export const receipts: Receipt[] = [

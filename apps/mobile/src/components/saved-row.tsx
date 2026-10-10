@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { Charity } from "@/data/sample";
 import { haptic } from "@/lib/haptics";
-import { colors, space } from "@/theme/tokens";
+import { colors, fonts, space } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { Text } from "./text";
 
@@ -40,5 +40,5 @@ export function SavedRow({ charities, live }: { charities: Charity[]; live: bool
 const styles = StyleSheet.create({
   tile: { width: 148, gap: 8 },
   image: { width: 148, aspectRatio: 4 / 3 },
-  name: { fontFamily: "Archivo_700Bold", fontSize: 16, lineHeight: 21, color: colors.ink },
+  name: { fontFamily: fonts.bodySemibold, fontSize: 16, lineHeight: 21, color: colors.ink },
 });

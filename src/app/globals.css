@@ -1,38 +1,47 @@
 @import "tailwindcss";
 
 /*
- * Design tokens, matching the phone app (apps/mobile/src/theme/tokens.ts):
- * logo blue for buttons, links and selection; ink text; a soft blue-green page.
- * Components use the tokens only.
+ * Nadiv Lev brand kit. Indigo and cream carry the page; deep coral is for
+ * buttons and links; coral and sage are for graphics and large type only
+ * (they fall below 4.5:1 on cream), so small green text uses --success.
+ * Matches the phone app (apps/mobile/src/theme/tokens.ts).
  */
 :root {
-  --brand: #0653b1;
+  --indigo: #1f2a5e;
+  --brand: #c4442f; /* deep coral: buttons and links */
   --brand-contrast: #ffffff;
-  --brand-soft: #e7f0fb;
-  --accent: #0653b1;
+  --brand-soft: #fbe9e4; /* pale coral tint; text on it is ink or indigo */
+  --accent: #c4442f;
+  --coral: #e5604b; /* the accent: heart, big type, logo dot */
+  --honey: #f2b84b;
+  --sage: #4f8a73; /* graphics only */
 
-  --bg: #f4fbfa;
+  --bg: #fbf6ec; /* cream */
   --surface: #ffffff;
-  --text: #1b2b3a;
-  --text-muted: #5b6b78;
-  --border: #d5e6e3;
+  --text: #191c2b; /* ink */
+  --text-muted: #6a6e80; /* stone */
+  --border: #e4dccb;
 
-  --success: #168a66;
-  --success-soft: #e3f4ee;
-  --warning: #8a5a00;
-  --warning-soft: #fbf0d9;
-  --danger: #c23b2a;
-  --danger-soft: #f9e5e2;
+  --success: #2f6b55; /* darker sage, for small text */
+  --success-soft: #e3f0ea;
+  --warning: #7a5200;
+  --warning-soft: #fbf0d3;
+  --danger: #a32818;
+  --danger-soft: #f9e1dc;
 
   --radius: 1rem;
   --radius-sm: 0.75rem;
 }
 
 @theme inline {
+  --color-indigo: var(--indigo);
   --color-brand: var(--brand);
   --color-brand-contrast: var(--brand-contrast);
   --color-brand-soft: var(--brand-soft);
   --color-accent: var(--accent);
+  --color-coral: var(--coral);
+  --color-honey: var(--honey);
+  --color-sage: var(--sage);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-text: var(--text);
@@ -46,7 +55,8 @@
   --color-danger-soft: var(--danger-soft);
   --radius-card: var(--radius);
   --radius-control: var(--radius-sm);
-  --font-sans: var(--font-latin), system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
 }
 
 body {
@@ -56,3 +66,13 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Page titles are Fraunces 600 in indigo (never below 20 px: all are text-xl or larger). Other headings stay Inter. */
+h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--indigo);
+}
+h2,
+h3 {
+  color: var(--indigo);
+}

@@ -1,6 +1,9 @@
 /**
  * The receipt as a printable web page (A4). It is turned into a PDF by
  * headless Chrome, because that handles Hebrew (right to left) correctly.
+ * Layout follows the brand kit: wordmark top left on white, Fraunces for the
+ * title, Inter for every field. The wording and fields come from the charity's
+ * advisers (config/receipts.ts), not from the design.
  * Pure: everything it prints comes from the stored snapshot.
  */
 import { formatRand } from "@/lib/money";
@@ -20,6 +23,8 @@ export function buildReceiptHtml(args: {
   /** @font-face rules (fonts are embedded, so the PDF looks the same everywhere). */
   fontCss?: string;
   platformName: string;
+  /** The wordmark as inline SVG (top left). Without it the platform name is printed as text. */
+  logoSvg?: string;
 }): string {
   const { details: d, reference } = args;
   const total = d.donations.reduce((t, x) => t + x.amount_cents, 0);
@@ -43,23 +48,27 @@ export function buildReceiptHtml(args: {
 ${args.fontCss ?? ""}
 @page { size: A4; margin: 18mm 16mm; }
 * { box-sizing: border-box; }
-body { font-family: "Noto Sans", "Noto Sans Hebrew", sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1b2b3a; margin: 0; }
-h1 { font-size: 20pt; margin: 0 0 2mm; }
-h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: .06em; color: #5b6b78; margin: 7mm 0 1.5mm; }
-.he { font-family: "Noto Sans Hebrew", "Noto Sans", sans-serif; }
-.head { border-bottom: 1px solid #d5e6e3; padding-bottom: 4mm; display: flex; justify-content: space-between; gap: 8mm; }
-.muted { color: #5b6b78; }
+body { font-family: "Inter", "Heebo", sans-serif; font-size: 10.5pt; line-height: 1.45; color: #191c2b; background: #fff; margin: 0; font-variant-numeric: tabular-nums; }
+.brand { margin: 0 0 8mm; }
+.brand svg { height: 9mm; width: auto; display: block; }
+.brand .name { font-weight: 600; font-size: 14pt; color: #1f2a5e; }
+h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 22pt; color: #1f2a5e; margin: 0 0 2mm; }
+h2 { font-size: 10.5pt; font-weight: 600; color: #1f2a5e; margin: 7mm 0 1.5mm; }
+.he { font-family: "Heebo", "Inter", sans-serif; }
+.head { border-bottom: 1px solid #e4dccb; padding-bottom: 4mm; display: flex; justify-content: space-between; gap: 8mm; }
+.muted { color: #6a6e80; }
 .ref { text-align: right; }
 table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
-th, td { padding: 2mm 0; border-bottom: 1px solid #e6efed; text-align: left; }
-th { font-size: 9pt; color: #5b6b78; font-weight: 600; }
+th, td { padding: 2mm 0; border-bottom: 1px solid #efe8d9; text-align: left; }
+th { font-size: 9pt; color: #6a6e80; font-weight: 600; }
 .r { text-align: right; }
-.total td { font-weight: 700; border-top: 1px solid #1b2b3a; border-bottom: 0; }
+.total td { font-weight: 600; border-top: 1px solid #1f2a5e; border-bottom: 0; }
 .statement { margin-top: 7mm; }
-.foot { position: fixed; bottom: 0; left: 0; right: 0; font-size: 8.5pt; color: #5b6b78; }
-${args.draft ? ".draft { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 46pt; font-weight: 700; color: rgba(200, 40, 40, .18); transform: rotate(-24deg); }" : ""}
+.foot { position: fixed; bottom: 0; left: 0; right: 0; font-size: 8.5pt; color: #6a6e80; }
+${args.draft ? ".draft { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 46pt; font-weight: 600; color: rgba(163, 40, 24, .18); transform: rotate(-24deg); }" : ""}
 </style></head><body>
 ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
+<div class="brand">${args.logoSvg ?? `<span class="name">${esc(args.platformName)}</span>`}</div>
 <div class="head">
   <div>
     <h1>${esc(d.wording.title)}</h1>

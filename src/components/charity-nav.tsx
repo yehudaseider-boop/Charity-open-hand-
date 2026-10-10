@@ -27,7 +27,7 @@ export function CharityNav({ id }: { id: string }) {
             key={t.label}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`shrink-0 rounded-full border px-3 py-1.5 ${active ? "border-brand bg-brand-soft text-brand" : "border-border"}`}
+            className={`shrink-0 rounded-full border px-3 py-1.5 ${active ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
           >
             {t.label}
           </Link>

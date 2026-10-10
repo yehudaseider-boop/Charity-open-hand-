@@ -29,7 +29,7 @@ export default function Account() {
   // privacy policy link in the app, and a way to start deleting your account.
   const open = (path: string) => () => openSite(path);
   const support = [
-    { label: "How NEDIV lev works", onPress: () => router.push("/how-it-works") },
+    { label: "How Nadiv Lev works", onPress: () => router.push("/how-it-works") },
     { label: "Privacy Policy", onPress: open("/privacy") },
     { label: "Terms", onPress: open("/terms") },
   ];

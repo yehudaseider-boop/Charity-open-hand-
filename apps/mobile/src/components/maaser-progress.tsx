@@ -12,7 +12,7 @@ function Corner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
     bl: { bottom: 8, left: 8, borderBottomWidth: 1.5, borderLeftWidth: 1.5 },
     br: { bottom: 8, right: 8, borderBottomWidth: 1.5, borderRightWidth: 1.5 },
   }[pos];
-  return <View style={[{ position: "absolute", width: s, height: s, borderColor: colors.accent, opacity: 0.6 }, edge]} />;
+  return <View style={[{ position: "absolute", width: s, height: s, borderColor: colors.indigo, opacity: 0.35 }, edge]} />;
 }
 
 /** Component 3: maaser (or chomesh) progress. Given vs target for the month or the year, one bar, one sentence. */
@@ -65,5 +65,5 @@ const styles = StyleSheet.create({
   block: { padding: 24, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface, gap: 10 },
   figures: { flexDirection: "row", alignItems: "flex-end", gap: 10, flexWrap: "wrap" },
   track: { height: 10, borderRadius: 5, backgroundColor: colors.hairline, overflow: "hidden" },
-  fill: { height: 10, borderRadius: 5, backgroundColor: colors.accent },
+  fill: { height: 10, borderRadius: 5, backgroundColor: colors.sage },
 });

@@ -18,7 +18,7 @@ const row = (o: Partial<CharityRow> = {}): CharityRow => ({
 });
 
 describe("live charity directory in the app", () => {
-  it("maps a charity row, with the website's 18A rule", () => {
+  it("maps a charity row, with the website's s18A rule", () => {
     const c = toCharity(row(), base);
     expect(c).toMatchObject({ slug: "meals", area: "Northcliff, Johannesburg", cause: "Weekly Shabbos parcels for families.", issues18a: true, causeIds: ["food", "medical"] });
     expect(c.coverUrl).toBe(`${base}/storage/v1/object/public/charity-public/c1/cover-a.jpg`);

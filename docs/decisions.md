@@ -203,15 +203,15 @@
 
 ## Donation model and app hand-off (Yehuda, 08/10/2026)
 
-- Name is NEDIV lev everywhere. "Open Hand" is retired.
-- No platform fee and no processing fee. Donors may tick a box to add a contribution to NEDIV lev: any amount, minimum R10, unticked by default. Minimum donation stays R30.
+- Name is Nadiv Lev everywhere. "Open Hand" is retired.
+- No platform fee and no processing fee. Donors may tick a box to add a contribution to Nadiv Lev: any amount, minimum R10, unticked by default. Minimum donation stays R30.
 - The donation and the contribution are separate line items (`amount_cents`, `contribution_cents`), whether or not the gateway splits payments. Charities never see the contribution.
-- OPEN: who pays the gateway's own charge (the charity out of its donation, or NEDIV lev). Real gateways stay closed until decided (`platformConfig.fees.gatewayChargePaidBy`); only the test gateway runs.
+- OPEN: who pays the gateway's own charge (the charity out of its donation, or Nadiv Lev). Real gateways stay closed until decided (`platformConfig.fees.gatewayChargePaidBy`); only the test gateway runs.
 - OPEN: which gateway, and whether it splits payments for South African merchants. Both adapters have `splitsPayments: false` until confirmed.
 - App Store rule: the app never takes payments. It shows no amount to pay, card fields or pay button. "Give on our website" opens the phone's browser on `/c/[slug]/donate`, carrying the donor's maaser, chomesh or tzedaka choice (`?kind=`). Amount fields for maaser targets and calculators in the app are fine: no money moves.
-- The confirmation page shows amount, charity, contribution and reference (`NL-XXXXXXXX`), and a "Back to the NEDIV lev app" link (`nedivlev://giving`; a universal link once we have a domain). In Expo Go the custom link does not open the app; it needs a standalone build.
+- The confirmation page shows amount, charity, contribution and reference (`NL-XXXXXXXX`), and a "Back to the Nadiv Lev app" link (`nedivlev://giving`; a universal link once we have a domain). In Expo Go the custom link does not open the app; it needs a standalone build.
 - Giving history and maaser/chomesh stats come from the server, updated by the webhook. A donor signs into the app with the email they gave with, and every donation under that email appears. (Server side done; app sign-in and live data still to build.)
-- NEDIV lev issues the s18A receipts on the charity's behalf, as built.
+- Nadiv Lev issues the s18A receipts on the charity's behalf, as built.
 - s18A details asked: ID number or income tax number only. Address and phone left out until Yehuda confirms what an s18A receipt must show.
 - Monthly donations: not built yet; needs the gateway's recurring billing.
 
@@ -235,7 +235,7 @@ Who sees what, enforced in the database and tested in `tests/privacy-db.test.ts`
 |---|---|---|
 | The public | Approved charities' public profile | Gateway references, mandate file, rejection reasons, any donor or donation |
 | A donor | Their own donations, giving kind, monthly donations, receipts, maaser records | What was typed at checkout (ID/tax numbers, fingerprints), anything of other donors or charities' private side |
-| A charity admin (with code) | Their own charity; donors who paid them: name, contact, amount, message, 18A yes/no | Fees, NEDIV lev contributions, gateway data, maaser/chomesh choice, any part of ID or tax numbers, other charities, abandoned checkouts |
+| A charity admin (with code) | Their own charity; donors who paid them: name, contact, amount, message, 18A yes/no | Fees, Nadiv Lev contributions, gateway data, maaser/chomesh choice, any part of ID or tax numbers, other charities, abandoned checkouts |
 | A platform admin (with code) | Everything needed to run the platform | Card details (never stored); ID and tax numbers only encrypted |
 | The server only | Gateway events, receipt numbering, rate limits, writes to money and receipts | |
 
@@ -273,11 +273,11 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 
 ## Website polish (09/10/2026)
 
-- Website matches the app: logo blue, ink text, soft blue-green page, Archivo font, NEDIV lev logo in the header, app icon as the site icon.
+- Website matches the app: logo blue, ink text, soft blue-green page, Archivo font, Nadiv Lev logo in the header, app icon as the site icon.
 - English only on the website and in the app: Hebrew names and descriptions are no longer asked for or shown (the database columns stay, unused).
 - Charity pages: cover, logo (or initials), area, "What they do" and a new "How your donation is used" field the charity fills in (`charities.funds_use_en`, public).
 - Home page: welcome, how it works, a few charities, the app.
-- Wording: we say "NEDIV lev charges no fee on donations", never "the charity gets your full donation", until it is decided who bears the payment provider's charge.
+- Wording: we say "Nadiv Lev charges no fee on donations", never "the charity gets your full donation", until it is decided who bears the payment provider's charge.
 
 ## Plain-English explanations (09/10/2026)
 
@@ -289,14 +289,14 @@ To be supplied before going live (`src/config/legal.ts`): company name, registra
 - **Jewish calendar:** the app greets by the day (Good Shabbos, Shavua tov, Chag sameach, Shana tova, Gmar chasima tova, Happy Chanukah, Freilichen Purim) and shows the Hebrew date, using diaspora Yom Tov. Seasonal cards in Elul, before Purim (matanos l'evyonim) and before Pesach (maos chitim). The calendar is our own arithmetic, checked against Hebcal for every day from 2020 to 2035. `isQuietTime()` (Shabbos and Yom Tov, from noon the day before) is ready for when the app sends notifications: none are sent then.
 - **Thank-you moment:** when a new donation reaches the app, it thanks the donor (amount, charity, date, and whether it counts as maaser, chomesh or tzedaka), with the charity's own short thank-you note if it wrote one (`charities.thank_you_en`, up to 300 characters, set on the charity's profile page, public). Which donations were already shown is kept on the phone (ids only), so a thank-you shows once.
 - **Maaser milestone:** when the target is reached the Giving tab says so, with "Tizku l'mitzvos."
-- **First-open welcome:** three short screens (what NEDIV lev is, giving happens on our website, an optional maaser target). Skippable, shown once per phone.
+- **First-open welcome:** three short screens (what Nadiv Lev is, giving happens on our website, an optional maaser target). Skippable, shown once per phone.
 - **Small touches:** gentle vibrations on buttons, choices and tabs; soft fades between tabs; animations switched off when the phone asks for less motion; larger text honoured (big headings capped so they still fit); screen-reader labels checked.
 - **Offline:** the last giving loaded is kept in the phone's secure storage for the signed-in person, so the app opens straight to it and still shows history without signal ("No connection. Showing what was saved on dd/mm/yyyy at hh:mm."). It is deleted when they sign out.
 
 ## Real photos and updates from charities (09/10/2026)
 
 - Charities add up to 12 photos (with an optional caption of up to 120 characters) and post short updates (up to 500 characters, with an optional photo) from a new "Photos and updates" tab in their dashboard. Both are public once the charity is approved, on its website page and in the app.
-- They publish straight away; NEDIV lev admins can remove any. Nothing is edited in place: remove and post again. Who posted is kept for us and never shown publicly.
+- They publish straight away; Nadiv Lev admins can remove any. Nothing is edited in place: remove and post again. Who posted is kept for us and never shown publicly.
 - The dashboard asks charities to post only photos they may share and never to show a family who receives help without consent. OPEN for Yosef: whether charity uploads need anything more under POPIA (e.g. a line in the charity agreement).
 - The app now reads the live charity directory (approved charities only) when connected; until then it shows the sample charities. Charities without a cover photo show their initials instead of a placeholder.
 - The target editor says "I give" (maaser, or maaser and chomesh), not "I keep".
@@ -335,13 +335,25 @@ Still open (need a decision or the payment provider):
 ## Pooled-fund model (10/10/2026), not built yet
 
 Yehuda's direction:
-- **NEDIV lev receives the donations.** Picking a charity is the donor's recommendation of where they'd like the money to go, not a payment to that charity. The Terms will say so.
-- **NEDIV lev distributes** the funds to charities based on what donors recommended.
+- **Nadiv Lev receives the donations.** Picking a charity is the donor's recommendation of where they'd like the money to go, not a payment to that charity. The Terms will say so.
+- **Nadiv Lev distributes** the funds to charities based on what donors recommended.
 - **s18A:** the charity we pay sends an s18A certificate, which we or the charity upload into the app for the donor.
 
 To do (not decided yet):
 1. **s18A per donor or one total?** An s18A receipt is issued to a named donor, so does the charity send one per donor per year (with each donor's name and ID or tax number), or one total? Undecided.
-2. **Who uploads the certificates:** NEDIV lev, the charity, or both. Undecided.
-3. **For Yosef, before building:** if the donor pays NEDIV lev, can the receiving charity legally issue an s18A to that donor, or must NEDIV lev itself be an s18A-approved PBO that issues the receipt? Also: holding and distributing donors' money (trust account, banking, payment provider rules), and how the "recommendation" wording sits with POPIA and consumer law.
+2. **Who uploads the certificates:** Nadiv Lev, the charity, or both. Undecided.
+3. **For Yosef, before building:** if the donor pays Nadiv Lev, can the receiving charity legally issue an s18A to that donor, or must Nadiv Lev itself be an s18A-approved PBO that issues the receipt? Also: holding and distributing donors' money (trust account, banking, payment provider rules), and how the "recommendation" wording sits with POPIA and consumer law.
 4. **App and website wording** would change from "Give to [charity]" to "Recommend [charity]" once this is confirmed.
 5. **Who pays the payment provider's charge.** Still open.
+
+## Brand kit applied (11/10/2026)
+
+Applied the Nadiv Lev brand kit (`NEDIV_lev_brand_kit.pdf`) to the app and the website.
+
+- **Name:** "Nadiv Lev" everywhere (both words capitalised). Replaces "NEDIV lev" in all text, docs and tests. Left as they were, because renaming them would break things without helping anyone: the app's link scheme `nedivlev://`, the keys the phone stores its data under (`nediv-lev.*`), the test accounts (`@nedivlev.test`), package names and the older database migration files.
+- **Colour:** cream pages, white forms, ink text (#191C2B), indigo headlines (#1F2A5E), stone secondary text (#6A6E80). Buttons and links are deep coral (#C4442F). Coral (#E5604B) is the single accent: the saved heart. Sage (#4F8A73) for progress bars and the s18A badge. Honey is defined for highlights but not used yet. Three shades are not in the kit, derived because the kit has none: a warm border (#E4DCCB), a pale coral tint (#FBE9E4) for highlight cards, and a darker sage (#2F6B55) and red (#A32818) for small success and error text, since sage and coral are below 4.5:1 on cream.
+- **Type:** Fraunces 600 for page titles and headlines (20 px and up only), Inter 400, 500 and 600 for everything else, Inter 600 with tabular figures for amounts. Heebo for any Hebrew. Archivo and Assistant are removed.
+- **Logo and icons:** the wordmark with the coral dot (concept 1) and the cream N with the coral dot on indigo (icon A), made from Inter so they can be redrawn at any size. Files: `public/brand/` (SVG, cream, one-colour indigo), `public/logo.png`, the app and favicon PNGs. The final logo files in the kit are still to confirm (kit open decision 1).
+- **s18A badges:** two badges the same shape and size, "s18A receipts" with a sage outline and tick and "No s18A receipt" with a stone outline and dash, both with ink text. "18A" in text is now "s18A".
+- **Kept as they were (your answer):** Rand amounts stay R1 250.00 with cents. The kit's no-cents rule is not applied.
+- **Not done yet:** receipts and emails (still to be restyled), and the kit's open decisions: entity line for footer and receipts, the fee sentence on the donate page, trademark and domain.
