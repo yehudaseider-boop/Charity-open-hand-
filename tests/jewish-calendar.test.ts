@@ -2,9 +2,13 @@
  * The app's Jewish calendar, checked day by day against the Hebcal library
  * (used in tests only) for 2020 to 2035, diaspora.
  */
-import { HDate, HebrewCalendar } from "@hebcal/core";
+import { HDate, HebrewCalendar, Location, Zmanim } from "@hebcal/core";
 import { describe, expect, it } from "vitest";
-import { dayLine, greeting, hebrewDate, isQuietTime, occasion, roshChodesh, seasonalAppeal } from "../apps/mobile/src/lib/jewish-calendar";
+import { dayLine, greeting, hebrewDate, isQuietTime, jewishDay, occasion, roshChodesh, seasonalAppeal, weekAhead } from "../apps/mobile/src/lib/jewish-calendar";
+import { sunset } from "../apps/mobile/src/lib/sun";
+
+// The app runs on South African phones; the sunset checks below depend on it.
+process.env.TZ = "Africa/Johannesburg";
 
 const hebcalMonth: Record<string, string> = {
   Tishrei: "Tishrei", Cheshvan: "Cheshvan", Kislev: "Kislev", Tevet: "Teves", "Sh'vat": "Shevat", Adar: "Adar",
@@ -89,8 +93,61 @@ describe("greeting and seasonal prompts", () => {
   it("keeps quiet on Shabbos and Yom Tov, from Friday midday", () => {
     expect(isQuietTime(new Date(2026, 9, 9, 11))).toBe(false); // Friday morning
     expect(isQuietTime(new Date(2026, 9, 9, 13))).toBe(true); // Friday afternoon
-    expect(isQuietTime(new Date(2026, 9, 10, 20))).toBe(true); // Shabbos
+    expect(isQuietTime(new Date(2026, 9, 10, 18, 30))).toBe(true); // Shabbos, just after sunset
+    expect(isQuietTime(new Date(2026, 9, 10, 19, 0))).toBe(true); // still Shabbos: 72 minutes after sunset (18:12) is 19:24
+    expect(isQuietTime(new Date(2026, 9, 10, 19, 30))).toBe(false); // Shabbos is over
     expect(isQuietTime(new Date(2026, 9, 11, 9))).toBe(false); // Sunday
     expect(isQuietTime(new Date(2026, 8, 21, 9))).toBe(true); // Yom Kippur
+  });
+});
+
+describe("sunset", () => {
+  it("is within three minutes of Hebcal's, every day of 2026 and 2027, in Johannesburg", () => {
+    const place = new Location(-26.2041, 28.0473, false, "Africa/Johannesburg", "Johannesburg", "ZA", undefined, 1753);
+    const wrong: string[] = [];
+    for (let d = new Date(2026, 0, 1); d < new Date(2028, 0, 1); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      const ours = sunset(d).getTime();
+      const theirs = new Zmanim(place, d, false).sunset().getTime();
+      if (Math.abs(ours - theirs) > 3 * 60_000) wrong.push(`${d.toDateString()}: ${(ours - theirs) / 60_000} min`);
+    }
+    expect(wrong.slice(0, 5)).toEqual([]);
+  });
+});
+
+describe("the Jewish day follows the sun", () => {
+  const at = (d: number, h: number, mi = 0) => new Date(2026, 9, d, h, mi); // October 2026; sunset in Johannesburg on the 10th is 18:12
+
+  it("turns over at sunset, not midnight", () => {
+    expect(dayLine(at(10, 17))).toBe("29 Tishrei 5787");
+    expect(dayLine(at(10, 19))).toBe("30 Tishrei 5787 · Rosh Chodesh Cheshvan"); // Saturday night is already Sunday's date
+    expect(jewishDay(at(10, 19)).getDate()).toBe(11);
+  });
+
+  it("wishes a good week only once Shabbos is over", () => {
+    expect(greeting(at(10, 18, 30))).toBe("Good Shabbos"); // after sunset, still Shabbos
+    expect(greeting(at(10, 19, 30))).toBe("Shavua tov");
+    expect(greeting(at(11, 9))).toBe("Shavua tov");
+  });
+
+  it("says where Rosh Chodesh is at, hour by hour", () => {
+    expect(weekAhead(at(9, 12))).toContain("Rosh Chodesh Cheshvan: Sunday and Monday.");
+    expect(weekAhead(at(10, 14))).toEqual(["Rosh Chodesh Cheshvan starts tonight: Sunday and Monday."]);
+    expect(weekAhead(at(10, 21))).toEqual(["Rosh Chodesh Cheshvan starts tonight: Sunday and Monday."]);
+    expect(weekAhead(at(11, 10))).toEqual(["Rosh Chodesh Cheshvan: today and tomorrow."]);
+    expect(weekAhead(at(11, 20))).toEqual(["Rosh Chodesh Cheshvan: tonight and Monday."]);
+    expect(weekAhead(at(12, 10))).toEqual(["Rosh Chodesh Cheshvan: today."]);
+    expect(weekAhead(at(12, 19))).toEqual([]);
+  });
+
+  it("says when Shabbos, Yom Tov and Chanukah are coming", () => {
+    expect(weekAhead(new Date(2026, 9, 9, 12))).toContain("Shabbos starts tonight.");
+    expect(weekAhead(new Date(2026, 8, 11, 12))).toEqual(["Erev Rosh Hashana: today.", "Rosh Hashana starts tonight: Saturday and Sunday."]);
+    expect(weekAhead(new Date(2026, 11, 4, 12))[0]).toBe("Chanukah starts tonight and runs until Saturday.");
+    expect(weekAhead(new Date(2026, 11, 8, 12))).toEqual(["Chanukah: until Saturday."]);
+  });
+
+  it("is quiet while Yom Tov comes in on the evening before", () => {
+    expect(isQuietTime(new Date(2026, 8, 11, 19))).toBe(true); // Erev Rosh Hashana evening
+    expect(isQuietTime(new Date(2026, 8, 13, 19, 30))).toBe(false); // after Rosh Hashana ends on Sunday night
   });
 });

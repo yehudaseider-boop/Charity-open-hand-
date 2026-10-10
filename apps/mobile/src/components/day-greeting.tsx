@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { dayLine, greeting, seasonalAppeal } from "@/lib/jewish-calendar";
+import { dayLine, greeting, seasonalAppeal, weekAhead } from "@/lib/jewish-calendar";
 import { colors, fonts, radius } from "@/theme/tokens";
 import { Text } from "./text";
 
-/** "Good Shabbos" / "Chag sameach" and today's Hebrew date, refreshed while the app is open. */
+/**
+ * "Good Shabbos" / "Chag sameach", today's Hebrew date (it changes at sunset) and
+ * where the week is at ("Rosh Chodesh Cheshvan starts tonight: Sunday and Monday"),
+ * refreshed every minute while the app is open.
+ */
 export function DayGreeting() {
   const now = useNow();
   const hello = greeting(now);
@@ -12,6 +16,9 @@ export function DayGreeting() {
     <View style={{ gap: 2 }} accessibilityRole="text">
       {hello ? <Text style={styles.hello}>{hello}</Text> : null}
       <Text variant="label">{dayLine(now)}</Text>
+      {weekAhead(now).map((line) => (
+        <Text key={line} style={styles.week}>{line}</Text>
+      ))}
     </View>
   );
 }
@@ -38,6 +45,7 @@ function useNow(): Date {
 }
 
 const styles = StyleSheet.create({
+  week: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.indigo, marginTop: 2 },
   hello: { fontFamily: fonts.bodySemibold, fontSize: 18, color: colors.indigo },
   card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.honeySoft, borderWidth: 1, borderColor: colors.honey },
   cardTitle: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.ink },

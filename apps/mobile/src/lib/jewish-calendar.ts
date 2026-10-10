@@ -3,11 +3,15 @@
  * that make the app feel at home: the Hebrew date, Yom Tov and Rosh Chodesh,
  * a greeting that fits the day, and gentle seasonal giving prompts.
  *
- * Diaspora calendar (South Africa). Dates are civil days: the evening before
- * is not split out, so a festival shows on its daytime date.
+ * Diaspora calendar (South Africa). `hebrewDate`, `occasion` and `roshChodesh`
+ * take a civil day and give its daytime. The functions that take "now"
+ * (greeting, dayLine, weekAhead, isQuietTime) follow the real Jewish day: it
+ * turns over at sunset, so on Saturday night it is already Sunday's date, and
+ * a festival or Rosh Chodesh starts the evening before.
  * Checked against the Hebcal library in tests.
  */
 import { hebrewYearFor, roshHashana } from "./hebrew-year";
+import { sunset } from "./sun";
 
 export type HebrewMonth =
   | "Tishrei" | "Cheshvan" | "Kislev" | "Teves" | "Shevat" | "Adar" | "Adar I" | "Adar II"
@@ -109,10 +113,38 @@ export function roshChodesh(d: Date): string | null {
   return null;
 }
 
-/** A greeting for the top of the app, fitting the day and time. */
+const MINUTE = 60_000;
+/**
+ * When Shabbos and Yom Tov end: 72 minutes after sunset. Later than most
+ * communities' nightfall on purpose, so the app never says the week has begun
+ * (or sends a reminder) while anyone is still keeping it.
+ */
+const restEnds = (civil: Date) => new Date(sunset(civil).getTime() + 72 * MINUTE);
+
+/** The civil date of the Jewish day that is running now: tomorrow's date once the sun has set. */
+export function jewishDay(now: Date): Date {
+  const today = midnight(now);
+  return now.getTime() >= sunset(today).getTime() ? new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1) : today;
+}
+
+const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const isRestDay = (d: Date) => d.getDay() === 6 || occasion(d)?.kind === "yomTov" || occasion(d)?.name === "Yom Kippur";
+
+/** True from Shabbos or Yom Tov coming in (sunset) until it is over (see `restEnds`). */
+function inRestPeriod(now: Date): boolean {
+  const today = midnight(now);
+  const begun = now.getTime() >= sunset(today).getTime();
+  // After sunset the next day's rest has begun; before sunset today's rest runs until it ends.
+  if (begun && isRestDay(addDays(today, 1))) return true;
+  if (isRestDay(today)) return !(now.getTime() >= restEnds(today).getTime() && !isRestDay(addDays(today, 1)));
+  return false;
+}
+
+/** A greeting for the top of the app, fitting the Jewish day and the time. */
 export function greeting(now: Date): string {
-  const o = occasion(now);
-  const h = hebrewDate(now);
+  const day = jewishDay(now);
+  const o = occasion(day);
+  const h = hebrewDate(day);
   if (h.month === "Elul" || (h.month === "Tishrei" && h.day <= 2)) return "Shana tova";
   if (h.month === "Tishrei" && h.day <= 10) return "Gmar chasima tova";
   if (o?.name === "Tisha B'Av") return "";
@@ -121,23 +153,82 @@ export function greeting(now: Date): string {
   if (o?.name === "Chanukah") return "Happy Chanukah";
   if (o?.name === "Purim") return "Freilichen Purim";
   const dow = now.getDay();
-  if (dow === 5 || dow === 6) return "Good Shabbos";
-  if (dow === 0 && now.getHours() < 12) return "Shavua tov";
+  // Friday, then all of Shabbos until it is over; then "a good week" until Sunday noon.
+  if (dow === 5 || inRestPeriod(now)) return "Good Shabbos";
+  if ((dow === 6 && now.getTime() >= restEnds(midnight(now)).getTime()) || (dow === 0 && now.getHours() < 12)) return "Shavua tov";
   const hour = now.getHours();
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
-/** The line under the greeting: Hebrew date, and the occasion or Rosh Chodesh. */
+/** The line under the greeting: today's Hebrew date (it changes at sunset), and the occasion or Rosh Chodesh. */
 export function dayLine(now: Date): string {
-  const extra = occasion(now)?.name ?? roshChodesh(now);
-  return [formatHebrewDate(hebrewDate(now)), extra].filter(Boolean).join(" · ");
+  const day = jewishDay(now);
+  const extra = occasion(day)?.name ?? roshChodesh(day);
+  return [formatHebrewDate(hebrewDate(day)), extra].filter(Boolean).join(" · ");
+}
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * Where the Jewish week is at: Rosh Chodesh, a festival or a fast that is on
+ * now or coming in the next few days, in plain words, e.g.
+ * "Rosh Chodesh Cheshvan starts tonight: Sunday and Monday." Empty when
+ * nothing is close. Shabbos itself shows in the greeting, so only
+ * "Shabbos starts tonight" is added, on Friday before sunset.
+ */
+export function weekAhead(now: Date): string[] {
+  const today = midnight(now);
+  const day = jewishDay(now); // the Jewish day running now, by its civil date
+  const night = today.getTime() < day.getTime(); // after sunset: the evening of `day`
+  const nameOf = (c: Date): string | null => occasion(c)?.name ?? roshChodesh(c);
+  // Runs of the same event over the next ten Jewish days, so a long one (Chanukah) is seen whole.
+  const groups: { name: string; days: Date[] }[] = [];
+  for (let i = 0; i < 10; i++) {
+    const c = addDays(day, i);
+    const name = nameOf(c);
+    if (!name) continue;
+    const last = groups[groups.length - 1];
+    if (last && last.name === name && daysBetween(last.days[last.days.length - 1], c) === 1) last.days.push(c);
+    else groups.push({ name, days: [c] });
+  }
+  const lines: string[] = [];
+  for (const g of groups) {
+    const first = g.days[0];
+    const ahead = daysBetween(day, first); // 0 = the running Jewish day
+    if (ahead > 3) continue;
+    const weekday = (c: Date) => WEEKDAYS[c.getDay()];
+    // Already under way: its day before this one had the same name.
+    const continuing = ahead === 0 && nameOf(addDays(day, -1)) === g.name;
+    // Starts this evening: the running day once the sun has set, or tomorrow's while it is still daytime.
+    const startsTonight = !continuing && ((ahead === 0 && night) || (ahead === 1 && !night));
+    const last = g.days[g.days.length - 1];
+    let when: string;
+    if (g.days.length >= 4) {
+      when = `until ${weekday(last)}`;
+    } else {
+      const labels = g.days.map((c) => {
+        const n = daysBetween(day, c);
+        if (startsTonight) return weekday(c);
+        if (n === 0) return night ? (continuing ? "tonight" : weekday(c)) : "today";
+        if (n === 1 && !night) return "tomorrow";
+        return weekday(c);
+      });
+      // Under way and it is now evening: "tonight and Monday".
+      if (continuing && night) labels.splice(1, 0, weekday(first));
+      when = labels.length > 1 ? `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}` : labels[0];
+    }
+    lines.push(startsTonight ? `${g.name} starts tonight${g.days.length >= 4 ? " and runs " : ": "}${when}.` : `${g.name}: ${when}.`);
+  }
+  // Friday before sunset: Shabbos comes in tonight.
+  if (now.getDay() === 5 && !night) lines.push("Shabbos starts tonight.");
+  return lines.slice(0, 2);
 }
 
 export type Appeal = { key: "elul" | "purim" | "pesach"; title: string; body: string };
 
 /** A gentle seasonal giving prompt, in the weeks before Rosh Hashana, Purim and Pesach. */
 export function seasonalAppeal(now: Date): Appeal | null {
-  const h = hebrewDate(now);
+  const h = hebrewDate(jewishDay(now));
   if (h.month === "Elul")
     return { key: "elul", title: "Before Rosh Hashana", body: "Many people give extra tzedaka in Elul, the month before the new year." };
   if (h.month === purimMonth(h) && h.day <= 14)
@@ -148,13 +239,12 @@ export function seasonalAppeal(now: Date): Appeal | null {
 }
 
 /**
- * When the app must not send reminders or notifications: Shabbos and Yom Tov.
- * Without sunset times we stay well clear: from 12:00 on Friday or Erev Yom
- * Tov until the next midnight after it ends. Use it before any notification.
+ * When the app must not send reminders or notifications: Shabbos and Yom Tov,
+ * from sunset when it comes in until 72 minutes after sunset when it ends
+ * (see `restEnds`), and from 12:00 on the day before, to stay well clear.
+ * Use it before any notification.
  */
 export function isQuietTime(now: Date): boolean {
-  const restDay = (d: Date) => d.getDay() === 6 || occasion(d)?.kind === "yomTov" || occasion(d)?.name === "Yom Kippur";
-  if (restDay(now)) return true;
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  return restDay(tomorrow) && now.getHours() >= 12;
+  if (inRestPeriod(now)) return true;
+  return isRestDay(addDays(midnight(now), 1)) && now.getHours() >= 12;
 }
