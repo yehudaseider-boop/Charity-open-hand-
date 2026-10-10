@@ -320,10 +320,18 @@ Still open (need a decision or the payment provider):
 - Refunds and chargebacks from the provider are recorded but not yet acted on (status and receipt). Built with the gateway choice.
 - If a charity loses s18A status, do donations made while it had it still get receipts? (Today: no.)
 - Should an approved charity's name change need our review?
-- Income log, targets and saved charities (signed out) belong to the phone, not the person: on a shared phone the next person sees them. Keep, or clear on sign-out?
 - Dates use the phone's time zone; a donor abroad could see a donation on the previous day.
 - On iPhone, the Keychain keeps sign-in and income after the app is deleted.
 
 ## Expo Go preview link (09/10/2026)
 
 - One permanent link for the preview: `exp://u.expo.dev/bb247170-f27b-4771-b143-41f5098c06bc?channel-name=preview`. It follows the "preview" channel (linked to the "preview" branch), so Expo Go loads the newest published update instead of a fixed one. No new QR code per update.
+
+## Everyone has their own records on a shared phone (10/10/2026)
+
+- Yehuda: "everyone must have their own". The income log and maaser/chomesh targets are now kept per signed-in person on the phone; nobody sees anyone else's. Saved charities already live on each person's account.
+- Anything set up before signing in goes to the first person who signs in on that phone (and only them), so a new user doesn't lose it.
+
+## OPEN: a pooled-fund model (10/10/2026)
+
+Yehuda described a different flow: NEDIV lev collects the funds, then chooses which charity they go to; that charity sends an s18A certificate, which we (or the charity) upload into the app. To clarify before building (see chat).

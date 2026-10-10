@@ -1,12 +1,12 @@
 import type { Target } from "@/components/target-editor";
-import { secureStorage } from "./secure-storage";
+import { loadOwned, saveOwned } from "./owned-storage";
 
-/** The donor's maaser and chomesh targets, kept on this phone only. */
+/** The donor's maaser and chomesh targets, kept on this phone only, one set per person. */
 const KEY = "nediv-lev.maaser-target";
 
-export async function loadTarget(): Promise<Target | null> {
+export async function loadTarget(userId: string | null): Promise<Target | null> {
   try {
-    const raw = await secureStorage.getItem(KEY);
+    const raw = await loadOwned(KEY, userId);
     if (!raw) return null;
     const t = JSON.parse(raw) as Target;
     const okCents = (v: unknown) => Number.isSafeInteger(v) && (v as number) > 0;
@@ -17,9 +17,9 @@ export async function loadTarget(): Promise<Target | null> {
   }
 }
 
-export async function saveTarget(t: Target): Promise<void> {
+export async function saveTarget(t: Target, userId: string | null): Promise<void> {
   try {
-    await secureStorage.setItem(KEY, JSON.stringify(t));
+    await saveOwned(KEY, userId, JSON.stringify(t));
   } catch {
     // Not saved: the targets still work until the app is closed.
   }

@@ -53,26 +53,33 @@ export default function Giving() {
   const newDonor = preview ? demoState === "empty" : !signedIn;
   const [target, setTarget] = useState<Target | null>(!preview || newDonor || p.demo === "first" ? null : sampleMaaserTarget);
   // Targets are personal and stay on this phone (in its secure storage), never on our servers.
+  // Each person has their own targets and income log on the phone; wait until we know who it is.
+  const owner = signedIn ? account.userId : null;
+  const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   const [targetLoaded, setTargetLoaded] = useState(preview);
   useEffect(() => {
-    if (preview) return;
+    if (preview || !ownerKnown) return;
     let live = true;
-    loadTarget().then((t) => {
+    setTargetLoaded(false);
+    setTarget(null);
+    loadTarget(owner).then((t) => {
       if (!live) return;
-      if (t) setTarget(t);
+      setTarget(t);
       setTargetLoaded(true);
     });
     return () => {
       live = false;
     };
-  }, [preview]);
+  }, [preview, ownerKnown, owner]);
   // Income (for maaser) stays on this phone only. Nothing is logged until the saved log has loaded.
   const [income, setIncome] = useState<IncomeEntry[]>([]);
   const [incomeLoaded, setIncomeLoaded] = useState(preview);
   useEffect(() => {
-    if (preview) return;
+    if (preview || !ownerKnown) return;
     let live = true;
-    loadIncome().then((rows) => {
+    setIncomeLoaded(false);
+    setIncome([]);
+    loadIncome(owner).then((rows) => {
       if (!live) return;
       setIncome(rows);
       setIncomeLoaded(true);
@@ -80,7 +87,7 @@ export default function Giving() {
     return () => {
       live = false;
     };
-  }, [preview]);
+  }, [preview, ownerKnown, owner]);
   const [busy, setBusy] = useState(false);
   const [previewElsewhere, setPreviewElsewhere] = useState<Elsewhere[]>(newDonor ? [] : sampleElsewhere);
   const [logging, setLogging] = useState<"income" | "elsewhere" | null>(null);
@@ -138,13 +145,13 @@ export default function Giving() {
     if (!incomeLoaded) return;
     const next = [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...e }, ...income].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     setIncome(next);
-    saveIncome(next);
+    saveIncome(next, owner);
     setLogging(null);
   };
   const removeIncome = (id: string) => {
     const next = income.filter((e) => e.id !== id);
     setIncome(next);
-    saveIncome(next);
+    saveIncome(next, owner);
   };
   const confirmRemove = (what: string, go: () => void) => confirmThen(`Remove this ${what}?`, "This can't be undone.", "Remove", go);
   const removeElsewhereEntry = (id: string) => {
@@ -213,7 +220,7 @@ export default function Giving() {
                 monthsLeft={monthsLeft}
                 onSave={(t) => {
                   setTarget(t);
-                  if (!preview) saveTarget(t);
+                  if (!preview) saveTarget(t, owner);
                   setEditing(false);
                   setSaved(true);
                 }}

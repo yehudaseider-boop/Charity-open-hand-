@@ -14,6 +14,7 @@ import { Text } from "@/components/text";
 import { ddmmyyyy } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
+import { useAccount } from "@/lib/account";
 import { saveTarget } from "@/lib/targets";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
 import { colors, radius, space, touch, type } from "@/theme/tokens";
@@ -33,6 +34,7 @@ const how = [
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
+  const account = useAccount();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
   const forced = p.welcome === "1";
   const [seen, setSeen] = useState<boolean | null>(forced ? false : null);
@@ -168,7 +170,7 @@ export default function Welcome() {
               monthsLeft={monthsLeftInGivingYear(now, hYear)}
               onSave={(t) => {
                 haptic.success();
-                saveTarget(t);
+                saveTarget(t, account.status === "signed-in" ? account.userId : null);
                 finish();
               }}
               onCancel={finish}
