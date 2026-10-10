@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens, matching the phone app (apps/mobile/src/theme/tokens.ts):
+ * logo blue for buttons, links and selection; ink text; a soft blue-green page.
+ * Components use the tokens only.
+ */
+:root {
+  --brand: #0653b1;
+  --brand-contrast: #ffffff;
+  --brand-soft: #e7f0fb;
+  --accent: #0653b1;
+
+  --bg: #f4fbfa;
+  --surface: #ffffff;
+  --text: #1b2b3a;
+  --text-muted: #5b6b78;
+  --border: #d5e6e3;
+
+  --success: #168a66;
+  --success-soft: #e3f4ee;
+  --warning: #8a5a00;
+  --warning-soft: #fbf0d9;
+  --danger: #c23b2a;
+  --danger-soft: #f9e5e2;
+
+  --radius: 1rem;
+  --radius-sm: 0.75rem;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --radius-card: var(--radius);
+  --radius-control: var(--radius-sm);
+  --font-sans: var(--font-latin), system-ui, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  /* Long words or references wrap instead of pushing the page sideways on a phone. */
+  overflow-wrap: anywhere;
+}
+

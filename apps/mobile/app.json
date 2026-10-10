@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "NEDIV lev",
+    "slug": "charity-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "za.co.givingapp.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F4FBFA",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "za.co.givingapp.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#F4FBFA"
+        }
+      ],
+      "expo-asset",
+      "expo-secure-store"
+    ],
+    "scheme": "nedivlev",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bb247170-f27b-4771-b143-41f5098c06bc"
+      }
+    },
+    "owner": "yehudaleib",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/bb247170-f27b-4771-b143-41f5098c06bc"
+    }
+  }
+}

@@ -1,0 +1,268 @@
+"use client";
+
+import { startTransition, useActionState, useState } from "react";
+import { FormStateProvider } from "@/components/forms/action-form";
+import { Info } from "@/components/info";
+import { TermsAndPrivacyLinks } from "@/components/legal";
+import { TextArea, TextField } from "@/components/forms/fields";
+import { givingKinds } from "@/lib/donations/validation";
+import { formatRand } from "@/lib/money";
+import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
+
+type Props = {
+  slug: string;
+  charityName: string;
+  receiptsAvailable: boolean;
+  minimumLabel: string;
+  contributionMinimumLabel: string;
+  initialKind?: keyof typeof givingKinds;
+  /** The donor came from the phone app, so the confirmation offers a way back to it. */
+  fromApp: boolean;
+};
+
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind, fromApp }: Props) {
+  const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
+  const [editingAmount, setEditingAmount] = useState(true);
+  const [giveExtra, setGiveExtra] = useState(false);
+  // The details form stays on screen (and keeps what the donor typed) while they
+  // change the amount; it just can't be paid until the new amount is confirmed.
+  const quote = quoteState.ok ? quoteState.quote : undefined;
+
+  return (
+    <div className="space-y-4">
+      <form
+        className="space-y-3 rounded-card border border-border bg-surface p-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          setEditingAmount(false);
+          startTransition(() => requestQuote(fd));
+        }}
+      >
+        <label htmlFor="amount" className="block text-sm font-medium">How much would you like to give?</label>
+        <div className="flex gap-2">
+          <div className="flex min-w-0 flex-1 items-center rounded-control border border-border bg-surface px-3">
+            <span className="text-muted">R</span>
+            <input
+              id="amount"
+              name="amount"
+              inputMode="decimal"
+              autoComplete="off"
+              required
+              onChange={() => setEditingAmount(true)}
+              className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
+            />
+          </div>
+          <button disabled={quoting} className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60">
+            {quoting ? "Checking…" : "Continue"}
+          </button>
+        </div>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. No NEDIV lev fee.</p>
+
+        <div className="space-y-2 rounded-control bg-bg p-3">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="give_extra"
+              className="mt-1"
+              checked={giveExtra}
+              onChange={(e) => {
+                setGiveExtra(e.target.checked);
+                setEditingAmount(true);
+              }}
+            />
+            <span>Also give to NEDIV lev, to help keep this platform running. Optional.</span>
+          </label>
+          {giveExtra ? (
+            <div>
+              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to NEDIV lev</label>
+              <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3">
+                <span className="text-muted">R</span>
+                <input
+                  id="contribution"
+                  name="contribution"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  required
+                  onChange={() => setEditingAmount(true)}
+                  className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted">Any amount, minimum {contributionMinimumLabel}. Paid together with your donation, kept separate from it.</p>
+            </div>
+          ) : null}
+        </div>
+        {!quoteState.ok && quoteState.message ? <p role="status" className="text-sm text-danger">{quoteState.message}</p> : null}
+      </form>
+
+      {quote ? (
+        <DetailsStep
+          stale={editingAmount}
+          quote={quote}
+          slug={slug}
+          charityName={charityName}
+          receiptsAvailable={receiptsAvailable}
+          initialKind={initialKind}
+          fromApp={fromApp}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; charityName: string }) {
+  return (
+    <dl className="space-y-1 text-sm">
+      <div className="flex justify-between gap-3"><dt>Donation to {charityName}</dt><dd>{formatRand(q.amountCents)}</dd></div>
+      {q.contributionCents > 0 ? (
+        <div className="flex justify-between gap-3"><dt>Contribution to NEDIV lev</dt><dd>{formatRand(q.contributionCents)}</dd></div>
+      ) : null}
+      <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Total</dt><dd>{formatRand(q.totalCents)}</dd></div>
+    </dl>
+  );
+}
+
+function Check({ name, children, error }: { name: string; children: React.ReactNode; error?: string }) {
+  const [checked, setChecked] = useState(false);
+  return (
+    <div>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" name={name} className="mt-1" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+        <span>{children}</span>
+      </label>
+      {error && !checked ? <p className="ml-6 text-xs text-danger">{error}</p> : null}
+    </div>
+  );
+}
+
+function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialKind, fromApp }: {
+  slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
+  initialKind?: keyof typeof givingKinds; fromApp: boolean;
+}) {
+  // A new amount from the form above replaces the shown one; so does a corrected one from the server.
+  const [shownQuote, setShownQuote] = useState(quote);
+  const [lastQuote, setLastQuote] = useState(quote);
+  if (quote !== lastQuote) {
+    setLastQuote(quote);
+    setShownQuote(quote);
+  }
+  const [state, dispatch, pending] = useActionState(
+    async (prev: CheckoutState, fd: FormData) => {
+      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, prev, fd);
+      if (next.quote) setShownQuote(next.quote);
+      return next;
+    },
+    { ok: false } as CheckoutState,
+  );
+  const [donorType, setDonorType] = useState<"individual" | "company" | "trust">("individual");
+  const [want18a, setWant18a] = useState(false);
+  const org = donorType !== "individual";
+
+  return (
+    <FormStateProvider state={state}>
+      <form
+        className="space-y-4 rounded-card border border-border bg-surface p-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          startTransition(() => dispatch(fd));
+        }}
+      >
+        <Breakdown q={shownQuote} charityName={charityName} />
+
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Giving as</legend>
+          <div className="flex flex-wrap gap-2">
+            {(["individual", "company", "trust"] as const).map((t) => (
+              <label key={t} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
+                <input type="radio" name="donor_type" value={t} checked={donorType === t} onChange={() => setDonorType(t)} />
+                {t === "individual" ? "Myself" : t === "company" ? "A company" : "A trust"}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        {org ? (
+          <>
+            <TextField name="organisation_name" label={donorType === "company" ? "Company name" : "Trust name"} required autoComplete="organization" />
+            <TextField name="registration_number" label="Registration number" required={want18a} />
+            <TextField name="contact_person" label="Contact person" required autoComplete="name" />
+          </>
+        ) : (
+          <>
+            <TextField name="first_name" label="First name" required autoComplete="given-name" />
+            <TextField name="last_name" label="Surname" required autoComplete="family-name" />
+          </>
+        )}
+        <TextField name="email" label="Email" type="email" required autoComplete="email" hint="Your confirmation goes here." />
+        <TextField name="phone" label="Phone" type="tel" autoComplete="tel" hint="Optional." />
+
+        {receiptsAvailable ? (
+          <div className="space-y-3 rounded-control bg-bg p-3">
+            <label className="flex items-start gap-2 text-sm font-medium">
+              <input type="checkbox" name="wants_18a" className="mt-1" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
+              <span>I want an s18A tax receipt</span>
+            </label>
+            <Info terms={["s18a"]} label="an s18A receipt" />
+            {want18a ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted">
+                  You&apos;ll get one s18A receipt for all your donations to {charityName} each tax year.
+                </p>
+                {org ? null : (
+                  <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." />
+                )}
+                <TextField name="tax_reference" label="Income tax number" inputMode="numeric" hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="rounded-control bg-warning-soft p-3 text-xs text-warning">
+            {charityName} is not s18A-approved, so this donation won&apos;t get a tax receipt.
+          </p>
+        )}
+
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">This donation is from</legend>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(givingKinds).map(([value, label]) => (
+              <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
+                <input type="radio" name="giving_kind" value={value} required defaultChecked={value === initialKind} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted">Counts towards your maaser and chomesh in the NEDIV lev app. Only you see this.</p>
+          <Info terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
+          {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
+        </fieldset>
+
+        <TextArea name="message" label={`Message to ${charityName}`} rows={3} />
+
+        <div className="space-y-2">
+          <Check name="is_anonymous">
+            Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
+            <span className="text-muted">{charityName} still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
+          </Check>
+          <Check name="age_confirmed" error={state.fieldErrors?.age_confirmed}>
+            I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
+          </Check>
+          <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
+            I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my
+            donation. NEDIV lev keeps my maaser, chomesh or tzedaka choice privately, for my own records.
+          </Check>
+        </div>
+
+        {/* Hidden from people; bots fill it in. */}
+        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
+
+        {stale ? <p role="status" className="text-sm text-muted">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
+        <button disabled={pending || stale} className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast disabled:opacity-60">
+          {pending ? "Please wait…" : `Pay ${formatRand(shownQuote.totalCents)}`}
+        </button>
+        {state.message ? <p role="status" className="text-sm text-danger">{state.message}</p> : null}
+        <p className="text-xs text-muted">You&apos;ll enter your card details on the payment provider&apos;s secure page. We never see or store them.</p>
+      </form>
+    </FormStateProvider>
+  );
+}
