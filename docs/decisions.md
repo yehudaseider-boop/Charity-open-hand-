@@ -332,6 +332,16 @@ Still open (need a decision or the payment provider):
 - Yehuda: "everyone must have their own". The income log and maaser/chomesh targets are now kept per signed-in person on the phone; nobody sees anyone else's. Saved charities already live on each person's account.
 - Anything set up before signing in goes to the first person who signs in on that phone (and only them), so a new user doesn't lose it.
 
-## OPEN: a pooled-fund model (10/10/2026)
+## Pooled-fund model (10/10/2026), not built yet
 
-Yehuda described a different flow: NEDIV lev collects the funds, then chooses which charity they go to; that charity sends an s18A certificate, which we (or the charity) upload into the app. To clarify before building (see chat).
+Yehuda's direction:
+- **NEDIV lev receives the donations.** Picking a charity is the donor's recommendation of where they'd like the money to go, not a payment to that charity. The Terms will say so.
+- **NEDIV lev distributes** the funds to charities based on what donors recommended.
+- **s18A:** the charity we pay sends an s18A certificate, which we or the charity upload into the app for the donor.
+
+To do (not decided yet):
+1. **s18A per donor or one total?** An s18A receipt is issued to a named donor, so does the charity send one per donor per year (with each donor's name and ID or tax number), or one total? Undecided.
+2. **Who uploads the certificates:** NEDIV lev, the charity, or both. Undecided.
+3. **For Yosef, before building:** if the donor pays NEDIV lev, can the receiving charity legally issue an s18A to that donor, or must NEDIV lev itself be an s18A-approved PBO that issues the receipt? Also: holding and distributing donors' money (trust account, banking, payment provider rules), and how the "recommendation" wording sits with POPIA and consumer law.
+4. **App and website wording** would change from "Give to [charity]" to "Recommend [charity]" once this is confirmed.
+5. **Who pays the payment provider's charge.** Still open.
