@@ -9,6 +9,7 @@ import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
 import { PlaceholderImage } from "@/components/placeholder-image";
+import { SkeletonBlock } from "@/components/states";
 import { TargetEditor } from "@/components/target-editor";
 import { Text } from "@/components/text";
 import { ddmmyyyy } from "@/lib/format";
@@ -163,19 +164,24 @@ export default function Welcome() {
               Keep track of your maaser.
             </Text>
             <Text variant="bodyMuted">Optional. Set a target and the app shows how much you have given towards it. You can change it any time on the Giving tab.</Text>
+            {/* Targets are saved per person, so wait until we know who is using the phone. */}
+            {account.status === "loading" ? (
+              <SkeletonBlock height={320} />
+            ) : (
             <TargetEditor
               initial={null}
               title="Your target"
               yearEnd={ddmmyyyy(givingYearRange(hYear).end)}
               monthsLeft={monthsLeftInGivingYear(now, hYear)}
-              onSave={(t) => {
+              onSave={async (t) => {
                 haptic.success();
-                saveTarget(t, account.status === "signed-in" ? account.userId : null);
+                await saveTarget(t, account.status === "signed-in" ? account.userId : null);
                 finish();
               }}
               onCancel={finish}
               cancelLabel="Skip for now"
             />
+            )}
             {dots}
           </FadeUp>
         )}

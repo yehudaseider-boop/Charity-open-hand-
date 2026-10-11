@@ -30,7 +30,7 @@ export function SeasonalCard() {
   return (
     <View accessible style={styles.card}>
       <Text style={styles.cardTitle}>{appeal.title}</Text>
-      <Text variant="bodyMuted">{appeal.body}</Text>
+      <Text style={styles.cardBody}>{appeal.body}</Text>
     </View>
   );
 }
@@ -48,5 +48,6 @@ const styles = StyleSheet.create({
   week: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.indigo, marginTop: 2 },
   hello: { fontFamily: fonts.bodySemibold, fontSize: 18, color: colors.indigo },
   card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.honeySoft, borderWidth: 1, borderColor: colors.honey },
+  cardBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 24, color: colors.ink },
   cardTitle: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.ink },
 });

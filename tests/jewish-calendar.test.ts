@@ -141,9 +141,17 @@ describe("the Jewish day follows the sun", () => {
 
   it("says when Shabbos, Yom Tov and Chanukah are coming", () => {
     expect(weekAhead(new Date(2026, 9, 9, 12))).toContain("Shabbos starts tonight.");
-    expect(weekAhead(new Date(2026, 8, 11, 12))).toEqual(["Erev Rosh Hashana: today.", "Rosh Hashana starts tonight: Saturday and Sunday."]);
-    expect(weekAhead(new Date(2026, 11, 4, 12))[0]).toBe("Chanukah starts tonight and runs until Saturday.");
+    expect(weekAhead(new Date(2026, 11, 4, 12))).toEqual(["Shabbos starts tonight.", "Chanukah starts tonight and runs until Saturday."]);
     expect(weekAhead(new Date(2026, 11, 8, 12))).toEqual(["Chanukah: until Saturday."]);
+  });
+
+  it("does not say Good Shabbos when a weekday festival ends", () => {
+    expect(greeting(new Date(2026, 8, 21, 19, 0))).not.toBe("Good Shabbos"); // Monday evening, just after Yom Kippur
+    expect(greeting(new Date(2026, 8, 14, 19, 0))).not.toBe("Good Shabbos"); // Monday evening, after Rosh Hashana
+  });
+
+  it("puts Shabbos first on a Friday, and still shows what else is coming", () => {
+    expect(weekAhead(new Date(2026, 8, 11, 12))).toEqual(["Shabbos starts tonight.", "Erev Rosh Hashana: today.", "Rosh Hashana starts tonight: Saturday and Sunday."]);
   });
 
   it("is quiet while Yom Tov comes in on the evening before", () => {

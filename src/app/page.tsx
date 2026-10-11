@@ -26,7 +26,7 @@ export default async function Home() {
     <div className="space-y-8">
       <section className="rounded-card bg-gradient-to-br from-brand-soft to-surface border border-border p-6 sm:p-8">
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">{platformConfig.appTagline}</h1>
-        <p className="mt-3 text-muted">
+        <p className="mt-3 text-text">
           Give to registered charities in a few taps, keep your maaser and chomesh in one place, and get your s18A receipts
           without chasing anyone.
         </p>

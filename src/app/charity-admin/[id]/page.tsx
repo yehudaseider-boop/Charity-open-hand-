@@ -107,7 +107,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                     <span>{mm}/{y}</span>
                     <span>{formatRand(m.amountCents)} <span className="text-muted">({plural(m.donationCount, "donation")})</span></span>
                   </div>
-                  <div className="mt-1 h-2 rounded-full bg-bg" aria-hidden>
+                  <div className="mt-1 h-2 rounded-full bg-honey-soft" aria-hidden>
                     <div className="h-2 rounded-full bg-honey" style={{ width: `${Math.max(2, Math.round((m.amountCents / max) * 100))}%` }} />
                   </div>
                 </li>

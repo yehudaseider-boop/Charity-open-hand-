@@ -153,8 +153,8 @@ export function greeting(now: Date): string {
   if (o?.name === "Chanukah") return "Happy Chanukah";
   if (o?.name === "Purim") return "Freilichen Purim";
   const dow = now.getDay();
-  // Friday, then all of Shabbos until it is over; then "a good week" until Sunday noon.
-  if (dow === 5 || inRestPeriod(now)) return "Good Shabbos";
+  // Friday, then all of Shabbos until it is over (not the end of a weekday festival); then "a good week" until Sunday noon.
+  if (dow === 5 || (dow === 6 && inRestPeriod(now))) return "Good Shabbos";
   if ((dow === 6 && now.getTime() >= restEnds(midnight(now)).getTime()) || (dow === 0 && now.getHours() < 12)) return "Shavua tov";
   const hour = now.getHours();
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -219,9 +219,9 @@ export function weekAhead(now: Date): string[] {
     }
     lines.push(startsTonight ? `${g.name} starts tonight${g.days.length >= 4 ? " and runs " : ": "}${when}.` : `${g.name}: ${when}.`);
   }
-  // Friday before sunset: Shabbos comes in tonight.
-  if (now.getDay() === 5 && !night) lines.push("Shabbos starts tonight.");
-  return lines.slice(0, 2);
+  // Friday before sunset: Shabbos comes in tonight, which comes first.
+  if (now.getDay() === 5 && !night) lines.unshift("Shabbos starts tonight.");
+  return lines.slice(0, 3);
 }
 
 export type Appeal = { key: "elul" | "purim" | "pesach"; title: string; body: string };

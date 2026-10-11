@@ -13,7 +13,7 @@ import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } fr
 const charity: PlanCharity & CharityRow = {
   id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", quickgive_code: "LTC",
   legal_name_en: "Linksfield Torah Learning Centre NPC", legal_name_he: "מרכז לימוד תורה",
-  npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "s18A/2026/1",
+  npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "18A/2026/1",
   address_line1: "1 Test Road", address_line2: null, suburb: "Linksfield", city: "Johannesburg", postal_code: "2192",
 };
 const donor: DonorRow = {
