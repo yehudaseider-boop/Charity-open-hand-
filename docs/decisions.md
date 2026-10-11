@@ -325,7 +325,7 @@ Still open (need a decision or the payment provider):
 
 ## Expo Go preview link (09/10/2026)
 
-- One permanent link for the preview: `exp://u.expo.dev/bb247170-f27b-4771-b143-41f5098c06bc?channel-name=preview`. It follows the "preview" channel (linked to the "preview" branch), so Expo Go loads the newest published update instead of a fixed one. No new QR code per update.
+- One permanent link for the preview: `exp://u.expo.dev/bb247170-f27b-4771-b143-41f5098c06bc?channel-name=preview&runtime-version=exposdk%3A57.0.0` (the runtime version part is needed so Expo Go picks the update that matches it). It follows the "preview" channel (linked to the "preview" branch), so Expo Go loads the newest published update instead of a fixed one. No new QR code per update.
 
 ## Everyone has their own records on a shared phone (10/10/2026)
 
