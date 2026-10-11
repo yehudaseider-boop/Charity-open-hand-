@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { reduceMotion } from "@/lib/motion";
@@ -11,24 +11,19 @@ import { colors, radius, space } from "@/theme/tokens";
 export function Sheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const v = useRef(new Animated.Value(0)).current;
+  const [v] = useState(() => new Animated.Value(0));
   const [mounted, setMounted] = useState(visible);
   const [keyboard, setKeyboard] = useState(0);
   // While sliding away, keep showing what was there (the screen may already have cleared it).
-  const shown = useRef(children);
-  if (visible) shown.current = children;
+  const [shown, setShown] = useState(children);
+  if (visible && !mounted) setMounted(true);
+  if (visible && shown !== children) setShown(children);
 
   useEffect(() => {
-    if (visible) setMounted(true);
-    const done = () => {
+    // Reduced motion: no slide, but the same sequence (the sheet is removed once it has "finished").
+    Animated.timing(v, { toValue: visible ? 1 : 0, duration: reduceMotion() ? 0 : 260, useNativeDriver: true }).start(() => {
       if (!visible) setMounted(false);
-    };
-    if (reduceMotion()) {
-      v.setValue(visible ? 1 : 0);
-      done();
-      return;
-    }
-    Animated.timing(v, { toValue: visible ? 1 : 0, duration: 260, useNativeDriver: true }).start(done);
+    });
   }, [visible, v]);
 
   // The sheet's own scroll area shrinks when the keyboard is up, so the top stays on screen.
@@ -61,7 +56,7 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
             <View style={styles.grabber} />
             {/* Tall forms scroll inside the sheet instead of running off a small screen. */}
             <ScrollView style={{ maxHeight: room }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              {visible ? children : shown.current}
+              {visible ? children : shown}
             </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>

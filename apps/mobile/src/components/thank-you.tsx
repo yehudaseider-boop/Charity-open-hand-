@@ -1,5 +1,5 @@
 import { useGlobalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Modal, StyleSheet, View } from "react-native";
 import { gifts as sampleGifts, type Gift } from "@/data/giving";
 import { useAccount } from "@/lib/account";
@@ -21,12 +21,16 @@ export function ThankYou() {
   const account = useAccount();
   const demo = useGlobalSearchParams<{ demo?: string }>().demo === "thanks";
   const [demoOpen, setDemoOpen] = useState(demo);
-  useEffect(() => setDemoOpen(demo), [demo]);
+  const [lastDemo, setLastDemo] = useState(demo);
+  if (demo !== lastDemo) {
+    setLastDemo(demo);
+    setDemoOpen(demo);
+  }
   const demoGift: Gift = { ...sampleGifts[0], thankYou: "Your gift fills a Shabbos table this week. From all of us at Northcliff Meals Fund, thank you." };
   const list = demoOpen ? [demoGift] : account.arrived;
   const visible = list.length > 0;
 
-  const scale = useRef(new Animated.Value(0.6)).current;
+  const [scale] = useState(() => new Animated.Value(0.6));
   useEffect(() => {
     if (!visible) return;
     haptic.success();

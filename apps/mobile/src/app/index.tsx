@@ -3,7 +3,7 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, TextLink } from "@/components/button";
+import { Button } from "@/components/button";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
@@ -17,6 +17,7 @@ import { haptic } from "@/lib/haptics";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
 import { useAccount } from "@/lib/account";
 import { saveTarget } from "@/lib/targets";
+import { notify } from "@/lib/open-site";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
 import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 
@@ -175,7 +176,11 @@ export default function Welcome() {
               monthsLeft={monthsLeftInGivingYear(now, hYear)}
               onSave={async (t) => {
                 haptic.success();
-                await saveTarget(t, account.status === "signed-in" ? account.userId : null);
+                const saved = await saveTarget(t, account.status === "signed-in" ? account.userId : null);
+                if (!saved.ok) {
+                  notify("Your target was not saved", "It could not be saved on this phone. Please try again, or skip for now and set it later on the Giving tab.");
+                  return;
+                }
                 finish();
               }}
               onCancel={finish}

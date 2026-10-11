@@ -7,28 +7,37 @@ import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { givingKinds } from "@/lib/donations/validation";
 import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
+import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Thank you" };
+// The address carries the donor's credential: never pass it on in a Referer header.
+export const metadata: Metadata = { title: "Thank you", referrer: "no-referrer" };
 
 /** Where the gateway sends the donor back. We check the payment ourselves. */
 export default async function DonateReturnPage({ searchParams }: PageProps<"/donate/return">) {
-  const { reference, from } = await searchParams;
+  const { reference, from, t } = await searchParams;
   const fromApp = from === "app";
   const ref = typeof reference === "string" ? reference : "";
-  // If the payment provider can't be reached, say we're still confirming rather than showing an error page.
+  // If the payment provider can't be reached, or the result can't be saved yet, say we're still
+  // confirming rather than showing an error page. Nothing here says "paid" unless it is saved.
   const outcome = await confirmPayment(ref).catch((e) => {
     console.error(e);
     return "pending" as const;
   });
 
-  const { data: d } = ref && outcome !== "not_found"
-    ? await createAdminClient()
-        .from("donations")
-        .select("id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, donation_giving_kinds(kind), charities(name_en, slug)")
-        .eq("gateway_ref", ref)
-        .maybeSingle()
-    : { data: null };
+  // The donation id is not a secret (charity admins see it), so the donor's details
+  // are read only for the signed-in donor (row-level security decides) or for
+  // someone holding the credential that came with their payment link.
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, donation_giving_kinds(kind), charities(name_en, slug)";
+  let d = null;
+  if (ref && outcome !== "not_found") {
+    if (await confirmationTokenMatches(ref, typeof t === "string" ? t : undefined)) {
+      d = (await createAdminClient().from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
+    } else {
+      d = (await (await createClient()).from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
+    }
+  }
   const charity = d?.charities as unknown as { name_en: string; slug: string } | undefined;
   const kindRow = d?.donation_giving_kinds as unknown as { kind: string } | { kind: string }[] | null | undefined;
   const givingKind = (Array.isArray(kindRow) ? kindRow[0] : kindRow)?.kind;
@@ -59,6 +68,21 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           </a>
         ) : null}
         <Link href={`/c/${charity.slug}`} className="mt-3 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
+      </Card>
+    );
+  }
+  if (outcome === "paid") {
+    // Paid, but we can't show whose it is: no amounts, no giving choice.
+    return (
+      <Card title="Thank you">
+        <p className="text-sm">Your payment went through. A confirmation is on its way to your email.</p>
+        <p className="mt-2 text-sm text-muted">To see the details, open the link from your payment or sign in with the email you gave with.</p>
+        {fromApp ? (
+          <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
+            Back to the Nadiv Lev app
+          </a>
+        ) : null}
+        <Link href="/charities" className="mt-3 inline-block text-sm text-brand underline">Find a charity</Link>
       </Card>
     );
   }

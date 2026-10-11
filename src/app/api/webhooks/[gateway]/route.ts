@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { confirmPayment } from "@/lib/donations/confirm";
+import { logAudit } from "@/lib/audit";
 import { gatewayByName } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -49,10 +50,39 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/webhook
   }
 
   // confirmPayment is safe to repeat: a donation only moves pending -> paid/failed once.
-  // If it throws, processed_at stays empty and the gateway's retry processes the event again.
+  // Only an event we have finished with is marked processed. Anything unfinished
+  // (still pending at the gateway, or a database or gateway error) leaves
+  // processed_at empty and answers with an error status, so the gateway sends the
+  // event again and the repeat is processed (see the lookup above).
   if (event.reference && (event.type === "payment_succeeded" || event.type === "payment_failed")) {
-    await confirmPayment(event.reference);
+    let outcome;
+    try {
+      outcome = await confirmPayment(event.reference);
+    } catch (e) {
+      console.error(`[webhook] ${gateway.name} event ${event.eventId} not finished`, e);
+      return new NextResponse("Try again", { status: 500, headers: { "Retry-After": "60" } });
+    }
+    if (outcome === "pending") {
+      return new NextResponse("Still confirming", { status: 503, headers: { "Retry-After": "60" } });
+    }
+    if (outcome === "not_found" || outcome === "review") {
+      // Needs a person. The audit log is the durable follow-up (review is logged by
+      // confirmPayment); a repeat delivery would not change the answer.
+      if (outcome === "not_found") {
+        await logAudit({
+          actorUserId: null,
+          action: "webhook.unmatched_payment",
+          entityType: "gateway_event",
+          entityId: eventRowId,
+          details: { gateway: gateway.name, eventId: event.eventId, reference: event.reference },
+        });
+      }
+    }
   }
-  await db.from("gateway_events").update({ processed_at: new Date().toISOString() }).eq("id", eventRowId);
+  const { error: doneError } = await db
+    .from("gateway_events")
+    .update({ processed_at: new Date().toISOString() })
+    .eq("id", eventRowId);
+  if (doneError) return new NextResponse("Error", { status: 500 });
   return NextResponse.json({ ok: true });
 }

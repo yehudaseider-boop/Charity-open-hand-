@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Animated, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
@@ -26,7 +26,7 @@ export default function CharityDetail() {
   const { live, charity, failed, retry } = useCharity(params.slug);
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const savedList = useSaved();
-  const pop = useRef(new Animated.Value(1)).current;
+  const [pop] = useState(() => new Animated.Value(1));
 
   if (charity === undefined) {
     return (

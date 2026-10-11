@@ -11,6 +11,7 @@ import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
+import { issueConfirmationToken } from "./confirmation-access";
 import { checkDonorDetails, type CheckoutInput } from "./validation";
 
 export type Quote = Pricing;
@@ -160,6 +161,9 @@ export async function startDonation(args: {
   const kind = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: v.giving_kind });
   if (kind.error) throw kind.error;
 
+  // Sent only to the donor, in the address the gateway returns them to.
+  const confirmationToken = await issueConfirmationToken(donationId);
+
   try {
     const site = process.env.SITE_URL ?? "";
     const { redirectUrl } = await gateway.createCheckout({
@@ -168,7 +172,7 @@ export async function startDonation(args: {
       lines: { charityCents: fees.amountCents, contributionCents: fees.contributionCents },
       charityAccountRef: charity.splitAccountRef,
       email: v.email,
-      returnUrl: `${site}/donate/return?reference=${donationId}${args.fromApp ? "&from=app" : ""}`,
+      returnUrl: `${site}/donate/return?reference=${donationId}&t=${confirmationToken}${args.fromApp ? "&from=app" : ""}`,
       description: `Donation to ${charity.name_en}`,
     });
     return { ok: true, redirectUrl };

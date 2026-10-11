@@ -26,7 +26,7 @@ export default function Discover() {
   const { live } = directory;
   // Live: the state comes from loading the directory; preview keeps the design-review states.
   const state = !live ? demoState : directory.data ? "ready" : directory.failed ? "error" : "loading";
-  const charities = directory.data?.charities ?? [];
+  const charities = useMemo(() => directory.data?.charities ?? [], [directory.data]);
   const saved = savedCharities(useSaved().slugs, charities);
   const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
   const [query, setQuery] = useState(state === "empty" ? "Bnei Akiva" : "");

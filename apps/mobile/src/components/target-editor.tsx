@@ -1,3 +1,4 @@
+import type { Target, TargetPeriod } from "@/lib/target-type";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { rand } from "@/lib/format";
@@ -11,9 +12,8 @@ import { InfoButton } from "./info-button";
 import { Segmented } from "./segmented";
 import { Text } from "./text";
 
-export type TargetPeriod = "month" | "year";
 /** Maaser target, and a separate chomesh target for donors who keep chomesh (null = maaser only). */
-export type Target = { period: TargetPeriod; maaserCents: number; chomeshCents: number | null };
+export type { Target, TargetPeriod };
 
 /** Maaser is a tenth of income; chomesh is a further tenth (a fifth in all). */
 const TENTH_PPM = percentToPpm("10");

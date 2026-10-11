@@ -7,19 +7,33 @@ import { notifyDonationPaid } from "./notify";
 
 export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
 
+/** The donation could not be read or written, so no final answer can be given. Safe to retry. */
+export class PersistenceError extends Error {
+  constructor(what: string, cause?: unknown) {
+    super(`Could not ${what}`, { cause });
+    this.name = "PersistenceError";
+  }
+}
+
 /**
  * Ask the gateway whether a payment went through and record the answer.
  * Safe to call any number of times (webhook, return page, retries): a
- * donation only moves pending -> paid/failed once.
+ * donation only moves pending -> paid/failed once, and only the call that
+ * makes the move sends the confirmation email.
+ *
+ * A database failure throws PersistenceError. It never reports "paid" or
+ * "failed" unless that state is saved, so callers can retry safely (the
+ * webhook answers with an error so the gateway sends the event again).
  */
 export async function confirmPayment(reference: string): Promise<ConfirmOutcome> {
   if (!/^[0-9a-f-]{36}$/i.test(reference)) return "not_found";
   const db = createAdminClient();
-  const { data: donation } = await db
+  const { data: donation, error: readError } = await db
     .from("donations")
     .select("id, status, gateway, total_charged_cents")
     .eq("gateway_ref", reference)
     .maybeSingle();
+  if (readError) throw new PersistenceError("read the donation", readError);
   if (!donation) return "not_found";
   if (donation.status === "paid") return "paid";
   if (donation.status !== "pending" && donation.status !== "failed") return donation.status as ConfirmOutcome;
@@ -38,23 +52,44 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
       return "review";
     }
     const paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
-    const { data: updated } = await db
+    const { data: updated, error } = await db
       .from("donations")
       .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt) })
       .eq("id", donation.id)
       .in("status", ["pending", "failed"])
       .select("id");
-    if (updated?.length) await notifyDonationPaid(donation.id);
-    return "paid";
+    if (error) throw new PersistenceError("save the paid donation", error);
+    if (updated?.length) {
+      await notifyDonationPaid(donation.id);
+      return "paid";
+    }
+    // Nothing changed: another confirmation got there first. Trust only what is saved.
+    const now = await currentStatus(donation.id);
+    if (now === "paid") return "paid";
+    if (now === "pending" || now === "failed") throw new PersistenceError("save the paid donation");
+    return now as ConfirmOutcome;
   }
 
   if (tx.status === "failed" && donation.status === "pending") {
-    await db
+    const { data: updated, error } = await db
       .from("donations")
       .update({ status: "failed", failed_at: new Date().toISOString() })
       .eq("id", donation.id)
-      .eq("status", "pending");
-    return "failed";
+      .eq("status", "pending")
+      .select("id");
+    if (error) throw new PersistenceError("save the failed donation", error);
+    if (updated?.length) return "failed";
+    const now = await currentStatus(donation.id);
+    if (now === "failed") return "failed";
+    if (now === "pending") throw new PersistenceError("save the failed donation");
+    return now as ConfirmOutcome; // paid (or later) by a concurrent confirmation
   }
   return donation.status === "failed" ? "failed" : "pending";
+}
+
+async function currentStatus(donationId: string): Promise<string> {
+  const { data, error } = await createAdminClient().from("donations").select("status").eq("id", donationId).maybeSingle();
+  if (error) throw new PersistenceError("re-read the donation", error);
+  if (!data) throw new PersistenceError("re-read the donation");
+  return data.status;
 }

@@ -378,3 +378,16 @@ Applied the Nadiv Lev brand kit (`NEDIV_lev_brand_kit.pdf`) to the app and the w
 ## Greeting and date on the first screen only (11/10/2026)
 
 - The greeting, Hebrew date and "where the week is at" line show on Discover only, not on Giving or the other tabs. To show them on every screen instead, put `<DayGreeting />` back under the heading on the other tabs.
+
+## Security and reliability fixes (11/10/2026)
+
+Six findings from an independent review, fixed on `milestone-1-foundation`. No live payments were enabled and nothing was deployed.
+
+1. **Confirmation page privacy.** The donation id is not a secret (charity admins see it in the dashboard and CSV), so it no longer opens the donor's giving choice or contribution. The page shows those only to the signed-in donor (row-level security decides) or to someone holding a 256-bit credential that is sent only in the gateway return address (`&t=`). Only its SHA-256 hash is stored, in `donation_confirmations` (migration `20261011000001`, no client can read it). Without either, the page says the payment went through and shows no amounts or choice. The page sends `Referrer-Policy: no-referrer`.
+2. **Payment database errors.** `confirmPayment` checks every read and write, re-reads after an empty update, and throws `PersistenceError` instead of reporting `paid` or `failed` that was not saved. The confirmation email is sent only by the call that made the change.
+3. **Webhook retries.** An event whose payment is still pending, or whose confirmation hit a database or gateway error, is not marked processed and answers 503 or 500, so the gateway delivers it again. `processed_at` is checked for write errors. A success event for a payment we cannot match is written to the audit log (`webhook.unmatched_payment`) before it is finished. A payment held for review is already audit-logged by `confirmPayment`. Open item: there is no scheduled sweep, so a payment still pending after the gateway stops retrying needs the team to look at unprocessed rows in `gateway_events`. Decide whether to add one.
+4. **Phone storage.** Income log and targets now return explicit results. A failed or invalid read is a problem state (try again; for invalid text, an explicit "set aside and start again" that keeps the old text under a `.set-aside` key), never an empty list. A failed save shows a banner with "Try saving again" and the entries stay on screen. Records and failure banners are per person.
+5. **Dependencies.** Fixed: `uuid` (override of `xcode`'s copy to 11.1.1). Not fixable today: `braces` (every published version, 3.0.3 is the latest), `node-forge` (1.4.0 is the latest) and `decode-uri-component` (the patched 0.5.0 is ESM-only and `query-string` 7 in expo-router needs the CommonJS 0.2.x). See the change summary for paths and exposure.
+6. **Phone lint.** `apps/mobile/eslint.config.js` (eslint-config-expo) so `npm run lint` in `apps/mobile` checks the app. Existing errors were fixed in the code, not suppressed.
+
+Deploy steps: apply migration `20261011000001_confirmation_credentials.sql`. Donations that started before the change have no credential, so their return page shows the generic "Your payment went through" view (their confirmation email is unchanged).

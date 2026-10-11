@@ -1,5 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { POLICY_VERSION } from "@shared/policy";
 import type { Gift, GivingKind, Receipt, Recurring } from "@/data/giving";
@@ -206,7 +206,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   // Whose data the screens may show right now. A load that finishes after
   // sign-out (or after someone else signs in) is thrown away.
   const currentUser = useRef<string | null>(null);
-  currentUser.current = status === "signed-in" ? userId : null;
+  const signedInUser = status === "signed-in" ? userId : null;
+  useLayoutEffect(() => {
+    currentUser.current = signedInUser;
+  }, [signedInUser]);
   const inFlight = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {

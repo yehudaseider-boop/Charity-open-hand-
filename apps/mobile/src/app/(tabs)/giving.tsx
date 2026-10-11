@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
@@ -18,7 +18,7 @@ import { ddmmyyyy, rand } from "@/lib/format";
 import { byCharity, givingKindLabels, groupByMonth, inGivingYear, monthlyToReach, percentOf, sumOfKind } from "@/lib/giving";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
 import { useAccount } from "@/lib/account";
-import { loadIncome, saveIncome } from "@/lib/income-store";
+import { loadIncome, saveIncome, startNewIncomeLog } from "@/lib/income-store";
 import { dateToIso, incomeBetween, isoToDate, owedFromIncome, type Elsewhere, type IncomeEntry } from "@/lib/ledger";
 import { useScreenState } from "@/lib/screen-state";
 import { useDirectory } from "@/lib/directory";
@@ -26,7 +26,10 @@ import { savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
 import { confirmThen, notify } from "@/lib/open-site";
-import { loadTarget, saveTarget } from "@/lib/targets";
+import { loadTarget, saveTarget, setAsideTarget } from "@/lib/targets";
+import { RecordProblem } from "@/components/record-problem";
+import { useStoredRecord } from "@/lib/use-stored-record";
+import type { SaveResult } from "@/lib/stored-result";
 import { colors, fonts, radius, space, tabular, touch, type } from "@/theme/tokens";
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -50,43 +53,41 @@ export default function Giving() {
           : "ready";
   const p = useLocalSearchParams<{ demo?: string; sheet?: string }>();
   const newDonor = preview ? demoState === "empty" : !signedIn;
-  const [target, setTarget] = useState<Target | null>(!preview || newDonor || p.demo === "first" ? null : sampleMaaserTarget);
+  const previewTarget = !preview || newDonor || p.demo === "first" ? null : sampleMaaserTarget;
   // Targets are personal and stay on this phone (in its secure storage), never on our servers.
   // Each person has their own targets and income log on the phone; wait until we know who it is.
   const owner = signedIn ? account.userId : null;
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
-  const [targetLoaded, setTargetLoaded] = useState(preview);
-  useEffect(() => {
-    if (preview || !ownerKnown) return;
-    let live = true;
-    setTargetLoaded(false);
-    setTarget(null);
-    loadTarget(owner).then((t) => {
-      if (!live) return;
-      setTarget(t);
-      setTargetLoaded(true);
-    });
-    return () => {
-      live = false;
-    };
-  }, [preview, ownerKnown, owner]);
+  // A record that could not be read is never treated as empty: nothing is saved over it until it
+  // has loaded, or the person chooses to start again (the old text is kept aside).
+  const targetRecord = useStoredRecord<Target | null>({ enabled: !preview && ownerKnown, owner, load: loadTarget, initial: previewTarget });
+  const target = targetRecord.value;
+  const targetLoaded = targetRecord.status === "ready";
+  const targetProblem = targetRecord.reason;
+  // A failed save belongs to the person it was for: someone else signing in never sees it.
+  const [targetSaveFailedFor, setTargetSaveFailedFor] = useState<{ owner: string | null } | null>(null);
+  const targetSaveFailed = targetSaveFailedFor !== null && targetSaveFailedFor.owner === owner;
+  const persistTarget = async (t: Target, forOwner: string | null) => {
+    const r = await saveTarget(t, forOwner);
+    setTargetSaveFailedFor(r.ok ? null : { owner: forOwner });
+  };
   // Income (for maaser) stays on this phone only. Nothing is logged until the saved log has loaded.
-  const [income, setIncome] = useState<IncomeEntry[]>([]);
-  const [incomeLoaded, setIncomeLoaded] = useState(preview);
-  useEffect(() => {
-    if (preview || !ownerKnown) return;
-    let live = true;
-    setIncomeLoaded(false);
-    setIncome([]);
-    loadIncome(owner).then((rows) => {
-      if (!live) return;
-      setIncome(rows);
-      setIncomeLoaded(true);
-    });
-    return () => {
-      live = false;
-    };
-  }, [preview, ownerKnown, owner]);
+  const incomeRecord = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, owner, load: loadIncome, initial: noIncome });
+  const income = incomeRecord.value;
+  const incomeReady = incomeRecord.status === "ready";
+  const incomeProblem = incomeRecord.reason;
+  const [incomeSaveFailedFor, setIncomeSaveFailedFor] = useState<{ owner: string | null } | null>(null);
+  const incomeSaveFailed = incomeSaveFailedFor !== null && incomeSaveFailedFor.owner === owner;
+  const persistIncome = async (next: IncomeEntry[], forOwner: string | null) => {
+    const r = await saveIncome(next, forOwner);
+    setIncomeSaveFailedFor(r.ok ? null : { owner: forOwner });
+  };
+  // The person's explicit choice to start again after unreadable stored text.
+  const startAgain = async (go: () => Promise<SaveResult>, reload: () => void, what: string) => {
+    const r = await go();
+    if (r.ok) reload();
+    else notify("Nothing was changed", `Your ${what} could not be set aside, so it was left as it is. Please try again.`);
+  };
   const [busy, setBusy] = useState(false);
   const [previewElsewhere, setPreviewElsewhere] = useState<Elsewhere[]>(newDonor ? [] : sampleElsewhere);
   const [logging, setLogging] = useState<"income" | "elsewhere" | null>(null);
@@ -141,16 +142,17 @@ export default function Giving() {
   const periodIncome = incomeBetween(income, periodFrom, periodTo);
   const owed = owedFromIncome(periodIncome, Boolean(target?.chomeshCents));
   const addIncome = (e: { cents: number; date: string; note: string }) => {
-    if (!incomeLoaded) return;
-    const next = [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...e }, ...income].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-    setIncome(next);
-    saveIncome(next, owner);
+    if (!incomeReady) return;
+    const next = [{ id: newEntryId(), ...e }, ...income].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    incomeRecord.setValue(next);
+    void persistIncome(next, owner);
     setLogging(null);
   };
   const removeIncome = (id: string) => {
+    if (!incomeReady) return;
     const next = income.filter((e) => e.id !== id);
-    setIncome(next);
-    saveIncome(next, owner);
+    incomeRecord.setValue(next);
+    void persistIncome(next, owner);
   };
   const confirmRemove = (what: string, go: () => void) => confirmThen(`Remove this ${what}?`, "This can't be undone.", "Remove", go);
   const removeElsewhereEntry = (id: string) => {
@@ -209,7 +211,27 @@ export default function Giving() {
                 <Button label="Sign in" onPress={() => router.push("/account")} />
               </View>
             ) : null}
-            {!targetLoaded ? (
+            {targetSaveFailed && target ? (
+              <RecordProblem
+                title="Your targets are not saved yet"
+                body="They show here, but could not be saved on this phone, so they would be lost when the app closes. Please try saving again."
+                retryLabel="Try saving again"
+                onRetry={() => void persistTarget(target, owner)}
+              />
+            ) : null}
+            {targetProblem ? (
+              <RecordProblem
+                title="We couldn't open your targets"
+                body={
+                  targetProblem === "unreadable"
+                    ? "Your targets are still saved on this phone. Nothing has been changed. Please try again."
+                    : "The saved targets on this phone can't be read. Nothing has been changed yet. You can try again, or set the old ones aside and enter new targets (the old ones are kept on this phone)."
+                }
+                onRetry={targetRecord.retry}
+                secondaryLabel={targetProblem === "corrupt" ? "Set the old targets aside and start again" : undefined}
+                onSecondary={() => confirmThen("Start new targets?", "The old targets are kept aside on this phone, and you can enter new ones.", "Start again", () => void startAgain(() => setAsideTarget(owner), targetRecord.retry, "targets"))}
+              />
+            ) : !targetLoaded ? (
               <SkeletonBlock height={190} />
             ) : target === null || editing ? (
               <TargetEditor
@@ -217,8 +239,8 @@ export default function Giving() {
                 yearEnd={yearEnd}
                 monthsLeft={monthsLeft}
                 onSave={(t) => {
-                  setTarget(t);
-                  if (!preview) saveTarget(t, owner);
+                  targetRecord.setValue(t);
+                  if (!preview) void persistTarget(t, owner);
                   setEditing(false);
                   setSaved(true);
                 }}
@@ -317,8 +339,30 @@ export default function Giving() {
                   <Text variant="bodyMuted">Set a maaser target above to see what your income means for maaser.</Text>
                 ) : null}
 
+                {incomeProblem ? (
+                  <RecordProblem
+                    title="We couldn't open your income log"
+                    body={
+                      incomeProblem === "unreadable"
+                        ? "Your income log is still saved on this phone. Nothing has been changed, and you can't add to it until it opens. Please try again."
+                        : "The saved income log on this phone can't be read. Nothing has been changed yet. You can try again, or set the old log aside and start a new one (the old one is kept on this phone)."
+                    }
+                    onRetry={incomeRecord.retry}
+                    secondaryLabel={incomeProblem === "corrupt" ? "Set the old log aside and start a new one" : undefined}
+                    onSecondary={() => confirmThen("Start a new income log?", "The old log is kept aside on this phone, and you can start a new one.", "Start new log", () => void startAgain(() => startNewIncomeLog(owner), incomeRecord.retry, "income log"))}
+                  />
+                ) : null}
+                {incomeSaveFailed ? (
+                  <RecordProblem
+                    title="Your income log is not saved yet"
+                    body="Your latest change shows here, but could not be saved on this phone, so it would be lost when the app closes. Please try saving again."
+                    retryLabel="Try saving again"
+                    onRetry={() => void persistIncome(income, owner)}
+                  />
+                ) : null}
+
                 <View style={{ flexDirection: "row", gap: 10 }}>
-                  <View style={{ flex: 1 }}><Button label="Log income" disabled={!incomeLoaded} onPress={() => setLogging("income")} /></View>
+                  <View style={{ flex: 1 }}><Button label="Log income" disabled={!incomeReady} onPress={() => setLogging("income")} /></View>
                   <View style={{ flex: 1 }}><Button label="Log giving elsewhere" onPress={() => setLogging("elsewhere")} /></View>
                 </View>
 
@@ -591,6 +635,9 @@ function DetailRow({ label, value, divider }: { label: string; value: string; di
     </View>
   );
 }
+
+const noIncome: IncomeEntry[] = [];
+const newEntryId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.parchment },

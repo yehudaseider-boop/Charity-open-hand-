@@ -79,7 +79,7 @@ describe("payment webhook", () => {
 
   it("retries an event whose first delivery failed part-way", async () => {
     confirmPayment.mockRejectedValueOnce(new Error("gateway API down"));
-    await expect(deliver("evt-2")).rejects.toThrow(/gateway API down/);
+    expect((await deliver("evt-2")).status).toBe(500);
     expect(events.get("evt-2")?.processed_at).toBeNull();
 
     const retry = await deliver("evt-2");

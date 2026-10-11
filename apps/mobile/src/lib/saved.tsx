@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAccount } from "./account";
 import { mergeSaved } from "./live-charities";
 import { secureStorage } from "./secure-storage";
@@ -86,7 +86,9 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
 
   // The current list, so quick taps build on each other rather than on an old copy.
   const current = useRef<string[]>([]);
-  current.current = slugs;
+  useLayoutEffect(() => {
+    current.current = slugs;
+  }, [slugs]);
   const writes = useRef(Promise.resolve());
 
   const toggle = useCallback(
