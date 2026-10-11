@@ -366,7 +366,7 @@ Applied the Nadiv Lev brand kit (`NEDIV_lev_brand_kit.pdf`) to the app and the w
 ## The app follows the Jewish day and week (11/10/2026)
 
 - **The Jewish day turns over at sunset**, not midnight. On Saturday night the app already shows Sunday's Hebrew date. Sunset is worked out from the date (Johannesburg, standard method, checked against Hebcal for every day of 2026 and 2027: within 3 minutes), so there is no table to go stale.
-- **"Where the week is at"** now sits under the date on Discover and Giving, in plain words, updated every minute: "Rosh Chodesh Cheshvan starts tonight: Sunday and Monday.", then "...: today and tomorrow.", then "...: tonight and Monday.", then "...: today.". It also covers festivals, fasts and Chanukah ("Chanukah starts tonight and runs until Saturday.") and "Shabbos starts tonight." on Friday. It says "tonight", never a time.
+- **"Where the week is at"** now sits under the date on Discover (the first screen only; Giving and the other tabs stay clean), in plain words, updated every minute: "Rosh Chodesh Cheshvan starts tonight: Sunday and Monday.", then "...: today and tomorrow.", then "...: tonight and Monday.", then "...: today.". It also covers festivals, fasts and Chanukah ("Chanukah starts tonight and runs until Saturday.") and "Shabbos starts tonight." on Friday. It says "tonight", never a time.
 - **Shabbos and Yom Tov end 72 minutes after sunset** for the greeting ("Good Shabbos" until then, then "Shavua tov") and for the quiet time when no reminders or notifications go out. That is later than most communities' nightfall on purpose, so the app never says the week has begun while anyone is still keeping Shabbos. Open for Yehuda or the Rabbi: whether to use another rule.
 - **Limits:** Johannesburg sunset is used for everyone (other SA cities differ by up to about half an hour, which is why no times are shown), and the phone must be on South African time.
 
@@ -374,3 +374,7 @@ Applied the Nadiv Lev brand kit (`NEDIV_lev_brand_kit.pdf`) to the app and the w
 
 - The four sample charities in the app's preview now have a cover photo, two gallery photos and (for Northcliff Meals Fund) a photo on an update, so the screens show how real pictures will look. Made with an image generator (no faces, no text), natural-light style, 12 images, about 3 credits in total.
 - They are loaded from their web addresses (the generator's host), not stored in the repository, and are only used in the preview. If those addresses stop working the app falls back to the grey placeholders. Real photos come from the charities' own uploads (dashboard "Photos and updates"), which the live app already shows.
+
+## Greeting and date on the first screen only (11/10/2026)
+
+- The greeting, Hebrew date and "where the week is at" line show on Discover only, not on Giving or the other tabs. To show them on every screen instead, put `<DayGreeting />` back under the heading on the other tabs.

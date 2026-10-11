@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
-import { DayGreeting } from "@/components/day-greeting";
 import { DottedArc } from "@/components/dotted-arc";
 import { FadeUp } from "@/components/fade-up";
 import { ChevronIcon } from "@/components/icons";
@@ -189,7 +188,6 @@ export default function Giving() {
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
         <View>
           <Text variant="h1" accessibilityRole="header">Giving</Text>
-          <DayGreeting />
           <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
         </View>
 
