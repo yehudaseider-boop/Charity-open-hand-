@@ -2,7 +2,7 @@
 
 # Nadiv Lev: project rules
 
-- The build brief is the source of truth; `docs/decisions.md` records changes and open questions.
+- The build brief is the source of truth; `docs/decisions.md` records changes and open questions. `docs/go-live-checklist.md` is the go-live list: update it whenever a new go-live step or open decision comes up, and bring it up when go-live is discussed.
 - Money is integer cents (bigint) in ZAR. Percentages are integer ppm. Never floats.
 - Fee, VAT, minimum and tax-year values live only in `src/config/platform.ts`.
 - Display: `R1 250` and `R30` (no cents when they are zero), `R34.57` when there are cents, dd/mm/yyyy, SA English, Johannesburg time.
