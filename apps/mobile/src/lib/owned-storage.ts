@@ -13,9 +13,9 @@ import { secureStorage } from "./secure-storage";
 const keyFor = (base: string, userId: string | null) => (userId ? `${base}.u.${userId}` : base);
 
 export async function loadOwned(base: string, userId: string | null): Promise<string | null> {
-  const own = await secureStorage.getItem(keyFor(base, userId));
+  const own = await secureStorage.getItemStrict(keyFor(base, userId));
   if (own !== null || !userId) return own;
-  const shared = await secureStorage.getItem(base);
+  const shared = await secureStorage.getItemStrict(base);
   if (shared === null) return null;
   await secureStorage.setItem(keyFor(base, userId), shared);
   await secureStorage.removeItem(base);

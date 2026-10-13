@@ -5,6 +5,7 @@ const store = new Map<string, string>();
 vi.mock("../apps/mobile/src/lib/secure-storage", () => ({
   secureStorage: {
     getItem: async (k: string) => store.get(k) ?? null,
+    getItemStrict: async (k: string) => store.get(k) ?? null,
     setItem: async (k: string, v: string) => void store.set(k, v),
     removeItem: async (k: string) => void store.delete(k),
   },

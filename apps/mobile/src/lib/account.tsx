@@ -4,6 +4,7 @@ import { AppState } from "react-native";
 import { POLICY_VERSION } from "@shared/policy";
 import type { Gift, GivingKind, Receipt, Recurring } from "@/data/giving";
 import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
+import { cacheKey, forgetGivingCache, writeGivingCache } from "./giving-cache";
 import { secureStorage } from "./secure-storage";
 import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
@@ -134,7 +135,6 @@ async function saveSeen(userId: string, seen: Seen): Promise<void> {
 }
 
 /** The last giving loaded, on this phone only (secure storage), so the app opens instantly and works offline. */
-const cacheKey = (userId: string) => `nediv-lev.giving.${userId}`;
 
 /** true / false, or null when we couldn't find out (e.g. offline). */
 async function hasAgreed(userId: string): Promise<boolean | null> {
@@ -197,6 +197,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       // A routine token refresh is the same person: no need to re-check anything.
       if (event === "TOKEN_REFRESHED") return setSession(s);
+      // The session ended (they signed out, or it was revoked): their giving does not stay on the phone.
+      // Only this event: a missing session at start-up can just mean the phone is offline.
+      if (event === "SIGNED_OUT") {
+        lastCached.current = null;
+        void forgetGivingCache(lastUser.current);
+      }
       settle(s);
     });
     return () => sub.subscription.unsubscribe();
@@ -231,9 +237,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       const unchanged = toCache({ ...next, loadedAt: new Date(0) });
       if (unchanged !== lastCached.current) {
         lastCached.current = unchanged;
-        await secureStorage.setItem(cacheKey(uid), toCache(next)).catch(() => undefined);
+        await writeGivingCache(uid, toCache(next)).catch(() => undefined);
         // Signed out while that was being written: take it off the phone again.
-        if (!mine()) await secureStorage.removeItem(cacheKey(uid)).catch(() => undefined);
+        if (!mine()) await forgetGivingCache(uid);
       }
       // Thank the donor for anything new since they last looked, then remember it as seen.
       const seen = await loadSeen(uid);
@@ -309,7 +315,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       refresh,
       async signOut() {
         // Nothing of theirs stays on the phone once they sign out.
-        if (session) await secureStorage.removeItem(cacheKey(session.user.id)).catch(() => undefined);
+        await forgetGivingCache(session?.user.id);
         lastCached.current = null;
         await supabase?.auth.signOut();
         setLive(null);

@@ -35,13 +35,25 @@ function serial<T>(key: string, job: () => Promise<T>): Promise<T> {
   return next;
 }
 
-async function readNative(k: string): Promise<string | null> {
+/** A value is stored (its pointer is there) but a piece of it is gone. */
+export class IncompleteValueError extends Error {
+  constructor(key: string) {
+    super(`The stored value for ${key} is incomplete`);
+    this.name = "IncompleteValueError";
+  }
+}
+
+/** `strict`: a missing piece throws instead of reading as "nothing stored". */
+async function readNative(k: string, strict: boolean): Promise<string | null> {
   const ptr = parsePointer(await SecureStore.getItemAsync(`${k}.n`));
   if (!ptr || !ptr.count) return null;
   const parts: string[] = [];
   for (let i = 0; i < ptr.count; i++) {
     const part = await SecureStore.getItemAsync(chunkKey(k, ptr.gen, i));
-    if (part === null) return null;
+    if (part === null) {
+      if (strict) throw new IncompleteValueError(k);
+      return null;
+    }
     parts.push(part);
   }
   return parts.join("");
@@ -56,7 +68,17 @@ export const secureStorage = {
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === "web") return globalThis.localStorage?.getItem(key) ?? null;
     const k = safeKey(key);
-    return serial(k, () => readNative(k));
+    return serial(k, () => readNative(k, false));
+  },
+  /**
+   * Like getItem, but a value whose pieces are partly missing throws
+   * (IncompleteValueError) instead of reading as "nothing saved". For personal
+   * records, where an empty answer would let the next save overwrite what is left.
+   */
+  async getItemStrict(key: string): Promise<string | null> {
+    if (Platform.OS === "web") return globalThis.localStorage?.getItem(key) ?? null;
+    const k = safeKey(key);
+    return serial(k, () => readNative(k, true));
   },
   async setItem(key: string, value: string): Promise<void> {
     if (Platform.OS === "web") return globalThis.localStorage?.setItem(key, value);
@@ -66,8 +88,14 @@ export const secureStorage = {
       const gen = (old?.gen ?? 0) + 1;
       const ascii = toAscii(value);
       const count = Math.max(1, Math.ceil(ascii.length / CHUNK));
-      for (let i = 0; i < count; i++) await SecureStore.setItemAsync(chunkKey(k, gen, i), ascii.slice(i * CHUNK, (i + 1) * CHUNK));
-      await SecureStore.setItemAsync(`${k}.n`, `${gen}:${count}`);
+      try {
+        for (let i = 0; i < count; i++) await SecureStore.setItemAsync(chunkKey(k, gen, i), ascii.slice(i * CHUNK, (i + 1) * CHUNK));
+        await SecureStore.setItemAsync(`${k}.n`, `${gen}:${count}`);
+      } catch (e) {
+        // The pointer still names the old value; remove the pieces of the new one so they don't pile up.
+        await dropChunks(k, { gen, count });
+        throw e;
+      }
       await dropChunks(k, old);
     });
   },

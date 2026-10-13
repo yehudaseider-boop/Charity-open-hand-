@@ -123,6 +123,36 @@ describe("draft charity", () => {
     });
   });
 
+  it("loses the bank-verified stamp when it changes its bank details", async () => {
+    await scenario(
+      async () => {
+        await toDraft();
+        await run("update public.charity_private set bank_verified_at = now() where charity_id = $1", [meals]);
+      },
+      async () => {
+        const before = await run("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
+        expect(before.rows[0].bank_verified_at).not.toBeNull();
+        await run("update public.charity_private set bank_account_holder = 'SOMEONE ELSE' where charity_id = $1", [meals]);
+        const after = await run("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
+        expect(after.rows[0].bank_verified_at).toBeNull();
+      },
+    );
+  });
+
+  it("keeps the stamp when an edit does not touch the bank details", async () => {
+    await scenario(
+      async () => {
+        await toDraft();
+        await run("update public.charity_private set bank_verified_at = now() where charity_id = $1", [meals]);
+      },
+      async () => {
+        await run("update public.charities set legal_name_en = 'Changed' where id = $1", [meals]);
+        const r = await run("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
+        expect(r.rows[0].bank_verified_at).not.toBeNull();
+      },
+    );
+  });
+
   it("can't mark its own bank account verified", async () => {
     await scenario(toDraft, async () => {
       await expect(

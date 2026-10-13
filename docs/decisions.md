@@ -391,3 +391,15 @@ Six findings from an independent review, fixed on `milestone-1-foundation`. No l
 6. **Phone lint.** `apps/mobile/eslint.config.js` (eslint-config-expo) so `npm run lint` in `apps/mobile` checks the app. Existing errors were fixed in the code, not suppressed.
 
 Deploy steps: apply migration `20261011000001_confirmation_credentials.sql`. Donations that started before the change have no credential, so their return page shows the generic "Your payment went through" view (their confirmation email is unchanged).
+
+## Review round fixes (13/10/2026)
+
+Five confirmed bugs from the ten-part code review, fixed on `milestone-1-foundation`. The other findings are listed in the review report and are not changed yet.
+
+1. **Uploads over 1 MB.** Next.js caps server action bodies at 1 MB by default, so charity photos and documents (allowed up to 5 MB) were refused before our own check ran. `next.config.ts` now allows 6 MB.
+2. **Yearly s18A job.** A donation confirmed after its donor's receipt was issued used to make the job plan a second receipt, hit the database's one-receipt-per-donor-per-year rule and crash on every run. Now such a donation is skipped as `late_after_receipt` and listed under `needsAttention`: a person voids the receipt and issues it again with the late donation on it. One failing receipt or PDF no longer stops the others; failures are listed in `failed` and the script exits with an error code.
+3. **Bank details.** A charity that is a draft or was rejected could change its bank account and keep the "verified" stamp. Any bank change by the charity now clears the stamp (migration `20261012000001`). Only the platform sets it.
+4. **Phone storage.** If one piece of a stored value is missing, the income log and targets now report "could not be opened" instead of "empty" (`getItemStrict`), so the next save cannot overwrite what is left. A write that fails half-way removes its half-written pieces.
+5. **Forced sign-out.** The phone's offline copy of someone's giving is now also removed when the session ends by itself (a `SIGNED_OUT` event), not only when they tap Sign out. It is deliberately not removed when the phone is merely offline at start-up. A session that ended while the app was closed leaves the copy until the next sign-in or sign-out (it is only readable by that same person).
+
+Go-live: also apply migration `20261012000001_bank_edit_clears_verified.sql`.

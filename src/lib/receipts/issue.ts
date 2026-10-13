@@ -48,6 +48,8 @@ export type JobSummary = {
   skippedByReason: Record<string, number>;
   /** Paid, s18A-requested donations that could not go on a receipt, for a person to look at. */
   needsAttention: Skipped[];
+  /** Steps that failed (one receipt, one PDF, ...). The rest of the run carried on; run the job again once fixed. */
+  failed: { what: string; message: string }[];
 };
 
 export async function runReceiptsJob(args: {
@@ -81,37 +83,49 @@ export async function runReceiptsJob(args: {
     emailed: 0,
     emailFailed: 0,
     skippedByReason: {},
-    needsAttention: skipped.filter((s) => s.reason === "charity_cannot_issue" || s.reason === "mandate_after_payment"),
+    needsAttention: skipped.filter((s) => s.reason === "charity_cannot_issue" || s.reason === "mandate_after_payment" || s.reason === "late_after_receipt"),
+    failed: [],
   };
+  const fail = (what: string, e: unknown) => summary.failed.push({ what, message: e instanceof Error ? e.message : String(e) });
   for (const s of skipped) summary.skippedByReason[s.reason] = (summary.skippedByReason[s.reason] ?? 0) + 1;
   if (args.mode === "dry-run") return summary;
 
   const charityById = new Map(charities.map((c) => [c.id, c]));
+  // One bad receipt never stops the others: its failure is recorded and the run carries on.
   for (const r of receipts) {
-    const charity = charityById.get(r.charityId)!;
-    const rows = await store.donorDetailsFor(r.donationIds);
-    if (rows.length === 0) throw new Error("No donor details found for a planned receipt");
-    // Donor details come from the most recent donation in the year.
-    const latest = [...rows].sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())[0];
-    const details = buildReceiptDetails({
-      charity,
-      donor: latest.donor,
-      donations: rows,
-      taxYear,
-      periodStart: start,
-      periodEnd: end,
-      issuedAt: args.now,
-    });
-    const issued = await store.issue(r, charity, details);
-    summary.issued += 1;
-    await store.savePdf(issued, await args.render({ details: issued.details, reference: issued.reference }));
-    summary.pdfsMade += 1;
+    const what = `receipt for donor ${r.donorId} (donations ${r.donationIds.join(", ")})`;
+    try {
+      const charity = charityById.get(r.charityId)!;
+      const rows = await store.donorDetailsFor(r.donationIds);
+      if (rows.length === 0) throw new Error("No donor details found for a planned receipt");
+      // Donor details come from the most recent donation in the year.
+      const latest = [...rows].sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())[0];
+      const details = buildReceiptDetails({
+        charity,
+        donor: latest.donor,
+        donations: rows,
+        taxYear,
+        periodStart: start,
+        periodEnd: end,
+        issuedAt: args.now,
+      });
+      const issued = await store.issue(r, charity, details);
+      summary.issued += 1;
+      await store.savePdf(issued, await args.render({ details: issued.details, reference: issued.reference }));
+      summary.pdfsMade += 1;
+    } catch (e) {
+      fail(what, e);
+    }
   }
 
   // Receipts issued earlier whose PDF failed or was never made.
   for (const missing of await store.listIssuedWithoutPdf(taxYear)) {
-    await store.savePdf(missing, await args.render({ details: missing.details, reference: missing.reference }));
-    summary.pdfsMade += 1;
+    try {
+      await store.savePdf(missing, await args.render({ details: missing.details, reference: missing.reference }));
+      summary.pdfsMade += 1;
+    } catch (e) {
+      fail(`PDF for ${missing.reference}`, e);
+    }
   }
 
   // Email every receipt that has a PDF and has not been emailed. One failed

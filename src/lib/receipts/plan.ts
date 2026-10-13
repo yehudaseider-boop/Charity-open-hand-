@@ -35,7 +35,7 @@ export type PlannedReceipt = {
   totalCents: number;
 };
 
-export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_requested" | "charity_cannot_issue" | "mandate_after_payment" | "already_receipted" | "wrong_year" };
+export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_requested" | "charity_cannot_issue" | "mandate_after_payment" | "already_receipted" | "late_after_receipt" | "wrong_year" };
 
 /** Can this charity issue s18A receipts: approval confirmed and a signed mandate. */
 export function charityCanIssue(c: PlanCharity): boolean {
@@ -58,6 +58,12 @@ export function planReceipts(args: {
   const groups = new Map<string, PlannedReceipt>();
   const skipped: Skipped[] = [];
 
+  // A person who already has an issued receipt for the year cannot get a second one
+  // (the database refuses it). A donation confirmed after that receipt was issued is
+  // left for a person: void the receipt and issue it again with the late donation on it.
+  const groupKey = (d: PlanDonation) => `${d.charityId}|${d.donorId}|${d.donorIdentity}`;
+  const receiptedGroups = new Set(args.donations.filter((d) => d.taxYear === args.taxYear && args.alreadyReceipted.has(d.id)).map(groupKey));
+
   for (const d of args.donations) {
     const skip = (reason: Skipped["reason"]) => skipped.push({ donationId: d.id, reason });
     if (d.taxYear !== args.taxYear) { skip("wrong_year"); continue; }
@@ -67,8 +73,9 @@ export function planReceipts(args: {
     const charity = charityById.get(d.charityId);
     if (!charity || !charityCanIssue(charity)) { skip("charity_cannot_issue"); continue; }
     if (new Date(charity.mandateSignedAt!).getTime() > new Date(d.paidAt).getTime()) { skip("mandate_after_payment"); continue; }
+    if (receiptedGroups.has(groupKey(d))) { skip("late_after_receipt"); continue; }
 
-    const key = `${d.charityId}|${d.donorId}|${d.donorIdentity}`;
+    const key = groupKey(d);
     const g = groups.get(key) ?? { charityId: d.charityId, donorId: d.donorId, donorIdentity: d.donorIdentity, taxYear: args.taxYear, donationIds: [], totalCents: 0 };
     g.donationIds.push(d.id);
     g.totalCents += d.amountCents;

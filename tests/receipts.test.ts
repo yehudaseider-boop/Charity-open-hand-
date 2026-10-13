@@ -37,6 +37,18 @@ describe("who gets a receipt", () => {
     expect(receipts.find((r) => r.donorId === "u2")?.totalCents).toBe(3_000);
   });
 
+  it("does not plan a second receipt for someone who already has one this year (late donation)", () => {
+    const { receipts, skipped } = plan([don({ id: "a" }), don({ id: "late" }), don({ id: "other", donorId: "u2" })], [charity], new Set(["a"]));
+    expect(receipts.map((r) => r.donorId)).toEqual(["u2"]);
+    expect(skipped).toEqual(expect.arrayContaining([{ donationId: "a", reason: "already_receipted" }, { donationId: "late", reason: "late_after_receipt" }]));
+  });
+
+  it("a voided receipt (its donations no longer count as receipted) is planned again in full", () => {
+    const { receipts } = plan([don({ id: "a" }), don({ id: "late" })], [charity], new Set());
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].donationIds).toEqual(["a", "late"]);
+  });
+
   it("never merges two people who share an email (same donor record, different s18A identity)", () => {
     const { receipts } = plan([
       don({ id: "alice", donorIdentity: "id-alice", amountCents: 500_000 }),
@@ -164,7 +176,9 @@ describe("the yearly job", () => {
   it("makes the PDF on the next run if it failed the first time", async () => {
     const { store, issued, pdfs } = fakeStore([don({ id: "a" })]);
     render.mockRejectedValueOnce(new Error("Chrome crashed"));
-    await expect(runReceiptsJob({ store, render, ...base, mode: "issue" })).rejects.toThrow(/Chrome crashed/);
+    render.mockRejectedValueOnce(new Error("Chrome crashed"));
+    const first = await runReceiptsJob({ store, render, ...base, mode: "issue" });
+    expect(first.failed.map((f) => f.message)).toEqual(["Chrome crashed", "Chrome crashed"]);
     expect(issued).toHaveLength(1);
     expect(pdfs.size).toBe(0);
     // The second run finds the receipt is already issued (the store now reports its donations) and only makes the PDF.
@@ -173,6 +187,33 @@ describe("the yearly job", () => {
     expect(again).toMatchObject({ planned: 0, issued: 0, pdfsMade: 1 });
     expect(issued).toHaveLength(1);
     expect(pdfs.size).toBe(1);
+  });
+
+  it("one failing receipt does not stop the others, and is reported", async () => {
+    const { store, issued } = fakeStore([don({ id: "a" }), don({ id: "b", donorId: "u2" }), don({ id: "c", donorId: "u3" })]);
+    const realIssue = store.issue;
+    store.issue = async (r, c, d) => {
+      if (r.donorId === "u2") throw new Error("duplicate key value violates unique constraint");
+      return realIssue(r, c, d);
+    };
+    const s = await runReceiptsJob({ store, render, ...base, mode: "issue" });
+    expect(s).toMatchObject({ planned: 3, issued: 2, pdfsMade: 2 });
+    expect(issued).toHaveLength(2);
+    expect(s.failed).toHaveLength(1);
+    expect(s.failed[0]).toMatchObject({ message: expect.stringContaining("unique constraint") });
+    expect(s.failed[0].what).toContain("u2");
+  });
+
+  it("a donation confirmed after the donor's receipt was issued is left for a person, and does not break the run", async () => {
+    // Donor u1 has an issued receipt covering "a"; "late" was confirmed afterwards. Donor u2 is new.
+    const { store, issued } = fakeStore([don({ id: "a" }), don({ id: "late", amountCents: 5_000 }), don({ id: "b", donorId: "u2" })]);
+    store.receiptedDonationIds = async () => new Set(["a"]);
+    const s = await runReceiptsJob({ store, render, ...base, mode: "issue" });
+    expect(s).toMatchObject({ planned: 1, issued: 1 });
+    expect(issued.map((r) => r.id)).toHaveLength(1);
+    expect(s.failed).toEqual([]);
+    expect(s.skippedByReason).toMatchObject({ already_receipted: 1, late_after_receipt: 1 });
+    expect(s.needsAttention).toEqual([{ donationId: "late", reason: "late_after_receipt" }]);
   });
 
   it("flags paid donations a charity can no longer receipt", async () => {

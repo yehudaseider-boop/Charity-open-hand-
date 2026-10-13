@@ -9,6 +9,10 @@ vi.mock("../apps/mobile/src/lib/secure-storage", () => ({
       if (fail.read) throw new Error("keychain unavailable");
       return store.get(k) ?? null;
     },
+    getItemStrict: async (k: string) => {
+      if (fail.read) throw new Error("keychain unavailable");
+      return store.get(k) ?? null;
+    },
     setItem: async (k: string, v: string) => {
       if (fail.write) throw new Error("keychain full");
       store.set(k, v);

@@ -7,6 +7,9 @@ export default defineConfig({
       { find: "@shared", replacement: path.resolve(import.meta.dirname, "src/lib") },
       { find: "@", replacement: path.resolve(import.meta.dirname, "src") },
       // The phone app's files (apps/mobile) have their own copy of React; tests use the website's one copy.
+      // The phone app's native packages, replaced by small stand-ins for unit tests.
+      { find: /^react-native$/, replacement: path.resolve(import.meta.dirname, "tests/stubs/react-native.ts") },
+      { find: /^expo-secure-store$/, replacement: path.resolve(import.meta.dirname, "tests/stubs/expo-secure-store.ts") },
       { find: /^react$/, replacement: path.resolve(import.meta.dirname, "node_modules/react") },
       { find: /^react\/(.*)$/, replacement: path.resolve(import.meta.dirname, "node_modules/react") + "/$1" },
     ],

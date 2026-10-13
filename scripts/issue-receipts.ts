@@ -68,6 +68,10 @@ async function main() {
       htmlToPdf(buildReceiptHtml({ details, reference, fontCss, platformName: platformConfig.appName, logoSvg })),
   });
   console.log(JSON.stringify(summary, null, 2));
+  if (summary.failed.length) {
+    console.error(`${summary.failed.length} step(s) failed (see "failed" above). Everything else was done. Fix the cause and run the job again.`);
+    process.exitCode = 1;
+  }
   if (!issue) console.log(`This was a dry run. Nothing was written. (Current tax year: ${taxYearFor(now)}.)`);
 }
 
