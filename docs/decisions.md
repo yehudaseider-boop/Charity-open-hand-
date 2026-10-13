@@ -208,7 +208,7 @@
 - The donation and the contribution are separate line items (`amount_cents`, `contribution_cents`), whether or not the gateway splits payments. Charities never see the contribution.
 - OPEN: who pays the gateway's own charge (the charity out of its donation, or Nadiv Lev). Real gateways stay closed until decided (`platformConfig.fees.gatewayChargePaidBy`); only the test gateway runs.
 - OPEN: which gateway, and whether it splits payments for South African merchants. Both adapters have `splitsPayments: false` until confirmed.
-- App Store rule: the app never takes payments. It shows no amount to pay, card fields or pay button. "Give on our website" opens the phone's browser on `/c/[slug]/donate`, carrying the donor's maaser, chomesh or tzedaka choice (`?kind=`). Amount fields for maaser targets and calculators in the app are fine: no money moves.
+- (Replaced on 13/10/2026, see "Giving from inside the app" below.) App Store rule: the app never takes payments. It shows no amount to pay, card fields or pay button. "Give on our website" opens the phone's browser on `/c/[slug]/donate`, carrying the donor's maaser, chomesh or tzedaka choice (`?kind=`). Amount fields for maaser targets and calculators in the app are fine: no money moves.
 - The confirmation page shows amount, charity, contribution and reference (`NL-XXXXXXXX`), and a "Back to the Nadiv Lev app" link (`nedivlev://giving`; a universal link once we have a domain). In Expo Go the custom link does not open the app; it needs a standalone build.
 - Giving history and maaser/chomesh stats come from the server, updated by the webhook. A donor signs into the app with the email they gave with, and every donation under that email appears. (Server side done; app sign-in and live data still to build.)
 - Nadiv Lev issues the s18A receipts on the charity's behalf, as built.
@@ -403,3 +403,13 @@ Five confirmed bugs from the ten-part code review, fixed on `milestone-1-foundat
 5. **Forced sign-out.** The phone's offline copy of someone's giving is now also removed when the session ends by itself (a `SIGNED_OUT` event), not only when they tap Sign out. It is deliberately not removed when the phone is merely offline at start-up. A session that ended while the app was closed leaves the copy until the next sign-in or sign-out (it is only readable by that same person).
 
 Go-live: also apply migration `20261012000001_bank_edit_clears_verified.sql`.
+
+## Giving from inside the app (13/10/2026)
+
+Changes the earlier rule "the app never takes payments" (decision of 08/10/2026). Yehuda asked for payment through the app and said Paystack is fine with it. Paystack's agreement covers the payment processor only, not Apple's or Google's store rules.
+
+- **Design.** The app does not build a card form and never sees card details. "Continue to payment" opens our existing website payment page (amount, donor details, gateway) in the phone's in-app browser sheet (`expo-web-browser`, private session). The donor's maaser, chomesh or tzedaka choice still travels with the link. When the donor finishes, the page's "Back to the Nadiv Lev app" link (`nedivlev://giving`) closes the sheet, and the app looks for the new gift a few times (now, 5 s, 15 s, 30 s) so the thank-you appears without a manual refresh.
+- **Switch, off by default.** `EXPO_PUBLIC_IN_APP_GIVING=yes` at build or publish time turns it on. Off, "Give on our website" opens the phone's browser as before. Store builds stay off until the store rules are checked.
+- **Gifts and accounts.** The sheet is a private session, so the donor is a guest on the payment page. The gift joins their app account by email, as before (they sign in to the app with the same email).
+- **Still open.** Live payments still need the gateway rates and who pays the gateway charge (platform settings). Not built: Apple Pay and Google Pay buttons, a native card form, and prefilling the donor's email.
+- **Not tested.** No real Paystack payment was made. The payment page and webhook were tested with the local test gateway; the in-app sheet was checked in the web preview only (the link it opens). A phone test is still needed.

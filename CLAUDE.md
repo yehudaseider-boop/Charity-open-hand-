@@ -17,6 +17,6 @@
 
 - Expo + Expo Router (routes in `apps/mobile/src/app`). Donor-facing; charity and admin screens stay on the website.
 - Brand tokens live only in `apps/mobile/src/theme/tokens.ts`. Follow `apps/mobile/AGENTS.md` for Expo rules.
-- The app never takes payments (App Store rule): no amount to pay, card fields or pay button. "Give on our website" opens the browser.
+- The app never handles card details and has no card fields or amount-to-pay screen of its own. Payment happens on our website's payment page: "Give on our website" opens the phone's browser, or, when the in-app giving switch is on (`EXPO_PUBLIC_IN_APP_GIVING=yes`, off by default), the same page in an in-app sheet ("Continue to payment"). Keep the switch off in store builds until Apple's and Google's donation rules are checked (see `docs/go-live-checklist.md`). Never name a specific gateway in app copy.
 - `src/lib/fees.ts` and `src/lib/money.ts` stay dependency-free so the app can share them.
 - Review screenshots: `npx expo export --platform web`, serve `dist`, open with `?preview=iphone`.

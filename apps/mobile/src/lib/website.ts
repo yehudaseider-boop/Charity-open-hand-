@@ -3,8 +3,9 @@ import type { GivingKind } from "../data/giving";
 
 /**
  * The website address, set with EXPO_PUBLIC_SITE_URL when we have a domain.
- * Payments happen ONLY on the website (App Store rule): the app never shows
- * an amount to pay, card fields or a pay button.
+ * Payments happen on our website's payment page only. The app has no card fields
+ * and never handles card details: it opens that page (in the phone's browser, or in
+ * an in-app sheet when the in-app giving switch is on, see give-flow.ts).
  */
 export const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL;
 

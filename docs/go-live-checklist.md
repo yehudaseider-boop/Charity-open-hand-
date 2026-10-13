@@ -22,7 +22,9 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] The gateway's webhook points at the live address, with signature checking on.
 - [ ] Re-run the dependency audit (`npm audit` in the main folder and in `apps/mobile`). Known and unfixable today: `braces`, `node-forge`, `decode-uri-component`. Check whether patched versions now exist.
 - [ ] A normal website build with the real font access passes, plus typecheck, lint and all tests.
-- [ ] Phone app: build and submit through the app stores. The app never takes payments, and "Give on our website" opens the browser.
+- [ ] Phone app: build and submit through the app stores. In-app giving is a switch (`EXPO_PUBLIC_IN_APP_GIVING`, off unless set to `yes` in the EAS environment). Leave it off for the first store submission. Before turning it on, check the current App Store and Google Play rules for donations inside apps (as I understand them: charity approval, offering Apple Pay on iPhone, disclosure of how funds are used, and Google's payments and fundraising policy), and update the app privacy and data-safety answers (payment details are handled by the payment provider, not the app). Decision.
+- [ ] In-app giving test on real phones (iPhone and Android) with the test gateway: open the sheet, pay, return to the app, thank-you appears. Then one small real payment after go-live.
+- [ ] A new native build is needed for the store apps because `expo-web-browser` was added (Expo Go already has it).
 
 ## C. First live day
 

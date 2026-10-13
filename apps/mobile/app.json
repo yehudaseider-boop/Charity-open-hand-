@@ -41,7 +41,8 @@
         }
       ],
       "expo-asset",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "scheme": "nedivlev",
     "extra": {

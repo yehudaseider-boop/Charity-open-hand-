@@ -1,7 +1,10 @@
 import { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { GivingKind } from "@/data/giving";
+import { useAccount } from "@/lib/account";
 import { givingKindLabels } from "@/lib/giving";
+import { IN_APP_GIVING, openGivingPage, refreshAfterGiving } from "@/lib/give-flow";
 import { haptic } from "@/lib/haptics";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, radius, type } from "@/theme/tokens";
@@ -12,11 +15,13 @@ import { Text } from "./text";
 /**
  * Before leaving for the website the donor says what this donation counts as,
  * so it lands in the right place in their maaser and chomesh. No default.
- * The amount and payment are entered on the website only.
+ * The amount and payment are entered on our website's payment page, never in this sheet:
+ * in the phone's browser, or inside the app when the in-app giving switch is on.
  */
 export function GiveSheet({ charityName, slug, onDone }: { charityName: string; slug: string; onDone?: () => void }) {
   const [kind, setKind] = useState<GivingKind | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const account = useAccount();
   const url = kind ? donateUrl(SITE_URL, slug, kind) : null;
 
   return (
@@ -45,21 +50,28 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
 
       <View style={{ gap: 8 }}>
         <Button
-          label="Give on our website"
+          label={IN_APP_GIVING ? "Continue to payment" : "Give on our website"}
           disabled={!url}
           style={!url ? { opacity: 0.4 } : undefined}
           onPress={async () => {
             if (!url) return;
+            setError(null);
             try {
-              await Linking.openURL(url);
+              if (IN_APP_GIVING) {
+                await openGivingPage(url, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
+                // Back from the payment page: look for the new gift, so the thank-you appears.
+                void refreshAfterGiving(account.refresh);
+              } else {
+                await Linking.openURL(url);
+              }
               onDone?.();
             } catch {
-              setError("We couldn't open your browser. Please try again.");
+              setError(IN_APP_GIVING ? "We couldn't open the payment page. Please try again." : "We couldn't open your browser. Please try again.");
             }
           }}
         />
         <Text variant="label" style={{ textAlign: "center" }}>
-          {kind && !SITE_URL ? "The website isn't live yet, so this button is off in the preview." : "Opens in your browser. You choose the amount and pay there."}
+          {kind && !SITE_URL ? "The website isn't live yet, so this button is off in the preview." : IN_APP_GIVING ? "Opens a secure payment page inside the app. You choose the amount and pay there." : "Opens in your browser. You choose the amount and pay there."}
         </Text>
         {error ? <Text style={{ color: colors.danger, textAlign: "center" }}>{error}</Text> : null}
       </View>
