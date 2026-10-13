@@ -1,7 +1,8 @@
 "use client";
 
 import { ActionForm } from "@/components/forms/action-form";
-import { TextArea, TextField } from "@/components/forms/fields";
+import { SelectField, TextArea, TextField } from "@/components/forms/fields";
+import { bankNames } from "@/lib/charity/validation";
 import type { FormState } from "@/lib/form";
 
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
@@ -48,6 +49,22 @@ export function AddAdminForm({ action }: { action: Action }) {
   return (
     <ActionForm action={action} submitLabel="Add admin">
       <TextField name="email" label="Email" type="email" required />
+    </ActionForm>
+  );
+}
+
+export function ChangeBankForm({ action, current }: { action: Action; current: { bank_name: string | null; bank_account_holder: string | null; bank_branch_code: string | null } }) {
+  return (
+    <ActionForm
+      action={action}
+      submitLabel="Change bank details"
+      confirm="Change this charity's bank details? It will come off the payment gateway until you connect it again, and its contact will be emailed."
+    >
+      <SelectField name="bank_name" label="Bank" required defaultValue={current.bank_name} options={bankNames.map((b) => ({ value: b, label: b }))} />
+      <TextField name="bank_account_holder" label="Account holder" required defaultValue={current.bank_account_holder ?? ""} />
+      <TextField name="bank_account_number" label="Account number" required inputMode="numeric" autoComplete="off" hint="6 to 16 digits." />
+      <TextField name="bank_branch_code" label="Branch code" required inputMode="numeric" defaultValue={current.bank_branch_code ?? ""} hint="6 digits." />
+      <Check name="checked_letter">I have checked the bank confirmation letter for this account.</Check>
     </ActionForm>
   );
 }

@@ -9,6 +9,8 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Monthly giving, in Paystack's test mode:** (1) a card payment with `channels: ["card"]` returns a reusable authorisation in the verify answer; (2) `charge_authorization` with the subaccount, flat `transaction_charge` and bearer settles like a first payment; (3) a declined card shows as failed in the verify answer; (4) the `charge.success` webhook for a charged authorisation carries our reference. Then run the job against test keys for a full month.
 - [ ] **Schedule the monthly job:** a scheduler calls `/api/jobs/monthly-giving` about hourly with `Authorization: Bearer <CRON_SECRET>`; set `CRON_SECRET` on the server (long random string). Check the answer each day for `errors` and `waiting`. Hosting is not chosen yet, so the scheduler is not either.
 - [ ] **Yosef:** terms and wording for monthly donations (authorisation tick-box, emails), and card-on-file rules for recurring payments.
+- [ ] **Yosef:** what an erasure keeps (donation amounts, dates and issued s18A receipts) and for how long (the Privacy page still says "to be confirmed"). Then try an erasure on test data and read the email it sends.
+- [ ] **Look at Admin, Payments each day** in the first weeks: anything stuck, held, or a monthly donation more than 24 hours late.
 - [ ] **Connect every approved charity** (Admin, charity page, "Connect to gateway") before opening. A charity that is not connected shows "isn't taking online donations yet".
 - [ ] **Who pays the gateway charge** (donor, Nadiv Lev or the charity). Decision.
 - [ ] **Pending-payment sweep.** Today a payment still pending after the gateway stops retrying needs a person to check unprocessed rows in `gateway_events`. Decide whether to add an automatic sweep. Decision.
@@ -20,7 +22,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 ## B. Before the switch (technical)
 
-- [ ] Run the database changes on the real database **first**, in order, up to and including `20261013000001_monthly_giving.sql` (the last three are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql` and this one). Then deploy the website code. Doing it the other way round makes new donations fail.
+- [ ] Run the database changes on the real database **first**, in order, up to and including `20261013000002_erase_donor.sql` (the last four are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql`, `20261013000001_monthly_giving.sql` and this one). Then deploy the website code. Doing it the other way round makes new donations fail.
 - [ ] Back up the real database before running them. Write down how to undo (restore the backup).
 - [ ] Live settings in place and checked: site address, encryption key, database keys, email sending, gateway keys. None of the test values.
 - [ ] **Test gateway is off:** `ALLOW_TEST_GATEWAY` is not set on the live site and the payment gateway setting is the real one.

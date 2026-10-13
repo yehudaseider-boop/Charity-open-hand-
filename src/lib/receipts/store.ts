@@ -28,7 +28,9 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       const rows = await all<Record<string, unknown>>((from, to) =>
         db
           .from("donations")
-          .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at, donation_checkout_details(receipt_identity)")
+          // A donor whose information was erased can no longer be given a receipt (their details are gone), so they are left out.
+          .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at, donation_checkout_details!inner(receipt_identity, erased_at)")
+          .is("donation_checkout_details.erased_at", null)
           .eq("tax_year", taxYear)
           .eq("status", "paid")
           .eq("wants_18a", true)

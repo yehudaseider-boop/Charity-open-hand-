@@ -5,7 +5,11 @@ import { logAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { decrypt } from "@/lib/crypto";
+import { decrypt, encrypt, last4 } from "@/lib/crypto";
+import { bankSchema } from "@/lib/charity/validation";
+import { formatDate } from "@/lib/dates";
+import { getEmailTransport } from "@/lib/email";
+import { formToObject, zodErrors } from "@/lib/form";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import type { FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
@@ -237,4 +241,80 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
   }
   refresh(id, charity.slug);
   return { ok: true, message: "Connected. The charity can now take donations." };
+}
+
+/**
+ * Change a charity's bank details after its application was submitted. Only a platform admin can
+ * (the charity cannot, by design). The charity is taken off the payment gateway until it is
+ * connected again with the new account, and its contact is emailed, because changed bank
+ * details are how payments get diverted.
+ */
+export async function changeBankDetails(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isUuid(id)) return { ok: false, message: "Unknown charity." };
+  const parsed = bankSchema.safeParse(formToObject(formData));
+  if (!parsed.success) return zodErrors(parsed.error);
+  if (formData.get("checked_letter") !== "on") {
+    return { ok: false, fieldErrors: { checked_letter: "Tick to confirm you have checked the bank confirmation letter" } };
+  }
+  const v = parsed.data;
+
+  const db = createAdminClient();
+  const { data: charity, error: charityError } = await db.from("charities").select("id, slug, name_en, gateway, gateway_subaccount_ref").eq("id", id).maybeSingle();
+  if (charityError || !charity) return { ok: false, message: "Unknown charity." };
+  const { data: before } = await db.from("charity_private").select("bank_name, bank_account_last4, contact_email").eq("charity_id", id).maybeSingle();
+
+  const { error } = await db
+    .from("charity_private")
+    .update({
+      bank_name: v.bank_name,
+      bank_account_holder: v.bank_account_holder,
+      bank_account_number_encrypted: encrypt(v.bank_account_number),
+      bank_account_last4: last4(v.bank_account_number),
+      bank_branch_code: v.bank_branch_code,
+      // The admin has checked the letter for this account.
+      bank_verified_at: new Date().toISOString(),
+    })
+    .eq("charity_id", id);
+  if (error) return failed(error);
+
+  // The old account is still registered with the gateway: stop payments until it is connected again.
+  const wasConnected = Boolean(charity.gateway_subaccount_ref);
+  if (wasConnected) {
+    const { error: unlink } = await db.from("charities").update({ gateway: null, gateway_subaccount_ref: null }).eq("id", id);
+    if (unlink) return failed(unlink);
+  }
+
+  await logAudit({
+    actorUserId: admin.userId,
+    action: "charity.bank_details_changed",
+    entityType: "charity",
+    entityId: id,
+    details: { from: { bank_name: before?.bank_name ?? null, last4: before?.bank_account_last4 ?? null }, to: { bank_name: v.bank_name, last4: last4(v.bank_account_number) }, gateway_disconnected: wasConnected },
+  });
+
+  if (before?.contact_email) {
+    try {
+      await getEmailTransport().send({
+        to: before.contact_email as string,
+        subject: `The bank details for ${charity.name_en} were changed`,
+        text: [
+          `The bank details held by Nadiv Lev for ${charity.name_en} were changed on ${formatDate(new Date())}. The new account ends in ${last4(v.bank_account_number)}.`,
+          "",
+          "If you did not ask for this, please tell us straight away.",
+          "",
+          "Nadiv Lev",
+        ].join("\n"),
+      });
+    } catch (e) {
+      console.error("[admin] bank change email not sent", e);
+    }
+  }
+  refresh(id, charity.slug);
+  return {
+    ok: true,
+    message: wasConnected
+      ? "Saved and marked verified. The charity is off the payment gateway until you connect it again with the new account."
+      : "Saved and marked verified.",
+  };
 }

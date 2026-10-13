@@ -24,6 +24,10 @@ export default async function AdminPage() {
         <p className="text-3xl font-semibold">{waiting}</p>
         <p className="text-sm text-muted">{waiting === 1 ? "application" : "applications"} waiting for review</p>
       </Link>
+      <Link href="/admin/payments" className="block rounded-card border border-border bg-surface p-5">
+        <p className="font-semibold">Payments</p>
+        <p className="text-sm text-muted">Anything stuck or held, monthly donations, and what came in by charity</p>
+      </Link>
       <Link href="/admin/receipts" className="block rounded-card border border-border bg-surface p-5">
         <p className="font-semibold">s18A receipts</p>
         <p className="text-sm text-muted">See issued receipts and withdraw one if it is wrong</p>

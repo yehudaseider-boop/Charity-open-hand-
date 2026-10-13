@@ -17,11 +17,12 @@ import {
   connectToGateway,
   reinstateCharity,
   rejectCharity,
+  changeBankDetails,
   revealBankAccount,
   revokeS18a,
   suspendCharity,
 } from "./actions";
-import { AddAdminForm, ApproveForm, ReasonForm, SimpleForm } from "./forms";
+import { AddAdminForm, ApproveForm, ChangeBankForm, ReasonForm, SimpleForm } from "./forms";
 
 export const metadata: Metadata = { title: "Review charity" };
 
@@ -121,6 +122,19 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
           <SimpleForm action={revealBankAccount.bind(null, id)} submitLabel="Show full account number" />
           <p className="mt-1 text-xs text-muted">Shown once and logged in the audit trail.</p>
         </div>
+        {charity.status !== "draft" && charity.status !== "rejected" ? (
+          <details className="mt-4 border-t border-border pt-3">
+            <summary className="cursor-pointer text-sm font-medium">Change the bank details</summary>
+            <p className="my-2 text-xs text-muted">
+              The charity cannot change these once it has applied. Check the new bank confirmation letter first. The charity
+              comes off the payment gateway until you connect it again, and its contact is emailed.
+            </p>
+            <ChangeBankForm
+              action={changeBankDetails.bind(null, id)}
+              current={{ bank_name: priv?.bank_name ?? null, bank_account_holder: priv?.bank_account_holder ?? null, bank_branch_code: priv?.bank_branch_code ?? null }}
+            />
+          </details>
+        ) : null}
       </Card>
       <Card title="Documents">
         <DocumentList docs={documents} hrefFor={(docId) => `/documents/${docId}`} />
