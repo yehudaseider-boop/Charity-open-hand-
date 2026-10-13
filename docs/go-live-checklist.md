@@ -22,7 +22,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 ## B. Before the switch (technical)
 
-- [ ] Run the database changes on the real database **first**, in order, up to and including `20261013000002_erase_donor.sql` (the last four are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql`, `20261013000001_monthly_giving.sql` and this one). Then deploy the website code. Doing it the other way round makes new donations fail.
+- [ ] Run the database changes on the real database **first**, in order, up to and including `20261014000002_resume_waits_for_charge_day.sql` (the last six are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql`, `20261013000001_monthly_giving.sql`, `20261013000002_erase_donor.sql`, `20261014000001_account_deletion_unblocked.sql` and this one). Then deploy the website code. Doing it the other way round makes new donations fail.
 - [ ] Back up the real database before running them. Write down how to undo (restore the backup).
 - [ ] Live settings in place and checked: site address, encryption key, database keys, email sending, gateway keys. None of the test values.
 - [ ] **Test gateway is off:** `ALLOW_TEST_GATEWAY` is not set on the live site and the payment gateway setting is the real one.

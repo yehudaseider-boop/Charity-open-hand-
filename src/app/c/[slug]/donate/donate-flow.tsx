@@ -26,7 +26,12 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
   const [giveExtra, setGiveExtra] = useState(false);
   // The details form stays on screen (and keeps what the donor typed) while they
   // change the amount; it just can't be paid until the new amount is confirmed.
-  const quote = quoteState.ok ? quoteState.quote : undefined;
+  // If the next amount is refused (too small, not a number) the last good quote and everything typed stays,
+  // but it cannot be paid until a new amount is accepted.
+  const [kept, setKept] = useState<QuoteState["quote"]>(undefined);
+  const fresh = quoteState.ok ? quoteState.quote : undefined;
+  if (fresh && fresh !== kept) setKept(fresh);
+  const quote = fresh ?? kept;
 
   return (
     <div className="space-y-4">
@@ -92,12 +97,12 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             </div>
           ) : null}
         </div>
-        {!quoteState.ok && quoteState.message ? <p role="status" className="text-sm text-danger">{quoteState.message}</p> : null}
+        {!quoteState.ok && quoteState.message ? <p role="alert" className="text-sm text-danger">{quoteState.message}</p> : null}
       </form>
 
       {quote ? (
         <DetailsStep
-          stale={editingAmount}
+          stale={editingAmount || !quoteState.ok}
           quote={quote}
           slug={slug}
           charityName={charityName}
@@ -251,7 +256,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                 Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Card payments only.
                 You can pause or cancel at any time in the Nadiv Lev app or from your account on this website.
               </p>
-              <Check name="monthly_authorised" error={state.fieldErrors?.monthly_authorised}>
+              <Check key={shownQuote.totalCents} name="monthly_authorised" error={state.fieldErrors?.monthly_authorised}>
                 I authorise Nadiv Lev to collect {formatRand(shownQuote.totalCents)} from my card every month until I cancel.
               </Check>
             </>

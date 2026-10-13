@@ -4,7 +4,7 @@ import { taxYearFor } from "@/lib/dates";
 import { gatewayByName } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyDonationPaid } from "./notify";
-import { activateMonthlyDonation, cancelMonthlyBeforeStart, monthlyWaitingFor } from "./recurring";
+import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyWaitingFor } from "./recurring";
 
 export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
 
@@ -37,11 +37,7 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
   if (readError) throw new PersistenceError("read the donation", readError);
   if (!donation) return "not_found";
   if (donation.status === "paid") {
-    // A first monthly payment that was saved as paid but whose monthly set-up did not finish: finish it now.
-    if (donation.recurring_id && (await monthlyWaitingFor(donation.id))) {
-      const again = await gatewayByName(donation.gateway).verifyTransaction(reference);
-      if (again.status === "success") await activateMonthlyDonation(donation.id, again);
-    }
+    await finishMonthlySetup(donation, reference);
     return "paid";
   }
   if (donation.status !== "pending" && donation.status !== "failed") return donation.status as ConfirmOutcome;
@@ -75,7 +71,11 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     }
     // Nothing changed: another confirmation got there first. Trust only what is saved.
     const now = await currentStatus(donation.id);
-    if (now === "paid") return "paid";
+    if (now === "paid") {
+      // The other call may have died before the monthly set-up finished: finish it here too.
+      await finishMonthlySetup(donation, reference);
+      return "paid";
+    }
     if (now === "pending" || now === "failed") throw new PersistenceError("save the paid donation");
     return now as ConfirmOutcome;
   }
@@ -89,7 +89,7 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
       .select("id");
     if (error) throw new PersistenceError("save the failed donation", error);
     if (updated?.length) {
-      if (donation.recurring_id) await cancelMonthlyBeforeStart(donation.id, "the first payment failed");
+      if (donation.recurring_id) await cancelMonthlyBeforeStart(donation.id, FIRST_PAYMENT_FAILED);
       return "failed";
     }
     const now = await currentStatus(donation.id);
@@ -98,6 +98,18 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     return now as ConfirmOutcome; // paid (or later) by a concurrent confirmation
   }
   return donation.status === "failed" ? "failed" : "pending";
+}
+
+/**
+ * A first monthly payment that was saved as paid but whose monthly set-up did not finish (or never
+ * sent its confirmation email): finish it now. Does nothing for any other donation.
+ */
+async function finishMonthlySetup(donation: { id: string; gateway: string; recurring_id: string | null }, reference: string): Promise<void> {
+  if (!donation.recurring_id || !(await monthlyWaitingFor(donation.id))) return;
+  const again = await gatewayByName(donation.gateway).verifyTransaction(reference);
+  if (again.status !== "success") return;
+  const monthly = await activateMonthlyDonation(donation.id, again);
+  if (monthly !== "none") await notifyDonationPaid(donation.id, { monthly });
 }
 
 async function currentStatus(donationId: string): Promise<string> {

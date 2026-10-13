@@ -21,6 +21,7 @@ import { Text } from "./text";
 export function GiveSheet({ charityName, slug, onDone }: { charityName: string; slug: string; onDone?: () => void }) {
   const [kind, setKind] = useState<GivingKind | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
   const account = useAccount();
   const url = kind ? donateUrl(SITE_URL, slug, kind) : null;
 
@@ -51,10 +52,11 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
       <View style={{ gap: 8 }}>
         <Button
           label={IN_APP_GIVING ? "Continue to payment" : "Give on our website"}
-          disabled={!url}
+          disabled={!url || opening}
           style={!url ? { opacity: 0.4 } : undefined}
           onPress={async () => {
-            if (!url) return;
+            if (!url || opening) return;
+            setOpening(true);
             setError(null);
             try {
               if (IN_APP_GIVING) {
@@ -67,13 +69,15 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
               onDone?.();
             } catch {
               setError(IN_APP_GIVING ? "We couldn't open the payment page. Please try again." : "We couldn't open your browser. Please try again.");
+            } finally {
+              setOpening(false);
             }
           }}
         />
         <Text variant="label" style={{ textAlign: "center" }}>
           {kind && !SITE_URL ? "The website isn't live yet, so this button is off in the preview." : IN_APP_GIVING ? "Opens a secure payment page inside the app. You choose the amount and pay there." : "Opens in your browser. You choose the amount and pay there."}
         </Text>
-        {error ? <Text style={{ color: colors.danger, textAlign: "center" }}>{error}</Text> : null}
+        {error ? <Text accessibilityRole="alert" style={{ color: colors.danger, textAlign: "center" }}>{error}</Text> : null}
       </View>
     </View>
   );

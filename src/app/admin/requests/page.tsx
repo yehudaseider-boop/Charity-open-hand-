@@ -32,6 +32,7 @@ export default async function PrivacyRequestsPage({ searchParams }: PageProps<"/
         </p>
       ) : null}
       {erased === "unchecked" || erased === "check" ? <p role="status" className="rounded-control bg-danger-soft p-3 text-sm text-danger">Nothing was erased. Tick the box to confirm you have checked who is asking{erased === "check" ? ", and type the email address twice, the same both times" : ""}.</p> : null}
+      {erased === "hasaccount" ? <p role="status" className="rounded-control bg-danger-soft p-3 text-sm text-danger">Nothing was erased. That address has a sign-in account, so erase it from the person&apos;s own delete request above.</p> : null}
       {erased === "notfound" ? <p role="status" className="rounded-control bg-danger-soft p-3 text-sm text-danger">That request is not an open delete request.</p> : null}
       <p className="text-sm text-muted">
         Correct or delete what the person asks for, keeping only the donation and receipt records tax law requires. Then

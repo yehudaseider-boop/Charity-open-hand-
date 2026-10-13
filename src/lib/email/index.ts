@@ -63,9 +63,24 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
   };
 }
 
+/** An address left behind by an erasure (see erase_donor_data). Nothing is ever sent to it. */
+export function isErasedAddress(address: string): boolean {
+  return address.trim().toLowerCase().endsWith("@erased.invalid");
+}
+
+function skippingErased(inner: EmailTransport): EmailTransport {
+  return {
+    name: inner.name,
+    async send(m) {
+      if (isErasedAddress(m.to)) return;
+      await inner.send(m);
+    },
+  };
+}
+
 export function getEmailTransport(env: Record<string, string | undefined> = process.env): EmailTransport {
   const name = env.EMAIL_TRANSPORT ?? "console";
-  if (name === "console") return consoleTransport;
-  if (name === "resend") return resendTransport(env);
+  if (name === "console") return skippingErased(consoleTransport);
+  if (name === "resend") return skippingErased(resendTransport(env));
   throw new EmailError(`Unknown EMAIL_TRANSPORT "${name}".`);
 }

@@ -183,3 +183,24 @@ describe("who may run it", () => {
     });
   }
 });
+
+describe("deleting the sign-in account", () => {
+  it("is not blocked by the person's audit rows (their agreement records are removed first)", async () => {
+    await tx(async () => {
+      await run("reset role");
+      const u = (
+        await run(
+          `insert into auth.users (id, email, aud, role) values (gen_random_uuid(), 'del-me@example.co.za', 'authenticated', 'authenticated') returning id`,
+        )
+      ).rows[0].id as string;
+      await run("insert into public.audit_log (actor_user_id, action, entity_type) values ($1, 'privacy.request_delete', 'user')", [u]);
+      await run("insert into public.consents (kind, policy_version, user_id) values ('account', '2026-10', $1)", [u]);
+      await run("delete from public.consents where user_id = $1", [u]); // what eraseDonor does first
+      await run("delete from auth.users where id = $1", [u]);
+      const left = await run("select count(*)::int as n from public.audit_log where actor_user_id = $1", [u]);
+      expect(left.rows[0].n).toBe(1); // the log keeps the bare id, never edited
+      const gone = await run("select count(*)::int as n from auth.users where id = $1", [u]);
+      expect(gone.rows[0].n).toBe(0);
+    });
+  });
+});

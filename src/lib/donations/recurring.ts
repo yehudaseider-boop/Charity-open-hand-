@@ -14,12 +14,20 @@ export class MonthlySetupError extends Error {
 
 type Waiting = { id: string; charge_day: number };
 
+/** Why a monthly donation is closed when its first payment is seen to fail. */
+export const FIRST_PAYMENT_FAILED = "the first payment failed";
+
+/**
+ * The monthly donation whose first payment this is and which has not started. That includes one
+ * closed only because the first payment looked failed: a payment can fail and then be paid on the
+ * same hosted page, and the donor should then get the monthly donation they asked for.
+ */
 async function waitingFor(donationId: string): Promise<Waiting | null> {
   const { data, error } = await createAdminClient()
     .from("recurring_donations")
     .select("id, charge_day")
     .eq("first_donation_id", donationId)
-    .eq("status", "pending")
+    .or(`status.eq.pending,and(status.eq.cancelled,ended_reason.eq.${FIRST_PAYMENT_FAILED})`)
     .maybeSingle();
   if (error) throw new MonthlySetupError("read the monthly donation", error);
   return data as Waiting | null;
@@ -36,20 +44,23 @@ export async function activateMonthlyDonation(donationId: string, tx: VerifiedTr
   const db = createAdminClient();
   const auth = tx.authorization;
   if (!auth || !auth.reusable) {
-    const { error } = await db
+    const { data, error } = await db
       .from("recurring_donations")
       .update({ status: "cancelled", cancelled_at: new Date().toISOString(), ended_reason: "this payment method cannot be charged again" })
       .eq("id", waiting.id)
-      .eq("status", "pending");
+      .or(`status.eq.pending,and(status.eq.cancelled,ended_reason.eq.${FIRST_PAYMENT_FAILED})`)
+      .select("id");
     if (error) throw new MonthlySetupError("close the monthly donation", error);
-    return "not_reusable";
+    return data?.length ? "not_reusable" : "none";
   }
   const paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
   const period = periodOf(paidAt);
-  const { error } = await db
+  const { data, error } = await db
     .from("recurring_donations")
     .update({
       status: "active",
+      cancelled_at: null,
+      ended_reason: null,
       authorization_encrypted: encrypt(auth.code),
       card_brand: auth.brand,
       card_last4: auth.last4,
@@ -59,9 +70,11 @@ export async function activateMonthlyDonation(donationId: string, tx: VerifiedTr
       next_charge_at: chargeTime(addMonths(period, 1), waiting.charge_day).toISOString(),
     })
     .eq("id", waiting.id)
-    .eq("status", "pending");
+    .or(`status.eq.pending,and(status.eq.cancelled,ended_reason.eq.${FIRST_PAYMENT_FAILED})`)
+    .select("id");
   if (error) throw new MonthlySetupError("start the monthly donation", error);
-  return "activated";
+  // Zero rows: someone else started (or the donor cancelled) first. Nothing more to do or to email.
+  return data?.length ? "activated" : "none";
 }
 
 /** The first payment failed: the monthly donation never starts. */

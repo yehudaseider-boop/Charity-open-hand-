@@ -42,6 +42,12 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const kindRow = d?.donation_giving_kinds as unknown as { kind: string } | { kind: string }[] | null | undefined;
   const givingKind = (Array.isArray(kindRow) ? kindRow[0] : kindRow)?.kind;
 
+  // Trying again from the phone app's sheet keeps the way back to the app and the giving choice.
+  const retryParams = new URLSearchParams();
+  if (fromApp) retryParams.set("from", "app");
+  if (givingKind && givingKind in givingKinds) retryParams.set("kind", givingKind);
+  const retryQuery = retryParams.size ? `?${retryParams}` : "";
+
   if (outcome === "paid" && d && charity) {
     return (
       <Card title="Thank you">
@@ -90,7 +96,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Card title="Payment didn't go through">
         <p className="text-sm">Nothing was charged. You can try again.</p>
-        <Link href={charity ? `/c/${charity.slug}/donate` : "/charities"} className="mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
+        <Link href={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} className="mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
           Try again
         </Link>
       </Card>

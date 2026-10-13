@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
-import { ERASE_KEPT_TEXT, eraseDonor } from "@/lib/privacy/erase";
+import { ERASE_KEPT_TEXT, eraseDonor, hasAccountFor } from "@/lib/privacy/erase";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /** Close a privacy request with a short reply the person sees on their "Your information" page. */
@@ -60,6 +60,7 @@ export async function eraseByEmail(formData: FormData) {
   if (!parsed.success || parsed.data.email.toLowerCase() !== parsed.data.again.toLowerCase() || formData.get("checked") !== "on") {
     redirect("/admin/requests?erased=check");
   }
+  if (await hasAccountFor(parsed.data.email)) redirect("/admin/requests?erased=hasaccount");
   const summary = await eraseDonor({ email: parsed.data.email, actorUserId: admin.userId });
   revalidatePath("/admin/requests");
   redirect(`/admin/requests?erased=guest&donors=${summary.donors}`);

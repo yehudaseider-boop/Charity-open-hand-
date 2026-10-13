@@ -26,7 +26,12 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
       else if (opts.monthly === "activated") {
         const { data: r } = await createAdminClient().from("recurring_donations").select("charge_day, card_last4").eq("id", d.recurring_id).maybeSingle();
         monthly = { kind: "first", chargeDay: r?.charge_day ?? 1, cardLast4: r?.card_last4 ?? null };
-      } else monthly = { kind: "repeat" };
+      } else {
+        // A later collection says "monthly donation". The first payment of a monthly donation that
+        // never started (no monthly set-up happened) is just a gift, and says so.
+        const { data: r } = await createAdminClient().from("recurring_donations").select("first_donation_id").eq("id", d.recurring_id).maybeSingle();
+        monthly = r?.first_donation_id === d.id ? undefined : { kind: "repeat" };
+      }
     }
     const site = process.env.SITE_URL;
     const m = confirmationEmail({

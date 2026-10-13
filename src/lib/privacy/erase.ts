@@ -26,8 +26,8 @@ export const ERASE_KEPT_TEXT =
  * (donation amounts and dates, issued s18A receipts). Either by their account, or, for a
  * donor who never had one, by the email address they gave with.
  *
- * Order matters: the confirmation email goes out first (the address is gone afterwards), the
- * database erasure is one step, and the sign-in account is deleted last (deleting it also
+ * Order matters: the database erasure is one step, the confirmation email follows (to the address
+ * we read beforehand), and the sign-in account is deleted last (deleting it also
  * removes their open privacy request, so the audit log is the lasting record).
  * Safe to run again.
  */
@@ -56,19 +56,6 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     for (const d of data ?? []) ids.add(d.id as string);
   }
 
-  // Tell them first: afterwards we no longer hold the address.
-  if (email) {
-    try {
-      await getEmailTransport().send({
-        to: email,
-        subject: "Your information has been erased",
-        text: `As you asked, we have erased the information that identifies you from Nadiv Lev.\n\n${ERASE_KEPT_TEXT}\n\nNadiv Lev`,
-      });
-    } catch (e) {
-      console.error("[erase] confirmation email not sent", e);
-    }
-  }
-
   const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
   if (error) throw new Error(`Could not erase: ${error.message}`);
   const c = (counts ?? {}) as Record<string, number>;
@@ -83,11 +70,28 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     accountDeleted: false,
   };
 
+  // Tell them once it is done and something was erased (the address is gone from our records now,
+  // so we use the one we read before).
+  if (email && summary.donors > 0) {
+    try {
+      await getEmailTransport().send({
+        to: email,
+        subject: "Your information has been erased",
+        text: `As you asked, we have erased the information that identifies you from Nadiv Lev.\n\n${ERASE_KEPT_TEXT}\n\nNadiv Lev`,
+      });
+    } catch (e) {
+      console.error("[erase] confirmation email not sent", e);
+    }
+  }
+
   if (userId) {
     const blocked = await accountBlocker(userId);
     if (blocked) {
       summary.note = blocked;
     } else {
+      // Their own agreement records go with them (the database requires each to name a person).
+      const { error: consentError } = await db.from("consents").delete().eq("user_id", userId);
+      if (consentError) throw new Error(`Could not remove their agreement records: ${consentError.message}`);
       const { error: delError } = await db.auth.admin.deleteUser(userId);
       if (delError) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
       else summary.accountDeleted = true;
@@ -103,6 +107,16 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     details: { ...summary },
   });
   return summary;
+}
+
+/** True when an account exists for this address, so the person must be erased from their own request instead. */
+export async function hasAccountFor(email: string): Promise<boolean> {
+  const { count, error } = await createAdminClient()
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .ilike("email", email.trim());
+  if (error) throw error;
+  return (count ?? 0) > 0;
 }
 
 /** Why a sign-in account must stay (it belongs to someone who runs a charity or the platform), or null. */

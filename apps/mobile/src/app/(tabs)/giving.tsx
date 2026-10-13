@@ -539,7 +539,10 @@ export default function Giving() {
             {!preview ? (
               <>
                 {open.status === "failed" ? (
-                  <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. To carry on giving monthly, start a new monthly donation on the charity&apos;s page.</Text>
+                  <View style={{ gap: 10 }}>
+                    <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. To carry on giving monthly, start a new monthly donation on the charity&apos;s page.</Text>
+                    <Button label={busy ? "Removing…" : "Remove it from my list"} disabled={busy} onPress={() => changeRecurring(open.id, "cancelled")} />
+                  </View>
                 ) : open.status === "cancelled" ? (
                   <Text>Cancellation requested. It is confirmed once the payment provider has stopped it.</Text>
                 ) : confirmCancel ? (
@@ -560,7 +563,7 @@ export default function Giving() {
                     </Pressable>
                   </>
                 )}
-                {recurringError ? <Text style={{ color: colors.danger }}>{recurringError}</Text> : null}
+                {recurringError ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{recurringError}</Text> : null}
                 <Text variant="label">
                   {open.syncing
                     ? "Your change is saved and waiting for the payment provider to apply it."

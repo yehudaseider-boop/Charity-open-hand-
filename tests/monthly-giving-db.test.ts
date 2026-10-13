@@ -124,6 +124,23 @@ describe("pausing, resuming and cancelling", () => {
     });
   });
 
+  it("resuming waits for the charge day instead of collecting within the hour", async () => {
+    await tx(async () => {
+      const { id } = await monthly();
+      await run("update public.recurring_donations set last_paid_period = '2020-01', next_charge_at = now() - interval '200 days' where id = $1", [id]);
+      await asWho(ids.donorUser);
+      await change(id, "paused");
+      await change(id, "active");
+      await run("reset role");
+      const { rows } = await run(
+        `select next_charge_at > now() as ahead, extract(day from next_charge_at at time zone 'UTC')::int as day,
+                extract(hour from next_charge_at at time zone 'UTC')::int as hour from public.recurring_donations where id = $1`,
+        [id],
+      );
+      expect(rows[0]).toEqual({ ahead: true, day: 15, hour: 6 });
+    });
+  });
+
   it("cancelling destroys the stored card authorisation, for good", async () => {
     await tx(async () => {
       const { id } = await monthly();

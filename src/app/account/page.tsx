@@ -6,7 +6,7 @@ import { requireViewer } from "@/lib/auth";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
-import { changeMonthly } from "./monthly/actions";
+import { MonthlyButton } from "./monthly-button";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -73,7 +73,11 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                   <div className="mt-2 flex flex-wrap gap-3">
                     {m.status === "active" ? <MonthlyButton id={m.id} status="paused" label="Pause" /> : null}
                     {m.status === "paused" ? <MonthlyButton id={m.id} status="active" label="Resume" /> : null}
-                    <MonthlyButton id={m.id} status="cancelled" label="Cancel for good" danger />
+                    {m.status === "failed" ? (
+                      <MonthlyButton id={m.id} status="cancelled" label="Remove" />
+                    ) : (
+                      <MonthlyButton id={m.id} status="cancelled" label="Cancel for good" danger confirmText="Cancel this monthly donation for good? We will forget your card and collect nothing more." />
+                    )}
                   </div>
                 </li>
               );
@@ -147,15 +151,5 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         <button className="text-sm text-muted underline">Sign out</button>
       </form>
     </div>
-  );
-}
-
-function MonthlyButton({ id, status, label, danger }: { id: string; status: string; label: string; danger?: boolean }) {
-  return (
-    <form action={changeMonthly}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="status" value={status} />
-      <button className={`min-h-11 text-sm underline ${danger ? "text-danger" : "text-brand"}`}>{label}</button>
-    </form>
   );
 }

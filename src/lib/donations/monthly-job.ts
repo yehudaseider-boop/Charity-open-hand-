@@ -32,8 +32,10 @@ export interface MonthlyStore {
   due(now: Date, limit: number): Promise<{ rows: DueMonthly[]; unreadable: { id: string; message: string }[] }>;
   /** Take the donation for this run. False if another run has it. */
   claim(id: string, now: Date): Promise<boolean>;
-  /** The status of a collection attempt's donation, or null if it does not exist yet. */
-  attemptStatus(donationId: string): Promise<string | null>;
+  /** A collection attempt's donation: its status and when it was created, or null if it does not exist yet. */
+  attemptStatus(donationId: string): Promise<{ status: string; createdAt: Date } | null>;
+  /** Is the monthly donation still active (not cancelled, paused or erased since it was read)? Checked just before a charge. */
+  stillActive(id: string): Promise<boolean>;
   /** Create the (pending) donation for one attempt, copying the donor's details from their first donation. */
   createAttempt(r: DueMonthly, donationId: string, totalCents: number): Promise<void>;
   /** Move the monthly donation's next collection time without charging (already collected this month). */
@@ -65,6 +67,9 @@ export type MonthlySummary = {
   errors: { id: string; message: string }[];
 };
 
+/** An attempt the gateway still has no record of after this long is taken to have died before the charge was sent. */
+const STUCK_AFTER_MS = 20 * 60_000;
+
 export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySummary> {
   const { store, now } = deps;
   const period = periodOf(now);
@@ -94,14 +99,37 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       const attempt = r.attemptPeriod === period ? r.failedAttempts : 0;
       const donationId = attemptDonationId(r.id, period, attempt);
       const totalCents = r.amountCents + r.contributionCents;
-      const status = await store.attemptStatus(donationId);
-      if (status === null) {
+      const existing = await store.attemptStatus(donationId);
+      const send = async () => {
+        // The donor may have cancelled, paused or been erased since this row was read.
+        if (!(await store.stillActive(r.id))) return false;
+        await deps.charge({ reference: donationId, r, totalCents });
+        return true;
+      };
+      if (existing === null) {
         await store.createAttempt(r, donationId, totalCents);
         // If this throws, the outcome is unknown: the attempt stays pending and is only checked, never charged again.
-        await deps.charge({ reference: donationId, r, totalCents });
+        if (!(await send())) {
+          summary.waiting.push({ id: r.id, reason: "no longer active" });
+          continue;
+        }
       }
 
-      const outcome = await deps.confirm(donationId);
+      let outcome: ConfirmOutcome;
+      try {
+        outcome = await deps.confirm(donationId);
+      } catch (e) {
+        // A pending attempt the gateway has never heard of: the run that made it died (or the charge was
+        // refused) before the charge reached the gateway. Send it again under the same reference; the
+        // gateway refuses a reference it already has, so this cannot take the money twice.
+        const stuck = existing !== null && existing.status === "pending" && now.getTime() - existing.createdAt.getTime() > STUCK_AFTER_MS;
+        if (!stuck) throw e;
+        if (!(await send())) {
+          summary.waiting.push({ id: r.id, reason: "no longer active" });
+          continue;
+        }
+        outcome = await deps.confirm(donationId);
+      }
       if (outcome === "paid") {
         await store.recordPaid(r.id, period, next);
         summary.paid += 1;

@@ -15,6 +15,8 @@ const row = (o: Partial<DueMonthly> = {}): DueMonthly => ({
 type World = {
   due: DueMonthly[];
   attempts: Map<string, string>; // donationId -> status
+  active: boolean;
+  born: Date;
   claimed: Set<string>;
   paid: { id: string; period: string; next: string }[];
   failures: { id: string; period: string; n: number; retryAt: string | null }[];
@@ -32,7 +34,8 @@ function deps(): MonthlyDeps {
   const store: MonthlyStore = {
     due: async () => ({ rows: world.due, unreadable: world.unreadable }),
     claim: async (id) => (world.claimed.has(id) ? false : (world.claimed.add(id), true)),
-    attemptStatus: async (id) => world.attempts.get(id) ?? null,
+    attemptStatus: async (id) => (world.attempts.has(id) ? { status: world.attempts.get(id)!, createdAt: world.born } : null),
+    stillActive: async () => world.active,
     createAttempt: async (_r, id) => void world.attempts.set(id, "pending"),
     reschedule: async (id, next) => void world.rescheduled.push({ id, next: next.toISOString() }),
     recordPaid: async (id, period, next) => void world.paid.push({ id, period, next: next.toISOString() }),
@@ -56,7 +59,7 @@ function deps(): MonthlyDeps {
 }
 
 beforeEach(() => {
-  world = { due: [row()], attempts: new Map(), claimed: new Set(), paid: [], failures: [], rescheduled: [], unreadable: [] };
+  world = { due: [row()], attempts: new Map(), active: true, born: NOW, claimed: new Set(), paid: [], failures: [], rescheduled: [], unreadable: [] };
   confirmWith = () => "paid";
   charges.length = 0;
   failedEmails.length = 0;
@@ -179,6 +182,46 @@ describe("when the card is declined", () => {
     const s = await runMonthlyCharges(d);
     expect(world.failures).toHaveLength(1);
     expect(s.errors).toEqual([]);
+  });
+});
+
+describe("a donor who cancels at the last moment", () => {
+  it("is not charged if the monthly donation stopped after it was read", async () => {
+    world.active = false;
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(s.waiting).toEqual([{ id: "rec1", reason: "no longer active" }]);
+    expect(s.paid).toBe(0);
+  });
+});
+
+describe("an attempt that never reached the gateway", () => {
+  const ref = attemptDonationId("rec1", "2026-11", 0);
+  it("is sent again under the same reference once it is old enough, and then collected", async () => {
+    world.attempts.set(ref, "pending");
+    world.born = new Date(NOW.getTime() - 30 * 60_000);
+    let known = false;
+    confirmWith = () => {
+      if (!known) {
+        known = true;
+        throw new Error("Paystack /transaction/verify failed: Transaction reference not found");
+      }
+      return "paid";
+    };
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: ref, total: 20_000 }]);
+    expect(s.paid).toBe(1);
+  });
+
+  it("a recent pending attempt is only checked, never sent again, and the error is reported", async () => {
+    world.attempts.set(ref, "pending");
+    world.born = new Date(NOW.getTime() - 60_000);
+    confirmWith = () => {
+      throw new Error("gateway down");
+    };
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(s.errors).toEqual([{ id: "rec1", message: "gateway down" }]);
   });
 });
 

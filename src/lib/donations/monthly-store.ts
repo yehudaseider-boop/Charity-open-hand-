@@ -42,6 +42,10 @@ export function supabaseMonthlyStore(): MonthlyStore {
           .eq("gateway", gateway.name)
           .not("authorization_encrypted", "is", null)
           .lte("next_charge_at", now.toISOString())
+          // Not one a run took in the last ten minutes, and the least recently tried first, so rows that
+          // keep waiting (charity paused, card unreadable) cannot crowd out everyone else.
+          .or(`last_attempt_at.is.null,last_attempt_at.lt.${new Date(now.getTime() - 10 * 60_000).toISOString()}`)
+          .order("last_attempt_at", { ascending: true, nullsFirst: true })
           .order("next_charge_at")
           .limit(limit),
         "list the monthly donations that are due",
@@ -52,6 +56,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
         const details = await db.from("donation_checkout_details").select("email").eq("donation_id", r.first_donation_id).maybeSingle();
         if (!r.charities || !details.data?.email) {
           unreadable.push({ id: r.id, message: "the donor's email or the charity could not be found" });
+          await db.from("recurring_donations").update({ last_attempt_at: now.toISOString() }).eq("id", r.id);
           continue;
         }
         let authorizationCode: string;
@@ -59,6 +64,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
           authorizationCode = decrypt(r.authorization_encrypted);
         } catch {
           unreadable.push({ id: r.id, message: "the stored card could not be read" });
+          await db.from("recurring_donations").update({ last_attempt_at: now.toISOString() }).eq("id", r.id);
           continue;
         }
         out.push({
@@ -94,9 +100,15 @@ export function supabaseMonthlyStore(): MonthlyStore {
     },
 
     async attemptStatus(donationId) {
-      const { data, error } = await db.from("donations").select("status").eq("id", donationId).maybeSingle();
+      const { data, error } = await db.from("donations").select("status, created_at").eq("id", donationId).maybeSingle();
       if (error) throw new Error(`Could not read a collection attempt: ${error.message}`);
-      return (data?.status as string | undefined) ?? null;
+      return data ? { status: data.status as string, createdAt: new Date(data.created_at as string) } : null;
+    },
+
+    async stillActive(id) {
+      const { data, error } = await db.from("recurring_donations").select("status, authorization_encrypted").eq("id", id).maybeSingle();
+      if (error) throw new Error(`Could not re-check a monthly donation: ${error.message}`);
+      return data?.status === "active" && data.authorization_encrypted !== null;
     },
 
     async createAttempt(r, donationId, totalCents) {

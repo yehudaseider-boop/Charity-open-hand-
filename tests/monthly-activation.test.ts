@@ -11,6 +11,8 @@ type Donation = { id: string; status: string; gateway: string; total_charged_cen
 let recurring: Recurring;
 let donation: Donation;
 let failNextRecurringWrite = false;
+/** Pending, or closed only because the first payment looked failed (what the real queries match). */
+const waiting = (r: Recurring) => r.status === "pending" || (r.status === "cancelled" && r.ended_reason === "the first payment failed");
 const verify = vi.fn();
 const notify = vi.fn(async (_id: string, _o?: unknown) => {});
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
@@ -24,10 +26,11 @@ vi.mock("@/lib/supabase/admin", () => ({
         select: () => q,
         eq: (c: string, v: unknown) => ((filters[c] = v), q),
         in: (c: string, v: unknown[]) => ((filters[c] = v), q),
+        or: () => ((filters.__or = true), q),
         maybeSingle: async () => {
           if (table === "donations") return { data: filters.gateway_ref === donation.gateway_ref || filters.id === donation.id ? { ...donation } : null, error: null };
           if (table === "recurring_donations") {
-            const hit = recurring.first_donation_id === filters.first_donation_id && recurring.status === filters.status;
+            const hit = recurring.first_donation_id === filters.first_donation_id && waiting(recurring);
             return { data: hit ? { ...recurring } : null, error: null };
           }
           return { data: null, error: null };
@@ -36,7 +39,14 @@ vi.mock("@/lib/supabase/admin", () => ({
           const u = {
             eq: (c: string, v: unknown) => ((filters[c] = v), u),
             in: (c: string, v: unknown[]) => ((filters[c] = v), u),
+            or: () => ((filters.__or = true), u),
             select: async () => {
+              if (table === "recurring_donations") {
+                if (failNextRecurringWrite) return { data: null, error: { message: "write refused" } };
+                if (!waiting(recurring)) return { data: [], error: null };
+                Object.assign(recurring, patch);
+                return { data: [{ id: recurring.id }], error: null };
+              }
               if (table === "donations") {
                 const ok = (filters.status as unknown) === donation.status || (Array.isArray(filters.status) && (filters.status as string[]).includes(donation.status));
                 if (!ok) return { data: [], error: null };
@@ -111,6 +121,25 @@ describe("the first payment of a monthly donation", () => {
     failNextRecurringWrite = false;
     expect(await confirmPayment(REF)).toBe("paid"); // the donation is already paid: only the set-up is finished
     expect(recurring.status).toBe("active");
+    expect(notify).toHaveBeenCalledWith(REF, { monthly: "activated" }); // the confirmation email is not lost on the retry
+  });
+
+  it("a first payment that looked failed and is then paid still starts the monthly donation", async () => {
+    verify.mockResolvedValueOnce({ status: "failed", amountCents: 0, currency: "ZAR" });
+    expect(await confirmPayment(REF)).toBe("failed");
+    expect(recurring.status).toBe("cancelled");
+
+    verify.mockResolvedValue(paid());
+    expect(await confirmPayment(REF)).toBe("paid");
+    expect(recurring).toMatchObject({ status: "active", ended_reason: null, cancelled_at: null });
+    expect(notify).toHaveBeenCalledWith(REF, { monthly: "activated" });
+  });
+
+  it("a monthly donation the donor cancelled before paying is not revived by the payment", async () => {
+    recurring = { ...recurring, status: "cancelled", ended_reason: "cancelled by the donor" };
+    verify.mockResolvedValue(paid());
+    await confirmPayment(REF);
+    expect(recurring.status).toBe("cancelled");
   });
 
   it("a failed first payment means the monthly donation never starts", async () => {
