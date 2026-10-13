@@ -4,6 +4,8 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 ## A. Decisions still open (nothing goes live until these are settled)
 
+- Paystack test-mode steps are in `docs/paystack-test-script.md`.
+
 - [ ] **Gateway rates.** Left empty on purpose until Yehuda supplies them (`src/config/platform.ts`). Never guessed.
 - [ ] **Split payments verified in Paystack's test mode** (needs the Paystack test keys; this sandbox cannot reach Paystack). Check, in order: (1) subaccount creation for a South African bank account works with the bank name we hold; (2) a test donation with a charity subaccount settles the donation amount to the subaccount and the contribution to the main account, in ZAR; (3) the fee lands on the side the bearer setting says; (4) what happens when the contribution is R0 and Nadiv Lev bears the fee; (5) the `charge.success` webhook and verify call report the full amount. Then set `PAYSTACK_SPLITS=yes`. Until then Paystack takes no donations.
 - [ ] **Monthly giving, in Paystack's test mode:** (1) a card payment with `channels: ["card"]` returns a reusable authorisation in the verify answer; (2) `charge_authorization` with the subaccount, flat `transaction_charge` and bearer settles like a first payment; (3) a declined card shows as failed in the verify answer; (4) the `charge.success` webhook for a charged authorisation carries our reference. Then run the job against test keys for a full month.
