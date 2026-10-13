@@ -16,6 +16,12 @@ export type CheckoutRequest = {
    * Nadiv Lev, which then owes the charity its line.
    */
   charityAccountRef: string | null;
+  /**
+   * Who pays the gateway's own charge when a payment is split: the charity (out of its
+   * donation) or Nadiv Lev (out of its share). Decided by Yehuda; null until then, and a
+   * split payment is never started without it.
+   */
+  feeBearer: "charity" | "nediv_lev" | null;
   email: string;
   /** Where the donor returns after paying. */
   returnUrl: string;

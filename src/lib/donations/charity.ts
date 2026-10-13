@@ -20,18 +20,21 @@ export async function loadDonatableCharity(slug: string) {
     // A misconfigured gateway must not take public pages down: show "not accepting" instead.
     console.error(e);
   }
+  const connected = gateway !== null && data.gateway === gateway.name && Boolean(data.gateway_subaccount_ref);
   return {
     ...data,
     receiptsAvailable: canIssue18a(data),
     /**
-     * Can take payments now. Real gateways stay closed until it is decided who
-     * pays the gateway's charge; a splitting gateway also needs the charity's account.
+     * Can take payments now. The test gateway always can (and, if it is set to split, needs the
+     * charity's test account). A real gateway is closed until it is decided who pays the gateway's
+     * charge, and then only takes a donation as a split payment straight to a charity that has been
+     * connected: otherwise the money would land with Nadiv Lev instead of the charity.
      */
     acceptingPayments:
       gateway !== null &&
-      (gateway.name === "test" || platformConfig.fees.gatewayChargePaidBy !== null) &&
-      (!gateway.splitsPayments || (data.gateway === gateway.name && Boolean(data.gateway_subaccount_ref))),
-    /** The charity's account at the gateway, used only when the gateway splits payments. */
+      (gateway.name === "test"
+        ? !gateway.splitsPayments || connected
+        : platformConfig.fees.gatewayChargePaidBy !== null && gateway.splitsPayments && connected),
     splitAccountRef: gateway?.splitsPayments && data.gateway === gateway.name ? data.gateway_subaccount_ref : null,
   };
 }

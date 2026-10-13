@@ -17,6 +17,7 @@ async function signedCheckout() {
     totalCents: 3240,
     lines: { charityCents: 3000, contributionCents: 240 },
     charityAccountRef: null,
+    feeBearer: null,
     email: "donor@example.com",
     returnUrl: "/donate/return?reference=11111111-1111-1111-1111-111111111111",
     description: "Donation",

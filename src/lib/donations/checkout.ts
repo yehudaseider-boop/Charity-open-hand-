@@ -171,6 +171,7 @@ export async function startDonation(args: {
       totalCents: fees.totalCents,
       lines: { charityCents: fees.amountCents, contributionCents: fees.contributionCents },
       charityAccountRef: charity.splitAccountRef,
+      feeBearer: platformConfig.fees.gatewayChargePaidBy,
       email: v.email,
       returnUrl: `${site}/donate/return?reference=${donationId}&t=${confirmationToken}${args.fromApp ? "&from=app" : ""}`,
       description: `Donation to ${charity.name_en}`,

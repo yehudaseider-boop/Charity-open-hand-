@@ -413,3 +413,15 @@ Changes the earlier rule "the app never takes payments" (decision of 08/10/2026)
 - **Gifts and accounts.** The sheet is a private session, so the donor is a guest on the payment page. The gift joins their app account by email, as before (they sign in to the app with the same email).
 - **Still open.** Live payments still need the gateway rates and who pays the gateway charge (platform settings). Not built: Apple Pay and Google Pay buttons, a native card form, and prefilling the donor's email.
 - **Not tested.** No real Paystack payment was made. The payment page and webhook were tested with the local test gateway; the in-app sheet was checked in the web preview only (the link it opens). A phone test is still needed.
+
+## Payments go straight to the chosen charity (Yehuda, 13/10/2026)
+
+Replaces the pooled-fund idea from 09/10/2026 (everything collected centrally and sent on by Nadiv Lev). Yehuda chose Paystack split payments: https://paystack.com/docs/payments/split-payments/
+
+- **How.** Each approved charity is registered as a Paystack subaccount (admin "Connect to gateway", which looks up Paystack's bank code from the bank name and refuses a missing or ambiguous match). A donation's checkout names that subaccount: the donation goes into the charity's own bank account, and the flat `transaction_charge` (the donor's optional contribution to Nadiv Lev) stays with our main account.
+- **Fee bearer.** `bearer` comes from the platform setting `gatewayChargePaidBy` (charity: "subaccount"; Nadiv Lev: "account"). Undecided (null), so no split payment starts and a real gateway takes no donations.
+- **Switch.** `PAYSTACK_SPLITS=yes`. Off, Paystack takes no donations, because without a split the money would land with Nadiv Lev. The test gateway can imitate splitting locally with `TEST_GATEWAY_SPLITS=yes`.
+- **Only connected charities take donations** on a real gateway; others show "isn't taking online donations yet".
+- **Adapter fixes made at the same time.** "Abandoned" at Paystack now stays pending (the donor may still pay) instead of being recorded as failed. A verify answer about a different payment is refused. A malformed webhook signature header is a plain rejection, not an error.
+- **Consequences.** The donor's charity choice is binding. The earlier open questions about pooling (holding funds, redistributing by vote, who uploads certificates) no longer apply.
+- **Not verified.** This sandbox cannot reach Paystack, so nothing here has run against it. See the go-live checklist for the test-mode checks. The code was tested with a stubbed network and the local test gateway (a full donation to a connected test charity; an unconnected charity shows "isn't taking online donations yet").

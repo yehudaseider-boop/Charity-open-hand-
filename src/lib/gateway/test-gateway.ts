@@ -42,8 +42,13 @@ function safeEqual(a: string, b: string) {
 
 export const testGateway: PaymentGateway = {
   name: "test",
-  /** Behaves like a gateway that cannot split, so that path is the one tested. */
-  splitsPayments: false,
+  /**
+   * Behaves like a gateway that cannot split unless TEST_GATEWAY_SPLITS=yes, which lets the
+   * direct-to-charity path be tried locally (a charity then needs a connected test account).
+   */
+  get splitsPayments() {
+    return process.env.TEST_GATEWAY_SPLITS === "yes";
+  },
 
   async createCheckout(req) {
     const params = new URLSearchParams({
