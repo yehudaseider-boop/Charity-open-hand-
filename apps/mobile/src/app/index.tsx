@@ -3,6 +3,7 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Backdrop } from "@/components/backdrop";
 import { Button } from "@/components/button";
 import { Drop } from "@/components/splash";
 import { FadeUp } from "@/components/fade-up";
@@ -89,9 +90,8 @@ export default function Welcome() {
       <View style={styles.screen}>
         <View style={styles.hero}>
           <LinearGradient colors={[colors.lilacSoft, colors.cream]} locations={[0, 1]} style={StyleSheet.absoluteFill} />
-          <View style={{ position: "absolute", right: -50, top: insets.top + 40 }}><Drop size={190} color={colors.lilac} rotate={22} opacity={0.5} /></View>
-          <View style={{ position: "absolute", left: -40, bottom: 10 }}><Drop size={140} color={colors.orange} rotate={-34} opacity={0.28} /></View>
-          <View style={{ position: "absolute", left: "52%", bottom: 40 }}><Drop size={60} color={colors.blue} rotate={74} opacity={0.2} /></View>
+          <View style={{ position: "absolute", right: -50, top: insets.top + 40 }}><Drop size={130} color={colors.lilac} rotate={16} opacity={0.55} /></View>
+          <View style={{ position: "absolute", left: -40, bottom: 10 }}><Drop size={150} color={colors.orange} rotate={-22} opacity={0.3} /></View>
           <FadeUp style={styles.heroLogo}>
             <Logo width={260} tagline />
           </FadeUp>
@@ -118,6 +118,7 @@ export default function Welcome() {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <Backdrop variant="page" />
       {skip}
       <ScrollView
         keyboardShouldPersistTaps="handled"

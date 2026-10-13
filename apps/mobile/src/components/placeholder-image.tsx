@@ -31,9 +31,9 @@ export function PlaceholderImage({
       accessibilityLabel={`Placeholder image: ${subject}`}
     >
       {/* Playful splashes standing in for the photo, in the logo's colours. */}
-      <View style={{ position: "absolute", right: "6%", top: "-10%" }}><Drop size={150} color={colors.lilac} rotate={24} opacity={0.6} /></View>
-      <View style={{ position: "absolute", left: "8%", bottom: "-22%" }}><Drop size={110} color={colors.orange} rotate={-30} opacity={0.5} /></View>
-      <View style={{ position: "absolute", left: "38%", top: "22%" }}><Drop size={46} color={colors.blue} rotate={70} opacity={0.35} /></View>
+      <View style={{ position: "absolute", right: "6%", top: "-10%" }}><Drop size={90} color={colors.lilac} rotate={18} opacity={0.7} /></View>
+      <View style={{ position: "absolute", left: "8%", bottom: "-22%" }}><Drop size={110} color={colors.orange} rotate={-24} opacity={0.6} /></View>
+      <View style={{ position: "absolute", left: "38%", top: "22%" }}><Drop size={80} color={colors.blue} rotate={-8} opacity={0.5} /></View>
       <View style={[styles.chip, labelPosition === "top" ? { top: labelOffset, right: 12 } : compact ? { bottom: 6, left: 6 } : { bottom: labelOffset, left: 12 }]}>
         <Text variant="label" style={{ color: colors.muted }}>{compact ? "Placeholder" : `Placeholder photo: ${subject}`}</Text>
       </View>

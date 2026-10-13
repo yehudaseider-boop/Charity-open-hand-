@@ -5,6 +5,7 @@ import { Button } from "@/components/button";
 import { CheckIcon } from "@/components/icons";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
+import { Backdrop } from "@/components/backdrop";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
 const steps = [
@@ -19,6 +20,7 @@ export default function HowItWorks() {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
+      <Backdrop variant="page" />
       <TopBar title="How it works" fallback="/discover" />
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.md, paddingBottom: insets.bottom + 32, gap: space.block }}>
         <Text variant="h1" accessibilityRole="header">Generosity made simple.</Text>

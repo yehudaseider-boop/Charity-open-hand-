@@ -1,6 +1,7 @@
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, Text, View, type ColorValue } from "react-native";
+import { Backdrop, type BackdropVariant } from "@/components/backdrop";
 import { ThankYou } from "@/components/thank-you";
 import { haptic } from "@/lib/haptics";
 import { AccountIcon, DiscoverIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
@@ -29,8 +30,11 @@ const styles = StyleSheet.create({
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const tab = usePathname().split("/")[1] || "discover";
+  const variant: BackdropVariant = (["discover", "giving", "receipts", "account"] as const).find((t) => t === tab) ?? "discover";
   return (
-    <>
+    <View style={{ flex: 1 }}>
+    <Backdrop variant={variant} />
     <Tabs
       screenListeners={{ tabPress: () => haptic.tap() }}
       screenOptions={{
@@ -40,7 +44,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.blue,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 0, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, height: 68 + insets.bottom, paddingTop: 8, paddingBottom: insets.bottom + 4, ...lift, shadowOffset: { width: 0, height: -6 } },
-        sceneStyle: { backgroundColor: colors.cream },
+        sceneStyle: { backgroundColor: "transparent" },
       }}
     >
       <Tabs.Screen name="discover" options={{ title: "Discover", tabBarLabel: label("Discover"), tabBarIcon: icon(DiscoverIcon) }} />
@@ -49,6 +53,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: label("Account"), tabBarIcon: icon(AccountIcon) }} />
     </Tabs>
     <ThankYou />
-    </>
+    </View>
   );
 }

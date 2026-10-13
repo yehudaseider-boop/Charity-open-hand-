@@ -38,7 +38,7 @@ export default function Account() {
     <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
       <View>
         <Text variant="h1" accessibilityRole="header">Account</Text>
-        <View style={styles.arc}><Splash size={84} blue={false} /></View>
+        <View style={styles.arc}><Splash size={84} /></View>
       </View>
 
       {account.status === "loading" ? (
@@ -92,7 +92,7 @@ export default function Account() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream },
-  arc: { position: "absolute", right: space.gutter - 2, top: 0 },
+  screen: { flex: 1, backgroundColor: "transparent" },
+  arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
   prompt: { gap: 12, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
 });

@@ -54,7 +54,7 @@ export default function Receipts() {
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
       <View>
         <Text variant="h1" accessibilityRole="header">Receipts</Text>
-        <View style={styles.arc}><Splash size={84} blue={false} /></View>
+        <View style={styles.arc}><Splash size={84} /></View>
       </View>
 
       {state === "loading" ? (
@@ -154,8 +154,8 @@ export default function Receipts() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream },
-  arc: { position: "absolute", right: space.gutter - 2, top: 0 },
+  screen: { flex: 1, backgroundColor: "transparent" },
+  arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
   notice: { gap: 4, paddingBottom: space.block - 4, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   list: { borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 16, paddingRight: 6, paddingVertical: 10, minHeight: touch + 12 },

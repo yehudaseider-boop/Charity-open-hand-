@@ -51,7 +51,7 @@ export default function Discover() {
         <View style={{ marginBottom: 14 }}><Logo width={112} /></View>
         <View style={{ marginBottom: 6 }}><DayGreeting /></View>
         <Text variant="h1" accessibilityRole="header">Discover</Text>
-        <View style={styles.arc}><Splash size={92} blue={false} /></View>
+        <View style={styles.arc}><Splash size={96} /></View>
       </View>
 
       <View style={styles.gutter}>
@@ -136,9 +136,9 @@ export default function Discover() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream },
+  screen: { flex: 1, backgroundColor: "transparent" },
   header: { paddingHorizontal: space.gutter, marginBottom: 16 },
-  arc: { position: "absolute", right: space.gutter - 4, top: 0 },
+  arc: { position: "absolute", right: space.gutter - 4, top: -6, zIndex: 2 },
   gutter: { paddingHorizontal: space.gutter },
   search: {
     flexDirection: "row",

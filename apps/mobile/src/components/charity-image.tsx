@@ -38,8 +38,8 @@ export function CharityImage({
   if (live) {
     return (
       <View style={[shape, styles.centre]} accessible={false}>
-        <View style={styles.dropA}><Drop size={compact ? 46 : 110} color={colors.lilac} rotate={28} opacity={0.55} /></View>
-        <View style={styles.dropB}><Drop size={compact ? 30 : 70} color={colors.orange} rotate={-24} opacity={0.5} /></View>
+        <View style={styles.dropA}><Drop size={compact ? 22 : 56} color={colors.lilac} rotate={20} opacity={0.6} /></View>
+        <View style={styles.dropB}><Drop size={compact ? 26 : 64} color={colors.orange} rotate={-20} opacity={0.55} /></View>
         <Text style={[styles.initials, compact && { fontSize: 28 }]}>{initials(charity.nameEn)}</Text>
       </View>
     );

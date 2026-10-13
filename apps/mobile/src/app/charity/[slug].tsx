@@ -16,6 +16,7 @@ import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
+import { Backdrop } from "@/components/backdrop";
 import { colors, radius, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
@@ -55,6 +56,7 @@ export default function CharityDetail() {
 
   return (
     <View style={styles.screen}>
+      <Backdrop variant="page" />
       <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
         <View>
           <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 16 / 9, minHeight: 240 }} />

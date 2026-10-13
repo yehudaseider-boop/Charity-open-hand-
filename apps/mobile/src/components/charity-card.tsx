@@ -1,8 +1,9 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import type { Charity } from "@/data/sample";
 import { colors, fonts, lift, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
+import { PressableScale } from "./pressable-scale";
 import { Status18a } from "./status-18a";
 import { Text } from "./text";
 
@@ -11,7 +12,7 @@ export function CharityCard({ charity, featured = false, live = false }: { chari
   const open = () => router.push(`/charity/${charity.slug}`);
   if (featured) {
     return (
-      <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured`} style={styles.featured}>
+      <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured`} style={styles.featured}>
         <CharityImage charity={charity} live={live} rounded={false} style={{ aspectRatio: 4 / 3, width: "100%" }} />
         <View style={styles.featuredText}>
           <View style={styles.tag}><Text variant="label" style={{ color: colors.blue }}>Featured</Text></View>
@@ -19,11 +20,11 @@ export function CharityCard({ charity, featured = false, live = false }: { chari
           <Text variant="bodyMuted">{[charity.area, charity.cause].filter(Boolean).join(" · ")}</Text>
           <Status18a issues18a={charity.issues18a} />
         </View>
-      </Pressable>
+      </PressableScale>
     );
   }
   return (
-    <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={charity.nameEn} style={styles.row}>
+    <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={charity.nameEn} style={styles.row}>
       <CharityImage charity={charity} live={live} compact style={styles.thumb} />
       <View style={styles.rowText}>
         <Text style={styles.name}>{charity.nameEn}</Text>
@@ -31,7 +32,7 @@ export function CharityCard({ charity, featured = false, live = false }: { chari
         <Text variant="bodyMuted" numberOfLines={2}>{charity.cause}</Text>
         <Status18a issues18a={charity.issues18a} />
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
