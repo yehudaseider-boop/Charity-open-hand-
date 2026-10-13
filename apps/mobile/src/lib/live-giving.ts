@@ -17,6 +17,8 @@ export type KindRow = { donation_id: string; kind: string };
 export type RecurringRow = {
   id: string;
   amount_cents: number | string;
+  /** The donor's extra gift to Nadiv Lev, collected with each month. */
+  contribution_cents?: number | string | null;
   status: string;
   needs_gateway_sync?: boolean;
   next_charge_at: string | null;
@@ -64,17 +66,17 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
 
 export function toRecurring(rows: RecurringRow[]): Recurring[] {
   return rows
-    // Cancelled ones only show while the payment provider hasn't yet stopped them.
-    .filter((r) => r.status === "active" || r.status === "paused" || (r.status === "cancelled" && r.needs_gateway_sync === true))
+    // Cancelled ones only show while the payment provider hasn't yet stopped them. A failed one stays so the donor sees why it stopped.
+    .filter((r) => r.status === "active" || r.status === "paused" || r.status === "failed" || (r.status === "cancelled" && r.needs_gateway_sync === true))
     .map((r) => {
       const c = one(r.charities);
       return {
         id: r.id,
         charitySlug: c?.slug ?? "",
         charityName: c?.name_en ?? "Charity",
-        cents: Number(r.amount_cents),
+        cents: Number(r.amount_cents) + Number(r.contribution_cents ?? 0),
         nextDate: r.next_charge_at ? new Date(r.next_charge_at) : null,
-        status: r.status as "active" | "paused" | "cancelled",
+        status: r.status as "active" | "paused" | "cancelled" | "failed",
         syncing: r.needs_gateway_sync === true,
       };
     });
@@ -179,7 +181,7 @@ export function fromCache(raw: string | null): Cached | null {
         ...(typeof g.thankYou === "string" ? { thankYou: g.thankYou } : {}),
       })),
       recurring: list(o.recurring).map((r) => {
-        const status = r.status === "active" || r.status === "paused" || r.status === "cancelled" ? r.status : null;
+        const status = r.status === "active" || r.status === "paused" || r.status === "cancelled" || r.status === "failed" ? r.status : null;
         if (!status) throw new Error("bad status");
         return {
           id: str(r.id),

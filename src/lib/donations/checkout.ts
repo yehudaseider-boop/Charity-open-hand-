@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
 import { issueConfirmationToken } from "./confirmation-access";
+import { chargeDayOf } from "./schedule";
 import { checkDonorDetails, type CheckoutInput } from "./validation";
 
 export type Quote = Pricing;
@@ -95,9 +96,31 @@ export async function startDonation(args: {
   } catch (e) {
     console.error(e);
   }
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
   const donationId = randomUUID();
   const gateway = getGateway();
+
+  // A monthly donation: the first payment below is month one. The monthly record waits
+  // ("pending") until that payment is confirmed and the card can be charged again.
+  const monthly = v.monthly === "on";
+  const recurringId = monthly ? randomUUID() : null;
+  if (recurringId) {
+    const r = await db.from("recurring_donations").insert({
+      id: recurringId,
+      donor_id: donorId,
+      charity_id: charity.id,
+      amount_cents: fees.amountCents,
+      contribution_cents: fees.contributionCents,
+      status: "pending",
+      wants_18a: want18a,
+      is_anonymous: v.is_anonymous === "on",
+      message: v.message ?? null,
+      gateway: gateway.name,
+      charge_day: chargeDayOf(nowDate),
+    });
+    if (r.error) throw r.error;
+  }
 
   const { error } = await db.from("donations").insert({
     id: donationId,
@@ -112,6 +135,7 @@ export async function startDonation(args: {
     status: "pending",
     gateway: gateway.name,
     gateway_ref: donationId,
+    recurring_id: recurringId,
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
@@ -155,6 +179,13 @@ export async function startDonation(args: {
   // What the donor agreed to, and which version of the Terms and Privacy Policy they saw.
   const consent = await db.from("consents").insert({ kind: "donation", policy_version: legalConfig.policyVersion, donation_id: donationId });
   if (consent.error) throw consent.error;
+  if (recurringId) {
+    // What the donor authorised: the same amount every month until they cancel.
+    const link = await db.from("recurring_donations").update({ first_donation_id: donationId }).eq("id", recurringId);
+    if (link.error) throw link.error;
+    const auth = await db.from("consents").insert({ kind: "monthly_authorisation", policy_version: legalConfig.policyVersion, donation_id: donationId });
+    if (auth.error) throw auth.error;
+  }
 
   // The donor's own choice (maaser, chomesh or general tzedaka). Kept in a table
   // only the donor can read: charities never see it.
@@ -173,12 +204,16 @@ export async function startDonation(args: {
       charityAccountRef: charity.splitAccountRef,
       feeBearer: platformConfig.fees.gatewayChargePaidBy,
       email: v.email,
+      saveCard: monthly,
       returnUrl: `${site}/donate/return?reference=${donationId}&t=${confirmationToken}${args.fromApp ? "&from=app" : ""}`,
       description: `Donation to ${charity.name_en}`,
     });
     return { ok: true, redirectUrl };
   } catch (e) {
     await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", donationId);
+    if (recurringId) {
+      await db.from("recurring_donations").update({ status: "cancelled", cancelled_at: new Date().toISOString(), ended_reason: "the first payment could not be started" }).eq("id", recurringId);
+    }
     if (e instanceof GatewayError) {
       console.error(e);
       return { ok: false, message: "We couldn't reach the payment provider. Please try again in a minute." };

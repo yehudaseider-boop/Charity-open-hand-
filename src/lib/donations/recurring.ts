@@ -1,0 +1,82 @@
+import "server-only";
+import { encrypt } from "@/lib/crypto";
+import type { VerifiedTransaction } from "@/lib/gateway/types";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { addMonths, chargeTime, periodOf } from "./schedule";
+
+/** Thrown when the database refuses a write the monthly set-up needs, so the caller can retry. */
+export class MonthlySetupError extends Error {
+  constructor(what: string, cause?: unknown) {
+    super(`Could not ${what}`, { cause });
+    this.name = "MonthlySetupError";
+  }
+}
+
+type Waiting = { id: string; charge_day: number };
+
+async function waitingFor(donationId: string): Promise<Waiting | null> {
+  const { data, error } = await createAdminClient()
+    .from("recurring_donations")
+    .select("id, charge_day")
+    .eq("first_donation_id", donationId)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (error) throw new MonthlySetupError("read the monthly donation", error);
+  return data as Waiting | null;
+}
+
+/**
+ * The first payment of a monthly donation went through: keep the card authorisation (encrypted)
+ * and schedule next month. Safe to run again. If the payment method cannot be charged again,
+ * the monthly donation is not started (the first gift still stands) and this says so.
+ */
+export async function activateMonthlyDonation(donationId: string, tx: VerifiedTransaction): Promise<"activated" | "not_reusable" | "none"> {
+  const waiting = await waitingFor(donationId);
+  if (!waiting) return "none";
+  const db = createAdminClient();
+  const auth = tx.authorization;
+  if (!auth || !auth.reusable) {
+    const { error } = await db
+      .from("recurring_donations")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), ended_reason: "this payment method cannot be charged again" })
+      .eq("id", waiting.id)
+      .eq("status", "pending");
+    if (error) throw new MonthlySetupError("close the monthly donation", error);
+    return "not_reusable";
+  }
+  const paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
+  const period = periodOf(paidAt);
+  const { error } = await db
+    .from("recurring_donations")
+    .update({
+      status: "active",
+      authorization_encrypted: encrypt(auth.code),
+      card_brand: auth.brand,
+      card_last4: auth.last4,
+      card_exp: auth.expires,
+      last_paid_period: period,
+      failed_attempts: 0,
+      next_charge_at: chargeTime(addMonths(period, 1), waiting.charge_day).toISOString(),
+    })
+    .eq("id", waiting.id)
+    .eq("status", "pending");
+  if (error) throw new MonthlySetupError("start the monthly donation", error);
+  return "activated";
+}
+
+/** The first payment failed: the monthly donation never starts. */
+export async function cancelMonthlyBeforeStart(donationId: string, reason: string): Promise<void> {
+  const waiting = await waitingFor(donationId);
+  if (!waiting) return;
+  const { error } = await createAdminClient()
+    .from("recurring_donations")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString(), ended_reason: reason })
+    .eq("id", waiting.id)
+    .eq("status", "pending");
+  if (error) throw new MonthlySetupError("close the monthly donation", error);
+}
+
+/** Is this payment the first of a monthly donation that has not started yet? */
+export async function monthlyWaitingFor(donationId: string): Promise<boolean> {
+  return (await waitingFor(donationId)) !== null;
+}

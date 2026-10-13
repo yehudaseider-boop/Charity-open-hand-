@@ -23,12 +23,28 @@ export type CheckoutRequest = {
    */
   feeBearer: "charity" | "nediv_lev" | null;
   email: string;
+  /**
+   * The donor is starting a monthly donation: take the payment by card only, so the gateway
+   * returns a reusable card authorisation (see `VerifiedTransaction.authorization`).
+   */
+  saveCard?: boolean;
   /** Where the donor returns after paying. */
   returnUrl: string;
   description: string;
 };
 
 export type TransactionStatus = "success" | "failed" | "pending";
+
+/** A card the donor allowed us to charge again (monthly donations). A secret: store it encrypted, never show it. */
+export type CardAuthorization = {
+  code: string;
+  /** False when the gateway will not let us charge this card again (not every payment method can be reused). */
+  reusable: boolean;
+  last4: string | null;
+  brand: string | null;
+  /** "mm/yyyy" */
+  expires: string | null;
+};
 
 export type VerifiedTransaction = {
   reference: string;
@@ -39,6 +55,20 @@ export type VerifiedTransaction = {
   gatewayTransactionId: string;
   /** When the gateway says the payment went through, if it says. */
   paidAt?: string | null;
+  /** The card used, when the gateway returns one that can be charged again. */
+  authorization?: CardAuthorization | null;
+};
+
+export type ChargeRequest = {
+  /** Our reference for this charge (unique per attempt); the donation id. */
+  reference: string;
+  authorizationCode: string;
+  email: string;
+  totalCents: number;
+  lines: { charityCents: number; contributionCents: number };
+  charityAccountRef: string | null;
+  feeBearer: "charity" | "nediv_lev" | null;
+  description: string;
 };
 
 export type WebhookEvent = {
@@ -69,6 +99,11 @@ export interface PaymentGateway {
   readonly splitsPayments: boolean;
   /** Start a hosted checkout. Returns the page to send the donor to. */
   createCheckout(req: CheckoutRequest): Promise<{ redirectUrl: string }>;
+  /**
+   * Charge a card the donor authorised earlier (a monthly donation). The answer is only a
+   * first indication: the result is always confirmed with `verifyTransaction` before it counts.
+   */
+  chargeAuthorization(req: ChargeRequest): Promise<{ status: TransactionStatus }>;
   /** Ask the gateway directly whether a payment went through. */
   verifyTransaction(reference: string): Promise<VerifiedTransaction>;
   /** Check a webhook's signature and read it. Returns null if the signature is wrong. */

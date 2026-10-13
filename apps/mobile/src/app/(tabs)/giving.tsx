@@ -473,7 +473,7 @@ export default function Giving() {
             <View style={{ gap: 12 }}>
               <Text variant="h2" style={styles.heading}>Monthly donations</Text>
               {recurring.length === 0 ? (
-                <Text variant="bodyMuted">No monthly donations yet. Monthly giving is coming soon.</Text>
+                <Text variant="bodyMuted">No monthly donations yet. Tick the monthly option on the payment page when you give.</Text>
               ) : (
                 <View style={styles.list}>
                   {recurring.map((r, i) => (
@@ -481,7 +481,7 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {r.status === "failed" ? "Stopped: the card was declined" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
                       <Text style={{ fontSize: 17 }}>{rand(r.cents)}/month</Text>
@@ -534,11 +534,13 @@ export default function Giving() {
             <View style={{ gap: 4 }}>
               <Text variant="label">Monthly donation</Text>
               <Text variant="h2">{open.charityName}</Text>
-              <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "cancelled" ? "cancellation requested" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
+              <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "failed" ? "stopped" : open.status === "cancelled" ? "cancellation requested" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
             </View>
             {!preview ? (
               <>
-                {open.status === "cancelled" ? (
+                {open.status === "failed" ? (
+                  <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. To carry on giving monthly, start a new monthly donation on the charity&apos;s page.</Text>
+                ) : open.status === "cancelled" ? (
                   <Text>Cancellation requested. It is confirmed once the payment provider has stopped it.</Text>
                 ) : confirmCancel ? (
                   <View style={{ gap: 10 }}>
@@ -562,7 +564,7 @@ export default function Giving() {
                 <Text variant="label">
                   {open.syncing
                     ? "Your change is saved and waiting for the payment provider to apply it."
-                    : "Your change is saved here and then passed to the payment provider, which takes the monthly payments. Past donations stay in your history."}
+                    : "Your change takes effect at once. Past donations stay in your history."}
                 </Text>
               </>
             ) : (

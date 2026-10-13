@@ -136,7 +136,9 @@ describe("a charity admin", () => {
       expect((await run("select * from public.donations where id = $1", [id])).rowCount).toBe(0);
       expect((await run("select * from public.donation_checkout_details where donation_id = $1", [id])).rowCount).toBe(0);
       expect((await run("select * from public.donation_giving_kinds where donation_id = $1", [id])).rowCount).toBe(0);
-      expect((await run("select * from public.recurring_donations where charity_id = $1", [ids.meals])).rowCount).toBe(0);
+      // Monthly donations: no whole-row read at all (the stored card authorisation is not readable), and no rows from the readable columns.
+      await denied("select * from public.recurring_donations where charity_id = $1", [ids.meals]);
+      expect((await run("select id, status from public.recurring_donations where charity_id = $1", [ids.meals])).rowCount).toBe(0);
       expect((await run("select * from public.donors")).rowCount).toBe(0);
       // Not even their own charity's gateway reference.
       await denied("select gateway_subaccount_ref from public.charities where id = $1", [ids.meals]);
@@ -322,13 +324,13 @@ describe("pausing and cancelling a monthly donation", () => {
     return (await run("select status, needs_gateway_sync, paused_at is not null as paused, cancelled_at is not null as cancelled from public.recurring_donations where id = $1", [id])).rows[0];
   };
 
-  it("lets the donor pause, resume and cancel, and flags each change for the payment provider", async () => {
+  it("lets the donor pause, resume and cancel, effective at once (nothing waits for the payment provider)", async () => {
     await tx(async () => {
       const id = await monthly();
       expect(await state(id)).toMatchObject({ status: "active", needs_gateway_sync: false });
       await as(ids.donorUser);
       await run("select public.set_my_recurring_status($1, 'paused')", [id]);
-      expect(await state(id)).toMatchObject({ status: "paused", paused: true, needs_gateway_sync: true });
+      expect(await state(id)).toMatchObject({ status: "paused", paused: true, needs_gateway_sync: false });
       await as(ids.donorUser);
       await run("select public.set_my_recurring_status($1, 'active')", [id]);
       expect(await state(id)).toMatchObject({ status: "active", paused: false });

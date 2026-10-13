@@ -6,6 +6,9 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 - [ ] **Gateway rates.** Left empty on purpose until Yehuda supplies them (`src/config/platform.ts`). Never guessed.
 - [ ] **Split payments verified in Paystack's test mode** (needs the Paystack test keys; this sandbox cannot reach Paystack). Check, in order: (1) subaccount creation for a South African bank account works with the bank name we hold; (2) a test donation with a charity subaccount settles the donation amount to the subaccount and the contribution to the main account, in ZAR; (3) the fee lands on the side the bearer setting says; (4) what happens when the contribution is R0 and Nadiv Lev bears the fee; (5) the `charge.success` webhook and verify call report the full amount. Then set `PAYSTACK_SPLITS=yes`. Until then Paystack takes no donations.
+- [ ] **Monthly giving, in Paystack's test mode:** (1) a card payment with `channels: ["card"]` returns a reusable authorisation in the verify answer; (2) `charge_authorization` with the subaccount, flat `transaction_charge` and bearer settles like a first payment; (3) a declined card shows as failed in the verify answer; (4) the `charge.success` webhook for a charged authorisation carries our reference. Then run the job against test keys for a full month.
+- [ ] **Schedule the monthly job:** a scheduler calls `/api/jobs/monthly-giving` about hourly with `Authorization: Bearer <CRON_SECRET>`; set `CRON_SECRET` on the server (long random string). Check the answer each day for `errors` and `waiting`. Hosting is not chosen yet, so the scheduler is not either.
+- [ ] **Yosef:** terms and wording for monthly donations (authorisation tick-box, emails), and card-on-file rules for recurring payments.
 - [ ] **Connect every approved charity** (Admin, charity page, "Connect to gateway") before opening. A charity that is not connected shows "isn't taking online donations yet".
 - [ ] **Who pays the gateway charge** (donor, Nadiv Lev or the charity). Decision.
 - [ ] **Pending-payment sweep.** Today a payment still pending after the gateway stops retrying needs a person to check unprocessed rows in `gateway_events`. Decide whether to add an automatic sweep. Decision.
@@ -17,7 +20,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 ## B. Before the switch (technical)
 
-- [ ] Run the database changes on the real database **first**, in order, up to and including `20261012000001_bank_edit_clears_verified.sql` (the last two are `20261011000001_confirmation_credentials.sql` and this one). Then deploy the website code. Doing it the other way round makes new donations fail.
+- [ ] Run the database changes on the real database **first**, in order, up to and including `20261013000001_monthly_giving.sql` (the last three are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql` and this one). Then deploy the website code. Doing it the other way round makes new donations fail.
 - [ ] Back up the real database before running them. Write down how to undo (restore the backup).
 - [ ] Live settings in place and checked: site address, encryption key, database keys, email sending, gateway keys. None of the test values.
 - [ ] **Test gateway is off:** `ALLOW_TEST_GATEWAY` is not set on the live site and the payment gateway setting is the real one.

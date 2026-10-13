@@ -213,7 +213,7 @@
 - Giving history and maaser/chomesh stats come from the server, updated by the webhook. A donor signs into the app with the email they gave with, and every donation under that email appears. (Server side done; app sign-in and live data still to build.)
 - Nadiv Lev issues the s18A receipts on the charity's behalf, as built.
 - s18A details asked: ID number or income tax number only. Address and phone left out until Yehuda confirms what an s18A receipt must show.
-- Monthly donations: not built yet; needs the gateway's recurring billing.
+- Monthly donations: built 13/10/2026 (see "Monthly giving" below). Not by the gateway's recurring billing: by our own scheduled job.
 
 ## Code review fixes (08/10/2026)
 
@@ -425,3 +425,16 @@ Replaces the pooled-fund idea from 09/10/2026 (everything collected centrally an
 - **Adapter fixes made at the same time.** "Abandoned" at Paystack now stays pending (the donor may still pay) instead of being recorded as failed. A verify answer about a different payment is refused. A malformed webhook signature header is a plain rejection, not an error.
 - **Consequences.** The donor's charity choice is binding. The earlier open questions about pooling (holding funds, redistributing by vote, who uploads certificates) no longer apply.
 - **Not verified.** This sandbox cannot reach Paystack, so nothing here has run against it. See the go-live checklist for the test-mode checks. The code was tested with a stubbed network and the local test gateway (a full donation to a connected test charity; an unconnected charity shows "isn't taking online donations yet").
+
+## Monthly giving (13/10/2026)
+
+Built with our own scheduled job, not Paystack's plans and subscriptions. Reason: it keeps the split to the charity (subaccount, flat contribution, fee payer) exactly as for a first payment, and everything can be tested with the local test gateway. Paystack's subscription handling of splits could not be read from this sandbox.
+
+- **Starting.** On the donation form the donor ticks "Give R__ every month" and a second tick-box authorises collecting that amount every month until they cancel (recorded as a `monthly_authorisation` consent against the first donation). The first payment is an ordinary card payment (the checkout is limited to cards, because only a card can be charged again). When it is confirmed, Paystack's reusable card authorisation is kept, encrypted, in `recurring_donations.authorization_encrypted`, which no client can read, not even its owner. A payment method that cannot be charged again keeps the gift but starts no monthly donation, and the donor is told. A failed first payment never starts one.
+- **Collecting.** `/api/jobs/monthly-giving` (needs `Authorization: Bearer <CRON_SECRET>`; off without it) is called by a scheduler about hourly. Each month a donor is collected once, at 08:00 Johannesburg time on the day of the month they first gave (29 to 31 fall on the last day of shorter months). Each attempt is a normal donation with a fixed id (monthly donation + month + attempt), so a repeated or crashed run can never charge twice. A payment the gateway has not settled is checked again, never charged again. Every payment still goes through the same confirmation (amount and currency checks, tax year, confirmation email).
+- **Receipts.** Each monthly donation carries the donor's s18A details and giving choice (copied from the first), so it joins the donor's annual s18A receipt like any other.
+- **Declines.** Up to three attempts in a month: the next day, then three days later. The donor is emailed each time. After the third failure the monthly donation is marked failed, the stored card is destroyed and nothing more is charged. The donor starts a new one to carry on.
+- **Pause and cancel.** The app (Giving tab) and the website (`/account`) both pause, resume and cancel, effective at once. Cancelling destroys the stored authorisation. A paused month is never collected later: on resume only the current month is collected.
+- **Wording to review (Yosef).** The authorisation tick-box, the monthly lines in the confirmation email and the "could not collect" emails are drafts. The Terms need a section on monthly donations.
+- **Not verified.** Nothing here has run against Paystack: the `charge_authorization` request, the reusable authorisation in Paystack's verify answer and the card-only checkout are written from Paystack's published API and stubbed in tests. The full flow (first payment, a collected month, three declines, cancellation) was run locally with the test gateway.
+- **Known gaps.** A donor with no account who loses the confirmation email cannot manage a monthly donation on the website (they sign in with the same email). "Download my information" does not yet include monthly donations. Removing a donor must break the loop between a monthly donation and its first donation (first set `first_donation_id` to null).

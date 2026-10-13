@@ -211,3 +211,31 @@ describe("saved copy size", () => {
     expect(back.gifts[0].id).toBe("g599");
   });
 });
+
+describe("monthly donations (collected by our own job)", () => {
+  it("shows what is collected each month: the donation plus the contribution", () => {
+    const [r] = toRecurring([{ id: "r1", amount_cents: 18_000, contribution_cents: "2000", status: "active", next_charge_at: "2026-11-15T06:00:00Z", charities: charity }]);
+    expect(r.cents).toBe(20_000);
+  });
+
+  it("an older row with no contribution still shows its amount", () => {
+    const [r] = toRecurring([{ id: "r1", amount_cents: 18_000, status: "active", next_charge_at: null, charities: charity }]);
+    expect(r.cents).toBe(18_000);
+  });
+
+  it("a monthly donation that stopped after failed attempts stays visible, and one still waiting for its first payment does not", () => {
+    const rows = toRecurring([
+      { id: "f", amount_cents: 100, status: "failed", next_charge_at: null, charities: charity },
+      { id: "p", amount_cents: 100, status: "pending", next_charge_at: null, charities: charity },
+    ]);
+    expect(rows.map((r) => [r.id, r.status])).toEqual([["f", "failed"]]);
+  });
+
+  it("a failed one survives being saved for offline use", () => {
+    const cached = toCache({
+      gifts: [], receipts: [], elsewhere: [], loadedAt: new Date("2026-10-13T08:00:00Z"),
+      recurring: toRecurring([{ id: "f", amount_cents: 100, status: "failed", next_charge_at: null, charities: charity }]),
+    });
+    expect(fromCache(cached)?.recurring[0].status).toBe("failed");
+  });
+});

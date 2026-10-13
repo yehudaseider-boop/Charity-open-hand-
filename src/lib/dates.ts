@@ -8,7 +8,7 @@ import { platformConfig } from "@/config/platform";
 
 const { timeZone, locale } = platformConfig;
 
-function zonedParts(date: Date): { year: number; month: number; day: number } {
+export function zonedParts(date: Date): { year: number; month: number; day: number } {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     year: "numeric",

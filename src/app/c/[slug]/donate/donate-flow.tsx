@@ -57,7 +57,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
-        <p className="text-xs text-muted">Minimum {minimumLabel}. Once-off donation. No Nadiv Lev fee.</p>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. No Nadiv Lev fee. You can make it monthly below.</p>
 
         <div className="space-y-2 rounded-control bg-bg p-3">
           <label className="flex items-start gap-2 text-sm">
@@ -156,6 +156,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   );
   const [donorType, setDonorType] = useState<"individual" | "company" | "trust">("individual");
   const [want18a, setWant18a] = useState(false);
+  const [monthly, setMonthly] = useState(false);
   const org = donorType !== "individual";
 
   return (
@@ -239,6 +240,24 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         <TextArea name="message" label={`Message to ${charityName}`} rows={3} />
 
+        <div className="space-y-2 rounded-control bg-bg p-3">
+          <label className="flex items-start gap-2 text-sm font-medium">
+            <input type="checkbox" name="monthly" className="mt-1" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
+            <span>Give {formatRand(shownQuote.totalCents)} every month</span>
+          </label>
+          {monthly ? (
+            <>
+              <p className="text-xs text-muted">
+                Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Card payments only.
+                You can pause or cancel at any time in the Nadiv Lev app or from your account on this website.
+              </p>
+              <Check name="monthly_authorised" error={state.fieldErrors?.monthly_authorised}>
+                I authorise Nadiv Lev to collect {formatRand(shownQuote.totalCents)} from my card every month until I cancel.
+              </Check>
+            </>
+          ) : null}
+        </div>
+
         <div className="space-y-2">
           <Check name="is_anonymous">
             Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
@@ -258,7 +277,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         {stale ? <p role="status" className="text-sm text-muted">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
         <button disabled={pending || stale} className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast disabled:opacity-60">
-          {pending ? "Please wait…" : `Pay ${formatRand(shownQuote.totalCents)}`}
+          {pending ? "Please wait…" : monthly ? `Pay ${formatRand(shownQuote.totalCents)} now, then monthly` : `Pay ${formatRand(shownQuote.totalCents)}`}
         </button>
         {state.message ? <p role="status" className="text-sm text-danger">{state.message}</p> : null}
         <p className="text-xs text-muted">You&apos;ll enter your card details on the payment provider&apos;s secure page. We never see or store them.</p>

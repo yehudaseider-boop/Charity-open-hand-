@@ -1,7 +1,7 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { PaymentGateway, VerifiedTransaction, WebhookEvent } from "./types";
+import { GatewayError, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /**
  * A stand-in gateway for local development and automated tests. It shows a
@@ -74,14 +74,34 @@ export const testGateway: PaymentGateway = {
       .order("received_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const p = data?.payload as { outcome?: string; amount?: number; reference?: string } | undefined;
+    const p = data?.payload as
+      | { outcome?: string; amount?: number; reference?: string; authorization?: { code: string; reusable: boolean; last4: string; brand: string; expires: string } }
+      | undefined;
     return {
       reference,
       status: p?.outcome === "success" ? "success" : p?.outcome === "failed" ? "failed" : "pending",
       amountCents: p?.amount ?? 0,
       currency: "ZAR",
       gatewayTransactionId: `test_${reference}`,
+      authorization: p?.authorization ?? null,
     };
+  },
+
+  /** A card authorisation whose code contains "decline" is refused, like a card that has been stopped. */
+  async chargeAuthorization(req) {
+    const outcome = req.authorizationCode.includes("decline") ? "failed" : "success";
+    const payload = {
+      id: randomUUID(),
+      outcome,
+      reference: req.reference,
+      amount: req.totalCents,
+      authorization: { code: req.authorizationCode, reusable: true, last4: "4081", brand: "visa", expires: "12/2030" },
+    };
+    const { error } = await createAdminClient()
+      .from("gateway_events")
+      .insert({ gateway: "test", event_id: payload.id, event_type: outcome === "success" ? "payment_succeeded" : "payment_failed", payload, processed_at: new Date().toISOString() });
+    if (error) throw new GatewayError(`Test gateway could not record the charge: ${error.message}`);
+    return { status: outcome === "success" ? ("success" as const) : ("failed" as const) };
   },
 
   async parseWebhook(rawBody, headers): Promise<WebhookEvent | null> {

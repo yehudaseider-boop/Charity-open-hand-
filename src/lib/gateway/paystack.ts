@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { GatewayError, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
+import { GatewayError, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /**
  * Paystack adapter.
@@ -51,12 +51,24 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** The split part of a checkout: the charity's subaccount, our flat share, and who bears Paystack's fee. */
-function splitFields(req: CheckoutRequest) {
+function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines">) {
   if (!req.feeBearer) throw new GatewayError("Who pays the gateway charge is not decided, so a split payment cannot start.");
   return {
     subaccount: req.charityAccountRef,
     transaction_charge: req.lines.contributionCents,
     bearer: req.feeBearer === "charity" ? "subaccount" : "account",
+  };
+}
+
+/** Paystack's card authorisation, as we keep it. Not reusable (or no code): treated as none. */
+function toAuthorization(a: { authorization_code?: string; reusable?: boolean; last4?: string; card_type?: string; brand?: string; exp_month?: string; exp_year?: string } | null | undefined): CardAuthorization | null {
+  if (!a?.authorization_code) return null;
+  return {
+    code: a.authorization_code,
+    reusable: a.reusable === true,
+    last4: a.last4 && /^\d{4}$/.test(a.last4) ? a.last4 : null,
+    brand: (a.brand ?? a.card_type ?? "").trim().toLowerCase() || null,
+    expires: a.exp_month && a.exp_year ? `${a.exp_month}/${a.exp_year}` : null,
   };
 }
 
@@ -76,6 +88,8 @@ export const paystackGateway: PaymentGateway = {
         currency: "ZAR",
         reference: req.reference,
         callback_url: req.returnUrl,
+        // Only a card payment gives a reusable authorisation, which a monthly donation needs.
+        ...(req.saveCard ? { channels: ["card"] } : {}),
         ...(req.charityAccountRef ? splitFields(req) : {}),
         metadata: {
           description: req.description,
@@ -88,7 +102,15 @@ export const paystackGateway: PaymentGateway = {
   },
 
   async verifyTransaction(reference): Promise<VerifiedTransaction> {
-    const data = await call<{ id: number; status: string; amount: number; currency: string; reference: string; paid_at?: string | null }>(
+    const data = await call<{
+      id: number;
+      status: string;
+      amount: number;
+      currency: string;
+      reference: string;
+      paid_at?: string | null;
+      authorization?: { authorization_code?: string; reusable?: boolean; last4?: string; card_type?: string; brand?: string; exp_month?: string; exp_year?: string } | null;
+    }>(
       `/transaction/verify/${encodeURIComponent(reference)}`,
     );
     // The answer must be about the payment we asked about.
@@ -101,7 +123,28 @@ export const paystackGateway: PaymentGateway = {
       currency: data.currency,
       gatewayTransactionId: String(data.id),
       paidAt: data.paid_at ?? null,
+      authorization: toAuthorization(data.authorization),
     };
+  },
+
+  /**
+   * Charge a card the donor authorised on their first payment. Same split as a first payment.
+   * VERIFY in test mode: the body fields, and the shape of the answer.
+   */
+  async chargeAuthorization(req) {
+    const data = await call<{ status: string }>("/transaction/charge_authorization", {
+      method: "POST",
+      body: JSON.stringify({
+        authorization_code: req.authorizationCode,
+        email: req.email,
+        amount: req.totalCents,
+        currency: "ZAR",
+        reference: req.reference,
+        ...(req.charityAccountRef ? splitFields(req) : {}),
+        metadata: { description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: true },
+      }),
+    });
+    return { status: data.status === "success" ? ("success" as const) : ["failed", "reversed"].includes(data.status) ? ("failed" as const) : ("pending" as const) };
   },
 
   async parseWebhook(rawBody, headers): Promise<WebhookEvent | null> {

@@ -181,3 +181,63 @@ describe("webhook signature", () => {
     expect(await paystackGateway.parseWebhook(body, headers("abc"))).toBeNull();
   });
 });
+
+describe("monthly donations", () => {
+  it("a monthly checkout asks for a card payment only, so the card can be charged again", async () => {
+    answers["/transaction/initialize"] = { authorization_url: "https://checkout.paystack.com/abc" };
+    await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "charity", saveCard: true });
+    expect(calls[0].body).toMatchObject({ channels: ["card"] });
+    calls.length = 0;
+    await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "charity" });
+    expect(calls[0].body).not.toHaveProperty("channels");
+  });
+
+  it("charges a saved card with the same split as a first payment", async () => {
+    answers["/transaction/charge_authorization"] = { status: "success" };
+    const r = await paystackGateway.chargeAuthorization({
+      reference: base.reference, authorizationCode: "AUTH_abc", email: base.email, totalCents: 20_345,
+      lines: base.lines, charityAccountRef: "ACCT_charity1", feeBearer: "nediv_lev", description: "Monthly donation",
+    });
+    expect(r.status).toBe("success");
+    expect(calls[0].body).toMatchObject({
+      authorization_code: "AUTH_abc", email: base.email, amount: 20_345, currency: "ZAR", reference: base.reference,
+      subaccount: "ACCT_charity1", transaction_charge: 2_345, bearer: "account",
+    });
+  });
+
+  it("will not charge a split payment while who pays the gateway charge is undecided", async () => {
+    await expect(
+      paystackGateway.chargeAuthorization({
+        reference: base.reference, authorizationCode: "AUTH_abc", email: base.email, totalCents: 20_345,
+        lines: base.lines, charityAccountRef: "ACCT_charity1", feeBearer: null, description: "Monthly donation",
+      }),
+    ).rejects.toBeInstanceOf(GatewayError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("reads the card authorisation from a verified payment", async () => {
+    answers["/transaction/verify"] = {
+      id: 7, status: "success", amount: 20_345, currency: "ZAR", reference: base.reference,
+      authorization: { authorization_code: "AUTH_abc", reusable: true, last4: "4081", card_type: "visa ", exp_month: "12", exp_year: "2030" },
+    };
+    const tx = await paystackGateway.verifyTransaction(base.reference);
+    expect(tx.authorization).toEqual({ code: "AUTH_abc", reusable: true, last4: "4081", brand: "visa", expires: "12/2030" });
+  });
+
+  it("a payment with no reusable card carries no usable authorisation", async () => {
+    answers["/transaction/verify"] = { id: 7, status: "success", amount: 1, currency: "ZAR", reference: base.reference, authorization: { authorization_code: "AUTH_x", reusable: false } };
+    expect((await paystackGateway.verifyTransaction(base.reference)).authorization?.reusable).toBe(false);
+    answers["/transaction/verify"] = { id: 7, status: "success", amount: 1, currency: "ZAR", reference: base.reference };
+    expect((await paystackGateway.verifyTransaction(base.reference)).authorization).toBeNull();
+  });
+
+  it("maps a charge answer: success, failed, anything else pending", async () => {
+    const charge = async (status: string) => {
+      answers["/transaction/charge_authorization"] = { status };
+      return (await paystackGateway.chargeAuthorization({ reference: base.reference, authorizationCode: "A", email: base.email, totalCents: 1, lines: base.lines, charityAccountRef: null, feeBearer: null, description: "x" })).status;
+    };
+    expect(await charge("success")).toBe("success");
+    expect(await charge("failed")).toBe("failed");
+    expect(await charge("ongoing")).toBe("pending");
+  });
+});

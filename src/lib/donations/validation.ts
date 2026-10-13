@@ -28,6 +28,9 @@ export const checkoutSchema = z.object({
   message: str(500),
   giving_kind: z.enum(["maaser", "chomesh", "tzedaka"], { error: "Choose maaser, chomesh or general tzedaka" }),
   is_anonymous: yes,
+  /** Give this amount every month until the donor cancels. */
+  monthly: yes,
+  monthly_authorised: yes,
   age_confirmed: yes,
   popia_consent: yes,
 });
@@ -59,6 +62,7 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
     if (v.tax_reference && !/^\d{10}$/.test(v.tax_reference)) e.tax_reference = "Income tax numbers are 10 digits";
   }
 
+  if (v.monthly === "on" && v.monthly_authorised !== "on") e.monthly_authorised = "Please confirm you authorise the monthly payments";
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";
   if (v.popia_consent !== "on") e.popia_consent = "Please agree so we can record your donation";
   return e;

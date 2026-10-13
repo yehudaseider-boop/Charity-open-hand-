@@ -93,7 +93,7 @@ async function loadLive(userId: string): Promise<Live> {
         .order("id")
         .range(a, b),
     ),
-    db.from("recurring_donations").select("id, amount_cents, status, needs_gateway_sync, next_charge_at, charities(slug, name_en)").in("donor_id", donorIds),
+    db.from("recurring_donations").select("id, amount_cents, contribution_cents, status, needs_gateway_sync, next_charge_at, charities(slug, name_en)").in("donor_id", donorIds),
     db
       .from("s18a_receipts")
       .select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en")

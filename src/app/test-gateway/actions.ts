@@ -23,7 +23,10 @@ export async function completeTestPayment(formData: FormData) {
   const outcome = formData.get("outcome") === "success" ? "success" : "failed";
   const returnUrl = sameSiteReturn(signed.get("return") ?? "");
 
-  const body = JSON.stringify({ id: randomUUID(), outcome, reference, amount });
+  // A successful card payment returns a reusable authorisation, like a real gateway (monthly donations use it).
+  const authorization =
+    outcome === "success" ? { code: `AUTH_test_${reference.slice(0, 8)}`, reusable: true, last4: "4081", brand: "visa", expires: "12/2030" } : undefined;
+  const body = JSON.stringify({ id: randomUUID(), outcome, reference, amount, authorization });
   const site = process.env.SITE_URL ?? "http://127.0.0.1:3000";
   const res = await fetch(`${site}/api/webhooks/test`, {
     method: "POST",
