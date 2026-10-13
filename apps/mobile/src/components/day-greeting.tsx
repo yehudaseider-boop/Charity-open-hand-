@@ -45,9 +45,9 @@ function useNow(): Date {
 }
 
 const styles = StyleSheet.create({
-  week: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.indigo, marginTop: 2 },
-  hello: { fontFamily: fonts.bodySemibold, fontSize: 18, color: colors.indigo },
-  card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.honeySoft, borderWidth: 1, borderColor: colors.honey },
+  week: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.blue, marginTop: 2 },
+  hello: { fontFamily: fonts.display, fontSize: 22, lineHeight: 28, color: colors.blue },
+  card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   cardBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 24, color: colors.ink },
   cardTitle: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.ink },
 });

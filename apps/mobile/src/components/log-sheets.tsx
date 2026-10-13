@@ -72,7 +72,7 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
             const selected = kind === k;
             return (
               <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setKind(k)} style={[styles.choice, selected && styles.choiceOn]}>
-                <Text style={[type.button, { fontSize: 16, textAlign: "center", color: selected ? colors.accent : colors.ink }]}>{givingKindLabels[k]}</Text>
+                <Text style={[type.button, { fontSize: 16, textAlign: "center", color: selected ? colors.blue : colors.ink }]}>{givingKindLabels[k]}</Text>
               </Pressable>
             );
           })}
@@ -109,5 +109,5 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
 const styles = StyleSheet.create({
   title: { fontSize: 22, lineHeight: 28 },
   choice: { flex: 1, minHeight: 56, paddingHorizontal: 8, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, justifyContent: "center", backgroundColor: colors.surface },
-  choiceOn: { borderColor: colors.accent, borderWidth: 1.5 },
+  choiceOn: { borderColor: colors.blue, borderWidth: 1.5 },
 });

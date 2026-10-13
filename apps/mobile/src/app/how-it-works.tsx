@@ -37,7 +37,7 @@ export default function HowItWorks() {
 
         <View style={styles.promise}>
           <View style={{ marginTop: 3 }}><CheckIcon /></View>
-          <Text style={{ flex: 1, fontSize: 17 }}>Nadiv Lev charges no fee on donations. You can choose to add a contribution to Nadiv Lev.</Text>
+          <Text style={{ flex: 1, fontSize: 17 }}>Givezy charges no fee on donations. You can choose to add a contribution to Givezy.</Text>
         </View>
 
         <Button label="Find a charity" onPress={() => router.navigate("/discover")} />
@@ -47,9 +47,9 @@ export default function HowItWorks() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.parchment },
+  screen: { flex: 1, backgroundColor: colors.cream },
   step: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
-  number: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  number: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
   numberText: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.onInk },
   promise: { flexDirection: "row", gap: 10, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
 });

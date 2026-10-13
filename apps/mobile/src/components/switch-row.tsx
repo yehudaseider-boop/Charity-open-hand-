@@ -49,11 +49,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 16, minHeight: touch, paddingVertical: 6 },
   label: { fontFamily: fonts.bodySemibold, fontSize: 17, lineHeight: 23, color: colors.ink },
   track: { width: 50, height: 30, borderRadius: 15, backgroundColor: colors.hairline, padding: 3, justifyContent: "center" },
-  trackOn: { backgroundColor: colors.accent },
+  trackOn: { backgroundColor: colors.blue },
   knob: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surface },
   knobOn: { alignSelf: "flex-end" },
   checkRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: touch - 8, paddingVertical: 4 },
   box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.muted, alignItems: "center", justifyContent: "center", marginTop: 1 },
-  boxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   tick: { width: 10, height: 6, borderLeftWidth: 2, borderBottomWidth: 2, borderColor: colors.onInk, transform: [{ rotate: "-45deg" }], marginTop: -2 },
 });

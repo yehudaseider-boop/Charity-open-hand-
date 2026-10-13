@@ -118,5 +118,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, lineHeight: 28 },
   check: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44 },
   box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.hairline, alignItems: "center", justifyContent: "center", marginTop: 2 },
-  boxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
 });

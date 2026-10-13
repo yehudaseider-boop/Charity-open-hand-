@@ -25,7 +25,7 @@ export function TopBar({ title, fallback = "/discover" }: { title: string; fallb
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.gutter - 12, paddingBottom: 4, backgroundColor: colors.parchment },
+  bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.gutter - 12, paddingBottom: 4, backgroundColor: colors.cream },
   back: { width: touch, height: touch, alignItems: "center", justifyContent: "center" },
   title: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.ink },
 });

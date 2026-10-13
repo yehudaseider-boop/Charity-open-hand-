@@ -22,12 +22,12 @@ export function confirmThen(title: string, message: string, okLabel: string, onO
 /** Open a page on our website, or say why it can't open yet. */
 export function openSite(path: string) {
   const url = siteUrl(SITE_URL, path);
-  if (!url) return notify("Not available yet", "This opens on the Nadiv Lev website once it is live.");
+  if (!url) return notify("Not available yet", "This opens on the Givezy website once it is live.");
   Linking.openURL(url).catch(() => notify("Couldn't open the website", "Please check your connection and try again."));
 }
 
 /** Open any https link (e.g. the donation page), or explain. */
 export function openUrl(url: string | null) {
-  if (!url) return notify("Not available yet", "Giving opens on the Nadiv Lev website once it is live.");
+  if (!url) return notify("Not available yet", "Giving opens on the Givezy website once it is live.");
   Linking.openURL(url).catch(() => notify("Couldn't open the website", "Please check your connection and try again."));
 }

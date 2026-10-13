@@ -23,7 +23,7 @@ export function InfoButton({ terms, label }: { terms: GlossaryTerm[]; label?: st
         hitSlop={12}
         style={styles.button}
       >
-        <InfoIcon size={18} color={colors.accent} />
+        <InfoIcon size={18} color={colors.blue} />
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Close" accessibilityRole="button" />

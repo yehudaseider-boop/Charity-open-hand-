@@ -1,6 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import { colors, radius } from "@/theme/tokens";
-import { PaperGrain } from "./paper-grain";
+import { Drop } from "./splash";
 import { Text } from "./text";
 
 /**
@@ -30,10 +30,10 @@ export function PlaceholderImage({
       accessibilityRole="image"
       accessibilityLabel={`Placeholder image: ${subject}`}
     >
-      {/* Soft warm forms suggesting light falling across a scene. */}
-      <View style={[styles.form, { width: "70%", height: "80%", left: "-12%", top: "-20%" }]} />
-      <View style={[styles.form, { width: "55%", height: "65%", right: "-10%", bottom: "-18%", opacity: 0.5 }]} />
-      <PaperGrain opacity={0.6} />
+      {/* Playful splashes standing in for the photo, in the logo's colours. */}
+      <View style={{ position: "absolute", right: "6%", top: "-10%" }}><Drop size={150} color={colors.lilac} rotate={24} opacity={0.6} /></View>
+      <View style={{ position: "absolute", left: "8%", bottom: "-22%" }}><Drop size={110} color={colors.orange} rotate={-30} opacity={0.5} /></View>
+      <View style={{ position: "absolute", left: "38%", top: "22%" }}><Drop size={46} color={colors.blue} rotate={70} opacity={0.35} /></View>
       <View style={[styles.chip, labelPosition === "top" ? { top: labelOffset, right: 12 } : compact ? { bottom: 6, left: 6 } : { bottom: labelOffset, left: 12 }]}>
         <Text variant="label" style={{ color: colors.muted }}>{compact ? "Placeholder" : `Placeholder photo: ${subject}`}</Text>
       </View>
@@ -42,13 +42,12 @@ export function PlaceholderImage({
 }
 
 const styles = StyleSheet.create({
-  box: { backgroundColor: colors.hairline, overflow: "hidden" },
-  form: { position: "absolute", borderRadius: 999, backgroundColor: colors.surface, opacity: 0.55 },
+  box: { backgroundColor: colors.lilacSoft, overflow: "hidden" },
   chip: {
     position: "absolute",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 999,
     backgroundColor: colors.surface,
   },
 });

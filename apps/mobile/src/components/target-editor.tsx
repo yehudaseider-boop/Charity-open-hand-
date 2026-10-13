@@ -80,7 +80,7 @@ export function TargetEditor({
                 haptic.tap();
                 setKeeps(v);
               }} style={[styles.choice, selected && styles.choiceOn]}>
-                <Text style={[type.button, { fontSize: 16, color: selected ? colors.accent : colors.ink, textAlign: "center" }]}>{label}</Text>
+                <Text style={[type.button, { fontSize: 16, color: selected ? colors.blue : colors.ink, textAlign: "center" }]}>{label}</Text>
                 <Text variant="label">{note}</Text>
               </Pressable>
             );
@@ -158,7 +158,7 @@ export function TargetEditor({
 
 const styles = StyleSheet.create({
   card: { gap: 18, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  choice: { flex: 1, minHeight: 64, paddingHorizontal: 8, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, alignItems: "center", justifyContent: "center", gap: 2, backgroundColor: colors.parchment },
-  choiceOn: { borderColor: colors.accent, borderWidth: 1.5 },
-  result: { gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.parchment },
+  choice: { flex: 1, minHeight: 64, paddingHorizontal: 8, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, alignItems: "center", justifyContent: "center", gap: 2, backgroundColor: colors.cream },
+  choiceOn: { borderColor: colors.blue, borderWidth: 1.5 },
+  result: { gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.cream },
 });

@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { Charity } from "@/data/sample";
-import { colors, fonts, radius } from "@/theme/tokens";
+import { colors, fonts, lift, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { Status18a } from "./status-18a";
 import { Text } from "./text";
@@ -12,9 +12,9 @@ export function CharityCard({ charity, featured = false, live = false }: { chari
   if (featured) {
     return (
       <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured`} style={styles.featured}>
-        <CharityImage charity={charity} live={live} style={{ aspectRatio: 4 / 3, width: "100%" }} />
+        <CharityImage charity={charity} live={live} rounded={false} style={{ aspectRatio: 4 / 3, width: "100%" }} />
         <View style={styles.featuredText}>
-          <Text variant="label" style={{ color: colors.indigo }}>Featured</Text>
+          <View style={styles.tag}><Text variant="label" style={{ color: colors.blue }}>Featured</Text></View>
           <Text variant="h1" style={{ fontSize: 28, lineHeight: 34 }}>{charity.nameEn}</Text>
           <Text variant="bodyMuted">{[charity.area, charity.cause].filter(Boolean).join(" · ")}</Text>
           <Status18a issues18a={charity.issues18a} />
@@ -36,10 +36,11 @@ export function CharityCard({ charity, featured = false, live = false }: { chari
 }
 
 const styles = StyleSheet.create({
-  featured: { gap: 14 },
-  featuredText: { gap: 4 },
-  row: { flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 4 },
-  thumb: { width: 132, aspectRatio: 4 / 3, borderRadius: radius.control },
+  featured: { gap: 0, borderRadius: radius.card, backgroundColor: colors.surface, overflow: "hidden", ...lift },
+  featuredText: { gap: 6, padding: 20, paddingTop: 16 },
+  tag: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.lilacSoft },
+  row: { flexDirection: "row", gap: 14, alignItems: "flex-start", padding: 12, borderRadius: radius.card, backgroundColor: colors.surface, ...lift },
+  thumb: { width: 120, aspectRatio: 1, borderRadius: radius.control + 4 },
   rowText: { flex: 1, gap: 3 },
-  name: { fontFamily: fonts.display, fontSize: 20, lineHeight: 25, color: colors.ink },
+  name: { fontFamily: fonts.display, fontSize: 20, lineHeight: 25, color: colors.blue },
 });

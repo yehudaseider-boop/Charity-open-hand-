@@ -17,7 +17,7 @@ export function SettingsGroup({ title, cells }: { title?: string; cells: Cell[] 
             onPress={c.onPress}
             accessibilityRole="button"
             accessibilityLabel={c.value ? `${c.label}, ${c.value}` : c.label}
-            style={({ pressed }) => [styles.cell, i > 0 && styles.divider, pressed && { backgroundColor: colors.parchment }]}
+            style={({ pressed }) => [styles.cell, i > 0 && styles.divider, pressed && { backgroundColor: colors.cream }]}
           >
             <Text style={[styles.label, c.destructive && { color: colors.danger }]}>{c.label}</Text>
             <View style={styles.right}>

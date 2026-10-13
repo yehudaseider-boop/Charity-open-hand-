@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
-import { DottedArc } from "@/components/dotted-arc";
+import { Drop } from "@/components/splash";
 import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
-import { PlaceholderImage } from "@/components/placeholder-image";
 import { SkeletonBlock } from "@/components/states";
 import { TargetEditor } from "@/components/target-editor";
 import { Text } from "@/components/text";
@@ -30,7 +29,7 @@ const how = [
 ];
 
 /**
- * First open: three short screens (what Nadiv Lev is, how giving works, an
+ * First open: three short screens (what Givezy is, how giving works, an
  * optional maaser target). Skippable, and shown once per phone.
  * `?welcome=1&step=2` shows it again for design review.
  */
@@ -73,7 +72,7 @@ export default function Welcome() {
   const skip =
     step < STEPS ? (
       <Pressable accessibilityRole="button" accessibilityLabel="Skip the introduction" hitSlop={8} onPress={finish} style={[styles.skip, { top: insets.top + 8 }]}>
-        <Text style={[type.button, { fontSize: 16, color: colors.accent }]}>Skip</Text>
+        <Text style={[type.button, { fontSize: 16, color: colors.blue }]}>Skip</Text>
       </Pressable>
     ) : null;
 
@@ -89,22 +88,17 @@ export default function Welcome() {
     return (
       <View style={styles.screen}>
         <View style={styles.hero}>
-          <PlaceholderImage subject="Shabbos table" rounded={false} labelPosition="top" labelOffset={insets.top + 64} style={StyleSheet.absoluteFill} />
-          <LinearGradient
-            colors={["rgba(251,246,236,0)", "rgba(251,246,236,0.6)", colors.parchment]}
-            locations={[0.35, 0.7, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={[styles.logo, { top: insets.top + 12 }]}>
-            <Logo />
-          </View>
+          <LinearGradient colors={[colors.lilacSoft, colors.cream]} locations={[0, 1]} style={StyleSheet.absoluteFill} />
+          <View style={{ position: "absolute", right: -50, top: insets.top + 40 }}><Drop size={190} color={colors.lilac} rotate={22} opacity={0.5} /></View>
+          <View style={{ position: "absolute", left: -40, bottom: 10 }}><Drop size={140} color={colors.orange} rotate={-34} opacity={0.28} /></View>
+          <View style={{ position: "absolute", left: "52%", bottom: 40 }}><Drop size={60} color={colors.blue} rotate={74} opacity={0.2} /></View>
+          <FadeUp style={styles.heroLogo}>
+            <Logo width={260} tagline />
+          </FadeUp>
           {skip}
         </View>
 
         <View style={[styles.content, { paddingBottom: insets.bottom + space.md }]}>
-          <View style={styles.arc}>
-            <DottedArc size={240} />
-          </View>
           <FadeUp>
             <Text variant="hero" accessibilityRole="header">
               Give to the causes that carry our community.
@@ -151,7 +145,7 @@ export default function Welcome() {
               <View style={{ marginTop: 3 }}>
                 <CheckIcon />
               </View>
-              <Text style={{ flex: 1, fontSize: 17 }}>Nadiv Lev charges no fee on donations.</Text>
+              <Text style={{ flex: 1, fontSize: 17 }}>Givezy charges no fee on donations.</Text>
             </View>
             <View style={{ flex: 1 }} />
             <View style={styles.actions}>
@@ -196,19 +190,19 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.parchment, overflow: "hidden" },
-  hero: { flex: 1, minHeight: 300 },
+  screen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
+  hero: { flex: 1, minHeight: 300, overflow: "hidden", borderBottomLeftRadius: 48, borderBottomRightRadius: 48 },
+  heroLogo: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 40 },
   logo: { position: "absolute", left: space.gutter, zIndex: 2 },
   skip: { position: "absolute", right: space.gutter, zIndex: 3, minHeight: touch, minWidth: touch, alignItems: "flex-end", justifyContent: "center" },
-  content: { paddingHorizontal: space.gutter, marginTop: -40 },
-  arc: { position: "absolute", top: -64, right: -40 },
+  content: { paddingHorizontal: space.gutter, marginTop: 24 },
   support: { marginTop: 12, fontSize: 17, lineHeight: 25 },
   actions: { marginTop: space.block, gap: 16 },
   dots: { flexDirection: "row", justifyContent: "center", gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.hairline },
-  dotOn: { width: 24, backgroundColor: colors.accent },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.lilac },
+  dotOn: { width: 28, backgroundColor: colors.orange },
   step: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
-  number: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
-  numberText: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.onInk },
-  promise: { flexDirection: "row", gap: 10, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
+  number: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
+  numberText: { fontFamily: fonts.display, fontSize: 19, color: colors.onInk },
+  promise: { flexDirection: "row", gap: 10, padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
 });

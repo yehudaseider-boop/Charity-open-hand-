@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Nadiv Lev",
+    "name": "Givezy",
     "slug": "charity-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1F2A5E",
+        "backgroundColor": "#1848A8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -37,7 +37,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#FBF6EC"
+          "backgroundColor": "#FEFDF7"
         }
       ],
       "expo-asset",

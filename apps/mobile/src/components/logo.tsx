@@ -1,8 +1,10 @@
 import { Image } from "react-native";
 
-const source = require("../../assets/logo.png");
+const word = require("../../assets/logo.png");
+const tagline = require("../../assets/logo-tagline.png");
 
-/** Nadiv Lev wordmark. Dark ink on a transparent background. */
-export function Logo({ width = 150 }: { width?: number }) {
-  return <Image source={source} accessibilityRole="image" accessibilityLabel="Nadiv Lev" style={{ width, height: width / 6.1213 }} resizeMode="contain" />;
+/** The Givezy wordmark (transparent background). `tagline` adds "Giving made easy." under it. */
+export function Logo({ width = 150, tagline: withTagline = false }: { width?: number; tagline?: boolean }) {
+  const ratio = withTagline ? 2.7232 : 2.9988;
+  return <Image source={withTagline ? tagline : word} accessibilityRole="image" accessibilityLabel="Givezy" style={{ width, height: width / ratio }} resizeMode="contain" />;
 }

@@ -2,6 +2,7 @@ import { Image, StyleSheet, View, type ViewStyle } from "react-native";
 import { initials } from "@shared/charity/initials";
 import type { Charity } from "@/data/sample";
 import { colors, fonts, radius } from "@/theme/tokens";
+import { Drop } from "./splash";
 import { PlaceholderImage } from "./placeholder-image";
 import { Text } from "./text";
 
@@ -37,6 +38,8 @@ export function CharityImage({
   if (live) {
     return (
       <View style={[shape, styles.centre]} accessible={false}>
+        <View style={styles.dropA}><Drop size={compact ? 46 : 110} color={colors.lilac} rotate={28} opacity={0.55} /></View>
+        <View style={styles.dropB}><Drop size={compact ? 30 : 70} color={colors.orange} rotate={-24} opacity={0.5} /></View>
         <Text style={[styles.initials, compact && { fontSize: 28 }]}>{initials(charity.nameEn)}</Text>
       </View>
     );
@@ -45,7 +48,9 @@ export function CharityImage({
 }
 
 const styles = StyleSheet.create({
-  box: { backgroundColor: colors.accentSoft, overflow: "hidden" },
+  box: { backgroundColor: colors.lilacSoft, overflow: "hidden" },
   centre: { alignItems: "center", justifyContent: "center" },
-  initials: { fontFamily: fonts.bodySemibold, fontSize: 48, color: colors.indigo, letterSpacing: 1 },
+  initials: { fontFamily: fonts.display, fontSize: 52, color: colors.blue, letterSpacing: 1 },
+  dropA: { position: "absolute", right: -10, top: -18 },
+  dropB: { position: "absolute", left: 10, bottom: -22 },
 });

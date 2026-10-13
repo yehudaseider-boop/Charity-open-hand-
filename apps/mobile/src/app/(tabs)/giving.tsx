@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
-import { DottedArc } from "@/components/dotted-arc";
+import { Splash } from "@/components/splash";
 import { FadeUp } from "@/components/fade-up";
 import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
@@ -190,7 +190,7 @@ export default function Giving() {
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
         <View>
           <Text variant="h1" accessibilityRole="header">Giving</Text>
-          <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
+          <View style={styles.arc}><Splash size={84} blue={false} /></View>
         </View>
 
         {state === "loading" ? (
@@ -283,8 +283,8 @@ export default function Giving() {
                     </Text>
                   </>
                 ) : (
-                  <View style={{ gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.honeySoft, borderWidth: 1, borderColor: colors.honey }}>
-                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.indigo }}>
+                  <View style={{ gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.orangeSoft, borderWidth: 1, borderColor: colors.orange }}>
+                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.blue }}>
                       You&apos;ve given your {target.chomeshCents ? "maaser and chomesh" : "maaser"} for this {target.period}.
                     </Text>
                     <Text style={{ fontSize: 16, lineHeight: 24, color: colors.ink }}>Tizku l&apos;mitzvos.</Text>
@@ -627,7 +627,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat} accessibilityLabel={`${label}: ${value}`}>
       <Text variant="label">{label}</Text>
-      <Text style={{ fontSize: 24, lineHeight: 30, ...tabular, color: colors.indigo }}>{value}</Text>
+      <Text style={{ fontSize: 24, lineHeight: 30, ...tabular, color: colors.blue }}>{value}</Text>
     </View>
   );
 }
@@ -645,8 +645,8 @@ const noIncome: IncomeEntry[] = [];
 const newEntryId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.parchment },
-  arc: { position: "absolute", right: -30, top: -6 },
+  screen: { flex: 1, backgroundColor: colors.cream },
+  arc: { position: "absolute", right: space.gutter - 2, top: 0 },
   heading: { fontSize: 22, lineHeight: 28 },
   list: { borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, minHeight: touch + 8 },

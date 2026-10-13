@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
-import { DottedArc } from "@/components/dotted-arc";
+import { Splash } from "@/components/splash";
 import { SettingsGroup } from "@/components/settings-group";
 import { Agree, SignIn } from "@/components/sign-in";
 import { SkeletonBlock } from "@/components/states";
@@ -29,7 +29,7 @@ export default function Account() {
   // privacy policy link in the app, and a way to start deleting your account.
   const open = (path: string) => () => openSite(path);
   const support = [
-    { label: "How Nadiv Lev works", onPress: () => router.push("/how-it-works") },
+    { label: "How Givezy works", onPress: () => router.push("/how-it-works") },
     { label: "Privacy Policy", onPress: open("/privacy") },
     { label: "Terms", onPress: open("/terms") },
   ];
@@ -38,7 +38,7 @@ export default function Account() {
     <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
       <View>
         <Text variant="h1" accessibilityRole="header">Account</Text>
-        <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
+        <View style={styles.arc}><Splash size={84} blue={false} /></View>
       </View>
 
       {account.status === "loading" ? (
@@ -92,7 +92,7 @@ export default function Account() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.parchment },
-  arc: { position: "absolute", right: -30, top: -6 },
+  screen: { flex: 1, backgroundColor: colors.cream },
+  arc: { position: "absolute", right: space.gutter - 2, top: 0 },
   prompt: { gap: 12, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
 });

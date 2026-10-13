@@ -77,8 +77,8 @@ export function HeartIcon({ size = 22, color = colors.ink, filled = false }: Ico
     <Svg {...base(size)}>
       <Path
         d="M12 19.5s-7.5-4.4-7.5-9.6A4.1 4.1 0 0112 7.6a4.1 4.1 0 017.5 2.3c0 5.2-7.5 9.6-7.5 9.6z"
-        {...stroke(filled ? colors.coral : color)}
-        fill={filled ? colors.coral : "none"}
+        {...stroke(filled ? colors.orange : color)}
+        fill={filled ? colors.orange : "none"}
       />
     </Svg>
   );

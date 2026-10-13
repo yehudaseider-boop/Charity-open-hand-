@@ -43,7 +43,7 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
               haptic.tap();
               setKind(k);
             }} style={[styles.choice, selected && styles.choiceOn]}>
-              <Text style={[type.button, { fontSize: 17, color: selected ? colors.accent : colors.ink }]}>{givingKindLabels[k]}</Text>
+              <Text style={[type.button, { fontSize: 17, color: selected ? colors.blue : colors.ink }]}>{givingKindLabels[k]}</Text>
             </Pressable>
           );
         })}
@@ -85,5 +85,5 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
 
 const styles = StyleSheet.create({
   choice: { minHeight: 52, paddingHorizontal: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, justifyContent: "center", backgroundColor: colors.surface },
-  choiceOn: { borderColor: colors.accent, borderWidth: 1.5 },
+  choiceOn: { borderColor: colors.blue, borderWidth: 1.5 },
 });

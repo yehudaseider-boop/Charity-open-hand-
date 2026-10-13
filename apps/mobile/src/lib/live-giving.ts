@@ -17,7 +17,7 @@ export type KindRow = { donation_id: string; kind: string };
 export type RecurringRow = {
   id: string;
   amount_cents: number | string;
-  /** The donor's extra gift to Nadiv Lev, collected with each month. */
+  /** The donor's extra gift to Givezy, collected with each month. */
   contribution_cents?: number | string | null;
   status: string;
   needs_gateway_sync?: boolean;

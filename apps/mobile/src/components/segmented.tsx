@@ -39,7 +39,7 @@ export function Segmented<T extends string>({
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", borderWidth: 1, borderColor: colors.hairline, borderRadius: radius.control, padding: 4, gap: 4, backgroundColor: colors.parchment },
-  option: { flex: 1, minHeight: touch - 4, borderRadius: radius.control - 4, alignItems: "center", justifyContent: "center" },
-  selected: { backgroundColor: colors.indigo },
+  track: { flexDirection: "row", borderRadius: radius.pill, padding: 4, gap: 4, backgroundColor: colors.lilacSoft },
+  option: { flex: 1, minHeight: touch - 4, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  selected: { backgroundColor: colors.blue },
 });

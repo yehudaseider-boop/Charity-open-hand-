@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
 /** Shown while offline: the screen is the giving the phone saved last time. */
 export function OfflineNote({ savedAt }: { savedAt: Date }) {
   return (
-    <View accessibilityRole="alert" style={{ padding: 12, borderRadius: radius.control, backgroundColor: colors.accentSoft }}>
+    <View accessibilityRole="alert" style={{ padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft }}>
       <Text style={{ fontSize: 15, lineHeight: 21 }}>
         No connection. Showing what was saved on {ddmmyyyy(savedAt)} at {hhmm(savedAt)}.
       </Text>

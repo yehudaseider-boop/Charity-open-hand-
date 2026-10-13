@@ -36,7 +36,7 @@ export function Field({
         <InputAccessoryView nativeID={accessoryId}>
           <View style={styles.doneBar}>
             <Pressable onPress={() => Keyboard.dismiss()} accessibilityRole="button" hitSlop={8} style={styles.done}>
-              <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.accent }}>Done</Text>
+              <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.blue }}>Done</Text>
             </Pressable>
           </View>
         </InputAccessoryView>

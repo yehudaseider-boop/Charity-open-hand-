@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharityCard } from "@/components/charity-card";
-import { DottedArc } from "@/components/dotted-arc";
+import { Splash } from "@/components/splash";
 import { FadeUp } from "@/components/fade-up";
 import { Logo } from "@/components/logo";
 import { SearchIcon } from "@/components/icons";
@@ -51,7 +51,7 @@ export default function Discover() {
         <View style={{ marginBottom: 14 }}><Logo width={112} /></View>
         <View style={{ marginBottom: 6 }}><DayGreeting /></View>
         <Text variant="h1" accessibilityRole="header">Discover</Text>
-        <View style={styles.arc}><DottedArc size={160} opacity={0.45} /></View>
+        <View style={styles.arc}><Splash size={92} blue={false} /></View>
       </View>
 
       <View style={styles.gutter}>
@@ -89,10 +89,9 @@ export default function Discover() {
                 haptic.tap();
                 setCause(c.id);
               }}
-              style={styles.filter}
+              style={[styles.filter, selected && styles.filterOn]}
             >
-              <Text style={[styles.filterText, selected && { color: colors.ink, fontFamily: fonts.bodySemibold }]}>{c.label}</Text>
-              <View style={[styles.underline, selected && { backgroundColor: colors.accent }]} />
+              <Text style={[styles.filterText, selected && { color: colors.onInk, fontFamily: fonts.bodySemibold }]}>{c.label}</Text>
             </Pressable>
           );
         })}
@@ -107,7 +106,7 @@ export default function Discover() {
         ) : state === "error" ? (
           <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => (live ? directory.retry() : router.replace("/discover"))} />
         ) : noneYet ? (
-          <EmptyState title="Charities are on their way" body="The first charities are joining Nadiv Lev. Check back soon." />
+          <EmptyState title="Charities are on their way" body="The first charities are joining Givezy. Check back soon." />
         ) : results.length === 0 ? (
           <EmptyState
             title="No charities found"
@@ -137,9 +136,9 @@ export default function Discover() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.parchment },
-  header: { paddingHorizontal: space.gutter, marginBottom: 16, overflow: "hidden" },
-  arc: { position: "absolute", right: -30, top: -6 },
+  screen: { flex: 1, backgroundColor: colors.cream },
+  header: { paddingHorizontal: space.gutter, marginBottom: 16 },
+  arc: { position: "absolute", right: space.gutter - 4, top: 0 },
   gutter: { paddingHorizontal: space.gutter },
   search: {
     flexDirection: "row",
@@ -147,14 +146,14 @@ const styles = StyleSheet.create({
     gap: 10,
     minHeight: touch + 4,
     paddingHorizontal: 14,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.lilac,
     backgroundColor: colors.surface,
   },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 12, outlineStyle: "none" } as object,
-  filters: { paddingHorizontal: space.gutter, gap: 20, marginTop: 12 },
-  filter: { minHeight: touch, justifyContent: "center" },
-  filterText: { fontFamily: fonts.body, fontSize: 16, color: colors.muted },
-  underline: { height: 2, borderRadius: 1, marginTop: 6, backgroundColor: "transparent" },
+  filters: { paddingHorizontal: space.gutter, gap: 10, marginTop: 16, paddingVertical: 4 },
+  filter: { minHeight: 44, paddingHorizontal: 18, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
+  filterOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  filterText: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.ink },
 });

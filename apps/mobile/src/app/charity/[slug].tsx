@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Animated, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
-import { DottedArc } from "@/components/dotted-arc";
 import { BackIcon, HeartIcon } from "@/components/icons";
 import { CharityImage } from "@/components/charity-image";
 import { Sheet } from "@/components/sheet";
@@ -59,12 +58,11 @@ export default function CharityDetail() {
       <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
         <View>
           <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 16 / 9, minHeight: 240 }} />
-          <LinearGradient colors={["rgba(251,246,236,0)", colors.parchment]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={["rgba(251,246,236,0)", colors.cream]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
         </View>
 
         <View style={styles.body}>
-          <View style={styles.arc}><DottedArc size={180} opacity={0.4} /></View>
-          {causeLabel ? <Text variant="label" style={{ color: colors.indigo }}>{causeLabel}</Text> : null}
+          {causeLabel ? <Text variant="label" style={{ color: colors.blue }}>{causeLabel}</Text> : null}
           <Text variant="h1" accessibilityRole="header">{charity.nameEn}</Text>
           <View style={{ marginTop: 6 }}><Status18a issues18a={charity.issues18a} /></View>
 
@@ -161,9 +159,8 @@ export default function CharityDetail() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.parchment, overflow: "hidden" },
+  screen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
   body: { paddingHorizontal: space.gutter, marginTop: -24, gap: 4 },
-  arc: { position: "absolute", right: -50, top: -40 },
   paras: { gap: 14, marginTop: space.block },
   section: { marginTop: space.block, gap: 12 },
   update: { gap: 6, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
@@ -172,6 +169,6 @@ const styles = StyleSheet.create({
   note: { marginTop: space.block, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.hairline },
   topBar: { position: "absolute", left: space.gutter, right: space.gutter, flexDirection: "row", justifyContent: "space-between" },
   round: { width: touch, height: touch, borderRadius: touch / 2, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.hairline },
-  roundOn: { borderColor: colors.coral, backgroundColor: colors.accentSoft },
-  giveBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.gutter, paddingTop: 12, backgroundColor: colors.parchment, borderTopWidth: 1, borderTopColor: colors.hairline },
+  roundOn: { borderColor: colors.orange, backgroundColor: colors.lilacSoft },
+  giveBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.gutter, paddingTop: 12, backgroundColor: colors.cream, borderTopWidth: 1, borderTopColor: colors.hairline },
 });

@@ -15,6 +15,8 @@
 
 # Phone app (apps/mobile)
 
+- **The phone app is now Givezy** (renamed from Nadiv Lev, 13/10/2026). Its look follows the Givezy logo, not the Nadiv Lev kit below: cream pages (#FEFDF7), navy text (#102848), blue (#1848A8) for headlines, buttons, links and tabs, one bright orange (#F88038) accent per screen (graphics only, never small or large text: it fails contrast), lilac (#CCB3FB) for soft highlight cards, Fredoka for headlines, Inter for body, Heebo for Hebrew, pill buttons, big soft corners, the splash drops (`src/components/splash.tsx`). Colours live only in `apps/mobile/src/theme/tokens.ts`. The website, emails and receipts still carry the Nadiv Lev kit until their own rename pass. The deep link scheme (`nedivlev://`) and storage keys (`nediv-lev.*`) are unchanged on purpose: renaming them would break the website's return link and people's saved data.
+
 - Expo + Expo Router (routes in `apps/mobile/src/app`). Donor-facing; charity and admin screens stay on the website.
 - Brand tokens live only in `apps/mobile/src/theme/tokens.ts`. Follow `apps/mobile/AGENTS.md` for Expo rules.
 - The app never handles card details and has no card fields or amount-to-pay screen of its own. Payment happens on our website's payment page: "Give on our website" opens the phone's browser, or, when the in-app giving switch is on (`EXPO_PUBLIC_IN_APP_GIVING=yes`, off by default), the same page in an in-app sheet ("Continue to payment"). Keep the switch off in store builds until Apple's and Google's donation rules are checked (see `docs/go-live-checklist.md`). Never name a specific gateway in app copy.

@@ -77,5 +77,5 @@ const styles = StyleSheet.create({
   card: { gap: 16, padding: 24, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center", alignItems: "stretch" },
   badge: { alignSelf: "center", width: 72, height: 72, borderRadius: 36, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },
   body: { fontSize: 17, lineHeight: 25, textAlign: "center", color: colors.ink },
-  note: { gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.accentSoft },
+  note: { gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
 });
