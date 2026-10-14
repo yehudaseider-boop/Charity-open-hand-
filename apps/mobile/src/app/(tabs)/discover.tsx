@@ -165,3 +165,6 @@ const styles = StyleSheet.create({
   filterOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   filterText: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.ink },
 });
+
+/** A failure while drawing shows "Try again" and the error, not a blank page. */
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

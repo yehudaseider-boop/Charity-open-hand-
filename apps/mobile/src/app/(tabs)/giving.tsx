@@ -665,3 +665,6 @@ const styles = StyleSheet.create({
   tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
   card: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
 });
+
+/** A failure while drawing shows "Try again" and the error, not a blank page. */
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

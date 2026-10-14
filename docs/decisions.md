@@ -515,3 +515,9 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - On Discover the curve follows the header's height, so it always sits just under the filter chips, with or without "Your charities" or a seasonal card.
 - Judgement call: the orange rim was added at Yehuda's request for "some orange". With the header splash that makes two touches of orange per tab, both graphics, never text.
 - Open: seen in the web preview only, not on a phone.
+
+## Givezy app: safety net on the tabs (14/10/2026)
+
+- Yehuda reported the Giving tab going blank in Expo Go on iPhone, twice. Not reproduced: the screen draws fully in the web preview and in an iPhone test render (jest-expo, iOS), with no errors, and the preview has no live database, so it runs on sample data.
+- Each tab now exports an `ErrorBoundary` (`apps/mobile/src/components/screen-error.tsx`): if a screen fails while drawing it shows "Something went wrong", a "Try again" button and the error's own words, instead of a blank page. Next time it happens, a screenshot shows the cause.
+- Open: the cause of the blank Giving page. Whether donors should see the technical error text is on the go-live checklist.

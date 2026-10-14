@@ -167,3 +167,6 @@ const styles = StyleSheet.create({
   iconBtn: { width: touch, height: touch, alignItems: "center", justifyContent: "center" },
   infoRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
 });
+
+/** A failure while drawing shows "Try again" and the error, not a blank page. */
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

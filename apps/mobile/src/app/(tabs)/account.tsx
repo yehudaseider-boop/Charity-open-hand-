@@ -100,3 +100,6 @@ const styles = StyleSheet.create({
   arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
   prompt: { gap: 12, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
 });
+
+/** A failure while drawing shows "Try again" and the error, not a blank page. */
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";
