@@ -12,7 +12,7 @@ export function SavedRow({ charities, live }: { charities: Charity[]; live: bool
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 12, paddingHorizontal: space.gutter }}
+      contentContainerStyle={{ gap: 10, paddingHorizontal: space.gutter }}
       accessibilityLabel="Your charities"
     >
       {charities.map((c) => (
@@ -29,7 +29,6 @@ export function SavedRow({ charities, live }: { charities: Charity[]; live: bool
           <CharityImage charity={c} live={live} compact style={styles.image} />
           <View style={{ gap: 2 }}>
             <Text style={styles.name} numberOfLines={2}>{c.nameEn}</Text>
-            {c.area ? <Text variant="label" numberOfLines={1}>{c.area}</Text> : null}
           </View>
         </Pressable>
       ))}
@@ -38,7 +37,7 @@ export function SavedRow({ charities, live }: { charities: Charity[]; live: bool
 }
 
 const styles = StyleSheet.create({
-  tile: { width: 148, gap: 8 },
-  image: { width: 148, aspectRatio: 4 / 3 },
-  name: { fontFamily: fonts.bodySemibold, fontSize: 16, lineHeight: 21, color: colors.ink },
+  tile: { width: 96, gap: 8, alignItems: "center" },
+  image: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: colors.lilac },
+  name: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 18, color: colors.ink, textAlign: "center" },
 });

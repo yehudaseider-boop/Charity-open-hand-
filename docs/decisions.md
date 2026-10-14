@@ -470,3 +470,11 @@ The business is now called Givezy (G-i-v-e-z-y). Yehuda supplied the logo and ch
 - **Not changed, on purpose:** the deep link scheme `nedivlev://` (the website's return link uses it) and the `nediv-lev.*` storage keys (renaming would lose saved targets and caches). Bundle ids are unchanged. Change these only together with the website rename.
 - **Still on the Nadiv Lev kit:** the website, emails, receipts and PDFs, the Privacy Policy and Terms (legal wording for Yosef). One rename pass for all of them is still to do.
 - **Open:** whether to use the logo's exact rounded display font if Yehuda has its name (Fredoka is a close free stand-in); photos in the sample data are remote images that need a network; preview screenshots are in `docs/givezy-app-preview/`. Nothing here has been seen on a real phone or in Expo Go yet.
+
+## Charity journey, less generic (14/10/2026)
+
+Yehuda: the screens felt "very AI"; the background stays, the blocks in front had to feel authentic. Started with the charity journey; the other pages follow once he approves this direction.
+
+- **Charity page** reads like a short magazine story: a tall photo, the name on a cream sheet that overlaps it, the Hebrew name under the English, the first paragraph as a large opening line, then "Where your gift goes". Cause, area and tax receipt sit in a ruled fact sheet instead of badges. Updates are dated notes with a lilac margin line; photos are white-bordered prints with a slight tilt and their caption. A cream bar slides in behind the back and heart buttons once the photo scrolls away. The button names the charity ("Give to ...").
+- **Discover** is an editorial list (square photo, name, area in orange text, cause, a quiet "s18A receipt" tick line) divided by hairlines, with no boxes. The featured charity is a cover: its photo with the name set over it and an "In the spotlight" tag. Saved charities are round photos with a lilac ring.
+- Sample photos are remote images, so the review screenshots show lilac where photos load on the phone.

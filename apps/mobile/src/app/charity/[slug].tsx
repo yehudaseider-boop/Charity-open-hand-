@@ -4,22 +4,31 @@ import { useState } from "react";
 import { Animated, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
-import { BackIcon, HeartIcon } from "@/components/icons";
+import { BackIcon, CheckIcon, HeartIcon } from "@/components/icons";
+import { InfoButton } from "@/components/info-button";
 import { CharityImage } from "@/components/charity-image";
 import { Sheet } from "@/components/sheet";
 import { GiveSheet } from "@/components/give-sheet";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
-import { Status18a } from "@/components/status-18a";
-import { Text } from "@/components/text";
+import { HebrewText, Text } from "@/components/text";
 import { ddmmyyyy } from "@/lib/format";
 import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
 import { Backdrop } from "@/components/backdrop";
-import { colors, radius, space, touch } from "@/theme/tokens";
+import { colors, fonts, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.fact}>
+      <Text variant="label" style={styles.factLabel}>{label}</Text>
+      <Text style={styles.factValue}>{value}</Text>
+    </View>
+  );
+}
+
 export default function CharityDetail() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ slug: string; sheet?: string; saved?: string }>();
@@ -27,6 +36,7 @@ export default function CharityDetail() {
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const savedList = useSaved();
   const [pop] = useState(() => new Animated.Value(1));
+  const [scrollY] = useState(() => new Animated.Value(0));
 
   if (charity === undefined) {
     return (
@@ -57,41 +67,50 @@ export default function CharityDetail() {
   return (
     <View style={styles.screen}>
       <Backdrop variant="page" />
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
+      <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}>
         <View>
-          <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 16 / 9, minHeight: 240 }} />
-          <LinearGradient colors={["rgba(251,246,236,0)", colors.cream]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} />
+          <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 4 / 4.2, minHeight: 320 }} />
         </View>
 
-        <View style={styles.body}>
-          {causeLabel ? <Text variant="label" style={{ color: colors.blue }}>{causeLabel}</Text> : null}
-          <Text variant="h1" accessibilityRole="header">{charity.nameEn}</Text>
-          <View style={{ marginTop: 6 }}><Status18a issues18a={charity.issues18a} /></View>
+        {/* The name sits on a cream sheet that overlaps the photo, like a page turned over it. */}
+        <View style={styles.sheet}>
+          <Text variant="h1" accessibilityRole="header" style={{ fontSize: 34, lineHeight: 39 }}>{charity.nameEn}</Text>
+          {charity.nameHe ? <HebrewText style={styles.hebrew}>{charity.nameHe}</HebrewText> : null}
 
-          <View style={styles.paras}>
-            {charity.area ? <Text variant="label">{charity.area}</Text> : null}
-            {charity.about[0] ? (
-              <>
-                <Text variant="label" style={{ color: colors.ink }}>What they do</Text>
-                <Text>{charity.about[0]}</Text>
-              </>
-            ) : null}
-            {charity.about[1] ? (
-              <>
-                <Text variant="label" style={{ color: colors.ink, marginTop: 6 }}>How your donation is used</Text>
-                <Text>{charity.about[1]}</Text>
-              </>
-            ) : null}
+          {charity.about[0] ? <Text style={styles.lead}>{charity.about[0]}</Text> : null}
+          {charity.about[1] ? (
+            <View style={{ gap: 6, marginTop: 18 }}>
+              <Text style={styles.kicker}>Where your gift goes</Text>
+              <Text>{charity.about[1]}</Text>
+            </View>
+          ) : null}
+
+          {/* A plain fact sheet, ruled like a form, instead of badges. */}
+          <View style={styles.facts}>
+            {causeLabel ? <Fact label="Cause" value={causeLabel} /> : null}
+            {charity.area ? <Fact label="Area" value={charity.area} /> : null}
+            <View style={styles.fact}>
+              <Text variant="label" style={styles.factLabel}>Tax receipt</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, justifyContent: "flex-end" }}>
+                {charity.issues18a ? <CheckIcon size={16} color={colors.sage} /> : null}
+                <Text style={styles.factValue}>{charity.issues18a ? "s18A receipt" : "No s18A receipt"}</Text>
+                <InfoButton terms={["s18a"]} />
+              </View>
+            </View>
           </View>
 
           {updates.length ? (
             <View style={styles.section}>
-              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">Latest from them</Text>
-              {updates.map((u) => (
-                <View key={u.id} style={styles.update}>
-                  <Text variant="label">{ddmmyyyy(u.date)}</Text>
+              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">What&apos;s been happening</Text>
+              {updates.map((u, i) => (
+                <View key={u.id} style={styles.note}>
+                  <Text style={styles.noteDate}>{ddmmyyyy(u.date)}</Text>
                   <Text>{u.body}</Text>
-                  {u.photoUrl ? <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} /> : null}
+                  {u.photoUrl ? (
+                    <View style={[styles.print, { transform: [{ rotate: i % 2 ? "1.2deg" : "-1.2deg" }] }]}>
+                      <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />
+                    </View>
+                  ) : null}
                 </View>
               ))}
             </View>
@@ -99,28 +118,29 @@ export default function CharityDetail() {
 
           {photos.length ? (
             <View style={styles.section}>
-              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">Photos</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: space.gutter }} style={{ marginRight: -space.gutter }}>
-                {photos.map((ph) => (
-                  <View key={ph.id} style={{ width: 220, gap: 6 }}>
+              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">From their week</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: space.gutter, paddingVertical: 10, paddingLeft: 2 }} style={{ marginRight: -space.gutter }}>
+                {photos.map((ph, i) => (
+                  <View key={ph.id} style={[styles.print, { width: 210, transform: [{ rotate: i % 2 ? "1.6deg" : "-1.6deg" }] }]}>
                     <Image source={{ uri: ph.url }} style={styles.photo} resizeMode="cover" accessibilityLabel={ph.caption ?? `Photo from ${charity.nameEn}`} />
-                    {ph.caption ? <Text variant="label" numberOfLines={2}>{ph.caption}</Text> : null}
+                    {ph.caption ? <Text style={styles.caption} numberOfLines={2}>{ph.caption}</Text> : null}
                   </View>
                 ))}
               </ScrollView>
             </View>
           ) : null}
 
-          <View style={styles.note}>
-            <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-              {charity.issues18a
-                ? `Donations qualify for one annual s18A tax receipt, issued on ${charity.nameEn}'s behalf after the tax year closes.`
-                : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
-            </Text>
-          </View>
+          <Text variant="bodyMuted" style={{ fontSize: 15, lineHeight: 22, marginTop: space.block }}>
+            {charity.issues18a
+              ? `Every donation counts towards one s18A receipt a year, issued on ${charity.nameEn}'s behalf after the tax year closes.`
+              : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
+          </Text>
           {live ? null : <Text variant="label" style={{ marginTop: 12 }}>Sample charity for design review</Text>}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Once the photo has scrolled away, a cream bar slides in behind the back and heart buttons. */}
+      <Animated.View pointerEvents="none" style={[styles.headerBar, { height: insets.top + 56 + touch + 10, opacity: scrollY.interpolate({ inputRange: [180, 260], outputRange: [0, 1], extrapolate: "clamp" }) }]} />
 
       {/* Header controls over the photo */}
       <View style={[styles.topBar, { top: insets.top + 56 }]} pointerEvents="box-none">
@@ -150,7 +170,8 @@ export default function CharityDetail() {
 
       {/* Sticky give bar */}
       <View style={[styles.giveBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Button label="Give" onPress={() => setSheetOpen(true)} />
+        <LinearGradient colors={["rgba(254,253,247,0)", colors.cream]} style={styles.fade} pointerEvents="none" />
+        <Button label={`Give to ${charity.nameEn}`} onPress={() => setSheetOpen(true)} />
       </View>
 
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)}>
@@ -162,15 +183,25 @@ export default function CharityDetail() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
-  body: { paddingHorizontal: space.gutter, marginTop: -24, gap: 4 },
-  paras: { gap: 14, marginTop: space.block },
-  section: { marginTop: space.block, gap: 12 },
-  update: { gap: 6, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  updatePhoto: { width: "100%", aspectRatio: 4 / 3, borderRadius: radius.control, marginTop: 4, backgroundColor: colors.hairline },
-  photo: { width: 220, aspectRatio: 1, borderRadius: radius.card, backgroundColor: colors.hairline },
-  note: { marginTop: space.block, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.hairline },
+  sheet: { marginTop: -36, paddingHorizontal: space.gutter, paddingTop: 26, borderTopLeftRadius: 36, borderTopRightRadius: 36, backgroundColor: colors.cream },
+  hebrew: { fontSize: 19, color: colors.muted, marginTop: 2 },
+  lead: { fontSize: 20, lineHeight: 30, color: colors.ink, marginTop: 18 },
+  kicker: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
+  facts: { marginTop: space.block, borderTopWidth: 1, borderTopColor: colors.hairline },
+  fact: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 52, borderBottomWidth: 1, borderBottomColor: colors.hairline, gap: 12 },
+  factLabel: { color: colors.muted },
+  factValue: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.ink, textAlign: "right" },
+  section: { marginTop: space.block + 8, gap: 14 },
+  note: { gap: 6, paddingLeft: 16, borderLeftWidth: 3, borderLeftColor: colors.lilac },
+  noteDate: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue },
+  print: { backgroundColor: colors.surface, padding: 7, paddingBottom: 10, borderRadius: 6, marginTop: 6, gap: 8, shadowColor: "#102848", shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  updatePhoto: { width: "100%", aspectRatio: 4 / 3, borderRadius: 3, backgroundColor: colors.lilacSoft },
+  photo: { width: "100%", aspectRatio: 1, borderRadius: 3, backgroundColor: colors.lilacSoft },
+  caption: { fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.ink, paddingHorizontal: 2 },
+  headerBar: { position: "absolute", top: 0, left: 0, right: 0, backgroundColor: colors.cream, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   topBar: { position: "absolute", left: space.gutter, right: space.gutter, flexDirection: "row", justifyContent: "space-between" },
   round: { width: touch, height: touch, borderRadius: touch / 2, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.hairline },
   roundOn: { borderColor: colors.orange, backgroundColor: colors.lilacSoft },
-  giveBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.gutter, paddingTop: 12, backgroundColor: colors.cream, borderTopWidth: 1, borderTopColor: colors.hairline },
+  giveBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.gutter, paddingTop: 12, backgroundColor: colors.cream },
+  fade: { position: "absolute", left: 0, right: 0, top: -28, height: 28 },
 });

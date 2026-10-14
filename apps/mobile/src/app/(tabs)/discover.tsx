@@ -120,10 +120,11 @@ export default function Discover() {
                 <CharityCard charity={featured} featured live={live} />
               </FadeUp>
             ) : null}
-            <View style={{ gap: 20 }}>
+            <View>
+              {rest.length ? <Text style={styles.listHead}>{cause === "all" && !query ? "More charities" : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
               {rest.map((c, i) => (
                 <FadeUp key={c.slug} index={i + 1}>
-                  <CharityCard charity={c} live={live} />
+                  <CharityCard charity={c} live={live} last={i === rest.length - 1} />
                 </FadeUp>
               ))}
             </View>
@@ -152,6 +153,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 12, outlineStyle: "none" } as object,
+  listHead: { fontFamily: fonts.bodySemibold, fontSize: 14, letterSpacing: 0.3, color: colors.muted, marginBottom: 2 },
   filters: { paddingHorizontal: space.gutter, gap: 10, marginTop: 16, paddingVertical: 4 },
   filter: { minHeight: 44, paddingHorizontal: 18, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
   filterOn: { backgroundColor: colors.blue, borderColor: colors.blue },
