@@ -1,7 +1,8 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CauseTiles } from "@/components/cause-tiles";
 import { CharityCard } from "@/components/charity-card";
 import { GiveSheet } from "@/components/give-sheet";
 import { Sheet } from "@/components/sheet";
@@ -13,7 +14,6 @@ import { SearchIcon } from "@/components/icons";
 import { EmptyState, ErrorState, LoadingList, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { useDirectory } from "@/lib/directory";
-import { haptic } from "@/lib/haptics";
 import { inCause, savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
@@ -82,25 +82,10 @@ export default function Discover() {
         </View>
       ) : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} accessibilityRole="tablist">
-        {causes.map((c) => {
-          const selected = c.id === cause;
-          return (
-            <Pressable
-              key={c.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              onPress={() => {
-                haptic.tap();
-                setCause(c.id);
-              }}
-              style={[styles.filter, selected && styles.filterOn]}
-            >
-              <Text style={[styles.filterText, selected && { color: colors.onInk, fontFamily: fonts.bodySemibold }]}>{c.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={{ marginTop: space.block, gap: 12 }}>
+        <Text variant="h2" style={{ fontSize: 22, lineHeight: 28, paddingHorizontal: space.gutter }} accessibilityRole="header">Causes</Text>
+        <CauseTiles causes={causes} selected={cause} onSelect={setCause} />
+      </View>
 
       <View style={[styles.gutter, { marginTop: space.block }]}>
         {state === "loading" ? (
@@ -162,8 +147,4 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 12, outlineStyle: "none" } as object,
   listHead: { fontFamily: fonts.bodySemibold, fontSize: 14, letterSpacing: 0.3, color: colors.muted, marginBottom: 2 },
-  filters: { paddingHorizontal: space.gutter, gap: 10, marginTop: 16, paddingVertical: 4 },
-  filter: { minHeight: 44, paddingHorizontal: 18, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
-  filterOn: { backgroundColor: colors.blue, borderColor: colors.blue },
-  filterText: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.ink },
 });
