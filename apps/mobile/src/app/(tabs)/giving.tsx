@@ -30,7 +30,7 @@ import { loadTarget, saveTarget, setAsideTarget } from "@/lib/targets";
 import { RecordProblem } from "@/components/record-problem";
 import { useStoredRecord } from "@/lib/use-stored-record";
 import type { SaveResult } from "@/lib/stored-result";
-import { colors, fonts, radius, space, tabular, touch, type } from "@/theme/tokens";
+import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -247,11 +247,33 @@ export default function Giving() {
                 onCancel={target ? () => setEditing(false) : undefined}
               />
             ) : (
-              <View style={{ gap: 10 }}>
+              <View style={{ gap: 22 }}>
                 <MaaserProgress title="Maaser" givenCents={maaserGiven} targetCents={target.maaserCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
                 {target.chomeshCents ? (
-                  <MaaserProgress title="Chomesh" givenCents={chomeshGiven} targetCents={target.chomeshCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
+                  <MaaserProgress title="Chomesh" givenCents={chomeshGiven} targetCents={target.chomeshCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} compact />
                 ) : null}
+              <View style={styles.strip}>
+                {remaining > 0 ? (
+                  <>
+                    <Text style={styles.stripKicker}>Still to give</Text>
+                    <Text variant="amount" style={{ fontSize: 34, lineHeight: 38 }}>{rand(remaining)}</Text>
+                    <Text style={{ fontSize: 16, lineHeight: 23, color: colors.ink }}>
+                      {target.chomeshCents ? `${rand(maaserLeft)} maaser and ${rand(chomeshLeft)} chomesh, ` : ""}
+                      {byMonth
+                        ? `still to give by ${periodEnd}, the end of this month.`
+                        : `still to give by ${yearEnd}. About ${rand(monthlyToReach(remaining, monthsLeft))} a month over the ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left.`}
+                    </Text>
+                    <TextLink label="Find a charity" onPress={() => router.push("/discover")} />
+                  </>
+                ) : (
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.blue }}>
+                      You&apos;ve given your {target.chomeshCents ? "maaser and chomesh" : "maaser"} for this {target.period}.
+                    </Text>
+                    <Text style={{ fontSize: 16, lineHeight: 24, color: colors.ink }}>Tizku l&apos;mitzvos.</Text>
+                  </View>
+                )}
+              </View>
                 <View style={styles.tzedakaRow}>
                   <Text style={{ flexShrink: 1, fontSize: 16 }}>General tzedaka this {target.period}</Text>
                   <View style={{ flex: 1 }}><InfoButton terms={["generalTzedaka"]} /></View>
@@ -269,29 +291,6 @@ export default function Giving() {
               </View>
             )}
 
-            {target !== null && !editing ? (
-              <View style={styles.card}>
-                <Text variant="label">Amount to give</Text>
-                {remaining > 0 ? (
-                  <>
-                    <Text variant="amount" style={{ fontSize: 36, lineHeight: 42 }}>{rand(remaining)}</Text>
-                    <Text variant="bodyMuted">
-                      {target.chomeshCents ? `${rand(maaserLeft)} maaser and ${rand(chomeshLeft)} chomesh, ` : ""}
-                      {byMonth
-                        ? `still to give by ${periodEnd}, the end of this month.`
-                        : `still to give by ${yearEnd}. About ${rand(monthlyToReach(remaining, monthsLeft))} a month over the ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left.`}
-                    </Text>
-                  </>
-                ) : (
-                  <View style={{ gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.orangeSoft, borderWidth: 1, borderColor: colors.orange }}>
-                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.blue }}>
-                      You&apos;ve given your {target.chomeshCents ? "maaser and chomesh" : "maaser"} for this {target.period}.
-                    </Text>
-                    <Text style={{ fontSize: 16, lineHeight: 24, color: colors.ink }}>Tizku l&apos;mitzvos.</Text>
-                  </View>
-                )}
-              </View>
-            ) : null}
 
             {/* Your records: income (kept on this phone) and giving made elsewhere. */}
             {preview || signedIn ? (
@@ -362,8 +361,8 @@ export default function Giving() {
                 ) : null}
 
                 <View style={{ flexDirection: "row", gap: 10 }}>
-                  <View style={{ flex: 1 }}><Button label="Log income" disabled={!incomeReady} onPress={() => setLogging("income")} /></View>
-                  <View style={{ flex: 1 }}><Button label="Log giving elsewhere" onPress={() => setLogging("elsewhere")} /></View>
+                  <View style={{ flex: 1 }}><Button variant="secondary" label="Log income" disabled={!incomeReady} onPress={() => setLogging("income")} /></View>
+                  <View style={{ flex: 1 }}><Button variant="secondary" label="Given elsewhere" onPress={() => setLogging("elsewhere")} /></View>
                 </View>
 
                 {income.length > 0 ? (
@@ -416,21 +415,21 @@ export default function Giving() {
             {myGifts.length > 0 ? (
               <View style={{ gap: 12 }}>
                 <Text variant="h2" style={styles.heading}>This year in numbers</Text>
-                <View style={styles.statRow}>
-                  <Stat label="Given this year" value={rand(giftsTotal)} />
-                  <Stat label="This month" value={rand(monthTotal)} />
-                </View>
-                <View style={styles.statRow}>
-                  <Stat label="Donations made" value={String(yearGifts.length)} />
-                  <Stat label="Charities" value={String(charities.length)} />
-                </View>
+                <Text style={styles.summary}>
+                  This year you gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}
+                  {monthTotal > 0 ? <>, <Text style={styles.summaryFigure}>{rand(monthTotal)}</Text> of it this month.</> : "."}
+                </Text>
                 {charities.length > 0 ? (
                   <View style={styles.list}>
                     {charities.map((c, i) => (
-                      <View key={c.name} style={[styles.row, i > 0 && styles.divider]}>
-                        <Text style={{ flex: 1, fontSize: 17 }}>{c.name}</Text>
-                        <Text variant="bodyMuted" style={{ fontSize: 16 }}>{percentOf(c.cents, giftsTotal)}%</Text>
-                        <Text style={{ fontSize: 17 }}>{rand(c.cents)}</Text>
+                      <View key={c.name} style={[styles.share, i > 0 && styles.divider]} accessible accessibilityLabel={`${c.name}: ${rand(c.cents)}, ${percentOf(c.cents, giftsTotal)} per cent`}>
+                        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10 }}>
+                          <Text style={{ flex: 1, fontSize: 17 }}>{c.name}</Text>
+                          <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{rand(c.cents)}</Text>
+                        </View>
+                        <View style={styles.shareTrack}>
+                          <View style={[styles.shareFill, { width: `${Math.max(percentOf(c.cents, giftsTotal), 2)}%` }]} />
+                        </View>
                       </View>
                     ))}
                   </View>
@@ -448,6 +447,7 @@ export default function Giving() {
                 <View style={styles.list}>
                   {(["maaser", "chomesh", "tzedaka"] as const).map((k, i) => (
                     <View key={k} style={[styles.row, i > 0 && styles.divider]}>
+                      <View style={[styles.dot, { backgroundColor: kindColour[k] }]} />
                       <Text style={{ flex: 1, fontSize: 17 }}>{givingKindLabels[k]}</Text>
                       <Text style={{ fontSize: 17 }}>{rand(sumOfKind(yearGifts, k))}</Text>
                     </View>
@@ -503,6 +503,7 @@ export default function Giving() {
                     <View style={styles.list}>
                       {g.rows.map((gift, i) => (
                         <Pressable key={gift.id} onPress={() => setOpenGift(gift)} accessibilityRole="button" accessibilityLabel={`${gift.charityName}, ${rand(gift.cents)}, ${ddmmyyyy(gift.date)}`} style={[styles.row, i > 0 && styles.divider]}>
+                          <View style={[styles.dot, { backgroundColor: kindColour[gift.kind] }]} />
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
                             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
@@ -623,15 +624,6 @@ export default function Giving() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.stat} accessibilityLabel={`${label}: ${value}`}>
-      <Text variant="label">{label}</Text>
-      <Text style={{ fontSize: 24, lineHeight: 30, ...tabular, color: colors.blue }}>{value}</Text>
-    </View>
-  );
-}
-
 function DetailRow({ label, value, divider }: { label: string; value: string; divider?: boolean }) {
   return (
     <View style={[styles.row, divider && styles.divider]}>
@@ -641,6 +633,9 @@ function DetailRow({ label, value, divider }: { label: string; value: string; di
   );
 }
 
+/** Each kind of giving keeps one colour everywhere: maaser blue, chomesh orange, tzedaka lilac. */
+const kindColour = { maaser: colors.blue, chomesh: colors.orange, tzedaka: colors.lilac } as const;
+
 const noIncome: IncomeEntry[] = [];
 const newEntryId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -648,12 +643,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
   arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
   heading: { fontSize: 22, lineHeight: 28 },
-  list: { borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface, overflow: "hidden" },
-  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, minHeight: touch + 8 },
+  // Lists are ruled like a ledger: lines above and below, no box.
+  list: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
+  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, minHeight: touch + 8 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  share: { gap: 8, paddingVertical: 12, paddingHorizontal: 2 },
+  shareTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.lilacSoft, overflow: "hidden" },
+  shareFill: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.blue },
+  summary: { fontFamily: fonts.display, fontSize: 24, lineHeight: 32, color: colors.ink },
+  summaryFigure: { fontFamily: fonts.display, fontSize: 24, lineHeight: 32, color: colors.blue },
+  strip: { gap: 4, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  stripKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue },
   divider: { borderTopWidth: 1, borderTopColor: colors.hairline },
   cancel: { minHeight: touch, alignItems: "center", justifyContent: "center" },
-  tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  card: { gap: 6, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  statRow: { flexDirection: "row", gap: 12 },
-  stat: { flex: 1, gap: 4, padding: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
+  tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
+  card: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
 });

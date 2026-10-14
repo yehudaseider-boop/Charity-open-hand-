@@ -478,3 +478,10 @@ Yehuda: the screens felt "very AI"; the background stays, the blocks in front ha
 - **Charity page** reads like a short magazine story: a tall photo, the name on a cream sheet that overlaps it, the Hebrew name under the English, the first paragraph as a large opening line, then "Where your gift goes". Cause, area and tax receipt sit in a ruled fact sheet instead of badges. Updates are dated notes with a lilac margin line; photos are white-bordered prints with a slight tilt and their caption. A cream bar slides in behind the back and heart buttons once the photo scrolls away. The button names the charity ("Give to ...").
 - **Discover** is an editorial list (square photo, name, area in orange text, cause, a quiet "s18A receipt" tick line) divided by hairlines, with no boxes. The featured charity is a cover: its photo with the name set over it and an "In the spotlight" tag. Saved charities are round photos with a lilac ring.
 - Sample photos are remote images, so the review screenshots show lilac where photos load on the phone.
+
+## Giving page, less generic (14/10/2026)
+
+- **Top of the page** is one statement, not three boxes: "Maaser · October 2026", the amount given large, a thick progress bar and a plain sentence. Chomesh is a smaller line under it with an orange bar. "Still to give" moved straight under them as a soft lilac strip with a "Find a charity" link (it used to sit below the fold).
+- **This year in numbers** is a sentence ("This year you gave R1 040 in 3 donations to 3 charities, R860 of it this month.") and a bar per charity showing its share, instead of four number tiles.
+- **Lists** (history, monthly, income, given elsewhere, the s18A split) are ruled like a ledger, without boxes. Each kind of giving keeps one colour everywhere: maaser blue, chomesh orange, general tzedaka lilac, shown as a dot on each donation.
+- "Log income" and "Given elsewhere" are outlined buttons (a new secondary button style), so the page has one strong action at a time. No calculations changed.
