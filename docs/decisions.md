@@ -500,3 +500,13 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Expo packages updated to the latest patch for SDK 57.
 
 **Known and accepted:** the phone app's package audit lists 22 advisories, almost all in build tools (Metro, the Expo command line) that never run on a phone; `braces` and `node-forge` have no fixed version yet. The one in the app itself (`decode-uri-component`, used for links) has its fix only in a new major version that is incompatible with the bundler, so it waits for Expo to update it. The website's audit is clean. Judgement call: the Giving page uses orange for chomesh in the bars and dots, so it has more than one orange accent; that is data colour, not decoration, and was kept on purpose.
+
+## Taking once-off gifts inside the app (14/10/2026)
+
+Yehuda decided donors can give inside the app, with the card entered on the payment provider's own page (not website donate pages). Chosen: app screens for amount, giving kind, contribution and donor details; the provider's hosted page in an in-app sheet; once-off gifts first, monthly after; in-app payments stay off in store builds until Apple and Google confirm in writing.
+
+- **Server:** `POST /api/app/quote` and `POST /api/app/checkout` reuse the website's `quoteDonation` and `startDonation`, so the minimums, the s18A rules, the age and privacy confirmations, the rate limit (5 attempts per 10 minutes by address and email), the pending record, the consents and the split to the charity are the same as on the website. A gift is marked paid only when the provider confirms it (webhook, or verification on return). The secret key never leaves the server.
+- **Switches, both off by default:** `APP_GIVING=yes` on the server (otherwise both endpoints answer 404) and `EXPO_PUBLIC_IN_APP_GIVING=yes` in the app. With the app switch off, "Give on our website" still opens the browser.
+- **App:** `give/[slug]` screen; the give sheet hands over to it when the switch is on. The app sends whole cents, never a card number. A changed total is shown again before anything is charged.
+- **Unchanged and still open:** who pays the provider's fee (`gatewayChargePaidBy`), the gateway rates, the first run against Paystack's test mode, and the store rules. Monthly giving in the app is the next step.
+- **Store-rule risk, raised once:** Apple's rules may allow in-app donations only for approved nonprofits, possibly per listed charity; Google lists tax-exempt donations as payments outside Play Billing. Yehuda accepted this with the switch off for store builds.

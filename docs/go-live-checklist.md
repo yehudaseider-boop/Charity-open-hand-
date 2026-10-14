@@ -35,6 +35,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] A normal website build with the real font access passes, plus typecheck, lint and all tests.
 - [ ] Phone app: build and submit through the app stores. In-app giving is a switch (`EXPO_PUBLIC_IN_APP_GIVING`, off unless set to `yes` in the EAS environment). Leave it off for the first store submission. Before turning it on, check the current App Store and Google Play rules for donations inside apps (as I understand them: charity approval, offering Apple Pay on iPhone, disclosure of how funds are used, and Google's payments and fundraising policy), and update the app privacy and data-safety answers (payment details are handled by the payment provider, not the app). Decision.
 - [ ] In-app giving test on real phones (iPhone and Android) with the test gateway: open the sheet, pay, return to the app, thank-you appears. Then one small real payment after go-live.
+- [ ] In-app payments (once-off): the app and server both stay off for store builds (`EXPO_PUBLIC_IN_APP_GIVING`, `APP_GIVING`). Before turning either on in production: get Apple's and Google's answer in writing, run `docs/paystack-test-script.md` through the app (give screen, then the Paystack page, return, confirmation), and decide who pays the provider's fee. Decision.
 - [ ] A new native build is needed for the store apps because `expo-web-browser` was added (Expo Go already has it).
 
 ## C. First live day
