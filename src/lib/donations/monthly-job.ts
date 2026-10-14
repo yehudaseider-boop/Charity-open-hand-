@@ -49,6 +49,8 @@ export type MonthlyDeps = {
   store: MonthlyStore;
   charge(req: { reference: string; r: DueMonthly; totalCents: number }): Promise<void>;
   confirm(reference: string): Promise<ConfirmOutcome>;
+  /** Whether an error from `confirm` means the gateway has no record of the payment at all. */
+  isNotFound(e: unknown): boolean;
   /** Whether the charity can still take donations, and its account at the gateway. */
   charityState(slug: string): Promise<{ accepting: boolean }>;
   notifyFailed(r: DueMonthly, info: { totalCents: number; final: boolean }): Promise<void>;
@@ -107,8 +109,14 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         return true;
       };
       if (existing === null) {
+        // Not even an attempt row for a donor who stopped since this list was read.
+        if (!(await store.stillActive(r.id))) {
+          summary.waiting.push({ id: r.id, reason: "no longer active" });
+          continue;
+        }
         await store.createAttempt(r, donationId, totalCents);
-        // If this throws, the outcome is unknown: the attempt stays pending and is only checked, never charged again.
+        // If this throws, the outcome is unknown: the attempt stays pending and is checked next run; it is
+        // sent again only if the gateway later says it never received it.
         if (!(await send())) {
           summary.waiting.push({ id: r.id, reason: "no longer active" });
           continue;
@@ -119,10 +127,11 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       try {
         outcome = await deps.confirm(donationId);
       } catch (e) {
-        // A pending attempt the gateway has never heard of: the run that made it died (or the charge was
-        // refused) before the charge reached the gateway. Send it again under the same reference; the
-        // gateway refuses a reference it already has, so this cannot take the money twice.
-        const stuck = existing !== null && existing.status === "pending" && now.getTime() - existing.createdAt.getTime() > STUCK_AFTER_MS;
+        // A pending attempt the gateway says it has never heard of: the run that made it died (or the
+        // charge was refused) before the charge reached the gateway. Only then is it sent again, under the
+        // same reference. Any other error (gateway down, database) is reported and checked next run.
+        const stuck =
+          existing !== null && existing.status === "pending" && now.getTime() - existing.createdAt.getTime() > STUCK_AFTER_MS && deps.isNotFound(e);
         if (!stuck) throw e;
         if (!(await send())) {
           summary.waiting.push({ id: r.id, reason: "no longer active" });

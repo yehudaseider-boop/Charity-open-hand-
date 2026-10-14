@@ -119,6 +119,27 @@ describe("erase_donor_data", () => {
     });
   });
 
+  it("a monthly donation closed by a failed first payment is marked as erased, so it can never restart", async () => {
+    await tx(async () => {
+      const w = await world();
+      await run("update public.recurring_donations set status = 'cancelled', ended_reason = 'the first payment failed' where donor_id = $1", [w.donor]);
+      await run("select public.erase_donor_data(array[$1]::uuid[])", [w.donor]);
+      const m = (await run("select ended_reason from public.recurring_donations where donor_id = $1", [w.donor])).rows[0];
+      expect(m.ended_reason).toBe("the donor's information was erased");
+    });
+  });
+
+  it("a charity's signed declarations survive the signer's account being deleted", async () => {
+    await tx(async () => {
+      await run("reset role");
+      const u = (await run("insert into auth.users (id, email, aud, role) values (gen_random_uuid(), 'signer@example.co.za', 'authenticated', 'authenticated') returning id")).rows[0].id as string;
+      await run("insert into public.consents (kind, policy_version, user_id, charity_id) values ('charity_declarations', '2026-10', $1, $2)", [u, ids.meals]);
+      await run("delete from auth.users where id = $1", [u]);
+      const left = await run("select user_id from public.consents where kind = 'charity_declarations' and charity_id = $1 and user_id is null", [ids.meals]);
+      expect(left.rows.length).toBeGreaterThan(0);
+    });
+  });
+
   it("removes the customer from the gateway's raw records but keeps the reference", async () => {
     await tx(async () => {
       const w = await world();

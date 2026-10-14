@@ -45,7 +45,9 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = (await res.json().catch(() => null)) as { status?: boolean; message?: string; data?: T } | null;
   if (!res.ok || !body?.status) {
-    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`);
+    // Only a 404, or Paystack saying in words that it has no such transaction, counts as "never received".
+    const notFound = res.status === 404 || /transaction reference not found|transaction not found/i.test(body?.message ?? "");
+    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound });
   }
   return body.data as T;
 }

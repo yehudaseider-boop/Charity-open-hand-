@@ -54,6 +54,7 @@ function deps(): MonthlyDeps {
       return o;
     },
     charityState: async () => ({ accepting }),
+    isNotFound: (e) => e instanceof Error && /not found/i.test(e.message),
     notifyFailed: async (_r, info) => void failedEmails.push({ final: info.final }),
   };
 }
@@ -211,6 +212,23 @@ describe("an attempt that never reached the gateway", () => {
     const s = await runMonthlyCharges(deps());
     expect(charges).toEqual([{ reference: ref, total: 20_000 }]);
     expect(s.paid).toBe(1);
+  });
+
+  it("an old pending attempt is not sent again when the gateway is merely down", async () => {
+    world.attempts.set(ref, "pending");
+    world.born = new Date(NOW.getTime() - 60 * 60_000);
+    confirmWith = () => {
+      throw new Error("gateway down");
+    };
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(s.errors).toEqual([{ id: "rec1", message: "gateway down" }]);
+  });
+
+  it("a donor who stopped since the list was read gets no attempt row at all", async () => {
+    world.active = false;
+    await runMonthlyCharges(deps());
+    expect(world.attempts.size).toBe(0);
   });
 
   it("a recent pending attempt is only checked, never sent again, and the error is reported", async () => {

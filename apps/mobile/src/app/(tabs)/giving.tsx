@@ -416,15 +416,17 @@ export default function Giving() {
               <View style={{ gap: 12 }}>
                 <Text variant="h2" style={styles.heading}>This year in numbers</Text>
                 <Text style={styles.summary}>
-                  This year you gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}
-                  {monthTotal > 0 ? <>, <Text style={styles.summaryFigure}>{rand(monthTotal)}</Text> of it this month.</> : "."}
+                  This year you gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}.
                 </Text>
+                {/* The month can include days before Rosh Hashana, so it is its own line, not "part of" the year. */}
+                {monthTotal > 0 ? <Text variant="bodyMuted">This month so far: {rand(monthTotal)}.</Text> : null}
                 {charities.length > 0 ? (
                   <View style={styles.list}>
                     {charities.map((c, i) => (
                       <View key={c.name} style={[styles.share, i > 0 && styles.divider]} accessible accessibilityLabel={`${c.name}: ${rand(c.cents)}, ${percentOf(c.cents, giftsTotal)} per cent`}>
                         <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10 }}>
                           <Text style={{ flex: 1, fontSize: 17 }}>{c.name}</Text>
+                          <Text variant="bodyMuted" style={{ fontSize: 15 }}>{percentOf(c.cents, giftsTotal)}%</Text>
                           <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{rand(c.cents)}</Text>
                         </View>
                         <View style={styles.shareTrack}>
@@ -542,7 +544,7 @@ export default function Giving() {
                 {open.status === "failed" ? (
                   <View style={{ gap: 10 }}>
                     <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. To carry on giving monthly, start a new monthly donation on the charity&apos;s page.</Text>
-                    <Button label={busy ? "Removing…" : "Remove it from my list"} disabled={busy} onPress={() => changeRecurring(open.id, "cancelled")} />
+                    <Button label={busy ? "Removing…" : "Remove it from my list"} disabled={busy} onPress={() => confirmThen("Remove this monthly donation?", "It has already stopped and nothing more is charged. It will no longer show in your list.", "Remove", () => changeRecurring(open.id, "cancelled"))} />
                   </View>
                 ) : open.status === "cancelled" ? (
                   <Text>Cancellation requested. It is confirmed once the payment provider has stopped it.</Text>

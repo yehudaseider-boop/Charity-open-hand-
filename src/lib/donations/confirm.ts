@@ -4,7 +4,7 @@ import { taxYearFor } from "@/lib/dates";
 import { gatewayByName } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyDonationPaid } from "./notify";
-import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyWaitingFor } from "./recurring";
+import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyHandledElsewhere, monthlyWaitingFor } from "./recurring";
 
 export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
 
@@ -66,7 +66,10 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (updated?.length) {
       // Set up the monthly donation first (a failure here is retried: see the paid branch above).
       const monthly = donation.recurring_id ? await activateMonthlyDonation(donation.id, tx) : "none";
-      await notifyDonationPaid(donation.id, { monthly });
+      // A concurrent call that finished the monthly set-up first has already sent the email.
+      if (!(donation.recurring_id && monthly === "none" && (await monthlyHandledElsewhere(donation.id)))) {
+        await notifyDonationPaid(donation.id, { monthly });
+      }
       return "paid";
     }
     // Nothing changed: another confirmation got there first. Trust only what is saved.

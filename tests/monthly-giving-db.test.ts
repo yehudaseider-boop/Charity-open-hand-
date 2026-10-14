@@ -4,6 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { addMonths, chargeTime, periodOf } from "@/lib/donations/schedule";
 
 const client = new pg.Client({
   connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
@@ -138,7 +139,32 @@ describe("pausing, resuming and cancelling", () => {
         [id],
       );
       expect(rows[0]).toEqual({ ahead: true, day: 15, hour: 6 });
+      // This month's charge day if it is still ahead, otherwise next month's.
+      const now = new Date((await run("select now() as n")).rows[0].n);
+      const p = periodOf(now);
+      const expected = chargeTime(p, 15) > now ? chargeTime(p, 15) : chargeTime(addMonths(p, 1), 15);
+      const got = (await run("select next_charge_at from public.recurring_donations where id = $1", [id])).rows[0].next_charge_at;
+      expect(new Date(got).toISOString()).toBe(expected.toISOString());
     });
+  });
+
+  it("resuming after this month is already collected waits for next month", async () => {
+    await tx(async () => {
+      const { id } = await monthly();
+      const now = new Date((await run("select now() as n")).rows[0].n);
+      await run("update public.recurring_donations set last_paid_period = $2 where id = $1", [id, periodOf(now)]);
+      await asWho(ids.donorUser);
+      await change(id, "paused");
+      await change(id, "active");
+      await run("reset role");
+      const got = (await run("select next_charge_at from public.recurring_donations where id = $1", [id])).rows[0].next_charge_at;
+      expect(new Date(got).toISOString()).toBe(chargeTime(addMonths(periodOf(now), 1), 15).toISOString());
+    });
+  });
+
+  it("a charge day past the end of a short month falls on its last day", async () => {
+    const { rows } = await run("select public.monthly_charge_time('2027-02-01'::timestamp, 31) as t");
+    expect(new Date(rows[0].t).toISOString()).toBe("2027-02-28T06:00:00.000Z");
   });
 
   it("cancelling destroys the stored card authorisation, for good", async () => {
@@ -158,8 +184,12 @@ describe("pausing, resuming and cancelling", () => {
       await run("savepoint p");
       await expect(change(id, "active")).rejects.toThrow(/cannot be set to/);
       await run("rollback to savepoint p");
+      await run("reset role");
+      await run("update public.recurring_donations set ended_reason = 'the card was declined every time we tried this month' where id = $1", [id]);
+      await as(ids.donorUser);
       await change(id, "cancelled");
-      expect((await status(id)).status).toBe("cancelled");
+      // Removing a stopped one keeps the real reason.
+      expect(await status(id)).toMatchObject({ status: "cancelled", ended_reason: "the card was declined every time we tried this month" });
     });
   });
 

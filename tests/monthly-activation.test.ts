@@ -30,7 +30,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         maybeSingle: async () => {
           if (table === "donations") return { data: filters.gateway_ref === donation.gateway_ref || filters.id === donation.id ? { ...donation } : null, error: null };
           if (table === "recurring_donations") {
-            const hit = recurring.first_donation_id === filters.first_donation_id && waiting(recurring);
+            const hit = recurring.first_donation_id === filters.first_donation_id && (!filters.__or || waiting(recurring));
             return { data: hit ? { ...recurring } : null, error: null };
           }
           return { data: null, error: null };
@@ -154,6 +154,13 @@ describe("the first payment of a monthly donation", () => {
     await confirmPayment(REF);
     expect(recurring.status).toBe("active");
     expect(notify).toHaveBeenCalledWith(REF, { monthly: "none" });
+  });
+
+  it("no second email when a concurrent confirmation already started the monthly donation", async () => {
+    recurring = { ...recurring, status: "active" }; // the other call won the set-up and sent the email
+    verify.mockResolvedValue(paid());
+    expect(await confirmPayment(REF)).toBe("paid");
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("activating twice changes nothing the second time", async () => {

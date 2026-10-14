@@ -18,6 +18,7 @@ export function CharityImage({
   compact = false,
   labelPosition,
   labelOffset,
+  bare = false,
 }: {
   charity: Charity;
   live: boolean;
@@ -26,6 +27,8 @@ export function CharityImage({
   compact?: boolean;
   labelPosition?: "top" | "bottom";
   labelOffset?: number;
+  /** No initials and no placeholder label: text will be set over the image. */
+  bare?: boolean;
 }) {
   const shape = [styles.box, rounded && { borderRadius: compact ? radius.control : radius.card }, style];
   if (charity.coverUrl) {
@@ -40,11 +43,11 @@ export function CharityImage({
       <View style={[shape, styles.centre]} accessible={false}>
         <View style={styles.dropA}><Drop size={compact ? 22 : 56} color={colors.lilac} rotate={20} opacity={0.6} /></View>
         <View style={styles.dropB}><Drop size={compact ? 26 : 64} color={colors.orange} rotate={-20} opacity={0.55} /></View>
-        <Text style={[styles.initials, compact && { fontSize: 28 }]}>{initials(charity.nameEn)}</Text>
+        {bare ? null : <Text style={[styles.initials, compact && { fontSize: 28 }]}>{initials(charity.nameEn)}</Text>}
       </View>
     );
   }
-  return <PlaceholderImage subject={charity.photo} rounded={rounded} compact={compact} labelPosition={labelPosition} labelOffset={labelOffset} style={style} />;
+  return <PlaceholderImage subject={charity.photo} rounded={rounded} compact={compact} labelPosition={bare ? "top" : labelPosition} labelOffset={labelOffset} style={style} />;
 }
 
 const styles = StyleSheet.create({

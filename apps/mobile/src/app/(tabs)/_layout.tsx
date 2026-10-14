@@ -1,4 +1,5 @@
 import { Tabs, usePathname } from "expo-router";
+import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, Text, View, type ColorValue } from "react-native";
 import { Backdrop, type BackdropVariant } from "@/components/backdrop";
@@ -30,8 +31,11 @@ const styles = StyleSheet.create({
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const tab = usePathname().split("/")[1] || "discover";
-  const variant: BackdropVariant = (["discover", "giving", "receipts", "account"] as const).find((t) => t === tab) ?? "discover";
+  // Keep the last tab's background while a pushed screen (a charity page) is on top, so it doesn't swap underneath.
+  const first = usePathname().split("/")[1] || "discover";
+  const tab = (["discover", "giving", "receipts", "account"] as const).find((t) => t === first);
+  const [variant, setVariant] = useState<BackdropVariant>(tab ?? "discover");
+  if (tab && tab !== variant) setVariant(tab);
   return (
     <View style={{ flex: 1 }}>
     <Backdrop variant={variant} />

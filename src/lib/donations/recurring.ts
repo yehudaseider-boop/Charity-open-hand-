@@ -16,6 +16,7 @@ type Waiting = { id: string; charge_day: number };
 
 /** Why a monthly donation is closed when its first payment is seen to fail. */
 export const FIRST_PAYMENT_FAILED = "the first payment failed";
+const NOT_REUSABLE = "this payment method cannot be charged again";
 
 /**
  * The monthly donation whose first payment this is and which has not started. That includes one
@@ -46,7 +47,7 @@ export async function activateMonthlyDonation(donationId: string, tx: VerifiedTr
   if (!auth || !auth.reusable) {
     const { data, error } = await db
       .from("recurring_donations")
-      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), ended_reason: "this payment method cannot be charged again" })
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), ended_reason: NOT_REUSABLE })
       .eq("id", waiting.id)
       .or(`status.eq.pending,and(status.eq.cancelled,ended_reason.eq.${FIRST_PAYMENT_FAILED})`)
       .select("id");
@@ -87,6 +88,20 @@ export async function cancelMonthlyBeforeStart(donationId: string, reason: strin
     .eq("id", waiting.id)
     .eq("status", "pending");
   if (error) throw new MonthlySetupError("close the monthly donation", error);
+}
+
+/**
+ * Did another confirmation already handle this first payment's monthly set-up (started it, or closed
+ * it because the card cannot be charged again)? Then that call sent the email and this one must not.
+ */
+export async function monthlyHandledElsewhere(donationId: string): Promise<boolean> {
+  const { data, error } = await createAdminClient()
+    .from("recurring_donations")
+    .select("status, ended_reason")
+    .eq("first_donation_id", donationId)
+    .maybeSingle();
+  if (error) throw new MonthlySetupError("read the monthly donation", error);
+  return !!data && (data.status === "active" || data.ended_reason === NOT_REUSABLE);
 }
 
 /** Is this payment the first of a monthly donation that has not started yet? */

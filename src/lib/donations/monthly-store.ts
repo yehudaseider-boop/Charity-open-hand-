@@ -5,6 +5,7 @@ import { loadDonatableCharity } from "./charity";
 import { getEmailTransport } from "@/lib/email";
 import { formatRand } from "@/lib/money";
 import { getGateway } from "@/lib/gateway";
+import { isGatewayNotFound } from "@/lib/gateway/types";
 import { platformConfig } from "@/config/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore, type MonthlySummary } from "./monthly-job";
@@ -191,6 +192,7 @@ export async function runMonthlyGiving(now = new Date()): Promise<MonthlySummary
       });
     },
     confirm: confirmPayment,
+    isNotFound: isGatewayNotFound,
     async charityState(slug) {
       return { accepting: Boolean((await loadDonatableCharity(slug))?.acceptingPayments) };
     },

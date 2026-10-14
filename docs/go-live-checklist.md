@@ -22,9 +22,11 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Domain, registrar and hosting** chosen.
 - [ ] **App calendar choices:** Shabbos and Yom Tov end at sunset plus 72 minutes (confirm), whether "today" follows the phone's time zone or Johannesburg, and whether Elul shows "Shana tova" instead of "Good Shabbos".
 
+- [ ] **One name everywhere.** The phone app says Givezy; the website, payment page, emails, receipts, Privacy Policy and Terms still say Nadiv Lev. Rename them together (with Yosef for the legal pages) before anyone outside the team sees both. Decision on timing.
+
 ## B. Before the switch (technical)
 
-- [ ] Run the database changes on the real database **first**, in order, up to and including `20261014000002_resume_waits_for_charge_day.sql` (the last six are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql`, `20261013000001_monthly_giving.sql`, `20261013000002_erase_donor.sql`, `20261014000001_account_deletion_unblocked.sql` and this one). Then deploy the website code. Doing it the other way round makes new donations fail.
+- [ ] Run the database changes on the real database **first**, in order, up to and including `20261014000003_review_fixes.sql` (the last seven are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql`, `20261013000001_monthly_giving.sql`, `20261013000002_erase_donor.sql`, `20261014000001_account_deletion_unblocked.sql`, `20261014000002_resume_waits_for_charge_day.sql` and this one). The Givezy test project (`bodfyjskiwrwxhagtkxt`) needs `20261014000003_review_fixes.sql` too. Then deploy the website code. Doing it the other way round makes new donations fail.
 - [ ] Back up the real database before running them. Write down how to undo (restore the backup).
 - [ ] Live settings in place and checked: site address, encryption key, database keys, email sending, gateway keys. None of the test values.
 - [ ] **Test gateway is off:** `ALLOW_TEST_GATEWAY` is not set on the live site and the payment gateway setting is the real one.

@@ -112,4 +112,16 @@ export interface PaymentGateway {
   createCharityAccount(req: CharityAccountRequest): Promise<{ accountRef: string }>;
 }
 
-export class GatewayError extends Error {}
+export class GatewayError extends Error {
+  /** True when the gateway says it has no record of the reference (it never received the payment). */
+  readonly notFound: boolean;
+  constructor(message: string, opts: { notFound?: boolean } = {}) {
+    super(message);
+    this.notFound = opts.notFound ?? false;
+  }
+}
+
+/** The gateway has never heard of this payment, as opposed to being unreachable or failing. */
+export function isGatewayNotFound(e: unknown): boolean {
+  return e instanceof GatewayError && e.notFound;
+}

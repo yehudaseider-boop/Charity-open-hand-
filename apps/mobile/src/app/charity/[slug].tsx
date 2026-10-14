@@ -16,7 +16,6 @@ import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
-import { Backdrop } from "@/components/backdrop";
 import { colors, fonts, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
@@ -66,7 +65,6 @@ export default function CharityDetail() {
 
   return (
     <View style={styles.screen}>
-      <Backdrop variant="page" />
       <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}>
         <View>
           <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 4 / 4.2, minHeight: 320 }} />
@@ -189,8 +187,8 @@ const styles = StyleSheet.create({
   kicker: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
   facts: { marginTop: space.block, borderTopWidth: 1, borderTopColor: colors.hairline },
   fact: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 52, borderBottomWidth: 1, borderBottomColor: colors.hairline, gap: 12 },
-  factLabel: { color: colors.muted },
-  factValue: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.ink, textAlign: "right" },
+  factLabel: { color: colors.muted, flexShrink: 0 },
+  factValue: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.ink, textAlign: "right", flexShrink: 1 },
   section: { marginTop: space.block + 8, gap: 14 },
   note: { gap: 6, paddingLeft: 16, borderLeftWidth: 3, borderLeftColor: colors.lilac },
   noteDate: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue },

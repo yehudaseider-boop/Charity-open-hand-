@@ -37,7 +37,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         select: (_c?: string, o?: { head?: boolean }) => (o?.head ? { eq: async () => ({ count: charityAdminCount }) } : q),
         eq: (c: string, v: unknown) => ((f[c] = v), q),
         maybeSingle: async () => ({ data: profile, error: null }),
-        delete: () => ({ eq: async () => (calls.push("consents"), { error: null }) }),
+        delete: () => ({ eq: () => ({ eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }) }) }),
         then: (resolve: (v: { data: unknown[]; error: null }) => void) => {
           const ids = table === "donors" ? (f.user_id ? donorsByUser : donorsByEmail) : [];
           resolve({ data: ids.map((id) => ({ id })), error: null });
@@ -82,7 +82,7 @@ describe("erasing a donor by their account", () => {
   it("finds every donor record that is theirs (by account or by email, once each), erases, emails them, then deletes the account", async () => {
     const s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(rpcIds?.sort()).toEqual(["d1", "d2"]);
-    expect(calls).toEqual(["rpc", "email", "consents", "deleteUser", "audit"]);
+    expect(calls).toEqual(["rpc", "email", "consents:kind=account", "deleteUser", "audit"]);
     expect(emails[0].to).toBe("erin@example.co.za");
     expect(emails[0].text).toContain("tax law requires");
     expect(emails[0].text).not.toMatch(/[!—]/);

@@ -89,8 +89,9 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     if (blocked) {
       summary.note = blocked;
     } else {
-      // Their own agreement records go with them (the database requires each to name a person).
-      const { error: consentError } = await db.from("consents").delete().eq("user_id", userId);
+      // Their own account agreement goes with them. A charity's declarations stay with the charity
+      // (the person's link to them is cleared when the account is deleted).
+      const { error: consentError } = await db.from("consents").delete().eq("user_id", userId).eq("kind", "account");
       if (consentError) throw new Error(`Could not remove their agreement records: ${consentError.message}`);
       const { error: delError } = await db.auth.admin.deleteUser(userId);
       if (delError) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
@@ -114,7 +115,7 @@ export async function hasAccountFor(email: string): Promise<boolean> {
   const { count, error } = await createAdminClient()
     .from("profiles")
     .select("id", { count: "exact", head: true })
-    .ilike("email", email.trim());
+    .eq("email", email.trim().toLowerCase());
   if (error) throw error;
   return (count ?? 0) > 0;
 }

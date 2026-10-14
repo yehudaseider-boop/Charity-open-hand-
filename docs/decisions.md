@@ -485,3 +485,18 @@ Yehuda: the screens felt "very AI"; the background stays, the blocks in front ha
 - **This year in numbers** is a sentence ("This year you gave R1 040 in 3 donations to 3 charities, R860 of it this month.") and a bar per charity showing its share, instead of four number tiles.
 - **Lists** (history, monthly, income, given elsewhere, the s18A split) are ruled like a ledger, without boxes. Each kind of giving keeps one colour everywhere: maaser blue, chomesh orange, general tzedaka lilac, shown as a dot on each donation.
 - "Log income" and "Given elsewhere" are outlined buttons (a new secondary button style), so the page has one strong action at a time. No calculations changed.
+
+## Code health check (14/10/2026)
+
+All automated checks pass; two independent reviews of the last two days' code found no critical problems. Fixed:
+
+- **An erased donor's monthly donation could restart** if its first payment had failed and then went through late. Erasure now always records "the donor's information was erased", which nothing can restart (migration `20261014000003`).
+- **The monthly job sends a charge again only when the gateway says it never received it** (a typed "not found" from the gateway adapter), never after a timeout or a database error. A donor who stopped gets no attempt row at all.
+- **No second confirmation email** when two confirmations of the same first monthly payment race.
+- **Erasing an account keeps a charity's signed declarations** (the person is unlinked, the record stays); only their own account agreement is removed. The "has an account" check matches the email exactly.
+- **Removing a stopped monthly donation keeps the real reason** (card declined) and asks first.
+- **App:** the year summary no longer claims the month is "part of" the year (it can include days before Rosh Hashana); percentages are back beside each charity's bar; long facts on a charity page wrap instead of running off the screen; the featured cover hides initials and placeholder text under its title; the tab background no longer swaps under a charity page; the hidden background on the charity page is gone; the button press respects "reduce motion"; no text below 14 px.
+- Tests now check the resume month exactly, month-end clamping, the erasure reason, kept declarations, the "gateway down" case and the no-double-email case.
+- Expo packages updated to the latest patch for SDK 57.
+
+**Known and accepted:** the phone app's package audit lists 22 advisories, almost all in build tools (Metro, the Expo command line) that never run on a phone; `braces` and `node-forge` have no fixed version yet. The one in the app itself (`decode-uri-component`, used for links) has its fix only in a new major version that is incompatible with the bundler, so it waits for Expo to update it. The website's audit is clean. Judgement call: the Giving page uses orange for chomesh in the bars and dots, so it has more than one orange accent; that is data colour, not decoration, and was kept on purpose.

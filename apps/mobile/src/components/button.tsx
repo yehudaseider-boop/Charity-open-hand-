@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Animated, Pressable, StyleSheet, type PressableProps } from "react-native";
 import { haptic } from "@/lib/haptics";
+import { reduceMotion } from "@/lib/motion";
 import { colors, lift, radius, touch, type } from "@/theme/tokens";
 import { Text } from "./text";
 
@@ -8,9 +9,12 @@ import { Text } from "./text";
 export function Button({ label, style, variant = "primary", ...rest }: Omit<PressableProps, "style"> & { label: string; style?: object; variant?: "primary" | "secondary" }) {
   const secondary = variant === "secondary";
   const [scale] = useState(() => new Animated.Value(1));
-  const to = (v: number) => Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 9 }).start();
+  const to = (v: number) => {
+    if (reduceMotion()) return;
+    Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 9 }).start();
+  };
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, !rest.disabled && !secondary && lift, { borderRadius: radius.pill }]}>
+    <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled: Boolean(rest.disabled) }}
@@ -27,7 +31,7 @@ export function Button({ label, style, variant = "primary", ...rest }: Omit<Pres
           haptic.press();
           rest.onPress?.(e);
         }}
-        style={[styles.primary, secondary && styles.secondary, rest.disabled && { opacity: 0.45 }, style]}
+        style={[styles.primary, !rest.disabled && !secondary && lift, secondary && styles.secondary, rest.disabled && { opacity: 0.45 }, style]}
       >
         <Text style={[type.button, { color: secondary ? colors.blue : colors.onInk }]}>{label}</Text>
       </Pressable>
