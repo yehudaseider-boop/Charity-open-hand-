@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { haptic } from "@/lib/haptics";
 import type { Charity } from "@/data/sample";
 import { colors, fonts, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
@@ -24,11 +25,30 @@ function Receipt18a({ issues18a, light = false }: { issues18a: boolean; light?: 
  * cover. Otherwise: a plain row in an editorial list (photo, name, where and what), divided by a
  * hairline, with no box around it.
  */
-export function CharityCard({ charity, featured = false, live = false, last = false }: { charity: Charity; featured?: boolean; live?: boolean; last?: boolean }) {
+/** A small "Give" pill beside the card, so the donor can give without opening the charity's page first. */
+function GiveButton({ charity, onGive, light = false }: { charity: Charity; onGive: (c: Charity) => void; light?: boolean }) {
+  return (
+    <Pressable
+      onPress={() => {
+        haptic.tap();
+        onGive(charity);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`Give to ${charity.nameEn}`}
+      hitSlop={6}
+      style={({ pressed }) => [styles.give, light && styles.giveLight, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={[styles.giveText, light && { color: colors.blue }]}>Give</Text>
+    </Pressable>
+  );
+}
+
+export function CharityCard({ charity, featured = false, live = false, last = false, onGive }: { charity: Charity; featured?: boolean; live?: boolean; last?: boolean; onGive?: (c: Charity) => void }) {
   const open = () => router.push(`/charity/${charity.slug}`);
   const where = [charity.area, charity.cause].filter(Boolean).join(" · ");
   if (featured) {
     return (
+      <View>
       <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured. ${where}`} style={styles.featured}>
         <CharityImage charity={charity} live={live} rounded={false} bare style={{ aspectRatio: 4 / 4.4, width: "100%" }} />
         <LinearGradient colors={["rgba(16,40,72,0)", "rgba(16,40,72,0.88)"]} locations={[0.2, 1]} style={StyleSheet.absoluteFill} />
@@ -39,10 +59,14 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
           <Receipt18a issues18a={charity.issues18a} light />
         </View>
       </PressableScale>
+      {/* A sibling, not inside the card, so screen readers reach it on its own. */}
+      {onGive ? <View style={styles.coverGive}><GiveButton charity={charity} onGive={onGive} light /></View> : null}
+      </View>
     );
   }
   return (
-    <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}. ${where}`} style={last ? styles.row : [styles.row, styles.rule]} to={0.98}>
+    <View style={[styles.rowWrap, !last && styles.rule]}>
+    <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}. ${where}`} style={styles.row} to={0.98}>
       <CharityImage charity={charity} live={live} compact style={styles.thumb} />
       <View style={styles.rowText}>
         <Text style={styles.name}>{charity.nameEn}</Text>
@@ -51,6 +75,8 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
         <Receipt18a issues18a={charity.issues18a} />
       </View>
     </PressableScale>
+    {onGive ? <GiveButton charity={charity} onGive={onGive} /> : null}
+    </View>
   );
 }
 
@@ -61,7 +87,12 @@ const styles = StyleSheet.create({
   coverKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.ink },
   coverName: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, color: colors.onInk },
   coverWhere: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.onInk },
-  row: { flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 16 },
+  rowWrap: { flexDirection: "row", alignItems: "center", gap: 10 },
+  row: { flex: 1, flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 16 },
+  give: { minHeight: 40, minWidth: 64, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.blue, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  giveLight: { borderColor: colors.surface },
+  giveText: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
+  coverGive: { position: "absolute", top: 16, right: 16 },
   rule: { borderBottomWidth: 1, borderBottomColor: colors.hairline },
   thumb: { width: 92, aspectRatio: 1, borderRadius: 18 },
   rowText: { flex: 1, gap: 2 },

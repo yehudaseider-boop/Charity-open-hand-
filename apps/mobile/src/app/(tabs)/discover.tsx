@@ -3,6 +3,9 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharityCard } from "@/components/charity-card";
+import { GiveSheet } from "@/components/give-sheet";
+import { Sheet } from "@/components/sheet";
+import type { Charity } from "@/data/sample";
 import { Splash } from "@/components/splash";
 import { FadeUp } from "@/components/fade-up";
 import { Logo } from "@/components/logo";
@@ -31,6 +34,8 @@ export default function Discover() {
   const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
   const [query, setQuery] = useState(state === "empty" ? "Bnei Akiva" : "");
   const [cause, setCause] = useState("all");
+  // The charity whose "Give" was tapped in the list: the same give sheet as on its page.
+  const [giveTo, setGiveTo] = useState<Charity | null>(null);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -117,14 +122,14 @@ export default function Discover() {
           <View style={{ gap: space.block }}>
             {featured ? (
               <FadeUp index={0}>
-                <CharityCard charity={featured} featured live={live} />
+                <CharityCard charity={featured} featured live={live} onGive={setGiveTo} />
               </FadeUp>
             ) : null}
             <View>
               {rest.length ? <Text style={styles.listHead}>{cause === "all" && !query ? "More charities" : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
               {rest.map((c, i) => (
                 <FadeUp key={c.slug} index={i + 1}>
-                  <CharityCard charity={c} live={live} last={i === rest.length - 1} />
+                  <CharityCard charity={c} live={live} last={i === rest.length - 1} onGive={setGiveTo} />
                 </FadeUp>
               ))}
             </View>
@@ -132,6 +137,9 @@ export default function Discover() {
           </View>
         )}
       </View>
+      <Sheet visible={giveTo !== null} onClose={() => setGiveTo(null)}>
+        {giveTo ? <GiveSheet charityName={giveTo.nameEn} slug={giveTo.slug} onDone={() => setGiveTo(null)} /> : null}
+      </Sheet>
     </ScrollView>
   );
 }
