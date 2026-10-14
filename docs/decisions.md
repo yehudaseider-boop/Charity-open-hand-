@@ -506,4 +506,4 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Charity photos are cut as petals (two opposite corners rounded right out, two tight), defined once as `petal` in `apps/mobile/src/theme/tokens.ts`. Used on the featured card, list thumbnails, the charity page hero, and its gallery and update photos. The tilted white "print" frames are gone.
 - Discover: the header is now the logo, the day greeting as the headline and the Hebrew date; the "Discover" title and the drifting background shapes are removed. The featured charity sits on the page (no dark gradient) with a Give button that opens the give sheet directly.
 - Give sheet: radio-style pill choices; the button names the choice ("Give as maaser"). Still no default choice.
-- Open: seen only with a stand-in image, not the real photos; not yet tested on a phone.
+- Published to the Expo Go preview channel 14/10/2026 (update group b93352ba-6e87-4a05-8f2f-3538f52fb7da). Open: seen only with a stand-in image in the web preview; not yet tested on a phone.
