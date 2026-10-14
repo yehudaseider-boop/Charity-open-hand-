@@ -12,8 +12,11 @@ type Shape = { color: typeof colors.lilac | typeof colors.orange | typeof colors
  * the edges, over a lilac wash that fades into cream. Related screens, never identical.
  */
 const LAYOUTS: Record<string, Shape[]> = {
-  // Discover stays clear: the search bar, the petal photos and the header splash are the art.
-  discover: [],
+  discover: [
+    { color: colors.lilac, size: 190, rotate: 18, opacity: 0.16, at: { right: -80, top: 300 } },
+    { color: colors.orange, size: 200, rotate: -26, opacity: 0.1, at: { left: -110, top: 600 } },
+    { color: colors.blue, size: 260, rotate: -12, opacity: 0.06, at: { right: -90, bottom: 90 } },
+  ],
   giving: [
     { color: colors.orange, size: 190, rotate: 22, opacity: 0.11, at: { right: -100, top: 330 } },
     { color: colors.lilac, size: 170, rotate: -20, opacity: 0.16, at: { left: -90, top: 560 } },

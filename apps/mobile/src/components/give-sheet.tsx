@@ -43,7 +43,6 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
               haptic.tap();
               setKind(k);
             }} style={[styles.choice, selected && styles.choiceOn]}>
-              <View style={[styles.dot, selected && styles.dotOn]}>{selected ? <View style={styles.dotFill} /> : null}</View>
               <Text style={[type.button, { fontSize: 17, color: selected ? colors.blue : colors.ink }]}>{givingKindLabels[k]}</Text>
             </Pressable>
           );
@@ -52,7 +51,7 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
 
       <View style={{ gap: 8 }}>
         <Button
-          label={kind ? `${IN_APP_GIVING ? "Continue" : "Give"} as ${givingKindLabels[kind].toLowerCase()}` : IN_APP_GIVING ? "Continue to payment" : "Give on our website"}
+          label={IN_APP_GIVING ? "Continue to payment" : "Give on our website"}
           disabled={!url || opening}
           style={!url ? { opacity: 0.4 } : undefined}
           onPress={async () => {
@@ -85,9 +84,6 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
 }
 
 const styles = StyleSheet.create({
-  choice: { minHeight: 58, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.hairline, flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: colors.surface },
-  choiceOn: { borderColor: colors.blue, backgroundColor: colors.blueSoft },
-  dot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.hairline, alignItems: "center", justifyContent: "center" },
-  dotOn: { borderColor: colors.blue },
-  dotFill: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.blue },
+  choice: { minHeight: 52, paddingHorizontal: 16, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, justifyContent: "center", backgroundColor: colors.surface },
+  choiceOn: { borderColor: colors.blue, borderWidth: 1.5 },
 });

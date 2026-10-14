@@ -9,12 +9,12 @@ import { Text } from "./text";
  * where the week is at ("Rosh Chodesh Cheshvan starts tonight: Sunday and Monday"),
  * refreshed every minute while the app is open.
  */
-export function DayGreeting({ large = false }: { large?: boolean }) {
+export function DayGreeting() {
   const now = useNow();
   const hello = greeting(now);
   return (
     <View style={{ gap: 2 }} accessibilityRole="text">
-      {hello || large ? <Text accessibilityRole={large ? "header" : undefined} style={large ? styles.helloLarge : styles.hello}>{hello || "Discover"}</Text> : null}
+      {hello ? <Text style={styles.hello}>{hello}</Text> : null}
       <Text variant="label">{dayLine(now)}</Text>
       {weekAhead(now).map((line) => (
         <Text key={line} style={styles.week}>{line}</Text>
@@ -46,7 +46,6 @@ function useNow(): Date {
 
 const styles = StyleSheet.create({
   week: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.blue, marginTop: 2 },
-  helloLarge: { fontFamily: fonts.display, fontSize: 40, lineHeight: 44, color: colors.blue },
   hello: { fontFamily: fonts.display, fontSize: 22, lineHeight: 28, color: colors.blue },
   card: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   cardBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 24, color: colors.ink },

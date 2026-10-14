@@ -68,17 +68,6 @@ export const radius = {
   pill: 999, // buttons, chips, tags
 } as const;
 
-/**
- * The petal: two opposite corners rounded right out, the other two kept tight, like the logo's
- * shapes. It is the app's signature for photos, so a charity's picture is never a plain rectangle.
- * `big` is for hero photos, `small` for thumbnails.
- */
-export const petal = {
-  big: { borderTopLeftRadius: 120, borderBottomRightRadius: 120, borderTopRightRadius: 26, borderBottomLeftRadius: 26 },
-  mid: { borderTopLeftRadius: 72, borderBottomRightRadius: 72, borderTopRightRadius: 18, borderBottomLeftRadius: 18 },
-  small: { borderTopLeftRadius: 40, borderBottomRightRadius: 40, borderTopRightRadius: 10, borderBottomLeftRadius: 10 },
-} as const;
-
 /** A soft, blue-tinted lift for cards, so they float a little off the cream. */
 export const lift = {
   shadowColor: "#1848A8",

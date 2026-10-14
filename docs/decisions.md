@@ -501,9 +501,6 @@ All automated checks pass; two independent reviews of the last two days' code fo
 
 **Known and accepted:** the phone app's package audit lists 22 advisories, almost all in build tools (Metro, the Expo command line) that never run on a phone; `braces` and `node-forge` have no fixed version yet. The one in the app itself (`decode-uri-component`, used for links) has its fix only in a new major version that is incompatible with the bundler, so it waits for Expo to update it. The website's audit is clean. Judgement call: the Giving page uses orange for chomesh in the bars and dots, so it has more than one orange accent; that is data colour, not decoration, and was kept on purpose.
 
-## Givezy app: petal photos and a calmer Discover (14/10/2026)
+## Givezy app: petal look tried and reversed (14/10/2026)
 
-- Charity photos are cut as petals (two opposite corners rounded right out, two tight), defined once as `petal` in `apps/mobile/src/theme/tokens.ts`. Used on the featured card, list thumbnails, the charity page hero, and its gallery and update photos. The tilted white "print" frames are gone.
-- Discover: the header is now the logo, the day greeting as the headline and the Hebrew date; the "Discover" title and the drifting background shapes are removed. The featured charity sits on the page (no dark gradient) with a Give button that opens the give sheet directly.
-- Give sheet: radio-style pill choices; the button names the choice ("Give as maaser"). Still no default choice.
-- Published to the Expo Go preview channel 14/10/2026 (update group b93352ba-6e87-4a05-8f2f-3538f52fb7da). Open: seen only with a stand-in image in the web preview; not yet tested on a phone.
+- Yehuda tried petal-shaped charity photos, a simpler Discover header, a petal-led charity page and a radio-style give sheet, did not like the charity photo shape, and asked for everything back as it was. All of it is reverted; the app is as at 13/10/2026. Republished to the Expo Go preview channel.
