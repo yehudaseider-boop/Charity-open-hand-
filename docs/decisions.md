@@ -501,9 +501,10 @@ All automated checks pass; two independent reviews of the last two days' code fo
 
 **Known and accepted:** the phone app's package audit lists 22 advisories, almost all in build tools (Metro, the Expo command line) that never run on a phone; `braces` and `node-forge` have no fixed version yet. The one in the app itself (`decode-uri-component`, used for links) has its fix only in a new major version that is incompatible with the bundler, so it waits for Expo to update it. The website's audit is clean. Judgement call: the Giving page uses orange for chomesh in the bars and dots, so it has more than one orange accent; that is data colour, not decoration, and was kept on purpose.
 
-## Givezy app: petal photos and a calmer Discover (14/10/2026)
+## Givezy app: calmer Discover and a lighter charity page (14/10/2026)
 
-- Charity photos are cut as petals (two opposite corners rounded right out, two tight), defined once as `petal` in `apps/mobile/src/theme/tokens.ts`. Used on the featured card, list thumbnails, the charity page hero, and its gallery and update photos. The tilted white "print" frames are gone.
-- Discover: the header is now the logo, the day greeting as the headline and the Hebrew date; the "Discover" title and the drifting background shapes are removed. The featured charity sits on the page (no dark gradient) with a Give button that opens the give sheet directly.
+- Charity photos keep plain rounded corners (28 for hero photos, 20 for thumbnails), set once as `photoCorners` in `apps/mobile/src/theme/tokens.ts`. A petal-shaped crop was tried and Yehuda did not like it, so it is not used. The rest of the pass stayed.
+- Discover: the header is the logo, the day greeting as the headline and the Hebrew date; the "Discover" title and the drifting background shapes are removed. The featured charity sits on the page (no dark gradient) with a Give button that opens the give sheet directly.
+- Charity page: the photo is inset on the page with a lilac shape behind it and the name below; gallery and update photos are rounded, not tilted in white frames.
 - Give sheet: radio-style pill choices; the button names the choice ("Give as maaser"). Still no default choice.
-- Published to the Expo Go preview channel 14/10/2026 (update group b93352ba-6e87-4a05-8f2f-3538f52fb7da). Open: seen only with a stand-in image in the web preview; not yet tested on a phone.
+- Open: seen only with a stand-in image in the web preview; not yet tested on a phone.

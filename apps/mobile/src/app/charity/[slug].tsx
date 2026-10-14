@@ -17,7 +17,7 @@ import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
-import { colors, fonts, petal, space, touch } from "@/theme/tokens";
+import { colors, fonts, photoCorners, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
 function Fact({ label, value }: { label: string; value: string }) {
@@ -67,10 +67,10 @@ export default function CharityDetail() {
   return (
     <View style={styles.screen}>
       <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}>
-        {/* The photo is cut as a petal, with a lilac shape behind it, and the name sits below it on the page. */}
+        {/* The photo is cut as a photoCorners, with a lilac shape behind it, and the name sits below it on the page. */}
         <View style={{ paddingTop: insets.top + 56 + touch + 14, paddingHorizontal: space.gutter }}>
           <View style={styles.dropBack} pointerEvents="none"><Drop size={170} color={colors.lilac} rotate={24} /></View>
-          <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" style={{ ...petal.big, width: "100%", aspectRatio: 1 / 0.9 }} />
+          <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" style={{ ...photoCorners.big, width: "100%", aspectRatio: 1 / 0.9 }} />
         </View>
 
         <View style={styles.sheet}>
@@ -193,8 +193,8 @@ const styles = StyleSheet.create({
   section: { marginTop: space.block + 8, gap: 14 },
   note: { gap: 6, paddingLeft: 16, borderLeftWidth: 3, borderLeftColor: colors.lilac },
   noteDate: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue },
-  updatePhoto: { ...petal.mid, width: "100%", aspectRatio: 4 / 3, marginTop: 6, backgroundColor: colors.lilacSoft },
-  photo: { ...petal.mid, width: "100%", aspectRatio: 4 / 4.6, backgroundColor: colors.lilacSoft },
+  updatePhoto: { ...photoCorners.mid, width: "100%", aspectRatio: 4 / 3, marginTop: 6, backgroundColor: colors.lilacSoft },
+  photo: { ...photoCorners.mid, width: "100%", aspectRatio: 4 / 4.6, backgroundColor: colors.lilacSoft },
   caption: { fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.ink, paddingHorizontal: 2 },
   headerBar: { position: "absolute", top: 0, left: 0, right: 0, backgroundColor: colors.cream, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   topBar: { position: "absolute", left: space.gutter, right: space.gutter, flexDirection: "row", justifyContent: "space-between" },

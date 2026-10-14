@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import type { Charity } from "@/data/sample";
 import { haptic } from "@/lib/haptics";
-import { colors, fonts, petal, radius } from "@/theme/tokens";
+import { colors, fonts, photoCorners, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { CheckIcon } from "./icons";
 import { PressableScale } from "./pressable-scale";
@@ -21,9 +21,9 @@ function Receipt18a({ issues18a }: { issues18a: boolean }) {
 }
 
 /**
- * A charity in the directory. Featured: its photo cut as a petal with a lilac shape peeking out
+ * A charity in the directory. Featured: its photo cut as a photoCorners with a lilac shape peeking out
  * behind it, the name set below on the page, and a Give button that goes straight to the give
- * sheet. Otherwise: a plain row in an editorial list (petal thumbnail, name, where and what),
+ * sheet. Otherwise: a plain row in an editorial list (photoCorners thumbnail, name, where and what),
  * divided by a hairline, with no box around it.
  */
 export function CharityCard({ charity, featured = false, live = false, last = false }: { charity: Charity; featured?: boolean; live?: boolean; last?: boolean }) {
@@ -34,7 +34,7 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
       <View style={styles.featured}>
         <View style={styles.dropBack} pointerEvents="none"><Drop size={150} color={colors.lilac} rotate={24} /></View>
         <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured. ${where}`} style={{ gap: 16 }}>
-          <CharityImage charity={charity} live={live} rounded={false} bare style={{ ...petal.big, aspectRatio: 1 / 0.82, width: "100%" }} />
+          <CharityImage charity={charity} live={live} rounded={false} bare style={{ ...photoCorners.big, aspectRatio: 1 / 0.82, width: "100%" }} />
           <View style={{ gap: 4 }}>
             <Text style={styles.coverName} numberOfLines={3}>{charity.nameEn}</Text>
             <Text variant="bodyMuted" numberOfLines={2}>{where}</Text>
@@ -59,7 +59,7 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
   }
   return (
     <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}. ${where}`} style={last ? styles.row : [styles.row, styles.rule]} to={0.98}>
-      <CharityImage charity={charity} live={live} compact rounded={false} style={{ ...petal.small, ...styles.thumb }} />
+      <CharityImage charity={charity} live={live} compact rounded={false} style={{ ...photoCorners.small, ...styles.thumb }} />
       <View style={styles.rowText}>
         <Text style={styles.name}>{charity.nameEn}</Text>
         {charity.area ? <Text style={styles.area}>{charity.area}</Text> : null}
