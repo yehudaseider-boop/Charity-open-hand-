@@ -67,9 +67,9 @@ export default function CharityDetail() {
   return (
     <View style={styles.screen}>
       <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}>
-        {/* The photo is cut as a photoCorners, with a lilac shape behind it, and the name sits below it on the page. */}
+        {/* The photo sits inset on the page with a lilac shape behind it, and the name below it. */}
         <View style={{ paddingTop: insets.top + 56 + touch + 14, paddingHorizontal: space.gutter }}>
-          <View style={styles.dropBack} pointerEvents="none"><Drop size={170} color={colors.lilac} rotate={24} /></View>
+          <View style={[styles.dropBack, { pointerEvents: "none" }]}><Drop size={170} color={colors.lilac} rotate={24} /></View>
           <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" style={{ ...photoCorners.big, width: "100%", aspectRatio: 1 / 0.9 }} />
         </View>
 

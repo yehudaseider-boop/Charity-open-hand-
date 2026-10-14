@@ -21,9 +21,9 @@ function Receipt18a({ issues18a }: { issues18a: boolean }) {
 }
 
 /**
- * A charity in the directory. Featured: its photo cut as a photoCorners with a lilac shape peeking out
+ * A charity in the directory. Featured: its photo with a lilac shape peeking out
  * behind it, the name set below on the page, and a Give button that goes straight to the give
- * sheet. Otherwise: a plain row in an editorial list (photoCorners thumbnail, name, where and what),
+ * sheet. Otherwise: a plain row in an editorial list (thumbnail, name, where and what),
  * divided by a hairline, with no box around it.
  */
 export function CharityCard({ charity, featured = false, live = false, last = false }: { charity: Charity; featured?: boolean; live?: boolean; last?: boolean }) {
@@ -32,7 +32,7 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
   if (featured) {
     return (
       <View style={styles.featured}>
-        <View style={styles.dropBack} pointerEvents="none"><Drop size={150} color={colors.lilac} rotate={24} /></View>
+        <View style={[styles.dropBack, { pointerEvents: "none" }]}><Drop size={150} color={colors.lilac} rotate={24} /></View>
         <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}, featured. ${where}`} style={{ gap: 16 }}>
           <CharityImage charity={charity} live={live} rounded={false} bare style={{ ...photoCorners.big, aspectRatio: 1 / 0.82, width: "100%" }} />
           <View style={{ gap: 4 }}>
