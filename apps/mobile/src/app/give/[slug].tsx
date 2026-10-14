@@ -121,7 +121,7 @@ export default function Give() {
   async function pay() {
     if (!quote || busy) return;
     if (monthly && !authorised) {
-      setErrors({ monthly_authorised: "Please confirm you authorise the monthly payments" });
+      setErrors((e) => ({ ...e, monthly_authorised: "Please confirm you authorise the monthly payments" }));
       return;
     }
     setBusy(true);
@@ -135,11 +135,21 @@ export default function Give() {
     });
     if (!r.ok) {
       setBusy(false);
+      setMessage(r.message);
+      if (r.quote) {
+        // The total changed: the donor must see and authorise the new amount.
+        setQuote(r.quote);
+        setAuthorised(false);
+      }
       if (r.fieldErrors) {
         setErrors(r.fieldErrors);
-        setQuote(null);
-      } else if (r.quote) setQuote(r.quote);
-      setMessage(r.message);
+        // Only the authorisation is answered on this step; anything else is fixed on the form.
+        const onForm = Object.keys(r.fieldErrors).some((k) => k !== "monthly_authorised");
+        if (onForm) {
+          setQuote(null);
+          setAuthorised(false);
+        }
+      }
       return;
     }
     try {
@@ -170,12 +180,18 @@ export default function Give() {
               {monthly ? (
                 <>
                   <Text variant="bodyMuted">
-                    Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Card payments only. You can pause or cancel any time in Account.
+                    Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Monthly gifts are by card only. You can pause or cancel any time in the Giving tab.
                   </Text>
                   <CheckRow
                     label={`I authorise Givezy to collect ${rand(quote.totalCents)} from my card every month until I cancel.`}
                     value={authorised}
-                    onChange={setAuthorised}
+                    onChange={(v) => {
+                      setAuthorised(v);
+                      if (v) {
+                        setErrors(({ monthly_authorised: _, ...rest }) => rest);
+                        setMessage(null);
+                      }
+                    }}
                     error={err("monthly_authorised")}
                   />
                 </>
@@ -183,7 +199,7 @@ export default function Give() {
               <Text variant="bodyMuted">Counts as {kind ? givingKindLabels[kind] : ""}. Only you see this. You enter your card on a secure payment page, not in the app.</Text>
               {message ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{message}</Text> : null}
               <Button label="Continue to payment" disabled={busy} onPress={pay} />
-              <Button label="Change something" variant="secondary" disabled={busy} onPress={() => { setQuote(null); setAuthorised(false); }} />
+              <Button label="Change something" variant="secondary" disabled={busy} onPress={() => { setQuote(null); setAuthorised(false); setMessage(null); }} />
             </View>
           ) : (
             <>

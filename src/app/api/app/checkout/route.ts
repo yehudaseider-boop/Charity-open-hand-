@@ -4,7 +4,8 @@ import { startDonation } from "@/lib/donations/checkout";
 import { clientIp } from "@/lib/client-ip";
 
 /**
- * Start a once-off gift from the phone app: record it as pending and return the payment
+ * Start a gift from the phone app, once-off or monthly: record it as pending (and, for a monthly
+ * gift, a pending monthly record and the donor's authorisation) and return the payment
  * provider's own page for the card. The gift is only marked paid when the provider confirms it
  * (webhook or verification on return), never because the app says so.
  */
