@@ -18,6 +18,7 @@ import {
   previousRange,
   RANGE_LABELS,
   recurringSummary,
+  sameDaysLastMonth,
   summarise,
 } from "../data/selectors";
 import type { DemoDataset, Donation } from "../data/types";
@@ -47,7 +48,7 @@ function Overview({ data }: { data: DemoDataset }) {
     const before = canCompare(range) ? summarise(data, previousRange(range), firsts) : null;
     const month = presetRange("month");
     const thisMonth = summarise(data, month, firsts);
-    const lastMonth = summarise(data, previousRange(month), firsts);
+    const lastMonth = summarise(data, sameDaysLastMonth(month), firsts);
     const series = monthlySeries(data, range, firsts);
     return { now, before, thisMonth, lastMonth, series, rec: recurringSummary(data, range), fin: financeSummary(data, range), pending: pendingSettlement(data) };
   }, [data, range]);

@@ -47,10 +47,9 @@ function Finances({ data }: { data: DemoDataset }) {
   );
   const reconciled = f.paidOutCents + f.inTransitCents + f.awaitingCents === f.grossCents && f.grossCents - f.refundsCents - f.processingFeesCents - f.platformFeesCents === f.netCents;
 
-  let nextThursday = addDays(DEMO_TODAY, 1);
-  while (weekday(nextThursday) !== 4) nextThursday = addDays(nextThursday, 1);
-  // The batch for this week is sent next Monday and arrives the Thursday after.
-  const nextArrival = addDays(nextThursday, 7);
+  // This week's batch (Monday to Sunday) is sent next Monday and arrives that Thursday.
+  const daysSinceMonday = (weekday(DEMO_TODAY) + 6) % 7;
+  const nextArrival = addDays(DEMO_TODAY, 10 - daysSinceMonday);
 
   const exportReport = () =>
     exportCsv(

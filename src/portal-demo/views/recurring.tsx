@@ -56,11 +56,15 @@ function Recurring({ data }: { data: DemoDataset }) {
     });
   }, [data, lookups]);
 
-  const shown = rows.filter((r) => {
+  const shown = useMemo(
+    () =>
+      rows.filter((r) => {
     if (status === "failing" ? !(r.lastFailed && r.status === "active") : status !== "all" && r.status !== status) return false;
     const n = q.trim().toLowerCase();
     return !n || `${r.donor} ${r.email}`.toLowerCase().includes(n);
-  });
+      }),
+    [rows, status, q],
+  );
   const failing = rows.filter((r) => r.lastFailed && r.status === "active").length;
   const labels = series.map((p) => showMonth(p.key, series.length > 6));
   const tips = series.map((p) => showMonth(p.key));

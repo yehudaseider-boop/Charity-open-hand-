@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_CHARITIES } from "@/portal-demo/data/charities";
 import { DEMO_START, DEMO_TODAY } from "@/portal-demo/data/demo-config";
-import { feeFor, generateDataset } from "@/portal-demo/data/generate";
+import { feeFor, generateDataset, localDay } from "@/portal-demo/data/generate";
 import {
   campaignStats,
   donorStats,
@@ -10,6 +10,7 @@ import {
   pendingSettlement,
   presetRange,
   recurringSummary,
+  sameDaysLastMonth,
   summarise,
 } from "@/portal-demo/data/selectors";
 
@@ -29,6 +30,12 @@ describe("charity portal demo data", () => {
     expect(new Set(sizes).size).toBe(3);
     expect(sizes[0]).toBeLessThan(sizes[1]);
     expect(sizes[1]).toBeLessThan(sizes[2]);
+  });
+
+  it("compares this month with the same calendar days last month", () => {
+    expect(sameDaysLastMonth({ from: "2026-10-01", to: "2026-10-14" })).toEqual({ from: "2026-09-01", to: "2026-09-14" });
+    expect(sameDaysLastMonth({ from: "2026-03-01", to: "2026-03-31" })).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+    expect(sameDaysLastMonth({ from: "2026-01-01", to: "2026-01-10" })).toEqual({ from: "2025-12-01", to: "2025-12-10" });
   });
 
   it("rounds the placeholder fee half up in whole cents", () => {
@@ -93,9 +100,9 @@ describe("charity portal demo data", () => {
 
       it("monthly giving: collected equals paid monthly donations", () => {
         const r = recurringSummary(ds, presetRange("12m"));
-        const monthly = paid.filter((d) => d.kind === "monthly" && d.donatedAt.slice(0, 10) >= presetRange("12m").from);
-        expect(r.collectedCount).toBeGreaterThan(0);
-        expect(r.collectedCents).toBeLessThanOrEqual(sum(monthly.map((d) => d.amountCents)) + 1);
+        const monthly = paid.filter((d) => d.kind === "monthly" && localDay(d.donatedAt) >= presetRange("12m").from);
+        expect(r.collectedCount).toBe(monthly.length);
+        expect(r.collectedCents).toBe(sum(monthly.map((d) => d.amountCents)));
         expect(r.active + r.paused + r.cancelled).toBe(ds.recurring.length);
       });
 

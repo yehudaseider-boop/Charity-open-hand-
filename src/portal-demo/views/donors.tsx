@@ -35,7 +35,9 @@ type Filter = "all" | DonorSegment | "monthly" | "repeat" | "anonymous" | "s18a"
 function Donors({ data }: { data: DemoDataset }) {
   const exportCsv = useExport();
   const lookups = useLookups(data);
-  const all = useMemo(() => donorStats(data).filter((d) => d.giftCount > 0 || d.hasMonthly), [data]);
+  const everyone = useMemo(() => donorStats(data), [data]);
+  // The directory lists people who have given; a profile opened from a donation can be anyone.
+  const all = useMemo(() => everyone.filter((d) => d.giftCount > 0 || d.hasMonthly), [everyone]);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [type, setType] = useState("all");
@@ -119,7 +121,7 @@ function Donors({ data }: { data: DemoDataset }) {
     { value: "anonymous", label: "Anonymous in public" },
   ];
 
-  const open = openId ? all.find((d) => d.id === openId) ?? null : null;
+  const open = openId ? everyone.find((d) => d.id === openId) ?? null : null;
 
   return (
     <div className="gz-fade-in">

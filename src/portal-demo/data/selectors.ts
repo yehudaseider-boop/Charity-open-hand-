@@ -108,6 +108,14 @@ export function summarise(ds: DemoDataset, range: DateRange, firsts = firstGiftD
   };
 }
 
+/** The same calendar days one month earlier: 01/10 to 14/10 gives 01/09 to 14/09 (clamped to the month's end). */
+export function sameDaysLastMonth(range: DateRange): DateRange {
+  const prevStart = addMonths(range.from, -1);
+  const prevEnd = addDays(`${range.from.slice(0, 7)}-01`, -1);
+  const to = `${prevStart.slice(0, 7)}-${range.to.slice(8, 10)}`;
+  return { from: `${prevStart.slice(0, 7)}-${range.from.slice(8, 10)}`, to: to > prevEnd ? prevEnd : to };
+}
+
 /** True when the demo holds data for the whole period before `range`, so a comparison is fair. */
 export function canCompare(range: DateRange): boolean {
   return previousRange(range).from >= DEMO_START;
