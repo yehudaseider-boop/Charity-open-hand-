@@ -41,9 +41,17 @@ describe("app giving API", () => {
     expect(r.ok).toBe(true); // the charity-dependent s18A rules run in startDonation
   });
 
-  it("only accepts whole-cent numbers and ignores a monthly flag", () => {
+  it("passes a monthly gift and its authorisation through to the website's rules", () => {
+    const r = toCheckoutInput({ ...base, monthly: true });
+    expect(r.ok && r.input.monthly).toBe("on");
+    if (r.ok) expect(checkDonorDetails(r.input, true).monthly_authorised).toBeTruthy();
+    const ok = toCheckoutInput({ ...base, monthly: true, monthly_authorised: true });
+    if (ok.ok) expect(checkDonorDetails(ok.input, true).monthly_authorised).toBeUndefined();
+  });
+
+  it("only accepts whole-cent numbers", () => {
     expect(appCheckoutSchema.safeParse({ slug: "x", giftCents: 18.5, contributionCents: 0, shownTotalCents: 18, details: base }).success).toBe(false);
-    const ok = appCheckoutSchema.safeParse({ slug: "x", giftCents: 1800, contributionCents: 0, shownTotalCents: 1800, details: { ...base, monthly: true } });
-    expect(ok.success && "monthly" in ok.data.details).toBe(false);
+    const ok = appCheckoutSchema.safeParse({ slug: "x", giftCents: 1800, contributionCents: 0, shownTotalCents: 1800, details: base });
+    expect(ok.success).toBe(true);
   });
 });

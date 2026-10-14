@@ -26,6 +26,8 @@ export type DonorDetails = {
   message?: string;
   giving_kind: "maaser" | "chomesh" | "tzedaka";
   is_anonymous?: boolean;
+  monthly?: boolean;
+  monthly_authorised?: boolean;
   age_confirmed: boolean;
   popia_consent: boolean;
 };

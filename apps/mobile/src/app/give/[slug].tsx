@@ -22,7 +22,7 @@ import { colors, radius, space } from "@/theme/tokens";
 import type { GivingKind } from "@/data/giving";
 
 /**
- * Give a once-off gift inside the app. The donor chooses the amount, what it counts as and who
+ * Give a once-off or monthly gift inside the app. The donor chooses the amount, what it counts as and who
  * they are here; the card is entered on the payment provider's own secure page, opened in a sheet.
  * The app never sees a card number. Only reachable when the in-app giving switch is on.
  */
@@ -43,6 +43,8 @@ export default function Give() {
   const [want18a, setWant18a] = useState(false);
   const [idNumber, setIdNumber] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const [monthly, setMonthly] = useState(false);
+  const [authorised, setAuthorised] = useState(false);
   const [age, setAge] = useState(false);
   const [consent, setConsent] = useState(false);
 
@@ -81,6 +83,8 @@ export default function Give() {
     id_number: s18aAvailable && want18a ? idNumber.trim() || undefined : undefined,
     giving_kind: kind ?? "tzedaka",
     is_anonymous: anonymous,
+    monthly,
+    monthly_authorised: monthly && authorised,
     age_confirmed: age,
     popia_consent: consent,
   });
@@ -116,6 +120,10 @@ export default function Give() {
 
   async function pay() {
     if (!quote || busy) return;
+    if (monthly && !authorised) {
+      setErrors({ monthly_authorised: "Please confirm you authorise the monthly payments" });
+      return;
+    }
     setBusy(true);
     setMessage(null);
     const r = await startPayment(SITE_URL!, {
@@ -157,12 +165,25 @@ export default function Give() {
               <View style={styles.summary}>
                 <Row label={`To ${charity.nameEn}`} value={rand(quote.amountCents)} />
                 {quote.contributionCents > 0 ? <Row label="To Givezy" value={rand(quote.contributionCents)} /> : null}
-                <Row label="You pay" value={rand(quote.totalCents)} strong />
+                <Row label={monthly ? "You pay today, then every month" : "You pay"} value={rand(quote.totalCents)} strong />
               </View>
+              {monthly ? (
+                <>
+                  <Text variant="bodyMuted">
+                    Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Card payments only. You can pause or cancel any time in Account.
+                  </Text>
+                  <CheckRow
+                    label={`I authorise Givezy to collect ${rand(quote.totalCents)} from my card every month until I cancel.`}
+                    value={authorised}
+                    onChange={setAuthorised}
+                    error={err("monthly_authorised")}
+                  />
+                </>
+              ) : null}
               <Text variant="bodyMuted">Counts as {kind ? givingKindLabels[kind] : ""}. Only you see this. You enter your card on a secure payment page, not in the app.</Text>
               {message ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{message}</Text> : null}
               <Button label="Continue to payment" disabled={busy} onPress={pay} />
-              <Button label="Change something" variant="secondary" disabled={busy} onPress={() => setQuote(null)} />
+              <Button label="Change something" variant="secondary" disabled={busy} onPress={() => { setQuote(null); setAuthorised(false); }} />
             </View>
           ) : (
             <>
@@ -181,7 +202,8 @@ export default function Give() {
                 {err("kind") || err("giving_kind") ? <Text variant="label" style={{ color: colors.danger }}>{err("kind") ?? err("giving_kind")}</Text> : null}
               </View>
 
-              <SwitchRow label="Add a contribution to Givezy" description="Optional. It helps us keep Givezy running. Your gift to the charity stays whole." value={extra} onChange={setExtra} />
+              <SwitchRow label="Give every month" description="The same amount each month until you cancel." value={monthly} onChange={(v) => { setMonthly(v); if (!v) setAuthorised(false); }} />
+              <SwitchRow label="Add a contribution to Givezy" description={monthly ? "Optional. It helps us keep Givezy running, and repeats each month with your gift." : "Optional. It helps us keep Givezy running. Your gift to the charity stays whole."} value={extra} onChange={setExtra} />
               {extra ? <Field label="Contribution" prefix="R" keyboardType="decimal-pad" value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" /> : null}
 
               <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>About you</Text>

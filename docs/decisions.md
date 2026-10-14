@@ -517,3 +517,9 @@ Yehuda: the charity pays Paystack's fee, out of its donation. Later we offer the
 
 - **Open, not built:** the donor-covers option. It needs Paystack's rate sheet (percentage, fixed amount, whether it includes VAT) in `src/config/platform.ts`; those stay empty until Yehuda supplies them, and nothing is estimated. Open question for him: when the donor covers it, is the charity to receive the full gift exactly, with the donor paying the extra, and should the receipt show the gift only?
 - Real payments still need the first Paystack test run and the store rules (see go-live checklist).
+
+## Monthly giving inside the app (14/10/2026)
+
+- The give screen has "Give every month". It uses the same server path as the website's monthly gifts (`startDonation`): the first payment is month one, the card is saved by the payment provider, and the monthly record stays pending until that payment is confirmed. The donor ticks an authorisation that names the exact total (gift plus any contribution), which is recorded as a consent. A contribution to Givezy repeats each month with the gift.
+- Pausing and cancelling stay in Account, as before. The monthly job, retries and emails are unchanged.
+- Yehuda confirmed (14/10/2026): when a donor covers the processing fee, the charity receives the full gift and the donor pays the extra; the s18A receipt shows the gift only. Still not built: it waits for Paystack's rate sheet.

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { checkoutSchema, cleanPhone, type CheckoutInput } from "./validation";
 
 /**
- * What the phone app sends to start a once-off gift. Money is whole cents; the app never sends
+ * What the phone app sends to start a gift, once-off or monthly. Money is whole cents; the app never sends
  * card details (the card is entered on the payment provider's own page). Yes/no answers are real
  * booleans here and become the checkout form's "on" before the shared rules run.
  */
@@ -37,13 +37,15 @@ export const appCheckoutSchema = appQuoteSchema.extend({
     message: z.string().max(500).optional(),
     giving_kind: z.string(),
     is_anonymous: flag,
+    monthly: flag,
+    monthly_authorised: flag,
     age_confirmed: flag,
     popia_consent: flag,
   }),
 });
 export type AppCheckoutBody = z.infer<typeof appCheckoutSchema>;
 
-const FLAGS = ["wants_18a", "is_anonymous", "age_confirmed", "popia_consent"] as const;
+const FLAGS = ["wants_18a", "is_anonymous", "monthly", "monthly_authorised", "age_confirmed", "popia_consent"] as const;
 
 /** Run the app's answers through the same rules as the website's checkout form. */
 export function toCheckoutInput(details: AppCheckoutBody["details"]):
