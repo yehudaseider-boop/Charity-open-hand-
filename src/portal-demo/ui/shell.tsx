@@ -17,6 +17,7 @@ const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: `${BASE}/donors`, label: "Donors", icon: "users" },
   { href: `${BASE}/campaigns`, label: "Campaigns", icon: "flag" },
   { href: `${BASE}/recurring`, label: "Monthly giving", icon: "repeat" },
+  { href: `${BASE}/receipts`, label: "s18A receipts", icon: "receipt" },
   { href: `${BASE}/analytics`, label: "Analytics", icon: "chart" },
   { href: `${BASE}/finances`, label: "Finances and payouts", icon: "wallet" },
   { href: `${BASE}/settings`, label: "Settings and team", icon: "settings" },

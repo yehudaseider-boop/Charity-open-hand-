@@ -12,8 +12,9 @@ import { count, date, permille, rand, randShort } from "../ui/format";
 import { FilterSelect, SearchInput } from "../ui/form";
 import { Icon } from "../ui/icons";
 import { Drawer } from "../ui/overlay";
-import { Avatar, Badge, Button, Callout, Card, CardHeader, cx, DetailList, EmptyState, PageHeader, type Tone } from "../ui/primitives";
+import { Avatar, Badge, Button, Callout, Card, CardHeader, cx, DetailList, EmptyState, PageHeader, Segmented, type Tone } from "../ui/primitives";
 import { DataTable, type Column } from "../ui/table";
+import { FollowUpPanel, isFollowUpKind } from "./follow-up";
 import { campaignName, DonationStatusBadge, Loaded, RecurringStatusBadge, Stat, useExport, useLookups, useQueryParam } from "./common";
 
 export function DonorsView() {
@@ -42,6 +43,14 @@ function Donors({ data }: { data: DemoDataset }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [type, setType] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [view, setView] = useState<"directory" | "follow-up">("directory");
+  const viewParam = useQueryParam("view");
+  const tabParam = useQueryParam("tab");
+  const [viewApplied, setViewApplied] = useState(false);
+  if (!viewApplied && viewParam) {
+    setViewApplied(true);
+    if (viewParam === "follow-up") setView("follow-up");
+  }
   const fromAddress = useQueryParam("donor");
   const [applied, setApplied] = useState<string | null>(null);
   if (fromAddress && applied !== fromAddress) {
@@ -145,6 +154,22 @@ function Donors({ data }: { data: DemoDataset }) {
         }
       />
 
+      <div className="mb-6">
+        <Segmented
+          label="Donors view"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "directory", label: "Directory" },
+            { value: "follow-up", label: "Follow up" },
+          ]}
+        />
+      </div>
+
+      {view === "follow-up" ? (
+        <FollowUpPanel data={data} initialTab={isFollowUpKind(tabParam) ? tabParam : null} />
+      ) : (
+        <>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Donors who have given" value={count(all.length)} />
         <Stat label="First-time donors, last 90 days" value={count(stats.now.newDonors)} />
@@ -218,6 +243,9 @@ function Donors({ data }: { data: DemoDataset }) {
           empty={<EmptyState icon="users" title="No donors match" body="Try another search or group." />}
         />
       </Card>
+
+        </>
+      )}
 
       {open && <DonorDrawer donor={open} data={data} lookups={lookups} onClose={() => setOpenId(null)} />}
     </div>

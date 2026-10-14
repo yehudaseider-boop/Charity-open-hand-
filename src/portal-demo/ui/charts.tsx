@@ -91,7 +91,7 @@ export function ChartFrame({ chart, table, legend, height }: { chart: ReactNode;
         <div className="min-h-5">{legend}</div>
         <div className="inline-flex rounded-full bg-gz-neutral-soft p-0.5 text-xs font-semibold" role="radiogroup" aria-label="Show as">
           {(["chart", "table"] as const).map((v) => (
-            <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cx("min-h-7 rounded-full px-2.5", view === v ? "bg-gz-surface text-gz-blue shadow-sm" : "text-gz-muted")}>
+            <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cx("min-h-10 rounded-full px-3 sm:min-h-7 sm:px-2.5", view === v ? "bg-gz-surface text-gz-blue shadow-sm" : "text-gz-muted")}>
               {v === "chart" ? "Chart" : "Table"}
             </button>
           ))}

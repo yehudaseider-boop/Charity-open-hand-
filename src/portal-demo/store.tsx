@@ -8,7 +8,8 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_CHARITIES } from "./data/charities";
-import type { FeeModel } from "./data/demo-config";
+import { DEFAULT_LARGE_DONATION_CENTS, DEMO_TODAY, type FeeModel } from "./data/demo-config";
+import { parseRandToCents } from "@/lib/money";
 import { presetRange, type DateRange, type RangePreset } from "./data/selectors";
 import { mockPortalApi } from "./data/service";
 import type { Campaign, CampaignStatus, DemoCharity, DemoDataset, TeamMember, TeamRole } from "./data/types";
@@ -44,6 +45,8 @@ export type CharityOverrides = {
   notifications?: NotificationPrefs;
   security?: SecurityPrefs;
   branding?: BrandingPrefs;
+  /** Follow-ups the team has dealt with: `${kind}:${id}` to the demo date it was marked done. */
+  followUps?: Record<string, string>;
 };
 
 export const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
@@ -107,6 +110,10 @@ type PortalState = {
   setMemberRole: (id: string, role: TeamRole) => void;
   removeMember: (id: string) => void;
   updateOverrides: (patch: Partial<CharityOverrides>) => void;
+  /** Mark follow-ups (thank-yous and win-backs) as done, or undo. */
+  markHandled: (keys: string[], on: boolean) => void;
+  /** The amount from which a donation is "large", from Notifications (cents). */
+  largeDonationCents: number;
   resetDemo: () => void;
   toast: (t: Omit<Toast, "id">) => void;
   dismissToast: (id: number) => void;
@@ -224,6 +231,15 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       setMemberRole: (id, role) => updateOverrides({ team: (team ?? []).map((m) => (m.id === id ? { ...m, role } : m)) }),
       removeMember: (id) => updateOverrides({ team: (team ?? []).filter((m) => m.id !== id) }),
       updateOverrides,
+      markHandled: (keys, on) => {
+        const next = { ...(overrides.followUps ?? {}) };
+        for (const k of keys) {
+          if (on) next[k] = DEMO_TODAY;
+          else delete next[k];
+        }
+        updateOverrides({ followUps: next });
+      },
+      largeDonationCents: parseRandToCents(overrides.notifications?.largeDonationRand ?? DEFAULT_NOTIFICATIONS.largeDonationRand) ?? DEFAULT_LARGE_DONATION_CENTS,
       resetDemo: () => {
         setAllOverrides({});
         setFeeModelState("charity");

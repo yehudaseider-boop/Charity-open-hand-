@@ -1,5 +1,7 @@
 # Givezy charity portal: design prototype
 
+_Updated 14/10/2026: added s18A receipts, a Needs attention panel on the overview, thank-you and win-back drafts under Donors, and a pace line on campaigns (nine sections now)._
+
 Built 14/10/2026 for review. A clickable prototype of the portal charity administrators would use. **Demo data only**: no database, no payment provider, no email. Approve the design here before any backend work starts.
 
 ## How to run it
@@ -25,7 +27,7 @@ The portal is a separate area of the website. It does not touch the donor app (`
 | `src/app/portal-demo/` | Routes (thin pages; each renders a view) |
 | `src/portal-demo/data/` | Demo data model, generator, selectors (every number), mock API |
 | `src/portal-demo/ui/` | Shared components: shell, sidebar, top bar, charts, table, filters, forms, dialogs, drawers, badges, toasts |
-| `src/portal-demo/views/` | The eight sections |
+| `src/portal-demo/views/` | The nine sections |
 | `src/portal-demo/store.tsx` | Demo state: charity switcher, date range, local changes |
 | `public/givezy/` | Givezy logo files, copied from `apps/mobile/assets` (not redrawn) |
 | `src/app/globals.css` | Givezy colour tokens, scoped to `.gz-portal` |
@@ -37,11 +39,12 @@ The portal is a separate area of the website. It does not touch the donor app (`
 |---|---|
 | `/portal-demo` | Overview |
 | `/portal-demo/donations` | Donations (`?status=failed` pre-filters) |
-| `/portal-demo/donors` | Donors (`?donor=<id>` opens a profile) |
+| `/portal-demo/donors` | Donors: Directory and Follow up (`?donor=<id>` opens a profile; `?view=follow-up&tab=new`, `large` or `winback`) |
 | `/portal-demo/campaigns` | Campaigns |
 | `/portal-demo/campaigns/new` | Create campaign |
 | `/portal-demo/campaigns/[id]` | Campaign detail, edit, status, share |
-| `/portal-demo/recurring` | Monthly giving |
+| `/portal-demo/recurring` | Monthly giving (`?status=failing` pre-filters) |
+| `/portal-demo/receipts` | s18A receipts |
 | `/portal-demo/analytics` | Analytics |
 | `/portal-demo/finances` | Finances and payouts |
 | `/portal-demo/settings` | Settings and team (`?tab=team` and so on) |
@@ -56,6 +59,8 @@ Screenshots of the key screens are in [`screens/`](screens/).
 4. On **Campaigns**, create one, then edit its goal, pause it and end it. It shows up in the overview, filters and comparisons.
 5. On **Finances**, flip the processing-fee switch to see both fee designs.
 6. On **Settings, Team members**, invite someone. Nothing is sent.
+7. On the **Overview**, read **Needs attention**, then follow a row. "First-time donors to welcome" opens **Donors, Follow up**, where each person has a draft message you can edit, copy, open in your own email and mark as done. Done people drop off the Overview list.
+8. Open **s18A receipts**: switch tax year, open a receipt for a preview with the draft wording, and use "Draft a request" for donors whose details are incomplete. Switch to Sunrise Table to see the page for a charity without s18A approval.
 
 ## Design specification
 
@@ -89,6 +94,13 @@ Placeholders, clearly labelled on screen and in `demo-config.ts`: a 3% processin
 
 **Works in the browser:** navigation, charity switcher, date ranges (presets and custom, with errors for bad dates), search, filters, sorting, pages, chart tooltips and table views, donation, donor, monthly-donation and payout drawers, campaign create, edit, publish, pause, resume, end, reopen, copy link, team invite, role change, remove, settings forms with validation, logo upload and preview, CSV exports (real files, made in the browser), the processing-fee switch, reset.
 
+**Added 14/10/2026:**
+- **s18A receipts:** one receipt per donor per SARS tax year (tax year 2026 is closed, so its receipts show as issued with numbers; tax year 2027 shows "after year end"). Amounts are the donation only. A receipt cannot be issued while the donor's details are incomplete. Refunded, failed and pending donations never count. The receipt preview uses the repository's draft wording and shows only the last 4 digits of ID or tax numbers (hidden in the demo). Not approved charities (Sunrise Table) see an explanation instead.
+- **Needs attention:** failed monthly payments, donors missing s18A details, campaigns behind pace or ending soon, large donations and first-time donors waiting for a thank-you. Every row opens the screen that fixes it. Each figure is computed from the same dataset (tested).
+- **Follow up (Donors):** welcome new donors, thank large donors, win back lapsing donors. Drafts are written in the charity's voice, editable, and open in the charity's own email app. Givezy sends nothing. "Done" is remembered in the browser. Win-back lists only donors who agreed to hear about appeals (a demo trait, see open decisions).
+- **Campaign pace:** an Ahead, On track or Behind badge and the amount needed each day, on the campaign page.
+- The "large donation" amount follows the setting under Settings, Notifications (R5 000 until changed).
+
 **Simulated, says so on screen:** invitations (no email), "Say thank you" (no email), notification settings (nothing sent), public page and sign-out (toast only), bank account change (a request toast), campaign publish (local only), refunds (shown, not actionable), verification steps (static per charity), recent activity (sample entries).
 
 ## Feature-to-backend map
@@ -113,3 +125,7 @@ These need Yehuda (and some Yosef) before the real build. They are also in `docs
 8. **Name:** the portal uses the Givezy brand; the website, emails and receipts still say Nadiv Lev until their rename pass.
 9. **Dark mode:** not designed. Wanted?
 10. **Live address** for campaign links (the demo uses `givezy.example`).
+11. **Marketing consent (POPIA), for Yosef:** the demo treats thank-yous as service messages any donor can get, and win-back appeals as marketing that needs consent (65% of demo donors "agreed", a made-up trait). Is that the right line, and where does the checkout ask for the consent?
+12. **Follow-up and pace settings are placeholders, not decisions** (in `demo-config.ts`): "new donor" for 14 days, "large donation" within 30 days, "ahead" at 110% of an even pace and "behind" under 90%, a campaign "ending soon" within 14 days. Donor groups: lapsing is 120 to 240 days since the last donation. Confirm or change.
+13. **Receipt numbers:** the demo numbers receipts in donor order within the year (`BF-2026-0001`). The real job numbers in issue order, per the existing sample format. Same format, different order.
+14. **Who writes to donors:** the portal drafts and the charity sends from its own email. Should Givezy ever send for them (needs consent, unsubscribe handling and sender authentication), or stay draft-only?

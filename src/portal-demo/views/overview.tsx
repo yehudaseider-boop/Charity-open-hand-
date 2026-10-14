@@ -30,6 +30,7 @@ import { Icon, type IconName } from "../ui/icons";
 import { MetricCard } from "../ui/metric";
 import { Avatar, ButtonLink, Card, CardHeader, cx, PageHeader, Progress } from "../ui/primitives";
 import { BASE } from "../ui/shell";
+import { AttentionCard } from "./attention";
 import { campaignName, DonationDrawer, DonationStatusBadge, donationCsvRows, Loaded, useExport, useLookups } from "./common";
 
 export function OverviewView() {
@@ -89,6 +90,8 @@ function Overview({ data }: { data: DemoDataset }) {
         <MetricCard label="Donors" icon="users" value={count(m.now.donorCount)} delta={m.before && changeTenths(m.now.donorCount, m.before.donorCount)} note={`${count(m.now.newDonors)} new · ${count(m.now.returningDonors)} returning`} trend={m.series.map((p) => p.newDonors + p.returningDonors)} trendColour="lilac" />
         <MetricCard label="Active monthly donations" icon="repeat" value={count(m.rec.active)} note={`${rand(m.rec.expectedMonthlyCents)} expected each month`} trend={m.series.map((p) => p.monthlyCents)} trendColour="sage" />
       </div>
+
+      <AttentionCard data={data} />
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -183,7 +186,7 @@ function Overview({ data }: { data: DemoDataset }) {
           </div>
           <div className="mt-4 rounded-2xl bg-gz-cream p-3.5 text-sm">
             <p className="font-semibold">{count(m.now.failedCount)} failed and {count(m.now.pendingCount)} pending payments</p>
-            <p className="mt-0.5 text-gz-muted">Not counted in your totals. <Link href={`${BASE}/donations?status=failed`} className="font-semibold text-gz-blue">Review</Link></p>
+            <p className="mt-0.5 text-gz-muted">Not counted in your totals. <Link href={`${BASE}/donations?status=failed`} className="inline-flex min-h-10 items-center font-semibold text-gz-blue">Review</Link></p>
           </div>
         </Card>
       </div>

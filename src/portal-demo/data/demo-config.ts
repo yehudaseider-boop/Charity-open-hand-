@@ -33,3 +33,20 @@ export type FeeModel = "charity" | "not_charity";
  * The payment provider's real schedule replaces this.
  */
 export const DEMO_PAYOUT_SCHEDULE = "Weekly (demo placeholder): settled Monday to Sunday, sent the next Monday, in your bank by Thursday";
+
+/**
+ * DESIGN PLACEHOLDERS for the "Needs attention" and follow-up screens. These are starting
+ * points for discussion, not decisions: change them here and every screen follows.
+ */
+/** A donor counts as "new to welcome" for this many days after their first donation. */
+export const FOLLOW_UP_NEW_DAYS = 14;
+/** Large donations are offered for a personal thank-you for this many days. */
+export const FOLLOW_UP_LARGE_DAYS = 30;
+/** A campaign is "ahead" at or above this percentage of where an even pace would put it. */
+export const PACE_AHEAD_PERCENT = 110;
+/** ... "on track" at or above this percentage, otherwise "behind". */
+export const PACE_ON_TRACK_PERCENT = 90;
+/** A campaign ending within this many days is flagged. */
+export const CAMPAIGN_ENDING_SOON_DAYS = 14;
+/** Large-donation threshold used until a charity sets its own under Notifications (R5 000, in cents). */
+export const DEFAULT_LARGE_DONATION_CENTS = 500_000;

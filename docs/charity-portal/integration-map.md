@@ -33,3 +33,9 @@ What each part of the prototype needs before it can run on real data. "Exists" m
 | Verification | static per charity | application status, badges | Yes | Map existing statuses to the steps |
 | Payment and payouts | static | `charity_private` (last 4 only), gateway connection | Yes | Bank change stays a Givezy admin action |
 | Security | local store | `mfa.ts`, session settings, `audit_log` | Partly | Session timeout setting; activity list from `audit_log` |
+| **s18A receipts** list, summary, preview | `s18aReceipts()`, `s18aSummary()` | `s18a_receipts` and links (job built, off) | Yes | Read as the charity admin (already allowed by `receipts_read`); a function returning the summary; "details incomplete" from the donor's checkout details (last 4 only) |
+| Receipt PDF download | toast | signed 60-second link | Yes | Reuse the existing receipt download route; already logged |
+| Missing-details request | local draft | email adapter or the charity's own email | Partly | Draft-only now; decide whether Givezy ever sends |
+| **Needs attention** items | `attentionItems()` | SQL views per item (failed monthly, missing details, campaign pace, large and new donors) | Partly | One function returning the same item shapes; cache per charity |
+| **Follow up** lists and drafts | `followUps()`, `buildDraft()` | donor and donation reads; marketing consent flag | No | Add marketing consent to the checkout and store it; hide donors without it from win-back; per-charity templates; "done" markers in a new table (`charity_follow_ups`) with RLS |
+| Campaign pace | `campaignPace()` | computed from campaign and donations | Yes | Same maths in SQL or the API; thresholds in config |

@@ -8,7 +8,8 @@
  *   net         gross - refunds - processing fees - platform fee
  * Periods filter by DONATION date unless a function says otherwise (payouts use payout date).
  */
-import { DEMO_START, DEMO_TODAY } from "./demo-config";
+import { taxYearFor, taxYearRange } from "@/lib/dates";
+import { CAMPAIGN_ENDING_SOON_DAYS, DEMO_START, DEMO_TODAY, FOLLOW_UP_LARGE_DAYS, FOLLOW_UP_NEW_DAYS, PACE_AHEAD_PERCENT, PACE_ON_TRACK_PERCENT } from "./demo-config";
 import { addDays, addMonths, daysBetween, monthKey } from "./day";
 import { localDay } from "./generate";
 import type { Campaign, DemoDataset, Donation, Donor, RecurringPlan } from "./types";
@@ -458,4 +459,239 @@ export function amountDistribution(ds: DemoDataset, range: DateRange): AmountBuc
     const inB = paid.filter((d) => d.amountCents >= min && (max === null || d.amountCents < max));
     return { label, min, max, count: inB.length, cents: sum(inB.map((d) => d.amountCents)) };
   });
+}
+
+/** Stable yes/no per donor for demo-only traits, so every reload agrees. `percent` is the chance of true. */
+export function demoFlag(id: string, salt: string, percent: number): boolean {
+  let h = 2166136261;
+  for (const c of `${salt}:${id}`) {
+    h ^= c.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 100 < percent;
+}
+
+/** Demo trait: the donor's s18A details (name, address, ID or tax number) are incomplete. */
+export const s18aDetailsMissing = (d: Donor) => demoFlag(d.id, "s18a", d.type === "individual" ? 9 : 4);
+
+/** Demo trait: the donor agreed to hear about appeals (marketing consent). Thank-yous do not need it. */
+export const hasMarketingConsent = (d: Donor) => demoFlag(d.id, "marketing", 65);
+
+export type S18aStatus = "issued" | "after_year_end" | "needs_details";
+
+export type S18aReceipt = {
+  /** Null until issued. */
+  number: string | null;
+  taxYear: number;
+  donorId: string;
+  /** Donation amounts only, never the processing fee. */
+  totalCents: number;
+  donationIds: string[];
+  status: S18aStatus;
+  issuedOn: string | null;
+};
+
+export const currentTaxYear = () => taxYearFor(`${DEMO_TODAY}T12:00:00Z`);
+
+export function isTaxYearClosed(taxYear: number): boolean {
+  return taxYearRange(taxYear).end < DEMO_TODAY;
+}
+
+/**
+ * One annual receipt per donor per tax year, covering paid donations that asked for an s18A
+ * receipt. Refunded, failed and pending donations never count. A receipt cannot be issued while
+ * the donor's details are incomplete. Charities without s18A approval have none.
+ */
+export function s18aReceipts(ds: DemoDataset, taxYear: number): S18aReceipt[] {
+  if (!ds.charity.s18a) return [];
+  const donors = new Map(ds.donors.map((d) => [d.id, d]));
+  const byDonor = new Map<string, Donation[]>();
+  for (const d of ds.donations) {
+    if (d.status !== "paid" || !d.wants18a || taxYearFor(d.donatedAt) !== taxYear) continue;
+    byDonor.set(d.donorId, [...(byDonor.get(d.donorId) ?? []), d]);
+  }
+  const closed = isTaxYearClosed(taxYear);
+  const { end } = taxYearRange(taxYear);
+  const ordered = [...byDonor.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  let n = 0;
+  return ordered.map(([donorId, list]) => {
+    const missing = s18aDetailsMissing(donors.get(donorId)!);
+    const status: S18aStatus = missing ? "needs_details" : closed ? "issued" : "after_year_end";
+    return {
+      number: status === "issued" ? `${ds.charity.initials}-${taxYear}-${String(++n).padStart(4, "0")}` : null,
+      taxYear,
+      donorId,
+      totalCents: sum(list.map((d) => d.amountCents)),
+      donationIds: list.sort((a, b) => (a.donatedAt < b.donatedAt ? -1 : 1)).map((d) => d.id),
+      status,
+      issuedOn: status === "issued" ? addDays(end, 14) : null,
+    };
+  });
+}
+
+export type S18aSummary = {
+  taxYear: number;
+  start: string;
+  end: string;
+  closed: boolean;
+  daysToYearEnd: number;
+  yearElapsedPermille: number;
+  donationCount: number;
+  totalCents: number;
+  donors: number;
+  issued: number;
+  afterYearEnd: number;
+  needsDetails: number;
+};
+
+export function s18aSummary(ds: DemoDataset, taxYear: number): S18aSummary {
+  const { start, end } = taxYearRange(taxYear);
+  const receipts = s18aReceipts(ds, taxYear);
+  const total = daysBetween(start, end) + 1;
+  const elapsed = Math.max(0, Math.min(total, daysBetween(start, DEMO_TODAY) + 1));
+  return {
+    taxYear,
+    start,
+    end,
+    closed: isTaxYearClosed(taxYear),
+    daysToYearEnd: Math.max(0, daysBetween(DEMO_TODAY, end)),
+    yearElapsedPermille: Math.round((elapsed * 1000) / total),
+    donationCount: receipts.reduce((s, r) => s + r.donationIds.length, 0),
+    totalCents: sum(receipts.map((r) => r.totalCents)),
+    donors: receipts.length,
+    issued: receipts.filter((r) => r.status === "issued").length,
+    afterYearEnd: receipts.filter((r) => r.status === "after_year_end").length,
+    needsDetails: receipts.filter((r) => r.status === "needs_details").length,
+  };
+}
+
+export type PaceState = "reached" | "ahead" | "on_track" | "behind";
+
+export type CampaignPace = { state: PaceState; remainingDays: number; neededPerDayCents: number };
+
+/**
+ * Where an active campaign stands against an even pace to its goal by its end date.
+ * Null for campaigns that are not active or have no end date (no pace to measure).
+ */
+export function campaignPace(c: Pick<CampaignStats, "status" | "raisedCents" | "goalCents" | "startDate" | "endDate">): CampaignPace | null {
+  if (c.status !== "active") return null;
+  if (c.raisedCents >= c.goalCents) return { state: "reached", remainingDays: 0, neededPerDayCents: 0 };
+  if (!c.endDate) return null;
+  const total = daysBetween(c.startDate, c.endDate) + 1;
+  const elapsed = Math.min(total, Math.max(0, daysBetween(c.startDate, DEMO_TODAY) + 1));
+  const remainingDays = Math.max(0, daysBetween(DEMO_TODAY, c.endDate));
+  const expected = Math.round((c.goalCents * elapsed) / total);
+  const state: PaceState = c.raisedCents * 100 >= expected * PACE_AHEAD_PERCENT ? "ahead" : c.raisedCents * 100 >= expected * PACE_ON_TRACK_PERCENT ? "on_track" : "behind";
+  const gap = c.goalCents - c.raisedCents;
+  return { state, remainingDays, neededPerDayCents: remainingDays > 0 ? Math.ceil(gap / remainingDays) : gap };
+}
+
+export type FollowUpKind = "new" | "large" | "winback";
+
+export type FollowUpRow = {
+  /** Handled marker key: `${kind}:${id}`. */
+  key: string;
+  kind: FollowUpKind;
+  donor: DonorStats;
+  donationId: string | null;
+  /** The donation that triggered it, or the donor's average donation for a win-back. */
+  amountCents: number;
+  day: string;
+  campaignId: string | null;
+  wants18a: boolean;
+};
+
+export type FollowUps = Record<FollowUpKind, FollowUpRow[]> & { winbackHiddenNoConsent: number };
+
+/**
+ * Who deserves a message. New: first donation in the last FOLLOW_UP_NEW_DAYS days. Large: a paid
+ * donation of at least `largeCents` in the last FOLLOW_UP_LARGE_DAYS days. Win-back: lapsing donors
+ * who gave more than once; only those who agreed to hear about appeals are listed.
+ */
+export function followUps(ds: DemoDataset, largeCents: number, stats: DonorStats[] = donorStats(ds)): FollowUps {
+  const byId = new Map(stats.map((d) => [d.id, d]));
+  const paid = ds.donations.filter((d) => d.status === "paid");
+  const row = (kind: FollowUpKind, id: string, donor: DonorStats, d: Donation | null, amountCents: number, day: string): FollowUpRow => ({
+    key: `${kind}:${id}`,
+    kind,
+    donor,
+    donationId: d?.id ?? null,
+    amountCents,
+    day,
+    campaignId: d?.campaignId ?? null,
+    wants18a: !!d?.wants18a,
+  });
+  const out: FollowUps = { new: [], large: [], winback: [], winbackHiddenNoConsent: 0 };
+  for (const donor of stats) {
+    if (donor.firstDay && daysBetween(donor.firstDay, DEMO_TODAY) <= FOLLOW_UP_NEW_DAYS) {
+      const first = paid.filter((d) => d.donorId === donor.id).sort((a, b) => (a.donatedAt < b.donatedAt ? -1 : 1))[0];
+      if (first) out.new.push(row("new", donor.id, donor, first, first.amountCents, dayOf(first)));
+    }
+  }
+  for (const d of paid) {
+    const donor = byId.get(d.donorId);
+    if (donor && d.amountCents >= largeCents && daysBetween(dayOf(d), DEMO_TODAY) <= FOLLOW_UP_LARGE_DAYS) out.large.push(row("large", d.id, donor, d, d.amountCents, dayOf(d)));
+  }
+  for (const donor of stats) {
+    if (donor.segment !== "lapsing" || donor.giftCount < 2 || !donor.lastDay) continue;
+    if (!hasMarketingConsent(donor)) {
+      out.winbackHiddenNoConsent++;
+      continue;
+    }
+    out.winback.push(row("winback", donor.id, donor, null, Math.round(donor.totalCents / donor.giftCount), donor.lastDay));
+  }
+  out.new.sort((a, b) => (a.day < b.day ? 1 : -1));
+  out.large.sort((a, b) => b.amountCents - a.amountCents);
+  out.winback.sort((a, b) => b.donor.totalCents - a.donor.totalCents);
+  return out;
+}
+
+export type AttentionKind = "failed_monthly" | "large_donation" | "new_donors" | "campaign_behind" | "campaign_ending" | "s18a_details";
+
+export type AttentionItem = {
+  key: string;
+  kind: AttentionKind;
+  /** 1 most urgent. */
+  priority: 1 | 2 | 3;
+  count: number;
+  amountCents?: number;
+  campaignId?: string;
+  campaignName?: string;
+  daysLeft?: number;
+  neededPerDayCents?: number;
+  progressPermille?: number;
+};
+
+/** What a charity should look at today, most urgent first. `handled` holds follow-up keys already done. */
+export function attentionItems(ds: DemoDataset, opts: { largeCents: number; handled: Record<string, string> }): AttentionItem[] {
+  const items: AttentionItem[] = [];
+  const stats = donorStats(ds);
+  const fu = followUps(ds, opts.largeCents, stats);
+
+  const latest = new Map<string, Donation>();
+  for (const d of ds.donations) if (d.recurringId && !latest.has(d.recurringId)) latest.set(d.recurringId, d);
+  const failing = ds.recurring.filter((p) => p.status === "active" && latest.get(p.id)?.status === "failed");
+  if (failing.length) items.push({ key: "failed_monthly", kind: "failed_monthly", priority: 1, count: failing.length, amountCents: sum(failing.map((p) => p.amountCents)) });
+
+  if (ds.charity.s18a) {
+    const missing = s18aReceipts(ds, currentTaxYear()).filter((r) => r.status === "needs_details").length;
+    if (missing) items.push({ key: "s18a_details", kind: "s18a_details", priority: 1, count: missing });
+  }
+
+  for (const c of campaignStats(ds)) {
+    const pace = campaignPace(c);
+    if (pace?.state === "behind" && pace.remainingDays > 0) {
+      items.push({ key: `behind:${c.id}`, kind: "campaign_behind", priority: 2, count: 1, campaignId: c.id, campaignName: c.name, daysLeft: pace.remainingDays, neededPerDayCents: pace.neededPerDayCents, progressPermille: c.progressPermille });
+    } else if (c.status === "active" && c.endDate && pace?.state !== "reached") {
+      const left = daysBetween(DEMO_TODAY, c.endDate);
+      if (left >= 0 && left <= CAMPAIGN_ENDING_SOON_DAYS) items.push({ key: `ending:${c.id}`, kind: "campaign_ending", priority: 3, count: 1, campaignId: c.id, campaignName: c.name, daysLeft: left, progressPermille: c.progressPermille });
+    }
+  }
+
+  const large = fu.large.filter((r) => !opts.handled[r.key]);
+  if (large.length) items.push({ key: "large_donation", kind: "large_donation", priority: 2, count: large.length, amountCents: sum(large.map((r) => r.amountCents)) });
+  const fresh = fu.new.filter((r) => !opts.handled[r.key]);
+  if (fresh.length) items.push({ key: "new_donors", kind: "new_donors", priority: 3, count: fresh.length });
+
+  return items.sort((a, b) => a.priority - b.priority);
 }

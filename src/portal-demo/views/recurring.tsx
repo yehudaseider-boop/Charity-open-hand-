@@ -17,7 +17,7 @@ import { Drawer } from "../ui/overlay";
 import { Avatar, Button, Callout, Card, CardHeader, DetailList, EmptyState, PageHeader } from "../ui/primitives";
 import { BASE } from "../ui/shell";
 import { DataTable } from "../ui/table";
-import { campaignName, DonationStatusBadge, Loaded, RecurringStatusBadge, useExport, useLookups } from "./common";
+import { campaignName, DonationStatusBadge, Loaded, RecurringStatusBadge, useExport, useLookups, useQueryParam } from "./common";
 
 export function RecurringView() {
   return <Loaded>{(data) => <Recurring data={data} />}</Loaded>;
@@ -32,6 +32,12 @@ function Recurring({ data }: { data: DemoDataset }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | RecurringStatus | "failing">("all");
   const [open, setOpen] = useState<Row | null>(null);
+  const statusParam = useQueryParam("status");
+  const [statusApplied, setStatusApplied] = useState(false);
+  if (!statusApplied && statusParam) {
+    setStatusApplied(true);
+    if (["active", "paused", "cancelled", "failing"].includes(statusParam)) setStatus(statusParam as typeof status);
+  }
 
   const s = useMemo(() => recurringSummary(data, range), [data, range]);
   const before = useMemo(() => (canCompare(range) ? recurringSummary(data, previousRange(range)) : null), [data, range]);

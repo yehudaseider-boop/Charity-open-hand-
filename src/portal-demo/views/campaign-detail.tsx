@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { DEMO_TODAY } from "../data/demo-config";
 import { daysBetween, showDay } from "../data/day";
-import { campaignCumulative, campaignStats, donorName } from "../data/selectors";
+import { campaignCumulative, campaignPace, campaignStats, donorName, type PaceState } from "../data/selectors";
 import type { DemoDataset, Donation } from "../data/types";
 import { usePortal } from "../store";
 import { LineChart } from "../ui/charts";
@@ -12,12 +12,19 @@ import { count, date, permille, rand, randShort, randWhole } from "../ui/format"
 import { Icon } from "../ui/icons";
 import { MetricCard } from "../ui/metric";
 import { Modal } from "../ui/overlay";
-import { Avatar, Button, ButtonLink, Callout, Card, CardHeader, EmptyState, Progress } from "../ui/primitives";
+import { Avatar, Badge, Button, ButtonLink, Callout, Card, CardHeader, EmptyState, Progress, type Tone } from "../ui/primitives";
 import { BASE } from "../ui/shell";
 import { DataTable } from "../ui/table";
 import { CampaignForm, campaignLink } from "./campaign-form";
 import { CampaignStatusActions } from "./campaigns";
 import { CampaignStatusBadge, DonationDrawer, DonationStatusBadge, Loaded, useLookups } from "./common";
+
+const PACE: Record<PaceState, [string, Tone]> = {
+  reached: ["Goal reached", "success"],
+  ahead: ["Ahead of pace", "success"],
+  on_track: ["On track", "info"],
+  behind: ["Behind pace", "warning"],
+};
 
 export function CampaignDetailView() {
   const { campaignId } = useParams<{ campaignId: string }>();
@@ -47,6 +54,7 @@ function CampaignDetail({ data, id }: { data: DemoDataset; id: string }) {
   const appShare = paid.length ? Math.round((paid.filter((d) => d.channel === "app").length * 1000) / paid.length) : 0;
   const daysLeft = campaign.endDate && campaign.status !== "ended" ? daysBetween(DEMO_TODAY, campaign.endDate) : null;
   const link = campaignLink(data.charity.publicSlug, campaign.slug);
+  const pace = campaignPace(stats);
 
   return (
     <div className="gz-fade-in space-y-6">
@@ -93,6 +101,18 @@ function CampaignDetail({ data, id }: { data: DemoDataset; id: string }) {
           </p>
         </div>
         <Progress permille={stats.progressPermille} className="mt-3 h-3.5" label="Progress to goal" />
+        {pace && (
+          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <Badge tone={PACE[pace.state][1]} icon={pace.state === "behind" ? "alert" : "check"}>
+              {PACE[pace.state][0]}
+            </Badge>
+            <span className="text-gz-muted">
+              {pace.state === "reached"
+                ? "The goal has been met."
+                : `${count(pace.remainingDays)} days left. It needs ${rand(pace.neededPerDayCents)} a day to reach the goal.`}
+            </span>
+          </p>
+        )}
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

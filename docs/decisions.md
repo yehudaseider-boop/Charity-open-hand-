@@ -509,3 +509,10 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Every figure comes from one generated dataset per demo charity, so totals agree across screens (`tests/portal-demo-data.test.ts`).
 - Placeholders that are NOT decisions: a 3% processing fee, a weekly payout schedule, the `givezy.example` address. The platform fee shows as R0 (decided 08/10/2026).
 - The team invites and four roles in Settings are a proposal that differs from the 09/10/2026 decision (Givezy adds charity admins; owners and admins see the same). Open questions are listed in `docs/charity-portal/README.md` and the go-live checklist.
+
+### Portal prototype additions (14/10/2026)
+
+- Added to the prototype: an s18A receipts screen, a Needs attention panel, thank-you and win-back drafts under Donors, and campaign pace. Still demo only.
+- Drafts only: the charity sends from its own email. Win-back appeals are treated as marketing and need donor consent (assumption, for Yosef); thank-yous are not.
+- Thresholds for follow-ups and pace (14 and 30 days, 110% and 90%) are design placeholders in `src/portal-demo/data/demo-config.ts`, not decisions.
+- Receipt amounts are the donation only; a receipt is not issued while the donor's details are incomplete. Wording stays a DRAFT until the attorney confirms it.

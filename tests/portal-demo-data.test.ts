@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_CHARITIES } from "@/portal-demo/data/charities";
-import { DEMO_START, DEMO_TODAY } from "@/portal-demo/data/demo-config";
+import { DEMO_START, DEMO_TODAY, FOLLOW_UP_LARGE_DAYS, FOLLOW_UP_NEW_DAYS } from "@/portal-demo/data/demo-config";
 import { feeFor, generateDataset, localDay } from "@/portal-demo/data/generate";
+import { taxYearFor, taxYearRange } from "@/lib/dates";
 import {
+  attentionItems,
+  campaignPace,
   campaignStats,
+  currentTaxYear,
+  followUps,
+  hasMarketingConsent,
+  s18aDetailsMissing,
+  s18aReceipts,
+  s18aSummary,
   donorStats,
   financeSummary,
   monthlySeries,
@@ -114,4 +123,119 @@ describe("charity portal demo data", () => {
       });
     });
   }
+
+  describe("s18A receipts", () => {
+    it("charities without s18A approval have no receipts", () => {
+      const ds = generateDataset("sunrise-table");
+      expect(s18aReceipts(ds, currentTaxYear())).toEqual([]);
+      expect(ds.donations.some((d) => d.wants18a)).toBe(false);
+    });
+
+    for (const id of ["bright-futures", "ezra-medical"]) {
+      describe(id, () => {
+        const ds = generateDataset(id);
+        for (const taxYear of [currentTaxYear() - 1, currentTaxYear()]) {
+          it(`tax year ${taxYear}: one receipt per donor, gift amounts only, paid donations that asked`, () => {
+            const receipts = s18aReceipts(ds, taxYear);
+            expect(receipts.length).toBeGreaterThan(0);
+            expect(new Set(receipts.map((r) => r.donorId)).size).toBe(receipts.length);
+            const expected = ds.donations.filter((d) => d.status === "paid" && d.wants18a && taxYearFor(d.donatedAt) === taxYear);
+            expect(receipts.reduce((s, r) => s + r.totalCents, 0)).toBe(sum(expected.map((d) => d.amountCents)));
+            expect(receipts.reduce((s, r) => s + r.donationIds.length, 0)).toBe(expected.length);
+            for (const r of receipts) {
+              const rows = ds.donations.filter((d) => r.donationIds.includes(d.id));
+              expect(rows.every((d) => d.status === "paid" && d.donorId === r.donorId)).toBe(true);
+              expect(r.totalCents).toBe(sum(rows.map((d) => d.amountCents)));
+            }
+          });
+        }
+
+        it("issues only after the tax year closes, and never without donor details", () => {
+          const closed = s18aReceipts(ds, currentTaxYear() - 1);
+          const open = s18aReceipts(ds, currentTaxYear());
+          expect(taxYearRange(currentTaxYear() - 1).end < DEMO_TODAY).toBe(true);
+          expect(closed.some((r) => r.status === "issued")).toBe(true);
+          expect(closed.every((r) => r.status !== "after_year_end")).toBe(true);
+          expect(open.every((r) => r.status !== "issued" && r.number === null)).toBe(true);
+          const donors = new Map(ds.donors.map((d) => [d.id, d]));
+          for (const r of [...closed, ...open]) {
+            if (s18aDetailsMissing(donors.get(r.donorId)!)) expect(r.status).toBe("needs_details");
+          }
+        });
+
+        it("numbers are unique and run without gaps", () => {
+          const numbers = s18aReceipts(ds, currentTaxYear() - 1).map((r) => r.number).filter((n): n is string => !!n);
+          expect(new Set(numbers).size).toBe(numbers.length);
+          expect(numbers[0]).toMatch(/^[A-Z]{2}-\d{4}-0001$/);
+          expect(numbers.at(-1)).toMatch(new RegExp(`-${String(numbers.length).padStart(4, "0")}$`));
+        });
+
+        it("summary matches the receipts", () => {
+          const sm = s18aSummary(ds, currentTaxYear());
+          const receipts = s18aReceipts(ds, currentTaxYear());
+          expect(sm.donors).toBe(receipts.length);
+          expect(sm.issued + sm.afterYearEnd + sm.needsDetails).toBe(sm.donors);
+          expect(sm.totalCents).toBe(sum(receipts.map((r) => r.totalCents)));
+          expect(sm.end).toBe("2027-02-28");
+        });
+      });
+    }
+  });
+
+  describe("campaign pace", () => {
+    const base = { status: "active" as const, goalCents: 1_000_000, startDate: "2026-09-14", endDate: "2026-10-24" };
+    it("is not measured for campaigns that are not active or have no end date", () => {
+      expect(campaignPace({ ...base, status: "paused", raisedCents: 0 })).toBeNull();
+      expect(campaignPace({ ...base, endDate: null, raisedCents: 0 })).toBeNull();
+    });
+    it("compares raised with an even pace (day 31 of 41, 10 days left)", () => {
+      // expected at an even pace: 1 000 000 x 31 / 41 = 756 098 cents
+      expect(campaignPace({ ...base, raisedCents: 900_000 })?.state).toBe("ahead");
+      expect(campaignPace({ ...base, raisedCents: 760_000 })?.state).toBe("on_track");
+      const behind = campaignPace({ ...base, raisedCents: 400_000 })!;
+      expect(behind.state).toBe("behind");
+      expect(behind.remainingDays).toBe(10);
+      expect(behind.neededPerDayCents).toBe(60_000);
+    });
+    it("reached once the goal is met", () => {
+      expect(campaignPace({ ...base, raisedCents: 1_000_000 })?.state).toBe("reached");
+    });
+  });
+
+  describe("follow-ups and attention", () => {
+    for (const charity of DEMO_CHARITIES) {
+      const ds = generateDataset(charity.id);
+      const large = 500_000;
+      it(`${charity.shortName}: lists only the right people`, () => {
+        const fu = followUps(ds, large);
+        expect(fu.new.length).toBeGreaterThan(0);
+        expect(fu.winback.length).toBeGreaterThan(0);
+        expect(fu.winbackHiddenNoConsent).toBeGreaterThan(0);
+        if (ds.charity.size !== "small") expect(fu.large.length).toBeGreaterThan(0);
+        for (const r of fu.new) expect(r.donor.firstDay! >= "2026-09-30").toBe(true);
+        expect(FOLLOW_UP_NEW_DAYS).toBe(14);
+        for (const r of fu.large) {
+          expect(r.amountCents).toBeGreaterThanOrEqual(large);
+          expect(r.day >= "2026-09-14").toBe(true);
+        }
+        expect(FOLLOW_UP_LARGE_DAYS).toBe(30);
+        for (const r of fu.winback) {
+          expect(r.donor.segment).toBe("lapsing");
+          expect(r.donor.giftCount).toBeGreaterThanOrEqual(2);
+          expect(hasMarketingConsent(r.donor)).toBe(true);
+        }
+      });
+
+      it(`${charity.shortName}: attention items agree with the screens`, () => {
+        const items = attentionItems(ds, { largeCents: large, handled: {} });
+        expect(items.map((i) => i.priority)).toEqual([...items.map((i) => i.priority)].sort());
+        const fu = followUps(ds, large);
+        expect(items.find((i) => i.kind === "large_donation")?.count ?? 0).toBe(fu.large.length);
+        expect(items.find((i) => i.kind === "new_donors")?.count ?? 0).toBe(fu.new.length);
+        const handled = Object.fromEntries(fu.new.map((r) => [r.key, DEMO_TODAY]));
+        expect(attentionItems(ds, { largeCents: large, handled }).some((i) => i.kind === "new_donors")).toBe(false);
+        if (!ds.charity.s18a) expect(items.some((i) => i.kind === "s18a_details")).toBe(false);
+      });
+    }
+  });
 });
