@@ -14,7 +14,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Yosef:** what an erasure keeps (donation amounts, dates and issued s18A receipts) and for how long (the Privacy page still says "to be confirmed"). Then try an erasure on test data and read the email it sends.
 - [ ] **Look at Admin, Payments each day** in the first weeks: anything stuck, held, or a monthly donation more than 24 hours late.
 - [ ] **Connect every approved charity** (Admin, charity page, "Connect to gateway") before opening. A charity that is not connected shows "isn't taking online donations yet".
-- [ ] **Who pays the gateway charge** (donor, Nadiv Lev or the charity). Decision.
+- [x] **Who pays the gateway charge:** the charity, out of its donation (decided 14/10/2026). The donor-covers option comes later, see D.
 - [ ] **Pending-payment sweep.** Today a payment still pending after the gateway stops retrying needs a person to check unprocessed rows in `gateway_events`. Decide whether to add an automatic sweep. Decision.
 - [x] **Money model decided 13/10/2026: straight to the chosen charity** (Paystack split payments), not pooled. Nadiv Lev never holds a charity's donation, so the "holding funds" question and the "choice is only a suggestion" wording fall away. Still for Yosef: s18A in this model (the charity issues the certificate or Nadiv Lev issues on its behalf under the mandate, as built), and how Nadiv Lev's own contribution is treated.
 - [ ] **s18A loss rule**, **refunds and chargebacks**, and **what happens when a charity changes its name.** Decisions.
