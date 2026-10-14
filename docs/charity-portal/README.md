@@ -1,0 +1,115 @@
+# Givezy charity portal: design prototype
+
+Built 14/10/2026 for review. A clickable prototype of the portal charity administrators would use. **Demo data only**: no database, no payment provider, no email. Approve the design here before any backend work starts.
+
+## How to run it
+
+```bash
+npm install
+npm run dev
+```
+
+Open <http://localhost:3000/portal-demo>. Chrome, Safari or Edge, any width from 375 px up.
+
+- The site needs `.env.local` to start (the website's own pages talk to Supabase). For the portal alone, two placeholder lines are enough:
+  `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=placeholder`.
+- On a built site (`npm run build && npm start`) the portal answers "not found" unless `PORTAL_DEMO=yes` is set. That keeps it off a live deploy by accident.
+- Changes made in the demo (campaigns, team, settings) are kept in the browser's local storage. "Reset demo" in the dark banner clears them.
+
+## Where it lives
+
+The portal is a separate area of the website. It does not touch the donor app (`apps/mobile`), the existing `/charity-admin` screens, the database or the payment code.
+
+| Path | What |
+|---|---|
+| `src/app/portal-demo/` | Routes (thin pages; each renders a view) |
+| `src/portal-demo/data/` | Demo data model, generator, selectors (every number), mock API |
+| `src/portal-demo/ui/` | Shared components: shell, sidebar, top bar, charts, table, filters, forms, dialogs, drawers, badges, toasts |
+| `src/portal-demo/views/` | The eight sections |
+| `src/portal-demo/store.tsx` | Demo state: charity switcher, date range, local changes |
+| `public/givezy/` | Givezy logo files, copied from `apps/mobile/assets` (not redrawn) |
+| `src/app/globals.css` | Givezy colour tokens, scoped to `.gz-portal` |
+| `tests/portal-demo-data.test.ts` | Proves every screen's figures come from one dataset and add up |
+
+## Routes
+
+| Route | Section |
+|---|---|
+| `/portal-demo` | Overview |
+| `/portal-demo/donations` | Donations (`?status=failed` pre-filters) |
+| `/portal-demo/donors` | Donors (`?donor=<id>` opens a profile) |
+| `/portal-demo/campaigns` | Campaigns |
+| `/portal-demo/campaigns/new` | Create campaign |
+| `/portal-demo/campaigns/[id]` | Campaign detail, edit, status, share |
+| `/portal-demo/recurring` | Monthly giving |
+| `/portal-demo/analytics` | Analytics |
+| `/portal-demo/finances` | Finances and payouts |
+| `/portal-demo/settings` | Settings and team (`?tab=team` and so on) |
+
+Screenshots of the key screens are in [`screens/`](screens/).
+
+## How to look around
+
+1. Start on **Overview**. The date button (top right of each page) changes the period for every screen.
+2. Use the **charity switcher** under the logo to move between the three demo charities: Sunrise Table (small community kitchen), Bright Futures (medium education trust), Ezra Medical (larger medical fund). Every screen changes with it.
+3. Open any donation row for its **drawer**: gross, fee, net, and the three dates (donated, settled, paid out) kept apart.
+4. On **Campaigns**, create one, then edit its goal, pause it and end it. It shows up in the overview, filters and comparisons.
+5. On **Finances**, flip the processing-fee switch to see both fee designs.
+6. On **Settings, Team members**, invite someone. Nothing is sent.
+
+## Design specification
+
+**Brand.** Givezy kit, the same tokens as the phone app (`apps/mobile/src/theme/tokens.ts`): cream pages `#FEFDF7`, navy text `#102848`, blue `#1848A8` for headlines, buttons, links and the active menu item, lilac `#CCB3FB` / `#F1EAFE` for soft highlight cards, sage `#2E9D6B` for progress and success, one orange `#F88038` accent per screen (graphics only: the logo splash on Overview, the DEMO MODE tag, failed collections in one chart). Fredoka for headlines and big numbers, Inter for everything else, tabular figures for money. Pill buttons, 22 to 28 px corners, soft blue-tinted shadows. Sentence case, no exclamation marks.
+
+**Layout.** Fixed sidebar (264 px) on laptops and desktops; below 1024 px it becomes a slide-out menu behind a menu button. Content max 1 320 px. Metric cards in a row of four (two on tablets, one on phones). Charts and summary cards in a 2:1 grid.
+
+**Components.** One set, used everywhere: `MetricCard` (value, change against the previous period, sparkline), `Card`, `PageHeader`, `Button` (primary, secondary, soft, ghost, danger), `Badge` (always icon or word with colour, never colour alone), `Progress`, `DataTable` (sort, pages, phone card layout), `SearchInput`, `FilterSelect`, `DateRangePicker`, `Segmented`, form fields with inline errors, `Modal`, `ConfirmDialog`, `Drawer` (full screen on phones), `Toasts`, `EmptyState`, skeleton loading.
+
+**Charts.** Plain SVG, no chart library. Every chart has a hover or tap tooltip, a legend when it has two series, and a **Table** switch showing the same numbers. Series colours in fixed order: blue, deep lilac `#9B7BE8`, sage, orange (checked for colour-blind separation). One y-axis per chart.
+
+**Money and dates.** Integer cents throughout; Rand shown as `R1 250` or `R34.57`; dates dd/mm/yyyy in Johannesburg time; the tax year option runs from 01/03.
+
+**Definitions used on every screen.** Raised = paid donations. Gross = paid plus refunded. Net = gross minus refunds minus processing fees minus platform fee (R0). Totals use the donation date; payouts use the payout date and say so.
+
+**Accessibility.** Visible labels on every control, 40 px or larger tap targets, focus rings, Escape closes dialogs and drawers, focus is kept inside an open dialog, status never shown by colour alone, no sideways scrolling at 375 px.
+
+## The demo data
+
+`src/portal-demo/data/generate.ts` builds each charity from a fixed seed, so it is the same every time: 18 months of history to 14/10/2026 (the screens default to the last 12; the earlier six give returning donors), once-off and monthly donations, first-time and returning donors, failed, pending and refunded payments, weekly payouts, campaigns with goals. Names are made-up combinations, emails use `example.org`, registration numbers carry a `DEMO` marker.
+
+| Demo charity | Size | Donations | Donors | Raised (18 months) |
+|---|---|---|---|---|
+| Sunrise Table Community Kitchen | small | about 990 | about 330 | about R217 000 |
+| Bright Futures Learning Trust | medium | about 4 400 | about 1 140 | about R2.6m |
+| Ezra Medical Assistance Fund | larger | about 12 900 | about 2 900 | about R17m |
+
+Placeholders, clearly labelled on screen and in `demo-config.ts`: a 3% processing fee (not a real rate), a weekly payout schedule, and the `givezy.example` link address.
+
+## What works, what is simulated
+
+**Works in the browser:** navigation, charity switcher, date ranges (presets and custom, with errors for bad dates), search, filters, sorting, pages, chart tooltips and table views, donation, donor, monthly-donation and payout drawers, campaign create, edit, publish, pause, resume, end, reopen, copy link, team invite, role change, remove, settings forms with validation, logo upload and preview, CSV exports (real files, made in the browser), the processing-fee switch, reset.
+
+**Simulated, says so on screen:** invitations (no email), "Say thank you" (no email), notification settings (nothing sent), public page and sign-out (toast only), bank account change (a request toast), campaign publish (local only), refunds (shown, not actionable), verification steps (static per charity), recent activity (sample entries).
+
+## Feature-to-backend map
+
+Summary below; the table per screen is in [`integration-map.md`](integration-map.md).
+
+- Replace `mockPortalApi` in `src/portal-demo/data/service.ts` with calls made as the signed-in charity admin (row-level security decides). The screens only use the `PortalApi` interface and the selectors.
+- Heavy totals (overview, analytics, finances) should move into SQL views or database functions returning the same shapes as `selectors.ts`, filtered by date range, rather than loading every donation into the browser.
+- Payouts and settlement dates need the payment provider's settlement data, through the gateway adapter only.
+
+## Open decisions
+
+These need Yehuda (and some Yosef) before the real build. They are also in `docs/go-live-checklist.md`.
+
+1. **Processing fee:** the real rate, and who pays it. The demo shows both designs behind a switch.
+2. **Team invites and roles:** decided 09/10/2026 that the Givezy team adds charity admins and owners and admins see the same things. The prototype shows self-service invites and four roles (owner, admin, finance, viewer) as a proposal. Keep, change or drop?
+3. **Payout schedule and settlement data:** what the payment provider actually reports and how often it pays out.
+4. **Refunds:** who can refund (charity or Givezy only), and whether the fee comes back.
+5. **Campaign review:** does a new campaign go live straight away or after a Givezy check?
+6. **Failed monthly donations:** the real flow has a "failed" end state after three declines; the demo shows only active, paused and cancelled. Add the fourth state to the design?
+7. **Portal and existing `/charity-admin`:** replace the current charity screens with this design, or run both for a while?
+8. **Name:** the portal uses the Givezy brand; the website, emails and receipts still say Nadiv Lev until their rename pass.
+9. **Dark mode:** not designed. Wanted?
+10. **Live address** for campaign links (the demo uses `givezy.example`).

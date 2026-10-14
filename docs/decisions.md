@@ -500,3 +500,12 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Expo packages updated to the latest patch for SDK 57.
 
 **Known and accepted:** the phone app's package audit lists 22 advisories, almost all in build tools (Metro, the Expo command line) that never run on a phone; `braces` and `node-forge` have no fixed version yet. The one in the app itself (`decode-uri-component`, used for links) has its fix only in a new major version that is incompatible with the bundler, so it waits for Expo to update it. The website's audit is clean. Judgement call: the Giving page uses orange for chomesh in the bars and dots, so it has more than one orange accent; that is data colour, not decoration, and was kept on purpose.
+
+## Givezy charity portal: design prototype (14/10/2026)
+
+- A clickable prototype of the charity portal at `/portal-demo`, for Yehuda to approve before any backend work. Demo data only: no database, payment provider or email. Code in `src/portal-demo`, routes in `src/app/portal-demo`, docs in `docs/charity-portal/`.
+- Uses the Givezy kit (as the phone app), with tokens scoped to `.gz-portal` in `globals.css`; the rest of the website keeps the Nadiv Lev kit.
+- Off on a built site unless `PORTAL_DEMO=yes`; `npm run dev` shows it. Never set on a live site.
+- Every figure comes from one generated dataset per demo charity, so totals agree across screens (`tests/portal-demo-data.test.ts`).
+- Placeholders that are NOT decisions: a 3% processing fee, a weekly payout schedule, the `givezy.example` address. The platform fee shows as R0 (decided 08/10/2026).
+- The team invites and four roles in Settings are a proposal that differs from the 09/10/2026 decision (Givezy adds charity admins; owners and admins see the same). Open questions are listed in `docs/charity-portal/README.md` and the go-live checklist.

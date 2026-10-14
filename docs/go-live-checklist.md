@@ -22,6 +22,8 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Domain, registrar and hosting** chosen.
 - [ ] **App calendar choices:** Shabbos and Yom Tov end at sunset plus 72 minutes (confirm), whether "today" follows the phone's time zone or Johannesburg, and whether Elul shows "Shana tova" instead of "Good Shabbos".
 
+- [ ] **Charity portal design (prototype at `/portal-demo`, 14/10/2026).** Approve the design, then decide: who pays the processing fee (the demo shows both); self-service team invites and the four proposed roles (today the Givezy team adds admins); refunds (who, and whether the fee comes back); campaign review before publishing; adding the "failed" state for monthly donations to the portal; whether the portal replaces `/charity-admin`; the live address for campaign links. Real payout and settlement data needs the gateway's settlement reports. The prototype must never be switched on for a live site (`PORTAL_DEMO` stays unset). Details: `docs/charity-portal/README.md`. Decision.
+
 - [ ] **One name everywhere.** The phone app says Givezy; the website, payment page, emails, receipts, Privacy Policy and Terms still say Nadiv Lev. Rename them together (with Yosef for the legal pages) before anyone outside the team sees both. Decision on timing.
 
 ## B. Before the switch (technical)

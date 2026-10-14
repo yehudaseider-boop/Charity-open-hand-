@@ -1,0 +1,398 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { centsToPlain } from "@/lib/csv";
+import { DEMO_PAYOUT_SCHEDULE, DEMO_TODAY } from "../data/demo-config";
+import { addDays, showDay, showMonth, weekday } from "../data/day";
+import { localDay } from "../data/generate";
+import { dayOf, donorName, financeSummary, inRange, monthsIn, pendingSettlement, RANGE_LABELS } from "../data/selectors";
+import type { DemoDataset, Payout } from "../data/types";
+import { usePortal } from "../store";
+import { DateRangePicker } from "../ui/date-range";
+import { count, date, rand } from "../ui/format";
+import { Icon, type IconName } from "../ui/icons";
+import { MetricCard } from "../ui/metric";
+import { Drawer } from "../ui/overlay";
+import { Badge, Button, Callout, Card, CardHeader, cx, DetailList, EmptyState, PageHeader, Segmented } from "../ui/primitives";
+import { DataTable } from "../ui/table";
+import { donationCsvRows, Loaded, netOf, useExport, useLookups } from "./common";
+
+export function FinancesView() {
+  return <Loaded>{(data) => <Finances data={data} />}</Loaded>;
+}
+
+function PayoutBadge({ status }: { status: Payout["status"] }) {
+  return status === "paid" ? <Badge tone="success">Paid out</Badge> : <Badge tone="info" icon="clock">On its way</Badge>;
+}
+
+function Finances({ data }: { data: DemoDataset }) {
+  const { range, rangePreset, feeModel, setFeeModel, toast } = usePortal();
+  const lookups = useLookups(data);
+  const exportCsv = useExport();
+  const [open, setOpen] = useState<Payout | null>(null);
+
+  const f = useMemo(() => financeSummary(data, range), [data, range]);
+  const pending = useMemo(() => pendingSettlement(data), [data]);
+  const payouts = useMemo(() => data.payouts.filter((p) => inRange(p.payoutDate, range)), [data, range]);
+  const refunds = useMemo(() => data.donations.filter((d) => d.status === "refunded" && d.refundedAt && inRange(localDay(d.refundedAt), range)), [data, range]);
+  const statement = useMemo(
+    () =>
+      monthsIn(range).map((key) => {
+        const from = `${key}-01` < range.from ? range.from : `${key}-01`;
+        const to = `${key}-31` > range.to ? range.to : `${key}-31`;
+        const s = financeSummary(data, { from, to });
+        return { key, ...s };
+      }),
+    [data, range],
+  );
+  const reconciled = f.paidOutCents + f.inTransitCents + f.awaitingCents === f.grossCents && f.grossCents - f.refundsCents - f.processingFeesCents - f.platformFeesCents === f.netCents;
+
+  let nextThursday = addDays(DEMO_TODAY, 1);
+  while (weekday(nextThursday) !== 4) nextThursday = addDays(nextThursday, 1);
+  // The batch for this week is sent next Monday and arrives the Thursday after.
+  const nextArrival = addDays(nextThursday, 7);
+
+  const exportReport = () =>
+    exportCsv(
+      "financial-report",
+      ["Month (by donation date)", "Gross donations (R)", "Refunds (R)", "Processing fees (R)", "Platform fee (R)", "Net (R)", "Paid out (R)", "On its way (R)", "Not paid out yet (R)"],
+      statement.map((m) => [showMonth(m.key), centsToPlain(m.grossCents), centsToPlain(m.refundsCents), centsToPlain(m.processingFeesCents), centsToPlain(m.platformFeesCents), centsToPlain(m.netCents), centsToPlain(m.paidOutCents), centsToPlain(m.inTransitCents), centsToPlain(m.awaitingCents)]),
+    );
+  const exportPayouts = () =>
+    exportCsv(
+      "payouts",
+      ["Payout", "Settlements from", "Settlements to", "Sent", "In your bank", "Status", "Donations", "Gross (R)", "Fees (R)", "Refunds (R)", "Net (R)"],
+      payouts.map((p) => [p.ref, showDay(p.periodStart), showDay(p.periodEnd), showDay(p.sentDate), showDay(p.payoutDate), p.status === "paid" ? "Paid out" : "On its way", p.donationCount, centsToPlain(p.grossCents), centsToPlain(p.feesCents), centsToPlain(p.refundsCents), centsToPlain(p.netCents)]),
+    );
+
+  return (
+    <div className="gz-fade-in space-y-6">
+      <PageHeader
+        title="Finances and payouts"
+        subtitle="What was donated, what came off it, and when it reached your bank account."
+        actions={
+          <>
+            <DateRangePicker />
+            <Button variant="secondary" icon="download" onClick={exportReport}>
+              Financial report
+            </Button>
+          </>
+        }
+      />
+
+      <Callout tone="warning" title="Open decision: processing fees">
+        <p>The real processing rate is not set and who pays it (the donor, Givezy or the charity) is not decided. The demo uses a placeholder rate. Switch to see both designs:</p>
+        <div className="mt-2">
+          <Segmented
+            label="Who pays the processing fee (demo switch)"
+            size="sm"
+            value={feeModel}
+            onChange={(v) => {
+              setFeeModel(v);
+              toast({ tone: "info", title: v === "charity" ? "Fees taken off donations" : "Charity receives the full donation", body: "Every screen now uses this setting." });
+            }}
+            options={[
+              { value: "charity", label: "Taken off each donation" },
+              { value: "not_charity", label: "Not paid by the charity" },
+            ]}
+          />
+        </div>
+      </Callout>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Gross donations" icon="donations" value={rand(f.grossCents)} note="Paid and later refunded" />
+        <MetricCard label="Fees" icon="receipt" value={rand(f.processingFeesCents + f.platformFeesCents)} note={`Processing ${rand(f.processingFeesCents)} · Givezy platform fee R0`} />
+        <MetricCard label="Refunds" icon="refresh" value={rand(f.refundsCents)} note={`${count(refunds.length)} refunded in this period`} />
+        <MetricCard highlight label="Net donations" icon="wallet" value={rand(f.netCents)} note="What your charity keeps" />
+      </div>
+
+      <Card>
+        <CardHeader title="Three dates, three meanings" subtitle="Figures on this page use the donation date unless a column says otherwise." />
+        <div className="grid gap-3 md:grid-cols-3">
+          <DateKind icon="donations" title="Donation date" body="When the donor gave. Used for totals, campaigns, s18A tax years and this page's figures." />
+          <DateKind icon="check" title="Settlement date" body="When the payment provider confirmed the money for your account, usually the next business day." />
+          <DateKind icon="bank" title="Payout date" body="When the money lands in your bank account. Payouts group a week of settlements." />
+        </div>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
+          <CardHeader
+            title="Reconciliation"
+            subtitle={`Donations made ${RANGE_LABELS[rangePreset].toLowerCase()}`}
+            action={reconciled ? <Badge tone="success">Balances</Badge> : <Badge tone="danger">Does not balance</Badge>}
+          />
+          <table className="w-full text-sm">
+            <caption className="sr-only">Reconciliation from gross donations to net</caption>
+            <tbody>
+              <Line label="Gross donations" value={f.grossCents} />
+              <Line label="Refunds" value={-f.refundsCents} />
+              <Line label="Processing fees (placeholder rate)" value={-f.processingFeesCents} />
+              <Line label="Givezy platform fee" value={-f.platformFeesCents} note="Givezy charges no platform fee" />
+              <Line label="Net donations" value={f.netCents} total />
+            </tbody>
+          </table>
+          <h3 className="mb-2 mt-6 text-base">Where the gross donations are now</h3>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Where tone="success" label="Paid out to your bank" value={f.paidOutCents} />
+            <Where tone="info" label="On its way" value={f.inTransitCents} />
+            <Where tone="warning" label="Settled or settling, not paid out yet" value={f.awaitingCents} />
+          </div>
+          <p className="mt-3 text-xs text-gz-muted">
+            Not in these figures: {rand(f.pendingPaymentsCents)} in payments still pending and {rand(f.failedCents)} in payments that failed (never charged).
+          </p>
+        </Card>
+
+        <Card className="bg-gz-blue-soft/50">
+          <CardHeader title="Next payout" subtitle={`Expected in your bank about ${showDay(nextArrival)}`} />
+          <p className="text-3xl font-semibold text-gz-blue" style={{ fontFamily: "var(--font-fredoka)" }}>
+            {rand(pending.netCents)}
+          </p>
+          <p className="text-xs text-gz-muted">so far, and growing until Sunday</p>
+          <dl className="mt-4 space-y-2 text-sm">
+            <Pair k={`Settled this week (${count(pending.settledCount)})`} v={rand(pending.settledCents)} />
+            <Pair k={`Paid, not settled yet (${count(pending.notSettledCount)})`} v={rand(pending.notSettledCents)} />
+            <Pair k="Fees" v={`− ${rand(pending.feesCents)}`} />
+            <Pair k="Refunds this week" v={`− ${rand(pending.refundsCents)}`} />
+          </dl>
+          <div className="mt-4 rounded-2xl bg-gz-surface p-3 text-xs text-gz-muted">
+            <p className="flex items-center gap-1.5 font-semibold text-gz-ink">
+              <Icon name="bank" size={14} /> {data.charity.bankName} ending {data.charity.bankLast4}
+            </p>
+            <p className="mt-1">{DEMO_PAYOUT_SCHEDULE}.</p>
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader title="Payout history" subtitle={`Payouts that reached your bank ${RANGE_LABELS[rangePreset].toLowerCase()} (by payout date)`} action={<Button variant="secondary" size="sm" icon="download" onClick={exportPayouts}>Export payouts</Button>} />
+        <DataTable
+          caption="Payout history"
+          rows={payouts}
+          rowKey={(p) => p.id}
+          onRowClick={setOpen}
+          rowLabel={(p) => `Open payout ${p.ref}`}
+          initialSort={{ key: "date", dir: "desc" }}
+          pageSize={10}
+          columns={[
+            { key: "ref", header: "Payout", cell: (p) => <span className="font-semibold">{p.ref}</span> },
+            { key: "date", header: "In your bank", sort: (p) => p.payoutDate, cell: (p) => showDay(p.payoutDate) },
+            { key: "period", header: "Settlements", cell: (p) => `${showDay(p.periodStart).slice(0, 5)} to ${showDay(p.periodEnd)}`, wide: true },
+            { key: "status", header: "Status", cell: (p) => <PayoutBadge status={p.status} /> },
+            { key: "count", header: "Donations", align: "right", sort: (p) => p.donationCount, cell: (p) => count(p.donationCount), wide: true },
+            { key: "gross", header: "Gross", align: "right", sort: (p) => p.grossCents, cell: (p) => rand(p.grossCents) },
+            { key: "fees", header: "Fees and refunds", align: "right", cell: (p) => <span className="text-gz-muted">− {rand(p.feesCents + p.refundsCents)}</span>, wide: true },
+            { key: "net", header: "Net paid", align: "right", sort: (p) => p.netCents, cell: (p) => <span className="font-semibold text-gz-blue">{rand(p.netCents)}</span> },
+          ]}
+          mobile={(p) => (
+            <span className="flex items-center justify-between gap-3">
+              <span>
+                <span className="block font-semibold">{showDay(p.payoutDate)}</span>
+                <span className="block text-xs text-gz-muted">{p.ref} · {count(p.donationCount)} donations</span>
+              </span>
+              <span className="text-right">
+                <span className="block font-semibold">{rand(p.netCents)}</span>
+                <PayoutBadge status={p.status} />
+              </span>
+            </span>
+          )}
+          empty={<EmptyState icon="wallet" title="No payouts in this period" body="Choose a longer date range." />}
+        />
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader title="Monthly statement" subtitle="By donation date" />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[440px] text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gz-muted">
+                  <th className="pb-2 font-semibold">Month</th>
+                  <th className="pb-2 text-right font-semibold">Gross</th>
+                  <th className="pb-2 text-right font-semibold">Refunds</th>
+                  <th className="pb-2 text-right font-semibold">Fees</th>
+                  <th className="pb-2 text-right font-semibold">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statement.map((m) => (
+                  <tr key={m.key} className="border-t border-gz-hairline/70">
+                    <td className="py-2">{showMonth(m.key)}</td>
+                    <td className="py-2 text-right">{rand(m.grossCents)}</td>
+                    <td className="py-2 text-right text-gz-muted">{m.refundsCents ? `− ${rand(m.refundsCents)}` : "R0"}</td>
+                    <td className="py-2 text-right text-gz-muted">{m.processingFeesCents ? `− ${rand(m.processingFeesCents)}` : "R0"}</td>
+                    <td className="py-2 text-right font-semibold">{rand(m.netCents)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-gz-ink/20 font-semibold">
+                  <td className="py-2">Total</td>
+                  <td className="py-2 text-right">{rand(f.grossCents)}</td>
+                  <td className="py-2 text-right">{f.refundsCents ? `− ${rand(f.refundsCents)}` : "R0"}</td>
+                  <td className="py-2 text-right">{f.processingFeesCents ? `− ${rand(f.processingFeesCents)}` : "R0"}</td>
+                  <td className="py-2 text-right text-gz-blue">{rand(f.netCents)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Refunds" subtitle="By the date of the refund" />
+          {refunds.length ? (
+            <ul className="divide-y divide-gz-hairline">
+              {refunds.slice(0, 8).map((d) => (
+                <li key={d.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{donorName(lookups.donor.get(d.donorId))}</span>
+                    <span className="block text-xs text-gz-muted">
+                      Donated {date(d.donatedAt)} · refunded {date(d.refundedAt!)}
+                    </span>
+                  </span>
+                  <span className="font-semibold">− {rand(d.amountCents)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon="refresh" title="No refunds in this period" />
+          )}
+          {refunds.length > 8 && <p className="mt-2 text-xs text-gz-muted">And {count(refunds.length - 8)} more in the financial report.</p>}
+          <p className="mt-3 text-xs text-gz-muted">Who can refund, and whether the fee comes back, are open decisions. In the demo only Givezy refunds, and the fee is not returned.</p>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader title="Exports for your bookkeeper" subtitle="CSV files, opened in Excel or Google Sheets. Made in your browser from demo data." />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <ExportTile icon="chart" title="Financial report" body="Monthly gross, refunds, fees and net" onClick={exportReport} />
+          <ExportTile icon="wallet" title="Payouts" body="Every payout with its dates and amounts" onClick={exportPayouts} />
+          <ExportTile
+            icon="donations"
+            title="Donations with fees"
+            body="Each donation with fee, net, settlement and payout"
+            onClick={() => {
+              const { header, body } = donationCsvRows(
+                data.donations.filter((d) => inRange(dayOf(d), range)),
+                lookups,
+              );
+              exportCsv("donations-with-fees", header, body);
+            }}
+          />
+        </div>
+      </Card>
+
+      {open && <PayoutDrawer payout={open} data={data} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+function DateKind({ icon, title, body }: { icon: IconName; title: string; body: string }) {
+  return (
+    <div className="flex gap-3 rounded-2xl border border-gz-hairline bg-gz-cream p-4">
+      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-gz-surface text-gz-blue shadow-sm">
+        <Icon name={icon} size={18} />
+      </span>
+      <span>
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="mt-0.5 block text-sm text-gz-muted">{body}</span>
+      </span>
+    </div>
+  );
+}
+
+function Line({ label, value, total, note }: { label: string; value: number; total?: boolean; note?: string }) {
+  return (
+    <tr className={cx(total ? "border-t-2 border-gz-ink/20" : "border-t border-gz-hairline/70 first:border-t-0")}>
+      <th scope="row" className={cx("py-2.5 text-left", total ? "font-semibold" : "font-normal text-gz-muted")}>
+        {label}
+        {note && <span className="block text-xs">{note}</span>}
+      </th>
+      <td className={cx("py-2.5 text-right", total ? "text-lg font-semibold text-gz-blue" : "font-semibold")}>{value < 0 ? `− ${rand(-value)}` : rand(value)}</td>
+    </tr>
+  );
+}
+
+function Where({ tone, label, value }: { tone: "success" | "info" | "warning"; label: string; value: number }) {
+  const t = { success: "bg-gz-success-soft text-gz-success", info: "bg-gz-blue-soft text-gz-blue", warning: "bg-gz-warning-soft text-gz-warning" }[tone];
+  return (
+    <div className={cx("rounded-2xl p-3", t)}>
+      <p className="text-lg font-bold">{rand(value)}</p>
+      <p className="text-xs font-medium">{label}</p>
+    </div>
+  );
+}
+
+function Pair({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-gz-muted">{k}</dt>
+      <dd className="whitespace-nowrap font-semibold">{v}</dd>
+    </div>
+  );
+}
+
+function ExportTile({ icon, title, body, onClick }: { icon: IconName; title: string; body: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="flex items-start gap-3 rounded-2xl border border-gz-hairline bg-gz-cream p-4 text-left hover:border-gz-blue/40 hover:bg-gz-blue-soft/30">
+      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-gz-surface text-gz-blue shadow-sm">
+        <Icon name={icon} size={18} />
+      </span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 text-sm font-semibold">
+          {title} <Icon name="download" size={14} className="text-gz-muted" />
+        </span>
+        <span className="mt-0.5 block text-xs text-gz-muted">{body}</span>
+      </span>
+    </button>
+  );
+}
+
+function PayoutDrawer({ payout, data, onClose }: { payout: Payout; data: DemoDataset; onClose: () => void }) {
+  const lookups = useLookups(data);
+  const rows = data.donations.filter((d) => d.payoutId === payout.id);
+  const refunds = data.donations.filter((d) => d.status === "refunded" && d.refundedAt && localDay(d.refundedAt) >= payout.periodStart && localDay(d.refundedAt) <= payout.periodEnd);
+  return (
+    <Drawer open onClose={onClose} title={rand(payout.netCents)} subtitle={<span className="inline-flex items-center gap-2"><PayoutBadge status={payout.status} /> {payout.ref}</span>}>
+      <div className="space-y-5">
+        <DetailList
+          items={[
+            ["Settlements", `${showDay(payout.periodStart)} to ${showDay(payout.periodEnd)}`],
+            ["Sent", showDay(payout.sentDate)],
+            ["In your bank", showDay(payout.payoutDate)],
+            ["Bank account", `${data.charity.bankName} ending ${data.charity.bankLast4}`],
+          ]}
+        />
+        <div>
+          <h3 className="mb-1 text-base">How it adds up</h3>
+          <DetailList
+            items={[
+              [`${count(payout.donationCount)} donations (gross)`, rand(payout.grossCents)],
+              ["Fees", `− ${rand(payout.feesCents)}`],
+              [`Refunds made that week (${refunds.length})`, `− ${rand(payout.refundsCents)}`],
+              ["Paid to your bank", <span key="n" className="text-gz-blue">{rand(payout.netCents)}</span>],
+            ]}
+          />
+        </div>
+        <div>
+          <h3 className="mb-2 text-base">Donations in this payout</h3>
+          <ul className="divide-y divide-gz-hairline rounded-2xl border border-gz-hairline bg-gz-surface px-3">
+            {rows.slice(0, 30).map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{donorName(lookups.donor.get(d.donorId))}</span>
+                  <span className="block text-xs text-gz-muted">
+                    Donated {date(d.donatedAt)} · settled {d.settledAt ? date(d.settledAt) : ""}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span className="block font-semibold">{rand(d.amountCents)}</span>
+                  <span className="block text-xs text-gz-muted">net {rand(netOf(d) + (d.status === "refunded" ? d.amountCents : 0))}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {rows.length > 30 && <p className="mt-2 text-xs text-gz-muted">Showing 30 of {count(rows.length)}. The donations export lists them all.</p>}
+        </div>
+      </div>
+    </Drawer>
+  );
+}

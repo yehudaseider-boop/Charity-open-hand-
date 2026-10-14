@@ -78,3 +78,123 @@ h2,
 h3 {
   color: var(--indigo);
 }
+
+/*
+ * Givezy charity portal (DEMO, /portal-demo). Givezy brand tokens, the same values as the
+ * phone app (apps/mobile/src/theme/tokens.ts): cream pages, navy text, blue for headlines,
+ * buttons, links and tabs, one orange accent per screen (graphics only), lilac for soft
+ * highlight cards, sage for progress. Scoped to the portal so the website keeps its own kit.
+ */
+.gz-portal {
+  --gz-cream: #fefdf7;
+  --gz-surface: #ffffff;
+  --gz-ink: #102848;
+  --gz-blue: #1848a8;
+  --gz-blue-hover: #123b8c;
+  --gz-blue-soft: #e8eefb;
+  --gz-muted: #5b6b84;
+  --gz-hairline: #e6e3d8;
+  --gz-grid: #efede5;
+  --gz-orange: #f88038;
+  --gz-orange-text: #b84a0a;
+  --gz-orange-soft: #feebdc;
+  --gz-lilac: #ccb3fb;
+  --gz-lilac-soft: #f1eafe;
+  /* A deeper lilac for chart marks: the logo lilac is too pale to read as a line or bar. */
+  --gz-lilac-mark: #9b7be8;
+  --gz-sage: #2e9d6b;
+  --gz-success-text: #1f6b4a;
+  --gz-success-soft: #e3f3eb;
+  --gz-warning-text: #7a5200;
+  --gz-warning-soft: #fbf0d3;
+  --gz-danger: #b3261e;
+  --gz-danger-soft: #fbe4e2;
+  --gz-neutral-soft: #f1f0ea;
+  --gz-shadow: 0 1px 2px rgb(16 40 72 / 0.04), 0 8px 24px rgb(24 72 168 / 0.06);
+  --gz-shadow-lg: 0 24px 64px rgb(16 40 72 / 0.18);
+
+  background: var(--gz-cream);
+  color: var(--gz-ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  /* The website wraps long words anywhere; in the portal, numbers and dates must never break. */
+  overflow-wrap: break-word;
+}
+
+@theme inline {
+  --color-gz-cream: var(--gz-cream);
+  --color-gz-surface: var(--gz-surface);
+  --color-gz-ink: var(--gz-ink);
+  --color-gz-blue: var(--gz-blue);
+  --color-gz-blue-hover: var(--gz-blue-hover);
+  --color-gz-blue-soft: var(--gz-blue-soft);
+  --color-gz-muted: var(--gz-muted);
+  --color-gz-hairline: var(--gz-hairline);
+  --color-gz-grid: var(--gz-grid);
+  --color-gz-orange: var(--gz-orange);
+  --color-gz-orange-text: var(--gz-orange-text);
+  --color-gz-orange-soft: var(--gz-orange-soft);
+  --color-gz-lilac: var(--gz-lilac);
+  --color-gz-lilac-soft: var(--gz-lilac-soft);
+  --color-gz-lilac-mark: var(--gz-lilac-mark);
+  --color-gz-sage: var(--gz-sage);
+  --color-gz-success: var(--gz-success-text);
+  --color-gz-success-soft: var(--gz-success-soft);
+  --color-gz-warning: var(--gz-warning-text);
+  --color-gz-warning-soft: var(--gz-warning-soft);
+  --color-gz-danger: var(--gz-danger);
+  --color-gz-danger-soft: var(--gz-danger-soft);
+  --color-gz-neutral-soft: var(--gz-neutral-soft);
+  --font-gz-display: var(--font-fredoka), var(--font-inter), system-ui, sans-serif;
+  --shadow-gz: var(--gz-shadow);
+  --shadow-gz-lg: var(--gz-shadow-lg);
+}
+
+/* The portal is its own app: hide the website's header and footer around it. */
+body:has(.gz-portal) > header,
+body:has(.gz-portal) > footer {
+  display: none;
+}
+body:has(.gz-portal) > main {
+  max-width: none;
+  padding: 0;
+}
+.gz-portal h1,
+.gz-portal h2,
+.gz-portal h3 {
+  font-family: var(--font-fredoka), var(--font-inter), system-ui, sans-serif;
+  color: var(--gz-blue);
+  font-weight: 600;
+}
+.gz-portal :focus-visible {
+  outline: 2px solid var(--gz-blue);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gz-fade-in {
+    animation: gz-fade-in 0.22s ease-out;
+  }
+  .gz-slide-in {
+    animation: gz-slide-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .gz-pulse {
+    animation: gz-pulse 1.4s ease-in-out infinite;
+  }
+}
+@keyframes gz-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes gz-slide-in {
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+}
+@keyframes gz-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
