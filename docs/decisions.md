@@ -508,3 +508,10 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Charity page: the photo is inset on the page with a lilac shape behind it and the name below; gallery and update photos are rounded, not tilted in white frames.
 - Give sheet: radio-style pill choices; the button names the choice ("Give as maaser"). Still no default choice.
 - Open: seen only with a stand-in image in the web preview; not yet tested on a phone.
+
+## Givezy app: lilac header curve on all four tabs (14/10/2026)
+
+- Yehuda picked option B of three backgrounds (soft colour wash, lilac header curve, big logo shapes). Each tab now opens on a lilac header that ends in a gentle curve with a thin lilac and orange rim (`HeaderCurve` in `apps/mobile/src/components/backdrop.tsx`), then plain cream below. The curve scrolls with the page. The faint drifting shapes are gone from the tabs; the welcome and "How Givezy works" pages keep them.
+- On Discover the curve follows the header's height, so it always sits just under the filter chips, with or without "Your charities" or a seasonal card.
+- Judgement call: the orange rim was added at Yehuda's request for "some orange". With the header splash that makes two touches of orange per tab, both graphics, never text.
+- Open: seen in the web preview only, not on a phone.

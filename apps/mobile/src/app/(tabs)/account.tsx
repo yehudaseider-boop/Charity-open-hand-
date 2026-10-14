@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { Splash } from "@/components/splash";
+import { HeaderCurve } from "@/components/backdrop";
 import { SettingsGroup } from "@/components/settings-group";
 import { Agree, SignIn } from "@/components/sign-in";
 import { SkeletonBlock } from "@/components/states";
@@ -36,10 +37,13 @@ export default function Account() {
 
   return (
     <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
+        <HeaderCurve depth={insets.top + 112} />
       <View>
         <Text variant="h1" accessibilityRole="header">Account</Text>
         <View style={styles.arc}><Splash size={84} /></View>
       </View>
+      {/* Room for the header curve. */}
+      <View style={{ height: 20 }} />
 
       {account.status === "loading" ? (
         <SkeletonBlock height={180} />

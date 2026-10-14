@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Splash } from "@/components/splash";
+import { HeaderCurve } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
 import { DownloadIcon, InfoIcon, ShareIcon } from "@/components/icons";
 import { ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
@@ -52,10 +53,13 @@ export default function Receipts() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
+        <HeaderCurve depth={insets.top + 112} />
       <View>
         <Text variant="h1" accessibilityRole="header">Receipts</Text>
         <View style={styles.arc}><Splash size={84} /></View>
       </View>
+      {/* Room for the header curve. */}
+      <View style={{ height: 20 }} />
 
       {state === "loading" ? (
         <View style={{ gap: 16 }}>

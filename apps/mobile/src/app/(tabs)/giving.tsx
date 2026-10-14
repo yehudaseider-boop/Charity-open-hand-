@@ -4,6 +4,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { Splash } from "@/components/splash";
+import { HeaderCurve } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
 import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
@@ -188,10 +189,13 @@ export default function Giving() {
         keyboardDismissMode="on-drag"
         refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined}
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
+        <HeaderCurve depth={insets.top + 112} />
         <View>
           <Text variant="h1" accessibilityRole="header">Giving</Text>
           <View style={styles.arc}><Splash size={84} /></View>
         </View>
+        {/* Room for the header curve. */}
+        <View style={{ height: 20 }} />
 
         {state === "loading" ? (
           <View style={{ gap: space.block }}>
