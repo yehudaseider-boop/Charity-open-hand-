@@ -65,18 +65,17 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
     );
   }
   return (
-    <View style={[styles.rowWrap, !last && styles.rule]}>
-    <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}. ${where}`} style={styles.row} to={0.98}>
+    <PressableScale onPress={open} accessibilityRole="button" accessibilityLabel={`${charity.nameEn}. ${where}`} style={last ? styles.row : [styles.row, styles.rule]} to={0.98}>
       <CharityImage charity={charity} live={live} compact style={styles.thumb} />
       <View style={styles.rowText}>
         <Text style={styles.name}>{charity.nameEn}</Text>
         {charity.area ? <Text style={styles.area}>{charity.area}</Text> : null}
         <Text variant="bodyMuted" numberOfLines={2} style={{ fontSize: 15, lineHeight: 21 }}>{charity.cause}</Text>
         <Receipt18a issues18a={charity.issues18a} />
+        {/* For the donor who doesn't need to read more: give straight from the list. */}
+        {onGive ? <View style={{ alignSelf: "flex-start", marginTop: 8 }}><GiveButton charity={charity} onGive={onGive} /></View> : null}
       </View>
     </PressableScale>
-    {onGive ? <GiveButton charity={charity} onGive={onGive} /> : null}
-    </View>
   );
 }
 
@@ -87,9 +86,8 @@ const styles = StyleSheet.create({
   coverKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.ink },
   coverName: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, color: colors.onInk },
   coverWhere: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.onInk },
-  rowWrap: { flexDirection: "row", alignItems: "center", gap: 10 },
-  row: { flex: 1, flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 16 },
-  give: { minHeight: 40, minWidth: 64, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.blue, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  row: { flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 16 },
+  give: { minHeight: 40, minWidth: 72, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.blue, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
   giveLight: { borderColor: colors.surface },
   giveText: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
   coverGive: { position: "absolute", top: 16, right: 16 },
