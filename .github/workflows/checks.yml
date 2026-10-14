@@ -1,0 +1,68 @@
+# Runs on every push and pull request: typecheck, lint, and every test,
+# including the database tests against a fresh local Supabase built from
+# supabase/migrations and the test data in scripts/seed.ts.
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Install website packages
+        run: npm ci --no-audit --no-fund
+
+      - name: Install phone app packages
+        working-directory: apps/mobile
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Start the test database
+        run: npm run db:start
+
+      - name: Write local settings for the seed and tests
+        run: |
+          npx supabase status -o env > supabase.env
+          set -a; . ./supabase.env; set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=${API_URL}"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${PUBLISHABLE_KEY:-$ANON_KEY}"
+            echo "SUPABASE_SECRET_KEY=${SECRET_KEY:-$SERVICE_ROLE_KEY}"
+            echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")"
+            echo "PAYMENT_GATEWAY=test"
+            echo "TEST_GATEWAY_SECRET=ci-only-test-secret"
+            echo "SITE_URL=http://127.0.0.1:3000"
+          } > .env.local
+          rm supabase.env
+
+      - name: Load test data
+        run: npm run db:seed
+
+      - name: Tests
+        run: npm test
+
+      - name: Stop the test database
+        if: always()
+        run: npx supabase stop --no-backup
