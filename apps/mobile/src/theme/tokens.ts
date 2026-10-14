@@ -75,6 +75,7 @@ export const radius = {
  */
 export const petal = {
   big: { borderTopLeftRadius: 120, borderBottomRightRadius: 120, borderTopRightRadius: 26, borderBottomLeftRadius: 26 },
+  mid: { borderTopLeftRadius: 72, borderBottomRightRadius: 72, borderTopRightRadius: 18, borderBottomLeftRadius: 18 },
   small: { borderTopLeftRadius: 40, borderBottomRightRadius: 40, borderTopRightRadius: 10, borderBottomLeftRadius: 10 },
 } as const;
 

@@ -48,10 +48,9 @@ export default function Discover() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
-        <View style={{ marginBottom: 14 }}><Logo width={112} /></View>
-        <View style={{ marginBottom: 6 }}><DayGreeting /></View>
-        <Text variant="h1" accessibilityRole="header">Discover</Text>
-        <View style={styles.arc}><Splash size={96} /></View>
+        <View style={{ marginBottom: 18 }}><Logo width={96} /></View>
+        <DayGreeting large />
+        <View style={styles.arc}><Splash size={84} /></View>
       </View>
 
       <View style={styles.gutter}>
