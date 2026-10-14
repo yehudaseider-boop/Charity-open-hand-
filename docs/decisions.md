@@ -510,3 +510,10 @@ Yehuda decided donors can give inside the app, with the card entered on the paym
 - **App:** `give/[slug]` screen; the give sheet hands over to it when the switch is on. The app sends whole cents, never a card number. A changed total is shown again before anything is charged.
 - **Unchanged and still open:** who pays the provider's fee (`gatewayChargePaidBy`), the gateway rates, the first run against Paystack's test mode, and the store rules. Monthly giving in the app is the next step.
 - **Store-rule risk, raised once:** Apple's rules may allow in-app donations only for approved nonprofits, possibly per listed charity; Google lists tax-exempt donations as payments outside Play Billing. Yehuda accepted this with the switch off for store builds.
+
+## Who pays Paystack's fee (14/10/2026)
+
+Yehuda: the charity pays Paystack's fee, out of its donation. Later we offer the donor the choice to cover the processing fee. `gatewayChargePaidBy` is now `"charity"`, so split payments can start (Paystack bearer = the charity's subaccount).
+
+- **Open, not built:** the donor-covers option. It needs Paystack's rate sheet (percentage, fixed amount, whether it includes VAT) in `src/config/platform.ts`; those stay empty until Yehuda supplies them, and nothing is estimated. Open question for him: when the donor covers it, is the charity to receive the full gift exactly, with the donor paying the extra, and should the receipt show the gift only?
+- Real payments still need the first Paystack test run and the store rules (see go-live checklist).

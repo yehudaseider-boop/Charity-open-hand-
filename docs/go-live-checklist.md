@@ -50,3 +50,5 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 ## D. Later ideas (not for go-live)
 
 HTML version of the confirmation email, yahrzeit giving, a tax pack, dedications, real charity photos from the charities.
+
+- [ ] Donor-covers-the-fee option: needs Paystack's rate sheet (percentage, fixed amount, VAT included or not) and Yehuda's answer on how the receipt shows it. Fee payer itself is decided: the charity.
