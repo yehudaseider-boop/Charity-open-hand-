@@ -7,7 +7,8 @@ import { QuickGive } from "@/components/quick-give";
 import { Sheet } from "@/components/sheet";
 import { ThankYou } from "@/components/thank-you";
 import { haptic } from "@/lib/haptics";
-import { AccountIcon, DiscoverIcon, GivingIcon, HeartIcon, ReceiptsIcon } from "@/components/icons";
+import { AccountIcon, DiscoverIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
+import { Splash } from "@/components/splash";
 import { colors, fonts, lift, radius } from "@/theme/tokens";
 
 /** Our own label: the default one clips this font's descenders. */
@@ -41,7 +42,8 @@ function GiveButton({ onPress }: { onPress: () => void }) {
         style={({ pressed }) => [styles.giveWrap, pressed && { transform: [{ scale: 0.94 }] }]}
       >
         <View style={styles.giveCircle}>
-          <HeartIcon filled size={30} color={colors.onInk} />
+          {/* The logo's own splash, all three shapes, on white so each colour shows. */}
+          <Splash size={46} />
         </View>
         <Text style={styles.giveLabel}>Give</Text>
       </Pressable>
@@ -52,7 +54,7 @@ function GiveButton({ onPress }: { onPress: () => void }) {
 const styles = StyleSheet.create({
   giveSlot: { flex: 1, alignItems: "center" },
   giveWrap: { alignItems: "center", marginTop: -30 },
-  giveCircle: { width: 66, height: 66, borderRadius: 33, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", borderWidth: 5, borderColor: colors.surface, ...lift, shadowOpacity: 0.28, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  giveCircle: { width: 70, height: 70, borderRadius: 35, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: colors.blue, ...lift, shadowOpacity: 0.28, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   giveLabel: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 20, color: colors.blue, marginTop: 0 },
   pill: { width: 56, height: 32, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   pillOn: { backgroundColor: colors.blueSoft },
