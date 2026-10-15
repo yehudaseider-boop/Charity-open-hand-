@@ -18,6 +18,9 @@ alter table public.recurring_donations
   add constraint dedication_name_length check (dedication_name is null or char_length(dedication_name) between 1 and 80),
   add constraint dedication_complete check ((dedication_kind is null) = (dedication_name is null));
 
+-- Donors read their own monthly donations through a column-by-column grant, so the new columns need one too.
+grant select (dedication_kind, dedication_name) on public.recurring_donations to authenticated;
+
 -- 2. Charities see the dedication on their donations (new columns go at the end of the view).
 create or replace view public.charity_donations with (security_barrier = true) as
   select
@@ -47,10 +50,10 @@ begin
     return jsonb_build_object('donors', 0);
   end if;
 
-  select coalesce(array_agg(distinct lower(email::text)), '{}') into emails
-    from (select email from public.donors where id = any (p_donor_ids)
-          union select c.email from public.donation_checkout_details c
-                join public.donations d on d.id = c.donation_id where d.donor_id = any (p_donor_ids)) e;
+  -- Every email they used, on the donor record and at each checkout (repeats are harmless below).
+  emails := array(select lower(email::text) from public.donors where id = any (p_donor_ids))
+         || array(select lower(c.email::text) from public.donation_checkout_details c
+                    join public.donations d on d.id = c.donation_id where d.donor_id = any (p_donor_ids));
   select coalesce(array_agg(gateway_ref), '{}') into refs
     from public.donations where donor_id = any (p_donor_ids) and gateway_ref is not null;
 
