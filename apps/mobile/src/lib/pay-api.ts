@@ -7,7 +7,7 @@
 export type Pricing = { amountCents: number; contributionCents: number; totalCents: number };
 export type QuoteReply = { ok: true; quote: Pricing } | { ok: false; message: string };
 export type CheckoutReply =
-  | { ok: true; redirectUrl: string }
+  | { ok: true; redirectUrl: string; reference: string; token: string }
   | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing };
 
 export type DonorDetails = {
@@ -68,6 +68,43 @@ export function startPayment(
   return call<CheckoutReply>(post, api(site, "checkout"), args);
 }
 
+/** What the give screen needs to know before the donor fills anything in. */
+export type ReadyReply =
+  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number }
+  /** Giving in the app is switched off on the server: give on the website instead. */
+  | { ok: false; closed: true }
+  | { ok: false; closed?: false; message: string };
+
+export async function checkReady(site: string, slug: string, campaignId: string | undefined, post: Post = fetchPost): Promise<ReadyReply> {
+  try {
+    const { status, json } = await post(api(site, "ready"), { slug, campaignId });
+    if (status === 404) return { ok: false, closed: true };
+    const j = json as Record<string, unknown> | null;
+    if (j?.ok === true && typeof j.minGiftCents === "number" && typeof j.minContributionCents === "number") {
+      return { ok: true, accepting: j.accepting === true, receiptsAvailable: j.receiptsAvailable === true, campaignOpen: j.campaignOpen === true, minGiftCents: j.minGiftCents, minContributionCents: j.minContributionCents };
+    }
+  } catch {
+    // fall through
+  }
+  return { ok: false, message: NETWORK };
+}
+
+export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
+
+/** Whether a payment went through, asked after the payment page closes. Unknown or unreachable reads as "pending". */
+export async function paymentStatus(site: string, reference: string, token: string, post: Post = fetchPost): Promise<PaymentOutcome> {
+  const r = await call<{ ok: boolean; outcome?: string }>(post, api(site, "status"), { reference, token });
+  const o = r.ok ? r.outcome : undefined;
+  return o === "paid" || o === "failed" || o === "review" || o === "not_found" ? o : "pending";
+}
+
+/** What to tell the donor after the payment page closes, when the gift isn't confirmed as paid. */
+export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">): string {
+  if (outcome === "failed") return "The payment didn't go through and nothing was charged. You can try again, or use another card.";
+  if (outcome === "review") return "Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.";
+  return "We haven't had word of this payment yet. If you didn't finish paying, nothing was charged and you can try again. If you did, please wait for your confirmation email before giving again.";
+}
+
 type PastGift = { charitySlug: string; cents: number; date: Date; kind: string; monthly: boolean };
 
 /**
@@ -99,4 +136,11 @@ export function cleanRemembered(v: unknown): RememberedDetails | null {
   const s = (k: string) => (typeof o[k] === "string" ? (o[k] as string).slice(0, 200) : "");
   const r = { first_name: s("first_name"), last_name: s("last_name"), email: s("email"), phone: s("phone") };
   return r.first_name && r.last_name && r.email ? r : null;
+}
+
+/** Cents as the donor would type them in the amount box: 18000 is "180", 18050 is "180.50". Whole-number maths only. */
+export function centsToInput(cents: number): string {
+  const c = cents % 100;
+  const whole = (cents - c) / 100;
+  return c ? `${whole}.${String(c).padStart(2, "0")}` : String(whole);
 }

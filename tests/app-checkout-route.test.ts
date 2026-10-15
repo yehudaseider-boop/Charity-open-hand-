@@ -32,7 +32,8 @@ function builder(table: string) {
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: builder }) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) }));
-vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => false }));
+const limits: { bucket: string; keys: string[]; limit: number }[] = [];
+vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async (bucket: string, keys: string[], limit: number) => (limits.push({ bucket, keys, limit }), false) }));
 vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
 vi.mock("@/lib/donations/confirmation-access", () => ({ issueConfirmationToken: async () => "tok" }));
 vi.mock("@/lib/donations/charity", () => ({
@@ -67,6 +68,7 @@ const gift = { slug: "meals", giftCents: 10_000, contributionCents: 1_000, shown
 beforeEach(() => {
   ops.length = 0;
   checkouts.length = 0;
+  limits.length = 0;
   campaignRow = null;
   process.env.APP_GIVING = "yes";
   process.env.SITE_URL = "https://site.test";
@@ -81,7 +83,7 @@ describe("app checkout endpoint", () => {
   it("starts a monthly gift: monthly record, saved card, authorisation consent, return to the app", async () => {
     const res = await call({ ...gift, details: { ...details, monthly: true, monthly_authorised: true } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, redirectUrl: "https://pay.test/x" });
+    expect(await res.json()).toEqual({ ok: true, redirectUrl: "https://pay.test/x", reference: expect.any(String), token: "tok" });
 
     const monthly = ops.find((o) => o.table === "recurring_donations" && o.op === "insert");
     expect(monthly?.row).toMatchObject({ amount_cents: 10_000, contribution_cents: 1_000, status: "pending" });
@@ -104,6 +106,13 @@ describe("app checkout endpoint", () => {
     expect(res.status).toBe(200);
     expect(ops.some((o) => o.table === "recurring_donations")).toBe(false);
     expect(checkouts[0]).toMatchObject({ saveCard: false });
+  });
+
+  it("counts only tries that would reach the payment page: 5 per email, 30 per address", async () => {
+    await call({ ...gift, giftCents: 100, shownTotalCents: 1_100, details });
+    expect(limits).toHaveLength(0);
+    await call({ ...gift, details });
+    expect(limits.map((l) => [l.keys[0].split(":")[0], l.limit])).toEqual([["email", 5], ["ip", 30]]);
   });
 
   it("stops when the total changed, and returns the new figures", async () => {

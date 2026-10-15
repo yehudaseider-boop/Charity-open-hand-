@@ -55,6 +55,11 @@ describe("app hand-off to the website", () => {
     );
     expect(donateUrl("https://example.co.za/", "a b", "maaser")).toBe("https://example.co.za/c/a%20b/donate?kind=maaser&from=app");
   });
+  it("carries a campaign over, and leaves the giving kind for the donor when none was chosen", () => {
+    expect(donateUrl("https://example.co.za", "a", null, "c0ffee00-0000-4000-8000-000000000001")).toBe(
+      "https://example.co.za/c/a/donate?campaign=c0ffee00-0000-4000-8000-000000000001&from=app",
+    );
+  });
   it("refuses a website address that isn't https", () => {
     expect(donateUrl("http://example.co.za", "x", "tzedaka")).toBeNull();
     expect(donateUrl("", "x", "tzedaka")).toBeNull();

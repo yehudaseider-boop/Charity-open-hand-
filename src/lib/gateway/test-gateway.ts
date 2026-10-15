@@ -61,7 +61,8 @@ export const testGateway: PaymentGateway = {
       return: req.returnUrl,
     });
     params.set("sig", testGatewaySign(params.toString()));
-    return { redirectUrl: `/test-gateway?${params}` };
+    // A full address, so the phone app (which only opens https pages) can show it too.
+    return { redirectUrl: `${process.env.SITE_URL ?? ""}/test-gateway?${params}` };
   },
 
   async verifyTransaction(reference): Promise<VerifiedTransaction> {

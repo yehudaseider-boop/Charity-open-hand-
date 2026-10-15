@@ -70,3 +70,9 @@ export function toCheckoutInput(details: AppCheckoutBody["details"]):
 
 /** Off unless APP_GIVING=yes on the server: the in-app payment API stays closed in production until we choose. */
 export const appGivingOpen = (env: Record<string, string | undefined> = process.env) => env.APP_GIVING === "yes";
+
+/** The give screen asks, as it opens, whether it can take this gift (and the campaign, if one was chosen). */
+export const appReadySchema = z.object({ slug: z.string().min(1).max(120), campaignId: z.uuid().optional() });
+
+/** After the payment page closes: did this payment go through? Only the donor holds the token. */
+export const appStatusSchema = z.object({ reference: z.uuid(), token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) });

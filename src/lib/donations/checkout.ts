@@ -46,7 +46,8 @@ export function quoteDonation(giftCents: number, contributionCents: number): Quo
 }
 
 export type StartResult =
-  | { ok: true; redirectUrl: string }
+  /** `reference` and `token` let the phone app ask whether this payment went through (api/app/status). */
+  | { ok: true; redirectUrl: string; reference: string; token: string }
   | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote };
 
 /**
@@ -78,15 +79,19 @@ export async function startDonation(args: {
   if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity." };
   if (campaign && args.input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
 
-  const limited = await hitRateLimit("checkout", [`ip:${args.ip}`, `email:${args.input.email.toLowerCase()}`], 5, 10);
-  if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
-
   const quoted = quoteDonation(args.giftCents, args.contributionCents);
   if (!quoted.ok) return { ok: false, message: quoted.message };
   const fees = quoted.quote;
   if (fees.totalCents !== args.shownTotalCents) {
     return { ok: false, message: `The total is now ${formatRand(fees.totalCents)}. Please confirm again.`, quote: fees };
   }
+
+  // Only attempts that would reach the payment page count. One email gets 5 tries in 10 minutes;
+  // one address gets more, because a shul's Wi-Fi or a mobile network puts many donors behind it.
+  const limited =
+    (await hitRateLimit("checkout", [`email:${args.input.email.toLowerCase()}`], 5, 10)) ||
+    (await hitRateLimit("checkout-ip", [`ip:${args.ip}`], 30, 10));
+  if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
 
   const v = args.input;
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
@@ -223,7 +228,7 @@ export async function startDonation(args: {
       returnUrl: `${site}/donate/return?reference=${donationId}&t=${confirmationToken}${args.fromApp ? "&from=app" : ""}`,
       description: `Donation to ${charity.name_en}`,
     });
-    return { ok: true, redirectUrl };
+    return { ok: true, redirectUrl, reference: donationId, token: confirmationToken };
   } catch (e) {
     await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", donationId);
     if (recurringId) {
@@ -305,7 +310,7 @@ async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<st
 }
 
 /** One of this charity's campaigns that is taking gifts now (active and not past its end), or null. */
-async function loadOpenCampaign(id: string, charityId: string): Promise<{ id: string } | null> {
+export async function loadOpenCampaign(id: string, charityId: string): Promise<{ id: string } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data } = await createAdminClient()
     .from("campaigns")

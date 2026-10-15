@@ -12,6 +12,8 @@ import { Drop } from "@/components/splash";
 import { CampaignCard } from "@/components/campaign-card";
 import { GiveSheet } from "@/components/give-sheet";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
+import { openUrl } from "@/lib/open-site";
+import { donateUrl, SITE_URL } from "@/lib/website";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { HebrewText, Text } from "@/components/text";
 import { ddmmyyyy } from "@/lib/format";
@@ -91,7 +93,7 @@ export default function CharityDetail() {
           {(charity.campaigns ?? []).length ? (
             <View style={{ gap: 12, marginTop: space.block }}>
               {(charity.campaigns ?? []).map((c) => (
-                <CampaignCard key={c.id} campaign={c} onGive={GIVE_IN_APP ? () => openGiveScreen(charity.slug, { campaign: c.id }) : undefined} />
+                <CampaignCard key={c.id} campaign={c} onGive={() => (GIVE_IN_APP ? openGiveScreen(charity.slug, { campaign: c.id }) : openUrl(donateUrl(SITE_URL, charity.slug, null, c.id)))} />
               ))}
             </View>
           ) : null}

@@ -25,7 +25,8 @@ let adminReads = 0;
 let confirmCalls = 0;
 let overLimit = false;
 let sessionRow: typeof row | null = null; // what row-level security lets the visitor read
-vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: async () => (confirmCalls++, outcome) }));
+let askedRef = "";
+vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: async (ref: string) => ((askedRef = ref), confirmCalls++, outcome) }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }) }));
 vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit }));
 vi.mock("@/lib/donations/confirmation-access", () => ({
@@ -37,10 +38,13 @@ const builder = (get: () => unknown) => {
 };
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => builder(() => (adminReads++, row)) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => builder(() => sessionRow) }));
-vi.mock("next/link", () => ({ default: (p: { href: string; children: unknown }) => p.children }));
+vi.mock("next/link", async () => {
+  const { createElement } = await import("react");
+  return { default: (p: { href: string; children: React.ReactNode }) => createElement("a", { href: p.href }, p.children) };
+});
 vi.mock("@/app/donate/return/keep-checking", () => ({ KeepChecking: () => null }));
 
-async function page(search: Record<string, string>) {
+async function page(search: Record<string, string | string[]>) {
   const { default: Page } = await import("@/app/donate/return/page");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ reference: ID, ...search }) } as any));
@@ -113,6 +117,23 @@ describe("checking with the payment provider", () => {
   it("under the limit, the payment is checked", async () => {
     await page({});
     expect(confirmCalls).toBe(1);
+  });
+
+  it("the provider adding its own reference to our address still finds the donation", async () => {
+    // Paystack sends the donor back to our address plus "&trxref=…&reference=…".
+    const html = await page({ reference: [ID, ID], trxref: ID, t: ["good-credential"], from: ["app", "app"] });
+    expect(askedRef).toBe(ID);
+    expect(html).toContain("R23.45");
+    expect(html).toContain("nedivlev://giving");
+  });
+});
+
+describe("trying again", () => {
+  it("a declined campaign gift tries again for the same campaign and giving choice", async () => {
+    outcome = "failed";
+    sessionRow = { ...row, campaign_id: "c0ffee00-0000-4000-8000-000000000001" } as typeof row;
+    const html = await page({});
+    expect(html).toContain('href="/c/northcliff-meals-fund/donate?kind=maaser&amp;campaign=c0ffee00-0000-4000-8000-000000000001"');
   });
 });
 

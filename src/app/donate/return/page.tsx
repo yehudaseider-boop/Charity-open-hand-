@@ -20,9 +20,13 @@ export const metadata: Metadata = { title: "Thank you", referrer: "no-referrer" 
 
 /** Where the gateway sends the donor back. We check the payment ourselves. */
 export default async function DonateReturnPage({ searchParams }: PageProps<"/donate/return">) {
-  const { reference, from, t } = await searchParams;
-  const fromApp = from === "app";
-  const ref = typeof reference === "string" ? reference : "";
+  const params = await searchParams;
+  // The payment provider adds its own "reference" (the same value) to our address, so a key
+  // can arrive twice: take the first.
+  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const fromApp = first(params.from) === "app";
+  const ref = first(params.reference) ?? "";
+  const t = first(params.t);
   // If the payment provider can't be reached, or the result can't be saved yet, say we're still
   // confirming rather than showing an error page. Nothing here says "paid" unless it is saved.
   // Each load can ask the payment provider about the payment, so one visitor gets a generous but
@@ -38,10 +42,10 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, donation_giving_kinds(kind), charities(name_en, slug)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind), charities(name_en, slug)";
   let d = null;
   if (ref && outcome !== "not_found") {
-    if (await confirmationTokenMatches(ref, typeof t === "string" ? t : undefined)) {
+    if (await confirmationTokenMatches(ref, t)) {
       d = (await createAdminClient().from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
     } else {
       d = (await (await createClient()).from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
@@ -55,6 +59,8 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const retryParams = new URLSearchParams();
   if (fromApp) retryParams.set("from", "app");
   if (givingKind && givingKind in givingKinds) retryParams.set("kind", givingKind);
+  // A campaign gift tries again for the same campaign (the donate page says if it has ended since).
+  if (d?.campaign_id) retryParams.set("campaign", d.campaign_id);
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
 
   if (outcome === "paid" && d && charity) {

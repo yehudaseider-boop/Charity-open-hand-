@@ -40,3 +40,37 @@ describe("fewer taps", () => {
     expect(cleanRemembered(null)).toBeNull();
   });
 });
+
+import { afterPaymentMessage, centsToInput, checkReady, paymentStatus } from "../apps/mobile/src/lib/pay-api";
+
+describe("before and after the payment page", () => {
+  it("a 404 from the server means give on the website instead", async () => {
+    expect(await checkReady("https://x.test", "a", undefined, async () => ({ status: 404, json: { ok: false } }))).toEqual({ ok: false, closed: true });
+  });
+  it("reads whether the charity can take the gift, the campaign and the minimums", async () => {
+    const seen: unknown[] = [];
+    const r = await checkReady("https://x.test", "a", "c1", async (url, body) => (seen.push([url, body]), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 } }));
+    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 });
+    expect(seen[0]).toEqual(["https://x.test/api/app/ready", { slug: "a", campaignId: "c1" }]);
+  });
+  it("offline is a plain message, not the website hand-off", async () => {
+    const r = await checkReady("https://x.test", "a", undefined, async () => { throw new Error("offline"); });
+    expect(r.ok === false && !r.closed && r.message).toMatch(/connection/);
+  });
+  it("an unknown or unreachable payment status reads as still pending, never as paid", async () => {
+    expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "paid" } }))).toBe("paid");
+    expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "weird" } }))).toBe("pending");
+    expect(await paymentStatus("https://x.test", "r", "t", async () => { throw new Error("offline"); })).toBe("pending");
+  });
+  it("tells the donor plainly whether anything was charged", () => {
+    expect(afterPaymentMessage("failed")).toMatch(/nothing was charged/);
+    expect(afterPaymentMessage("review")).toMatch(/don't pay again/);
+    expect(afterPaymentMessage("pending")).toMatch(/wait for your confirmation email before giving again/);
+    for (const o of ["failed", "review", "pending", "not_found"] as const) expect(afterPaymentMessage(o)).not.toMatch(/!|—/);
+  });
+  it("puts a past amount in the box as the donor would type it", () => {
+    expect(centsToInput(18_000)).toBe("180");
+    expect(centsToInput(18_050)).toBe("180.50");
+    expect(centsToInput(125_005)).toBe("1250.05");
+  });
+});

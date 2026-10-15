@@ -12,6 +12,7 @@ import { colors, fonts, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { BackIcon, SearchIcon } from "./icons";
 import { GiveSheet } from "./give-sheet";
+import { ErrorState, SkeletonBlock } from "./states";
 import { Text } from "./text";
 
 /**
@@ -75,6 +76,11 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
           <View style={{ gap: 4 }}>
             <Text style={styles.head}>All charities</Text>
             {all.map((c, i) => <Row key={c.slug} charity={c} live={directory.live} last={i === all.length - 1} onPress={() => pick(c)} />)}
+            {!all.length && directory.failed ? (
+              <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={directory.retry} />
+            ) : !all.length ? (
+              <SkeletonBlock height={120} />
+            ) : null}
           </View>
         </>
       )}

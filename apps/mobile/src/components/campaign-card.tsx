@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
 import type { Campaign } from "@/data/sample";
-import { ddmmyyyy, rand } from "@/lib/format";
+import { ddmmyyyy, jhbDay, rand } from "@/lib/format";
 import { campaignPercent } from "@/lib/live-charities";
 import { colors, fonts, radius } from "@/theme/tokens";
 import { Button } from "./button";
@@ -26,7 +26,8 @@ export function CampaignCard({ campaign, onGive, compact = false }: { campaign: 
           </View>
         ) : null}
         <Text variant="label">
-          {c.giftCount} {c.giftCount === 1 ? "gift" : "gifts"}{c.endsAt ? ` · until ${ddmmyyyy(c.endsAt)}` : ""}
+          {c.giftCount} {c.giftCount === 1 ? "gift" : "gifts"}{/* The last day in South Africa, wherever the phone is. */}
+          {c.endsAt ? ` · until ${ddmmyyyy(jhbDay(c.endsAt))}` : ""}
         </Text>
       </View>
       {onGive ? <Button label="Give to this campaign" onPress={onGive} style={{ marginTop: 6 }} /> : null}

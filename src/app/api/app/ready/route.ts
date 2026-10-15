@@ -1,0 +1,27 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { platformConfig } from "@/config/platform";
+import { appGivingOpen, appReadySchema } from "@/lib/donations/app-api";
+import { loadDonatableCharity } from "@/lib/donations/charity";
+import { loadOpenCampaign } from "@/lib/donations/checkout";
+
+/**
+ * Asked by the app's give screen before the donor fills anything in: is giving in the app open,
+ * can this charity take a payment now, is the chosen campaign still running, and what are the
+ * minimums. A 404 means the app should send the donor to the website instead.
+ */
+export async function POST(request: NextRequest) {
+  if (!appGivingOpen()) return NextResponse.json({ ok: false, message: "Giving in the app isn't switched on yet." }, { status: 404 });
+  const body = appReadySchema.safeParse(await request.json().catch(() => null));
+  if (!body.success) return NextResponse.json({ ok: false, message: "Something went wrong. Please try again." }, { status: 400 });
+  const charity = await loadDonatableCharity(body.data.slug);
+  const accepting = Boolean(charity?.acceptingPayments);
+  const campaignOpen = charity && body.data.campaignId ? Boolean(await loadOpenCampaign(body.data.campaignId, charity.id)) : false;
+  return NextResponse.json({
+    ok: true,
+    accepting,
+    receiptsAvailable: Boolean(charity?.receiptsAvailable),
+    campaignOpen,
+    minGiftCents: platformConfig.minDonationCents,
+    minContributionCents: platformConfig.minContributionCents,
+  });
+}
