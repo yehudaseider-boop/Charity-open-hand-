@@ -15,7 +15,7 @@ import { InfoButton } from "@/components/info-button";
 import { TargetEditor, type Target } from "@/components/target-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleMaaserTarget, type Gift, type Recurring } from "@/data/giving";
-import { ddmmyyyy, rand } from "@/lib/format";
+import { ddmmyyyy, jhbToday, rand } from "@/lib/format";
 import { byCharity, givingKindLabels, groupByMonth, inGivingYear, monthlyToReach, percentOf, sumOfKind } from "@/lib/giving";
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
 import { useAccount } from "@/lib/account";
@@ -61,7 +61,7 @@ export default function Giving() {
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   // A record that could not be read is never treated as empty: nothing is saved over it until it
   // has loaded, or the person chooses to start again (the old text is kept aside).
-  const targetRecord = useStoredRecord<Target | null>({ enabled: !preview && ownerKnown, owner, load: loadTarget, initial: previewTarget });
+  const targetRecord = useStoredRecord<Target | null>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadTarget, initial: previewTarget });
   const target = targetRecord.value;
   const targetLoaded = targetRecord.status === "ready";
   const targetProblem = targetRecord.reason;
@@ -73,7 +73,7 @@ export default function Giving() {
     setTargetSaveFailedFor(r.ok ? null : { owner: forOwner });
   };
   // Income (for maaser) stays on this phone only. Nothing is logged until the saved log has loaded.
-  const incomeRecord = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, owner, load: loadIncome, initial: noIncome });
+  const incomeRecord = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
   const income = incomeRecord.value;
   const incomeReady = incomeRecord.status === "ready";
   const incomeProblem = incomeRecord.reason;
@@ -90,6 +90,9 @@ export default function Giving() {
     else notify("Nothing was changed", `Your ${what} could not be set aside, so it was left as it is. Please try again.`);
   };
   const [busy, setBusy] = useState(false);
+  // The lists show the latest 12; every entry still counts, and "Show all" opens the rest to check or remove.
+  const [showAllIncome, setShowAllIncome] = useState(false);
+  const [showAllElsewhere, setShowAllElsewhere] = useState(false);
   const [previewElsewhere, setPreviewElsewhere] = useState<Elsewhere[]>(newDonor ? [] : sampleElsewhere);
   const [logging, setLogging] = useState<"income" | "elsewhere" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -102,7 +105,8 @@ export default function Giving() {
 
   const directory = useDirectory();
   const savedList = savedCharities(useSaved().slugs, directory.data?.charities ?? []);
-  const now = new Date();
+  // Today as a Johannesburg calendar day: months and the giving year follow South African dates.
+  const now = jhbToday();
   const hYear = hebrewYearFor(now);
   const { start: yearStart, end: yearEndDate } = givingYearRange(hYear);
   const yearEnd = ddmmyyyy(yearEndDate);
@@ -208,7 +212,7 @@ export default function Giving() {
         ) : (
           <>
             {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
-            {!preview && !signedIn ? (
+            {account.status === "signed-out" ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
                 <Text variant="bodyMuted">Sign in with the email you give with. Every donation shows up here, and counts towards your maaser and chomesh.</Text>
@@ -235,6 +239,12 @@ export default function Giving() {
                 secondaryLabel={targetProblem === "corrupt" ? "Set the old targets aside and start again" : undefined}
                 onSecondary={() => confirmThen("Start new targets?", "The old targets are kept aside on this phone, and you can enter new ones.", "Start again", () => void startAgain(() => setAsideTarget(owner), targetRecord.retry, "targets"))}
               />
+            ) : account.status === "agreeing" ? (
+              <View style={styles.card}>
+                <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>One more step</Text>
+                <Text variant="bodyMuted">Agree to the Terms and Privacy Policy on the Account tab, and your giving and targets appear here.</Text>
+                <Button label="Go to Account" onPress={() => router.push("/account")} />
+              </View>
             ) : !targetLoaded ? (
               <SkeletonBlock height={190} />
             ) : target === null || editing ? (
@@ -373,7 +383,7 @@ export default function Giving() {
                   <View style={{ gap: 6 }}>
                     <Text variant="label">Income log (on this phone only)</Text>
                     <View style={styles.list}>
-                      {income.slice(0, 12).map((e, i) => (
+                      {(showAllIncome ? income : income.slice(0, 12)).map((e, i) => (
                         <Pressable key={e.id} onLongPress={() => confirmRemove("income entry", () => removeIncome(e.id))} accessibilityRole="button" accessibilityHint="Press and hold to remove" accessibilityActions={[{ name: "delete", label: "Remove" }]} onAccessibilityAction={(ev) => ev.nativeEvent.actionName === "delete" && confirmRemove("income entry", () => removeIncome(e.id))} accessibilityLabel={`${rand(e.cents)}, ${ddmmyyyy(isoToDate(e.date))}${e.note ? `, ${e.note}` : ""}`} style={[styles.row, i > 0 && styles.divider]}>
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{e.note || "Income"}</Text>
@@ -383,6 +393,7 @@ export default function Giving() {
                         </Pressable>
                       ))}
                     </View>
+                    {income.length > 12 && !showAllIncome ? <TextLink label={`Show all ${income.length}`} onPress={() => setShowAllIncome(true)} /> : null}
                     <Text variant="label">Press and hold an entry to remove it.</Text>
                   </View>
                 ) : null}
@@ -391,7 +402,7 @@ export default function Giving() {
                   <View style={{ gap: 6 }}>
                     <Text variant="label">Given elsewhere</Text>
                     <View style={styles.list}>
-                      {elsewhere.slice(0, 12).map((e, i) => (
+                      {(showAllElsewhere ? elsewhere : elsewhere.slice(0, 12)).map((e, i) => (
                         <Pressable
                           key={e.id}
                           onLongPress={() => confirmRemove("entry", () => removeElsewhereEntry(e.id))}
@@ -410,6 +421,7 @@ export default function Giving() {
                         </Pressable>
                       ))}
                     </View>
+                    {elsewhere.length > 12 && !showAllElsewhere ? <TextLink label={`Show all ${elsewhere.length}`} onPress={() => setShowAllElsewhere(true)} /> : null}
                     <Text variant="label">These count towards your maaser and chomesh. Press and hold an entry to remove it.</Text>
                   </View>
                 ) : null}

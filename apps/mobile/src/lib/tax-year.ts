@@ -1,7 +1,7 @@
 /**
  * SARS tax year: 1 March to the end of February, named by the year it ends
  * (tax year 2027 = 01/03/2026 to 28/02/2027). Same rule as the website's
- * src/lib/dates.ts. Uses the date's own calendar fields.
+ * src/lib/dates.ts. Uses the date's own calendar fields: pass a Johannesburg calendar day (`jhbDay`, `jhbToday`).
  */
 export function taxYearFor(d: Date): number {
   return d.getMonth() >= 2 ? d.getFullYear() + 1 : d.getFullYear();

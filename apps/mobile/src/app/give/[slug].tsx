@@ -6,7 +6,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { Field } from "@/components/field";
-import { EmptyState } from "@/components/states";
+import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
@@ -29,11 +29,11 @@ import type { GivingKind } from "@/data/giving";
 export default function Give() {
   const insets = useSafeAreaInsets();
   const { slug, kind: kindParam } = useLocalSearchParams<{ slug: string; kind?: string }>();
-  const { charity } = useCharity(slug);
+  const { charity, failed, retry } = useCharity(slug);
   const account = useAccount();
 
   const [amount, setAmount] = useState("");
-  const [kind, setKind] = useState<GivingKind | null>(kindParam && kindParam in givingKindLabels ? (kindParam as GivingKind) : null);
+  const [kind, setKind] = useState<GivingKind | null>(kindParam && Object.hasOwn(givingKindLabels, kindParam) ? (kindParam as GivingKind) : null);
   const [extra, setExtra] = useState(false);
   const [extraAmount, setExtraAmount] = useState("");
   const [first, setFirst] = useState("");
@@ -63,10 +63,23 @@ export default function Give() {
       </View>
     );
   }
+  // Loading (undefined), not found (null) or could not load: never a blank screen.
   if (!charity) {
     return (
       <View style={styles.screen}>
         <TopBar title="Give" />
+        <View style={{ padding: space.gutter, gap: space.md }}>
+          {failed ? (
+            <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retry} />
+          ) : charity === null ? (
+            <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
+          ) : (
+            <>
+              <SkeletonBlock height={64} />
+              <SkeletonBlock height={220} />
+            </>
+          )}
+        </View>
       </View>
     );
   }
@@ -159,7 +172,8 @@ export default function Give() {
     try {
       await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
       void refreshAfterGiving(account.refresh);
-      router.replace("/giving");
+      // Back to the Giving tab that is already open underneath (replace would stack a second tab bar).
+      router.dismissTo("/giving");
     } catch {
       setMessage("We couldn't open the payment page. Please try again.");
     } finally {

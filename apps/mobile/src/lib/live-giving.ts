@@ -3,6 +3,7 @@
  * Pure functions (no React Native), so the website's test suite can check them.
  */
 import type { Gift, GivingKind, Receipt, Recurring } from "../data/giving";
+import { jhbDay } from "./format";
 
 export type DonationRow = {
   id: string;
@@ -51,7 +52,8 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
       const k = kindOf.get(d.id);
       return {
         id: d.id,
-        date: new Date(d.paid_at!),
+        date: jhbDay(new Date(d.paid_at!)),
+        at: new Date(d.paid_at!),
         charitySlug: c?.slug ?? "",
         charityName: c?.name_en ?? "Charity",
         cents: Number(d.amount_cents),
@@ -61,8 +63,11 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
         ...(c?.thank_you_en ? { thankYou: c.thank_you_en } : {}),
       };
     })
-    .sort((a, b) => b.date.getTime() - a.date.getTime());
+    .sort((a, b) => momentOf(b) - momentOf(a));
 }
+
+/** When a gift was paid, to the moment where known (live), else its day. */
+const momentOf = (g: Gift) => (g.at ?? g.date).getTime();
 
 export function toRecurring(rows: RecurringRow[]): Recurring[] {
   return rows
@@ -75,7 +80,7 @@ export function toRecurring(rows: RecurringRow[]): Recurring[] {
         charitySlug: c?.slug ?? "",
         charityName: c?.name_en ?? "Charity",
         cents: Number(r.amount_cents) + Number(r.contribution_cents ?? 0),
-        nextDate: r.next_charge_at ? new Date(r.next_charge_at) : null,
+        nextDate: r.next_charge_at ? jhbDay(new Date(r.next_charge_at)) : null,
         status: r.status as "active" | "paused" | "cancelled" | "failed",
         syncing: r.needs_gateway_sync === true,
       };
@@ -91,7 +96,7 @@ export function toReceipts(rows: ReceiptRow[]): Receipt[] {
       charityName: r.charity_name ?? "Charity",
       number: r.reference ?? "",
       cents: Number(r.amount_cents),
-      issued: new Date(r.issued_at),
+      issued: jhbDay(new Date(r.issued_at)),
     }));
 }
 
@@ -117,13 +122,13 @@ export function newArrivals(gifts: Gift[], seen: Seen | null): Gift[] {
   const ids = new Set(seen.ids);
   const since = seen.since ? new Date(seen.since).getTime() : -Infinity;
   // Strictly newer than the oldest remembered one: anything at or before it was already seen.
-  return gifts.filter((g) => g.date.getTime() > since && !ids.has(g.id)).sort((a, b) => a.date.getTime() - b.date.getTime());
+  return gifts.filter((g) => momentOf(g) > since && !ids.has(g.id)).sort((a, b) => momentOf(a) - momentOf(b));
 }
 
 /** What to remember as seen: the newest 200 donations, and the date of the oldest of them. */
 export function seenFrom(gifts: Gift[]): Seen {
-  const newest = [...gifts].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 200);
-  return { ids: newest.map((g) => g.id), since: newest.length ? newest[newest.length - 1].date.toISOString() : null };
+  const newest = [...gifts].sort((a, b) => momentOf(b) - momentOf(a)).slice(0, 200);
+  return { ids: newest.map((g) => g.id), since: newest.length ? new Date(momentOf(newest[newest.length - 1])).toISOString() : null };
 }
 
 /**
@@ -136,17 +141,18 @@ export type Cached = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[
 export function toCache(live: Cached): string {
   // Kept small: the newest 500 donations, without the charities' thank-you notes.
   const gifts = [...live.gifts]
-    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .sort((a, b) => momentOf(b) - momentOf(a))
     .slice(0, 500)
     .map(({ thankYou: _note, ...g }) => g);
-  return JSON.stringify({ v: 1, ...live, gifts });
+  // Version 2: dates are Johannesburg calendar days, with the exact moment kept as `at`.
+  return JSON.stringify({ v: 2, ...live, gifts });
 }
 
 export function fromCache(raw: string | null): Cached | null {
   if (!raw) return null;
   try {
     const o = JSON.parse(raw) as Record<string, unknown>;
-    if (o.v !== 1) return null;
+    if (o.v !== 2) return null;
     const date = (v: unknown): Date => {
       const d = new Date(typeof v === "string" ? v : NaN);
       if (Number.isNaN(d.getTime())) throw new Error("bad date");
@@ -172,6 +178,7 @@ export function fromCache(raw: string | null): Cached | null {
       gifts: list(o.gifts).map((g) => ({
         id: str(g.id),
         date: date(g.date),
+        ...(g.at !== undefined ? { at: date(g.at) } : {}),
         charitySlug: str(g.charitySlug),
         charityName: str(g.charityName),
         cents: cents(g.cents),

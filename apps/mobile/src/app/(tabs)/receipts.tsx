@@ -10,7 +10,7 @@ import { ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { charities } from "@/data/sample";
 import { gifts, receipts } from "@/data/giving";
-import { rand } from "@/lib/format";
+import { jhbToday, rand } from "@/lib/format";
 import { Button } from "@/components/button";
 import { InfoButton } from "@/components/info-button";
 import { useAccount } from "@/lib/account";
@@ -37,7 +37,7 @@ export default function Receipts() {
           ? "loading"
           : "ready";
   const directory = useDirectory();
-  const current = taxYearFor(new Date());
+  const current = taxYearFor(jhbToday());
   const currentEnd = taxYearRangeLabel(current).split(" to ")[1];
 
   const empty = preview ? state === "empty" : !signedIn;

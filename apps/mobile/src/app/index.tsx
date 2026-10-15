@@ -161,7 +161,7 @@ export default function Welcome() {
             </Text>
             <Text variant="bodyMuted">Optional. Set a target and the app shows how much you have given towards it. You can change it any time on the Giving tab.</Text>
             {/* Targets are saved per person, so wait until we know who is using the phone. */}
-            {account.status === "loading" ? (
+            {account.status === "loading" || account.status === "agreeing" ? (
               <SkeletonBlock height={320} />
             ) : (
             <TargetEditor
