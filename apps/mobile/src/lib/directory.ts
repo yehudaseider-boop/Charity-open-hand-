@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { causes as sampleCauses, charities as sampleCharities, findCharity, type Cause, type Charity } from "@/data/sample";
-import { CHARITY_COLUMNS, toCauses, toCharity, toPhotos, toUpdates, type CategoryRow, type CharityRow, type PhotoRow, type UpdateRow } from "./live-charities";
+import { CHARITY_COLUMNS, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
 import { supabase } from "./supabase";
 
 /**
@@ -63,14 +63,18 @@ async function loadCharity(slug: string): Promise<Charity | null> {
   if (error) throw error;
   if (!data) return null;
   const row = data as unknown as CharityRow;
-  const [photos, updates] = await Promise.all([
+  const [photos, updates, campaigns] = await Promise.all([
     db.from("charity_photos").select("id, storage_path, caption_en").eq("charity_id", row.id).order("created_at"),
     db.from("charity_updates").select("id, body_en, photo_path, created_at").eq("charity_id", row.id).order("created_at", { ascending: false }).limit(5),
+    db.from("campaigns").select("id, title, description, target_cents, ends_at").eq("charity_id", row.id).eq("status", "active").order("created_at", { ascending: false }).limit(3),
   ]);
+  const campaignRows = (campaigns.data ?? []) as CampaignRow[];
+  const progress = campaignRows.length ? await db.rpc("campaign_progress", { p_campaign_ids: campaignRows.map((c) => c.id) }) : { data: [] };
   return {
     ...toCharity(row, base),
     photos: toPhotos((photos.data ?? []) as PhotoRow[], base),
     updates: toUpdates((updates.data ?? []) as UpdateRow[], base),
+    campaigns: toCampaigns(campaignRows, (progress.data ?? []) as ProgressRow[]),
   };
 }
 

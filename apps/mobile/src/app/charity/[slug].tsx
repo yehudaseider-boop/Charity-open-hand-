@@ -9,6 +9,7 @@ import { InfoButton } from "@/components/info-button";
 import { CharityImage } from "@/components/charity-image";
 import { Sheet } from "@/components/sheet";
 import { Drop } from "@/components/splash";
+import { CampaignCard } from "@/components/campaign-card";
 import { GiveSheet } from "@/components/give-sheet";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
@@ -83,6 +84,15 @@ export default function CharityDetail() {
             <View style={{ gap: 6, marginTop: 18 }}>
               <Text style={styles.kicker}>Where your gift goes</Text>
               <Text>{charity.about[1]}</Text>
+            </View>
+          ) : null}
+
+          {/* Campaigns come first after the story: they are what the charity is raising for now. */}
+          {(charity.campaigns ?? []).length ? (
+            <View style={{ gap: 12, marginTop: space.block }}>
+              {(charity.campaigns ?? []).map((c) => (
+                <CampaignCard key={c.id} campaign={c} onGive={GIVE_IN_APP ? () => openGiveScreen(charity.slug, { campaign: c.id }) : undefined} />
+              ))}
             </View>
           ) : null}
 

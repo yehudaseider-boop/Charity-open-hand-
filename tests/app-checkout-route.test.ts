@@ -10,6 +10,7 @@ vi.mock("server-only", () => ({}));
 type Op = { table: string; op: string; row?: Record<string, unknown> };
 const ops: Op[] = [];
 const checkouts: Record<string, unknown>[] = [];
+let campaignRow: Record<string, unknown> | null = null;
 
 function builder(table: string) {
   const result = { data: [] as unknown, error: null };
@@ -24,6 +25,7 @@ function builder(table: string) {
     return b;
   };
   b.single = async () => ({ data: { id: "donor-1" }, error: null });
+  b.maybeSingle = async () => ({ data: table === "campaigns" ? campaignRow : null, error: null });
   b.then = (ok: (v: unknown) => unknown) => Promise.resolve(result).then(ok);
   return b;
 }
@@ -65,6 +67,7 @@ const gift = { slug: "meals", giftCents: 10_000, contributionCents: 1_000, shown
 beforeEach(() => {
   ops.length = 0;
   checkouts.length = 0;
+  campaignRow = null;
   process.env.APP_GIVING = "yes";
   process.env.SITE_URL = "https://site.test";
 });
@@ -107,6 +110,27 @@ describe("app checkout endpoint", () => {
     const res = await call({ ...gift, shownTotalCents: 10_000, details });
     expect(res.status).toBe(409);
     expect((await res.json()).quote.totalCents).toBe(11_000);
+    expect(checkouts).toHaveLength(0);
+  });
+
+  const CAMPAIGN = "6f1c2a52-3b7e-4d0a-9c41-2f6e8d5b7a10";
+
+  it("labels a gift with the charity's active campaign", async () => {
+    campaignRow = { id: CAMPAIGN, ends_at: null };
+    const res = await call({ ...gift, campaignId: CAMPAIGN, details });
+    expect(res.status).toBe(200);
+    expect(ops.find((o) => o.table === "donations" && o.op === "insert")?.row).toMatchObject({ campaign_id: CAMPAIGN });
+  });
+
+  it("refuses an ended or unknown campaign, and a monthly campaign gift, before recording anything", async () => {
+    campaignRow = { id: CAMPAIGN, ends_at: "2020-01-01T00:00:00Z" };
+    expect((await call({ ...gift, campaignId: CAMPAIGN, details })).status).toBe(409);
+    campaignRow = null;
+    expect((await call({ ...gift, campaignId: CAMPAIGN, details })).status).toBe(409);
+    campaignRow = { id: CAMPAIGN, ends_at: null };
+    const monthly = await call({ ...gift, campaignId: CAMPAIGN, details: { ...details, monthly: true, monthly_authorised: true } });
+    expect((await monthly.json()).message).toMatch(/once-off/);
+    expect(ops.filter((o) => o.op === "insert")).toHaveLength(0);
     expect(checkouts).toHaveLength(0);
   });
 });

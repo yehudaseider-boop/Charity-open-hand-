@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
+import { CampaignCard } from "@/components/campaign-card";
 import { Field } from "@/components/field";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
@@ -31,7 +32,7 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
  */
 export default function Give() {
   const insets = useSafeAreaInsets();
-  const { slug, kind: kindParam } = useLocalSearchParams<{ slug: string; kind?: string }>();
+  const { slug, kind: kindParam, campaign: campaignParam } = useLocalSearchParams<{ slug: string; kind?: string; campaign?: string }>();
   const { charity, failed, retry } = useCharity(slug);
   const account = useAccount();
   const preview = account.status === "preview";
@@ -112,6 +113,8 @@ export default function Give() {
     );
   }
 
+  // Giving to one of the charity's campaigns: shown at the top, once-off only.
+  const campaign = campaignParam ? (charity.campaigns ?? []).find((c) => c.id === campaignParam) ?? null : null;
   const gift = parseRandToCents(amount);
   const contribution = extra ? parseRandToCents(extraAmount) : 0;
   const total = gift !== null && contribution !== null ? gift + contribution : null;
@@ -129,7 +132,7 @@ export default function Give() {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
     if (s18aAvailable && want18a && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
     if (dedicate && !dedicationName.trim()) e.dedication_name = "Enter their name, or switch the dedication off";
-    if (monthly && !authorised) e.monthly_authorised = "Please confirm you authorise the monthly payments";
+    if (monthly && !campaign && !authorised) e.monthly_authorised = "Please confirm you authorise the monthly payments";
     if (!agreed) e.agreed = "Please confirm so we can record your donation";
     if ((e.first_name || e.last_name || e.email) && remembered) setEditingDetails(true);
     return e;
@@ -162,12 +165,12 @@ export default function Give() {
       is_anonymous: anonymous,
       dedication_kind: dedicate ?? undefined,
       dedication_name: dedicate ? dedicationName.trim() : undefined,
-      monthly,
-      monthly_authorised: authorised,
+      monthly: monthly && !campaign,
+      monthly_authorised: authorised && !campaign,
       age_confirmed: agreed,
       popia_consent: agreed,
     };
-    const r = await startPayment(SITE_URL, { slug: charity!.slug, giftCents: gift!, contributionCents: contribution ?? 0, shownTotalCents: total, details });
+    const r = await startPayment(SITE_URL, { slug: charity!.slug, giftCents: gift!, contributionCents: contribution ?? 0, shownTotalCents: total, campaignId: campaign?.id, details });
     if (!r.ok) {
       setBusy(false);
       setMessage(r.quote ? `${r.message} The total is now ${rand(r.quote.totalCents)}.` : r.message);
@@ -191,13 +194,14 @@ export default function Give() {
   }
 
   const err = (k: string) => errors[k];
-  const buttonLabel = total ? `Give ${rand(total)}${monthly ? " every month" : ""}` : "Give";
+  const buttonLabel = total ? `Give ${rand(total)}${monthly && !campaign ? " every month" : ""}` : "Give";
 
   return (
     <View style={styles.screen}>
       <TopBar title={`Give to ${charity.nameEn}`} fallback="/discover" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: space.gutter, gap: 18, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+          {campaign ? <CampaignCard campaign={campaign} compact /> : null}
           <View style={{ gap: 10 }}>
             <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} error={err("amount")} placeholder="0" />
             {quick.length ? (
@@ -229,7 +233,7 @@ export default function Give() {
             {err("giving_kind") ? <Text variant="label" style={{ color: colors.danger }}>{err("giving_kind")}</Text> : null}
           </View>
 
-          <SwitchRow label="Give every month" description="The same amount each month until you cancel." value={monthly} onChange={setMonthly} />
+          {campaign ? null : <SwitchRow label="Give every month" description="The same amount each month until you cancel." value={monthly} onChange={setMonthly} />}
           <SwitchRow
             label="Add a contribution to Givezy"
             description={monthly ? "Optional. It helps us keep Givezy running, and repeats each month with your gift." : "Optional. It helps us keep Givezy running. Your gift to the charity stays whole."}
@@ -286,7 +290,7 @@ export default function Give() {
             </View>
           ) : null}
 
-          {monthly && total ? (
+          {monthly && !campaign && total ? (
             <View style={{ gap: 8 }}>
               <Text variant="bodyMuted">
                 Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Monthly gifts are by card only. You can pause or cancel any time in the Giving tab.

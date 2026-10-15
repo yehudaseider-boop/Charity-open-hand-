@@ -33,7 +33,12 @@ export type Charity = {
   coverUrl?: string | null;
   photos?: CharityPhoto[];
   updates?: CharityUpdate[];
+  /** Active campaigns with their running totals. */
+  campaigns?: Campaign[];
 };
+
+/** A charity's campaign: a goal in Rand and what has been given to it so far (paid gifts only). */
+export type Campaign = { id: string; title: string; description: string | null; targetCents: number | null; raisedCents: number; giftCount: number; endsAt: Date | null };
 
 export type CharityPhoto = { id: string; url: string; caption: string | null };
 export type CharityUpdate = { id: string; date: Date; body: string; photoUrl: string | null };
@@ -64,6 +69,10 @@ export const charities: Charity[] = [
     featured: true,
     coverUrl: dummy.meals[0],
     photos: gallery(dummy.meals, ["Fresh challah in every parcel", "Sorting fruit and vegetables on a Thursday night"]),
+    // Sample figures for the design preview only.
+    campaigns: [
+      { id: "c-pesach", title: "Pesach food parcels", description: "A full Pesach parcel for every family on our list, delivered before Yom Tov.", targetCents: 5_000_000, raisedCents: 3_140_000, giftCount: 86, endsAt: new Date(2027, 3, 18) },
+    ],
     updates: [
       { id: "u1", date: new Date(2026, 9, 2), body: "Thursday night packing went late this week. Thank you to everyone who came to help.", photoUrl: dummy.meals[2] },
       { id: "u2", date: new Date(2026, 8, 18), body: "Yom Tov parcels went out before Sukkos. Every family on our list received one.", photoUrl: null },

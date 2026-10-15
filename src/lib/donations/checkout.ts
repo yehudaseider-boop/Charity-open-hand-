@@ -61,6 +61,8 @@ export async function startDonation(args: {
   shownTotalCents: number;
   /** Came from the phone app: the confirmation page then offers a way back. */
   fromApp?: boolean;
+  /** Given to one of this charity's active campaigns (once-off gifts only). */
+  campaignId?: string;
   input: CheckoutInput;
   ip: string;
 }): Promise<StartResult> {
@@ -71,6 +73,10 @@ export async function startDonation(args: {
 
   const fieldErrors = checkDonorDetails(args.input, charity.receiptsAvailable);
   if (Object.keys(fieldErrors).length) return { ok: false, message: "Please check the highlighted fields.", fieldErrors };
+
+  const campaign = args.campaignId ? await loadOpenCampaign(args.campaignId, charity.id) : null;
+  if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity." };
+  if (campaign && args.input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
 
   const limited = await hitRateLimit("checkout", [`ip:${args.ip}`, `email:${args.input.email.toLowerCase()}`], 5, 10);
   if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
@@ -142,6 +148,7 @@ export async function startDonation(args: {
     gateway: gateway.name,
     gateway_ref: donationId,
     recurring_id: recurringId,
+    ...(campaign ? { campaign_id: campaign.id } : {}),
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
@@ -295,4 +302,19 @@ async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<st
     if (error?.code !== "23505") throw error; // someone else created it a moment ago: look again
   }
   throw new Error("Could not create donor");
+}
+
+/** One of this charity's campaigns that is taking gifts now (active and not past its end), or null. */
+async function loadOpenCampaign(id: string, charityId: string): Promise<{ id: string } | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const { data } = await createAdminClient()
+    .from("campaigns")
+    .select("id, ends_at")
+    .eq("id", id)
+    .eq("charity_id", charityId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!data) return null;
+  if (data.ends_at && new Date(data.ends_at).getTime() < Date.now()) return null;
+  return { id: data.id };
 }

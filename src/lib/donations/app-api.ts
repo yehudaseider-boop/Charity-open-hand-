@@ -17,6 +17,8 @@ export const appQuoteSchema = z.object({
 
 export const appCheckoutSchema = appQuoteSchema.extend({
   shownTotalCents: cents,
+  /** One of the charity's campaigns, when the gift is for it. */
+  campaignId: z.uuid().optional(),
   details: z.object({
     donor_type: z.enum(["individual", "company", "trust"]),
     email: z.string().max(200),

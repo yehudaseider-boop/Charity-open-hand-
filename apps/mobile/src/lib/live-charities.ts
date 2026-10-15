@@ -3,7 +3,7 @@
  * photos and updates. Pure functions (no React Native), so the website's
  * test suite can check them.
  */
-import type { Cause, Charity, CharityPhoto, CharityUpdate } from "../data/sample";
+import type { Campaign, Cause, Charity, CharityPhoto, CharityUpdate } from "../data/sample";
 
 export type CharityRow = {
   id: string;
@@ -103,4 +103,31 @@ export function givenBefore(gifts: { charitySlug: string; date: Date }[], charit
     if (out.length === limit) break;
   }
   return out;
+}
+
+export type CampaignRow = { id: string; title: string; description: string | null; target_cents: number | string | null; ends_at: string | null };
+export type ProgressRow = { campaign_id: string; raised_cents: number | string; gift_count: number | string };
+
+/** Active campaigns with their totals; any past its last day is left out (the server refuses those gifts too). */
+export function toCampaigns(rows: CampaignRow[], progress: ProgressRow[], now: Date = new Date()): Campaign[] {
+  return rows.flatMap((r) => {
+    const endsAt = r.ends_at ? new Date(r.ends_at) : null;
+    if (endsAt && endsAt.getTime() < now.getTime()) return [];
+    const p = progress.find((x) => x.campaign_id === r.id);
+    return [{
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      targetCents: r.target_cents === null ? null : Number(r.target_cents),
+      raisedCents: p ? Number(p.raised_cents) : 0,
+      giftCount: p ? Number(p.gift_count) : 0,
+      endsAt,
+    }];
+  });
+}
+
+/** How far along, as a whole percentage for the bar (0 to 100). */
+export function campaignPercent(c: Pick<Campaign, "raisedCents" | "targetCents">): number {
+  if (!c.targetCents || c.targetCents <= 0) return 0;
+  return Math.min(100, Math.floor((c.raisedCents * 100) / c.targetCents));
 }

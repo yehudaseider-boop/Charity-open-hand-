@@ -611,3 +611,14 @@ Inspired by Givelify's "three taps". Yehuda: as few taps as possible, so the gif
 - **One tick instead of two:** "I am 18 or older, I agree to the Terms and Privacy Policy, and that Givezy records this donation." It sets both confirmations the server requires. **For Yosef to approve** (the website still shows two ticks).
 - The Give button and the tick are pinned to the bottom of the screen.
 - In the design preview (no live data) the give screen is always used, so the flow can be tried; it stops before payment with a note. Live builds still follow the in-app giving switches.
+
+## Campaigns with a goal (16/10/2026)
+
+From Givelify's "virtual envelopes". Built on the `campaigns` table that was in the schema from the start (no screens until now).
+
+- **Charity side (website):** a Campaigns tab. Start one with a name, what it's for, a goal in Rand (required) and an optional last day; end it with one button. Up to 3 running at once (the database enforces it). Started and ended campaigns are in the audit log.
+- **Donor side (app):** the charity page shows each running campaign under the story: raised so far, the goal, a bar, number of gifts and the last day, with "Give to this campaign". The give screen shows the campaign at the top.
+- **Money:** a campaign gift is an ordinary donation to the charity, labelled with the campaign. The total counts paid gifts only (never the contribution to Givezy); refunded and charged-back gifts drop out. The database refuses a gift for another charity's campaign. The server refuses an ended campaign (status or past its last day) before recording anything.
+- **Once-off only:** campaign gifts can't be monthly (a monthly gift would outlive the campaign). Give monthly to the charity itself.
+- Drafts stay private; the public sees active and ended campaigns of approved charities only.
+- Not yet: campaigns on the website's public charity page and on Discover; giving to a campaign from the website.

@@ -62,7 +62,7 @@ export function requestQuote(site: string, slug: string, giftCents: number, cont
 
 export function startPayment(
   site: string,
-  args: { slug: string; giftCents: number; contributionCents: number; shownTotalCents: number; details: DonorDetails },
+  args: { slug: string; giftCents: number; contributionCents: number; shownTotalCents: number; campaignId?: string; details: DonorDetails },
   post: Post = fetchPost,
 ) {
   return call<CheckoutReply>(post, api(site, "checkout"), args);

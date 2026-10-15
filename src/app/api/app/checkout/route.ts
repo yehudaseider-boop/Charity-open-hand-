@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     contributionCents: body.data.contributionCents,
     shownTotalCents: body.data.shownTotalCents,
     fromApp: true,
+    campaignId: body.data.campaignId,
     input: details.input,
     ip: clientIp(request.headers),
   });
