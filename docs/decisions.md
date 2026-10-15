@@ -586,5 +586,7 @@ Four independent read-only reviews (money, security and privacy, receipts and ta
 - **Tax pack:** for a closed year it shows what is on issued s18A receipts (not only what was asked for), per donation and in total.
 - **Lists read in full:** charity donor list and receipts page read every row (the database answers 1 000 at a time); admin receipts has a search.
 - **Dedication names:** invisible direction-changing characters are removed and names show in their own direction (Hebrew right to left).
+- **App:** account reloads are keyed to the signed-in person; the Giving tab waits for its data instead of flashing the signed-out view; dates and times follow Johannesburg time wherever the phone is; Expo patch updates applied.
+- **In-app giving confirmed** (Yehuda, 15/10/2026): the give screen stays, with donors typing the amount and their details in the app and paying on the provider's page. `EXPO_PUBLIC_IN_APP_GIVING=yes` is set in the Expo preview environment. It has no effect until the website is deployed and `EXPO_PUBLIC_SITE_URL` (app) and `APP_GIVING=yes` (server) are set; until then the button falls back to the website. Store builds stay off until Apple and Google confirm in writing.
 - Not changed: a receipted donation that is later refunded plus a late donation would make the receipts job show a database error instead of a "needs attention" line. Nothing can refund a donation yet; handle it with the refunds decision.
 
