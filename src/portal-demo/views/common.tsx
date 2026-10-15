@@ -102,7 +102,10 @@ export function campaignName(id: string | null, campaigns: Map<string, Campaign>
 
 /** Builds a CSV in the browser and downloads it. Demo data only: nothing is sent anywhere. */
 export function downloadCsv(filename: string, header: string[], rows: (string | number | null)[][]) {
-  const blob = new Blob([toCsv(header, rows)], { type: "text/csv;charset=utf-8" });
+  const text = toCsv(header, rows);
+  // The shareable single-page build runs where downloads are blocked: it shows the file instead.
+  if (window.__gzCsvPreview) return window.__gzCsvPreview(filename, text);
+  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -275,7 +278,7 @@ export function useQueryParam(name: string): string | null {
   const [value, setValue] = useState<string | null>(null);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read the address once, after hydration
-    setValue(new URLSearchParams(window.location.search).get(name));
+    setValue(new URLSearchParams(window.__gzSearch ?? window.location.search).get(name));
   }, [name]);
   return value;
 }

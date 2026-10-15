@@ -20,6 +20,16 @@ Open <http://localhost:3000/portal-demo>. Chrome, Safari or Edge, any width from
 - On a built site (`npm run build && npm start`) the portal answers "not found" unless `PORTAL_DEMO=yes` is set. That keeps it off a live deploy by accident.
 - Changes made in the demo (campaigns, team, settings) are kept in the browser's local storage. "Reset demo" in the dark banner clears them.
 
+## Shareable preview page
+
+The same portal can be built as one self-contained page (scripts, styles and logos inlined), so people can click through it without running the website:
+
+```bash
+node scripts/build-portal-artifact.mjs ./givezy-charity-portal.html
+```
+
+The page routes inside itself (`src/portal-demo/artifact`) instead of using Next.js routing. Where the host blocks downloads, each CSV export opens on screen to copy instead. Changes made in the page stay in that viewer's browser.
+
 ## Where it lives
 
 The portal is a separate area of the website. It does not touch the donor app (`apps/mobile`), the existing `/charity-admin` screens, the database or the payment code.
