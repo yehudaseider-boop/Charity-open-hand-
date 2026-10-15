@@ -13,7 +13,7 @@ import type { DemoDataset, Payout } from "../data/types";
 import { usePortal } from "../store";
 import { count, date, permille, rand } from "../ui/format";
 import { Icon } from "../ui/icons";
-import { Drawer } from "../ui/overlay";
+import { ConfirmDialog, Drawer } from "../ui/overlay";
 import { Badge, Button, Callout, Card, CardHeader, DetailList, EmptyState, Progress, Segmented } from "../ui/primitives";
 import { DataTable } from "../ui/table";
 import { campaignName, useExport, useLookups } from "./common";
@@ -63,6 +63,7 @@ export function BankDepositsCard({ data, payouts, periodLabel }: { data: DemoDat
   const matched = useMemo(() => overrides.reconciled ?? {}, [overrides.reconciled]);
   const [show, setShow] = useState<"all" | "todo" | "done">("all");
   const [open, setOpen] = useState<Payout | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
   const exports = useDepositExports(data, payouts);
 
   const inBank = payouts.filter((p) => p.status === "paid");
@@ -102,14 +103,29 @@ export function BankDepositsCard({ data, payouts, periodLabel }: { data: DemoDat
             variant="soft"
             size="sm"
             icon="check"
-            onClick={() => {
-              markReconciled(toDo.map((p) => p.id), true);
-              toast({ tone: "success", title: `${count(toDo.length)} deposits matched`, body: "Only do this after checking each amount against your bank statement." });
-            }}
+            onClick={() => setConfirmAll(true)}
           >
             Mark all {count(toDo.length)} as matched
           </Button>
         )}
+        <ConfirmDialog
+          open={confirmAll}
+          onClose={() => setConfirmAll(false)}
+          onConfirm={() => {
+            markReconciled(toDo.map((p) => p.id), true);
+            toast({ tone: "success", title: `${count(toDo.length)} deposits matched`, body: "You can untick any of them again." });
+          }}
+          title={`Mark ${count(toDo.length)} deposits as matched?`}
+          body={
+            <>
+              <p>
+                {count(toDo.length)} deposits, {rand(toDo.reduce((t, p) => t + p.netCents, 0))} in total, from {toDo.length ? showDay(toDo.reduce((a, p) => (p.payoutDate < a ? p.payoutDate : a), toDo[0].payoutDate)) : ""} to {toDo.length ? showDay(toDo.reduce((a, p) => (p.payoutDate > a ? p.payoutDate : a), toDo[0].payoutDate)) : ""}.
+              </p>
+              <p className="mt-2">Only do this if you have checked each one against your bank statement.</p>
+            </>
+          }
+          confirmLabel="Yes, I have checked them"
+        />
       </div>
 
       <div className="mb-3">

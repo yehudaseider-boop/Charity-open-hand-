@@ -144,6 +144,6 @@ These need Yehuda (and some Yosef) before the real build. They are also in `docs
 12. **Follow-up and pace settings are placeholders, not decisions** (in `demo-config.ts`): "new donor" welcome list for 14 days, "large donation" within 30 days, "ahead" at 110% of an even pace and "behind" under 90%, a campaign "ending soon" within 14 days. Confirm or change.
 13. **Receipt numbers:** the demo numbers receipts in donor order within the year (`BF-2026-0001`). The real job numbers in issue order, per the existing sample format. Same format, different order.
 14. **Who writes to donors:** the portal drafts and the charity sends from its own email. Should Givezy ever send for them (needs consent, unsubscribe handling and sender authentication), or stay draft-only?
-15. **Giving-group rules are placeholders too:** New for 28 days (Givelify says four weeks), 30-day windows, 6 windows each side, Consistent at 5 of 6. Givelify does not publish its cut-offs.
-16. **Statement reference:** the demo shows each deposit on the bank statement as `GIVEZY PO-yyyymmdd`. The real text depends on the payment provider; check it in test mode.
-17. **"Mark all as matched":** handy for catching up, risky if used without checking. Keep it, or make bookkeepers tick one by one?
+15. **Giving-group rules: decided 15/10/2026, keep for now.** New for 28 days, 30-day windows, 6 each side, Consistent at 5 of 6. Revisit once real donations show the patterns. Change them in `demo-config.ts`.
+16. **Statement reference: decided 15/10/2026, placeholder.** The demo keeps `GIVEZY PO-yyyymmdd`; the real wording is checked in the payment provider's test mode (on the go-live checklist).
+17. **"Mark all as matched": decided 15/10/2026, keep it**, behind a confirmation that shows how many deposits, their total and their dates, and asks "Have you checked them?".

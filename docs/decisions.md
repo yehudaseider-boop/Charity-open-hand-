@@ -522,3 +522,4 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Givelify is the functional reference (Yehuda, 15/10/2026). No Givelify login; details come from search summaries of their published pages. Nothing of their interface, names or assets is copied.
 - Donor groups now follow the five Givelify describes (Consistent, Occasional, New, Decreasing, Inactive) as plain, visible rules, replacing the earlier New, Active, Lapsing, Lapsed. Thresholds are placeholders in `demo-config.ts`.
 - Finances has a Bank deposits reconciliation view. Exports are plain CSV for now (Yehuda, 15/10/2026); no accounting-package formats yet.
+- Decided by Yehuda (15/10/2026): keep the giving-group cut-offs for now (New 28 days; Consistent 5 of the last 6 months); keep `GIVEZY PO-yyyymmdd` as a placeholder statement reference until the real wording is seen in test mode; keep "Mark all as matched", behind a confirmation showing the count, total and dates.
