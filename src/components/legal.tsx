@@ -26,6 +26,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border bg-surface print:hidden">
       <div className="mx-auto flex max-w-3xl flex-wrap gap-x-4 gap-y-1 px-4 py-4 text-xs text-muted">
+        <Link href="/for-charities" className="hover:text-brand">For charities</Link>
         <Link href="/privacy" className="hover:text-brand">Privacy Policy</Link>
         <Link href="/terms" className="hover:text-brand">Terms</Link>
         <Link href="/account/data" className="hover:text-brand">Your information</Link>

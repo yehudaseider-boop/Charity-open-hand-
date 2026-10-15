@@ -34,8 +34,8 @@ export default async function Home() {
           <Link href="/charities" className="rounded-control bg-brand px-5 py-3 font-semibold text-brand-contrast">
             Find a charity
           </Link>
-          <Link href="/apply" className="rounded-control border border-border bg-surface px-5 py-3 font-medium">
-            List your charity
+          <Link href="/for-charities" className="rounded-control border border-border bg-surface px-5 py-3 font-medium">
+            For charities
           </Link>
         </div>
       </section>
