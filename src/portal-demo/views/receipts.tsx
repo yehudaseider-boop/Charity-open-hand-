@@ -125,7 +125,7 @@ function Receipts({ data }: { data: DemoDataset }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard highlight label="Asked for a receipt" icon="receipt" value={randWhole(summary.totalCents)} note={`${count(summary.donationCount)} donations from ${count(summary.donors)} donors`} />
         <MetricCard label={summary.closed ? "Receipts issued" : "Issued after year end"} icon="check" value={count(summary.closed ? summary.issued : summary.afterYearEnd)} note={summary.closed ? "Ready for donors to download" : `On or after ${showDay(summary.end)}`} />
-        <MetricCard label="Donations asking for a receipt" icon="users" value={permille(share)} note="Of paid donations this tax year. The donor gives their ID or tax number at checkout." />
+        <MetricCard label="Donations asking for a receipt" icon="receipt" value={permille(share)} note="Of paid donations this tax year. The donor gives their ID or tax number at checkout." />
         <MetricCard label={summary.closed ? "Year closed" : "Days to year end"} icon="calendar" value={summary.closed ? showDay(summary.end) : count(summary.daysToYearEnd)} note={taxYearLabel(summary.taxYear)} />
       </div>
 

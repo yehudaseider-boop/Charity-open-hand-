@@ -179,7 +179,7 @@ export function CampaignStatusActions({ campaign }: { campaign: Campaign }) {
         </Button>
       )}
       {(campaign.status === "active" || campaign.status === "paused") && (
-        <Button variant="secondary" icon="flag" onClick={() => setAsk("ended")}>
+        <Button variant="secondary" icon="stop" onClick={() => setAsk("ended")}>
           End campaign
         </Button>
       )}

@@ -183,7 +183,7 @@ function Overview({ data }: { data: DemoDataset }) {
                 toast({ tone: "success", title: "Link copied (demo address)", body: link });
               }}
             />
-            <QuickAction href={`${BASE}/settings?tab=team`} icon="users" label="Invite a team member" />
+            <QuickAction href={`${BASE}/settings?tab=team`} icon="userPlus" label="Invite a team member" />
           </div>
           <div className="mt-4 rounded-2xl bg-gz-cream p-3.5 text-sm">
             <p className="font-semibold">{rand(m.now.reversedCents)} refunded or charged back</p>

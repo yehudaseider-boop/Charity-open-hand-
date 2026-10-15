@@ -16,7 +16,7 @@ const TABS = [
   { id: "branding", label: "Branding and logo", icon: "image" },
   { id: "notifications", label: "Notifications", icon: "bell" },
   { id: "team", label: "Team members", icon: "users" },
-  { id: "roles", label: "Role permissions", icon: "lock" },
+  { id: "roles", label: "Role permissions", icon: "key" },
   { id: "verification", label: "Verification", icon: "shield" },
   { id: "payouts", label: "Payment and payouts", icon: "bank" },
   { id: "security", label: "Security", icon: "lock" },

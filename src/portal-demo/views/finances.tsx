@@ -89,8 +89,8 @@ function Finances({ data }: { data: DemoDataset }) {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Gross donations" icon="donations" value={rand(f.grossCents)} note="Paid, including later refunded or charged back" />
-        <MetricCard label="Fees" icon="receipt" value={rand(f.processingFeesCents + f.platformFeesCents)} note={`Processing ${rand(f.processingFeesCents)} · Givezy platform fee R0`} />
-        <MetricCard label="Refunds and chargebacks" icon="refresh" value={rand(f.refundsCents + f.chargebacksCents)} note={`Refunds ${rand(f.refundsCents)} · chargebacks ${rand(f.chargebacksCents)}`} />
+        <MetricCard label="Fees" icon="percent" value={rand(f.processingFeesCents + f.platformFeesCents)} note={`Processing ${rand(f.processingFeesCents)} · Givezy platform fee R0`} />
+        <MetricCard label="Refunds and chargebacks" icon="undo" value={rand(f.refundsCents + f.chargebacksCents)} note={`Refunds ${rand(f.refundsCents)} · chargebacks ${rand(f.chargebacksCents)}`} />
         <MetricCard highlight label="Net donations" icon="wallet" value={rand(f.netCents)} note="What your charity keeps" />
       </div>
 
@@ -205,7 +205,7 @@ function Finances({ data }: { data: DemoDataset }) {
               ))}
             </ul>
           ) : (
-            <EmptyState icon="refresh" title="No refunds or chargebacks in this period" />
+            <EmptyState icon="undo" title="No refunds or chargebacks in this period" />
           )}
           {refunds.length > 8 && <p className="mt-2 text-xs text-gz-muted">And {count(refunds.length - 8)} more in the financial report.</p>}
           <p className="mt-3 text-xs text-gz-muted">A chargeback is started by the card holder&apos;s bank, not by you or Givezy. Who can refund, and whether the fee comes back, are open decisions. In the demo only Givezy refunds, and the fee is not returned.</p>

@@ -22,7 +22,7 @@ export function DonorsView() {
 }
 
 const GROUP_TONE: Record<DonorGroup, Tone> = { consistent: "success", occasional: "lilac", new: "info", decreasing: "warning", inactive: "neutral" };
-const GROUP_ICON = { consistent: "repeat", occasional: "spark", new: "plus", decreasing: "arrowDown", inactive: "clock" } as const;
+const GROUP_ICON = { consistent: "repeat", occasional: "calendar", new: "spark", decreasing: "arrowDown", inactive: "clock" } as const;
 
 export function GroupBadge({ group }: { group: DonorGroup }) {
   return (

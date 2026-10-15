@@ -60,7 +60,7 @@ const DONATION_STATUS: Record<DonationStatus, [string, Tone]> = {
 export function DonationStatusBadge({ status }: { status: DonationStatus }) {
   const [label, tone] = DONATION_STATUS[status];
   return (
-    <Badge tone={tone} icon={status === "refunded" ? "refresh" : status === "charged_back" ? "arrowDown" : undefined}>
+    <Badge tone={tone} icon={status === "refunded" ? "undo" : status === "charged_back" ? "alert" : undefined}>
       {label}
     </Badge>
   );
@@ -76,7 +76,7 @@ const CAMPAIGN_STATUS: Record<CampaignStatus, [string, Tone]> = {
 export function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
   const [label, tone] = CAMPAIGN_STATUS[status];
   return (
-    <Badge tone={tone} icon={status === "paused" ? "pause" : status === "draft" ? "edit" : status === "ended" ? "flag" : undefined}>
+    <Badge tone={tone} icon={status === "paused" ? "pause" : status === "draft" ? "edit" : status === "ended" ? "stop" : undefined}>
       {label}
     </Badge>
   );
