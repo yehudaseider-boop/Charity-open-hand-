@@ -3,6 +3,7 @@
  * Pure builders (tested); sending is done by `notifyCharity` and never blocks the action that sent it.
  */
 import { getEmailTransport, type EmailMessage } from "@/lib/email";
+import { formatRand } from "@/lib/money";
 
 const sign = ["", "The Givezy team"];
 const site = (env: Record<string, string | undefined> = process.env) => (env.SITE_URL ?? "").replace(/\/+$/, "");
@@ -84,6 +85,32 @@ export function inviteEmail(to: string, charityName: string, link: string): Emai
       `Start your application (your name is already filled in): ${link}`,
       "",
       "The link works for 30 days.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
+/**
+ * "You received a donation": the amount to the charity only (never the contribution to Givezy) and,
+ * if there was one, the campaign. No donor details: the charity sees those on its dashboard.
+ */
+export function donationReceivedEmail(
+  to: string,
+  d: { charityName: string; charityId: string; amountCents: number; monthly: boolean; campaignTitle: string | null },
+  base = site(),
+): EmailMessage {
+  const what = d.monthly ? "a monthly donation" : "a donation";
+  return {
+    to,
+    subject: `${d.charityName} received ${formatRand(d.amountCents)} on Givezy`,
+    text: [
+      `${d.charityName} has received ${what} of ${formatRand(d.amountCents)} through Givezy${d.campaignTitle ? `, for your campaign "${d.campaignTitle}"` : ""}.`,
+      "",
+      "The money is paid into your bank account by our payment provider. Who gave, and any message or dedication, is on your dashboard.",
+      "",
+      `Your dashboard: ${base}/charity-admin/${d.charityId}/donations`,
+      "",
+      `You can turn these emails off on your profile page: ${base}/charity-admin/${d.charityId}/profile`,
       ...sign,
     ].join("\n"),
   };

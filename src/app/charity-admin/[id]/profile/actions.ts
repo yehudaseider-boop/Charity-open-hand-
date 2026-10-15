@@ -100,3 +100,17 @@ export async function uploadImage(
   revalidate(charityId, charity.slug);
   return { ok: true, message: kind === "logo" ? "Logo updated." : "Cover image updated." };
 }
+
+/** Turn "a donation came in" emails on or off for this charity. */
+export async function saveDonationEmails(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const viewer = await requireViewer();
+  await loadCharityForManager(charityId);
+  const on = formData.get("notify_donations") === "on";
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("charity_private").update({ notify_donations: on }).eq("charity_id", charityId).select("charity_id");
+  if (error) return failed(error);
+  if (!data?.length) return { ok: false, message: "You can't change this charity's settings." };
+  await logAudit({ actorUserId: viewer.userId, action: on ? "charity.donation_emails_on" : "charity.donation_emails_off", entityType: "charity", entityId: charityId });
+  revalidatePath(`/charity-admin/${charityId}/profile`);
+  return { ok: true, message: on ? "Saved. We'll email you when a donation comes in." : "Saved. We won't email you about each donation." };
+}

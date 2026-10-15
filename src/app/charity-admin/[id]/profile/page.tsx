@@ -3,15 +3,15 @@ import Link from "next/link";
 import { Card } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { loadCategories, loadCharityForManager, publicImageUrl } from "@/lib/charity/queries";
-import { saveProfile, uploadImage } from "./actions";
-import { ImageForm, ProfileForm } from "./forms";
+import { saveDonationEmails, saveProfile, uploadImage } from "./actions";
+import { DonationEmailsForm, ImageForm, ProfileForm } from "./forms";
 
 export const metadata: Metadata = { title: "Edit profile" };
 
 export default async function ProfilePage({ params }: PageProps<"/charity-admin/[id]/profile">) {
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/profile`);
-  const [{ charity, categoryIds }, categories] = await Promise.all([loadCharityForManager(id), loadCategories()]);
+  const [{ charity, priv, categoryIds }, categories] = await Promise.all([loadCharityForManager(id), loadCategories()]);
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
 
@@ -28,6 +28,9 @@ export default async function ProfilePage({ params }: PageProps<"/charity-admin/
       </div>
       <Card title="Details">
         <ProfileForm action={saveProfile.bind(null, id)} charity={charity} categories={categories} selected={categoryIds} />
+      </Card>
+      <Card title="Emails">
+        <DonationEmailsForm action={saveDonationEmails.bind(null, id)} on={priv?.notify_donations !== false} email={priv?.contact_email ?? null} />
       </Card>
       <Card title="Logo">
         {/* eslint-disable-next-line @next/next/no-img-element */}

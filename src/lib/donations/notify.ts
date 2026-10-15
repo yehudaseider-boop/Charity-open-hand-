@@ -1,4 +1,5 @@
 import "server-only";
+import { donationReceivedEmail, notifyCharity } from "@/lib/charity/emails";
 import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { confirmationEmail } from "./confirmation-email";
@@ -53,5 +54,34 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
     await getEmailTransport().send({ to: email, ...m });
   } catch (e) {
     console.error(`[notify] confirmation email for donation ${donationId} failed`, e);
+  }
+  await notifyCharityOfDonation(donationId);
+}
+
+/** Tell the charity a donation came in, unless it turned these emails off. Never blocks or undoes anything. */
+async function notifyCharityOfDonation(donationId: string) {
+  try {
+    const db = createAdminClient();
+    const { data: d, error } = await db
+      .from("donations")
+      .select("amount_cents, paid_at, recurring_id, charity_id, campaign_id, charities(name_en)")
+      .eq("id", donationId)
+      .single();
+    if (error) throw error;
+    if (!d.paid_at) return;
+    const { data: priv } = await db.from("charity_private").select("contact_email, notify_donations").eq("charity_id", d.charity_id).maybeSingle();
+    if (!priv?.contact_email || priv.notify_donations === false) return;
+    const charity = d.charities as unknown as { name_en: string };
+    // Read on its own: donations point at campaigns through two keys, which makes an embedded read ambiguous.
+    const campaign = d.campaign_id ? (await db.from("campaigns").select("title").eq("id", d.campaign_id).maybeSingle()).data : null;
+    await notifyCharity(donationReceivedEmail(priv.contact_email, {
+      charityName: charity.name_en,
+      charityId: d.charity_id,
+      amountCents: Number(d.amount_cents),
+      monthly: Boolean(d.recurring_id),
+      campaignTitle: campaign?.title ?? null,
+    }));
+  } catch (e) {
+    console.error(`[notify] charity email for donation ${donationId} failed`, e);
   }
 }

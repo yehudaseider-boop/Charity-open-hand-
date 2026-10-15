@@ -27,3 +27,19 @@ describe("charity sign-up emails", () => {
     expect(all[3].text).toMatch(/can't issue s18A receipts/);
   });
 });
+
+import { donationReceivedEmail } from "@/lib/charity/emails";
+
+describe("donation received email to the charity", () => {
+  it("gives the amount and campaign, links to the dashboard and the off switch, and names no donor", () => {
+    const m = donationReceivedEmail("c@x.co", { charityName: "Meals Fund", charityId: "id-1", amountCents: 1_234_550, monthly: false, campaignTitle: "Pesach parcels" }, base);
+    expect(m.subject).toBe("Meals Fund received R12 345.50 on Givezy");
+    expect(m.text).toContain('for your campaign "Pesach parcels"');
+    expect(m.text).toContain(`${base}/charity-admin/id-1/donations`);
+    expect(m.text).toContain(`${base}/charity-admin/id-1/profile`);
+    expect(m.text + m.subject).not.toMatch(/!|—/);
+  });
+  it("says when it is a monthly donation", () => {
+    expect(donationReceivedEmail("c@x.co", { charityName: "M", charityId: "i", amountCents: 18_000, monthly: true, campaignTitle: null }, base).text).toMatch(/a monthly donation of R180/);
+  });
+});

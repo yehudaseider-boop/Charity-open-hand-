@@ -645,3 +645,7 @@ Yehuda chose this over the Paystack test run as the next step: without charities
 ## QR poster for charities (16/10/2026)
 
 Each approved charity has a printable A4 poster under its dashboard (QR poster): its name, a large QR code to its Givezy page, "Point your phone camera here to give", the short web address, the s18A line when it applies, and the Givezy logo. Print, or "Save as PDF" in the print window for a print shop; the QR code alone downloads as an SVG. The code is navy on white with medium error correction. Library: `qrcode` 1.5.4 (MIT). In the same change, `sharp` (which cleans uploaded photos) went from 0.35.4 to 0.35.5 for a security advisory in its SVG library.
+
+## Donation emails to charities (16/10/2026)
+
+Until now only the donor got an email when a gift was paid. Now the charity's contact email also gets one: "Meals Fund received R180 on Givezy", saying whether it was monthly and which campaign it was for, with links to the Donations page and to switch these emails off. It shows the gift only: never the donor's name, email or the contribution to Givezy, so a forwarded email or a shared inbox leaks nothing about who gave. The charity sees donor details on its dashboard as before. On by default; the switch is on the charity's Profile page ("Emails"), saved in `charity_private.notify_donations`. It is sent only after the payment provider confirms the gift, after the donor's email, and a failed email never affects the donation.

@@ -35,3 +35,14 @@ export function ImageForm({ action, label }: { action: Action; label: string }) 
     </ActionForm>
   );
 }
+
+export function DonationEmailsForm({ action, on, email }: { action: Action; on: boolean; email: string | null }) {
+  return (
+    <ActionForm action={action} submitLabel="Save">
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="notify_donations" defaultChecked={on} className="mt-1" />
+        <span>Email me when a donation comes in{email ? <> (to {email})</> : null}. The email shows the amount only, never who gave.</span>
+      </label>
+    </ActionForm>
+  );
+}
