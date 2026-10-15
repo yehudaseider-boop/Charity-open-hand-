@@ -66,7 +66,7 @@ th { font-size: 9pt; color: ${colours.muted}; font-weight: 600; }
 .total td { font-weight: 600; border-top: 1px solid ${colours.blue}; border-bottom: 0; }
 .statement { margin-top: 7mm; }
 .foot { position: fixed; bottom: 0; left: 0; right: 0; font-size: 8.5pt; color: ${colours.muted}; }
-${args.draft ? ".draft { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 46pt; font-weight: 600; color: ${colours.danger}2E; transform: rotate(-24deg); }" : ""}
+${args.draft ? `.draft { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 46pt; font-weight: 600; color: ${colours.danger}2E; transform: rotate(-24deg); }` : ""}
 </style></head><body>
 ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
 <div class="brand">${args.logoHtml ?? `<span class="name">${esc(args.platformName)}</span>`}</div>

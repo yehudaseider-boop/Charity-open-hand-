@@ -118,6 +118,8 @@ describe("receipt contents", () => {
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("DRAFT, NOT A TAX RECEIPT");
+    // Every colour and value is filled in: no template placeholder is left in the page.
+    expect(html).not.toContain("${");
     expect(html).toContain('lang="he" dir="rtl"');
     expect(html).toContain("•••• 9085");
     expect(buildReceiptHtml({ details, reference: "LTC-2027-0001", platformName: "Givezy" })).not.toContain("DRAFT");
