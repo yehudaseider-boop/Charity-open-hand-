@@ -19,6 +19,8 @@ export function confirmationEmail(d: {
   monthly?: { kind: "first"; chargeDay: number; cardLast4: string | null } | { kind: "repeat" } | { kind: "not_started" };
   /** Where a donor manages their monthly donation on the website, when known. */
   manageUrl?: string;
+  /** "In memory of Chaim Cohen", if the donor dedicated the donation. */
+  dedication?: string | null;
 }) {
   const ref = donationReference(d.id);
   const lines = [
@@ -28,6 +30,7 @@ export function confirmationEmail(d: {
     ...(d.contributionCents > 0 ? [`Contribution to Givezy: ${formatRand(d.contributionCents)}`] : []),
     `Total paid: ${formatRand(d.totalCents)} on ${formatDate(d.paidAt)}`,
     `Reference: ${ref}`,
+    ...(d.dedication ? [d.dedication] : []),
     "",
     d.wants18a
       ? "This donation will be on your annual s18A receipt, which we send after the tax year closes at the end of February."

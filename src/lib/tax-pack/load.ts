@@ -1,5 +1,6 @@
 import "server-only";
 import { taxYearRange } from "@/lib/dates";
+import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { createClient } from "@/lib/supabase/server";
 import { buildTaxPack, type PackDonationRow, type PackReceiptRow, type TaxPack } from "./build";
 
@@ -9,6 +10,8 @@ type DonationRow = {
   amount_cents: number | string;
   wants_18a: boolean;
   recurring_id: string | null;
+  dedication_kind: string | null;
+  dedication_name: string | null;
   charities: { name_en: string } | { name_en: string }[] | null;
   donation_giving_kinds: { kind: string } | { kind: string }[] | null;
 };
@@ -34,7 +37,7 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
   for (let page = 0; ; page += 1000) {
     const { data, error } = await supabase
       .from("donations")
-      .select("id, paid_at, amount_cents, wants_18a, recurring_id, charities(name_en), donation_giving_kinds(kind)")
+      .select("id, paid_at, amount_cents, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_giving_kinds(kind)")
       .in("donor_id", donorIds)
       .eq("status", "paid")
       .gte("paid_at", from)
@@ -64,6 +67,10 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
       wants18a: r.wants_18a,
       monthly: r.recurring_id !== null,
       kind: one(r.donation_giving_kinds)?.kind ?? null,
+      dedication: (() => {
+        const d = dedicationFrom(r.dedication_kind, r.dedication_name);
+        return d ? dedicationLine(d) : null;
+      })(),
     }));
   const receiptRows: PackReceiptRow[] = ((receipts ?? []) as unknown as { amount_cents: number | string; issued_at: string; status: string; reference: string | null; charity_name: string | null }[]).map((r) => ({
     charityName: r.charity_name,

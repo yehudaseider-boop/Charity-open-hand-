@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidSaIdNumber } from "@/lib/sa-id";
+import { parseDedication } from "./dedication";
 
 const str = (max = 200) => z.string().max(max).optional();
 const yes = z.literal("on").optional();
@@ -26,6 +27,9 @@ export const checkoutSchema = z.object({
   city: str(80),
   postal_code: str(4),
   message: str(500),
+  /** Optional: given in honour of, or in memory of, someone (the name is checked in checkDonorDetails). */
+  dedication_kind: z.enum(["none", "honour", "memory"]).optional(),
+  dedication_name: str(200),
   giving_kind: z.enum(["maaser", "chomesh", "tzedaka"], { error: "Choose maaser, chomesh or general tzedaka" }),
   is_anonymous: yes,
   /** Give this amount every month until the donor cancels. */
@@ -61,6 +65,9 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
     }
     if (v.tax_reference && !/^\d{10}$/.test(v.tax_reference)) e.tax_reference = "Income tax numbers are 10 digits";
   }
+
+  const dedication = parseDedication(v.dedication_kind, v.dedication_name);
+  if (dedication && "error" in dedication) e.dedication_name = dedication.error;
 
   if (v.monthly === "on" && v.monthly_authorised !== "on") e.monthly_authorised = "Please confirm you authorise the monthly payments";
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";

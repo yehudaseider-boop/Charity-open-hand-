@@ -10,6 +10,7 @@ import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
 import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Thank you", referrer: "no-referrer" };
@@ -29,7 +30,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, donation_giving_kinds(kind), charities(name_en, slug)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, donation_giving_kinds(kind), charities(name_en, slug)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (await confirmationTokenMatches(ref, typeof t === "string" ? t : undefined)) {
@@ -58,6 +59,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           ) : null}
           <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
           <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>
+          {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
+            <div className="flex justify-between gap-3"><dt>Dedication</dt><dd className="text-right">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd></div>
+          ) : null}
         </dl>
         <p className="mt-3 text-sm text-muted">
           A confirmation is on its way to your email.{" "}

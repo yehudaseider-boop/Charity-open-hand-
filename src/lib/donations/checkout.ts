@@ -14,6 +14,7 @@ import { loadDonatableCharity } from "./charity";
 import { issueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
 import { checkDonorDetails, type CheckoutInput } from "./validation";
+import { parseDedication } from "./dedication";
 
 export type Quote = Pricing;
 
@@ -83,6 +84,9 @@ export async function startDonation(args: {
 
   const v = args.input;
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
+  // Already checked in checkDonorDetails, so here it is a dedication or none.
+  const parsedDedication = parseDedication(v.dedication_kind, v.dedication_name);
+  const dedication = parsedDedication && !("error" in parsedDedication) ? parsedDedication : null;
   const db = createAdminClient();
   const donorId = await findOrCreateDonor(v, want18a);
   // Signed in with this same (confirmed) email: the donation joins their account now,
@@ -116,6 +120,8 @@ export async function startDonation(args: {
       wants_18a: want18a,
       is_anonymous: v.is_anonymous === "on",
       message: v.message ?? null,
+      dedication_kind: dedication?.kind ?? null,
+      dedication_name: dedication?.name ?? null,
       gateway: gateway.name,
       charge_day: chargeDayOf(nowDate),
     });
@@ -139,6 +145,8 @@ export async function startDonation(args: {
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
+    dedication_kind: dedication?.kind ?? null,
+    dedication_name: dedication?.name ?? null,
     popia_consent_at: now,
     age_confirmed_at: now,
   });

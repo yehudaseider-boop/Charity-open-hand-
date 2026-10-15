@@ -69,7 +69,7 @@ export async function loadDonors(charityId: string): Promise<DonorRow[]> {
 }
 
 export const DONATION_FIELDS =
-  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
+  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
 
 export type DonationRow = {
   id: string;
@@ -84,6 +84,9 @@ export type DonationRow = {
   wants_18a: boolean;
   is_anonymous: boolean;
   message: string | null;
+  /** "honour" or "memory", with the name, if the donor dedicated the donation. */
+  dedication_kind: string | null;
+  dedication_name: string | null;
   donor_type: string | null;
   first_name: string | null;
   last_name: string | null;

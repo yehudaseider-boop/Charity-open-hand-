@@ -6,8 +6,9 @@ import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
 import { centsToPlain, toCsv } from "@/lib/csv";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
+import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 
-const HEADER = ["Date", "Reference", "Status", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "s18A receipt requested", "Anonymous publicly", "Message"];
+const HEADER = ["Date", "Reference", "Status", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "s18A receipt requested", "Anonymous publicly", "Dedication", "Message"];
 
 /** All of a charity's donations as a CSV, for their bookkeeper. Optional ?status=paid. */
 export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admin/[id]/export/donations">) {
@@ -44,6 +45,10 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       centsToPlain(d.amount_cents),
       d.wants_18a ? "Yes" : "No",
       d.is_anonymous ? "Yes" : "No",
+      (() => {
+        const ded = dedicationFrom(d.dedication_kind, d.dedication_name);
+        return ded ? dedicationLine(ded) : "";
+      })(),
       d.message,
     ]),
   );

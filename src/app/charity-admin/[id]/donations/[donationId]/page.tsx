@@ -11,6 +11,7 @@ import { formatDateTime } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { donationReference } from "@/lib/donations/reference";
 import { createClient } from "@/lib/supabase/server";
+import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 
 export const metadata: Metadata = { title: "Donation" };
 
@@ -74,6 +75,12 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {addressLine(d) ? <Row label="Address">{addressLine(d)}</Row> : null}
         </dl>
       </Card>
+
+      {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
+        <Card title="Dedication">
+          <p className="text-sm">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</p>
+        </Card>
+      ) : null}
 
       {d.message ? (
         <Card title="Message from the donor">

@@ -2,6 +2,7 @@ import "server-only";
 import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { confirmationEmail } from "./confirmation-email";
+import { dedicationFrom, dedicationLine } from "./dedication";
 
 /**
  * Called once, when a donation is confirmed paid (by the webhook or the
@@ -12,7 +13,7 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
   try {
     const { data: d, error } = await createAdminClient()
       .from("donations")
-      .select("id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, recurring_id, charities(name_en), donation_checkout_details(email)")
+      .select("id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_checkout_details(email)")
       .eq("id", donationId)
       .single();
     if (error) throw error;
@@ -44,6 +45,10 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
       totalCents: Number(d.total_charged_cents),
       paidAt: d.paid_at,
       wants18a: d.wants_18a,
+      dedication: (() => {
+        const ded = dedicationFrom(d.dedication_kind, d.dedication_name);
+        return ded ? dedicationLine(ded) : null;
+      })(),
     });
     await getEmailTransport().send({ to: email, ...m });
   } catch (e) {

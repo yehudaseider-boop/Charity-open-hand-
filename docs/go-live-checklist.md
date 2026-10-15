@@ -18,6 +18,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Pending-payment sweep.** Today a payment still pending after the gateway stops retrying needs a person to check unprocessed rows in `gateway_events`. Decide whether to add an automatic sweep. Decision.
 - [x] **Money model decided 13/10/2026: straight to the chosen charity** (Paystack split payments), not pooled. Givezy never holds a charity's donation, so the "holding funds" question and the "choice is only a suggestion" wording fall away. Still for Yosef: s18A in this model (the charity issues the certificate or Givezy issues on its behalf under the mandate, as built), and how Givezy's own contribution is treated.
 - [ ] **s18A loss rule**, **refunds and chargebacks**, and **what happens when a charity changes its name.** Decisions.
+- [ ] **Givezy's registered details:** the full registered company name and registration number go in `src/config/legal.ts` (both empty, so the Privacy Policy and Terms show a placeholder). Never guessed.
 - [ ] **Legal wording approved** by Yosef: Privacy Policy and Terms are drafts. Also the entity line, the fee sentence and the trademark question from the brand kit.
 - [ ] **Domain, registrar and hosting** chosen.
 - [ ] **App calendar choices:** Shabbos and Yom Tov end at sunset plus 72 minutes (confirm), whether "today" follows the phone's time zone or Johannesburg, and whether Elul shows "Shana tova" instead of "Good Shabbos".
@@ -26,7 +27,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 ## B. Before the switch (technical)
 
-- [ ] Run the database changes on the real database **first**, in order, up to and including `20261014000003_review_fixes.sql` (the last seven are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql`, `20261013000001_monthly_giving.sql`, `20261013000002_erase_donor.sql`, `20261014000001_account_deletion_unblocked.sql`, `20261014000002_resume_waits_for_charge_day.sql` and this one). The Givezy test project (`bodfyjskiwrwxhagtkxt`) needs `20261014000003_review_fixes.sql` too. Then deploy the website code. Doing it the other way round makes new donations fail.
+- [ ] Run the database changes on the real database **first**, in order, up to and including `20261015000001_dedications.sql` (new 15/10/2026: dedication columns, the charity view and the erasure function; it must run before the website code that writes dedications). Before that, up to `20261014000003_review_fixes.sql` (the last seven are `20261011000001_confirmation_credentials.sql`, `20261012000001_bank_edit_clears_verified.sql`, `20261013000001_monthly_giving.sql`, `20261013000002_erase_donor.sql`, `20261014000001_account_deletion_unblocked.sql`, `20261014000002_resume_waits_for_charge_day.sql` and this one). The Givezy test project (`bodfyjskiwrwxhagtkxt`) needs `20261014000003_review_fixes.sql` and `20261015000001_dedications.sql` too. Then deploy the website code. Doing it the other way round makes new donations fail.
 - [ ] Back up the real database before running them. Write down how to undo (restore the backup).
 - [ ] Live settings in place and checked: site address, encryption key, database keys, email sending, gateway keys. None of the test values.
 - [ ] **Phone app error screens:** each tab shows the error's own words under "Try again" (added 14/10/2026 to diagnose the Giving page going blank in Expo Go). Decide before the store release whether donors should see that text or only the friendly message.
@@ -50,6 +51,6 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 ## D. Later ideas (not for go-live)
 
-HTML version of the confirmation email, yahrzeit giving, a tax pack, dedications, real charity photos from the charities.
+HTML version of the confirmation email, yahrzeit giving, real charity photos from the charities. (Tax pack and dedications were built on 15/10/2026.)
 
 - [ ] Donor-covers-the-fee option: needs Paystack's rate sheet (percentage, fixed amount, VAT included or not) and Yehuda's answer on how the receipt shows it. Fee payer itself is decided: the charity.

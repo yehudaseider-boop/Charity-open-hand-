@@ -43,6 +43,8 @@ export default function Give() {
   const [want18a, setWant18a] = useState(false);
   const [idNumber, setIdNumber] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const [dedicate, setDedicate] = useState<"honour" | "memory" | null>(null);
+  const [dedicationName, setDedicationName] = useState("");
   const [monthly, setMonthly] = useState(false);
   const [authorised, setAuthorised] = useState(false);
   const [age, setAge] = useState(false);
@@ -83,6 +85,8 @@ export default function Give() {
     id_number: s18aAvailable && want18a ? idNumber.trim() || undefined : undefined,
     giving_kind: kind ?? "tzedaka",
     is_anonymous: anonymous,
+    dedication_kind: dedicate ?? undefined,
+    dedication_name: dedicate ? dedicationName.trim() : undefined,
     monthly,
     monthly_authorised: monthly && authorised,
     age_confirmed: age,
@@ -177,6 +181,9 @@ export default function Give() {
                 {quote.contributionCents > 0 ? <Row label="To Givezy" value={rand(quote.contributionCents)} /> : null}
                 <Row label={monthly ? "You pay today, then every month" : "You pay"} value={rand(quote.totalCents)} strong />
               </View>
+              {dedicate && dedicationName.trim() ? (
+                <Text variant="bodyMuted">{dedicate === "honour" ? "In honour of" : "In memory of"} {dedicationName.trim()}</Text>
+              ) : null}
               {monthly ? (
                 <>
                   <Text variant="bodyMuted">
@@ -235,6 +242,24 @@ export default function Give() {
                 </>
               ) : null}
               <SwitchRow label="Give anonymously" description="The charity won't see your name." value={anonymous} onChange={setAnonymous} />
+
+              {/* Optional: in honour of, or in memory of, someone. */}
+              <SwitchRow label="Dedicate this donation" description="In honour of, or in memory of, someone. The charity sees the name; it is not on your s18A receipt." value={dedicate !== null} onChange={(v) => setDedicate(v ? "memory" : null)} />
+              {dedicate ? (
+                <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="Dedication">
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {(["honour", "memory"] as const).map((k) => {
+                      const on = dedicate === k;
+                      return (
+                        <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.choice, { flex: 1 }, on && styles.choiceOn]}>
+                          <Text style={{ fontSize: 17, color: on ? colors.blue : colors.ink }}>{k === "honour" ? "In honour of" : "In memory of"}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Field label="Their name" value={dedicationName} onChangeText={setDedicationName} autoCapitalize="words" maxLength={80} error={err("dedication_name")} />
+                </View>
+              ) : null}
 
               <CheckRow label="I am 18 or older." value={age} onChange={setAge} error={err("age_confirmed")} />
               <CheckRow label="I agree to the Terms and Privacy Policy, and that Givezy records this donation." value={consent} onChange={setConsent} error={err("popia_consent")} />

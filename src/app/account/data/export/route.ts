@@ -36,7 +36,7 @@ export async function GET() {
   const donations = donorIds.length
     ? await supabase
         .from("donations")
-        .select("id, created_at, paid_at, status, amount_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, tax_year, charities(name_en)")
+        .select("id, created_at, paid_at, status, amount_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, dedication_kind, dedication_name, tax_year, charities(name_en)")
         .in("donor_id", donorIds)
         .order("created_at")
     : { data: [] };

@@ -554,3 +554,20 @@ Yehuda wants giving to be the first thing the app offers. A big round Give butto
 - Two sessions were publishing the phone app to the same Expo preview channel from different branches, so each publish wiped the other's work. From now on `milestone-1-foundation` is the app's branch: build on it and publish only from it.
 - Combined on 15/10/2026 (Give button and charity picker, plus the header curve, inset photos and Try again screens, plus the new Receipts and Account) and published as update group 4931e23a-9078-45d6-9ac7-2cb9517ccaa3.
 - Receipts: a "tax year so far" card (this tax year's paid s18A gifts) and each issued receipt as a slip with Download and Share. Account: initials, name and email, Giving and Receipts as tiles, then settings.
+
+## Website renamed to Givezy, with the Givezy look (15/10/2026)
+
+- The company is Givezy (Yehuda, 15/10/2026). The website, payment page, emails, receipts, monthly authorisation, Privacy Policy and Terms say Givezy. The registered company name and number are still empty in `src/config/legal.ts` until Yehuda supplies them.
+- The website, receipt PDFs and the receipt email take the app's look: cream, navy text, Givezy blue for headlines, buttons and links, orange accent, lilac highlights, Fredoka headlines, Heebo for Hebrew, the Givezy logo and icon. Receipts and emails read colours from `src/lib/brand-colors.ts` (they cannot use CSS variables).
+- Kept on purpose: the app's return link `nedivlev://`, its storage keys `nediv-lev.*`, test account emails, internal identifiers (`nediv_lev` fee bearer value, package names, local database name) and old database history files.
+
+## Annual tax pack (15/10/2026)
+
+- `/account/tax-pack/[year]`: every paid donation in the tax year (1 March to the end of February, Johannesburg time), split into s18A and other, by charity, maaser/chomesh/tzedaka totals (private to the donor), and the s18A receipts issued. Donations only, not contributions to Givezy. Clearly marked as a summary, not a tax receipt.
+- "Save as PDF" uses the browser's print dialog instead of making PDFs on the server, so it works on any hosting; a spreadsheet (CSV) download sits beside it. Linked from the website account page and the app's Receipts tab.
+
+## Dedications (15/10/2026, approved by Yehuda)
+
+- A donor may give "in honour of" or "in memory of" someone (name up to 80 characters). The note to the charity is the donation's existing message. Stored on the donation (and on a monthly donation, copied to each month).
+- Seen by the donor (thank-you page, confirmation email, tax pack, data download) and the charity (donation page and export). Never on the s18A receipt. Wiped with the donor's other information when they ask for erasure.
+- Database change `20261015000001_dedications.sql`, not yet run on any database (the sandbox cannot reach one; see the go-live checklist).

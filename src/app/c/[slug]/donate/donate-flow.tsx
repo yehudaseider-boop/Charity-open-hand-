@@ -243,6 +243,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
         </fieldset>
 
+        <Dedicate error={state.fieldErrors?.dedication_name} />
+
         <TextArea name="message" label={`Message to ${charityName}`} rows={3} />
 
         <div className="space-y-2 rounded-control bg-bg p-3">
@@ -290,3 +292,31 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
     </FormStateProvider>
   );
 }
+
+/**
+ * Optional: give in honour of, or in memory of, someone. The charity sees it on the donation;
+ * it is never on the s18A receipt. A note about the person goes in the message below.
+ */
+function Dedicate({ error }: { error?: string }) {
+  const [kind, setKind] = useState<"none" | "honour" | "memory">("none");
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">Dedicate this donation <span className="font-normal text-muted">(optional)</span></legend>
+      <div className="flex flex-wrap gap-2">
+        {([["none", "No"], ["honour", "In honour of"], ["memory", "In memory of"]] as const).map(([value, label]) => (
+          <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
+            <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} />
+            {label}
+          </label>
+        ))}
+      </div>
+      {kind !== "none" ? (
+        <TextField name="dedication_name" label="Their name" required hint={`${charityLabel(kind)} The charity sees this name; it is not on your s18A receipt.`} />
+      ) : null}
+      {error && kind === "none" ? <p className="text-xs text-danger">{error}</p> : null}
+    </fieldset>
+  );
+}
+
+const charityLabel = (kind: "honour" | "memory") => (kind === "honour" ? "Shown as \u201cIn honour of\u201d this person." : "Shown as \u201cIn memory of\u201d this person.");
+
