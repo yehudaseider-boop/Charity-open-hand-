@@ -17,6 +17,8 @@ export const legalConfig = {
   informationOfficer: { name: null as string | null, email: null as string | null },
   /** Where people send privacy requests and complaints. */
   privacyEmail: null as string | null,
+  /** Where charities ask for help (a lost authenticator, a change to their details). Not chosen yet. */
+  supportEmail: null as string | null,
 
   /** Version of the Terms and Privacy Policy (set in src/lib/policy.ts, shared with the app). */
   policyVersion: POLICY_VERSION,

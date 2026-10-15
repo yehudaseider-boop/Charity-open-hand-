@@ -44,3 +44,13 @@ export function Section({ title, children }: { title: string; children: React.Re
     </section>
   );
 }
+
+/** How a charity reaches us: the support address once there is one, until then a reply to our emails. */
+export function SupportContact() {
+  const email = legalConfig.supportEmail;
+  return email ? (
+    <a href={`mailto:${email}`} className="text-brand underline">{email}</a>
+  ) : (
+    <>reply to any email we&apos;ve sent you</>
+  );
+}

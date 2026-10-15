@@ -19,6 +19,7 @@ import {
   type DocumentType,
 } from "@/lib/charity/validation";
 import { encrypt, last4 } from "@/lib/crypto";
+import { isoDateInJhb } from "@/lib/dates";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isRealDocument } from "@/lib/charity/file-check";
@@ -172,7 +173,7 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
     if (!signedOn || !/^\d{4}-\d{2}-\d{2}$/.test(signedOn)) {
       return { ok: false, fieldErrors: { signed_on: "Enter the date the mandate was signed" } };
     }
-    if (signedOn > new Date().toISOString().slice(0, 10)) {
+    if (signedOn > isoDateInJhb()) {
       return { ok: false, fieldErrors: { signed_on: "The signing date can't be in the future" } };
     }
   }

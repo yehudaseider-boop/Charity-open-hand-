@@ -30,6 +30,8 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 - [ ] **Charity sign-up wording (Yehuda):** approve the draft emails in `src/lib/charity/emails.ts` (application received, approved with next steps, sent back, invitation) and the "For charities" page (`src/app/for-charities/page.tsx`). The received email promises review in "a few working days": confirm that is realistic, or change it.
 - [ ] **ADMIN_NOTIFY_EMAIL** set on the live site to the address that should hear about new charity applications.
+- [ ] **Support email for charities** (Yehuda to choose): set `supportEmail` in `src/config/legal.ts`. Until then the paused-charity notice and the lost-phone help on the second-step page say "reply to any email we've sent you". Replies to our emails also need to reach someone: check the sending address has a real inbox.
+- [ ] **Lost authenticator resets:** agree who may reset a charity admin's second step and how they check it is really them (a call to a number already on file). Each reset is logged with that note and the person is emailed.
 - [ ] **Charity invitations and POPIA:** the invitations table keeps the invited contact's email. Decide how long to keep unused, expired invitations (suggest: delete 90 days after they expire) and add it to the Privacy Policy.
 
 ## B. Before the switch (technical)

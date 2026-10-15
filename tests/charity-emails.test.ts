@@ -43,3 +43,31 @@ describe("donation received email to the charity", () => {
     expect(donationReceivedEmail("c@x.co", { charityName: "M", charityId: "i", amountCents: 18_000, monthly: true, campaignTitle: null }, base).text).toMatch(/a monthly donation of R180/);
   });
 });
+
+import { adminRemovedEmail, connectedEmail, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, suspendedEmail } from "@/lib/charity/emails";
+
+describe("emails after approval", () => {
+  const later = [
+    suspendedEmail("c@x.co", "Meals Fund", "id-1", "Your bank letter has expired.", base),
+    reinstatedEmail("c@x.co", "Meals Fund", "id-1", base),
+    connectedEmail("c@x.co", "Meals Fund", "id-1", base),
+    receiptsReadyEmail("c@x.co", "Meals Fund", "id-1", base),
+  ];
+  it("name the charity, link to its dashboard, and follow the house style", () => {
+    for (const m of later) {
+      expect(m.subject).toContain("Meals Fund");
+      expect(m.text).toContain(`${base}/charity-admin/id-1`);
+      expect(m.text + m.subject).not.toMatch(/!|—/);
+    }
+  });
+  it("a suspension gives the reason and what it means for donors", () => {
+    expect(later[0].text).toContain("Your bank letter has expired.");
+    expect(later[0].text).toMatch(/donors can't give to you/);
+  });
+  it("tell people about changes to their own access", () => {
+    for (const m of [adminRemovedEmail("p@x.co", "Meals Fund"), secondStepResetEmail("p@x.co")]) {
+      expect(m.text).toMatch(/reply to this email/);
+      expect(m.text + m.subject).not.toMatch(/!|—/);
+    }
+  });
+});

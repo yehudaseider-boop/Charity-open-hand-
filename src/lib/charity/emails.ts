@@ -56,6 +56,86 @@ export function approvedEmail(to: string, charityName: string, charityId: string
   };
 }
 
+export function suspendedEmail(to: string, charityName: string, charityId: string, reason: string, base = site()): EmailMessage {
+  return {
+    to,
+    subject: `${charityName} is paused on Givezy`,
+    text: [
+      `We have paused ${charityName} on Givezy. While it is paused, your page is hidden and donors can't give to you. Monthly donations to you are not collected.`,
+      "",
+      "The reason:",
+      reason,
+      "",
+      `Your dashboard still works, and your past donations and receipts are kept: ${base}/charity-admin/${charityId}`,
+      "",
+      "To sort this out, reply to this email.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
+export function reinstatedEmail(to: string, charityName: string, charityId: string, base = site()): EmailMessage {
+  return {
+    to,
+    subject: `${charityName} is back on Givezy`,
+    text: [`${charityName} is listed on Givezy again, and donors can give to you.`, "", `Your dashboard: ${base}/charity-admin/${charityId}`, ...sign].join("\n"),
+  };
+}
+
+export function connectedEmail(to: string, charityName: string, charityId: string, base = site()): EmailMessage {
+  return {
+    to,
+    subject: `${charityName} can take online donations now`,
+    text: [
+      `Your bank account is connected to our payment provider, so ${charityName} can take online donations on Givezy from today.`,
+      "",
+      "Each donation goes straight to your bank account. The payment provider's card fee comes off each donation before it reaches you.",
+      "",
+      `Share your page, or print your QR poster: ${base}/charity-admin/${charityId}/poster`,
+      ...sign,
+    ].join("\n"),
+  };
+}
+
+export function receiptsReadyEmail(to: string, charityName: string, charityId: string, base = site()): EmailMessage {
+  return {
+    to,
+    subject: `s18A receipts are set up for ${charityName}`,
+    text: [
+      `We've confirmed your s18A approval and receipting mandate. From now on, donors to ${charityName} can ask for an s18A receipt, issued by Givezy in your name under your mandate.`,
+      "",
+      `See your receipts: ${base}/charity-admin/${charityId}/receipts`,
+      ...sign,
+    ].join("\n"),
+  };
+}
+
+export function adminRemovedEmail(to: string, charityName: string): EmailMessage {
+  return {
+    to,
+    subject: `You no longer manage ${charityName} on Givezy`,
+    text: [
+      `Your access to manage ${charityName} on Givezy has been removed. You can still sign in to Givezy as a donor.`,
+      "",
+      "If you think this is a mistake, reply to this email.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
+export function secondStepResetEmail(to: string): EmailMessage {
+  return {
+    to,
+    subject: "Your Givezy second step was reset",
+    text: [
+      "At your request, we removed the authenticator app linked to your Givezy account. Next time you sign in to manage a charity, you'll be asked to set up a new one.",
+      "",
+      "If you did not ask for this, reply to this email straight away.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
 export function sentBackEmail(to: string, charityName: string, charityId: string, reason: string, base = site()): EmailMessage {
   return {
     to,

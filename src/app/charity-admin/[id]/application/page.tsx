@@ -43,6 +43,12 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
         <div className="mt-2"><Badge tone={status.tone}>{status.label}</Badge></div>
       </div>
 
+      {charity.status === "suspended" ? (
+        <Notice tone="danger">
+          <p className="font-medium">Your page is paused, so donors can&apos;t give to you right now.</p>
+          {charity.rejection_reason ? <p className="mt-1 whitespace-pre-line">The reason: {charity.rejection_reason}</p> : null}
+        </Notice>
+      ) : null}
       {charity.status === "rejected" && charity.rejection_reason ? (
         <Notice tone="danger">
           <p className="font-medium">Please update your application:</p>

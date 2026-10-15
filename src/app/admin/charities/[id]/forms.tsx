@@ -68,3 +68,13 @@ export function ChangeBankForm({ action, current }: { action: Action; current: {
     </ActionForm>
   );
 }
+
+export function ReceiptsForm({ action, reference, s18aDone, mandateDone }: { action: Action; reference: string | null; s18aDone: boolean; mandateDone: boolean }) {
+  return (
+    <ActionForm action={action} submitLabel="Save" confirm="Save these s18A details? Receipts start once both are confirmed.">
+      <TextField name="s18a_reference" label="s18A reference number" required defaultValue={reference ?? ""} hint="From the SARS approval letter." />
+      {s18aDone ? null : <Check name="confirm_s18a">I have confirmed the s18A approval with the SARS letter uploaded below.</Check>}
+      {mandateDone ? null : <Check name="confirm_mandate">The receipting mandate uploaded below is properly signed.</Check>}
+    </ActionForm>
+  );
+}

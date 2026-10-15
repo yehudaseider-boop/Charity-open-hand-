@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
-import { approvedEmail, notifyCharity, sentBackEmail } from "@/lib/charity/emails";
+import { adminRemovedEmail, approvedEmail, connectedEmail, notifyCharity, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, sentBackEmail, suspendedEmail } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { decrypt, encrypt, last4 } from "@/lib/crypto";
-import { bankSchema } from "@/lib/charity/validation";
-import { formatDate } from "@/lib/dates";
+import { bankSchema, DOCUMENT_MIME, documentTypes, MAX_UPLOAD_BYTES, type DocumentType } from "@/lib/charity/validation";
+import { isRealDocument } from "@/lib/charity/file-check";
+import { formatDate, isoDateInJhb } from "@/lib/dates";
 import { getEmailTransport } from "@/lib/email";
 import { formToObject, zodErrors } from "@/lib/form";
 import { getGateway, GatewayError } from "@/lib/gateway";
@@ -76,6 +77,9 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
   const { data, error } = await createAdminClient().from("charities").update(update).eq("id", id).eq("status", "pending_review").select("id");
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
+  // The admin has just checked the bank confirmation letter (part of vetting).
+  const bank = await createAdminClient().from("charity_private").update({ bank_verified_at: now }).eq("charity_id", id);
+  if (bank.error) console.error("[admin] bank verified date not saved", bank.error);
   await logAudit({
     actorUserId: admin.userId,
     action: "charity.approved",
@@ -116,7 +120,7 @@ export async function rejectCharity(id: string, _prev: FormState, formData: Form
 
 export async function suspendCharity(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requirePlatformAdmin();
-  const { charity } = await loadCharityForManager(id);
+  const { charity, priv } = await loadCharityForManager(id);
   if (charity.status !== "approved") return { ok: false, message: "Only approved charities can be suspended." };
   const reason = reasonFrom(formData);
   if (!reason) return { ok: false, fieldErrors: { reason: "Give a reason for the record" } };
@@ -130,13 +134,14 @@ export async function suspendCharity(id: string, _prev: FormState, formData: For
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.suspended", entityType: "charity", entityId: id, details: { reason } });
+  if (priv?.contact_email) await notifyCharity(suspendedEmail(priv.contact_email, charity.name_en, id, reason));
   refresh(id, charity.slug);
-  return { ok: true, message: "Suspended. The charity is hidden and can't receive donations." };
+  return { ok: true, message: `Suspended. The charity is hidden and can't receive donations.${priv?.contact_email ? " Its contact has been emailed the reason." : ""}` };
 }
 
 export async function reinstateCharity(id: string, _prev: FormState): Promise<FormState> {
   const admin = await requirePlatformAdmin();
-  const { charity } = await loadCharityForManager(id);
+  const { charity, priv } = await loadCharityForManager(id);
   if (charity.status !== "suspended") return { ok: false, message: "Only suspended charities can be reinstated." };
   const { data, error } = await createAdminClient()
     .from("charities")
@@ -147,6 +152,7 @@ export async function reinstateCharity(id: string, _prev: FormState): Promise<Fo
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.reinstated", entityType: "charity", entityId: id });
+  if (priv?.contact_email) await notifyCharity(reinstatedEmail(priv.contact_email, charity.name_en, id));
   refresh(id, charity.slug);
   return { ok: true, message: "Reinstated." };
 }
@@ -211,7 +217,7 @@ export async function addCharityAdmin(id: string, _prev: FormState, formData: Fo
 
 export async function connectToGateway(id: string, _prev: FormState): Promise<FormState> {
   const admin = await requirePlatformAdmin();
-  const { charity } = await loadCharityForManager(id);
+  const { charity, priv: contact } = await loadCharityForManager(id);
   if (charity.status !== "approved") return { ok: false, message: "Approve the charity first." };
 
   const db = createAdminClient();
@@ -250,8 +256,9 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
     if (e instanceof GatewayError) return { ok: false, message: e.message };
     throw e;
   }
+  if (contact?.contact_email) await notifyCharity(connectedEmail(contact.contact_email, charity.name_en, id));
   refresh(id, charity.slug);
-  return { ok: true, message: "Connected. The charity can now take donations." };
+  return { ok: true, message: "Connected. The charity can now take donations, and its contact has been emailed." };
 }
 
 /**
@@ -328,4 +335,136 @@ export async function changeBankDetails(id: string, _prev: FormState, formData: 
       ? "Saved and marked verified. The charity is off the payment gateway until you connect it again with the new account."
       : "Saved and marked verified.",
   };
+}
+
+/**
+ * Take away someone's access to a charity (a volunteer who left, a lost account). Their sign-in
+ * stays, as a donor; the charity's pages, exports and donor details close to them at once.
+ */
+export async function removeCharityAdmin(id: string, userId: string, _prev: FormState): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isUuid(id) || !isUuid(userId)) return { ok: false, message: "Unknown admin." };
+  const db = createAdminClient();
+  const { data: charity } = await db.from("charities").select("name_en").eq("id", id).maybeSingle();
+  const { data: profile } = await db.from("profiles").select("email").eq("id", userId).maybeSingle();
+  const { data, error } = await db.from("charity_admins").delete().eq("charity_id", id).eq("user_id", userId).select("user_id");
+  if (error) return failed(error);
+  if (!data?.length) return { ok: false, message: "That person no longer manages this charity." };
+  await logAudit({ actorUserId: admin.userId, action: "charity.admin_removed", entityType: "charity", entityId: id, details: { email: profile?.email ?? null } });
+  if (profile?.email && charity) await notifyCharity(adminRemovedEmail(profile.email as string, charity.name_en));
+  refresh(id);
+  return { ok: true, message: `${profile?.email ?? "That person"} can no longer manage this charity.` };
+}
+
+/**
+ * Someone lost the phone with their authenticator app. After checking who they are (a call to a
+ * number we already have, not one they give now), remove it so they can set up a new one. The
+ * person is emailed, so the real owner hears about it if it wasn't them.
+ */
+export async function resetSecondStep(id: string, userId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isUuid(id) || !isUuid(userId)) return { ok: false, message: "Unknown admin." };
+  const how = String(formData.get("reason") ?? "").trim();
+  if (how.length < 5) return { ok: false, fieldErrors: { reason: "Say how you checked it was really them" } };
+  if (userId === admin.userId) return { ok: false, message: "You can't reset your own second step here. Ask another platform admin." };
+  const db = createAdminClient();
+  const member = await db.from("charity_admins").select("user_id").eq("charity_id", id).eq("user_id", userId).maybeSingle();
+  if (!member.data) return { ok: false, message: "That person doesn't manage this charity." };
+  const factors = await db.auth.admin.mfa.listFactors({ userId });
+  if (factors.error) return failed(factors.error);
+  const list = factors.data.factors ?? [];
+  if (!list.length) return { ok: false, message: "They have no authenticator set up, so there is nothing to reset." };
+  for (const f of list) {
+    const del = await db.auth.admin.mfa.deleteFactor({ userId, id: f.id });
+    if (del.error) return failed(del.error);
+  }
+  const { data: profile } = await db.from("profiles").select("email").eq("id", userId).maybeSingle();
+  await logAudit({ actorUserId: admin.userId, action: "charity.admin_second_step_reset", entityType: "charity", entityId: id, details: { email: profile?.email ?? null, checked: how.slice(0, 500) } });
+  if (profile?.email) await notifyCharity(secondStepResetEmail(profile.email as string));
+  refresh(id);
+  return { ok: true, message: "Reset. They'll set up a new authenticator app next time they sign in, and they've been emailed." };
+}
+
+/**
+ * Add a document for the charity after it has applied (it can't, by design): a new SARS s18A
+ * letter or a signed receipting mandate it emailed us. Kept with the others as the record.
+ */
+export async function adminUploadDocument(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isUuid(id)) return { ok: false, message: "Unknown charity." };
+  const type = String(formData.get("document_type") ?? "") as DocumentType;
+  const file = formData.get("file");
+  const signedOn = String(formData.get("signed_on") ?? "").trim() || null;
+  if (!(type in documentTypes)) return { ok: false, fieldErrors: { document_type: "Choose a document type" } };
+  if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose a file" } };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Files must be 5 MB or smaller" } };
+  if (!(DOCUMENT_MIME as readonly string[]).includes(file.type) || !(await isRealDocument(file))) {
+    return { ok: false, fieldErrors: { file: "Upload a PDF, JPG or PNG" } };
+  }
+  if (type === "receipting_mandate") {
+    if (!signedOn || !/^\d{4}-\d{2}-\d{2}$/.test(signedOn)) return { ok: false, fieldErrors: { signed_on: "Enter the date the mandate was signed" } };
+    if (signedOn > isoDateInJhb()) return { ok: false, fieldErrors: { signed_on: "The signing date can't be in the future" } };
+  }
+  const db = createAdminClient();
+  const ext = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" }[file.type];
+  const path = `${id}/${type}-${crypto.randomUUID()}.${ext}`;
+  const upload = await db.storage.from("charity-documents").upload(path, file, { contentType: file.type, upsert: false });
+  if (upload.error) return failed(upload.error);
+  const { error } = await db.from("charity_documents").insert({
+    charity_id: id,
+    document_type: type,
+    storage_path: path,
+    file_name: file.name.slice(0, 200),
+    signed_on: type === "receipting_mandate" ? signedOn : null,
+    uploaded_by: admin.userId,
+  });
+  if (error) {
+    await db.storage.from("charity-documents").remove([path]);
+    return failed(error);
+  }
+  await logAudit({ actorUserId: admin.userId, action: "charity.document_added", entityType: "charity", entityId: id, details: { document_type: type } });
+  refresh(id);
+  return { ok: true, message: "Uploaded." };
+}
+
+/**
+ * Set up s18A receipts for a charity that was approved without them (it got SARS approval later,
+ * or the boxes weren't ticked at approval). Same checks as at approval.
+ */
+export async function setUpReceipts(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  const { charity, priv, documents } = await loadCharityForManager(id);
+  if (charity.status !== "approved" && charity.status !== "suspended") return { ok: false, message: "Use the approval form for applications." };
+  const reference = String(formData.get("s18a_reference") ?? "").trim().slice(0, 60);
+  if (!reference) return { ok: false, fieldErrors: { s18a_reference: "Enter the s18A reference number from the SARS letter" } };
+  const confirmS18a = formData.get("confirm_s18a") === "on";
+  const confirmMandate = formData.get("confirm_mandate") === "on";
+  if (!confirmS18a && !confirmMandate) return { ok: false, message: "Tick what you have confirmed." };
+
+  const now = new Date().toISOString();
+  const update: Record<string, unknown> = { s18a_reference: reference };
+  if (confirmS18a) {
+    if (!documents.some((d) => d.document_type === "s18a_approval")) return { ok: false, message: "Upload the SARS s18A approval letter first." };
+    update.is_s18a = true;
+    update.s18a_confirmed_at = now;
+  }
+  if (confirmMandate) {
+    const mandate = documents.filter((d) => d.document_type === "receipting_mandate").at(-1);
+    if (!mandate?.signed_on) return { ok: false, message: "Upload the signed mandate, with its signing date, first." };
+    update.mandate_signed_at = saMidnight(mandate.signed_on);
+    update.mandate_document_path = mandate.storage_path;
+  }
+  const { error } = await createAdminClient().from("charities").update(update).eq("id", id);
+  if (error) return failed(error);
+  await logAudit({
+    actorUserId: admin.userId,
+    action: "charity.receipts_set_up",
+    entityType: "charity",
+    entityId: id,
+    details: { s18a_reference: reference, s18a_confirmed: confirmS18a, mandate_confirmed: confirmMandate },
+  });
+  const ready = (confirmS18a || charity.is_s18a) && (confirmMandate || Boolean(charity.mandate_signed_at));
+  if (ready && priv?.contact_email) await notifyCharity(receiptsReadyEmail(priv.contact_email, charity.name_en, id));
+  refresh(id, charity.slug);
+  return { ok: true, message: ready ? "s18A receipts are set up, and the charity has been emailed." : "Saved. Receipts start once both the s18A approval and the mandate are confirmed." };
 }

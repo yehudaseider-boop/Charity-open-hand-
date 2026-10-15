@@ -649,3 +649,16 @@ Each approved charity has a printable A4 poster under its dashboard (QR poster):
 ## Donation emails to charities (16/10/2026)
 
 Until now only the donor got an email when a gift was paid. Now the charity's contact email also gets one: "Meals Fund received R180 on Givezy", saying whether it was monthly and which campaign it was for, with links to the Donations page and to switch these emails off. It shows the gift only: never the donor's name, email or the contribution to Givezy, so a forwarded email or a shared inbox leaks nothing about who gave. The charity sees donor details on its dashboard as before. On by default; the switch is on the charity's Profile page ("Emails"), saved in `charity_private.notify_donations`. It is sent only after the payment provider confirms the gift, after the donor's email, and a failed email never affects the donation.
+
+## Platform admin controls after approval (16/10/2026)
+
+From the charity-side review. On Admin, Charities, each charity:
+
+- **Remove access** for a charity admin (a volunteer who left). Their sign-in stays, as a donor; the charity's donors, donations and exports close to them at once. Logged, and they are emailed.
+- **Reset second step** when someone loses the phone with their authenticator app. The admin first checks it is really them (a call to a number we already have), writes how in a note that is logged, and the person is emailed. An admin can't reset their own.
+- **Set up s18A receipts later**, for a charity approved without them: add the SARS letter and signed mandate it sent us under Documents (the charity can't add documents once it has applied), enter the reference, and confirm, with the same checks as at approval. The charity is emailed when receipts are set up.
+- **Paused charities are told:** suspending emails the contact the reason; their dashboard says the page is paused, what that means (hidden, no donations, monthly gifts not collected, history kept) and how to reach us. Reinstating emails them too.
+- **Approval marks the bank details verified** (the admin checks the bank letter as part of vetting), and **connecting to the payment provider emails the charity** that it can take donations, as the approval email promises.
+- The charity's mandate signing date is checked against today in Johannesburg, not UTC.
+
+No support email address exists yet: `supportEmail` in `src/config/legal.ts` is empty until Yehuda chooses one (go-live checklist).

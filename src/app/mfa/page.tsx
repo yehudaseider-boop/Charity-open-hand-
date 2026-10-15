@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { SupportContact } from "@/components/legal";
 import { safeNextPath } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 import { CodeField, Enrol } from "./enrol";
@@ -36,6 +37,11 @@ export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
         ) : (
           <Enrol next={next} />
         )}
+        {verified ? (
+          <p className="mt-4 text-xs text-muted">
+            Lost your phone or changed it? We can reset this for you once we&apos;ve checked it&apos;s you: <SupportContact />.
+          </p>
+        ) : null}
       </div>
     </div>
   );

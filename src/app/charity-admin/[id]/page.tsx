@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SupportContact } from "@/components/legal";
 import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
@@ -33,6 +34,24 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const { charity } = await loadCharityForManager(id);
   const base = `/charity-admin/${id}`;
 
+  if (charity.status === "suspended") {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold">{charity.name_en}</h1>
+        <Notice tone="danger">
+          <p className="font-medium">Your page is paused</p>
+          <p className="mt-1">While it is paused, your page is hidden and donors can&apos;t give to you. Monthly donations aren&apos;t collected. Your past donations and receipts are kept.</p>
+          {charity.rejection_reason ? <p className="mt-2 whitespace-pre-line">The reason: {charity.rejection_reason}</p> : null}
+          <p className="mt-2">To sort this out, <SupportContact />.</p>
+        </Notice>
+        <p className="text-sm">
+          <Link href={`${base}/donations`} className="text-brand underline">Your donations</Link>
+          {" · "}
+          <Link href={`${base}/receipts`} className="text-brand underline">Receipts</Link>
+        </p>
+      </div>
+    );
+  }
   if (charity.status !== "approved") {
     return (
       <div className="space-y-4">
