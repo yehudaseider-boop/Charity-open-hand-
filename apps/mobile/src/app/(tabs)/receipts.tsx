@@ -137,6 +137,25 @@ export default function Receipts() {
             })
           )}
 
+          {/* The tax pack lives on the website (signed in there), as a page to save as a PDF or a spreadsheet. */}
+          {preview || signedIn ? (
+            <View style={styles.pack}>
+              <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 17 }}>Tax pack</Text>
+              <Text variant="bodyMuted" style={{ fontSize: 16 }}>Every donation in a tax year, what goes on s18A receipts, and the totals. Opens on our website.</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
+                {[current, current - 1].map((y) => (
+                  <Button
+                    key={y}
+                    variant="secondary"
+                    label={y === current ? `${y} so far` : `Tax year ${y}`}
+                    style={{ paddingHorizontal: 18 }}
+                    onPress={() => (preview ? notify("Sample tax pack", "In the live app this opens your tax pack on our website.") : openSite(`/account/tax-pack/${y}`))}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           {no18a.length ? (
             <View style={styles.infoRow}>
               <InfoIcon />
@@ -157,6 +176,7 @@ const styles = StyleSheet.create({
   arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
   summary: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   summaryKicker: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
+  pack: { gap: 4, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
   summaryBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.ink },
   infoRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
 });
