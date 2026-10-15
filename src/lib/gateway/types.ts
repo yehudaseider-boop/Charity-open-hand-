@@ -115,10 +115,21 @@ export interface PaymentGateway {
 export class GatewayError extends Error {
   /** True when the gateway says it has no record of the reference (it never received the payment). */
   readonly notFound: boolean;
-  constructor(message: string, opts: { notFound?: boolean } = {}) {
+  /**
+   * True when the gateway answered and turned the request down (for example a card authorisation it
+   * will no longer charge). False for "never received", timeouts, network failures and outages.
+   */
+  readonly refused: boolean;
+  constructor(message: string, opts: { notFound?: boolean; refused?: boolean } = {}) {
     super(message);
     this.notFound = opts.notFound ?? false;
+    this.refused = opts.refused ?? false;
   }
+}
+
+/** The gateway answered and said no, as opposed to never receiving the request or being unreachable. */
+export function isGatewayRefusal(e: unknown): boolean {
+  return e instanceof GatewayError && e.refused;
 }
 
 /** The gateway has never heard of this payment, as opposed to being unreachable or failing. */

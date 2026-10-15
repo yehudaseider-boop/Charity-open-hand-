@@ -10,6 +10,9 @@ import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
 import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { clientIp } from "@/lib/client-ip";
+import { hitRateLimit } from "@/lib/rate-limit";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
@@ -22,10 +25,15 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const ref = typeof reference === "string" ? reference : "";
   // If the payment provider can't be reached, or the result can't be saved yet, say we're still
   // confirming rather than showing an error page. Nothing here says "paid" unless it is saved.
-  const outcome = await confirmPayment(ref).catch((e) => {
-    console.error(e);
-    return "pending" as const;
-  });
+  // Each load can ask the payment provider about the payment, so one visitor gets a generous but
+  // limited number of checks (a donor needs about 13); past that the page just says "still confirming".
+  const limited = await hitRateLimit("return-check", [`ip:${clientIp(await headers())}`], 40, 10).catch(() => false);
+  const outcome = limited
+    ? ("pending" as const)
+    : await confirmPayment(ref).catch((e) => {
+        console.error(e);
+        return "pending" as const;
+      });
 
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
@@ -117,7 +125,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Card title="We're confirming your payment">
         <p className="text-sm">This can take a minute. Please don&apos;t pay again.</p>
-        <KeepChecking />
+        <KeepChecking retryHref={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} />
       </Card>
     );
   }

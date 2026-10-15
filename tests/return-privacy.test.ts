@@ -22,8 +22,12 @@ const row = {
 
 let outcome = "paid";
 let adminReads = 0;
+let confirmCalls = 0;
+let overLimit = false;
 let sessionRow: typeof row | null = null; // what row-level security lets the visitor read
-vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: async () => outcome }));
+vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: async () => (confirmCalls++, outcome) }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }) }));
+vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit }));
 vi.mock("@/lib/donations/confirmation-access", () => ({
   confirmationTokenMatches: async (_id: string, t?: string) => t === "good-credential",
 }));
@@ -46,6 +50,8 @@ const privateBits = [/R23\.45/, /Contribution to Givezy/, /maaser/i, /Counted as
 beforeEach(() => {
   outcome = "paid";
   adminReads = 0;
+  confirmCalls = 0;
+  overLimit = false;
   sessionRow = null;
 });
 
@@ -95,3 +101,18 @@ describe("confirmation page privacy", () => {
     expect(await page({})).toContain("Donation not found");
   });
 });
+
+describe("checking with the payment provider", () => {
+  it("a visitor over the limit gets 'still confirming' without the provider being asked", async () => {
+    overLimit = true;
+    const html = await page({});
+    expect(confirmCalls).toBe(0);
+    expect(html).toContain("We&#x27;re confirming your payment");
+  });
+
+  it("under the limit, the payment is checked", async () => {
+    await page({});
+    expect(confirmCalls).toBe(1);
+  });
+});
+
