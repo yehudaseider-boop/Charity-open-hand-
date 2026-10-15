@@ -50,3 +50,17 @@ export const PACE_ON_TRACK_PERCENT = 90;
 export const CAMPAIGN_ENDING_SOON_DAYS = 14;
 /** Large-donation threshold used until a charity sets its own under Notifications (R5 000, in cents). */
 export const DEFAULT_LARGE_DONATION_CENTS = 500_000;
+
+/**
+ * DESIGN PLACEHOLDERS for donor giving groups (modelled on the groups Givelify describes:
+ * Consistent, Occasional, New, Decreasing, Inactive). Plain rules, not AI, so a charity can see why.
+ * Giving is counted in 30-day windows: the last six (about six months) and the six before.
+ */
+/** A donor is "New" for this many days after their first donation (Givelify describes four weeks). */
+export const GROUP_NEW_DAYS = 28;
+/** Length of one window, in days. */
+export const GROUP_WINDOW_DAYS = 30;
+/** Windows looked at, each side. */
+export const GROUP_WINDOWS = 6;
+/** "Consistent" means a donation in at least this many of the windows. */
+export const GROUP_CONSISTENT_MIN = 5;

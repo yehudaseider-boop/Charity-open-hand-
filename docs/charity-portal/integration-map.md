@@ -39,3 +39,8 @@ What each part of the prototype needs before it can run on real data. "Exists" m
 | **Needs attention** items | `attentionItems()` | SQL views per item (failed monthly, missing details, campaign pace, large and new donors) | Partly | One function returning the same item shapes; cache per charity |
 | **Follow up** lists and drafts | `followUps()`, `buildDraft()` | donor and donation reads; marketing consent flag | No | Add marketing consent to the checkout and store it; hide donors without it from win-back; per-charity templates; "done" markers in a new table (`charity_follow_ups`) with RLS |
 | Campaign pace | `campaignPace()` | computed from campaign and donations | Yes | Same maths in SQL or the API; thresholds in config |
+| **Giving groups** (Donors) | `givingWindows()`, `groupFor()` | paid donations per donor | Yes | A SQL view computing the windows per donor; thresholds in config |
+| Check-in and win-back lists | `followUps()` | groups + marketing consent | No | Consent capture at checkout (decision first) |
+| **Bank deposits** list and matching | `ds.payouts`, `reconciled` in the browser | the payment provider's settlement and transfer records | No | `payouts` and `payout_lines` tables filled through `src/lib/gateway`; a `reconciled_at`/`reconciled_by` column, audit-logged |
+| Deposit detail and by-campaign split | `depositLines()`, `depositByFund()` | the same tables | No | A SQL function returning the same lines; a check job that alerts when lines do not add up to the deposit |
+| Deposit CSV exports | browser CSV | export routes | Partly | Same columns; audit-logged and rate-limited like the existing exports |

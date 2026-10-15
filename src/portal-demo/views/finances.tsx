@@ -1,35 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { centsToPlain } from "@/lib/csv";
 import { DEMO_PAYOUT_SCHEDULE, DEMO_TODAY } from "../data/demo-config";
 import { addDays, showDay, showMonth, weekday } from "../data/day";
 import { localDay } from "../data/generate";
 import { dayOf, donorName, financeSummary, inRange, monthsIn, pendingSettlement, RANGE_LABELS } from "../data/selectors";
-import type { DemoDataset, Payout } from "../data/types";
+import type { DemoDataset } from "../data/types";
 import { usePortal } from "../store";
 import { DateRangePicker } from "../ui/date-range";
 import { count, date, rand } from "../ui/format";
 import { Icon, type IconName } from "../ui/icons";
 import { MetricCard } from "../ui/metric";
-import { Drawer } from "../ui/overlay";
-import { Badge, Button, Callout, Card, CardHeader, cx, DetailList, EmptyState, PageHeader, Segmented } from "../ui/primitives";
-import { DataTable } from "../ui/table";
-import { donationCsvRows, Loaded, netOf, useExport, useLookups } from "./common";
+import { Badge, Button, Callout, Card, CardHeader, cx, EmptyState, PageHeader, Segmented } from "../ui/primitives";
+import { BankDepositsCard, useDepositExports } from "./bank-deposits";
+import { donationCsvRows, Loaded, useExport, useLookups } from "./common";
 
 export function FinancesView() {
   return <Loaded>{(data) => <Finances data={data} />}</Loaded>;
-}
-
-function PayoutBadge({ status }: { status: Payout["status"] }) {
-  return status === "paid" ? <Badge tone="success">Paid out</Badge> : <Badge tone="info" icon="clock">On its way</Badge>;
 }
 
 function Finances({ data }: { data: DemoDataset }) {
   const { range, rangePreset, feeModel, setFeeModel, toast } = usePortal();
   const lookups = useLookups(data);
   const exportCsv = useExport();
-  const [open, setOpen] = useState<Payout | null>(null);
 
   const f = useMemo(() => financeSummary(data, range), [data, range]);
   const pending = useMemo(() => pendingSettlement(data), [data]);
@@ -57,12 +51,7 @@ function Finances({ data }: { data: DemoDataset }) {
       ["Month (by donation date)", "Gross donations (R)", "Refunds (R)", "Processing fees (R)", "Platform fee (R)", "Net (R)", "Paid out (R)", "On its way (R)", "Not paid out yet (R)"],
       statement.map((m) => [showMonth(m.key), centsToPlain(m.grossCents), centsToPlain(m.refundsCents), centsToPlain(m.processingFeesCents), centsToPlain(m.platformFeesCents), centsToPlain(m.netCents), centsToPlain(m.paidOutCents), centsToPlain(m.inTransitCents), centsToPlain(m.awaitingCents)]),
     );
-  const exportPayouts = () =>
-    exportCsv(
-      "payouts",
-      ["Payout", "Settlements from", "Settlements to", "Sent", "In your bank", "Status", "Donations", "Gross (R)", "Fees (R)", "Refunds (R)", "Net (R)"],
-      payouts.map((p) => [p.ref, showDay(p.periodStart), showDay(p.periodEnd), showDay(p.sentDate), showDay(p.payoutDate), p.status === "paid" ? "Paid out" : "On its way", p.donationCount, centsToPlain(p.grossCents), centsToPlain(p.feesCents), centsToPlain(p.refundsCents), centsToPlain(p.netCents)]),
-    );
+  const depositExports = useDepositExports(data, payouts);
 
   return (
     <div className="gz-fade-in space-y-6">
@@ -163,41 +152,7 @@ function Finances({ data }: { data: DemoDataset }) {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader title="Payout history" subtitle={`Payouts that reached your bank ${RANGE_LABELS[rangePreset].toLowerCase()} (by payout date)`} action={<Button variant="secondary" size="sm" icon="download" onClick={exportPayouts}>Export payouts</Button>} />
-        <DataTable
-          caption="Payout history"
-          rows={payouts}
-          rowKey={(p) => p.id}
-          onRowClick={setOpen}
-          rowLabel={(p) => `Open payout ${p.ref}`}
-          initialSort={{ key: "date", dir: "desc" }}
-          pageSize={10}
-          columns={[
-            { key: "ref", header: "Payout", cell: (p) => <span className="font-semibold">{p.ref}</span> },
-            { key: "date", header: "In your bank", sort: (p) => p.payoutDate, cell: (p) => showDay(p.payoutDate) },
-            { key: "period", header: "Settlements", cell: (p) => `${showDay(p.periodStart).slice(0, 5)} to ${showDay(p.periodEnd)}`, wide: true },
-            { key: "status", header: "Status", cell: (p) => <PayoutBadge status={p.status} /> },
-            { key: "count", header: "Donations", align: "right", sort: (p) => p.donationCount, cell: (p) => count(p.donationCount), wide: true },
-            { key: "gross", header: "Gross", align: "right", sort: (p) => p.grossCents, cell: (p) => rand(p.grossCents) },
-            { key: "fees", header: "Fees and refunds", align: "right", cell: (p) => <span className="text-gz-muted">− {rand(p.feesCents + p.refundsCents)}</span>, wide: true },
-            { key: "net", header: "Net paid", align: "right", sort: (p) => p.netCents, cell: (p) => <span className="font-semibold text-gz-blue">{rand(p.netCents)}</span> },
-          ]}
-          mobile={(p) => (
-            <span className="flex items-center justify-between gap-3">
-              <span>
-                <span className="block font-semibold">{showDay(p.payoutDate)}</span>
-                <span className="block text-xs text-gz-muted">{p.ref} · {count(p.donationCount)} donations</span>
-              </span>
-              <span className="text-right">
-                <span className="block font-semibold">{rand(p.netCents)}</span>
-                <PayoutBadge status={p.status} />
-              </span>
-            </span>
-          )}
-          empty={<EmptyState icon="wallet" title="No payouts in this period" body="Choose a longer date range." />}
-        />
-      </Card>
+      <BankDepositsCard data={data} payouts={payouts} periodLabel={RANGE_LABELS[rangePreset].toLowerCase()} />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
@@ -260,10 +215,12 @@ function Finances({ data }: { data: DemoDataset }) {
       </div>
 
       <Card>
-        <CardHeader title="Exports for your bookkeeper" subtitle="CSV files, opened in Excel or Google Sheets. Made in your browser from demo data." />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <CardHeader title="Exports for your bookkeeper" subtitle={`Plain CSV files that open in Excel or Google Sheets and import into any accounting package. Deposits ${RANGE_LABELS[rangePreset].toLowerCase()}, by the date they reached your bank. Made in your browser from demo data.`} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ExportTile icon="bank" title="Bank deposits" body="One row per deposit, to tick off against your bank statement" onClick={depositExports.deposits} />
+          <ExportTile icon="table" title="Deposit detail" body="Every donation and refund behind each deposit, adding up to it" onClick={depositExports.detail} />
+          <ExportTile icon="flag" title="Deposits by campaign" body="Each deposit split by campaign, for your journal entries" onClick={depositExports.byFund} />
           <ExportTile icon="chart" title="Financial report" body="Monthly gross, refunds, fees and net" onClick={exportReport} />
-          <ExportTile icon="wallet" title="Payouts" body="Every payout with its dates and amounts" onClick={exportPayouts} />
           <ExportTile
             icon="donations"
             title="Donations with fees"
@@ -279,7 +236,6 @@ function Finances({ data }: { data: DemoDataset }) {
         </div>
       </Card>
 
-      {open && <PayoutDrawer payout={open} data={data} onClose={() => setOpen(null)} />}
     </div>
   );
 }
@@ -342,56 +298,5 @@ function ExportTile({ icon, title, body, onClick }: { icon: IconName; title: str
         <span className="mt-0.5 block text-xs text-gz-muted">{body}</span>
       </span>
     </button>
-  );
-}
-
-function PayoutDrawer({ payout, data, onClose }: { payout: Payout; data: DemoDataset; onClose: () => void }) {
-  const lookups = useLookups(data);
-  const rows = data.donations.filter((d) => d.payoutId === payout.id);
-  const refunds = data.donations.filter((d) => d.status === "refunded" && d.refundedAt && localDay(d.refundedAt) >= payout.periodStart && localDay(d.refundedAt) <= payout.periodEnd);
-  return (
-    <Drawer open onClose={onClose} title={rand(payout.netCents)} subtitle={<span className="inline-flex items-center gap-2"><PayoutBadge status={payout.status} /> {payout.ref}</span>}>
-      <div className="space-y-5">
-        <DetailList
-          items={[
-            ["Settlements", `${showDay(payout.periodStart)} to ${showDay(payout.periodEnd)}`],
-            ["Sent", showDay(payout.sentDate)],
-            ["In your bank", showDay(payout.payoutDate)],
-            ["Bank account", `${data.charity.bankName} ending ${data.charity.bankLast4}`],
-          ]}
-        />
-        <div>
-          <h3 className="mb-1 text-base">How it adds up</h3>
-          <DetailList
-            items={[
-              [`${count(payout.donationCount)} donations (gross)`, rand(payout.grossCents)],
-              ["Fees", `− ${rand(payout.feesCents)}`],
-              [`Refunds made that week (${refunds.length})`, `− ${rand(payout.refundsCents)}`],
-              ["Paid to your bank", <span key="n" className="text-gz-blue">{rand(payout.netCents)}</span>],
-            ]}
-          />
-        </div>
-        <div>
-          <h3 className="mb-2 text-base">Donations in this payout</h3>
-          <ul className="divide-y divide-gz-hairline rounded-2xl border border-gz-hairline bg-gz-surface px-3">
-            {rows.slice(0, 30).map((d) => (
-              <li key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">{donorName(lookups.donor.get(d.donorId))}</span>
-                  <span className="block text-xs text-gz-muted">
-                    Donated {date(d.donatedAt)} · settled {d.settledAt ? date(d.settledAt) : ""}
-                  </span>
-                </span>
-                <span className="text-right">
-                  <span className="block font-semibold">{rand(d.amountCents)}</span>
-                  <span className="block text-xs text-gz-muted">net {rand(netOf(d) + (d.status === "refunded" ? d.amountCents : 0))}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          {rows.length > 30 && <p className="mt-2 text-xs text-gz-muted">Showing 30 of {count(rows.length)}. The donations export lists them all.</p>}
-        </div>
-      </div>
-    </Drawer>
   );
 }

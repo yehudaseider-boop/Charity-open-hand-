@@ -47,6 +47,8 @@ export type CharityOverrides = {
   branding?: BrandingPrefs;
   /** Follow-ups the team has dealt with: `${kind}:${id}` to the demo date it was marked done. */
   followUps?: Record<string, string>;
+  /** Bank deposits the bookkeeper has matched on the bank statement: payout id to the demo date. */
+  reconciled?: Record<string, string>;
 };
 
 export const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
@@ -112,6 +114,8 @@ type PortalState = {
   updateOverrides: (patch: Partial<CharityOverrides>) => void;
   /** Mark follow-ups (thank-yous and win-backs) as done, or undo. */
   markHandled: (keys: string[], on: boolean) => void;
+  /** Tick or untick bank deposits as matched on the bank statement. */
+  markReconciled: (payoutIds: string[], on: boolean) => void;
   /** The amount from which a donation is "large", from Notifications (cents). */
   largeDonationCents: number;
   resetDemo: () => void;
@@ -238,6 +242,14 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
           else delete next[k];
         }
         updateOverrides({ followUps: next });
+      },
+      markReconciled: (ids, on) => {
+        const next = { ...(overrides.reconciled ?? {}) };
+        for (const id of ids) {
+          if (on) next[id] = DEMO_TODAY;
+          else delete next[id];
+        }
+        updateOverrides({ reconciled: next });
       },
       largeDonationCents: parseRandToCents(overrides.notifications?.largeDonationRand ?? DEFAULT_NOTIFICATIONS.largeDonationRand) ?? DEFAULT_LARGE_DONATION_CENTS,
       resetDemo: () => {

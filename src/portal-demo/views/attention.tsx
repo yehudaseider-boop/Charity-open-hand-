@@ -18,6 +18,7 @@ const STYLE: Record<AttentionKind, { icon: IconName; tone: string }> = {
   campaign_ending: { icon: "clock", tone: "bg-gz-blue-soft text-gz-blue" },
   large_donation: { icon: "donations", tone: "bg-gz-lilac-soft text-gz-ink" },
   new_donors: { icon: "spark", tone: "bg-gz-blue-soft text-gz-blue" },
+  giving_less: { icon: "arrowDown", tone: "bg-gz-warning-soft text-gz-warning" },
 };
 
 function words(i: AttentionItem): { title: string; detail: string; href: string; action: string } {
@@ -33,6 +34,8 @@ function words(i: AttentionItem): { title: string; detail: string; href: string;
       return { title: `${i.campaignName} ends in ${count(i.daysLeft ?? 0)} ${i.daysLeft === 1 ? "day" : "days"}`, detail: `${permille(i.progressPermille ?? 0)} of the goal reached so far.`, href: `${BASE}/campaigns/${i.campaignId}`, action: "Open" };
     case "large_donation":
       return { title: `${n} large ${i.count === 1 ? "donation" : "donations"} to thank`, detail: `${randWhole(i.amountCents ?? 0)} in total. A personal thank-you means the most here.`, href: `${BASE}/donors?view=follow-up&tab=large`, action: "Draft thank-yous" };
+    case "giving_less":
+      return { title: `${n} ${i.count === 1 ? "donor is" : "donors are"} giving less often`, detail: "They used to give most months. A personal check-in now is the best chance to keep them.", href: `${BASE}/donors?view=follow-up&tab=checkin`, action: "Draft check-ins" };
     case "new_donors":
       return { title: `${n} first-time ${i.count === 1 ? "donor" : "donors"} to welcome`, detail: `They first gave in the last ${FOLLOW_UP_NEW_DAYS} days. A thank-you in the first week matters most.`, href: `${BASE}/donors?view=follow-up&tab=new`, action: "Draft welcomes" };
   }

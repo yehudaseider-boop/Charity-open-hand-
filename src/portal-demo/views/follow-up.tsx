@@ -21,11 +21,12 @@ import { campaignName, useLookups } from "./common";
 const TABS: { id: FollowUpKind; label: string; hint: string }[] = [
   { id: "new", label: "Welcome new donors", hint: `Gave for the first time in the last ${FOLLOW_UP_NEW_DAYS} days. A thank-you in the first week is what turns one donation into two.` },
   { id: "large", label: "Thank large donors", hint: `Large donations in the last ${FOLLOW_UP_LARGE_DAYS} days. The amount comes from Notifications in Settings.` },
-  { id: "winback", label: "Win back lapsing donors", hint: "Gave more than once, but not for 4 to 8 months. Only donors who agreed to hear about appeals are listed." },
+  { id: "checkin", label: "Check in: giving less", hint: "Donors in the Decreasing group: they used to give most months and now give less often. A personal note now, before they stop, is the best chance to keep them." },
+  { id: "winback", label: "Win back inactive donors", hint: "Donors in the Inactive group who gave more than once: no donation in the last 6 months." },
 ];
 
 export function isFollowUpKind(v: string | null): v is FollowUpKind {
-  return v === "new" || v === "large" || v === "winback";
+  return v === "new" || v === "large" || v === "checkin" || v === "winback";
 }
 
 export function FollowUpPanel({ data, initialTab }: { data: DemoDataset; initialTab: FollowUpKind | null }) {
@@ -75,13 +76,12 @@ export function FollowUpPanel({ data, initialTab }: { data: DemoDataset; initial
             </button>
           )}
         </div>
-        {tab === "winback" && lists.winbackHiddenNoConsent > 0 && (
+        {(tab === "winback" || tab === "checkin") && (tab === "winback" ? lists.winbackHiddenNoConsent : lists.checkinHiddenNoConsent) > 0 && (
           <p className="mb-3 flex gap-2 rounded-2xl bg-gz-neutral-soft p-3 text-xs text-gz-muted">
             <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
-            {count(lists.winbackHiddenNoConsent)} lapsing donors are not listed because they did not agree to hear about appeals. Thank-you messages do not need that agreement.
+            {count(tab === "winback" ? lists.winbackHiddenNoConsent : lists.checkinHiddenNoConsent)} more donors are not listed because they did not agree to hear about appeals. Thank-you messages do not need that agreement.
           </p>
-        )}
-        {rows.length ? (
+        )}        {rows.length ? (
           <ul className="divide-y divide-gz-hairline">
             {visible.map((r) => {
               const done = handled[r.key];
@@ -138,7 +138,7 @@ export function FollowUpPanel({ data, initialTab }: { data: DemoDataset; initial
 }
 
 function describe(r: FollowUpRow, data: DemoDataset, campaigns: ReturnType<typeof useLookups>["campaign"]): string {
-  if (r.kind === "winback") return `${count(r.donor.giftCount)} donations, last on ${showDay(r.day)}, usually ${rand(r.amountCents)}`;
+  if (r.kind === "winback" || r.kind === "checkin") return `${count(r.donor.giftCount)} donations, last on ${showDay(r.day)}, usually ${rand(r.amountCents)}${r.kind === "checkin" ? ` · gave in ${r.donor.recentWindows} of the last 6 months` : ""}`;
   return `${rand(r.amountCents)} to ${campaignName(r.campaignId, campaigns)} on ${showDay(r.day)}${r.kind === "new" ? " · first donation" : ""}${r.wants18a && data.charity.s18a ? " · wants s18A" : ""}`;
 }
 
@@ -162,6 +162,12 @@ export function buildDraft(r: FollowUpRow, data: DemoDataset, campaigns: ReturnT
       body: `Dear ${first},\n\nThank you for your donation of ${rand(r.amountCents)} on ${showDay(r.day)}${forCampaign}. A gift of this size makes a real difference to the work of ${charity.name}, and we wanted to thank you personally.${s18a}\n\nIf you would like to hear how it is being used, please reply and we will gladly arrange it.\n\n${sign}`,
     };
   }
+  if (r.kind === "checkin") {
+    return {
+      subject: `A note of thanks from ${charity.shortName}`,
+      body: `Dear ${first},\n\nThank you for giving to ${charity.name} so faithfully over the past year. Your donations, most recently on ${showDay(r.day)}, have made a real difference.\n\nWe wanted to check in and share what is happening here. If anything has changed for you, we understand completely. If you would like to keep giving, a donation like your usual ${rand(r.amountCents)} would help us plan ahead.\n\nIf you would rather not hear from us, just reply and we will stop.\n\n${sign}`,
+    };
+  }
   return {
     subject: `We have missed you at ${charity.shortName}`,
     body: `Dear ${first},\n\nYou have given to ${charity.name} ${count(r.donor.giftCount)} times, most recently on ${showDay(r.day)}, and we are grateful for every one of those donations.\n\nWe would like to share what your support has helped us do, and to ask whether you would give again. A donation similar to your usual ${rand(r.amountCents)} would help us plan ahead, and any amount is welcome.\n\nIf you would rather not hear from us, just reply and we will stop.\n\n${sign}`,
@@ -180,7 +186,7 @@ function DraftModal({ row, data, onClose }: { row: FollowUpRow; data: DemoDatase
     setBody(initial.body);
   }, [initial]);
   const edited = subject !== initial.subject || body !== initial.body;
-  const kindLabel = row.kind === "winback" ? "Win-back" : row.kind === "large" ? "Thank-you for a large donation" : "Welcome";
+  const kindLabel = row.kind === "winback" ? "Win-back" : row.kind === "checkin" ? "Check-in" : row.kind === "large" ? "Thank-you for a large donation" : "Welcome";
   return (
     <Modal
       open
@@ -227,7 +233,7 @@ function DraftModal({ row, data, onClose }: { row: FollowUpRow; data: DemoDatase
         <p className="text-sm"><span className="text-gz-muted">To:</span> {row.donor.email}</p>
         <TextInput label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
         <TextArea label="Message" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-72 font-sans leading-relaxed" />
-        {row.kind === "winback" && <Callout tone="neutral" title="This is an appeal">This donor agreed to hear about appeals, and the draft says how to stop. Keep that line in.</Callout>}
+        {(row.kind === "winback" || row.kind === "checkin") && <Callout tone="neutral" title="This is an appeal">This donor agreed to hear about appeals, and the draft says how to stop. Keep that line in.</Callout>}
       </div>
     </Modal>
   );

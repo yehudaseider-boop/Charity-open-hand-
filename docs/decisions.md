@@ -516,3 +516,9 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Drafts only: the charity sends from its own email. Win-back appeals are treated as marketing and need donor consent (assumption, for Yosef); thank-yous are not.
 - Thresholds for follow-ups and pace (14 and 30 days, 110% and 90%) are design placeholders in `src/portal-demo/data/demo-config.ts`, not decisions.
 - Receipt amounts are the donation only; a receipt is not issued while the donor's details are incomplete. Wording stays a DRAFT until the attorney confirms it.
+
+### Portal prototype: Givelify-style groups and bank deposits (15/10/2026)
+
+- Givelify is the functional reference (Yehuda, 15/10/2026). No Givelify login; details come from search summaries of their published pages. Nothing of their interface, names or assets is copied.
+- Donor groups now follow the five Givelify describes (Consistent, Occasional, New, Decreasing, Inactive) as plain, visible rules, replacing the earlier New, Active, Lapsing, Lapsed. Thresholds are placeholders in `demo-config.ts`.
+- Finances has a Bank deposits reconciliation view. Exports are plain CSV for now (Yehuda, 15/10/2026); no accounting-package formats yet.

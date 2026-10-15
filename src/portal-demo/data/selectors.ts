@@ -9,10 +9,10 @@
  * Periods filter by DONATION date unless a function says otherwise (payouts use payout date).
  */
 import { taxYearFor, taxYearRange } from "@/lib/dates";
-import { CAMPAIGN_ENDING_SOON_DAYS, DEMO_START, DEMO_TODAY, FOLLOW_UP_LARGE_DAYS, FOLLOW_UP_NEW_DAYS, PACE_AHEAD_PERCENT, PACE_ON_TRACK_PERCENT } from "./demo-config";
+import { CAMPAIGN_ENDING_SOON_DAYS, DEMO_START, DEMO_TODAY, GROUP_CONSISTENT_MIN, GROUP_NEW_DAYS, GROUP_WINDOW_DAYS, GROUP_WINDOWS, FOLLOW_UP_LARGE_DAYS, FOLLOW_UP_NEW_DAYS, PACE_AHEAD_PERCENT, PACE_ON_TRACK_PERCENT } from "./demo-config";
 import { addDays, addMonths, daysBetween, monthKey } from "./day";
 import { localDay } from "./generate";
-import type { Campaign, DemoDataset, Donation, Donor, RecurringPlan } from "./types";
+import type { Campaign, DemoDataset, Donation, Donor, Payout, RecurringPlan } from "./types";
 
 export type DateRange = { from: string; to: string };
 
@@ -226,13 +226,25 @@ export function campaignCumulative(ds: DemoDataset, c: Campaign): { day: string;
   return out;
 }
 
-export type DonorSegment = "new" | "active" | "lapsing" | "lapsed";
+export type DonorGroup = "consistent" | "occasional" | "new" | "decreasing" | "inactive";
 
-export const SEGMENT_LABELS: Record<DonorSegment, string> = {
+export const GROUP_ORDER: DonorGroup[] = ["consistent", "occasional", "new", "decreasing", "inactive"];
+
+export const GROUP_LABELS: Record<DonorGroup, string> = {
+  consistent: "Consistent",
+  occasional: "Occasional",
   new: "New",
-  active: "Active",
-  lapsing: "Lapsing",
-  lapsed: "Lapsed",
+  decreasing: "Decreasing",
+  inactive: "Inactive",
+};
+
+/** One line per group, shown on screen, so a charity can see exactly why someone is in it. */
+export const GROUP_RULES: Record<DonorGroup, string> = {
+  new: `First donation in the last ${GROUP_NEW_DAYS} days.`,
+  consistent: `Gave in at least ${GROUP_CONSISTENT_MIN} of the last ${GROUP_WINDOWS} months.`,
+  decreasing: `Gave in at least ${GROUP_CONSISTENT_MIN} of the ${GROUP_WINDOWS} months before that, but less often since.`,
+  occasional: "Gives now and then, without a regular pattern.",
+  inactive: `No donation in the last ${GROUP_WINDOWS} months.`,
 };
 
 export type DonorStats = Donor & {
@@ -241,7 +253,11 @@ export type DonorStats = Donor & {
   giftCount: number;
   firstDay: string | null;
   lastDay: string | null;
-  segment: DonorSegment;
+  group: DonorGroup;
+  /** Of the last GROUP_WINDOWS 30-day windows, how many had a paid donation. */
+  recentWindows: number;
+  /** The same for the GROUP_WINDOWS windows before those. */
+  priorWindows: number;
   hasMonthly: boolean;
   monthlyCents: number;
   campaignIds: string[];
@@ -249,17 +265,30 @@ export type DonorStats = Donor & {
   wants18a: boolean;
 };
 
-/**
- * Retention segment from the last gift: new (first gift in the last 60 days), active
- * (gave in the last 120 days), lapsing (120 to 240 days), lapsed (longer).
- */
-export function segmentFor(firstDay: string | null, lastDay: string | null): DonorSegment {
-  if (!lastDay || !firstDay) return "lapsed";
-  if (daysBetween(firstDay, DEMO_TODAY) <= 60) return "new";
-  const since = daysBetween(lastDay, DEMO_TODAY);
-  if (since <= 120) return "active";
-  if (since <= 240) return "lapsing";
-  return "lapsed";
+/** How many 30-day windows had a donation: [last six, the six before]. Window 0 ends today. */
+export function givingWindows(paidDays: string[]): [number, number] {
+  const hit = new Set<number>();
+  for (const day of paidDays) {
+    const w = Math.floor(daysBetween(day, DEMO_TODAY) / GROUP_WINDOW_DAYS);
+    if (w >= 0 && w < GROUP_WINDOWS * 2) hit.add(w);
+  }
+  let recent = 0;
+  let prior = 0;
+  for (const w of hit) {
+    if (w < GROUP_WINDOWS) recent++;
+    else prior++;
+  }
+  return [recent, prior];
+}
+
+/** Giving group from the donor's paid donations. Checked in order: new, inactive, consistent, decreasing, occasional. */
+export function groupFor(firstDay: string | null, recent: number, prior: number): DonorGroup {
+  if (!firstDay) return "inactive";
+  if (daysBetween(firstDay, DEMO_TODAY) < GROUP_NEW_DAYS) return "new";
+  if (recent === 0) return "inactive";
+  if (recent >= GROUP_CONSISTENT_MIN) return "consistent";
+  if (prior >= GROUP_CONSISTENT_MIN) return "decreasing";
+  return "occasional";
 }
 
 export function donorStats(ds: DemoDataset): DonorStats[] {
@@ -278,6 +307,7 @@ export function donorStats(ds: DemoDataset): DonorStats[] {
     const plans = activePlans.get(donor.id) ?? [];
     const firstDay = days[0] ?? null;
     const lastDay = days.at(-1) ?? null;
+    const [recentWindows, priorWindows] = givingWindows(days);
     return {
       ...donor,
       name: donorName(donor),
@@ -285,7 +315,9 @@ export function donorStats(ds: DemoDataset): DonorStats[] {
       giftCount: paid.length,
       firstDay,
       lastDay,
-      segment: segmentFor(firstDay, lastDay),
+      group: groupFor(firstDay, recentWindows, priorWindows),
+      recentWindows,
+      priorWindows,
       hasMonthly: plans.length > 0,
       monthlyCents: sum(plans.map((p) => p.amountCents)),
       campaignIds: [...new Set(paid.map((d) => d.campaignId).filter((x): x is string => !!x))],
@@ -586,7 +618,7 @@ export function campaignPace(c: Pick<CampaignStats, "status" | "raisedCents" | "
   return { state, remainingDays, neededPerDayCents: remainingDays > 0 ? Math.ceil(gap / remainingDays) : gap };
 }
 
-export type FollowUpKind = "new" | "large" | "winback";
+export type FollowUpKind = "new" | "large" | "checkin" | "winback";
 
 export type FollowUpRow = {
   /** Handled marker key: `${kind}:${id}`. */
@@ -594,19 +626,24 @@ export type FollowUpRow = {
   kind: FollowUpKind;
   donor: DonorStats;
   donationId: string | null;
-  /** The donation that triggered it, or the donor's average donation for a win-back. */
+  /** The donation that triggered it, or the donor's average donation for a check-in or win-back. */
   amountCents: number;
   day: string;
   campaignId: string | null;
   wants18a: boolean;
 };
 
-export type FollowUps = Record<FollowUpKind, FollowUpRow[]> & { winbackHiddenNoConsent: number };
+export type FollowUps = Record<FollowUpKind, FollowUpRow[]> & {
+  /** Decreasing and inactive donors left out because they did not agree to hear about appeals. */
+  checkinHiddenNoConsent: number;
+  winbackHiddenNoConsent: number;
+};
 
 /**
  * Who deserves a message. New: first donation in the last FOLLOW_UP_NEW_DAYS days. Large: a paid
- * donation of at least `largeCents` in the last FOLLOW_UP_LARGE_DAYS days. Win-back: lapsing donors
- * who gave more than once; only those who agreed to hear about appeals are listed.
+ * donation of at least `largeCents` in the last FOLLOW_UP_LARGE_DAYS days. Check in: Decreasing donors.
+ * Win back: Inactive donors who gave more than once. Check-ins and win-backs ask for money, so only
+ * donors who agreed to hear about appeals are listed.
  */
 export function followUps(ds: DemoDataset, largeCents: number, stats: DonorStats[] = donorStats(ds)): FollowUps {
   const byId = new Map(stats.map((d) => [d.id, d]));
@@ -621,7 +658,7 @@ export function followUps(ds: DemoDataset, largeCents: number, stats: DonorStats
     campaignId: d?.campaignId ?? null,
     wants18a: !!d?.wants18a,
   });
-  const out: FollowUps = { new: [], large: [], winback: [], winbackHiddenNoConsent: 0 };
+  const out: FollowUps = { new: [], large: [], checkin: [], winback: [], checkinHiddenNoConsent: 0, winbackHiddenNoConsent: 0 };
   for (const donor of stats) {
     if (donor.firstDay && daysBetween(donor.firstDay, DEMO_TODAY) <= FOLLOW_UP_NEW_DAYS) {
       const first = paid.filter((d) => d.donorId === donor.id).sort((a, b) => (a.donatedAt < b.donatedAt ? -1 : 1))[0];
@@ -633,20 +670,24 @@ export function followUps(ds: DemoDataset, largeCents: number, stats: DonorStats
     if (donor && d.amountCents >= largeCents && daysBetween(dayOf(d), DEMO_TODAY) <= FOLLOW_UP_LARGE_DAYS) out.large.push(row("large", d.id, donor, d, d.amountCents, dayOf(d)));
   }
   for (const donor of stats) {
-    if (donor.segment !== "lapsing" || donor.giftCount < 2 || !donor.lastDay) continue;
+    if (!donor.lastDay) continue;
+    const kind = donor.group === "decreasing" ? "checkin" : donor.group === "inactive" && donor.giftCount >= 2 ? "winback" : null;
+    if (!kind) continue;
     if (!hasMarketingConsent(donor)) {
-      out.winbackHiddenNoConsent++;
+      if (kind === "checkin") out.checkinHiddenNoConsent++;
+      else out.winbackHiddenNoConsent++;
       continue;
     }
-    out.winback.push(row("winback", donor.id, donor, null, Math.round(donor.totalCents / donor.giftCount), donor.lastDay));
+    out[kind].push(row(kind, donor.id, donor, null, Math.round(donor.totalCents / donor.giftCount), donor.lastDay));
   }
   out.new.sort((a, b) => (a.day < b.day ? 1 : -1));
   out.large.sort((a, b) => b.amountCents - a.amountCents);
+  out.checkin.sort((a, b) => b.donor.totalCents - a.donor.totalCents);
   out.winback.sort((a, b) => b.donor.totalCents - a.donor.totalCents);
   return out;
 }
 
-export type AttentionKind = "failed_monthly" | "large_donation" | "new_donors" | "campaign_behind" | "campaign_ending" | "s18a_details";
+export type AttentionKind = "failed_monthly" | "large_donation" | "new_donors" | "giving_less" | "campaign_behind" | "campaign_ending" | "s18a_details";
 
 export type AttentionItem = {
   key: string;
@@ -690,8 +731,67 @@ export function attentionItems(ds: DemoDataset, opts: { largeCents: number; hand
 
   const large = fu.large.filter((r) => !opts.handled[r.key]);
   if (large.length) items.push({ key: "large_donation", kind: "large_donation", priority: 2, count: large.length, amountCents: sum(large.map((r) => r.amountCents)) });
+  const less = fu.checkin.filter((r) => !opts.handled[r.key]);
+  if (less.length) items.push({ key: "giving_less", kind: "giving_less", priority: 2, count: less.length, amountCents: sum(less.map((r) => r.amountCents)) });
   const fresh = fu.new.filter((r) => !opts.handled[r.key]);
   if (fresh.length) items.push({ key: "new_donors", kind: "new_donors", priority: 3, count: fresh.length });
 
   return items.sort((a, b) => a.priority - b.priority);
+}
+
+/** What appears on the charity's bank statement for a deposit (demo format until the payment provider's is known). */
+export const statementRef = (p: Payout) => `GIVEZY ${p.ref}`;
+
+export type DepositLine = {
+  payoutId: string;
+  kind: "donation" | "refund";
+  donationId: string;
+  /** Donation date for a donation line; refund date for a refund line. */
+  day: string;
+  donorId: string;
+  campaignId: string | null;
+  donationKind: Donation["kind"];
+  grossCents: number;
+  feeCents: number;
+  refundCents: number;
+  netCents: number;
+};
+
+/**
+ * Every line behind one bank deposit: each donation settled in its week (gross, fee, net) and each
+ * refund made that week (a negative line). The lines always add up to the deposit, to the cent.
+ */
+export function depositLines(ds: DemoDataset, payout: Payout): DepositLine[] {
+  const lines: DepositLine[] = [];
+  for (const d of ds.donations) {
+    if (d.payoutId === payout.id) {
+      const fee = d.processingFeeCents + d.platformFeeCents;
+      lines.push({ payoutId: payout.id, kind: "donation", donationId: d.id, day: dayOf(d), donorId: d.donorId, campaignId: d.campaignId, donationKind: d.kind, grossCents: d.amountCents, feeCents: fee, refundCents: 0, netCents: d.amountCents - fee });
+    }
+    if (d.status === "refunded" && d.refundedAt) {
+      const day = localDay(d.refundedAt);
+      if (day >= payout.periodStart && day <= payout.periodEnd) {
+        lines.push({ payoutId: payout.id, kind: "refund", donationId: d.id, day, donorId: d.donorId, campaignId: d.campaignId, donationKind: d.kind, grossCents: 0, feeCents: 0, refundCents: d.amountCents, netCents: -d.amountCents });
+      }
+    }
+  }
+  return lines.sort((a, b) => (a.kind === b.kind ? (a.day < b.day ? -1 : a.day > b.day ? 1 : 0) : a.kind === "donation" ? -1 : 1));
+}
+
+export type FundLine = { campaignId: string | null; count: number; grossCents: number; feeCents: number; refundCents: number; netCents: number };
+
+/** One row per campaign (fund) inside a deposit, for an accounting journal. Adds up to the deposit. */
+export function depositByFund(lines: DepositLine[]): FundLine[] {
+  const by = new Map<string, FundLine>();
+  for (const l of lines) {
+    const key = l.campaignId ?? "";
+    const f = by.get(key) ?? { campaignId: l.campaignId, count: 0, grossCents: 0, feeCents: 0, refundCents: 0, netCents: 0 };
+    if (l.kind === "donation") f.count++;
+    f.grossCents += l.grossCents;
+    f.feeCents += l.feeCents;
+    f.refundCents += l.refundCents;
+    f.netCents += l.netCents;
+    by.set(key, f);
+  }
+  return [...by.values()].sort((a, b) => b.netCents - a.netCents);
 }

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { centsToPlain } from "@/lib/csv";
 import { DEMO_TODAY } from "../data/demo-config";
 import { addMonths, monthKey, showMonth } from "../data/day";
-import { dayOf, donorStats, firstGiftDays, presetRange, previousRange, SEGMENT_LABELS, summarise, type DonorSegment, type DonorStats } from "../data/selectors";
+import { dayOf, donorStats, firstGiftDays, presetRange, previousRange, GROUP_LABELS, GROUP_ORDER, GROUP_RULES, summarise, type DonorGroup, type DonorStats } from "../data/selectors";
 import type { DemoDataset } from "../data/types";
 import { usePortal } from "../store";
 import { BarChart } from "../ui/charts";
@@ -21,17 +21,18 @@ export function DonorsView() {
   return <Loaded>{(data) => <Donors data={data} />}</Loaded>;
 }
 
-const SEGMENT_TONE: Record<DonorSegment, Tone> = { new: "info", active: "success", lapsing: "warning", lapsed: "neutral" };
+const GROUP_TONE: Record<DonorGroup, Tone> = { consistent: "success", occasional: "lilac", new: "info", decreasing: "warning", inactive: "neutral" };
+const GROUP_ICON = { consistent: "repeat", occasional: "spark", new: "plus", decreasing: "arrowDown", inactive: "clock" } as const;
 
-export function SegmentBadge({ segment }: { segment: DonorSegment }) {
+export function GroupBadge({ group }: { group: DonorGroup }) {
   return (
-    <Badge tone={SEGMENT_TONE[segment]} icon={segment === "new" ? "spark" : segment === "lapsed" ? "clock" : undefined}>
-      {SEGMENT_LABELS[segment]}
+    <Badge tone={GROUP_TONE[group]} icon={GROUP_ICON[group]}>
+      {GROUP_LABELS[group]}
     </Badge>
   );
 }
 
-type Filter = "all" | DonorSegment | "monthly" | "repeat" | "anonymous" | "s18a";
+type Filter = "all" | DonorGroup | "monthly" | "repeat" | "anonymous" | "s18a";
 
 function Donors({ data }: { data: DemoDataset }) {
   const exportCsv = useExport();
@@ -74,7 +75,7 @@ function Donors({ data }: { data: DemoDataset }) {
       before,
       repeatPermille: all.length ? Math.round((repeat * 1000) / all.length) : 0,
       retentionPermille: beforeIds.size ? Math.round((kept * 1000) / beforeIds.size) : 0,
-      bySegment: (["new", "active", "lapsing", "lapsed"] as DonorSegment[]).map((s) => [s, all.filter((d) => d.segment === s).length] as const),
+      byGroup: GROUP_ORDER.map((g) => [g, all.filter((d) => d.group === g).length] as const),
     };
   }, [data, all]);
 
@@ -86,7 +87,7 @@ function Donors({ data }: { data: DemoDataset }) {
       if (filter === "repeat" && d.giftCount < 2) return false;
       if (filter === "anonymous" && !d.anyAnonymous) return false;
       if (filter === "s18a" && !d.wants18a) return false;
-      if (["new", "active", "lapsing", "lapsed"].includes(filter) && d.segment !== filter) return false;
+      if ((GROUP_ORDER as string[]).includes(filter) && d.group !== filter) return false;
       return !needle || `${d.name} ${d.email} ${d.city}`.toLowerCase().includes(needle);
     });
   }, [all, q, filter, type]);
@@ -109,7 +110,7 @@ function Donors({ data }: { data: DemoDataset }) {
         </span>
       ),
     },
-    { key: "segment", header: "Status", sort: (d) => d.segment, cell: (d) => <SegmentBadge segment={d.segment} /> },
+    { key: "group", header: "Giving group", sort: (d) => GROUP_ORDER.indexOf(d.group), cell: (d) => <GroupBadge group={d.group} /> },
     { key: "gifts", header: "Donations", align: "right", sort: (d) => d.giftCount, cell: (d) => count(d.giftCount) },
     { key: "total", header: "Total given", align: "right", sort: (d) => d.totalCents, cell: (d) => <span className="font-semibold">{rand(d.totalCents)}</span> },
     { key: "monthly", header: "Monthly", align: "right", sort: (d) => d.monthlyCents, cell: (d) => (d.hasMonthly ? <Badge tone="lilac" icon="repeat">{rand(d.monthlyCents)}</Badge> : <span className="text-gz-muted">None</span>), wide: true },
@@ -120,10 +121,7 @@ function Donors({ data }: { data: DemoDataset }) {
 
   const chips: { value: Filter; label: string }[] = [
     { value: "all", label: "All donors" },
-    { value: "new", label: "New" },
-    { value: "active", label: "Active" },
-    { value: "lapsing", label: "Lapsing" },
-    { value: "lapsed", label: "Lapsed" },
+    ...GROUP_ORDER.map((g) => ({ value: g as Filter, label: GROUP_LABELS[g] })),
     { value: "repeat", label: "Gave more than once" },
     { value: "monthly", label: "Monthly donors" },
     { value: "s18a", label: "Asked for s18A" },
@@ -144,8 +142,8 @@ function Donors({ data }: { data: DemoDataset }) {
             onClick={() =>
               exportCsv(
                 "donors",
-                ["Donor", "Email", "City", "Type", "Status", "Donations", "Total given (R)", "First gift", "Last gift", "Monthly (R)", "s18A requested", "Anonymous on public pages"],
-                rows.map((d) => [d.name, d.email, d.city, d.type === "company" ? "Company" : "Individual", SEGMENT_LABELS[d.segment], d.giftCount, centsToPlain(d.totalCents), d.firstDay ? date(`${d.firstDay}T12:00:00Z`) : "", d.lastDay ? date(`${d.lastDay}T12:00:00Z`) : "", centsToPlain(d.monthlyCents), d.wants18a ? "Yes" : "No", d.anyAnonymous ? "Yes" : "No"]),
+                ["Donor", "Email", "City", "Type", "Giving group", "Donations", "Total given (R)", "First gift", "Last gift", "Monthly (R)", "s18A requested", "Anonymous on public pages"],
+                rows.map((d) => [d.name, d.email, d.city, d.type === "company" ? "Company" : "Individual", GROUP_LABELS[d.group], d.giftCount, centsToPlain(d.totalCents), d.firstDay ? date(`${d.firstDay}T12:00:00Z`) : "", d.lastDay ? date(`${d.lastDay}T12:00:00Z`) : "", centsToPlain(d.monthlyCents), d.wants18a ? "Yes" : "No", d.anyAnonymous ? "Yes" : "No"]),
               )
             }
           >
@@ -170,37 +168,29 @@ function Donors({ data }: { data: DemoDataset }) {
         <FollowUpPanel data={data} initialTab={isFollowUpKind(tabParam) ? tabParam : null} />
       ) : (
         <>
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Stat label="Donors who have given" value={count(all.length)} />
         <Stat label="First-time donors, last 90 days" value={count(stats.now.newDonors)} />
         <Stat label="Returning donors, last 90 days" value={count(stats.now.returningDonors)} />
         <Stat label="Kept from the 90 days before" value={permille(stats.retentionPermille)} />
+        <Stat label="Gave more than once" value={permille(stats.repeatPermille)} />
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader title="Where your donors are" subtitle="By their last donation. New: first gift in the last 60 days. Active: gave in the last 120 days. Lapsing: 120 to 240 days. Lapsed: longer." />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {stats.bySegment.map(([s, n]) => (
-              <button key={s} type="button" onClick={() => setFilter(s)} className={cx("rounded-2xl border p-4 text-left transition-colors", filter === s ? "border-gz-blue bg-gz-blue-soft/50" : "border-gz-hairline hover:border-gz-blue/40")}>
-                <SegmentBadge segment={s} />
-                <p className="mt-2 text-2xl font-semibold" style={{ fontFamily: "var(--font-fredoka)" }}>
+        <Card className="xl:col-span-3">
+          <CardHeader title="Giving groups" subtitle="How each donor gives, from their own donations. Tap a group to list its donors." />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {stats.byGroup.map(([g, n]) => (
+              <button key={g} type="button" onClick={() => setFilter(g)} aria-pressed={filter === g} className={cx("flex flex-col rounded-2xl border p-4 text-left transition-colors", filter === g ? "border-gz-blue bg-gz-blue-soft/50" : "border-gz-hairline hover:border-gz-blue/40")}>
+                <GroupBadge group={g} />
+                <span className="mt-2 text-2xl font-semibold" style={{ fontFamily: "var(--font-fredoka)" }}>
                   {count(n)}
-                </p>
-                <p className="text-xs text-gz-muted">{permille(all.length ? Math.round((n * 1000) / all.length) : 0)} of donors</p>
+                </span>
+                <span className="text-xs text-gz-muted">{permille(all.length ? Math.round((n * 1000) / all.length) : 0)} of donors</span>
+                <span className="mt-2 text-xs leading-snug text-gz-ink/75">{GROUP_RULES[g]}</span>
               </button>
             ))}
           </div>
-        </Card>
-        <Card className="bg-gz-lilac-soft">
-          <CardHeader title="Gave more than once" />
-          <p className="text-4xl font-semibold text-gz-blue" style={{ fontFamily: "var(--font-fredoka)" }}>
-            {permille(stats.repeatPermille)}
-          </p>
-          <p className="mt-2 text-sm text-gz-ink/80">of your donors have given at least twice. A thank-you within a week of a first gift is the best-known way to raise this.</p>
-          <Button variant="secondary" size="sm" className="mt-4" onClick={() => setFilter("new")}>
-            See new donors
-          </Button>
         </Card>
       </div>
 
@@ -234,7 +224,7 @@ function Donors({ data }: { data: DemoDataset }) {
                   {count(d.giftCount)} donations · last {d.lastDay ? date(`${d.lastDay}T12:00:00Z`) : "none"}
                 </span>
                 <span className="mt-1 block">
-                  <SegmentBadge segment={d.segment} />
+                  <GroupBadge group={d.group} />
                 </span>
               </span>
               <span className="font-semibold">{rand(d.totalCents)}</span>
@@ -270,7 +260,7 @@ function DonorDrawer({ donor, data, lookups, onClose }: { donor: DonorStats; dat
       }
       subtitle={
         <span className="flex flex-wrap items-center gap-1.5">
-          <SegmentBadge segment={donor.segment} />
+          <GroupBadge group={donor.group} />
           {donor.hasMonthly && <Badge tone="lilac" icon="repeat">Monthly donor</Badge>}
           {donor.wants18a && <Badge tone="success" icon="receipt">s18A requested</Badge>}
           {donor.type === "company" && <Badge tone="info" icon="building">Company</Badge>}
@@ -301,6 +291,8 @@ function DonorDrawer({ donor, data, lookups, onClose }: { donor: DonorStats; dat
           items={[
             ["Email", donor.email],
             ["City", donor.city],
+            ["Giving group", `${GROUP_LABELS[donor.group]}: ${GROUP_RULES[donor.group]}`],
+            ["Months with a donation", `${donor.recentWindows} of the last 6 · ${donor.priorWindows} of the 6 before`],
             ["First gift", donor.firstDay ? date(`${donor.firstDay}T12:00:00Z`) : "None"],
             ["Last gift", donor.lastDay ? date(`${donor.lastDay}T12:00:00Z`) : "None"],
             ["Campaigns supported", donor.campaignIds.length ? donor.campaignIds.map((id) => campaignName(id, lookups.campaign)).join(", ") : "General fund only"],

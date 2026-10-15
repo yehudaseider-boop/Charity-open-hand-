@@ -198,7 +198,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, s
           onClick={() => onChange(o.value)}
           className={cx(
             "rounded-full font-semibold transition-colors",
-            size === "sm" ? "min-h-8 px-3 text-xs" : "min-h-9 px-3.5 text-sm",
+            size === "sm" ? "min-h-10 px-3 text-xs sm:min-h-8" : "min-h-9 px-3.5 text-sm",
             value === o.value ? "bg-gz-blue text-white" : "text-gz-muted hover:text-gz-blue",
           )}
         >

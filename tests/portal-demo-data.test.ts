@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_CHARITIES } from "@/portal-demo/data/charities";
-import { DEMO_START, DEMO_TODAY, FOLLOW_UP_LARGE_DAYS, FOLLOW_UP_NEW_DAYS } from "@/portal-demo/data/demo-config";
+import { DEMO_START, DEMO_TODAY, FOLLOW_UP_LARGE_DAYS, FOLLOW_UP_NEW_DAYS, GROUP_CONSISTENT_MIN } from "@/portal-demo/data/demo-config";
 import { feeFor, generateDataset, localDay } from "@/portal-demo/data/generate";
 import { taxYearFor, taxYearRange } from "@/lib/dates";
 import {
   attentionItems,
+  depositByFund,
+  depositLines,
+  givingWindows,
+  GROUP_ORDER,
+  groupFor,
   campaignPace,
   campaignStats,
   currentTaxYear,
@@ -220,8 +225,12 @@ describe("charity portal demo data", () => {
         }
         expect(FOLLOW_UP_LARGE_DAYS).toBe(30);
         for (const r of fu.winback) {
-          expect(r.donor.segment).toBe("lapsing");
+          expect(r.donor.group).toBe("inactive");
           expect(r.donor.giftCount).toBeGreaterThanOrEqual(2);
+          expect(hasMarketingConsent(r.donor)).toBe(true);
+        }
+        for (const r of fu.checkin) {
+          expect(r.donor.group).toBe("decreasing");
           expect(hasMarketingConsent(r.donor)).toBe(true);
         }
       });
@@ -232,10 +241,64 @@ describe("charity portal demo data", () => {
         const fu = followUps(ds, large);
         expect(items.find((i) => i.kind === "large_donation")?.count ?? 0).toBe(fu.large.length);
         expect(items.find((i) => i.kind === "new_donors")?.count ?? 0).toBe(fu.new.length);
+        expect(items.find((i) => i.kind === "giving_less")?.count ?? 0).toBe(fu.checkin.length);
         const handled = Object.fromEntries(fu.new.map((r) => [r.key, DEMO_TODAY]));
         expect(attentionItems(ds, { largeCents: large, handled }).some((i) => i.kind === "new_donors")).toBe(false);
         if (!ds.charity.s18a) expect(items.some((i) => i.kind === "s18a_details")).toBe(false);
       });
+    }
+  });
+
+  describe("giving groups", () => {
+    it("follows the rules in order: new, inactive, consistent, decreasing, occasional", () => {
+      expect(groupFor("2026-10-01", 1, 0)).toBe("new");
+      expect(groupFor("2025-05-01", 0, 6)).toBe("inactive");
+      expect(groupFor("2025-05-01", GROUP_CONSISTENT_MIN, 0)).toBe("consistent");
+      expect(groupFor("2025-05-01", GROUP_CONSISTENT_MIN - 1, GROUP_CONSISTENT_MIN)).toBe("decreasing");
+      expect(groupFor("2025-05-01", 2, 2)).toBe("occasional");
+      expect(groupFor(null, 0, 0)).toBe("inactive");
+    });
+
+    it("counts 30-day windows back from the demo's today", () => {
+      // 14/10/2026 is in window 0; 15/09/2026 (29 days back) too; 14/09/2026 (30 back) is window 1.
+      expect(givingWindows(["2026-10-14", "2026-09-15"])).toEqual([1, 0]);
+      expect(givingWindows(["2026-10-14", "2026-09-14"])).toEqual([2, 0]);
+      // 180 days back is the first window of the earlier six.
+      expect(givingWindows(["2026-04-17"])).toEqual([0, 1]);
+    });
+
+    for (const charity of DEMO_CHARITIES) {
+      it(`${charity.shortName}: every donor is in exactly one group, and monthly donors are mostly consistent`, () => {
+        const stats = donorStats(generateDataset(charity.id)).filter((d) => d.giftCount > 0);
+        for (const d of stats) expect(GROUP_ORDER).toContain(d.group);
+        const monthly = stats.filter((d) => d.hasMonthly && d.firstDay! < "2026-04-01");
+        expect(monthly.filter((d) => d.group === "consistent").length / monthly.length).toBeGreaterThan(0.8);
+        for (const d of stats.filter((x) => x.group === "inactive")) expect(d.lastDay! <= "2026-04-17").toBe(true);
+      });
+    }
+  });
+
+  describe("bank deposits", () => {
+    for (const charity of DEMO_CHARITIES) {
+      for (const feeModel of ["charity", "not_charity"] as const) {
+        it(`${charity.shortName} (${feeModel}): every deposit's lines and campaign split add up to it`, () => {
+          const ds = generateDataset(charity.id, feeModel);
+          let refundLines = 0;
+          for (const p of ds.payouts) {
+            const lines = depositLines(ds, p);
+            expect(sum(lines.map((l) => l.netCents))).toBe(p.netCents);
+            expect(sum(lines.map((l) => l.grossCents))).toBe(p.grossCents);
+            expect(sum(lines.map((l) => l.feeCents))).toBe(p.feesCents);
+            expect(sum(lines.map((l) => l.refundCents))).toBe(p.refundsCents);
+            expect(lines.filter((l) => l.kind === "donation").length).toBe(p.donationCount);
+            const funds = depositByFund(lines);
+            expect(sum(funds.map((f) => f.netCents))).toBe(p.netCents);
+            expect(new Set(funds.map((f) => f.campaignId)).size).toBe(funds.length);
+            refundLines += lines.filter((l) => l.kind === "refund").length;
+          }
+          expect(refundLines).toBeGreaterThan(0);
+        });
+      }
     }
   });
 });

@@ -2,6 +2,8 @@
 
 _Updated 14/10/2026: added s18A receipts, a Needs attention panel on the overview, thank-you and win-back drafts under Donors, and a pace line on campaigns (nine sections now)._
 
+_Updated 15/10/2026, using Givelify as the functional reference: donor giving groups (Consistent, Occasional, New, Decreasing, Inactive) and a Bank deposits reconciliation view with plain CSV exports. See "Givelify reference" below._
+
 Built 14/10/2026 for review. A clickable prototype of the portal charity administrators would use. **Demo data only**: no database, no payment provider, no email. Approve the design here before any backend work starts.
 
 ## How to run it
@@ -97,11 +99,24 @@ Placeholders, clearly labelled on screen and in `demo-config.ts`: a 3% processin
 **Added 14/10/2026:**
 - **s18A receipts:** one receipt per donor per SARS tax year (tax year 2026 is closed, so its receipts show as issued with numbers; tax year 2027 shows "after year end"). Amounts are the donation only. A receipt cannot be issued while the donor's details are incomplete. Refunded, failed and pending donations never count. The receipt preview uses the repository's draft wording and shows only the last 4 digits of ID or tax numbers (hidden in the demo). Not approved charities (Sunrise Table) see an explanation instead.
 - **Needs attention:** failed monthly payments, donors missing s18A details, campaigns behind pace or ending soon, large donations and first-time donors waiting for a thank-you. Every row opens the screen that fixes it. Each figure is computed from the same dataset (tested).
-- **Follow up (Donors):** welcome new donors, thank large donors, win back lapsing donors. Drafts are written in the charity's voice, editable, and open in the charity's own email app. Givezy sends nothing. "Done" is remembered in the browser. Win-back lists only donors who agreed to hear about appeals (a demo trait, see open decisions).
+- **Follow up (Donors):** welcome new donors, thank large donors, check in with donors giving less often, win back inactive donors (the last two from 15/10/2026). Drafts are written in the charity's voice, editable, and open in the charity's own email app. Givezy sends nothing. "Done" is remembered in the browser. Win-back lists only donors who agreed to hear about appeals (a demo trait, see open decisions).
 - **Campaign pace:** an Ahead, On track or Behind badge and the amount needed each day, on the campaign page.
 - The "large donation" amount follows the setting under Settings, Notifications (R5 000 until changed).
 
+**Added 15/10/2026:** giving groups on Donors (cards, filter chips, a column, the reason on each profile and in the CSV), Check-in and Win-back lists in Follow up, a "giving less often" Needs attention row, and Bank deposits on Finances with matching, the deposit drawer and three new CSV exports.
+
 **Simulated, says so on screen:** invitations (no email), "Say thank you" (no email), notification settings (nothing sent), public page and sign-out (toast only), bank account change (a request toast), campaign publish (local only), refunds (shown, not actionable), verification steps (static per charity), recent activity (sample entries).
+
+## Givelify reference (15/10/2026)
+
+Givelify's Analytics Studio is the functional reference for this portal, as the original brief said. It is a reference for what charities need, not a template: no layout, names or assets are copied. There is no Givelify login on our side and their site was not reachable from the build machine, so what follows comes from search summaries of Givelify's own help and blog pages and third-party reviews. Treat it as their description of their product.
+
+| What Givelify describes | What the portal now does |
+|---|---|
+| Five donor groups: Consistent (weekly, fortnightly or monthly pattern), Occasional (more than once, no pattern), New (first four weeks), Decreasing (was consistent, has drifted), Inactive. Givelify says AI sorts donors. | The same five groups as **plain rules a charity can read** (shown on screen): New is a first donation in the last 28 days; Consistent gave in at least 5 of the last 6 thirty-day windows; Decreasing did that in the 6 windows before but less often since; Inactive gave nothing in the last 6 windows; everyone else is Occasional. Each donor's profile says why ("1 of the last 6 · 5 of the 6 before"). |
+| Bank deposits report, grouped by date, to match the bank statement; per-deposit view of each donation with fees, net and campaign. | **Bank deposits** on Finances: one row per deposit with the statement reference, a tick box to mark it matched on the bank statement (remembered), a progress bar, and a drawer with every donation and refund line and a by-campaign split, all adding up to the deposit to the cent (tested). |
+| Import-ready exports: donations with fees by campaign, bank deposits, CSV or Excel. | Plain CSV, as agreed: **Bank deposits**, **Deposit detail** (every donation and refund line), **Deposits by campaign** (journal-ready), plus the existing financial report and donations with fees. Each file adds up to the deposits it covers. |
+| Donor engagement around those groups. | **Check in: giving less** (Decreasing donors) and **Win back inactive donors** in Follow up, and a "giving less often" row in Needs attention. |
 
 ## Feature-to-backend map
 
@@ -126,6 +141,9 @@ These need Yehuda (and some Yosef) before the real build. They are also in `docs
 9. **Dark mode:** not designed. Wanted?
 10. **Live address** for campaign links (the demo uses `givezy.example`).
 11. **Marketing consent (POPIA), for Yosef:** the demo treats thank-yous as service messages any donor can get, and win-back appeals as marketing that needs consent (65% of demo donors "agreed", a made-up trait). Is that the right line, and where does the checkout ask for the consent?
-12. **Follow-up and pace settings are placeholders, not decisions** (in `demo-config.ts`): "new donor" for 14 days, "large donation" within 30 days, "ahead" at 110% of an even pace and "behind" under 90%, a campaign "ending soon" within 14 days. Donor groups: lapsing is 120 to 240 days since the last donation. Confirm or change.
+12. **Follow-up and pace settings are placeholders, not decisions** (in `demo-config.ts`): "new donor" welcome list for 14 days, "large donation" within 30 days, "ahead" at 110% of an even pace and "behind" under 90%, a campaign "ending soon" within 14 days. Confirm or change.
 13. **Receipt numbers:** the demo numbers receipts in donor order within the year (`BF-2026-0001`). The real job numbers in issue order, per the existing sample format. Same format, different order.
 14. **Who writes to donors:** the portal drafts and the charity sends from its own email. Should Givezy ever send for them (needs consent, unsubscribe handling and sender authentication), or stay draft-only?
+15. **Giving-group rules are placeholders too:** New for 28 days (Givelify says four weeks), 30-day windows, 6 windows each side, Consistent at 5 of 6. Givelify does not publish its cut-offs.
+16. **Statement reference:** the demo shows each deposit on the bank statement as `GIVEZY PO-yyyymmdd`. The real text depends on the payment provider; check it in test mode.
+17. **"Mark all as matched":** handy for catching up, risky if used without checking. Keep it, or make bookkeepers tick one by one?

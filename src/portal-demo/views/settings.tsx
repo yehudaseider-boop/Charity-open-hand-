@@ -514,7 +514,7 @@ function PayoutsTab({ data }: { data: DemoDataset }) {
             ["Account", `Ending ${data.charity.bankLast4}`],
             ["Account holder", data.charity.name],
             ["Schedule", DEMO_PAYOUT_SCHEDULE],
-            ["Statement reference", `GIVEZY ${data.charity.initials}`],
+            ["Statement reference", "GIVEZY PO-yyyymmdd (demo format, one per deposit)"],
           ]}
         />
         <p className="mt-3 text-xs text-gz-muted">Only the last 4 digits are ever shown.</p>
