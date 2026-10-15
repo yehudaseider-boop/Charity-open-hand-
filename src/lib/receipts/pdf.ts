@@ -10,9 +10,9 @@ export function loadFontCss(): string {
   };
   const latin = "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD";
   const hebrew = "U+0307-0308,U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F";
-  // The brand fonts: Fraunces for the title, Inter for every field, Heebo for any Hebrew.
+  // The brand fonts: Fredoka for the title, Inter for every field, Heebo for any Hebrew.
   return [
-    face("Fraunces", 600, "@fontsource/fraunces", "fraunces-latin-600-normal.woff2", latin),
+    face("Fredoka", 600, "@fontsource/fredoka", "fredoka-latin-600-normal.woff2", latin),
     face("Inter", 400, "@fontsource/inter", "inter-latin-400-normal.woff2", latin),
     face("Inter", 500, "@fontsource/inter", "inter-latin-500-normal.woff2", latin),
     face("Inter", 600, "@fontsource/inter", "inter-latin-600-normal.woff2", latin),
@@ -21,9 +21,10 @@ export function loadFontCss(): string {
   ].join("\n");
 }
 
-/** The Givezy wordmark as inline SVG, for the top left of a receipt. */
-export function loadLogoSvg(): string {
-  return readFileSync(join(process.cwd(), "public", "brand", "nadiv-lev.svg"), "utf8");
+/** The Givezy logo as an embedded image, for the top left of a receipt. */
+export function loadLogoHtml(): string {
+  const b64 = readFileSync(join(process.cwd(), "public", "logo.png")).toString("base64");
+  return `<img src="data:image/png;base64,${b64}" alt="Givezy">`;
 }
 
 /** Print HTML to an A4 PDF with headless Chrome. CHROME_PATH points at the Chrome or Chromium to use. */
