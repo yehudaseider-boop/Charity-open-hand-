@@ -523,3 +523,7 @@ Yehuda: the charity pays Paystack's fee, out of its donation. Later we offer the
 - The give screen has "Give every month". It uses the same server path as the website's monthly gifts (`startDonation`): the first payment is month one, the card is saved by the payment provider, and the monthly record stays pending until that payment is confirmed. The donor ticks an authorisation that names the exact total (gift plus any contribution), which is recorded as a consent. A contribution to Givezy repeats each month with the gift.
 - Pausing and cancelling stay in Account, as before. The monthly job, retries and emails are unchanged.
 - Yehuda confirmed (14/10/2026): when a donor covers the processing fee, the charity receives the full gift and the donor pays the extra; the s18A receipt shows the gift only. Still not built: it waits for Paystack's rate sheet.
+
+## Giving first: the Give button (15/10/2026)
+
+Yehuda wants giving to be the first thing the app offers. A big round blue Give button sits in the middle of the tab bar, raised above it, on every tab. It opens "Who would you like to give to?": a search, "Give again" (charities the donor gave to before, most recent first), "Your charities" (saved ones not already shown), then all charities. Choosing one goes straight to the usual give step for that charity, with "Another charity" to go back. The middle tab is a button, not a page; a link to it lands on Discover.
