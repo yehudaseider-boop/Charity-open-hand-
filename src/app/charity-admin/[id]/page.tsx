@@ -3,7 +3,9 @@ import Link from "next/link";
 import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
-import { loadCharityForManager } from "@/lib/charity/queries";
+import { gettingStarted } from "@/lib/charity/checklist";
+import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
+import { CopyLink } from "./copy-link";
 import { allTime, averageCents, monthlySummary, repeatPercent, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { progressPercent } from "@/lib/charity/campaigns";
@@ -45,7 +47,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
   const now = new Date();
   const taxYear = thisTaxYear(now);
-  const [month, year, all, monthly, recurring, insights, campaigns] = await Promise.all([
+  const [month, year, all, monthly, recurring, insights, campaigns, stories] = await Promise.all([
     loadOverview(id, thisMonth(now)),
     loadOverview(id, taxYear),
     loadOverview(id, allTime),
@@ -53,8 +55,12 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     loadMonthlyDonations(id),
     loadInsights(id, thisMonth(now)),
     loadCampaigns(id),
+    loadStories(id, 1),
   ]);
   const activeCampaigns = campaigns.filter((c) => c.status === "active");
+  const start = gettingStarted(charity, { updates: stories.updates.length, campaigns: campaigns.length }, base);
+  const startDone = start.filter((i) => i.done).length;
+  const publicLink = `${(process.env.SITE_URL ?? "").replace(/\/+$/, "")}/c/${charity.slug}`;
   const regular = monthlySummary(recurring);
   const receipts = canIssue18a(charity);
   const chart = [...monthly].reverse();
@@ -65,6 +71,29 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">{charity.name_en}</h1>
+
+      {/* Shown until everything is done: what helps donors find you and give. */}
+      {startDone < start.length ? (
+        <Card title={`Getting started: ${startDone} of ${start.length} done`}>
+          <ul className="space-y-2 text-sm">
+            {start.map((i) => (
+              <li key={i.key} className="flex items-start gap-2">
+                <span aria-hidden className={i.done ? "text-success" : "text-muted"}>{i.done ? "✓" : "○"}</span>
+                {i.done || !i.href ? (
+                  <span className={i.done ? "text-muted line-through" : ""}>{i.label}</span>
+                ) : (
+                  <Link href={i.href} className="text-brand underline">{i.label}</Link>
+                )}
+                {i.done ? <span className="sr-only"> (done)</span> : null}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 border-t border-border pt-3 text-sm">
+            <p className="mb-2">Share your Givezy page with your community:</p>
+            <CopyLink url={publicLink} />
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3">
         <Stat label="This month" value={formatRand(month.paid_cents)} note={plural(month.paid_count, "donation")} />

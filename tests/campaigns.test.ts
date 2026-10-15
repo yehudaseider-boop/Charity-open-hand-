@@ -38,3 +38,39 @@ describe("charity insights figures", () => {
     expect(repeatPercent(0, 0)).toBe(0);
   });
 });
+
+import { applicationSteps, currentStep } from "@/lib/charity/checklist";
+
+describe("guided application", () => {
+  const items = [
+    { key: "organisation", label: "", done: true },
+    { key: "address", label: "", done: true },
+    { key: "contact", label: "", done: false },
+    { key: "bank", label: "", done: true },
+    { key: "bank_confirmation", label: "", done: true },
+    { key: "s18a_approval", label: "", done: false },
+  ];
+  it("groups the checklist into steps; documents are done only when every document is", () => {
+    const steps = applicationSteps(items);
+    expect(steps.map((s) => [s.key, s.done])).toEqual([["organisation", true], ["address", true], ["contact", false], ["bank", true], ["documents", false], ["submit", false]]);
+  });
+  it("lands on the step asked for, else the first one not done", () => {
+    const steps = applicationSteps(items);
+    expect(currentStep(steps, undefined).key).toBe("contact");
+    expect(currentStep(steps, "bank").key).toBe("bank");
+    expect(currentStep(steps, "nonsense").key).toBe("contact");
+    expect(currentStep(applicationSteps(items.map((i) => ({ ...i, done: true }))), undefined).key).toBe("submit");
+  });
+});
+
+import { gettingStarted } from "@/lib/charity/checklist";
+
+describe("getting started after approval", () => {
+  it("ticks itself off from what the charity has done", () => {
+    const none = gettingStarted({ cover_path: null, description_en: null, funds_use_en: " ", gateway_subaccount_ref: null }, { updates: 0, campaigns: 0 }, "/c-a/1");
+    expect(none.every((i) => !i.done)).toBe(true);
+    expect(none.find((i) => i.key === "payments")?.href).toBeNull();
+    const all = gettingStarted({ cover_path: "1/cover.jpg", description_en: "We feed families", funds_use_en: "Food", gateway_subaccount_ref: "ACCT_1" }, { updates: 2, campaigns: 1 }, "/c-a/1");
+    expect(all.every((i) => i.done)).toBe(true);
+  });
+});
