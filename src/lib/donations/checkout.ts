@@ -240,6 +240,8 @@ async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<st
   const db = createAdminClient();
   const reg = v.donor_type === "individual" ? null : (v.registration_number ?? null);
   const now = new Date().toISOString();
+  // The full ID and tax numbers stay only with each donation's checkout details (for its receipt), never on the
+  // donor record: that record can be shared by everyone who gives with one email address.
   const fields = {
     first_name: v.first_name ?? null,
     last_name: v.last_name ?? null,
@@ -248,9 +250,7 @@ async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<st
     phone: v.phone ?? null,
     ...(want18a
       ? {
-          id_number_encrypted: v.id_number ? encrypt(v.id_number.replace(/\s/g, "")) : null,
           id_number_last4: v.id_number ? last4(v.id_number) : null,
-          tax_reference_encrypted: v.tax_reference ? encrypt(v.tax_reference) : null,
           tax_reference_last4: v.tax_reference ? last4(v.tax_reference) : null,
           address_line1: v.address_line1 ?? null,
           address_line2: v.address_line2 ?? null,

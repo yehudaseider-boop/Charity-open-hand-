@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/ids";
 import { isRealImage } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
+import { cleanImage } from "@/lib/charity/clean-image";
 
 function revalidate(charityId: string, slug: string) {
   revalidatePath(`/charity-admin/${charityId}/profile`);
@@ -84,7 +85,7 @@ export async function uploadImage(
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
   const path = `${charityId}/${kind}-${crypto.randomUUID()}.${ext}`;
   const supabase = await createClient();
-  const up = await supabase.storage.from("charity-public").upload(path, file, { contentType: file.type });
+  const up = await supabase.storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
   if (up.error) return failed(up.error);
 
   const column = kind === "logo" ? "logo_path" : "cover_path";

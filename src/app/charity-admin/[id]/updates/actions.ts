@@ -11,6 +11,7 @@ import { isUuid } from "@/lib/ids";
 import { isRealImage } from "@/lib/charity/file-check";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { cleanImage } from "@/lib/charity/clean-image";
 
 function revalidate(charityId: string, slug: string) {
   revalidatePath(`/charity-admin/${charityId}/updates`);
@@ -28,7 +29,7 @@ async function uploadIfAny(charityId: string, folder: "photos" | "updates", form
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
   const path = `${charityId}/${folder}/${crypto.randomUUID()}.${ext}`;
   const supabase = await createClient();
-  const up = await supabase.storage.from("charity-public").upload(path, file, { contentType: file.type });
+  const up = await supabase.storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
   if (up.error) {
     console.error(up.error);
     return { error: { ok: false, message: "The upload didn't work. Please try again." } as FormState };

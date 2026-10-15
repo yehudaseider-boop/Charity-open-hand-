@@ -236,11 +236,13 @@ export async function submitApplication(charityId: string, _prev: FormState, for
   if (!isComplete(checklist)) {
     return { ok: false, message: "Some sections are still incomplete. See the checklist." };
   }
-  const supabase = await createClient();
-  const { data: rows, error } = await supabase
+  // Only this server action can submit (the database no longer lets a browser change a charity's status),
+  // so the four declarations and the consent record below always come with a submission.
+  const { data: rows, error } = await createAdminClient()
     .from("charities")
     .update({ status: "pending_review" })
     .eq("id", charityId)
+    .in("status", ["draft", "rejected"])
     .select("id");
   const fail = refusal(error, rows);
   if (fail) return fail;

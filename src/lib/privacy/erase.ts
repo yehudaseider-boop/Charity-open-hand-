@@ -85,9 +85,18 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
   }
 
   if (userId) {
+    // Their own records kept against the account go in every case, also when the account itself has to stay
+    // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, maaser settings.
+    for (const table of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"]) {
+      const { error: ownError } = await db.from(table).delete().eq("user_id", userId);
+      if (ownError) throw new Error(`Could not erase their ${table.replace(/_/g, " ")}: ${ownError.message}`);
+    }
     const blocked = await accountBlocker(userId);
     if (blocked) {
       summary.note = blocked;
+      // The account stays for their charity or platform work, without the name they gave as a donor.
+      const { error: nameError } = await db.from("profiles").update({ full_name: null }).eq("id", userId);
+      if (nameError) throw new Error(`Could not erase their name: ${nameError.message}`);
     } else {
       // Their own account agreement goes with them. A charity's declarations stay with the charity
       // (the person's link to them is cleared when the account is deleted).

@@ -36,13 +36,9 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
   const d = data as unknown as DonationRow;
   const s = donationStatus[d.status];
 
-  // The receipt this donation is on, if one has been issued (a charity admin can read its charity's receipts).
-  const { data: links } = await supabase
-    .from("s18a_receipt_donations")
-    .select("s18a_receipts(id, status, pdf_path, reference:details->>receipt_reference)")
-    .eq("donation_id", donationId);
-  type Receipt = { id: string; status: string; pdf_path: string | null; reference: string };
-  const receipts = (links ?? []).map((l) => (Array.isArray(l.s18a_receipts) ? l.s18a_receipts[0] : l.s18a_receipts) as unknown as Receipt | null).filter((r): r is Receipt => r !== null);
+  // The receipt this donation is on, if one has been issued (a narrow view: no donor ID or tax digits).
+  const { data: links } = await supabase.from("charity_receipt_donations").select("receipt_id, status, reference").eq("donation_id", donationId);
+  const receipts = (links ?? []).map((l) => ({ id: l.receipt_id as string, status: l.status as string, reference: l.reference as string }));
 
   return (
     <div className="space-y-4">
@@ -98,7 +94,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
             {receipts.map((r) => (
               <li key={r.id}>
                 {r.reference}{" "}
-                {r.status === "void" ? <Badge tone="warning">Withdrawn</Badge> : r.pdf_path ? <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">Download PDF</Link> : <span className="text-muted">PDF on its way</span>}
+                {r.status === "void" ? <Badge tone="warning">Withdrawn</Badge> : <Badge tone="success">Issued</Badge>}
               </li>
             ))}
           </ul>

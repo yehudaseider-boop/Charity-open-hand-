@@ -184,7 +184,14 @@ export async function addCharityAdmin(id: string, _prev: FormState, formData: Fo
 
   const db = createAdminClient();
   let { data: profile } = await db.from("profiles").select("id").eq("email", email).maybeSingle();
-  if (!profile) {
+  if (profile) {
+    // An account someone registered but never confirmed could belong to anyone who typed this email:
+    // never give it a charity's access.
+    const existing = await db.auth.admin.getUserById(profile.id);
+    if (existing.error || !existing.data.user?.email_confirmed_at) {
+      return { ok: false, message: "That email has an unconfirmed account. Ask them to sign in once with the emailed code first, then add them again." };
+    }
+  } else {
     const created = await db.auth.admin.createUser({ email, email_confirm: true });
     if (created.error) return { ok: false, message: created.error.message };
     profile = { id: created.data.user.id };

@@ -194,7 +194,7 @@
 
 - Five day-one screens at `/charity-admin/[id]`: Overview, Donations (with detail), Donors, Receipts, and CSV downloads of donations and donors.
 - Charities read through `charity_donations` and the `charity_*` functions only. They never see fees, gateway data or the donor's maaser/chomesh/tzedaka choice.
-- Charity admins see donor name, contact and address as typed at checkout, and only the last 4 of ID and tax numbers. Anonymous donors are anonymous on public pages only.
+- Charity admins see donor name, contact and address as typed at checkout, and no part of ID or tax numbers (changed 15/10/2026, see below; it was the last 4). Anonymous donors are anonymous on public pages only.
 - CSV downloads are checked against `is_charity_admin`, rate limited (10 per 10 minutes per person) and audit logged. Cells that start with `=`, `+`, `-` or `@` are neutralised.
 - Receipts screen is read-only. Only platform admins withdraw and re-issue receipts.
 - Decided by Yehuda (09/10/2026): owners and admins see the same things; no team invites for now (platform team adds charity admins); English only everywhere, no Hebrew version.
@@ -571,3 +571,15 @@ Yehuda wants giving to be the first thing the app offers. A big round Give butto
 - A donor may give "in honour of" or "in memory of" someone (name up to 80 characters). The note to the charity is the donation's existing message. Stored on the donation (and on a monthly donation, copied to each month).
 - Seen by the donor (thank-you page, confirmation email, tax pack, data download) and the charity (donation page and export). Never on the s18A receipt. Wiped with the donor's other information when they ask for erasure.
 - Database change `20261015000001_dedications.sql`, not yet run on any database (the sandbox cannot reach one; see the go-live checklist).
+
+## Code review of the whole stack (15/10/2026)
+
+Four independent read-only reviews (money, security and privacy, receipts and tax, the phone app), each finding checked against the code before fixing. Fixes so far:
+- **Monthly giving:** collects for the month a charge belongs to (a retry or pending check after midnight on the 1st no longer counts as next month, never a catch-up); a charge the gateway refuses outright counts as a failed attempt; a payment without the charity's account is refused when splits are on; gateway calls time out; a stopped monthly donation can only be removed, and resuming needs a card (migration `20261015000002`). The decline email tells donors to cancel the old monthly donation before starting a new one (two monthly donations to one charity can be deliberate, so nothing is cancelled automatically).
+- **Return page:** limited provider checks per visitor; after about a minute, a clear "I didn't pay: try again".
+- **Charities see no part of a donor's ID or tax number** (Yehuda, 15/10/2026, until Yosef confirms what a charity must hold): receipts are read through `charity_receipts` and `charity_receipt_donations`; the receipt PDF is for the donor and platform admins only (migration `20261015000003`).
+- **Shared donor records:** full ID and tax numbers are no longer copied onto the donor record (each donation keeps its own, for its receipt) and old copies are cleared; the data download shows last 4 digits only, includes monthly donations, reads every donation, and fails rather than handing over a partial file.
+- **Security:** sessions started with a password are refused (website and database), an unconfirmed account cannot be made a charity admin, browsers can no longer change a charity's status or approval fields (submitting goes through the server with its declarations), the unused income table is closed to clients, new database functions are not public by default (migration `20261015000004`).
+- **Erasure** also deletes the person's income log, giving elsewhere, notes, saved charities and maaser settings when their account has to stay, and clears payment references.
+- **Charity photos** are re-encoded on upload, so no GPS position or other hidden details reach the public site.
+

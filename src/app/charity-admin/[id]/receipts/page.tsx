@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
@@ -18,8 +17,9 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
   const { charity } = await loadCharityForManager(id);
   const supabase = await createClient();
   const { data: receipts, error } = await supabase
-    .from("s18a_receipts")
-    .select("id, tax_year, amount_cents, issued_at, status, pdf_path, emailed_at, reference:details->>receipt_reference, donor_name:details->donor->>name")
+    // A narrow view: no part of the donor's ID or tax number reaches the charity.
+    .from("charity_receipts")
+    .select("id, tax_year, amount_cents, issued_at, status, emailed_at, reference, donor_name")
     .eq("charity_id", id)
     .order("issued_at", { ascending: false })
     .limit(200);
@@ -53,13 +53,7 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
                 </div>
                 <div className="shrink-0 space-y-1 text-right">
                   <p className="font-semibold">{formatRand(r.amount_cents)}</p>
-                  {r.status === "void" ? (
-                    <Badge tone="warning">Withdrawn</Badge>
-                  ) : r.pdf_path ? (
-                    <div><Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">Download PDF</Link></div>
-                  ) : (
-                    <Badge>PDF on its way</Badge>
-                  )}
+                  {r.status === "void" ? <Badge tone="warning">Withdrawn</Badge> : <Badge tone="success">Issued</Badge>}
                   {r.status !== "void" ? <div>{r.emailed_at ? <Badge tone="success">Emailed</Badge> : <Badge>Not emailed</Badge>}</div> : null}
                 </div>
               </div>
@@ -71,7 +65,10 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
           <p className="text-sm text-muted">No receipts have been issued yet. They appear here once the tax year has ended and receipts have been issued.</p>
         </Card>
       )}
-      <p className="text-xs text-muted">If a receipt needs correcting, contact the platform team: only they can withdraw and re-issue one.</p>
+      <p className="text-xs text-muted">
+        The receipt itself goes to the donor (it shows their ID or tax number, which charities don&apos;t see). If a receipt needs correcting,
+        contact the platform team: only they can withdraw and re-issue one.
+      </p>
     </div>
   );
 }
