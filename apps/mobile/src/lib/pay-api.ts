@@ -64,3 +64,36 @@ export function startPayment(
 ) {
   return call<CheckoutReply>(post, api(site, "checkout"), args);
 }
+
+type PastGift = { charitySlug: string; cents: number; date: Date; kind: string; monthly: boolean };
+
+/**
+ * One-tap amounts, taken only from the donor's own past gifts (we never suggest a figure of our
+ * own): the last amount given to this charity first, then other recent amounts. At most three.
+ */
+export function quickAmounts(gifts: PastGift[], slug: string, max = 3): number[] {
+  const recent = [...gifts].sort((a, b) => b.date.getTime() - a.date.getTime());
+  const out: number[] = [];
+  for (const g of [...recent.filter((g) => g.charitySlug === slug), ...recent]) {
+    if (g.cents > 0 && !out.includes(g.cents)) out.push(g.cents);
+    if (out.length === max) break;
+  }
+  return out;
+}
+
+/** What the donor's last gift to this charity counted as, to start from. */
+export function lastKind(gifts: PastGift[], slug: string): "maaser" | "chomesh" | "tzedaka" | null {
+  const g = [...gifts].filter((x) => x.charitySlug === slug).sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+  return g && (g.kind === "maaser" || g.kind === "chomesh" || g.kind === "tzedaka") ? g.kind : null;
+}
+
+/** The donor's own details, kept on this phone only when they ask us to remember them. Never ID or tax numbers. */
+export type RememberedDetails = { first_name: string; last_name: string; email: string; phone: string };
+
+export function cleanRemembered(v: unknown): RememberedDetails | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const s = (k: string) => (typeof o[k] === "string" ? (o[k] as string).slice(0, 200) : "");
+  const r = { first_name: s("first_name"), last_name: s("last_name"), email: s("email"), phone: s("phone") };
+  return r.first_name && r.last_name && r.email ? r : null;
+}

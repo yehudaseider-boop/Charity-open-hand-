@@ -9,6 +9,7 @@ import { InfoButton } from "@/components/info-button";
 import { CharityImage } from "@/components/charity-image";
 import { Sheet } from "@/components/sheet";
 import { GiveSheet } from "@/components/give-sheet";
+import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { HebrewText, Text } from "@/components/text";
 import { ddmmyyyy } from "@/lib/format";
@@ -169,7 +170,7 @@ export default function CharityDetail() {
       {/* Sticky give bar */}
       <View style={[styles.giveBar, { paddingBottom: insets.bottom + 12 }]}>
         <LinearGradient colors={["rgba(254,253,247,0)", colors.cream]} style={styles.fade} pointerEvents="none" />
-        <Button label={`Give to ${charity.nameEn}`} onPress={() => setSheetOpen(true)} />
+        <Button label={`Give to ${charity.nameEn}`} onPress={() => (GIVE_IN_APP ? openGiveScreen(charity.slug) : setSheetOpen(true))} />
       </View>
 
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)}>

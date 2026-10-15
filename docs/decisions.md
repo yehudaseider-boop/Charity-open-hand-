@@ -527,3 +527,15 @@ Yehuda: the charity pays Paystack's fee, out of its donation. Later we offer the
 ## Giving first: the Give button (15/10/2026)
 
 Yehuda wants giving to be the first thing the app offers. A big round Give button sits in the middle of the tab bar, raised above it, on every tab: the logo's splash (all three shapes) on white inside a blue ring, so each colour shows (Yehuda: the logo, not a heart). It opens "Who would you like to give to?": a search, "Give again" (charities the donor gave to before, most recent first), "Your charities" (saved ones not already shown), then all charities. Choosing one goes straight to the usual give step for that charity, with "Another charity" to go back. The middle tab is a button, not a page; a link to it lands on Discover.
+
+## Fewer taps to give (15/10/2026)
+
+Inspired by Givelify's "three taps". Yehuda: as few taps as possible, so the gift goes through.
+
+- **One screen, no review step.** The button shows the exact total ("Give R500", "Give R500 every month") and goes straight to the payment page. The server still re-checks the total and the minimums and refuses if anything changed.
+- **One-tap amounts from the donor's own history only:** the last amount given to this charity, then other recent amounts, at most three. We never suggest a figure of our own. New donors type the amount.
+- **What it counts as** starts from the donor's last gift to that charity.
+- **Remember my details on this phone** (off unless the donor turns it on): name, email and phone in the phone's secure storage, per signed-in person. Never ID or tax numbers. Next time the screen shows "Giving as ..." with Change.
+- **One tick instead of two:** "I am 18 or older, I agree to the Terms and Privacy Policy, and that Givezy records this donation." It sets both confirmations the server requires. **For Yosef to approve** (the website still shows two ticks).
+- The Give button and the tick are pinned to the bottom of the screen.
+- In the design preview (no live data) the give screen is always used, so the flow can be tried; it stops before payment with a note. Live builds still follow the in-app giving switches.

@@ -4,6 +4,7 @@ import { gifts as sampleGifts } from "@/data/giving";
 import type { Charity } from "@/data/sample";
 import { useAccount } from "@/lib/account";
 import { useDirectory } from "@/lib/directory";
+import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { givenBefore, savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
@@ -44,7 +45,11 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
   const matches = q ? all.filter((c) => c.nameEn.toLowerCase().includes(q) || c.cause.toLowerCase().includes(q) || c.area.toLowerCase().includes(q)) : [];
   const pick = (c: Charity) => {
     haptic.tap();
-    setChosen(c);
+    if (GIVE_IN_APP) {
+      // Straight to the one-screen give step: amount, what it counts as, done.
+      onDone();
+      openGiveScreen(c.slug);
+    } else setChosen(c);
   };
   // Saved ones not already under "Give again".
   const savedOnly = saved.filter((c) => !again.includes(c));

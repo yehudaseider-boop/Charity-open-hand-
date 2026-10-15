@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CauseTiles } from "@/components/cause-tiles";
 import { CharityCard } from "@/components/charity-card";
 import { GiveSheet } from "@/components/give-sheet";
+import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { Sheet } from "@/components/sheet";
 import type { Charity } from "@/data/sample";
 import { Splash } from "@/components/splash";
@@ -36,6 +37,7 @@ export default function Discover() {
   const [cause, setCause] = useState("all");
   // The charity whose "Give" was tapped in the list: the same give sheet as on its page.
   const [giveTo, setGiveTo] = useState<Charity | null>(null);
+  const onGive = (c: Charity) => (GIVE_IN_APP ? openGiveScreen(c.slug) : setGiveTo(c));
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -107,14 +109,14 @@ export default function Discover() {
           <View style={{ gap: space.block }}>
             {featured ? (
               <FadeUp index={0}>
-                <CharityCard charity={featured} featured live={live} onGive={setGiveTo} />
+                <CharityCard charity={featured} featured live={live} onGive={onGive} />
               </FadeUp>
             ) : null}
             <View>
               {rest.length ? <Text style={styles.listHead}>{cause === "all" && !query ? "More charities" : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
               {rest.map((c, i) => (
                 <FadeUp key={c.slug} index={i + 1}>
-                  <CharityCard charity={c} live={live} last={i === rest.length - 1} onGive={setGiveTo} />
+                  <CharityCard charity={c} live={live} last={i === rest.length - 1} onGive={onGive} />
                 </FadeUp>
               ))}
             </View>
