@@ -62,7 +62,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
-        <p className="text-xs text-muted">Minimum {minimumLabel}. No Nadiv Lev fee. You can make it monthly below.</p>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. No Givezy fee. You can make it monthly below.</p>
 
         <div className="space-y-2 rounded-control bg-bg p-3">
           <label className="flex items-start gap-2 text-sm">
@@ -76,11 +76,11 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                 setEditingAmount(true);
               }}
             />
-            <span>Also give to Nadiv Lev, to help keep this platform running. Optional.</span>
+            <span>Also give to Givezy, to help keep this platform running. Optional.</span>
           </label>
           {giveExtra ? (
             <div>
-              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Nadiv Lev</label>
+              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Givezy</label>
               <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3">
                 <span className="text-muted">R</span>
                 <input
@@ -120,7 +120,7 @@ function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; ch
     <dl className="space-y-1 text-sm">
       <div className="flex justify-between gap-3"><dt>Donation to {charityName}</dt><dd>{formatRand(q.amountCents)}</dd></div>
       {q.contributionCents > 0 ? (
-        <div className="flex justify-between gap-3"><dt>Contribution to Nadiv Lev</dt><dd>{formatRand(q.contributionCents)}</dd></div>
+        <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(q.contributionCents)}</dd></div>
       ) : null}
       <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Total</dt><dd>{formatRand(q.totalCents)}</dd></div>
     </dl>
@@ -238,10 +238,12 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
               </label>
             ))}
           </div>
-          <p className="text-xs text-muted">Counts towards your maaser and chomesh in the Nadiv Lev app. Only you see this.</p>
+          <p className="text-xs text-muted">Counts towards your maaser and chomesh in the Givezy app. Only you see this.</p>
           <Info terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
           {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
         </fieldset>
+
+        <Dedicate error={state.fieldErrors?.dedication_name} />
 
         <TextArea name="message" label={`Message to ${charityName}`} rows={3} />
 
@@ -254,10 +256,10 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
             <>
               <p className="text-xs text-muted">
                 Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Card payments only.
-                You can pause or cancel at any time in the Nadiv Lev app or from your account on this website.
+                You can pause or cancel at any time in the Givezy app or from your account on this website.
               </p>
               <Check key={shownQuote.totalCents} name="monthly_authorised" error={state.fieldErrors?.monthly_authorised}>
-                I authorise Nadiv Lev to collect {formatRand(shownQuote.totalCents)} from my card every month until I cancel.
+                I authorise Givezy to collect {formatRand(shownQuote.totalCents)} from my card every month until I cancel.
               </Check>
             </>
           ) : null}
@@ -273,7 +275,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           </Check>
           <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
             I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my
-            donation. Nadiv Lev keeps my maaser, chomesh or tzedaka choice privately, for my own records.
+            donation. Givezy keeps my maaser, chomesh or tzedaka choice privately, for my own records.
           </Check>
         </div>
 
@@ -290,3 +292,31 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
     </FormStateProvider>
   );
 }
+
+/**
+ * Optional: give in honour of, or in memory of, someone. The charity sees it on the donation;
+ * it is never on the s18A receipt. A note about the person goes in the message below.
+ */
+function Dedicate({ error }: { error?: string }) {
+  const [kind, setKind] = useState<"none" | "honour" | "memory">("none");
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">Dedicate this donation <span className="font-normal text-muted">(optional)</span></legend>
+      <div className="flex flex-wrap gap-2">
+        {([["none", "No"], ["honour", "In honour of"], ["memory", "In memory of"]] as const).map(([value, label]) => (
+          <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
+            <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} />
+            {label}
+          </label>
+        ))}
+      </div>
+      {kind !== "none" ? (
+        <TextField name="dedication_name" label="Their name" required autoDirection hint={`${charityLabel(kind)} The charity sees this name; it is not on your s18A receipt.`} />
+      ) : null}
+      {error && kind === "none" ? <p className="text-xs text-danger">{error}</p> : null}
+    </fieldset>
+  );
+}
+
+const charityLabel = (kind: "honour" | "memory") => (kind === "honour" ? "Shown as \u201cIn honour of\u201d this person." : "Shown as \u201cIn memory of\u201d this person.");
+

@@ -16,11 +16,21 @@ export type Viewer = {
   agreedToCurrentPolicy: boolean;
 };
 
+/** True when the session's sign-in methods include a password (read from the verified token). */
+export async function signedInWithPassword(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
+  const { data } = await supabase.auth.getClaims();
+  const amr = (data?.claims as { amr?: { method?: string }[] } | undefined)?.amr ?? [];
+  return amr.some((a) => a.method === "password");
+}
+
 /** The signed-in person and their roles, or null for a visitor. */
 export async function getViewer(): Promise<Viewer | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+  // Givezy signs people in with an emailed code only: a session started with a password is refused
+  // (someone could have registered another person's email with a password before they ever signed in).
+  if (await signedInWithPassword(supabase)) return null;
 
   const [{ data: profile }, { data: memberships }, { data: agreement }] = await Promise.all([
     supabase.from("profiles").select("role").eq("id", user.id).single(),

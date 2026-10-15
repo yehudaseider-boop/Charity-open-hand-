@@ -22,7 +22,7 @@ describe("confirmation email", () => {
 
   it("shows the contribution as its own line", () => {
     const m = confirmationEmail({ ...base, contributionCents: 2_500, totalCents: 20_500 });
-    expect(m.text).toContain("Contribution to Nadiv Lev: R25");
+    expect(m.text).toContain("Contribution to Givezy: R25");
     expect(m.text).toContain("Total paid: R205");
   });
 });

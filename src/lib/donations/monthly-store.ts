@@ -5,7 +5,7 @@ import { loadDonatableCharity } from "./charity";
 import { getEmailTransport } from "@/lib/email";
 import { formatRand } from "@/lib/money";
 import { getGateway } from "@/lib/gateway";
-import { isGatewayNotFound } from "@/lib/gateway/types";
+import { isGatewayNotFound, isGatewayRefusal } from "@/lib/gateway/types";
 import { platformConfig } from "@/config/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore, type MonthlySummary } from "./monthly-job";
@@ -21,6 +21,7 @@ type DueRow = {
   last_paid_period: string | null;
   attempt_period: string | null;
   failed_attempts: number;
+  next_charge_at: string;
   first_donation_id: string;
   charities: { slug: string; name_en: string } | null;
 };
@@ -38,7 +39,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
       const rows = must(
         await db
           .from("recurring_donations")
-          .select("id, amount_cents, contribution_cents, charge_day, authorization_encrypted, card_last4, last_paid_period, attempt_period, failed_attempts, first_donation_id, charities(slug, name_en)")
+          .select("id, amount_cents, contribution_cents, charge_day, authorization_encrypted, card_last4, last_paid_period, attempt_period, failed_attempts, next_charge_at, first_donation_id, charities(slug, name_en)")
           .eq("status", "active")
           .eq("gateway", gateway.name)
           .not("authorization_encrypted", "is", null)
@@ -81,6 +82,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
           lastPaidPeriod: r.last_paid_period,
           attemptPeriod: r.attempt_period,
           failedAttempts: r.failed_attempts,
+          nextChargeAt: new Date(r.next_charge_at),
         });
       }
       return { rows: out, unreadable };
@@ -113,7 +115,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
     },
 
     async createAttempt(r, donationId, totalCents) {
-      const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, gateway, first_donation_id").eq("id", r.id).maybeSingle(), "read the monthly donation");
+      const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id").eq("id", r.id).maybeSingle(), "read the monthly donation");
       const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
       const ins = await db.from("donations").insert({
         id: donationId,
@@ -133,6 +135,9 @@ export function supabaseMonthlyStore(): MonthlyStore {
         wants_18a: rec.wants_18a,
         is_anonymous: rec.is_anonymous,
         message: rec.message,
+        // Each month carries the dedication the donor chose when they set it up.
+        dedication_kind: rec.dedication_kind,
+        dedication_name: rec.dedication_name,
         popia_consent_at: first.popia_consent_at,
         age_confirmed_at: first.age_confirmed_at,
       });
@@ -179,7 +184,9 @@ export async function runMonthlyGiving(now = new Date()): Promise<MonthlySummary
     store: supabaseMonthlyStore(),
     now,
     async charge({ reference, r, totalCents }) {
+      // Checked again right before charging: the charity may have stopped taking donations since this run began.
       const charity = await loadDonatableCharity(r.charitySlug);
+      if (!charity?.acceptingPayments) throw new Error("The charity is not taking donations right now, so nothing was charged.");
       await gateway.chargeAuthorization({
         reference,
         authorizationCode: r.authorizationCode,
@@ -193,6 +200,7 @@ export async function runMonthlyGiving(now = new Date()): Promise<MonthlySummary
     },
     confirm: confirmPayment,
     isNotFound: isGatewayNotFound,
+    isRefused: isGatewayRefusal,
     async charityState(slug) {
       return { accepting: Boolean((await loadDonatableCharity(slug))?.acceptingPayments) };
     },

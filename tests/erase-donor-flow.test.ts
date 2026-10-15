@@ -37,7 +37,14 @@ vi.mock("@/lib/supabase/admin", () => ({
         select: (_c?: string, o?: { head?: boolean }) => (o?.head ? { eq: async () => ({ count: charityAdminCount }) } : q),
         eq: (c: string, v: unknown) => ((f[c] = v), q),
         maybeSingle: async () => ({ data: profile, error: null }),
-        delete: () => ({ eq: () => ({ eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }) }) }),
+        delete: () => ({
+          eq: (c1: string, v1: unknown) => ({
+            // consents: .eq("user_id").eq("kind"); the person's own tables: one .eq("user_id")
+            eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }),
+            then: (resolve: (v: { error: null }) => void) => (calls.push(`${table}:deleted:${c1}=${v1}`), resolve({ error: null })),
+          }),
+        }),
+        update: (patch: Record<string, unknown>) => ({ eq: async () => (calls.push(`${table}:update:${JSON.stringify(patch)}`), { error: null }) }),
         then: (resolve: (v: { data: unknown[]; error: null }) => void) => {
           const ids = table === "donors" ? (f.user_id ? donorsByUser : donorsByEmail) : [];
           resolve({ data: ids.map((id) => ({ id })), error: null });
@@ -82,7 +89,14 @@ describe("erasing a donor by their account", () => {
   it("finds every donor record that is theirs (by account or by email, once each), erases, emails them, then deletes the account", async () => {
     const s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(rpcIds?.sort()).toEqual(["d1", "d2"]);
-    expect(calls).toEqual(["rpc", "email", "consents:kind=account", "deleteUser", "audit"]);
+    expect(calls).toEqual([
+      "rpc",
+      "email",
+      ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"].map((t) => `${t}:deleted:user_id=${USER}`),
+      "consents:kind=account",
+      "deleteUser",
+      "audit",
+    ]);
     expect(emails[0].to).toBe("erin@example.co.za");
     expect(emails[0].text).toContain("tax law requires");
     expect(emails[0].text).not.toMatch(/[!—]/);
@@ -109,6 +123,11 @@ describe("erasing a donor by their account", () => {
     expect(s.accountDeleted).toBe(false);
     expect(s.note).toMatch(/manage a charity/);
     expect(calls).toContain("rpc");
+    // The account stays, but their own giving records and their name as a donor go.
+    for (const t of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"]) {
+      expect(calls).toContain(`${t}:deleted:user_id=${USER}`);
+    }
+    expect(calls).toContain('profiles:update:{"full_name":null}');
   });
 
   it("reports an account that could not be deleted, after the information was erased", async () => {

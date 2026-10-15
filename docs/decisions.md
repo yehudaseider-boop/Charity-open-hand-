@@ -194,7 +194,7 @@
 
 - Five day-one screens at `/charity-admin/[id]`: Overview, Donations (with detail), Donors, Receipts, and CSV downloads of donations and donors.
 - Charities read through `charity_donations` and the `charity_*` functions only. They never see fees, gateway data or the donor's maaser/chomesh/tzedaka choice.
-- Charity admins see donor name, contact and address as typed at checkout, and only the last 4 of ID and tax numbers. Anonymous donors are anonymous on public pages only.
+- Charity admins see donor name, contact and address as typed at checkout, and no part of ID or tax numbers (changed 15/10/2026, see below; it was the last 4). Anonymous donors are anonymous on public pages only.
 - CSV downloads are checked against `is_charity_admin`, rate limited (10 per 10 minutes per person) and audit logged. Cells that start with `=`, `+`, `-` or `@` are neutralised.
 - Receipts screen is read-only. Only platform admins withdraw and re-issue receipts.
 - Decided by Yehuda (09/10/2026): owners and admins see the same things; no team invites for now (platform team adds charity admins); English only everywhere, no Hebrew version.
@@ -501,6 +501,27 @@ All automated checks pass; two independent reviews of the last two days' code fo
 
 **Known and accepted:** the phone app's package audit lists 22 advisories, almost all in build tools (Metro, the Expo command line) that never run on a phone; `braces` and `node-forge` have no fixed version yet. The one in the app itself (`decode-uri-component`, used for links) has its fix only in a new major version that is incompatible with the bundler, so it waits for Expo to update it. The website's audit is clean. Judgement call: the Giving page uses orange for chomesh in the bars and dots, so it has more than one orange accent; that is data colour, not decoration, and was kept on purpose.
 
+## Givezy app: calmer Discover and a lighter charity page (14/10/2026)
+
+- Charity photos keep plain rounded corners (28 for hero photos, 20 for thumbnails), set once as `photoCorners` in `apps/mobile/src/theme/tokens.ts`. A petal-shaped crop was tried and Yehuda did not like it, so it is not used. The rest of the pass stayed.
+- Discover: the header is the logo, the day greeting as the headline and the Hebrew date; the "Discover" title and the drifting background shapes are removed. The featured charity sits on the page (no dark gradient) with a Give button that opens the give sheet directly.
+- Charity page: the photo is inset on the page with a lilac shape behind it and the name below; gallery and update photos are rounded, not tilted in white frames.
+- Give sheet: radio-style pill choices; the button names the choice ("Give as maaser"). Still no default choice.
+- Open: seen only with a stand-in image in the web preview; not yet tested on a phone.
+
+## Givezy app: lilac header curve on all four tabs (14/10/2026)
+
+- Yehuda picked option B of three backgrounds (soft colour wash, lilac header curve, big logo shapes). Each tab now opens on a lilac header that ends in a gentle curve with a thin lilac and orange rim (`HeaderCurve` in `apps/mobile/src/components/backdrop.tsx`), then plain cream below. The curve scrolls with the page. The faint drifting shapes are gone from the tabs; the welcome and "How Givezy works" pages keep them.
+- On Discover the curve follows the header's height, so it always sits just under the filter chips, with or without "Your charities" or a seasonal card.
+- Judgement call: the orange rim was added at Yehuda's request for "some orange". With the header splash that makes two touches of orange per tab, both graphics, never text.
+- Open: seen in the web preview only, not on a phone.
+
+## Givezy app: safety net on the tabs (14/10/2026)
+
+- Yehuda reported the Giving tab going blank in Expo Go on iPhone, twice. Not reproduced: the screen draws fully in the web preview and in an iPhone test render (jest-expo, iOS), with no errors, and the preview has no live database, so it runs on sample data.
+- Each tab now exports an `ErrorBoundary` (`apps/mobile/src/components/screen-error.tsx`): if a screen fails while drawing it shows "Something went wrong", a "Try again" button and the error's own words, instead of a blank page. Next time it happens, a screenshot shows the cause.
+- Open: the cause of the blank Giving page. Whether donors should see the technical error text is on the go-live checklist.
+
 ## Taking once-off gifts inside the app (14/10/2026)
 
 Yehuda decided donors can give inside the app, with the card entered on the payment provider's own page (not website donate pages). Chosen: app screens for amount, giving kind, contribution and donor details; the provider's hosted page in an in-app sheet; once-off gifts first, monthly after; in-app payments stay off in store builds until Apple and Google confirm in writing.
@@ -527,6 +548,57 @@ Yehuda: the charity pays Paystack's fee, out of its donation. Later we offer the
 ## Giving first: the Give button (15/10/2026)
 
 Yehuda wants giving to be the first thing the app offers. A big round Give button sits in the middle of the tab bar, raised above it, on every tab: the logo's splash (all three shapes) on white inside a blue ring, so each colour shows (Yehuda: the logo, not a heart). It opens "Who would you like to give to?": a search, "Give again" (charities the donor gave to before, most recent first), "Your charities" (saved ones not already shown), then all charities. Choosing one goes straight to the usual give step for that charity, with "Another charity" to go back. The middle tab is a button, not a page; a link to it lands on Discover.
+
+## One branch for the app (15/10/2026)
+
+- Two sessions were publishing the phone app to the same Expo preview channel from different branches, so each publish wiped the other's work. From now on `milestone-1-foundation` is the app's branch: build on it and publish only from it.
+- Combined on 15/10/2026 (Give button and charity picker, plus the header curve, inset photos and Try again screens, plus the new Receipts and Account) and published as update group 4931e23a-9078-45d6-9ac7-2cb9517ccaa3.
+- Receipts: a "tax year so far" card (this tax year's paid s18A gifts) and each issued receipt as a slip with Download and Share. Account: initials, name and email, Giving and Receipts as tiles, then settings.
+
+## Website renamed to Givezy, with the Givezy look (15/10/2026)
+
+- The company is Givezy (Yehuda, 15/10/2026). The website, payment page, emails, receipts, monthly authorisation, Privacy Policy and Terms say Givezy. The registered company name and number are still empty in `src/config/legal.ts` until Yehuda supplies them.
+- The website, receipt PDFs and the receipt email take the app's look: cream, navy text, Givezy blue for headlines, buttons and links, orange accent, lilac highlights, Fredoka headlines, Heebo for Hebrew, the Givezy logo and icon. Receipts and emails read colours from `src/lib/brand-colors.ts` (they cannot use CSS variables).
+- Kept on purpose: the app's return link `nedivlev://`, its storage keys `nediv-lev.*`, test account emails, internal identifiers (`nediv_lev` fee bearer value, package names, local database name) and old database history files.
+
+## Annual tax pack (15/10/2026)
+
+- `/account/tax-pack/[year]`: every paid donation in the tax year (1 March to the end of February, Johannesburg time), split into s18A and other, by charity, maaser/chomesh/tzedaka totals (private to the donor), and the s18A receipts issued. Donations only, not contributions to Givezy. Clearly marked as a summary, not a tax receipt.
+- "Save as PDF" uses the browser's print dialog instead of making PDFs on the server, so it works on any hosting; a spreadsheet (CSV) download sits beside it. Linked from the website account page and the app's Receipts tab.
+
+## Dedications (15/10/2026, approved by Yehuda)
+
+- A donor may give "in honour of" or "in memory of" someone (name up to 80 characters). The note to the charity is the donation's existing message. Stored on the donation (and on a monthly donation, copied to each month).
+- Seen by the donor (thank-you page, confirmation email, tax pack, data download) and the charity (donation page and export). Never on the s18A receipt. Wiped with the donor's other information when they ask for erasure.
+- Database change `20261015000001_dedications.sql`, not yet run on any database (the sandbox cannot reach one; see the go-live checklist).
+
+## Code review of the whole stack (15/10/2026)
+
+Four independent read-only reviews (money, security and privacy, receipts and tax, the phone app), each finding checked against the code before fixing. Fixes so far:
+- **Monthly giving:** collects for the month a charge belongs to (a retry or pending check after midnight on the 1st no longer counts as next month, never a catch-up); a charge the gateway refuses outright counts as a failed attempt; a payment without the charity's account is refused when splits are on; gateway calls time out; a stopped monthly donation can only be removed, and resuming needs a card (migration `20261015000002`). The decline email tells donors to cancel the old monthly donation before starting a new one (two monthly donations to one charity can be deliberate, so nothing is cancelled automatically).
+- **Return page:** limited provider checks per visitor; after about a minute, a clear "I didn't pay: try again".
+- **Charities see no part of a donor's ID or tax number** (Yehuda, 15/10/2026, until Yosef confirms what a charity must hold): receipts are read through `charity_receipts` and `charity_receipt_donations`; the receipt PDF is for the donor and platform admins only (migration `20261015000003`).
+- **Shared donor records:** full ID and tax numbers are no longer copied onto the donor record (each donation keeps its own, for its receipt) and old copies are cleared; the data download shows last 4 digits only, includes monthly donations, reads every donation, and fails rather than handing over a partial file.
+- **Security:** sessions started with a password are refused (website and database), an unconfirmed account cannot be made a charity admin, browsers can no longer change a charity's status or approval fields (submitting goes through the server with its declarations), the unused income table is closed to clients, new database functions are not public by default (migration `20261015000004`).
+- **Erasure** also deletes the person's income log, giving elsewhere, notes, saved charities and maaser settings when their account has to stay, and clears payment references.
+- **Charity photos** are re-encoded on upload, so no GPS position or other hidden details reach the public site.
+- **Receipts:** references print every digit past 9 999 (they repeated before; migration `20261015000005`); the receipts job lists any donor record given more than one receipt by one charity in a year (different ID or tax numbers typed) for a person to check, warns about s18A payments from the last days of the year still pending, and refuses to email without `SITE_URL`.
+- **Tax pack:** for a closed year it shows what is on issued s18A receipts (not only what was asked for), per donation and in total.
+- **Lists read in full:** charity donor list and receipts page read every row (the database answers 1 000 at a time); admin receipts has a search.
+- **Dedication names:** invisible direction-changing characters are removed and names show in their own direction (Hebrew right to left).
+- **App:** account reloads are keyed to the signed-in person; the Giving tab waits for its data instead of flashing the signed-out view; dates and times follow Johannesburg time wherever the phone is; Expo patch updates applied.
+- **In-app giving confirmed** (Yehuda, 15/10/2026): the give screen stays, with donors typing the amount and their details in the app and paying on the provider's page. `EXPO_PUBLIC_IN_APP_GIVING=yes` is set in the Expo preview environment. It has no effect until the website is deployed and `EXPO_PUBLIC_SITE_URL` (app) and `APP_GIVING=yes` (server) are set; until then the button falls back to the website. Store builds stay off until Apple and Google confirm in writing.
+- Not changed: a receipted donation that is later refunded plus a late donation would make the receipts job show a database error instead of a "needs attention" line. Nothing can refund a donation yet; handle it with the refunds decision.
+
+
+## Monthly donations for charities (16/10/2026)
+
+- New "Monthly" tab in the charity dashboard (`/charity-admin/[id]/monthly`), and a "Monthly donations" card on the overview. Yehuda asked for it after the portal update.
+- Shows each monthly donor: name and contact as typed at their latest payment, amount a month, the collection day, next date, payments so far and their total, s18A requested, anonymous publicly, any dedication, and the state: running, card declined and being retried, paused by the donor, stopped (card declined every time) or cancelled. Filter by state and search by name or email.
+- Read only. Donors pause, restart and cancel themselves; charities can't change a monthly donation.
+- Read through `charity_monthly_list` (migration `20261016000001`), never the raw rows: no card details, gateway references, the donor's contribution to Givezy, their maaser/chomesh/tzedaka choice or the stored end reason. Like donations, a monthly donation shows only once a payment from it has gone through.
+- Database tests now run in the sandbox against a local Postgres with a stand-in for Supabase's auth and storage schemas: all 132 pass, including migrations `20261015000002` to `20261016000001`. Five older tests were updated to the stricter rules from the code review (a charity can't change its own status from the browser; resuming needs a card).
+- Not checked in a browser: the page needs a live Supabase.
 
 ## Fewer taps to give (15/10/2026)
 

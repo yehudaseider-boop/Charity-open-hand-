@@ -11,7 +11,7 @@ import { taxYearRange } from "@/lib/dates";
 import type { EmailTransport } from "@/lib/email";
 import { buildReceiptEmail } from "./email";
 import { buildReceiptDetails, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
-import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
+import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped, type SeveralIdentities } from "./plan";
 
 export type IssuedReceipt = { id: string; reference: string; charityId: string; details: ReceiptDetails; pdfPath: string | null };
 
@@ -48,6 +48,8 @@ export type JobSummary = {
   skippedByReason: Record<string, number>;
   /** Paid, s18A-requested donations that could not go on a receipt, for a person to look at. */
   needsAttention: Skipped[];
+  /** Donor records given more than one receipt by one charity (different ID or tax numbers typed): check whether it is one person. */
+  checkIdentities: SeveralIdentities[];
   /** Steps that failed (one receipt, one PDF, ...). The rest of the run carried on; run the job again once fixed. */
   failed: { what: string; message: string }[];
 };
@@ -72,7 +74,7 @@ export async function runReceiptsJob(args: {
   const donations = await store.listDonations(taxYear);
   const charities = await store.listCharities([...new Set(donations.map((d) => d.charityId))]);
   const already = await store.receiptedDonationIds(taxYear);
-  const { receipts, skipped } = planReceipts({ taxYear, donations, charities, alreadyReceipted: already });
+  const { receipts, skipped, severalIdentities } = planReceipts({ taxYear, donations, charities, alreadyReceipted: already });
 
   const summary: JobSummary = {
     taxYear,
@@ -84,6 +86,7 @@ export async function runReceiptsJob(args: {
     emailFailed: 0,
     skippedByReason: {},
     needsAttention: skipped.filter((s) => s.reason === "charity_cannot_issue" || s.reason === "mandate_after_payment" || s.reason === "late_after_receipt"),
+    checkIdentities: severalIdentities,
     failed: [],
   };
   const fail = (what: string, e: unknown) => summary.failed.push({ what, message: e instanceof Error ? e.message : String(e) });

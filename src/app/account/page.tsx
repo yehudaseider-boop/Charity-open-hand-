@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { BilingualName } from "@/components/bilingual-name";
 import { requireViewer } from "@/lib/auth";
-import { formatDate, taxYearLabel } from "@/lib/dates";
+import { formatDate, taxYearFor, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyButton } from "./monthly-button";
@@ -119,6 +119,23 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
             Sign in with the same email address you gave with.
           </p>
         )}
+      </section>
+
+      <section className="rounded-card bg-surface border border-border p-5 space-y-2">
+        <h2 className="font-semibold">Tax packs</h2>
+        <p className="text-sm text-muted">Every donation in a tax year, what goes on s18A receipts, and the totals. Save it as a PDF or a spreadsheet for your tax return.</p>
+        <ul className="flex flex-wrap gap-2">
+          {[0, 1, 2].map((back) => {
+            const year = taxYearFor(new Date()) - back;
+            return (
+              <li key={year}>
+                <Link href={`/account/tax-pack/${year}`} className="inline-block rounded-control border border-brand px-3 py-1.5 text-sm font-semibold text-brand">
+                  Tax year {year}{back === 0 ? " so far" : ""}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       {viewer.managedCharityIds.length > 0 || viewer.isPlatformAdmin ? (

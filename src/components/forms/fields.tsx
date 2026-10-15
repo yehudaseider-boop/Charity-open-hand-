@@ -37,6 +37,7 @@ export function TextField({
   defaultValue,
   type = "text",
   hebrew,
+  autoDirection,
   inputMode,
   autoComplete,
   ...base
@@ -45,6 +46,8 @@ export function TextField({
   type?: "text" | "email" | "tel" | "url" | "date";
   /** Hebrew input: right-to-left. */
   hebrew?: boolean;
+  /** English or Hebrew: the box follows the direction of what is typed. */
+  autoDirection?: boolean;
   inputMode?: "numeric" | "tel" | "email" | "url";
   autoComplete?: string;
 }) {
@@ -62,7 +65,7 @@ export function TextField({
         aria-describedby={error ? `${id}-error` : base.hint ? `${id}-hint` : undefined}
         inputMode={inputMode}
         autoComplete={autoComplete}
-        {...(hebrew ? { lang: "he", dir: "rtl" } : {})}
+        {...(hebrew ? { lang: "he", dir: "rtl" } : autoDirection ? { dir: "auto" } : {})}
         className={inputClass}
       />
     </Wrapper>

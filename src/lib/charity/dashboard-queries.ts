@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { Period } from "./dashboard";
+import type { MonthlyRow, Period } from "./dashboard";
 
 /** Everything here is read as the signed-in person, so row-level security decides what comes back. */
 
@@ -63,13 +63,32 @@ export type DonorRow = {
 
 export async function loadDonors(charityId: string): Promise<DonorRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("charity_donor_list", { p_charity_id: charityId });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as DonorRow[]).map((d) => ({ ...d, donation_count: n(d.donation_count), total_cents: n(d.total_cents) }));
+  // The database answers at most 1 000 rows at a time, so a long list is read page by page.
+  const rows: DonorRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.rpc("charity_donor_list", { p_charity_id: charityId }).range(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as DonorRow[]));
+    if (!data || data.length < 1000) break;
+  }
+  return rows.map((d) => ({ ...d, donation_count: n(d.donation_count), total_cents: n(d.total_cents) }));
+}
+
+/** The charity's monthly donations, read through `charity_monthly_list` (no card or gateway details). */
+export async function loadMonthlyDonations(charityId: string): Promise<MonthlyRow[]> {
+  const supabase = await createClient();
+  const rows: MonthlyRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.rpc("charity_monthly_list", { p_charity_id: charityId }).range(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as MonthlyRow[]));
+    if (!data || data.length < 1000) break;
+  }
+  return rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents), paid_count: n(r.paid_count), paid_cents: n(r.paid_cents) }));
 }
 
 export const DONATION_FIELDS =
-  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
+  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
 
 export type DonationRow = {
   id: string;
@@ -84,6 +103,9 @@ export type DonationRow = {
   wants_18a: boolean;
   is_anonymous: boolean;
   message: string | null;
+  /** "honour" or "memory", with the name, if the donor dedicated the donation. */
+  dedication_kind: string | null;
+  dedication_name: string | null;
   donor_type: string | null;
   first_name: string | null;
   last_name: string | null;

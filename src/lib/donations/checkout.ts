@@ -14,6 +14,7 @@ import { loadDonatableCharity } from "./charity";
 import { issueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
 import { checkDonorDetails, type CheckoutInput } from "./validation";
+import { parseDedication } from "./dedication";
 
 export type Quote = Pricing;
 
@@ -83,6 +84,9 @@ export async function startDonation(args: {
 
   const v = args.input;
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
+  // Already checked in checkDonorDetails, so here it is a dedication or none.
+  const parsedDedication = parseDedication(v.dedication_kind, v.dedication_name);
+  const dedication = parsedDedication && !("error" in parsedDedication) ? parsedDedication : null;
   const db = createAdminClient();
   const donorId = await findOrCreateDonor(v, want18a);
   // Signed in with this same (confirmed) email: the donation joins their account now,
@@ -116,6 +120,8 @@ export async function startDonation(args: {
       wants_18a: want18a,
       is_anonymous: v.is_anonymous === "on",
       message: v.message ?? null,
+      // Only when there is one, so taking a donation keeps working even if this code goes live before the dedications database change (other screens do need it: run the database change first).
+      ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
       gateway: gateway.name,
       charge_day: chargeDayOf(nowDate),
     });
@@ -139,6 +145,8 @@ export async function startDonation(args: {
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
+    // Only when there is one, so taking a donation keeps working even if this code goes live before the dedications database change (other screens do need it: run the database change first).
+    ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
     popia_consent_at: now,
     age_confirmed_at: now,
   });
@@ -232,6 +240,8 @@ async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<st
   const db = createAdminClient();
   const reg = v.donor_type === "individual" ? null : (v.registration_number ?? null);
   const now = new Date().toISOString();
+  // The full ID and tax numbers stay only with each donation's checkout details (for its receipt), never on the
+  // donor record: that record can be shared by everyone who gives with one email address.
   const fields = {
     first_name: v.first_name ?? null,
     last_name: v.last_name ?? null,
@@ -240,9 +250,7 @@ async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<st
     phone: v.phone ?? null,
     ...(want18a
       ? {
-          id_number_encrypted: v.id_number ? encrypt(v.id_number.replace(/\s/g, "")) : null,
           id_number_last4: v.id_number ? last4(v.id_number) : null,
-          tax_reference_encrypted: v.tax_reference ? encrypt(v.tax_reference) : null,
           tax_reference_last4: v.tax_reference ? last4(v.tax_reference) : null,
           address_line1: v.address_line1 ?? null,
           address_line2: v.address_line2 ?? null,

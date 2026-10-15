@@ -22,6 +22,8 @@ export type DueMonthly = {
   lastPaidPeriod: string | null;
   attemptPeriod: string | null;
   failedAttempts: number;
+  /** When this collection was due (the charge day, or the retry time after a failed attempt). */
+  nextChargeAt: Date;
 };
 
 export interface MonthlyStore {
@@ -51,6 +53,8 @@ export type MonthlyDeps = {
   confirm(reference: string): Promise<ConfirmOutcome>;
   /** Whether an error from `confirm` means the gateway has no record of the payment at all. */
   isNotFound(e: unknown): boolean;
+  /** Whether an error from `charge` means the gateway answered and refused it (counted as a failed attempt). */
+  isRefused(e: unknown): boolean;
   /** Whether the charity can still take donations, and its account at the gateway. */
   charityState(slug: string): Promise<{ accepting: boolean }>;
   notifyFailed(r: DueMonthly, info: { totalCents: number; final: boolean }): Promise<void>;
@@ -72,9 +76,21 @@ export type MonthlySummary = {
 /** An attempt the gateway still has no record of after this long is taken to have died before the charge was sent. */
 const STUCK_AFTER_MS = 20 * 60_000;
 
+/**
+ * The month a due row is collecting for. A retry belongs to the month of the failed attempt, and a
+ * first attempt to the month of its charge day, even when the run happens after midnight on the 1st.
+ * Never more than one month back: a donation that waited longer (a long pause, the job not running)
+ * is collected for the current month, so a skipped month is never charged late.
+ */
+export function collectingPeriod(r: Pick<DueMonthly, "attemptPeriod" | "lastPaidPeriod" | "failedAttempts" | "nextChargeAt">, now: Date): Period {
+  const current = periodOf(now);
+  const retrying = r.attemptPeriod !== null && r.attemptPeriod !== r.lastPaidPeriod && r.failedAttempts > 0 && r.failedAttempts < MAX_ATTEMPTS;
+  const candidate = retrying ? r.attemptPeriod! : periodOf(r.nextChargeAt);
+  return candidate >= addMonths(current, -1) && candidate <= current ? candidate : current;
+}
+
 export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySummary> {
   const { store, now } = deps;
-  const period = periodOf(now);
   const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, errors: [] };
 
   const { rows, unreadable } = await store.due(now, deps.limit ?? 50);
@@ -82,6 +98,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
   for (const r of rows) {
     summary.considered += 1;
     try {
+      const period = collectingPeriod(r, now);
       const next = chargeTime(addMonths(period, 1), r.chargeDay);
       // Never twice in one month, and never a catch-up for months that were skipped (paused).
       if (r.lastPaidPeriod === period) {
@@ -102,10 +119,17 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       const donationId = attemptDonationId(r.id, period, attempt);
       const totalCents = r.amountCents + r.contributionCents;
       const existing = await store.attemptStatus(donationId);
+      // The gateway turning the charge down outright counts as a failed attempt (not something to resend).
+      let refused = false;
       const send = async () => {
         // The donor may have cancelled, paused or been erased since this row was read.
         if (!(await store.stillActive(r.id))) return false;
-        await deps.charge({ reference: donationId, r, totalCents });
+        try {
+          await deps.charge({ reference: donationId, r, totalCents });
+        } catch (e) {
+          if (!deps.isRefused(e)) throw e;
+          refused = true;
+        }
         return true;
       };
       if (existing === null) {
@@ -125,7 +149,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
 
       let outcome: ConfirmOutcome;
       try {
-        outcome = await deps.confirm(donationId);
+        outcome = refused ? "failed" : await deps.confirm(donationId);
       } catch (e) {
         // A pending attempt the gateway says it has never heard of: the run that made it died (or the
         // charge was refused) before the charge reached the gateway. Only then is it sent again, under the
@@ -137,7 +161,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
           summary.waiting.push({ id: r.id, reason: "no longer active" });
           continue;
         }
-        outcome = await deps.confirm(donationId);
+        outcome = refused ? "failed" : await deps.confirm(donationId);
       }
       if (outcome === "paid") {
         await store.recordPaid(r.id, period, next);

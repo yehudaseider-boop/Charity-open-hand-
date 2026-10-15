@@ -112,15 +112,17 @@ describe("receipt contents", () => {
   });
 
   it("prints amounts in Rand, escapes everything, and marks drafts", () => {
-    const html = buildReceiptHtml({ details: { ...details, donor: { ...details.donor, name: '<script>alert("x")</script>' } }, reference: "LTC-2027-0001", draft: true, platformName: "Nadiv Lev" });
+    const html = buildReceiptHtml({ details: { ...details, donor: { ...details.donor, name: '<script>alert("x")</script>' } }, reference: "LTC-2027-0001", draft: true, platformName: "Givezy" });
     expect(html).toContain("R680");
     expect(html).toContain("R180");
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("DRAFT, NOT A TAX RECEIPT");
+    // Every colour and value is filled in: no template placeholder is left in the page.
+    expect(html).not.toContain("${");
     expect(html).toContain('lang="he" dir="rtl"');
     expect(html).toContain("•••• 9085");
-    expect(buildReceiptHtml({ details, reference: "LTC-2027-0001", platformName: "Nadiv Lev" })).not.toContain("DRAFT");
+    expect(buildReceiptHtml({ details, reference: "LTC-2027-0001", platformName: "Givezy" })).not.toContain("DRAFT");
     expect(esc(`a&b"c'`)).toBe("a&amp;b&quot;c&#39;");
   });
 });
@@ -238,7 +240,7 @@ describe("emailing receipts", () => {
   const sentTo = () => {
     const sent: EmailMessage[] = [];
     const transport = { name: "test", send: async (m: EmailMessage) => void sent.push(m) };
-    return { sent, mailer: { transport, siteUrl: "https://example.co.za", platformName: "Nadiv Lev" } };
+    return { sent, mailer: { transport, siteUrl: "https://example.co.za", platformName: "Givezy" } };
   };
 
   function setup(donations: PlanDonation[]) {
@@ -293,7 +295,7 @@ describe("emailing receipts", () => {
     const sent: string[] = [];
     let fail = true;
     const transport = { name: "test", send: async (m: EmailMessage) => { if (fail && m.to.includes("r1")) throw new Error("provider down"); sent.push(m.to); } };
-    const mailer = { transport, siteUrl: "https://example.co.za", platformName: "Nadiv Lev" };
+    const mailer = { transport, siteUrl: "https://example.co.za", platformName: "Givezy" };
     const first = await runReceiptsJob({ store, render, ...base, mailer });
     expect(first).toMatchObject({ emailed: 1, emailFailed: 1 });
     expect([...emailed]).toEqual(["r2"]);
@@ -309,7 +311,7 @@ describe("emailing receipts", () => {
       donations: [{ paidAt: "2026-10-01T10:00:00Z", amountCents: 50_000 }, { paidAt: "2026-09-15T10:00:00Z", amountCents: 18_000 }],
       taxYear: 2027, periodStart: "2026-03-01", periodEnd: "2027-02-28", issuedAt: new Date("2027-03-02T08:00:00Z"),
     });
-    const m = buildReceiptEmail({ details, reference: "LTC-2027-0001", siteUrl: "https://example.co.za/", platformName: "Nadiv Lev" });
+    const m = buildReceiptEmail({ details, reference: "LTC-2027-0001", siteUrl: "https://example.co.za/", platformName: "Givezy" });
     expect(m.text).toContain("Total donated: R680");
     expect(m.text).toContain("https://example.co.za/account");
     expect(m.html).not.toContain("<b>Sarah</b>");
@@ -326,5 +328,24 @@ describe("email adapter", () => {
     expect(() => getEmailTransport({ EMAIL_TRANSPORT: "resend" })).toThrow(/RESEND_API_KEY/);
     expect(getEmailTransport({ EMAIL_TRANSPORT: "resend", RESEND_API_KEY: "k", EMAIL_FROM: "a@b.co.za" }).name).toBe("resend");
     expect(() => getEmailTransport({ EMAIL_TRANSPORT: "carrier-pigeon" })).toThrow(/Unknown/);
+  });
+});
+
+describe("one donor record with more than one identity at a charity", () => {
+  it("issues both and lists them for a person to check", async () => {
+    const { planReceipts } = await import("@/lib/receipts/plan");
+    const base = { charityId: "c1", donorId: "donor1", taxYear: 2027, status: "paid", wants18a: true, paidAt: "2026-06-01T08:00:00Z" };
+    const { receipts, severalIdentities } = planReceipts({
+      taxYear: 2027,
+      charities: [{ id: "c1", isS18a: true, mandateSignedAt: "2026-01-01T00:00:00Z" }],
+      alreadyReceipted: new Set(),
+      donations: [
+        { ...base, id: "a", donorIdentity: "id-fingerprint", amountCents: 50_000 },
+        { ...base, id: "b", donorIdentity: "tax-fingerprint", amountCents: 30_000 },
+        { ...base, id: "c", donorId: "donor2", donorIdentity: "x", amountCents: 10_000 },
+      ],
+    });
+    expect(receipts).toHaveLength(3);
+    expect(severalIdentities).toEqual([{ charityId: "c1", donorId: "donor1", taxYear: 2027, receipts: 2 }]);
   });
 });

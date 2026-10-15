@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
-import { Animated, Easing, StyleSheet, View, type ViewStyle } from "react-native";
+import { Animated, Easing, StyleSheet, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { reduceMotion } from "@/lib/motion";
 import { colors } from "@/theme/tokens";
 import { Drop } from "./splash";
@@ -8,30 +8,15 @@ import { Drop } from "./splash";
 type Shape = { color: typeof colors.lilac | typeof colors.orange | typeof colors.blue; size: number; rotate: number; opacity: number; at: ViewStyle };
 
 /**
- * Each screen gets its own arrangement of the logo's three shapes, very faint and drifting off
- * the edges, over a lilac wash that fades into cream. Related screens, never identical.
+ * The four tabs sit on plain cream: their colour comes from the lilac header curve (`HeaderCurve`),
+ * which scrolls with the page. Other pages keep the logo's shapes, very faint and drifting off the
+ * edges, over a lilac wash that fades into cream.
  */
 const LAYOUTS: Record<string, Shape[]> = {
-  discover: [
-    { color: colors.lilac, size: 190, rotate: 18, opacity: 0.16, at: { right: -80, top: 300 } },
-    { color: colors.orange, size: 200, rotate: -26, opacity: 0.1, at: { left: -110, top: 600 } },
-    { color: colors.blue, size: 260, rotate: -12, opacity: 0.06, at: { right: -90, bottom: 90 } },
-  ],
-  giving: [
-    { color: colors.orange, size: 190, rotate: 22, opacity: 0.11, at: { right: -100, top: 330 } },
-    { color: colors.lilac, size: 170, rotate: -20, opacity: 0.16, at: { left: -90, top: 560 } },
-    { color: colors.blue, size: 240, rotate: 8, opacity: 0.06, at: { right: -70, bottom: 110 } },
-  ],
-  receipts: [
-    { color: colors.lilac, size: 180, rotate: -16, opacity: 0.16, at: { left: -90, top: 260 } },
-    { color: colors.blue, size: 260, rotate: -6, opacity: 0.06, at: { right: -110, top: 520 } },
-    { color: colors.orange, size: 170, rotate: 28, opacity: 0.1, at: { right: -70, bottom: 120 } },
-  ],
-  account: [
-    { color: colors.orange, size: 180, rotate: -24, opacity: 0.1, at: { left: -100, top: 330 } },
-    { color: colors.lilac, size: 190, rotate: 20, opacity: 0.16, at: { right: -90, bottom: 150 } },
-    { color: colors.blue, size: 220, rotate: 10, opacity: 0.05, at: { left: -60, bottom: 40 } },
-  ],
+  discover: [],
+  giving: [],
+  receipts: [],
+  account: [],
   page: [
     { color: colors.lilac, size: 170, rotate: 18, opacity: 0.14, at: { right: -90, top: 420 } },
     { color: colors.orange, size: 170, rotate: -22, opacity: 0.09, at: { left: -100, bottom: 160 } },
@@ -68,7 +53,7 @@ export function Backdrop({ variant }: { variant: BackdropVariant }) {
   const shapes = LAYOUTS[variant] ?? LAYOUTS.page;
   return (
     <View style={[StyleSheet.absoluteFill, styles.base, { pointerEvents: "none" }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <LinearGradient colors={[colors.lilacSoft, colors.cream]} locations={[0, 1]} style={styles.wash} />
+      {shapes.length ? <LinearGradient colors={[colors.lilacSoft, colors.cream]} locations={[0, 1]} style={styles.wash} /> : null}
       {shapes.map((s, i) => (
         <Floating key={`${variant}-${i}`} index={i} style={s.at}>
           <Drop size={s.size} color={s.color} rotate={s.rotate} opacity={s.opacity} />
@@ -78,7 +63,34 @@ export function Backdrop({ variant }: { variant: BackdropVariant }) {
   );
 }
 
+/** Radius of the circle the curve is cut from: big, so the edge is a gentle arc across the phone. */
+const CURVE_R = 560;
+
+/**
+ * The lilac header at the top of each tab, ending in a gentle curve with a lilac and an orange rim.
+ * Put it first inside the screen's scroll content; it scrolls away with the header. `depth` is how
+ * far down the middle of the curve reaches from the top of the content.
+ */
+export function HeaderCurve({ depth }: { depth: number }) {
+  const { width } = useWindowDimensions();
+  const d = CURVE_R * 2;
+  const sag = CURVE_R - Math.sqrt(CURVE_R * CURVE_R - (width / 2) ** 2);
+  const circle = (color: string, drop: number) => (
+    <View style={{ position: "absolute", width: d, height: d, borderRadius: CURVE_R, left: (width - d) / 2, top: depth + drop - d, backgroundColor: color }} />
+  );
+  return (
+    <View style={[styles.curve, { height: depth, pointerEvents: "none" }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {/* Reaches above the top, so pulling down to refresh shows lilac, not a gap. */}
+      <View style={{ position: "absolute", left: 0, right: 0, top: -800, height: 800 + depth - sag - 20, backgroundColor: colors.lilacSoft }} />
+      {circle(colors.orange, 8)}
+      {circle(colors.lilac, 4)}
+      {circle(colors.lilacSoft, 0)}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  curve: { position: "absolute", top: 0, left: 0, right: 0 },
   base: { backgroundColor: colors.cream, overflow: "hidden" },
   wash: { position: "absolute", top: 0, left: 0, right: 0, height: 340 },
 });

@@ -35,6 +35,8 @@ export const appCheckoutSchema = appQuoteSchema.extend({
     city: z.string().max(80).optional(),
     postal_code: z.string().max(4).optional(),
     message: z.string().max(500).optional(),
+    dedication_kind: z.string().max(10).optional(),
+    dedication_name: z.string().max(200).optional(),
     giving_kind: z.string(),
     is_anonymous: flag,
     monthly: flag,

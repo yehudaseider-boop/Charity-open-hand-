@@ -8,6 +8,7 @@ import { BackIcon, CheckIcon, HeartIcon } from "@/components/icons";
 import { InfoButton } from "@/components/info-button";
 import { CharityImage } from "@/components/charity-image";
 import { Sheet } from "@/components/sheet";
+import { Drop } from "@/components/splash";
 import { GiveSheet } from "@/components/give-sheet";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
@@ -17,7 +18,7 @@ import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
-import { colors, fonts, space, touch } from "@/theme/tokens";
+import { colors, fonts, photoCorners, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
 function Fact({ label, value }: { label: string; value: string }) {
@@ -67,11 +68,12 @@ export default function CharityDetail() {
   return (
     <View style={styles.screen}>
       <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}>
-        <View>
-          <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" labelOffset={insets.top + 12} style={{ width: "100%", aspectRatio: 4 / 4.2, minHeight: 320 }} />
+        {/* The photo sits inset on the page with a lilac shape behind it, and the name below it. */}
+        <View style={{ paddingTop: insets.top + 56 + touch + 14, paddingHorizontal: space.gutter }}>
+          <View style={[styles.dropBack, { pointerEvents: "none" }]}><Drop size={170} color={colors.lilac} rotate={24} /></View>
+          <CharityImage charity={charity} live={live} rounded={false} labelPosition="top" style={{ ...photoCorners.big, width: "100%", aspectRatio: 1 / 0.9 }} />
         </View>
 
-        {/* The name sits on a cream sheet that overlaps the photo, like a page turned over it. */}
         <View style={styles.sheet}>
           <Text variant="h1" accessibilityRole="header" style={{ fontSize: 34, lineHeight: 39 }}>{charity.nameEn}</Text>
           {charity.nameHe ? <HebrewText style={styles.hebrew}>{charity.nameHe}</HebrewText> : null}
@@ -101,14 +103,12 @@ export default function CharityDetail() {
           {updates.length ? (
             <View style={styles.section}>
               <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">What&apos;s been happening</Text>
-              {updates.map((u, i) => (
+              {updates.map((u) => (
                 <View key={u.id} style={styles.note}>
                   <Text style={styles.noteDate}>{ddmmyyyy(u.date)}</Text>
                   <Text>{u.body}</Text>
                   {u.photoUrl ? (
-                    <View style={[styles.print, { transform: [{ rotate: i % 2 ? "1.2deg" : "-1.2deg" }] }]}>
-                      <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />
-                    </View>
+                    <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />
                   ) : null}
                 </View>
               ))}
@@ -118,9 +118,9 @@ export default function CharityDetail() {
           {photos.length ? (
             <View style={styles.section}>
               <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">From their week</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: space.gutter, paddingVertical: 10, paddingLeft: 2 }} style={{ marginRight: -space.gutter }}>
-                {photos.map((ph, i) => (
-                  <View key={ph.id} style={[styles.print, { width: 210, transform: [{ rotate: i % 2 ? "1.6deg" : "-1.6deg" }] }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: space.gutter, paddingVertical: 4 }} style={{ marginRight: -space.gutter }}>
+                {photos.map((ph) => (
+                  <View key={ph.id} style={{ width: 220, gap: 8 }}>
                     <Image source={{ uri: ph.url }} style={styles.photo} resizeMode="cover" accessibilityLabel={ph.caption ?? `Photo from ${charity.nameEn}`} />
                     {ph.caption ? <Text style={styles.caption} numberOfLines={2}>{ph.caption}</Text> : null}
                   </View>
@@ -182,7 +182,8 @@ export default function CharityDetail() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
-  sheet: { marginTop: -36, paddingHorizontal: space.gutter, paddingTop: 26, borderTopLeftRadius: 36, borderTopRightRadius: 36, backgroundColor: colors.cream },
+  dropBack: { position: "absolute", right: space.gutter - 18, top: 80, zIndex: 0 },
+  sheet: { paddingHorizontal: space.gutter, paddingTop: 22 },
   hebrew: { fontSize: 19, color: colors.muted, marginTop: 2 },
   lead: { fontSize: 20, lineHeight: 30, color: colors.ink, marginTop: 18 },
   kicker: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
@@ -193,9 +194,8 @@ const styles = StyleSheet.create({
   section: { marginTop: space.block + 8, gap: 14 },
   note: { gap: 6, paddingLeft: 16, borderLeftWidth: 3, borderLeftColor: colors.lilac },
   noteDate: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue },
-  print: { backgroundColor: colors.surface, padding: 7, paddingBottom: 10, borderRadius: 6, marginTop: 6, gap: 8, shadowColor: "#102848", shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  updatePhoto: { width: "100%", aspectRatio: 4 / 3, borderRadius: 3, backgroundColor: colors.lilacSoft },
-  photo: { width: "100%", aspectRatio: 1, borderRadius: 3, backgroundColor: colors.lilacSoft },
+  updatePhoto: { ...photoCorners.mid, width: "100%", aspectRatio: 4 / 3, marginTop: 6, backgroundColor: colors.lilacSoft },
+  photo: { ...photoCorners.mid, width: "100%", aspectRatio: 4 / 4.6, backgroundColor: colors.lilacSoft },
   caption: { fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.ink, paddingHorizontal: 2 },
   headerBar: { position: "absolute", top: 0, left: 0, right: 0, backgroundColor: colors.cream, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   topBar: { position: "absolute", left: space.gutter, right: space.gutter, flexDirection: "row", justifyContent: "space-between" },

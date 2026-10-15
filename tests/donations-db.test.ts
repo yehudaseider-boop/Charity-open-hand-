@@ -113,7 +113,7 @@ describe("checkout details", () => {
   });
 });
 
-describe("Nadiv Lev contribution line", () => {
+describe("Givezy contribution line", () => {
   const insert = (amount: number, contribution: number, total: number) =>
     run(
       `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents,

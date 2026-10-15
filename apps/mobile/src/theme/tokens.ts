@@ -68,6 +68,13 @@ export const radius = {
   pill: 999, // buttons, chips, tags
 } as const;
 
+/** Corners for charity photos: plain rounded rectangles, big for hero photos and small for thumbnails. */
+export const photoCorners = {
+  big: { borderRadius: 28 },
+  mid: { borderRadius: 20 },
+  small: { borderRadius: 20 },
+} as const;
+
 /** A soft, blue-tinted lift for cards, so they float a little off the cream. */
 export const lift = {
   shadowColor: "#1848A8",

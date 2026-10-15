@@ -239,3 +239,23 @@ describe("monthly donations (collected by our own job)", () => {
     expect(fromCache(cached)?.recurring[0].status).toBe("failed");
   });
 });
+
+describe("dates follow Johannesburg time", () => {
+  it("a payment at 00:30 on 01/11 in Johannesburg is on 01/11 (and in November), wherever the phone is", async () => {
+    const { ddmmyyyy, jhbDay } = await import("../apps/mobile/src/lib/format");
+    const [gift] = toGifts([row({ paid_at: "2026-10-31T22:30:00Z" })], []);
+    expect(ddmmyyyy(gift.date)).toBe("01/11/2026");
+    expect(gift.date.getMonth()).toBe(10);
+    expect(gift.at?.toISOString()).toBe("2026-10-31T22:30:00.000Z");
+    expect(ddmmyyyy(jhbDay(new Date("2027-02-28T22:01:00Z")))).toBe("01/03/2027");
+  });
+
+  it("the time of day is Johannesburg time", async () => {
+    const { hhmm } = await import("../apps/mobile/src/lib/format");
+    expect(hhmm(new Date("2026-10-15T12:05:00Z"))).toBe("14:05");
+  });
+
+  it("a saved copy from before this change is not used (it gets loaded again)", () => {
+    expect(fromCache(JSON.stringify({ v: 1, gifts: [], recurring: [], receipts: [], elsewhere: [], loadedAt: new Date().toISOString() }))).toBeNull();
+  });
+});

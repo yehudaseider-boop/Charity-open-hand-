@@ -9,6 +9,7 @@ import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { Sheet } from "@/components/sheet";
 import type { Charity } from "@/data/sample";
 import { Splash } from "@/components/splash";
+import { HeaderCurve } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
 import { Logo } from "@/components/logo";
 import { SearchIcon } from "@/components/icons";
@@ -35,6 +36,8 @@ export default function Discover() {
   const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
   const [query, setQuery] = useState(state === "empty" ? "Bnei Akiva" : "");
   const [cause, setCause] = useState("all");
+  // Where the header ends (after the cause tiles), so the curve always sits just under it (the saved row and seasonal card change the height).
+  const [chipsEnd, setChipsEnd] = useState<number | null>(null);
   // The charity whose "Give" was tapped in the list: the same give sheet as on its page.
   const [giveTo, setGiveTo] = useState<Charity | null>(null);
   const onGive = (c: Charity) => (GIVE_IN_APP ? openGiveScreen(c.slug) : setGiveTo(c));
@@ -54,11 +57,13 @@ export default function Discover() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+      <HeaderCurve depth={chipsEnd ? chipsEnd + 52 : insets.top + 328} />
+      {/* Everything above the list, measured so the curve sits just under the cause tiles. */}
+      <View onLayout={(e) => setChipsEnd(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
       <View style={styles.header}>
-        <View style={{ marginBottom: 14 }}><Logo width={112} /></View>
-        <View style={{ marginBottom: 6 }}><DayGreeting /></View>
-        <Text variant="h1" accessibilityRole="header">Discover</Text>
-        <View style={styles.arc}><Splash size={96} /></View>
+        <View style={{ marginBottom: 18 }}><Logo width={96} /></View>
+        <DayGreeting large />
+        <View style={styles.arc}><Splash size={84} /></View>
       </View>
 
       <View style={styles.gutter}>
@@ -88,8 +93,9 @@ export default function Discover() {
         <Text variant="h2" style={{ fontSize: 22, lineHeight: 28, paddingHorizontal: space.gutter }} accessibilityRole="header">Causes</Text>
         <CauseTiles causes={causes} selected={cause} onSelect={setCause} />
       </View>
+      </View>
 
-      <View style={[styles.gutter, { marginTop: space.block }]}>
+      <View style={[styles.gutter, { marginTop: space.block + 44 }]}>
         {state === "loading" ? (
           <View style={{ gap: space.block }}>
             <SkeletonBlock height={258} />
@@ -150,3 +156,6 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 12, outlineStyle: "none" } as object,
   listHead: { fontFamily: fonts.bodySemibold, fontSize: 14, letterSpacing: 0.3, color: colors.muted, marginBottom: 2 },
 });
+
+/** A failure while drawing shows "Try again" and the error, not a blank page. */
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

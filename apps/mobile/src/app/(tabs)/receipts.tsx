@@ -1,14 +1,16 @@
 import { router } from "expo-router";
-import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import { ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Splash } from "@/components/splash";
+import { HeaderCurve } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
-import { DownloadIcon, InfoIcon, ShareIcon } from "@/components/icons";
+import { InfoIcon } from "@/components/icons";
+import { ReceiptSlip } from "@/components/receipt-slip";
 import { ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { charities } from "@/data/sample";
 import { gifts, receipts } from "@/data/giving";
-import { ddmmyyyy, rand } from "@/lib/format";
+import { jhbToday, rand } from "@/lib/format";
 import { Button } from "@/components/button";
 import { InfoButton } from "@/components/info-button";
 import { useAccount } from "@/lib/account";
@@ -16,7 +18,7 @@ import { notify, openSite } from "@/lib/open-site";
 import { useDirectory } from "@/lib/directory";
 import { useScreenState } from "@/lib/screen-state";
 import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
-import { colors, fonts, radius, space, touch } from "@/theme/tokens";
+import { colors, fonts, radius, space } from "@/theme/tokens";
 
 /** Screen 8: Receipts. Annual s18A receipts, grouped by tax year. */
 export default function Receipts() {
@@ -35,13 +37,17 @@ export default function Receipts() {
           ? "loading"
           : "ready";
   const directory = useDirectory();
-  const current = taxYearFor(new Date());
+  const current = taxYearFor(jhbToday());
   const currentEnd = taxYearRangeLabel(current).split(" to ")[1];
 
   const empty = preview ? state === "empty" : !signedIn;
   const myReceipts = preview ? (empty ? [] : receipts) : (account.live?.receipts ?? []);
   const myGifts = preview ? gifts : (account.live?.gifts ?? []);
   const years = [...new Set(myReceipts.map((r) => r.taxYear))].sort((a, b) => b - a);
+  // This tax year so far: the gifts that will go on next year's s18A receipts.
+  const thisYear = empty ? [] : myGifts.filter((g) => g.with18a && taxYearFor(g.date) === current);
+  const thisYearCents = thisYear.reduce((t, g) => t + g.cents, 0);
+  const thisYearCharities = new Set(thisYear.map((g) => g.charitySlug)).size;
 
   // Charities in the donor's history that never issue s18A receipts.
   const no18a = empty
@@ -52,10 +58,13 @@ export default function Receipts() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
+        <HeaderCurve depth={insets.top + 112} />
       <View>
         <Text variant="h1" accessibilityRole="header">Receipts</Text>
         <View style={styles.arc}><Splash size={84} /></View>
       </View>
+      {/* Room for the header curve. */}
+      <View style={{ height: 20 }} />
 
       {state === "loading" ? (
         <View style={{ gap: 16 }}>
@@ -67,16 +76,22 @@ export default function Receipts() {
       ) : (
         <>
           {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
-          <View style={styles.notice}>
+          {/* This tax year so far: what will be on next year's receipts, and when they come. */}
+          {/* Signed out (live), there is nothing of theirs to total, so no card. */}
+          {preview || signedIn ? (
+          <View style={styles.summary}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>Receipts arrive once a year</Text>
+              <Text style={styles.summaryKicker}>Tax year {current} so far</Text>
               <InfoButton terms={["s18a"]} />
             </View>
-            <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-              You get one s18A receipt per charity, covering all your donations to it in a tax year (1 March to the end of February). Receipts for this tax year
-              come after {currentEnd}.
+            <Text variant="amount" style={{ fontSize: 44, lineHeight: 50 }}>{rand(thisYearCents)}</Text>
+            <Text style={styles.summaryBody}>
+              {thisYearCents
+                ? `Counts towards your s18A receipts from ${thisYearCharities} ${thisYearCharities === 1 ? "charity" : "charities"}. They come after ${currentEnd}, one per charity.`
+                : `Nothing towards s18A receipts yet this tax year. Receipts come once a year, one per charity, after ${currentEnd}.`}
             </Text>
           </View>
+          ) : null}
 
           {!preview && !signedIn ? (
             <View style={{ gap: 12, alignItems: "center", paddingVertical: 24 }}>
@@ -96,47 +111,50 @@ export default function Receipts() {
               return (
                 <FadeUp key={y} index={yi} style={{ gap: 8 }}>
                   <View style={{ gap: 2 }}>
-                    <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Tax year {y}</Text>
+                    <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">Tax year {y}</Text>
                     <Text variant="label">{taxYearRangeLabel(y)}</Text>
                   </View>
-                  <View style={styles.list}>
-                    {rows.map((r, i) => (
-                      <View key={r.id} style={[styles.row, i > 0 && styles.divider]}>
-                        <View style={{ flex: 1, gap: 2 }}>
-                          <Text style={{ fontSize: 17 }}>{r.charityName}</Text>
-                          <Text variant="bodyMuted" style={{ fontSize: 16 }}>{rand(r.cents)} · issued {ddmmyyyy(r.issued)}</Text>
-                        </View>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Share receipt from ${r.charityName}`}
-                          onPress={() =>
-                            Share.share({ message: `s18A receipt${r.number ? ` ${r.number}` : ""} from ${r.charityName}, tax year ${y}` }).catch(() =>
-                              notify("Couldn't share", "Sharing isn't available here."),
-                            )
-                          }
-                          style={styles.iconBtn}
-                        >
-                          <ShareIcon />
-                        </Pressable>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Download receipt from ${r.charityName}`}
-                          onPress={() => {
-                            // The PDF is handed out by the website, after it checks who is asking.
-                            if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF on our website.");
-                            openSite(`/receipts/${r.id}`);
-                          }}
-                          style={styles.iconBtn}
-                        >
-                          <DownloadIcon />
-                        </Pressable>
-                      </View>
+                  <View style={{ gap: 14 }}>
+                    {rows.map((r) => (
+                      <ReceiptSlip
+                        key={r.id}
+                        receipt={r}
+                        onShare={() =>
+                          Share.share({ message: `s18A receipt${r.number ? ` ${r.number}` : ""} from ${r.charityName}, tax year ${y}` }).catch(() =>
+                            notify("Couldn't share", "Sharing isn't available here."),
+                          )
+                        }
+                        onDownload={() => {
+                          // The PDF is handed out by the website, after it checks who is asking.
+                          if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF on our website.");
+                          openSite(`/receipts/${r.id}`);
+                        }}
+                      />
                     ))}
                   </View>
                 </FadeUp>
               );
             })
           )}
+
+          {/* The tax pack lives on the website (signed in there), as a page to save as a PDF or a spreadsheet. */}
+          {preview || signedIn ? (
+            <View style={styles.pack}>
+              <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 17 }}>Tax pack</Text>
+              <Text variant="bodyMuted" style={{ fontSize: 16 }}>Every donation in a tax year, what goes on s18A receipts, and the totals. Opens on our website.</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
+                {[current, current - 1].map((y) => (
+                  <Button
+                    key={y}
+                    variant="secondary"
+                    label={y === current ? `${y} so far` : `Tax year ${y}`}
+                    style={{ paddingHorizontal: 18 }}
+                    onPress={() => (preview ? notify("Sample tax pack", "In the live app this opens your tax pack on our website.") : openSite(`/account/tax-pack/${y}`))}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {no18a.length ? (
             <View style={styles.infoRow}>
@@ -156,10 +174,12 @@ export default function Receipts() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
   arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
-  notice: { gap: 4, paddingBottom: space.block - 4, borderBottomWidth: 1, borderBottomColor: colors.hairline },
-  list: { borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface, overflow: "hidden" },
-  row: { flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 16, paddingRight: 6, paddingVertical: 10, minHeight: touch + 12 },
-  divider: { borderTopWidth: 1, borderTopColor: colors.hairline },
-  iconBtn: { width: touch, height: touch, alignItems: "center", justifyContent: "center" },
+  summary: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  summaryKicker: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
+  pack: { gap: 4, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
+  summaryBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.ink },
   infoRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
 });
+
+/** A failure while drawing shows "Try again" and the error, not a blank page. */
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

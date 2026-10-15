@@ -10,6 +10,10 @@ import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
 import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { clientIp } from "@/lib/client-ip";
+import { hitRateLimit } from "@/lib/rate-limit";
+import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Thank you", referrer: "no-referrer" };
@@ -21,15 +25,20 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const ref = typeof reference === "string" ? reference : "";
   // If the payment provider can't be reached, or the result can't be saved yet, say we're still
   // confirming rather than showing an error page. Nothing here says "paid" unless it is saved.
-  const outcome = await confirmPayment(ref).catch((e) => {
-    console.error(e);
-    return "pending" as const;
-  });
+  // Each load can ask the payment provider about the payment, so one visitor gets a generous but
+  // limited number of checks (a donor needs about 13); past that the page just says "still confirming".
+  const limited = await hitRateLimit("return-check", [`ip:${clientIp(await headers())}`], 40, 10).catch(() => false);
+  const outcome = limited
+    ? ("pending" as const)
+    : await confirmPayment(ref).catch((e) => {
+        console.error(e);
+        return "pending" as const;
+      });
 
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, donation_giving_kinds(kind), charities(name_en, slug)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, donation_giving_kinds(kind), charities(name_en, slug)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (await confirmationTokenMatches(ref, typeof t === "string" ? t : undefined)) {
@@ -54,10 +63,13 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
-            <div className="flex justify-between gap-3"><dt>Contribution to Nadiv Lev</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
+            <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
           ) : null}
           <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
           <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>
+          {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
+            <div className="flex justify-between gap-3"><dt>Dedication</dt><dd className="text-right" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd></div>
+          ) : null}
         </dl>
         <p className="mt-3 text-sm text-muted">
           A confirmation is on its way to your email.{" "}
@@ -70,7 +82,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         ) : null}
         {fromApp ? (
           <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
-            Back to the Nadiv Lev app
+            Back to the Givezy app
           </a>
         ) : null}
         <Link href={`/c/${charity.slug}`} className="mt-3 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
@@ -85,7 +97,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         <p className="mt-2 text-sm text-muted">To see the details, open the link from your payment or sign in with the email you gave with.</p>
         {fromApp ? (
           <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
-            Back to the Nadiv Lev app
+            Back to the Givezy app
           </a>
         ) : null}
         <Link href="/charities" className="mt-3 inline-block text-sm text-brand underline">Find a charity</Link>
@@ -113,7 +125,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Card title="We're confirming your payment">
         <p className="text-sm">This can take a minute. Please don&apos;t pay again.</p>
-        <KeepChecking />
+        <KeepChecking retryHref={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} />
       </Card>
     );
   }

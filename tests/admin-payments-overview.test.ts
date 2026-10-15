@@ -30,7 +30,7 @@ describe("payments overview", () => {
     expect(rows[1].reference).toBe("NL-3F9A2C71");
   });
 
-  it("adds up per charity: donations to the charity, contributions to Nadiv Lev, in whole cents", () => {
+  it("adds up per charity: donations to the charity, contributions to Givezy, in whole cents", () => {
     const t = totalsByCharity([
       { charity_id: "a", charity: "Meals", amount_cents: "18000", contribution_cents: "2000" },
       { charity_id: "a", charity: "Meals", amount_cents: 5000, contribution_cents: 0 },

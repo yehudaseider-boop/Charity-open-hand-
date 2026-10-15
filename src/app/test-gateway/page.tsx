@@ -23,7 +23,7 @@ export default async function TestGatewayPage({ searchParams }: PageProps<"/test
       <h1 className="text-xl font-semibold">Pay {formatRand(total)}</h1>
       <dl className="space-y-1 text-sm">
         <div className="flex justify-between"><dt className="text-muted">Donation to charity</dt><dd>{formatRand(toCharity)}</dd></div>
-        <div className="flex justify-between"><dt className="text-muted">Contribution to Nadiv Lev</dt><dd>{formatRand(contribution)}</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">Contribution to Givezy</dt><dd>{formatRand(contribution)}</dd></div>
       </dl>
       <form action={completeTestPayment} className="space-y-2">
         {[...params.entries()].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}

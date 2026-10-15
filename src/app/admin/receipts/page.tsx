@@ -14,11 +14,13 @@ const tabs = ["issued", "void"] as const;
 
 export default async function AdminReceiptsPage({ searchParams }: PageProps<"/admin/receipts">) {
   await requirePlatformAdmin();
-  const { status: raw } = await searchParams;
+  const { status: raw, q: rawQ } = await searchParams;
   const status = tabs.includes(raw as (typeof tabs)[number]) ? (raw as (typeof tabs)[number]) : "issued";
+  // Search by receipt number, donor or charity name: letters, digits, spaces and dashes only (it goes into a filter).
+  const q = typeof rawQ === "string" ? rawQ.replace(/[^\p{L}\p{N} -]/gu, "").trim().slice(0, 60) : "";
 
   const supabase = await createClient();
-  const { data: receipts, error } = await supabase
+  let query = supabase
     .from("s18a_receipts")
     .select(
       "id, tax_year, amount_cents, issued_at, voided_at, void_reason, pdf_path, emailed_at, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en, donor_name:details->donor->>name",
@@ -26,6 +28,12 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
     .eq("status", status)
     .order("issued_at", { ascending: false })
     .limit(100);
+  if (q) {
+    query = query.or(
+      `details->>receipt_reference.ilike.*${q}*,details->donor->>name.ilike.*${q}*,details->charity->>legal_name_en.ilike.*${q}*`,
+    );
+  }
+  const { data: receipts, error } = await query;
   if (error) throw error;
 
   return (
@@ -43,6 +51,18 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
           </Link>
         ))}
       </nav>
+      <form className="flex gap-2" role="search">
+        <input type="hidden" name="status" value={status} />
+        <input
+          name="q"
+          defaultValue={q}
+          placeholder="Receipt number, donor or charity"
+          aria-label="Search receipts"
+          className="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm"
+        />
+        <button type="submit" className="rounded-control bg-brand px-4 py-2 text-sm font-semibold text-brand-contrast">Search</button>
+      </form>
+      <p className="text-xs text-muted">{q ? `Matches for \u201c${q}\u201d (up to 100).` : "The latest 100. Search to find an older receipt."}</p>
       {receipts && receipts.length > 0 ? (
         <ul className="space-y-3">
           {receipts.map((r) => (

@@ -70,7 +70,7 @@ describe("starting a checkout", () => {
     });
   });
 
-  it("Nadiv Lev bearing the fee means the main account bears it", async () => {
+  it("Givezy bearing the fee means the main account bears it", async () => {
     await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "nediv_lev" });
     expect(calls[0].body).toMatchObject({ bearer: "account", subaccount: "ACCT_charity1" });
   });
@@ -239,5 +239,58 @@ describe("monthly donations", () => {
     expect(await charge("success")).toBe("success");
     expect(await charge("failed")).toBe("failed");
     expect(await charge("ongoing")).toBe("pending");
+  });
+});
+
+describe("how Paystack's errors are read", () => {
+  const answerWith = (status: number, body: unknown) =>
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
+  const verifyError = async () => {
+    try {
+      await paystackGateway.verifyTransaction("11111111-1111-1111-1111-111111111111");
+    } catch (e) {
+      return e as InstanceType<typeof GatewayError>;
+    }
+    throw new Error("expected an error");
+  };
+
+  it("an answer that says no is a refusal (a failed attempt), not 'never received'", async () => {
+    answerWith(400, { status: false, message: "Authorization is not active" });
+    const e = await verifyError();
+    expect(e).toBeInstanceOf(GatewayError);
+    expect(e.refused).toBe(true);
+    expect(e.notFound).toBe(false);
+  });
+
+  it("'transaction not found' is never-received, not a refusal", async () => {
+    answerWith(400, { status: false, message: "Transaction reference not found" });
+    const e = await verifyError();
+    expect(e.notFound).toBe(true);
+    expect(e.refused).toBe(false);
+  });
+
+  it("an outage, a rate limit or the network failing is neither", async () => {
+    answerWith(502, { status: false, message: "Bad gateway" });
+    expect(await verifyError()).toMatchObject({ refused: false, notFound: false });
+    answerWith(429, { status: false, message: "Too many requests" });
+    expect(await verifyError()).toMatchObject({ refused: false, notFound: false });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    const e = await verifyError();
+    expect(e).toBeInstanceOf(GatewayError);
+    expect(e).toMatchObject({ refused: false, notFound: false });
+  });
+});
+
+describe("split payments never quietly drop the charity", () => {
+  it("with splits on, a payment without the charity's account is refused before anything is sent", async () => {
+    process.env.PAYSTACK_SPLITS = "yes";
+    await expect(paystackGateway.createCheckout({ ...base, charityAccountRef: null, feeBearer: "charity" })).rejects.toBeInstanceOf(GatewayError);
+    await expect(
+      paystackGateway.chargeAuthorization({
+        reference: base.reference, authorizationCode: "AUTH_x", email: base.email, totalCents: base.totalCents,
+        lines: base.lines, charityAccountRef: null, feeBearer: "charity", description: "Monthly donation",
+      }),
+    ).rejects.toBeInstanceOf(GatewayError);
+    expect(calls).toEqual([]);
   });
 });

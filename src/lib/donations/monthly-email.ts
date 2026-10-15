@@ -12,8 +12,8 @@ export function monthlyFailedEmail(d: { charityName: string; totalText: string; 
     : [
         `We could not collect your monthly donation of ${d.totalText} to ${d.charityName} from ${card}.`,
         "",
-        "We will try again shortly. If the card has expired or been replaced, please start a new monthly donation on the charity's page.",
+        "We will try again shortly. If the card has expired or been replaced, first cancel this monthly donation (so we stop trying the old card), then start a new one on the charity's page. Otherwise we will keep trying this one, and you could be charged twice.",
       ];
-  lines.push("", `You can pause or cancel a monthly donation at any time in the Nadiv Lev app (Giving tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`, "", "Nadiv Lev");
+  lines.push("", `You can pause or cancel a monthly donation at any time in the Givezy app (Giving tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`, "", "Givezy");
   return { subject: d.final ? `Your monthly donation to ${d.charityName} has stopped` : `We could not collect your monthly donation to ${d.charityName}`, text: lines.join("\n") };
 }

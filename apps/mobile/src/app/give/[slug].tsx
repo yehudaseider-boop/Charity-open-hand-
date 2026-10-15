@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { Field } from "@/components/field";
+import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
@@ -31,14 +32,14 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
 export default function Give() {
   const insets = useSafeAreaInsets();
   const { slug, kind: kindParam } = useLocalSearchParams<{ slug: string; kind?: string }>();
-  const { charity } = useCharity(slug);
+  const { charity, failed, retry } = useCharity(slug);
   const account = useAccount();
   const preview = account.status === "preview";
   const history = preview ? sampleGifts : (account.live?.gifts ?? []);
   const quick = slug ? quickAmounts(history, slug) : [];
 
   const [amount, setAmount] = useState("");
-  const startKind = kindParam && kindParam in givingKindLabels ? (kindParam as GivingKind) : slug ? lastKind(history, slug) : null;
+  const startKind = kindParam && Object.hasOwn(givingKindLabels, kindParam) ? (kindParam as GivingKind) : slug ? lastKind(history, slug) : null;
   const [kind, setKind] = useState<GivingKind | null>(startKind);
   const [monthly, setMonthly] = useState(false);
   const [extra, setExtra] = useState(false);
@@ -53,6 +54,8 @@ export default function Give() {
   const [want18a, setWant18a] = useState(false);
   const [idNumber, setIdNumber] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const [dedicate, setDedicate] = useState<"honour" | "memory" | null>(null);
+  const [dedicationName, setDedicationName] = useState("");
   const [agreed, setAgreed] = useState(false);
   // The monthly authorisation names an exact total: it counts only for the total that was ticked.
   const [authorisedTotal, setAuthorisedTotal] = useState<number | null>(null);
@@ -88,7 +91,26 @@ export default function Give() {
       </View>
     );
   }
-  if (!charity) return <View style={styles.screen}><TopBar title="Give" /></View>;
+  // Loading (undefined), not found (null) or could not load: never a blank screen.
+  if (!charity) {
+    return (
+      <View style={styles.screen}>
+        <TopBar title="Give" />
+        <View style={{ padding: space.gutter, gap: space.md }}>
+          {failed ? (
+            <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retry} />
+          ) : charity === null ? (
+            <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
+          ) : (
+            <>
+              <SkeletonBlock height={64} />
+              <SkeletonBlock height={220} />
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   const gift = parseRandToCents(amount);
   const contribution = extra ? parseRandToCents(extraAmount) : 0;
@@ -106,6 +128,7 @@ export default function Give() {
     if (!last.trim()) e.last_name = "Enter your surname";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
     if (s18aAvailable && want18a && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
+    if (dedicate && !dedicationName.trim()) e.dedication_name = "Enter their name, or switch the dedication off";
     if (monthly && !authorised) e.monthly_authorised = "Please confirm you authorise the monthly payments";
     if (!agreed) e.agreed = "Please confirm so we can record your donation";
     if ((e.first_name || e.last_name || e.email) && remembered) setEditingDetails(true);
@@ -137,6 +160,8 @@ export default function Give() {
       id_number: s18aAvailable && want18a ? idNumber.trim() || undefined : undefined,
       giving_kind: kind!,
       is_anonymous: anonymous,
+      dedication_kind: dedicate ?? undefined,
+      dedication_name: dedicate ? dedicationName.trim() : undefined,
       monthly,
       monthly_authorised: authorised,
       age_confirmed: agreed,
@@ -156,7 +181,8 @@ export default function Give() {
     try {
       await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
       void refreshAfterGiving(account.refresh);
-      router.replace("/giving");
+      // Back to the Giving tab that is already open underneath (replace would stack a second tab bar).
+      router.dismissTo("/giving");
     } catch {
       setMessage("We couldn't open the payment page. Please try again.");
     } finally {
@@ -241,6 +267,24 @@ export default function Give() {
             </>
           ) : null}
           <SwitchRow label="Give anonymously" description="Your name won't appear publicly." value={anonymous} onChange={setAnonymous} />
+
+          {/* Optional: in honour of, or in memory of, someone. */}
+          <SwitchRow label="Dedicate this donation" description="In honour of, or in memory of, someone. The charity sees the name; it is not on your s18A receipt." value={dedicate !== null} onChange={(v) => setDedicate(v ? "memory" : null)} />
+          {dedicate ? (
+            <View style={{ gap: 8 }}>
+              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Dedication">
+                {(["honour", "memory"] as const).map((k) => {
+                  const on = dedicate === k;
+                  return (
+                    <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.chip, on && styles.chipOn]}>
+                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{k === "honour" ? "In honour of" : "In memory of"}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Field label="Their name" value={dedicationName} onChangeText={setDedicationName} autoCapitalize="words" maxLength={80} error={err("dedication_name")} />
+            </View>
+          ) : null}
 
           {monthly && total ? (
             <View style={{ gap: 8 }}>

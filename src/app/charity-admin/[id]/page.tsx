@@ -4,8 +4,8 @@ import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { allTime, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
-import { loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
+import { allTime, monthlySummary, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
+import { loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 
@@ -43,12 +43,14 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
   const now = new Date();
   const taxYear = thisTaxYear(now);
-  const [month, year, all, monthly] = await Promise.all([
+  const [month, year, all, monthly, recurring] = await Promise.all([
     loadOverview(id, thisMonth(now)),
     loadOverview(id, taxYear),
     loadOverview(id, allTime),
     loadMonthlyTotals(id, 12),
+    loadMonthlyDonations(id),
   ]);
+  const regular = monthlySummary(recurring);
   const receipts = canIssue18a(charity);
   const chart = [...monthly].reverse();
   const max = Math.max(1, ...chart.map((m) => m.amountCents));
@@ -66,7 +68,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         <Stat label="Donors" value={String(all.donor_count)} note="who have given" />
       </div>
       <p className="text-xs text-muted">
-        Amounts are the donations only. Any contribution a donor chose to add for Nadiv Lev is not included.
+        Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included.
         {" "}{taxYearLabel(taxYear.taxYear)}.
       </p>
 
@@ -79,6 +81,18 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
           <Link href={`${base}/donations`} className="mt-3 inline-block text-sm text-brand underline">See all donations</Link>
         </Card>
       ) : null}
+
+      <Card title="Monthly donations">
+        {recurring.length === 0 ? (
+          <p className="text-sm text-muted">No monthly donors yet. Donors can choose to give every month when they donate.</p>
+        ) : (
+          <p className="text-sm">
+            {plural(regular.runningCount, "donor")} {regular.runningCount === 1 ? "gives" : "give"} {formatRand(regular.runningCentsPerMonth)} a month in total
+            {regular.pausedCount > 0 ? `, ${regular.pausedCount} paused` : ""}.{" "}
+            <Link href={`${base}/monthly`} className="text-brand underline">See monthly donations</Link>
+          </p>
+        )}
+      </Card>
 
       <Card title="s18A receipts">
         {receipts ? (
@@ -120,6 +134,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
       <div className="flex flex-wrap gap-2 text-sm">
         <Link href={`${base}/donations`} className="rounded-control border border-border px-3 py-2">Donations</Link>
         <Link href={`${base}/donors`} className="rounded-control border border-border px-3 py-2">Donors</Link>
+        <Link href={`${base}/monthly`} className="rounded-control border border-border px-3 py-2">Monthly</Link>
         <Link href={`${base}/receipts`} className="rounded-control border border-border px-3 py-2">Receipts</Link>
         <a href={`${base}/export/donations`} className="rounded-control border border-border px-3 py-2">Download donations (CSV)</a>
       </div>

@@ -184,7 +184,14 @@ export async function addCharityAdmin(id: string, _prev: FormState, formData: Fo
 
   const db = createAdminClient();
   let { data: profile } = await db.from("profiles").select("id").eq("email", email).maybeSingle();
-  if (!profile) {
+  if (profile) {
+    // An account someone registered but never confirmed could belong to anyone who typed this email:
+    // never give it a charity's access.
+    const existing = await db.auth.admin.getUserById(profile.id);
+    if (existing.error || !existing.data.user?.email_confirmed_at) {
+      return { ok: false, message: "That email has an unconfirmed account. Ask them to sign in once with the emailed code first, then add them again." };
+    }
+  } else {
     const created = await db.auth.admin.createUser({ email, email_confirm: true });
     if (created.error) return { ok: false, message: created.error.message };
     profile = { id: created.data.user.id };
@@ -299,11 +306,11 @@ export async function changeBankDetails(id: string, _prev: FormState, formData: 
         to: before.contact_email as string,
         subject: `The bank details for ${charity.name_en} were changed`,
         text: [
-          `The bank details held by Nadiv Lev for ${charity.name_en} were changed on ${formatDate(new Date())}. The new account ends in ${last4(v.bank_account_number)}.`,
+          `The bank details held by Givezy for ${charity.name_en} were changed on ${formatDate(new Date())}. The new account ends in ${last4(v.bank_account_number)}.`,
           "",
           "If you did not ask for this, please tell us straight away.",
           "",
-          "Nadiv Lev",
+          "Givezy",
         ].join("\n"),
       });
     } catch (e) {

@@ -19,7 +19,7 @@ export async function GET() {
 
   const [profile, donors, kinds, consents, requests, favourites, maaserSettings, income, external, notes] = await Promise.all([
     supabase.from("profiles").select("email, full_name, created_at").eq("id", user.id).maybeSingle(),
-    supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_encrypted, tax_reference_encrypted, address_line1, address_line2, suburb, city, postal_code, created_at").eq("user_id", user.id),
+    supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, created_at").eq("user_id", user.id),
     supabase.from("donation_giving_kinds").select("donation_id, kind"),
     supabase.from("consents").select("kind, policy_version, accepted_at").eq("user_id", user.id).order("accepted_at"),
     supabase.from("data_requests").select("kind, details, status, response, created_at, closed_at").eq("user_id", user.id),
@@ -30,19 +30,36 @@ export async function GET() {
     supabase.from("donation_private_notes").select("donation_id, note, created_at").eq("user_id", user.id),
   ]);
 
+  // A download with a missing part would look complete, so any read that fails stops it.
+  const failed = [profile, donors, kinds, consents, requests, favourites, maaserSettings, income, external, notes].find((r) => r.error);
+  if (failed) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+
   // Filter by this person's own donor records: a platform admin's access to
   // everyone's donations must not end up in their personal download.
   const donorIds = (donors.data ?? []).map((d) => d.id as string);
-  const donations = donorIds.length
-    ? await supabase
-        .from("donations")
-        .select("id, created_at, paid_at, status, amount_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, tax_year, charities(name_en)")
-        .in("donor_id", donorIds)
-        .order("created_at")
-    : { data: [] };
-  const myReceipts = donorIds.length
-    ? await supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference").in("donor_id", donorIds)
-    : { data: [] };
+  const donations: Record<string, unknown>[] = [];
+  for (let page = 0; donorIds.length; page += 1000) {
+    const { data, error } = await supabase
+      .from("donations")
+      .select("id, created_at, paid_at, status, amount_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, dedication_kind, dedication_name, tax_year, charities(name_en)")
+      .in("donor_id", donorIds)
+      .order("created_at")
+      .order("id")
+      .range(page, page + 999);
+    if (error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+    donations.push(...((data ?? []) as Record<string, unknown>[]));
+    if (!data || data.length < 1000) break;
+  }
+  const [myReceipts, monthly] = donorIds.length
+    ? await Promise.all([
+        supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference").in("donor_id", donorIds),
+        supabase
+          .from("recurring_donations")
+          .select("id, created_at, status, amount_cents, contribution_cents, charge_day, next_charge_at, card_brand, card_last4, card_exp, wants_18a, is_anonymous, message, dedication_kind, dedication_name, ended_reason, charities(name_en)")
+          .in("donor_id", donorIds),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (myReceipts.error || monthly.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   const open = (v: string | null) => {
     if (!v) return null;
     try {
@@ -53,15 +70,13 @@ export async function GET() {
   };
 
   const body = {
-    about: "Everything Nadiv Lev holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are UTC.",
+    about: "Everything Givezy holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are UTC.",
     downloaded_at: new Date().toISOString(),
     account: profile.data,
-    donor_details: (donors.data ?? []).map(({ id_number_encrypted, tax_reference_encrypted, ...d }) => ({
-      ...d,
-      id_number: open(id_number_encrypted as string | null),
-      tax_reference: open(tax_reference_encrypted as string | null),
-    })),
-    donations: donations.data ?? [],
+    // ID and tax numbers as their last 4 digits only: a donor record can be shared by everyone who gave with one email.
+    donor_details: donors.data ?? [],
+    donations,
+    monthly_donations: monthly.data ?? [],
     giving_kinds: kinds.data ?? [],
     s18a_receipts: myReceipts.data ?? [],
     agreements: consents.data ?? [],
@@ -82,7 +97,7 @@ export async function GET() {
   return new NextResponse(JSON.stringify(body, null, 2), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="my-nadiv-lev-information.json"',
+      "Content-Disposition": 'attachment; filename="my-givezy-information.json"',
       "Cache-Control": "no-store",
     },
   });

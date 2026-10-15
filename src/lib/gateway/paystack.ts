@@ -14,12 +14,12 @@ import { GatewayError, type CardAuthorization, type ChargeRequest, type Checkout
  * registered as a Paystack SUBACCOUNT (settlement bank + account). A checkout started with
  * that subaccount pays the charity's line into its own bank account, and
  * `transaction_charge` (a flat amount, in cents) is what stays with the main account: the
- * donor's optional contribution to Nadiv Lev. `bearer` says who pays Paystack's own fee:
- * "subaccount" (the charity) or "account" (Nadiv Lev), from the platform setting
+ * donor's optional contribution to Givezy. `bearer` says who pays Paystack's own fee:
+ * "subaccount" (the charity) or "account" (Givezy), from the platform setting
  * `gatewayChargePaidBy`, which Yehuda has not decided yet.
  *
  * Splitting is a switch: PAYSTACK_SPLITS=yes. Off, a charity takes no payments through
- * this gateway (the money would otherwise land with Nadiv Lev). Whether Paystack splits for
+ * this gateway (the money would otherwise land with Givezy). Whether Paystack splits for
  * South African merchants, the exact settlement and fee behaviour (including when the
  * contribution is R0), and the bank list for ZA are all unverified: check in test mode
  * with docs/go-live-checklist.md before switching it on.
@@ -33,21 +33,33 @@ function secretKey(): string {
   return k;
 }
 
+/** How long to wait for Paystack before giving up on a call (it is then treated as unreachable, never as refused). */
+const TIMEOUT_MS = 20_000;
+
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${secretKey()}`,
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${secretKey()}`,
+        "Content-Type": "application/json",
+        ...init?.headers,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    // Network failure or timeout: the outcome is unknown, so it is neither "not found" nor "refused".
+    throw new GatewayError(`Paystack ${path} could not be reached: ${e instanceof Error ? e.message : String(e)}`);
+  }
   const body = (await res.json().catch(() => null)) as { status?: boolean; message?: string; data?: T } | null;
   if (!res.ok || !body?.status) {
     // Only a 404, or Paystack saying in words that it has no such transaction, counts as "never received".
     const notFound = res.status === 404 || /transaction reference not found|transaction not found/i.test(body?.message ?? "");
-    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound });
+    // Paystack answered and said no (a 4xx other than "not found" or "too many requests", or a 2xx with status false).
+    const refused = !notFound && ((res.status >= 400 && res.status < 500 && res.status !== 429) || (res.ok && body?.status === false));
+    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused });
   }
   return body.data as T;
 }
@@ -60,6 +72,16 @@ function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountR
     transaction_charge: req.lines.contributionCents,
     bearer: req.feeBearer === "charity" ? "subaccount" : "account",
   };
+}
+
+/**
+ * With split payments on, every payment must name the charity's account: without one the whole
+ * amount would settle to Givezy instead of the charity, so it is refused before anything is sent.
+ */
+function splitOrNone(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines">, splitting: boolean) {
+  if (req.charityAccountRef) return splitFields(req);
+  if (splitting) throw new GatewayError("This charity has no gateway account, so the payment was not started (it would not reach the charity).");
+  return {};
 }
 
 /** Paystack's card authorisation, as we keep it. Not reusable (or no code): treated as none. */
@@ -92,7 +114,7 @@ export const paystackGateway: PaymentGateway = {
         callback_url: req.returnUrl,
         // Only a card payment gives a reusable authorisation, which a monthly donation needs.
         ...(req.saveCard ? { channels: ["card"] } : {}),
-        ...(req.charityAccountRef ? splitFields(req) : {}),
+        ...splitOrNone(req, paystackGateway.splitsPayments),
         metadata: {
           description: req.description,
           charity_cents: req.lines.charityCents,
@@ -142,7 +164,7 @@ export const paystackGateway: PaymentGateway = {
         amount: req.totalCents,
         currency: "ZAR",
         reference: req.reference,
-        ...(req.charityAccountRef ? splitFields(req) : {}),
+        ...splitOrNone(req, paystackGateway.splitsPayments),
         metadata: { description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: true },
       }),
     });

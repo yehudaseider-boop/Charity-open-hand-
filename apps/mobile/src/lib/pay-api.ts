@@ -24,6 +24,9 @@ export type DonorDetails = {
   city?: string;
   postal_code?: string;
   message?: string;
+  /** Given in honour of, or in memory of, someone: the charity sees it, it is not on the s18A receipt. */
+  dedication_kind?: "honour" | "memory";
+  dedication_name?: string;
   giving_kind: "maaser" | "chomesh" | "tzedaka";
   is_anonymous?: boolean;
   monthly?: boolean;

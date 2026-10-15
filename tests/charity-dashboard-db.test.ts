@@ -248,3 +248,82 @@ describe("charity_overview, charity_monthly_totals and charity_donor_list", () =
     });
   });
 });
+
+describe("monthly donations for a charity", () => {
+  async function monthly(c: string, d: string, o: { status?: string; amount?: number; failedAttempts?: number } = {}) {
+    const { id } = await one(
+      `insert into public.recurring_donations (donor_id, charity_id, amount_cents, contribution_cents, status, charge_day, next_charge_at,
+         authorization_encrypted, card_last4, gateway_customer_ref, failed_attempts, dedication_kind, dedication_name)
+       values ($1, $2, $3, 2000, $4, 15, '2026-11-15T08:00:00Z', 'secret', '4242', 'CUS_x', $5, 'memory', 'Chaim Cohen') returning id`,
+      [d, c, o.amount ?? 18_000, o.status ?? "active", o.failedAttempts ?? 0],
+    );
+    return id as string;
+  }
+  const linkPayment = (donationId: string, recurringId: string) =>
+    run("update public.donations set recurring_id = $2 where id = $1", [donationId, recurringId]);
+
+  it("shows a charity admin their own monthly donors once a payment has gone through, without card, gateway, contribution or giving kind", async () => {
+    await tx(async () => {
+      const a = await user(), b = await user();
+      const ca = await charity(a), cb = await charity(b);
+      const d = await donor();
+      const mine = await monthly(ca, d);
+      await linkPayment(await donation(ca, d, { amount: 18_000, first: "Sarah", last: "Levin", email: "sarah@x.test" }), mine);
+      await linkPayment(await donation(ca, d, { amount: 18_000, paidAt: "2026-11-15T08:00:00Z" }), mine);
+      const unpaid = await monthly(ca, d);
+      await linkPayment(await donation(ca, d, { status: "pending" }), unpaid);
+      const other = await monthly(cb, d);
+      await linkPayment(await donation(cb, d), other);
+
+      await asUser(a);
+      const rows = (await run("select * from public.charity_monthly_list($1)", [ca])).rows;
+      expect(rows.map((r) => r.recurring_id)).toEqual([mine]);
+      expect(rows[0]).toMatchObject({
+        status: "active", retrying: false, amount_cents: "18000", charge_day: 15, paid_count: "2", paid_cents: "36000",
+        display_name: "Sarah Levin", dedication_kind: "memory", dedication_name: "Chaim Cohen",
+      });
+      for (const hidden of ["authorization_encrypted", "card_last4", "card_brand", "gateway_customer_ref", "gateway_subscription_ref", "contribution_cents", "giving_kind", "failed_attempts", "ended_reason"]) {
+        expect(Object.keys(rows[0])).not.toContain(hidden);
+      }
+      await run("savepoint s");
+      await expect(run("select * from public.charity_monthly_list($1)", [cb])).rejects.toThrow(/Not allowed/);
+      await run("rollback to savepoint s");
+      expect((await run("select id from public.recurring_donations")).rowCount).toBe(0);
+    });
+  });
+
+  it("marks a donation being retried, and gives no next date once it is paused or stopped", async () => {
+    await tx(async () => {
+      const a = await user();
+      const c = await charity(a);
+      const d = await donor();
+      const retry = await monthly(c, d, { failedAttempts: 1 });
+      const paused = await monthly(c, d, { status: "paused" });
+      const stopped = await monthly(c, d, { status: "failed" });
+      for (const r of [retry, paused, stopped]) await linkPayment(await donation(c, d), r);
+      await asUser(a);
+      const rows = (await run("select recurring_id, status, retrying, next_charge_at from public.charity_monthly_list($1)", [c])).rows;
+      const by = Object.fromEntries(rows.map((r) => [r.recurring_id, r]));
+      expect(by[retry]).toMatchObject({ status: "active", retrying: true });
+      expect(by[retry].next_charge_at).not.toBeNull();
+      expect(by[paused]).toMatchObject({ status: "paused", next_charge_at: null });
+      expect(by[stopped]).toMatchObject({ status: "failed", next_charge_at: null });
+    });
+  });
+
+  it("is closed to strangers and visitors", async () => {
+    await tx(async () => {
+      const a = await user(), stranger = await user();
+      const c = await charity(a);
+      const d = await donor();
+      await linkPayment(await donation(c, d), await monthly(c, d));
+      await asUser(stranger);
+      await run("savepoint s");
+      await expect(run("select * from public.charity_monthly_list($1)", [c])).rejects.toThrow(/Not allowed/);
+      await run("rollback to savepoint s");
+      await reset();
+      await run("set local role anon");
+      await expect(run("select * from public.charity_monthly_list($1)", [c])).rejects.toThrow(/permission denied/);
+    });
+  });
+});

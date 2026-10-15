@@ -27,7 +27,7 @@ export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
         {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
         {verified ? (
           <form action={verifyCode} className="space-y-3">
-            <p className="text-sm text-muted">Open your authenticator app and enter the 6-digit code for Nadiv Lev.</p>
+            <p className="text-sm text-muted">Open your authenticator app and enter the 6-digit code for Givezy.</p>
             <input type="hidden" name="factorId" value={verified.id} />
             <input type="hidden" name="next" value={next} />
             <CodeField />

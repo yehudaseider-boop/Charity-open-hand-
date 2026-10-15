@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Nadiv Lev: project rules
+# Givezy: project rules
 
 - The build brief is the source of truth; `docs/decisions.md` records changes and open questions. `docs/go-live-checklist.md` is the go-live list: update it whenever a new go-live step or open decision comes up, and bring it up when go-live is discussed.
 - Money is integer cents (bigint) in ZAR. Percentages are integer ppm. Never floats.
@@ -10,12 +10,12 @@
 - Nothing outside the gateway adapter may reference a specific gateway.
 - Every table has row-level security. Money and receipt writes are server-only (service role).
 - Hebrew text: `lang="he" dir="rtl"`. Check pages at 375px wide.
-- Brand: the Nadiv Lev brand kit. The name is always "Nadiv Lev". Colours live only in `src/app/globals.css` and `apps/mobile/src/theme/tokens.ts`: cream pages, ink text, indigo headlines, deep coral for buttons and links, one coral accent per screen, sage for progress and the s18A badge. Fraunces (600, 20 px and up) for headlines, Inter for everything else, Heebo for Hebrew. Sentence case, no all-caps buttons, no exclamation marks. Write "s18A receipt".
+- Brand: Givezy (renamed from Nadiv Lev, 15/10/2026; the company is Givezy). The name is always "Givezy". Website, app, emails and receipts share one look, read off the Givezy logo: cream pages (#FEFDF7), navy text (#102848), blue (#1848A8) for headlines, buttons and links, one bright orange (#F88038) accent per screen (graphics only, never text), lilac (#CCB3FB) for soft highlights, sage for progress and the s18A badge. Fredoka (600) for headlines, Inter for everything else, Heebo for Hebrew. Big soft corners, pill buttons. Colours live only in `src/app/globals.css` (website), `apps/mobile/src/theme/tokens.ts` (app) and `src/lib/brand-colors.ts` (receipt PDFs and emails, which cannot read CSS variables); change all three together. The website keeps its colour variable names (`--indigo` is the headline colour, `--brand` buttons and links, `--coral` the accent, `--honey` the soft highlight). Sentence case, no all-caps buttons, no exclamation marks. Write "s18A receipt".
 - Run `npm test`, `npm run typecheck` and `npm run lint` before committing.
 
 # Phone app (apps/mobile)
 
-- **The phone app is now Givezy** (renamed from Nadiv Lev, 13/10/2026). Its look follows the Givezy logo, not the Nadiv Lev kit below: cream pages (#FEFDF7), navy text (#102848), blue (#1848A8) for headlines, buttons, links and tabs, one bright orange (#F88038) accent per screen (graphics only, never small or large text: it fails contrast), lilac (#CCB3FB) for soft highlight cards, Fredoka for headlines, Inter for body, Heebo for Hebrew, pill buttons, big soft corners, the logo's splash (`src/components/splash.tsx`): the lilac, orange and blue shapes are images cut from the logo, never redrawn, and always all three together when used as the mark. Colours live only in `apps/mobile/src/theme/tokens.ts`. The website, emails and receipts still carry the Nadiv Lev kit until their own rename pass. The deep link scheme (`nedivlev://`) and storage keys (`nediv-lev.*`) are unchanged on purpose: renaming them would break the website's return link and people's saved data.
+- **The phone app is Givezy** (renamed from Nadiv Lev, 13/10/2026), like the website. Its look follows the Givezy logo: cream pages (#FEFDF7), navy text (#102848), blue (#1848A8) for headlines, buttons, links and tabs, one bright orange (#F88038) accent per screen (graphics only, never small or large text: it fails contrast), lilac (#CCB3FB) for soft highlight cards, Fredoka for headlines, Inter for body, Heebo for Hebrew, pill buttons, big soft corners, the logo's splash (`src/components/splash.tsx`): the lilac, orange and blue shapes are images cut from the logo, never redrawn, and always all three together when used as the mark. Colours live only in `apps/mobile/src/theme/tokens.ts`. The deep link scheme (`nedivlev://`) and storage keys (`nediv-lev.*`) are unchanged on purpose: renaming them would break the website's return link and people's saved data.
 
 - Expo + Expo Router (routes in `apps/mobile/src/app`). Donor-facing; charity and admin screens stay on the website.
 - Brand tokens live only in `apps/mobile/src/theme/tokens.ts`. Follow `apps/mobile/AGENTS.md` for Expo rules.

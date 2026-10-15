@@ -31,7 +31,7 @@ export function staleEvents(rows: EventRow[], now: Date) {
     .sort((a, b) => a.receivedAt.localeCompare(b.receivedAt));
 }
 
-/** Money per charity: what went to the charity and what Nadiv Lev received as contributions. */
+/** Money per charity: what went to the charity and what Givezy received as contributions. */
 export function totalsByCharity(rows: PaidRow[]) {
   const by = new Map<string, { charity: string; count: number; donationCents: number; contributionCents: number }>();
   for (const r of rows) {

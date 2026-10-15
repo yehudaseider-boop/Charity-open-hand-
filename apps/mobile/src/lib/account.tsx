@@ -216,13 +216,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
     currentUser.current = signedInUser;
   }, [signedInUser]);
-  const inFlight = useRef<Promise<void> | null>(null);
+  // The load running now, and whose it is.
+  const inFlight = useRef<{ uid: string; job: Promise<void> } | null>(null);
+  // One more load queued behind it, shared by everyone who asks while it runs.
+  const queued = useRef<{ uid: string; job: Promise<void> } | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!supabase || !userId || status !== "signed-in") return;
-    // One load at a time: callers share the one already running.
-    if (inFlight.current) return inFlight.current;
-    const uid = userId;
+  const startLoad = useCallback(async (uid: string) => {
     const mine = () => currentUser.current === uid;
     const job = (async () => {
     setRefreshing(true);
@@ -253,13 +252,35 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       setRefreshing(false);
     }
     })();
-    inFlight.current = job;
+    inFlight.current = { uid, job };
     try {
       await job;
     } finally {
-      inFlight.current = null;
+      if (inFlight.current?.job === job) inFlight.current = null;
     }
-  }, [userId, status]);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    if (!supabase || !userId || status !== "signed-in") return;
+    const uid = userId;
+    const running = inFlight.current;
+    // A load already running for this person may have started before the change the caller just made
+    // (an entry added, a monthly donation paused), so one more runs after it. Someone else's load is
+    // never reused: its results are thrown away when it finishes.
+    if (running && running.uid === uid) {
+      if (queued.current?.uid !== uid) {
+        const job = running.job
+          .catch(() => undefined)
+          .then(() => {
+            if (queued.current?.job === job) queued.current = null;
+            return startLoad(uid);
+          });
+        queued.current = { uid, job };
+      }
+      return queued.current.job;
+    }
+    return startLoad(uid);
+  }, [userId, status, startLoad]);
 
   // Show what the phone saved last time straight away; fresh data replaces it.
   useEffect(() => {

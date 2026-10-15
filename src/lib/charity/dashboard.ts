@@ -63,3 +63,63 @@ export function isDonationStatus(s: string): s is DonationStatus {
 export function addressLine(a: { address_line1?: string | null; address_line2?: string | null; suburb?: string | null; city?: string | null; postal_code?: string | null }): string {
   return [a.address_line1, a.address_line2, a.suburb, a.city, a.postal_code].map((x) => x?.trim()).filter(Boolean).join(", ");
 }
+
+/** A monthly donation as the charity sees it (from `charity_monthly_list`). */
+export type MonthlyRow = {
+  recurring_id: string;
+  status: "active" | "paused" | "failed" | "cancelled";
+  /** Running, but this month's charge has been declined at least once and will be tried again. */
+  retrying: boolean;
+  amount_cents: number;
+  charge_day: number | null;
+  next_charge_at: string | null;
+  started_at: string;
+  last_paid_at: string | null;
+  paid_count: number;
+  paid_cents: number;
+  wants_18a: boolean;
+  is_anonymous: boolean;
+  dedication_kind: string | null;
+  dedication_name: string | null;
+  donor_type: string | null;
+  display_name: string | null;
+  email: string | null;
+  phone: string | null;
+  paused_at: string | null;
+  ended_at: string | null;
+};
+
+export type MonthlyState = "running" | "retrying" | "paused" | "stopped" | "cancelled";
+
+export const monthlyStateLabel = {
+  running: { label: "Running", tone: "success" },
+  retrying: { label: "Card declined, trying again", tone: "warning" },
+  paused: { label: "Paused by the donor", tone: "neutral" },
+  stopped: { label: "Stopped: card declined", tone: "danger" },
+  cancelled: { label: "Cancelled", tone: "neutral" },
+} as const;
+
+export function monthlyState(r: Pick<MonthlyRow, "status" | "retrying">): MonthlyState {
+  if (r.status === "active") return r.retrying ? "retrying" : "running";
+  if (r.status === "paused") return "paused";
+  if (r.status === "failed") return "stopped";
+  return "cancelled";
+}
+
+/** The day of the month in words: 29 to 31 collect on the last day of shorter months. */
+export function chargeDayLabel(day: number | null): string | null {
+  if (!day || day < 1 || day > 31) return null;
+  const suffix = day % 10 === 1 && day !== 11 ? "st" : day % 10 === 2 && day !== 12 ? "nd" : day % 10 === 3 && day !== 13 ? "rd" : "th";
+  return day >= 29 ? `the ${day}${suffix} (or the last day of a shorter month)` : `the ${day}${suffix}`;
+}
+
+/** Running monthly donations (including those being retried): how many, and what they bring in each month. */
+export function monthlySummary(rows: Pick<MonthlyRow, "status" | "amount_cents">[]) {
+  const running = rows.filter((r) => r.status === "active");
+  return {
+    runningCount: running.length,
+    runningCentsPerMonth: running.reduce((t, r) => t + Number(r.amount_cents), 0),
+    pausedCount: rows.filter((r) => r.status === "paused").length,
+    endedCount: rows.filter((r) => r.status === "failed" || r.status === "cancelled").length,
+  };
+}

@@ -9,7 +9,8 @@ import type { ConfirmOutcome } from "@/lib/donations/confirm";
 const NOW = new Date("2026-11-15T06:30:00Z"); // 08:30 in Johannesburg, 15 November
 const row = (o: Partial<DueMonthly> = {}): DueMonthly => ({
   id: "rec1", charitySlug: "meals", charityName: "Meals Fund", amountCents: 18_000, contributionCents: 2_000, chargeDay: 15,
-  authorizationCode: "AUTH_x", email: "d@example.co.za", cardLast4: "4081", lastPaidPeriod: "2026-10", attemptPeriod: null, failedAttempts: 0, ...o,
+  authorizationCode: "AUTH_x", email: "d@example.co.za", cardLast4: "4081", lastPaidPeriod: "2026-10", attemptPeriod: null, failedAttempts: 0,
+  nextChargeAt: new Date("2026-11-15T06:00:00Z"), ...o,
 });
 
 type World = {
@@ -29,8 +30,9 @@ const charges: { reference: string; total: number }[] = [];
 const failedEmails: { final: boolean }[] = [];
 let accepting = true;
 let chargeThrows = false;
+let chargeRefused = false;
 
-function deps(): MonthlyDeps {
+function deps(now: Date = NOW): MonthlyDeps {
   const store: MonthlyStore = {
     due: async () => ({ rows: world.due, unreadable: world.unreadable }),
     claim: async (id) => (world.claimed.has(id) ? false : (world.claimed.add(id), true)),
@@ -43,9 +45,10 @@ function deps(): MonthlyDeps {
   };
   return {
     store,
-    now: NOW,
+    now,
     charge: async ({ reference, totalCents }) => {
       if (chargeThrows) throw new Error("network down");
+      if (chargeRefused) throw new Error("refused: authorization is not active");
       charges.push({ reference, total: totalCents });
     },
     confirm: async (ref) => {
@@ -55,6 +58,7 @@ function deps(): MonthlyDeps {
     },
     charityState: async () => ({ accepting }),
     isNotFound: (e) => e instanceof Error && /not found/i.test(e.message),
+    isRefused: (e) => e instanceof Error && /^refused/.test(e.message),
     notifyFailed: async (_r, info) => void failedEmails.push({ final: info.final }),
   };
 }
@@ -66,6 +70,7 @@ beforeEach(() => {
   failedEmails.length = 0;
   accepting = true;
   chargeThrows = false;
+  chargeRefused = false;
 });
 
 describe("collecting a month", () => {
@@ -265,3 +270,57 @@ describe("one donation never stops the others", () => {
     expect(s.paid).toBe(1);
   });
 });
+
+describe("the end of the month", () => {
+  it("a retry that runs after midnight on the 1st still collects the month it is for", async () => {
+    // Charge day 31: the 31/01 attempt was declined, the retry falls on 01/02.
+    const now = new Date("2027-02-01T06:30:00Z");
+    world.due = [row({ chargeDay: 31, lastPaidPeriod: "2026-12", attemptPeriod: "2027-01", failedAttempts: 1, nextChargeAt: new Date("2027-02-01T06:00:00Z") })];
+    await runMonthlyCharges(deps(now));
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2027-01", 1), total: 20_000 }]);
+    // January is paid, and February is still collected on its own day (the last day, 28/02).
+    expect(world.paid).toEqual([{ id: "rec1", period: "2027-01", next: chargeTime("2027-02", 31).toISOString() }]);
+  });
+
+  it("a month-end attempt still pending after midnight is checked, not charged again", async () => {
+    const now = new Date("2027-02-01T06:30:00Z");
+    const january = attemptDonationId("rec1", "2027-01", 0);
+    world.attempts.set(january, "pending");
+    world.due = [row({ chargeDay: 31, lastPaidPeriod: "2026-12", nextChargeAt: new Date("2027-01-31T06:00:00Z") })];
+    await runMonthlyCharges(deps(now));
+    expect(charges).toEqual([]);
+    expect(world.paid).toEqual([{ id: "rec1", period: "2027-01", next: chargeTime("2027-02", 31).toISOString() }]);
+  });
+
+  it("after a long pause, only the current month is collected (never a catch-up)", async () => {
+    world.due = [row({ lastPaidPeriod: "2026-07", nextChargeAt: new Date("2026-08-15T06:00:00Z") })];
+    await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 0), total: 20_000 }]);
+    expect(world.paid[0].period).toBe("2026-11");
+  });
+
+  it("an old retry left from months ago does not charge that old month", async () => {
+    world.due = [row({ lastPaidPeriod: "2026-07", attemptPeriod: "2026-08", failedAttempts: 1, nextChargeAt: new Date("2026-08-16T06:00:00Z") })];
+    await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 0), total: 20_000 }]);
+  });
+});
+
+describe("a charge the gateway refuses outright", () => {
+  it("counts as a failed attempt: retry later, email the donor, no re-sending", async () => {
+    chargeRefused = true;
+    const s = await runMonthlyCharges(deps());
+    expect(s).toMatchObject({ failed: 1, errors: [] });
+    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: new Date(NOW.getTime() + 24 * 3_600_000).toISOString() }]);
+    expect(failedEmails).toEqual([{ final: false }]);
+  });
+
+  it("the third refusal stops the monthly donation", async () => {
+    chargeRefused = true;
+    world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 2 })];
+    const s = await runMonthlyCharges(deps());
+    expect(s).toMatchObject({ failed: 1, stopped: 1 });
+    expect(world.failures[0]).toMatchObject({ n: 3, retryAt: null });
+  });
+});
+

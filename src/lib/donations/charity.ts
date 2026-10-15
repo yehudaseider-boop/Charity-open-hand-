@@ -28,7 +28,7 @@ export async function loadDonatableCharity(slug: string) {
      * Can take payments now. The test gateway always can (and, if it is set to split, needs the
      * charity's test account). A real gateway is closed until it is decided who pays the gateway's
      * charge, and then only takes a donation as a split payment straight to a charity that has been
-     * connected: otherwise the money would land with Nadiv Lev instead of the charity.
+     * connected: otherwise the money would land with Givezy instead of the charity.
      */
     acceptingPayments:
       gateway !== null &&

@@ -9,14 +9,18 @@ import type { LoadResult } from "./stored-result";
  * - `problem`  could not be read or is invalid; `value` stays `initial`, so callers must not save over it
  *
  * When `enabled` is false (design preview) there is nothing to read: the record is `initial` and `ready`.
+ * When `waiting` is true (who is using the phone is not known yet: signing in, or agreeing to the terms)
+ * nothing is read either, and the record is `loading`, so nothing can be saved over someone's record.
  */
 export function useStoredRecord<T>({
   enabled,
+  waiting = false,
   owner,
   load,
   initial,
 }: {
   enabled: boolean;
+  waiting?: boolean;
   owner: string | null;
   load: (owner: string | null) => Promise<LoadResult<T>>;
   initial: T;
@@ -38,7 +42,7 @@ export function useStoredRecord<T>({
   }, [enabled, owner, key, load]);
 
   const result = loaded?.key === key ? loaded.result : null;
-  const status = !enabled ? "ready" : result === null ? "loading" : result.ok ? "ready" : "problem";
+  const status = waiting ? "loading" : !enabled ? "ready" : result === null ? "loading" : result.ok ? "ready" : "problem";
   const base = result?.ok ? result.value : initial;
   return {
     status: status as "loading" | "ready" | "problem",
