@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/audit";
 import { legalConfig } from "@/config/legal";
 import { requireViewer } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
+import { applicationReceivedEmail, newApplicationEmail, notifyCharity } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import {
   addressSchema,
@@ -256,6 +257,9 @@ export async function submitApplication(charityId: string, _prev: FormState, for
     entityType: "charity",
     entityId: charityId,
   });
+  // Tell the charity we have it, and tell us there is one to review.
+  await notifyCharity(applicationReceivedEmail(data.priv?.contact_email ?? viewer.email ?? "", data.charity.name_en));
+  if (process.env.ADMIN_NOTIFY_EMAIL) await notifyCharity(newApplicationEmail(process.env.ADMIN_NOTIFY_EMAIL, data.charity.name_en, charityId));
   revalidatePath(`/charity-admin/${charityId}/application`);
-  return { ok: true, message: "Submitted. We'll let you know once it has been reviewed." };
+  return { ok: true, message: "Submitted. We've emailed you a confirmation, and we'll let you know once it has been reviewed." };
 }

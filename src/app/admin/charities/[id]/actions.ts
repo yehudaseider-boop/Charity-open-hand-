@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
+import { approvedEmail, notifyCharity, sentBackEmail } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { decrypt, encrypt, last4 } from "@/lib/crypto";
 import { bankSchema } from "@/lib/charity/validation";
@@ -38,6 +39,7 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
   const admin = await requirePlatformAdmin();
   const { charity, priv, documents } = await loadCharityForManager(id);
   if (charity.status !== "pending_review") return { ok: false, message: "Only applications waiting for review can be approved." };
+  const contactEmail = priv?.contact_email ?? null;
 
   const checklist = applicationChecklist({ charity, priv, documentTypes: documents.map((d) => d.document_type) });
   if (!isComplete(checklist)) return { ok: false, message: "The application is incomplete." };
@@ -81,8 +83,9 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
     entityId: id,
     details: { s18a_confirmed: confirmS18a, mandate_confirmed: confirmMandate },
   });
+  if (contactEmail) await notifyCharity(approvedEmail(contactEmail, charity.name_en, id, confirmS18a && confirmMandate));
   refresh(id, charity.slug);
-  return { ok: true, message: "Approved." };
+  return { ok: true, message: contactEmail ? "Approved. The charity has been emailed." : "Approved. (No contact email on file, so nobody was emailed.)" };
 }
 
 function reasonFrom(formData: FormData) {
@@ -92,7 +95,7 @@ function reasonFrom(formData: FormData) {
 
 export async function rejectCharity(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requirePlatformAdmin();
-  const { charity } = await loadCharityForManager(id);
+  const { charity, priv } = await loadCharityForManager(id);
   if (charity.status !== "pending_review") return { ok: false, message: "Only applications waiting for review can be sent back." };
   const reason = reasonFrom(formData);
   if (!reason) return { ok: false, fieldErrors: { reason: "Explain what the charity needs to fix" } };
@@ -106,8 +109,9 @@ export async function rejectCharity(id: string, _prev: FormState, formData: Form
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.rejected", entityType: "charity", entityId: id, details: { reason } });
+  if (priv?.contact_email) await notifyCharity(sentBackEmail(priv.contact_email, charity.name_en, id, reason));
   refresh(id);
-  return { ok: true, message: "Sent back to the charity." };
+  return { ok: true, message: priv?.contact_email ? "Sent back to the charity, and they've been emailed what to fix." : "Sent back to the charity. (No contact email on file, so nobody was emailed.)" };
 }
 
 export async function suspendCharity(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
