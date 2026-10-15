@@ -120,7 +120,7 @@ export async function startDonation(args: {
       wants_18a: want18a,
       is_anonymous: v.is_anonymous === "on",
       message: v.message ?? null,
-      // Only when there is one, so a donation never depends on the dedication columns existing.
+      // Only when there is one, so taking a donation keeps working even if this code goes live before the dedications database change (other screens do need it: run the database change first).
       ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
       gateway: gateway.name,
       charge_day: chargeDayOf(nowDate),
@@ -145,7 +145,7 @@ export async function startDonation(args: {
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
-    // Only when there is one, so a donation never depends on the dedication columns existing.
+    // Only when there is one, so taking a donation keeps working even if this code goes live before the dedications database change (other screens do need it: run the database change first).
     ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
     popia_consent_at: now,
     age_confirmed_at: now,

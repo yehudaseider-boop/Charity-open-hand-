@@ -10,9 +10,15 @@ export type Dedication = { kind: DedicationKind; name: string };
 
 export const DEDICATION_NAME_MAX = 80;
 
-/** Trims, joins runs of spaces and drops control characters, so the name prints cleanly. */
+/**
+ * Trims, joins runs of spaces and drops control characters, including the invisible ones that change
+ * text direction (a Hebrew name still shows right to left: the page marks it `dir="auto"`).
+ */
 export function cleanDedicationName(raw: string | null | undefined): string {
-  return (raw ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  return (raw ?? "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

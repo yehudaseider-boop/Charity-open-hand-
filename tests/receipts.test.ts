@@ -330,3 +330,22 @@ describe("email adapter", () => {
     expect(() => getEmailTransport({ EMAIL_TRANSPORT: "carrier-pigeon" })).toThrow(/Unknown/);
   });
 });
+
+describe("one donor record with more than one identity at a charity", () => {
+  it("issues both and lists them for a person to check", async () => {
+    const { planReceipts } = await import("@/lib/receipts/plan");
+    const base = { charityId: "c1", donorId: "donor1", taxYear: 2027, status: "paid", wants18a: true, paidAt: "2026-06-01T08:00:00Z" };
+    const { receipts, severalIdentities } = planReceipts({
+      taxYear: 2027,
+      charities: [{ id: "c1", isS18a: true, mandateSignedAt: "2026-01-01T00:00:00Z" }],
+      alreadyReceipted: new Set(),
+      donations: [
+        { ...base, id: "a", donorIdentity: "id-fingerprint", amountCents: 50_000 },
+        { ...base, id: "b", donorIdentity: "tax-fingerprint", amountCents: 30_000 },
+        { ...base, id: "c", donorId: "donor2", donorIdentity: "x", amountCents: 10_000 },
+      ],
+    });
+    expect(receipts).toHaveLength(3);
+    expect(severalIdentities).toEqual([{ charityId: "c1", donorId: "donor1", taxYear: 2027, receipts: 2 }]);
+  });
+});

@@ -17,7 +17,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getEmailTransport } from "../src/lib/email";
 import { platformConfig } from "../src/config/platform";
 import { receiptsEnabled } from "../src/config/receipts";
-import { formatDate, taxYearFor } from "../src/lib/dates";
+import { formatDate, taxYearFor, taxYearRange } from "../src/lib/dates";
 import { buildReceiptHtml } from "../src/lib/receipts/html";
 import { previewReceipts, runReceiptsJob } from "../src/lib/receipts/issue";
 import { htmlToPdf, loadFontCss, loadLogoHtml } from "../src/lib/receipts/pdf";
@@ -31,6 +31,8 @@ async function main() {
   const issue = args.includes("--issue");
   const email = args.includes("--email");
   if (email && !issue) throw new Error("--email goes with --issue.");
+  // Receipt emails link to the site and show its logo: without the address those links would be broken.
+  if (email && !process.env.SITE_URL) throw new Error("Set SITE_URL (the website's address) before emailing receipts.");
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secret = process.env.SUPABASE_SECRET_KEY;
@@ -54,6 +56,24 @@ async function main() {
 
   if (issue && !receiptsEnabled()) {
     throw new Error("Receipts are switched off. Set RECEIPTS_ENABLED=yes and RECEIPT_WORDING_CONFIRMED=yes (after the attorney confirms the wording).");
+  }
+  // A payment from the last days of the tax year still waiting for the gateway could be confirmed after its
+  // receipt is issued, and then need a withdraw and re-issue. (Abandoned checkouts also stay "pending", so
+  // this warns rather than blocks: check them in Admin, Payments first.)
+  if (issue) {
+    const { end } = taxYearRange(taxYear);
+    const lastDays = new Date(Date.parse(`${end}T00:00:00+02:00`) - 3 * 86_400_000).toISOString();
+    const { count, error } = await createClient(url, secret, { auth: { persistSession: false } })
+      .from("donations")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .eq("wants_18a", true)
+      .gte("created_at", lastDays)
+      .lte("created_at", `${end}T23:59:59+02:00`);
+    if (error) throw new Error(`Could not check for pending payments: ${error.message}`);
+    if (count) {
+      console.warn(`WARNING: ${count} s18A payment(s) from the last days of tax year ${taxYear} are still pending. If any is confirmed later it will need its donor's receipt withdrawn and issued again.`);
+    }
   }
   const fontCss = issue ? loadFontCss() : "";
   const logoHtml = issue ? loadLogoHtml() : undefined;

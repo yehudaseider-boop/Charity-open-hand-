@@ -24,14 +24,29 @@ export type PackDonationRow = {
 
 export type PackReceiptRow = { charityName: string | null; reference: string | null; amountCents: number | string; issuedAt: string; status: string };
 
-export type PackLine = { id: string; paidAt: string; charityName: string; cents: number; s18a: boolean; monthly: boolean; kind: PackKind; dedication: string | null };
+export type PackLine = {
+  id: string;
+  paidAt: string;
+  charityName: string;
+  cents: number;
+  /** The donor asked for an s18A receipt. */
+  s18a: boolean;
+  /** It is on an issued s18A receipt (only known once the tax year's receipts exist). */
+  receipted: boolean;
+  monthly: boolean;
+  kind: PackKind;
+  dedication: string | null;
+};
 export type PackCharity = { name: string; cents: number; count: number; s18aCents: number };
 export type TaxPack = {
   taxYear: number;
   lines: PackLine[];
   totalCents: number;
+  /** Asked for an s18A receipt. */
   s18aCents: number;
   otherCents: number;
+  /** On issued s18A receipts (what counts for tax once the year's receipts are out). */
+  receiptedCents: number;
   byCharity: PackCharity[];
   byKind: Record<PackKind, number>;
   receipts: { charityName: string; reference: string | null; cents: number; issuedAt: string }[];
@@ -46,7 +61,7 @@ export function parseTaxYear(raw: string): number | null {
   return y >= 2020 && y <= 2100 ? y : null;
 }
 
-export function buildTaxPack(taxYear: number, donations: PackDonationRow[], receipts: PackReceiptRow[]): TaxPack {
+export function buildTaxPack(taxYear: number, donations: PackDonationRow[], receipts: PackReceiptRow[], receiptedIds: ReadonlySet<string> = new Set()): TaxPack {
   const lines: PackLine[] = donations
     .filter((d) => d.paidAt && taxYearFor(d.paidAt) === taxYear)
     .map((d) => ({
@@ -55,6 +70,7 @@ export function buildTaxPack(taxYear: number, donations: PackDonationRow[], rece
       charityName: d.charityName,
       cents: Number(d.amountCents),
       s18a: d.wants18a,
+      receipted: receiptedIds.has(d.id),
       monthly: d.monthly,
       kind: isKind(d.kind) ? d.kind : "tzedaka",
       dedication: d.dedication?.trim() ? d.dedication.trim() : null,
@@ -63,6 +79,7 @@ export function buildTaxPack(taxYear: number, donations: PackDonationRow[], rece
 
   const totalCents = lines.reduce((t, l) => t + l.cents, 0);
   const s18aCents = lines.filter((l) => l.s18a).reduce((t, l) => t + l.cents, 0);
+  const receiptedCents = lines.filter((l) => l.receipted).reduce((t, l) => t + l.cents, 0);
   const charities = new Map<string, PackCharity>();
   for (const l of lines) {
     const c = charities.get(l.charityName) ?? { name: l.charityName, cents: 0, count: 0, s18aCents: 0 };
@@ -80,6 +97,7 @@ export function buildTaxPack(taxYear: number, donations: PackDonationRow[], rece
     totalCents,
     s18aCents,
     otherCents: totalCents - s18aCents,
+    receiptedCents,
     byCharity: [...charities.values()].sort((a, b) => b.cents - a.cents || a.name.localeCompare(b.name)),
     byKind,
     // Issued receipts for this tax year only; withdrawn ones are not shown.

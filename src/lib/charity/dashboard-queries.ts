@@ -63,9 +63,15 @@ export type DonorRow = {
 
 export async function loadDonors(charityId: string): Promise<DonorRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("charity_donor_list", { p_charity_id: charityId });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as DonorRow[]).map((d) => ({ ...d, donation_count: n(d.donation_count), total_cents: n(d.total_cents) }));
+  // The database answers at most 1 000 rows at a time, so a long list is read page by page.
+  const rows: DonorRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.rpc("charity_donor_list", { p_charity_id: charityId }).range(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as DonorRow[]));
+    if (!data || data.length < 1000) break;
+  }
+  return rows.map((d) => ({ ...d, donation_count: n(d.donation_count), total_cents: n(d.total_cents) }));
 }
 
 export const DONATION_FIELDS =

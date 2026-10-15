@@ -52,10 +52,18 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
 
   const { data: receipts, error: receiptsError } = await supabase
     .from("s18a_receipts")
-    .select("amount_cents, issued_at, status, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en")
+    .select("id, amount_cents, issued_at, status, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en")
     .in("donor_id", donorIds)
     .eq("tax_year", taxYear);
   if (receiptsError) throw receiptsError;
+  // Which donations are on an issued receipt (the donor can read their own receipts' links).
+  const issuedIds = ((receipts ?? []) as { id: string; status: string }[]).filter((r) => r.status === "issued").map((r) => r.id);
+  const receiptedIds = new Set<string>();
+  if (issuedIds.length) {
+    const { data: links, error: linksError } = await supabase.from("s18a_receipt_donations").select("donation_id").in("receipt_id", issuedIds);
+    if (linksError) throw linksError;
+    for (const l of links ?? []) receiptedIds.add(l.donation_id as string);
+  }
 
   const donations: PackDonationRow[] = rows
     .filter((r) => r.paid_at)
@@ -79,5 +87,5 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
     issuedAt: r.issued_at,
     status: r.status,
   }));
-  return buildTaxPack(taxYear, donations, receiptRows);
+  return buildTaxPack(taxYear, donations, receiptRows, receiptedIds);
 }

@@ -582,4 +582,9 @@ Four independent read-only reviews (money, security and privacy, receipts and ta
 - **Security:** sessions started with a password are refused (website and database), an unconfirmed account cannot be made a charity admin, browsers can no longer change a charity's status or approval fields (submitting goes through the server with its declarations), the unused income table is closed to clients, new database functions are not public by default (migration `20261015000004`).
 - **Erasure** also deletes the person's income log, giving elsewhere, notes, saved charities and maaser settings when their account has to stay, and clears payment references.
 - **Charity photos** are re-encoded on upload, so no GPS position or other hidden details reach the public site.
+- **Receipts:** references print every digit past 9 999 (they repeated before; migration `20261015000005`); the receipts job lists any donor record given more than one receipt by one charity in a year (different ID or tax numbers typed) for a person to check, warns about s18A payments from the last days of the year still pending, and refuses to email without `SITE_URL`.
+- **Tax pack:** for a closed year it shows what is on issued s18A receipts (not only what was asked for), per donation and in total.
+- **Lists read in full:** charity donor list and receipts page read every row (the database answers 1 000 at a time); admin receipts has a search.
+- **Dedication names:** invisible direction-changing characters are removed and names show in their own direction (Hebrew right to left).
+- Not changed: a receipted donation that is later refunded plus a late donation would make the receipts job show a database error instead of a "needs attention" line. Nothing can refund a donation yet; handle it with the refunds decision.
 

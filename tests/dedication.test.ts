@@ -49,3 +49,11 @@ describe("dedications", () => {
     expect(m.text).toContain("In memory of Chaim Cohen");
   });
 });
+
+describe("dedication names with hidden characters", () => {
+  it("drops direction overrides and other invisible control characters", () => {
+    expect(cleanDedicationName("‮Chaim‬ Cohen‏")).toBe("Chaim Cohen");
+    expect(cleanDedicationName("\u0085Rivka⁦ Levin")).toBe("Rivka Levin");
+    expect(cleanDedicationName("חיים כהן")).toBe("חיים כהן");
+  });
+});

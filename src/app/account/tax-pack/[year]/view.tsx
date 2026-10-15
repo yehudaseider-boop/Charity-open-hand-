@@ -45,16 +45,33 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
               <p className="font-display text-3xl font-semibold text-indigo">{formatRand(pack.totalCents)}</p>
               <p className="text-sm text-muted">{pack.lines.length} {pack.lines.length === 1 ? "donation" : "donations"}</p>
             </div>
-            <div className="rounded-card border border-border bg-surface p-4">
-              <p className="text-sm font-semibold text-success">With s18A receipts</p>
-              <p className="font-display text-3xl font-semibold">{formatRand(pack.s18aCents)}</p>
-              <p className="text-sm text-muted">One receipt per charity</p>
-            </div>
-            <div className="rounded-card border border-border bg-surface p-4">
-              <p className="text-sm font-semibold text-muted">Without s18A receipts</p>
-              <p className="font-display text-3xl font-semibold">{formatRand(pack.otherCents)}</p>
-              <p className="text-sm text-muted">Not tax-deductible</p>
-            </div>
+            {yearOpen || pack.receipts.length === 0 ? (
+              <>
+                <div className="rounded-card border border-border bg-surface p-4">
+                  <p className="text-sm font-semibold text-success">s18A receipt asked for</p>
+                  <p className="font-display text-3xl font-semibold">{formatRand(pack.s18aCents)}</p>
+                  <p className="text-sm text-muted">{yearOpen ? "Receipts come after the tax year closes" : "Receipts not issued yet"}</p>
+                </div>
+                <div className="rounded-card border border-border bg-surface p-4">
+                  <p className="text-sm font-semibold text-muted">No s18A receipt asked for</p>
+                  <p className="font-display text-3xl font-semibold">{formatRand(pack.otherCents)}</p>
+                  <p className="text-sm text-muted">Not tax-deductible</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-card border border-border bg-surface p-4">
+                  <p className="text-sm font-semibold text-success">On your s18A receipts</p>
+                  <p className="font-display text-3xl font-semibold">{formatRand(pack.receiptedCents)}</p>
+                  <p className="text-sm text-muted">{pack.receipts.length} {pack.receipts.length === 1 ? "receipt" : "receipts"} issued</p>
+                </div>
+                <div className="rounded-card border border-border bg-surface p-4">
+                  <p className="text-sm font-semibold text-muted">Not on an s18A receipt</p>
+                  <p className="font-display text-3xl font-semibold">{formatRand(pack.totalCents - pack.receiptedCents)}</p>
+                  <p className="text-sm text-muted">Not tax-deductible</p>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="rounded-card border border-border bg-surface p-5 print:break-inside-avoid">
@@ -101,8 +118,8 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
                   <div>
                     <p>{l.charityName}</p>
                     <p className="text-xs text-muted">
-                      <span className="tabular-nums">{formatDate(l.paidAt)}</span> · {kindLabel[l.kind]}{l.monthly ? " · monthly" : ""} · {l.s18a ? "s18A receipt" : "no s18A receipt"}
-                      {l.dedication ? <span className="block">{l.dedication}</span> : null}
+                      <span className="tabular-nums">{formatDate(l.paidAt)}</span> · {kindLabel[l.kind]}{l.monthly ? " · monthly" : ""} · {l.receipted ? "on an s18A receipt" : l.s18a ? (yearOpen || pack.receipts.length === 0 ? "s18A receipt asked for" : "asked for, not on a receipt") : "no s18A receipt"}
+                      {l.dedication ? <span className="block" dir="auto">{l.dedication}</span> : null}
                     </p>
                   </div>
                   <p className="whitespace-nowrap font-medium tabular-nums">{formatRand(l.cents)}</p>

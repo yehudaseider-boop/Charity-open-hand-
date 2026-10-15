@@ -74,7 +74,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
 
       {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
         <Card title="Dedication">
-          <p className="text-sm">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</p>
+          <p className="text-sm" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</p>
         </Card>
       ) : null}
 

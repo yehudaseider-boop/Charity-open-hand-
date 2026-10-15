@@ -311,7 +311,7 @@ function Dedicate({ error }: { error?: string }) {
         ))}
       </div>
       {kind !== "none" ? (
-        <TextField name="dedication_name" label="Their name" required hint={`${charityLabel(kind)} The charity sees this name; it is not on your s18A receipt.`} />
+        <TextField name="dedication_name" label="Their name" required autoDirection hint={`${charityLabel(kind)} The charity sees this name; it is not on your s18A receipt.`} />
       ) : null}
       {error && kind === "none" ? <p className="text-xs text-danger">{error}</p> : null}
     </fieldset>

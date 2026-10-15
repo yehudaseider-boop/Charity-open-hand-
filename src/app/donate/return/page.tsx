@@ -68,7 +68,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
           <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>
           {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
-            <div className="flex justify-between gap-3"><dt>Dedication</dt><dd className="text-right">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd></div>
+            <div className="flex justify-between gap-3"><dt>Dedication</dt><dd className="text-right" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd></div>
           ) : null}
         </dl>
         <p className="mt-3 text-sm text-muted">

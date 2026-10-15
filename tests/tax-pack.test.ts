@@ -59,3 +59,12 @@ describe("the annual tax pack", () => {
     for (const bad of ["27", "2027a", "1999", "9999", "", "20 27"]) expect(parseTaxYear(bad)).toBeNull();
   });
 });
+
+describe("what is actually on a receipt", () => {
+  it("counts only donations on an issued receipt, apart from what was asked for", () => {
+    const pack = buildTaxPack(2027, [row({ id: "on", amountCents: 50_000 }), row({ id: "late", amountCents: 20_000 }), row({ id: "none", wants18a: false, amountCents: 5_000 })], [], new Set(["on"]));
+    expect(pack.s18aCents).toBe(70_000);
+    expect(pack.receiptedCents).toBe(50_000);
+    expect(pack.lines.find((l) => l.id === "late")).toMatchObject({ s18a: true, receipted: false });
+  });
+});

@@ -16,14 +16,21 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
   await requireViewer(`/charity-admin/${id}/receipts`);
   const { charity } = await loadCharityForManager(id);
   const supabase = await createClient();
-  const { data: receipts, error } = await supabase
-    // A narrow view: no part of the donor's ID or tax number reaches the charity.
-    .from("charity_receipts")
-    .select("id, tax_year, amount_cents, issued_at, status, emailed_at, reference, donor_name")
-    .eq("charity_id", id)
-    .order("issued_at", { ascending: false })
-    .limit(200);
-  if (error) throw error;
+  // Every receipt, read page by page (the database answers at most 1 000 rows at a time).
+  // A narrow view: no part of the donor's ID or tax number reaches the charity.
+  const receipts: { id: string; tax_year: number; amount_cents: number; issued_at: string; status: string; emailed_at: string | null; reference: string; donor_name: string | null }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from("charity_receipts")
+      .select("id, tax_year, amount_cents, issued_at, status, emailed_at, reference, donor_name")
+      .eq("charity_id", id)
+      .order("issued_at", { ascending: false })
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw error;
+    receipts.push(...((data ?? []) as typeof receipts));
+    if (!data || data.length < 1000) break;
+  }
   const taxYear = thisTaxYear(new Date());
 
   return (

@@ -35,6 +35,13 @@ export type PlannedReceipt = {
   totalCents: number;
 };
 
+/**
+ * One donor record getting more than one receipt from a charity in a year, because different ID or tax
+ * numbers were typed. Two people sharing an email look exactly the same, so these are issued and listed for
+ * a person to check: if it is one person, void them and issue one.
+ */
+export type SeveralIdentities = { charityId: string; donorId: string; taxYear: number; receipts: number };
+
 export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_requested" | "charity_cannot_issue" | "mandate_after_payment" | "already_receipted" | "late_after_receipt" | "wrong_year" };
 
 /** Can this charity issue s18A receipts: approval confirmed and a signed mandate. */
@@ -53,7 +60,7 @@ export function planReceipts(args: {
   charities: PlanCharity[];
   /** Donation ids already on an issued receipt. */
   alreadyReceipted: Set<string>;
-}): { receipts: PlannedReceipt[]; skipped: Skipped[] } {
+}): { receipts: PlannedReceipt[]; skipped: Skipped[]; severalIdentities: SeveralIdentities[] } {
   const charityById = new Map(args.charities.map((c) => [c.id, c]));
   const groups = new Map<string, PlannedReceipt>();
   const skipped: Skipped[] = [];
@@ -81,5 +88,12 @@ export function planReceipts(args: {
     g.totalCents += d.amountCents;
     groups.set(key, g);
   }
-  return { receipts: [...groups.values()], skipped };
+  const perDonor = new Map<string, SeveralIdentities>();
+  for (const g of groups.values()) {
+    const k = `${g.charityId}|${g.donorId}`;
+    const e = perDonor.get(k) ?? { charityId: g.charityId, donorId: g.donorId, taxYear: g.taxYear, receipts: 0 };
+    e.receipts += 1;
+    perDonor.set(k, e);
+  }
+  return { receipts: [...groups.values()], skipped, severalIdentities: [...perDonor.values()].filter((e) => e.receipts > 1) };
 }
