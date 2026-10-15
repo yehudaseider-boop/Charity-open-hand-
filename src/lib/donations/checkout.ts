@@ -120,8 +120,8 @@ export async function startDonation(args: {
       wants_18a: want18a,
       is_anonymous: v.is_anonymous === "on",
       message: v.message ?? null,
-      dedication_kind: dedication?.kind ?? null,
-      dedication_name: dedication?.name ?? null,
+      // Only when there is one, so a donation never depends on the dedication columns existing.
+      ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
       gateway: gateway.name,
       charge_day: chargeDayOf(nowDate),
     });
@@ -145,8 +145,8 @@ export async function startDonation(args: {
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
-    dedication_kind: dedication?.kind ?? null,
-    dedication_name: dedication?.name ?? null,
+    // Only when there is one, so a donation never depends on the dedication columns existing.
+    ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
     popia_consent_at: now,
     age_confirmed_at: now,
   });
