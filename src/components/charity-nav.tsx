@@ -7,6 +7,7 @@ const tabs = [
   { href: "", label: "Overview", exact: true },
   { href: "/donations", label: "Donations" },
   { href: "/donors", label: "Donors" },
+  { href: "/monthly", label: "Monthly" },
   { href: "/receipts", label: "Receipts" },
   { href: "/application", label: "Registration" },
   { href: "/profile", label: "Public profile" },

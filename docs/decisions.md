@@ -590,3 +590,12 @@ Four independent read-only reviews (money, security and privacy, receipts and ta
 - **In-app giving confirmed** (Yehuda, 15/10/2026): the give screen stays, with donors typing the amount and their details in the app and paying on the provider's page. `EXPO_PUBLIC_IN_APP_GIVING=yes` is set in the Expo preview environment. It has no effect until the website is deployed and `EXPO_PUBLIC_SITE_URL` (app) and `APP_GIVING=yes` (server) are set; until then the button falls back to the website. Store builds stay off until Apple and Google confirm in writing.
 - Not changed: a receipted donation that is later refunded plus a late donation would make the receipts job show a database error instead of a "needs attention" line. Nothing can refund a donation yet; handle it with the refunds decision.
 
+
+## Monthly donations for charities (16/10/2026)
+
+- New "Monthly" tab in the charity dashboard (`/charity-admin/[id]/monthly`), and a "Monthly donations" card on the overview. Yehuda asked for it after the portal update.
+- Shows each monthly donor: name and contact as typed at their latest payment, amount a month, the collection day, next date, payments so far and their total, s18A requested, anonymous publicly, any dedication, and the state: running, card declined and being retried, paused by the donor, stopped (card declined every time) or cancelled. Filter by state and search by name or email.
+- Read only. Donors pause, restart and cancel themselves; charities can't change a monthly donation.
+- Read through `charity_monthly_list` (migration `20261016000001`), never the raw rows: no card details, gateway references, the donor's contribution to Givezy, their maaser/chomesh/tzedaka choice or the stored end reason. Like donations, a monthly donation shows only once a payment from it has gone through.
+- Database tests now run in the sandbox against a local Postgres with a stand-in for Supabase's auth and storage schemas: all 132 pass, including migrations `20261015000002` to `20261016000001`. Five older tests were updated to the stricter rules from the code review (a charity can't change its own status from the browser; resuming needs a card).
+- Not checked in a browser: the page needs a live Supabase.

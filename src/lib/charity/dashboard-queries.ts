@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { Period } from "./dashboard";
+import type { MonthlyRow, Period } from "./dashboard";
 
 /** Everything here is read as the signed-in person, so row-level security decides what comes back. */
 
@@ -72,6 +72,19 @@ export async function loadDonors(charityId: string): Promise<DonorRow[]> {
     if (!data || data.length < 1000) break;
   }
   return rows.map((d) => ({ ...d, donation_count: n(d.donation_count), total_cents: n(d.total_cents) }));
+}
+
+/** The charity's monthly donations, read through `charity_monthly_list` (no card or gateway details). */
+export async function loadMonthlyDonations(charityId: string): Promise<MonthlyRow[]> {
+  const supabase = await createClient();
+  const rows: MonthlyRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.rpc("charity_monthly_list", { p_charity_id: charityId }).range(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as MonthlyRow[]));
+    if (!data || data.length < 1000) break;
+  }
+  return rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents), paid_count: n(r.paid_count), paid_cents: n(r.paid_cents) }));
 }
 
 export const DONATION_FIELDS =

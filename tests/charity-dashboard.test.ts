@@ -75,3 +75,38 @@ describe("names and search", () => {
     expect(safeSearch("a".repeat(200))).toHaveLength(60);
   });
 });
+
+describe("monthly donations for charities", () => {
+  it("names each state the way the charity sees it", async () => {
+    const { monthlyState } = await import("@/lib/charity/dashboard");
+    expect(monthlyState({ status: "active", retrying: false })).toBe("running");
+    expect(monthlyState({ status: "active", retrying: true })).toBe("retrying");
+    expect(monthlyState({ status: "paused", retrying: false })).toBe("paused");
+    expect(monthlyState({ status: "failed", retrying: false })).toBe("stopped");
+    expect(monthlyState({ status: "cancelled", retrying: false })).toBe("cancelled");
+  });
+
+  it("adds up only running donations, in whole cents, for the amount a month", async () => {
+    const { monthlySummary } = await import("@/lib/charity/dashboard");
+    expect(
+      monthlySummary([
+        { status: "active", amount_cents: 18_000 },
+        { status: "active", amount_cents: 5_050 },
+        { status: "paused", amount_cents: 100_000 },
+        { status: "failed", amount_cents: 36_000 },
+        { status: "cancelled", amount_cents: 7_200 },
+      ]),
+    ).toEqual({ runningCount: 2, runningCentsPerMonth: 23_050, pausedCount: 1, endedCount: 2 });
+  });
+
+  it("says which day of the month, and that 29 to 31 fall back to the last day", async () => {
+    const { chargeDayLabel } = await import("@/lib/charity/dashboard");
+    expect(chargeDayLabel(1)).toBe("the 1st");
+    expect(chargeDayLabel(2)).toBe("the 2nd");
+    expect(chargeDayLabel(11)).toBe("the 11th");
+    expect(chargeDayLabel(23)).toBe("the 23rd");
+    expect(chargeDayLabel(31)).toBe("the 31st (or the last day of a shorter month)");
+    expect(chargeDayLabel(null)).toBeNull();
+    expect(chargeDayLabel(0)).toBeNull();
+  });
+});

@@ -161,16 +161,16 @@ describe("draft charity", () => {
     });
   });
 
-  it("can submit for review", async () => {
+  it("can't change its own status from the browser (only the server's submit action can)", async () => {
     await scenario(toDraft, async () => {
-      await run("update public.charities set status = 'pending_review' where id = $1", [meals]);
+      await expect(run("update public.charities set status = 'pending_review' where id = $1", [meals])).rejects.toThrow(/permission denied/);
     });
   });
 
   it("can't approve itself", async () => {
     await scenario(toDraft, async () => {
       await expect(run("update public.charities set status = 'approved' where id = $1", [meals])).rejects.toThrow(
-        /Only a platform admin/,
+        /Only a platform admin|permission denied/,
       );
     });
   });
@@ -182,7 +182,7 @@ describe("draft charity", () => {
       },
       async () => {
         await expect(run("update public.charities set is_verified = true where id = $1", [meals])).rejects.toThrow(
-          /Only a platform admin/,
+          /Only a platform admin|permission denied/,
         );
       },
     );

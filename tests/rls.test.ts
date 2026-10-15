@@ -146,10 +146,10 @@ describe("charity admin", () => {
       await rows("update public.charities set description_en = 'Updated' where id = $1", [ids.meals]);
       await expect(
         rows("update public.charities set is_s18a = false where id = $1", [ids.meals]),
-      ).rejects.toThrow(/Only a platform admin/);
+      ).rejects.toThrow(/Only a platform admin|permission denied/);
       await expect(
         rows("update public.charities set status = 'suspended' where id = $1", [ids.meals]),
-      ).rejects.toThrow(/Only a platform admin/);
+      ).rejects.toThrow(/Only a platform admin|permission denied/);
     });
   });
 

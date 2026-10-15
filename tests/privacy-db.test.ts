@@ -314,9 +314,9 @@ describe("giving made elsewhere", () => {
 });
 
 describe("pausing and cancelling a monthly donation", () => {
-  async function monthly() {
+  async function monthly(card = true) {
     await run("reset role");
-    const { rows } = await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents) values ($1, $2, 50000) returning id", [ids.donor, ids.meals]);
+    const { rows } = await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents, authorization_encrypted) values ($1, $2, 50000, $3) returning id", [ids.donor, ids.meals, card ? "enc" : null]);
     return rows[0].id as string;
   }
   const state = async (id: string) => {
@@ -342,6 +342,18 @@ describe("pausing and cancelling a monthly donation", () => {
       await run("savepoint p");
       await expect(run("select public.set_my_recurring_status($1, 'active')", [id])).rejects.toThrow(/cannot be set/);
       await run("rollback to savepoint p");
+    });
+  });
+
+  it("won't resume a paused monthly donation that has no card to charge", async () => {
+    await tx(async () => {
+      const id = await monthly(false);
+      await as(ids.donorUser);
+      await run("select public.set_my_recurring_status($1, 'paused')", [id]);
+      await run("savepoint p");
+      await expect(run("select public.set_my_recurring_status($1, 'active')", [id])).rejects.toThrow(/no card to charge/);
+      await run("rollback to savepoint p");
+      expect(await state(id)).toMatchObject({ status: "paused" });
     });
   });
 
