@@ -9,7 +9,7 @@ import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
 import { CopyLink } from "./copy-link";
 import { allTime, averageCents, monthlySummary, repeatPercent, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
-import { progressPercent } from "@/lib/charity/campaigns";
+import { isRunning, progressPercent } from "@/lib/charity/campaigns";
 import { loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
@@ -76,7 +76,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     loadCampaigns(id),
     loadStories(id, 1),
   ]);
-  const activeCampaigns = campaigns.filter((c) => c.status === "active");
+  const activeCampaigns = campaigns.filter((c) => isRunning(c, now));
   const start = gettingStarted(charity, { updates: stories.updates.length, campaigns: campaigns.length }, base);
   const startDone = start.filter((i) => i.done).length;
   const publicLink = `${(process.env.SITE_URL ?? "").replace(/\/+$/, "")}/c/${charity.slug}`;
@@ -122,7 +122,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         <Stat label="Donors" value={String(all.donor_count)} note="who have given" />
       </div>
       <p className="text-xs text-muted">
-        Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included.
+        Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included. The payment provider&apos;s card fee comes off each donation before it reaches your bank.
         {" "}{taxYearLabel(taxYear.taxYear)}.
       </p>
 

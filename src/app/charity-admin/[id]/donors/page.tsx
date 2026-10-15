@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
-import { safeSearch } from "@/lib/charity/dashboard";
+import { ERASED_DONOR, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
 import { loadDonors } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
@@ -35,7 +35,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         <a href={`/charity-admin/${id}/export/donors`} className="text-sm text-brand underline">Download CSV</a>
       </div>
       <p className="text-sm text-muted">
-        People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record gifts and issue s18A receipts.
+        People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record gifts. Where a donor asked for one, Givezy issues the s18A receipt in your name.
       </p>
 
       <form action={base} className="flex gap-2">
@@ -57,8 +57,8 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
             <li key={d.donor_id} className="rounded-card border border-border bg-surface p-4 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{d.display_name}</p>
-                  <p className="break-all text-muted">{d.email}</p>
+                  <p className="truncate font-medium">{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</p>
+                  {shownEmail(d.email) ? <p className="break-all text-muted">{d.email}</p> : null}
                   {d.phone ? <p className="text-muted">{d.phone}</p> : null}
                   <p className="mt-1 text-muted">
                     {d.donation_count} {d.donation_count === 1 ? "donation" : "donations"}, last on {formatDate(d.last_paid_at)}

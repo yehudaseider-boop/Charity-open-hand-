@@ -5,7 +5,7 @@ import { logAudit } from "@/lib/audit";
 import { legalConfig } from "@/config/legal";
 import { requireViewer } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
-import { applicationReceivedEmail, newApplicationEmail, notifyCharity } from "@/lib/charity/emails";
+import { applicationReceivedEmail, contactChangedEmail, newApplicationEmail, notifyCharity } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import {
   addressSchema,
@@ -99,8 +99,8 @@ export async function saveAddress(charityId: string, _prev: FormState, formData:
 }
 
 export async function saveContact(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  await requireViewer();
-  await loadCharityForManager(charityId);
+  const viewer = await requireViewer();
+  const { charity, priv: before } = await loadCharityForManager(charityId);
   const raw = formToObject(formData);
   raw.contact_phone = normalisePhone(raw.contact_phone);
   const parsed = contactSchema.safeParse(raw);
@@ -115,6 +115,12 @@ export async function saveContact(charityId: string, _prev: FormState, formData:
     .select("charity_id");
   const fail = refusal(error, data);
   if (fail) return fail;
+  // Our emails about bank changes and approval go to this address: tell the old one when it moves.
+  const oldEmail = before?.contact_email ?? null;
+  if (oldEmail && oldEmail.toLowerCase() !== v.contact_email.toLowerCase()) {
+    await logAudit({ actorUserId: viewer.userId, action: "charity.contact_email_changed", entityType: "charity", entityId: charityId });
+    await notifyCharity(contactChangedEmail(oldEmail, charity.name_en, v.contact_email));
+  }
   revalidatePath(`/charity-admin/${charityId}/application`);
   return saved;
 }

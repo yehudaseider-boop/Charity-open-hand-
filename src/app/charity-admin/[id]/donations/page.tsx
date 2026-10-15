@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { donationStatus, donorName, isDonationStatus, safeSearch } from "@/lib/charity/dashboard";
+import { containsPattern, donationStatus, donorName, isDonationStatus, safeSearch } from "@/lib/charity/dashboard";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
@@ -34,7 +34,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
     .range((page - 1) * PAGE, page * PAGE - 1);
   if (status !== "all") query = query.eq("status", status);
   if (q) {
-    const like = `%${q}%`;
+    const like = containsPattern(q);
     query = query.or(`first_name.ilike.${like},last_name.ilike.${like},organisation_name.ilike.${like},email.ilike.${like}`);
   }
   const { data, count, error } = await query;
@@ -57,7 +57,15 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <h1 className="text-xl font-semibold">Donations</h1>
-        <a href={`/charity-admin/${id}/export/donations${status !== "all" ? `?status=${status}` : ""}`} className="text-sm text-brand underline">Download CSV</a>
+        {/* Paid only by default, so the bookkeeper's total is income received. */}
+        <div className="text-right text-sm">
+          <a href={`/charity-admin/${id}/export/donations?status=${status === "all" ? "paid" : status}`} className="text-brand underline">
+            {status === "all" || status === "paid" ? "Download paid donations (CSV)" : "Download CSV"}
+          </a>
+          {status === "all" ? (
+            <a href={`/charity-admin/${id}/export/donations?status=all`} className="mt-1 block text-xs text-muted underline">Every status</a>
+          ) : null}
+        </div>
       </div>
 
       <form action={base} className="flex gap-2">

@@ -18,7 +18,7 @@ import {
 } from "./actions";
 import { AddressForm, BankForm, ContactForm, OrganisationForm, SubmitForm, UploadForm } from "./forms";
 
-export const metadata: Metadata = { title: "Application" };
+export const metadata: Metadata = { title: "Registration" };
 
 export default async function ApplicationPage({ params, searchParams }: PageProps<"/charity-admin/[id]/application">) {
   const { id } = await params;
@@ -156,6 +156,11 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
         <>
           <Card title="Organisation"><OrganisationSummary c={charity} /></Card>
           <Card title="Contact and bank"><PrivateSummary p={priv} /></Card>
+          {/* The contact person can change at any time: our emails (approval, bank changes) go to them. */}
+          <Card title="Contact person">
+            <p className="mb-3 text-sm text-muted">Who we email about your charity. If you change the email, we let the old address know too.</p>
+            <ContactForm action={saveContact.bind(null, id)} priv={priv} />
+          </Card>
           <Card title="Documents"><DocumentList docs={documents} /></Card>
         </>
       )}

@@ -23,6 +23,14 @@ export function applicationReceivedEmail(to: string, charityName: string, base =
   };
 }
 
+export function publicChangeEmail(to: string, charityName: string, charityId: string, what: string, base = site()): EmailMessage {
+  return {
+    to,
+    subject: `${charityName} changed its public page`,
+    text: [`${charityName}, an approved charity, changed ${what}. Check it still matches the organisation you vetted.`, "", `Review it: ${base}/admin/charities/${charityId}`].join("\n"),
+  };
+}
+
 export function newApplicationEmail(to: string, charityName: string, charityId: string, base = site()): EmailMessage {
   return {
     to,
@@ -118,6 +126,19 @@ export function adminRemovedEmail(to: string, charityName: string): EmailMessage
       `Your access to manage ${charityName} on Givezy has been removed. You can still sign in to Givezy as a donor.`,
       "",
       "If you think this is a mistake, reply to this email.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
+export function contactChangedEmail(to: string, charityName: string, newEmail: string): EmailMessage {
+  return {
+    to,
+    subject: `The contact email for ${charityName} on Givezy was changed`,
+    text: [
+      `The contact email for ${charityName} on Givezy was changed to ${newEmail}. Our emails about the charity now go there instead of to this address.`,
+      "",
+      "If you did not expect this, reply to this email straight away.",
       ...sign,
     ].join("\n"),
   };

@@ -11,6 +11,13 @@ import { isUuid } from "@/lib/ids";
 import { isRealImage } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
 import { cleanImage } from "@/lib/charity/clean-image";
+import { notifyCharity, publicChangeEmail } from "@/lib/charity/emails";
+
+/** An approved charity is public with a "Verified" badge: tell us when its name or pictures change, so we can look. */
+async function tellReviewer(charity: { id: string; status: string; name_en: string }, what: string) {
+  const to = process.env.ADMIN_NOTIFY_EMAIL;
+  if (to && charity.status === "approved") await notifyCharity(publicChangeEmail(to, charity.name_en, charity.id, what));
+}
 
 function revalidate(charityId: string, slug: string) {
   revalidatePath(`/charity-admin/${charityId}/profile`);
@@ -60,7 +67,15 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
   const removed = await del;
   if (removed.error) return failed(removed.error);
 
-  await logAudit({ actorUserId: viewer.userId, action: "charity.profile_updated", entityType: "charity", entityId: charityId });
+  const renamed = v.name_en !== charity.name_en;
+  await logAudit({
+    actorUserId: viewer.userId,
+    action: "charity.profile_updated",
+    entityType: "charity",
+    entityId: charityId,
+    details: renamed ? { name_from: charity.name_en, name_to: v.name_en } : undefined,
+  });
+  if (renamed) await tellReviewer(charity, `its name, from "${charity.name_en}" to "${v.name_en}"`);
   revalidate(charityId, charity.slug);
   return { ok: true, message: "Profile saved." };
 }
@@ -71,7 +86,7 @@ export async function uploadImage(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireViewer();
+  const viewer = await requireViewer();
   if (kind !== "logo" && kind !== "cover") return { ok: false, message: "Unknown image." };
   const { charity } = await loadCharityForManager(charityId);
   const file = formData.get("file");
@@ -97,6 +112,8 @@ export async function uploadImage(
   if (old && old.startsWith(`${charityId}/`) && !old.includes("..")) {
     await createAdminClient().storage.from("charity-public").remove([old]);
   }
+  await logAudit({ actorUserId: viewer.userId, action: `charity.${kind}_changed`, entityType: "charity", entityId: charityId });
+  await tellReviewer(charity, kind === "logo" ? "its logo" : "its cover image");
   revalidate(charityId, charity.slug);
   return { ok: true, message: kind === "logo" ? "Logo updated." : "Cover image updated." };
 }

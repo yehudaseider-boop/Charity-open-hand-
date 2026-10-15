@@ -662,3 +662,16 @@ From the charity-side review. On Admin, Charities, each charity:
 - The charity's mandate signing date is checked against today in Johannesburg, not UTC.
 
 No support email address exists yet: `supportEmail` in `src/config/legal.ts` is empty until Yehuda chooses one (go-live checklist).
+
+## Charity dashboard details (16/10/2026)
+
+From the charity-side review:
+
+- **Campaigns past their last day count as ended** everywhere: they leave "Running now", free one of the 3 places (database rule too), and show "Ended on dd/mm/yyyy". The button that ends a campaign says "End", not a red "Remove".
+- **Donations CSV is paid donations only by default**, so the bookkeeper's total is income received; "Every status" is a separate link. The Reference column is the `NL-` reference donors see, and there is a Tax year column.
+- **The contact person can be changed after applying** (it was locked with the rest). When the email changes, the old address is told.
+- **Renaming, or a new logo or cover, after approval** is allowed but logged, and emails `ADMIN_NOTIFY_EMAIL` to check it still matches the organisation that was vetted. Yehuda can tighten this to "needs review" later.
+- **What goes public on approval** (name, pictures, story, updates, campaigns) is shown on the review page, so it is checked with the application.
+- **Search** on Donations, Donors and Monthly keeps emails and names as typed (dots, apostrophes), quoted safely in the database filter.
+- **Erased donors** show as "Erased at the donor's request", with no placeholder address on screen, in exports or as an email link.
+- Wording: Givezy (not the charity) issues s18A receipts; the tax year line reads properly; the dashboard says the provider's card fee comes off before the money reaches the bank; "contact us" points to the support contact.

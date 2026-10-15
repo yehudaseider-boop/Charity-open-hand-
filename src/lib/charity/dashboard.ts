@@ -34,15 +34,29 @@ export function thisTaxYear(now: Date): Period & { taxYear: number; end: string 
 
 export const allTime: Period = { from: sa("2000-01-01"), to: sa("2100-01-01") };
 
+/** A donor who asked to be erased keeps a placeholder address so the record still adds up; never shown or emailed. */
+export const isErasedEmail = (email: string | null | undefined): boolean => Boolean(email && /@erased\.invalid$/i.test(email));
+export const shownEmail = (email: string | null | undefined): string | null => (email && !isErasedEmail(email) ? email : null);
+export const ERASED_DONOR = "Erased at the donor's request";
+
 /** The name to show for a donor: person, or organisation. */
-export function donorName(d: { donor_type: string | null; first_name: string | null; last_name: string | null; organisation_name: string | null }): string {
+export function donorName(d: { donor_type: string | null; first_name: string | null; last_name: string | null; organisation_name: string | null; email?: string | null }): string {
+  if (isErasedEmail(d.email)) return ERASED_DONOR;
   if (d.donor_type && d.donor_type !== "individual") return (d.organisation_name ?? "").trim() || "Organisation";
   return [d.first_name, d.last_name].map((x) => x?.trim()).filter(Boolean).join(" ") || "Donor";
 }
 
-/** Characters that would change the meaning of a PostgREST filter, removed from search text. */
+/**
+ * Search text as typed, so "sarah.cohen@gmail.com" and "O'Brien" still match. Only the characters
+ * that could break out of a quoted PostgREST value, or act as wildcards, are removed.
+ */
 export function safeSearch(q: string): string {
-  return q.replace(/[,()*%_\\"'.:]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  return q.replace(/[\\"*%\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+
+/** A "contains" pattern for a PostgREST or() filter: quoted, so commas, dots and brackets are plain text. */
+export function containsPattern(q: string): string {
+  return `"%${safeSearch(q)}%"`;
 }
 
 export const donationStatus = {

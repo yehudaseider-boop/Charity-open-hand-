@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Card, Notice } from "@/components/card";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
-import { progressPercent } from "@/lib/charity/campaigns";
+import { isRunning, progressPercent } from "@/lib/charity/campaigns";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
@@ -17,20 +17,22 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
   await requireViewer(`/charity-admin/${id}/campaigns`);
   const { charity } = await loadCharityForManager(id);
   const campaigns = await loadCampaigns(id);
-  const active = campaigns.filter((c) => c.status === "active");
-  const past = campaigns.filter((c) => c.status === "ended");
+  const now = new Date();
+  const active = campaigns.filter((c) => isRunning(c, now));
+  // Ended by hand, or past its last day.
+  const past = campaigns.filter((c) => !isRunning(c, now) && c.status !== "draft");
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold">Campaigns</h1>
         <p className="text-sm text-muted">
-          Raise for one thing at a time, like Pesach food parcels or a new Sefer Torah. Donors give to it in the Givezy app and see how close you are to the goal.
+          Raise for one thing at a time, like Pesach food parcels or a new Sefer Torah. Donors give to it in the Givezy app or on your Givezy page, and see how close you are to the goal.
           The money comes to you like any other donation. You can run up to 3 at a time.
         </p>
       </div>
 
-      {charity.status !== "approved" ? <Notice tone="warning">Campaigns appear in the app once your application is approved.</Notice> : null}
+      {charity.status !== "approved" ? <Notice tone="warning">Campaigns appear to donors once your application is approved.</Notice> : null}
 
       {active.length < 3 ? (
         <Card title="Start a campaign">
@@ -46,7 +48,7 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
                 <div className="flex justify-between gap-3">
                   <p className="font-medium">{c.title}</p>
                   <form action={endCampaign.bind(null, id, c.id)}>
-                    <RemoveButton what={c.title} confirmText={`End "${c.title}"? Donors won't be able to give to it any more. Gifts already made stay with you.`} />
+                    <RemoveButton label="End" what={c.title} confirmText={`End "${c.title}"? Donors won't be able to give to it any more. Gifts already made stay with you.`} />
                   </form>
                 </div>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={c.endsAt} />
@@ -63,6 +65,7 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
               <li key={c.id} className="space-y-2 py-3">
                 <p className="font-medium">{c.title}</p>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={null} />
+                {c.status === "active" && c.endsAt ? <p className="text-xs text-muted">Ended on {formatDate(c.endsAt)}</p> : null}
               </li>
             ))}
           </ul>

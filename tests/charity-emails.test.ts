@@ -71,3 +71,19 @@ describe("emails after approval", () => {
     }
   });
 });
+
+import { contactChangedEmail, publicChangeEmail } from "@/lib/charity/emails";
+
+describe("change alerts", () => {
+  it("tell the old contact address where our emails go now", () => {
+    const m = contactChangedEmail("old@x.co", "Meals Fund", "new@x.co");
+    expect(m.to).toBe("old@x.co");
+    expect(m.text).toContain("new@x.co");
+    expect(m.text + m.subject).not.toMatch(/!|—/);
+  });
+  it("tell the reviewer what an approved charity changed, with a link to check it", () => {
+    const m = publicChangeEmail("me@x.co", "Meals Fund", "id-1", 'its name, from "A" to "B"', base);
+    expect(m.text).toContain(`${base}/admin/charities/id-1`);
+    expect(m.text).toContain('from "A" to "B"');
+  });
+});

@@ -110,4 +110,12 @@ describe("campaigns", () => {
       await run("rollback to savepoint q");
     });
   });
+
+  it("a campaign past its last day no longer takes one of the three places", async () => {
+    await tx(async () => {
+      for (const s of ["a", "b", "c"]) await start(ids.meals, s);
+      await run("update public.campaigns set ends_at = now() - interval '1 day' where charity_id = $1 and slug = 'a'", [ids.meals]);
+      await start(ids.meals, "d");
+    });
+  });
 });

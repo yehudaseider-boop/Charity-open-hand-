@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { isRunning } from "./campaigns";
 
 export type CampaignRow = {
   id: string;
@@ -49,5 +50,5 @@ export async function loadCampaigns(charityId: string): Promise<CampaignRow[]> {
  */
 export async function loadOpenCampaigns(charityId: string, now: Date = new Date()): Promise<CampaignRow[]> {
   const all = await loadCampaigns(charityId);
-  return all.filter((c) => c.status === "active" && (!c.endsAt || new Date(c.endsAt).getTime() >= now.getTime()));
+  return all.filter((c) => isRunning(c, now));
 }

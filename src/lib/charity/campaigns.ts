@@ -47,3 +47,8 @@ export function progressPercent(raisedCents: number, targetCents: number | null)
   if (!targetCents || targetCents <= 0) return 0;
   return Math.min(100, Math.floor((raisedCents * 100) / targetCents));
 }
+
+/** Taking gifts now: active, and not past its last day. A campaign past its last day counts as ended everywhere. */
+export function isRunning(c: { status: string; endsAt: string | null }, now: Date = new Date()): boolean {
+  return c.status === "active" && (!c.endsAt || new Date(c.endsAt).getTime() >= now.getTime());
+}

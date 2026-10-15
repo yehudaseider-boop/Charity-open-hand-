@@ -6,7 +6,7 @@ import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/
 import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { charityBadges } from "@/lib/charities";
-import { loadCharityForManager } from "@/lib/charity/queries";
+import { loadCharityForManager, publicImageUrl } from "@/lib/charity/queries";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 import { formatDate } from "@/lib/dates";
 import { getGateway } from "@/lib/gateway";
@@ -37,7 +37,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
   const { id } = await params;
   const { charity, priv, documents } = await loadCharityForManager(id);
   const supabase = await createClient();
-  const [{ data: memberships }, { data: history }] = await Promise.all([
+  const [{ data: memberships }, { data: history }, { data: updates }, { data: campaignRows }] = await Promise.all([
     supabase.from("charity_admins").select("user_id, role").eq("charity_id", id),
     supabase
       .from("audit_log")
@@ -46,6 +46,9 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
       .eq("entity_id", id)
       .order("created_at", { ascending: false })
       .limit(20),
+    // What goes public the moment the charity is approved: check it with the application.
+    supabase.from("charity_updates").select("id, body_en, created_at").eq("charity_id", id).order("created_at", { ascending: false }).limit(10),
+    supabase.from("campaigns").select("id, title, description, status").eq("charity_id", id).eq("status", "active").limit(3),
   ]);
 
   // charity_admins links to auth users, so look up their emails separately.
@@ -118,6 +121,35 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
               <SimpleForm action={connectToGateway.bind(null, id)} submitLabel="Connect to payment gateway" />
             </>
           )}
+        </Card>
+      ) : null}
+
+      {charity.status === "pending_review" ? (
+        <Card title="What goes public on approval">
+          <div className="space-y-3 text-sm">
+            <div className="flex flex-wrap gap-3">
+              {publicImageUrl(charity.logo_path) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={publicImageUrl(charity.logo_path)!} alt="Logo" className="h-16 w-16 rounded-control border border-border object-cover" />
+              ) : <span className="text-muted">No logo.</span>}
+              {publicImageUrl(charity.cover_path) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={publicImageUrl(charity.cover_path)!} alt="Cover" className="h-16 w-28 rounded-control border border-border object-cover" />
+              ) : <span className="text-muted">No cover photo.</span>}
+            </div>
+            <div><p className="font-medium">Public name</p><p>{charity.name_en}</p></div>
+            {charity.description_en ? <div><p className="font-medium">About</p><p className="whitespace-pre-line">{charity.description_en}</p></div> : null}
+            {charity.funds_use_en ? <div><p className="font-medium">How donations are used</p><p className="whitespace-pre-line">{charity.funds_use_en}</p></div> : null}
+            {charity.website ? <div><p className="font-medium">Website</p><p className="break-all">{charity.website}</p></div> : null}
+            <div>
+              <p className="font-medium">Updates ({updates?.length ?? 0})</p>
+              {updates?.length ? <ul className="mt-1 list-disc space-y-1 pl-5">{updates.map((u) => <li key={u.id} className="whitespace-pre-line">{u.body_en}</li>)}</ul> : <p className="text-muted">None.</p>}
+            </div>
+            <div>
+              <p className="font-medium">Campaigns ({campaignRows?.length ?? 0})</p>
+              {campaignRows?.length ? <ul className="mt-1 list-disc space-y-1 pl-5">{campaignRows.map((c) => <li key={c.id}>{c.title}{c.description ? `: ${c.description}` : ""}</li>)}</ul> : <p className="text-muted">None.</p>}
+            </div>
+          </div>
         </Card>
       ) : null}
 

@@ -69,10 +69,16 @@ describe("names and search", () => {
     expect(donorName({ donor_type: null, first_name: null, last_name: null, organisation_name: null })).toBe("Donor");
   });
 
-  it("strips characters that could change a search filter", () => {
-    expect(safeSearch("levin),email.neq.x,(a")).toBe("levin email neq x a");
-    expect(safeSearch("  O'Brien  ")).toBe("O Brien");
+  it("keeps emails and names as typed, and removes only what could break out of the quoted filter", () => {
+    expect(safeSearch("  sarah.cohen@gmail.com ")).toBe("sarah.cohen@gmail.com");
+    expect(safeSearch("O'Brien")).toBe("O'Brien");
+    expect(safeSearch('levin"),email.neq.x')).toBe("levin ),email.neq.x");
+    expect(safeSearch("a%b*c\\d")).toBe("a b c d");
     expect(safeSearch("a".repeat(200))).toHaveLength(60);
+  });
+  it("quotes the search inside the filter, so commas and brackets are plain text", async () => {
+    const { containsPattern } = await import("@/lib/charity/dashboard");
+    expect(containsPattern("levin),email.neq.x")).toBe('"%levin),email.neq.x%"');
   });
 });
 
@@ -108,5 +114,24 @@ describe("monthly donations for charities", () => {
     expect(chargeDayLabel(31)).toBe("the 31st (or the last day of a shorter month)");
     expect(chargeDayLabel(null)).toBeNull();
     expect(chargeDayLabel(0)).toBeNull();
+  });
+});
+
+describe("details that must read right", () => {
+  it("a campaign past its last day counts as ended", async () => {
+    const { isRunning } = await import("@/lib/charity/campaigns");
+    const now = new Date("2026-10-16T10:00:00+02:00");
+    expect(isRunning({ status: "active", endsAt: null }, now)).toBe(true);
+    expect(isRunning({ status: "active", endsAt: "2026-10-16T23:59:59+02:00" }, now)).toBe(true);
+    expect(isRunning({ status: "active", endsAt: "2026-10-15T23:59:59+02:00" }, now)).toBe(false);
+    expect(isRunning({ status: "ended", endsAt: null }, now)).toBe(false);
+  });
+  it("an erased donor shows as erased, never as a blank name or a placeholder address", async () => {
+    const { donorName, shownEmail, isErasedEmail } = await import("@/lib/charity/dashboard");
+    const erased = { donor_type: "individual", first_name: null, last_name: null, organisation_name: null, email: "erased+abc@erased.invalid" };
+    expect(donorName(erased)).toBe("Erased at the donor's request");
+    expect(shownEmail(erased.email)).toBeNull();
+    expect(isErasedEmail("sarah@erased.invalid.co.za")).toBe(false);
+    expect(shownEmail("sarah@x.co")).toBe("sarah@x.co");
   });
 });

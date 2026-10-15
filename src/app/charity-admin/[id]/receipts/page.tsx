@@ -3,6 +3,7 @@ import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
+import { SupportContact } from "@/components/legal";
 import { thisTaxYear } from "@/lib/charity/dashboard";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate, taxYearLabel } from "@/lib/dates";
@@ -38,7 +39,7 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
       <h1 className="text-xl font-semibold">s18A receipts</h1>
       {canIssue18a(charity) ? (
         <Notice>
-          One receipt is issued for each donor, once a year, after the tax year ends. The current tax year ({taxYearLabel(taxYear.taxYear)}) ends on {formatDate(taxYear.end)}.
+          One receipt is issued for each donor, once a year, after the tax year ends. The current tax year runs from {formatDate(taxYear.from)} to {formatDate(taxYear.end)} (SARS calls it tax year {taxYear.taxYear}).
           Each receipt lists that donor&apos;s paid donations to you and shows the donations only, not any contribution to Givezy.
         </Notice>
       ) : (
@@ -74,7 +75,7 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
       )}
       <p className="text-xs text-muted">
         The receipt itself goes to the donor (it shows their ID or tax number, which charities don&apos;t see). If a receipt needs correcting,
-        contact the platform team: only they can withdraw and re-issue one.
+        tell us (<SupportContact />): only we can withdraw and re-issue one.
       </p>
     </div>
   );

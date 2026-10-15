@@ -35,7 +35,7 @@ export async function startCampaign(charityId: string, _prev: FormState, formDat
   await logAudit({ actorUserId: viewer.userId, action: "charity.campaign_started", entityType: "charity", entityId: charityId });
   revalidatePath(`/charity-admin/${charityId}/campaigns`);
   revalidatePath(`/c/${charity.slug}`);
-  return { ok: true, message: "Your campaign is live in the Givezy app." };
+  return { ok: true, message: charity.status === "approved" ? "Your campaign is live. Donors can give to it now." : "Saved. Donors see it once your application is approved." };
 }
 
 export async function endCampaign(charityId: string, campaignId: string): Promise<void> {

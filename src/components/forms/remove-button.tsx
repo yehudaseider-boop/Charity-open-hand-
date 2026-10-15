@@ -1,16 +1,16 @@
 "use client";
 
-/** A "Remove" button inside a server-action form: asks first, and says what it removes. */
-export function RemoveButton({ what, confirmText }: { what: string; confirmText?: string }) {
+/** A "Remove" button inside a server-action form: asks first, and says what it removes. `label` for another verb ("End"). */
+export function RemoveButton({ what, confirmText, label = "Remove" }: { what: string; confirmText?: string; label?: string }) {
   return (
     <button
-      aria-label={`Remove ${what}`}
+      aria-label={`${label} ${what}`}
       onClick={(e) => {
         if (!window.confirm(confirmText ?? `Remove ${what}? This can't be undone.`)) e.preventDefault();
       }}
-      className="text-xs text-danger underline"
+      className={`text-xs underline ${label === "Remove" ? "text-danger" : "text-brand"}`}
     >
-      Remove
+      {label}
     </button>
   );
 }

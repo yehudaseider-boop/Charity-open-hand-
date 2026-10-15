@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
-import { chargeDayLabel, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, type MonthlyState } from "@/lib/charity/dashboard";
+import { chargeDayLabel, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, shownEmail, type MonthlyState } from "@/lib/charity/dashboard";
 import { loadMonthlyDonations } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
@@ -114,7 +114,7 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-medium" dir="auto">{r.display_name ?? "Donor's details erased"}</p>
-                    {r.email ? <p className="break-all text-muted">{r.email}</p> : null}
+                    {shownEmail(r.email) ? <p className="break-all text-muted">{r.email}</p> : null}
                     {r.phone ? <p className="text-muted">{r.phone}</p> : null}
                   </div>
                   <p className="shrink-0 text-right font-semibold">
