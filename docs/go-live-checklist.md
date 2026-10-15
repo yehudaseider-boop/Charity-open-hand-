@@ -20,7 +20,9 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **s18A loss rule**, **refunds and chargebacks**, and **what happens when a charity changes its name.** Decisions.
 - [ ] **Givezy's registered details:** the full registered company name and registration number go in `src/config/legal.ts` (both empty, so the Privacy Policy and Terms show a placeholder). Never guessed.
 - [ ] **Legal wording approved** by Yosef: Privacy Policy and Terms are drafts. Also the entity line, the fee sentence and the trademark question from the brand kit.
-- [ ] **Domain, registrar and hosting** chosen.
+- [x] **Domain:** givezy.co.za, registered at GoDaddy (16/10/2026).
+- [ ] **Hosting: Vercel**, Frankfurt (`fra1`, next to the Supabase project in eu-central-1). Test site on the free Hobby plan first; Hobby is non-commercial only and runs scheduled jobs once a day, so move to Pro (about $20 a month) before the first real donation, then add the hourly monthly-giving job to `vercel.json`: `"crons": [{ "path": "/api/jobs/monthly-giving", "schedule": "0 * * * *" }]` and set `CRON_SECRET` (Vercel sends it as the Bearer header itself). Set `CLIENT_IP_HEADER=x-real-ip` on Vercel. In Supabase, Authentication, URL configuration: set the site URL and allow the Vercel and givezy.co.za addresses as redirect URLs, or sign-in links break.
+- [ ] **Supabase Pro** (from about $25 a month) before going live: the free plan pauses after a week without visitors and has no daily backups.
 - [ ] **App calendar choices:** Shabbos and Yom Tov end at sunset plus 72 minutes (confirm), whether "today" follows the phone's time zone or Johannesburg, and whether Elul shows "Shana tova" instead of "Good Shabbos".
 
 - [x] **One name everywhere** (15/10/2026): the company is Givezy, and the website, payment page, emails, receipts, Privacy Policy and Terms now say Givezy. Yosef still approves the legal pages (see the legal wording item). Kept on purpose: the app's return link `nedivlev://` and its storage keys `nediv-lev.*` (renaming them would break return links and wipe people's saved data), test account emails, and old database history files.
