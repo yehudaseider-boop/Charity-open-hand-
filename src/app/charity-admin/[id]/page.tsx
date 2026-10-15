@@ -4,8 +4,10 @@ import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { allTime, monthlySummary, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
-import { loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
+import { allTime, averageCents, monthlySummary, repeatPercent, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
+import { loadCampaigns } from "@/lib/charity/campaign-queries";
+import { progressPercent } from "@/lib/charity/campaigns";
+import { loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 
@@ -43,13 +45,16 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
   const now = new Date();
   const taxYear = thisTaxYear(now);
-  const [month, year, all, monthly, recurring] = await Promise.all([
+  const [month, year, all, monthly, recurring, insights, campaigns] = await Promise.all([
     loadOverview(id, thisMonth(now)),
     loadOverview(id, taxYear),
     loadOverview(id, allTime),
     loadMonthlyTotals(id, 12),
     loadMonthlyDonations(id),
+    loadInsights(id, thisMonth(now)),
+    loadCampaigns(id),
   ]);
+  const activeCampaigns = campaigns.filter((c) => c.status === "active");
   const regular = monthlySummary(recurring);
   const receipts = canIssue18a(charity);
   const chart = [...monthly].reverse();
@@ -81,6 +86,53 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
           <Link href={`${base}/donations`} className="mt-3 inline-block text-sm text-brand underline">See all donations</Link>
         </Card>
       ) : null}
+
+      <Card title="Your donors">
+        {all.paid_count === 0 ? (
+          <p className="text-sm text-muted">These fill in once donations start coming in.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            <li>
+              <span className="font-semibold">{plural(insights.newDonors, "new donor")}</span> this month
+              {insights.returningDonors ? <>, and {plural(insights.returningDonors, "donor")} who gave before came back</> : null}.
+            </li>
+            <li>
+              <span className="font-semibold">{repeatPercent(insights.repeatDonors, insights.allDonors)}%</span> of your donors have given more than once
+              <span className="text-muted"> ({insights.repeatDonors} of {insights.allDonors})</span>.
+            </li>
+            <li>
+              The average gift this tax year is <span className="font-semibold">{formatRand(averageCents(year.paid_cents, year.paid_count))}</span>
+              <span className="text-muted"> ({plural(year.paid_count, "gift")})</span>.
+            </li>
+          </ul>
+        )}
+      </Card>
+
+      <Card title="Campaigns">
+        {activeCampaigns.length ? (
+          <ul className="space-y-3 text-sm">
+            {activeCampaigns.map((c) => {
+              const pct = progressPercent(c.raisedCents, c.targetCents);
+              return (
+                <li key={c.id}>
+                  <div className="flex justify-between gap-3">
+                    <span className="font-medium">{c.title}</span>
+                    <span>{formatRand(c.raisedCents)}{c.targetCents ? <span className="text-muted"> of {formatRand(c.targetCents)}</span> : null}</span>
+                  </div>
+                  {c.targetCents ? (
+                    <div className="mt-1 h-2 rounded-full bg-honey-soft" aria-hidden>
+                      <div className="h-2 rounded-full bg-honey" style={{ width: `${Math.max(2, pct)}%` }} />
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">Raising for something specific, like Pesach parcels? Start a campaign with a goal, and donors see how close you are.</p>
+        )}
+        <Link href={`${base}/campaigns`} className="mt-3 inline-block text-sm text-brand underline">{activeCampaigns.length ? "Manage campaigns" : "Start a campaign"}</Link>
+      </Card>
 
       <Card title="Monthly donations">
         {recurring.length === 0 ? (

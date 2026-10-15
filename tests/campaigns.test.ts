@@ -24,3 +24,17 @@ describe("a charity's new campaign", () => {
     expect(progressPercent(100, null)).toBe(0);
   });
 });
+
+import { averageCents, repeatPercent } from "@/lib/charity/dashboard";
+
+describe("charity insights figures", () => {
+  it("averages in whole cents, rounding half up, without floats", () => {
+    expect(averageCents(100_00, 3)).toBe(3_333);
+    expect(averageCents(5, 2)).toBe(3);
+    expect(averageCents(0, 0)).toBe(0);
+  });
+  it("gives the repeat share as a whole percentage", () => {
+    expect(repeatPercent(1, 3)).toBe(33);
+    expect(repeatPercent(0, 0)).toBe(0);
+  });
+});

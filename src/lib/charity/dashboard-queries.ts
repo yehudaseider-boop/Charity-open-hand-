@@ -120,3 +120,21 @@ export type DonationRow = {
   city: string | null;
   postal_code: string | null;
 };
+
+export type Insights = { newDonors: number; returningDonors: number; repeatDonors: number; allDonors: number; monthlyActive: number; monthlyActiveCents: number };
+
+/** New and returning donors in the period, repeat donors and active monthly donors (all time). */
+export async function loadInsights(charityId: string, period: Period): Promise<Insights> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("charity_insights", { p_charity_id: charityId, p_from: period.from, p_to: period.to });
+  if (error) throw new Error(error.message);
+  const r = (Array.isArray(data) ? data[0] : data) ?? {};
+  return {
+    newDonors: n(r.new_donors),
+    returningDonors: n(r.returning_donors),
+    repeatDonors: n(r.repeat_donors),
+    allDonors: n(r.all_donors),
+    monthlyActive: n(r.monthly_active),
+    monthlyActiveCents: n(r.monthly_active_cents),
+  };
+}

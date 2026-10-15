@@ -123,3 +123,15 @@ export function monthlySummary(rows: Pick<MonthlyRow, "status" | "amount_cents">
     endedCount: rows.filter((r) => r.status === "failed" || r.status === "cancelled").length,
   };
 }
+
+/** The average gift in whole cents, rounded half up, using whole numbers only. 0 when there are none. */
+export function averageCents(totalCents: number, count: number): number {
+  if (count <= 0) return 0;
+  const t = BigInt(totalCents), c = BigInt(count);
+  return Number((t * 2n + c) / (c * 2n));
+}
+
+/** Share of donors who gave more than once, as a whole percentage. */
+export function repeatPercent(repeat: number, all: number): number {
+  return all > 0 ? Math.floor((repeat * 100) / all) : 0;
+}

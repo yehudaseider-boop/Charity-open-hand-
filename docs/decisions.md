@@ -622,3 +622,11 @@ From Givelify's "virtual envelopes". Built on the `campaigns` table that was in 
 - **Once-off only:** campaign gifts can't be monthly (a monthly gift would outlive the campaign). Give monthly to the charity itself.
 - Drafts stay private; the public sees active and ended campaigns of approved charities only.
 - Not yet: campaigns on the website's public charity page and on Discover; giving to a campaign from the website.
+
+## Insights for charities (16/10/2026)
+
+From Givelify's analytics, kept to plain counts a small charity can act on. On the charity's dashboard:
+
+- **Your donors:** new donors this month and donors who gave before and came back this month; the share of all their donors who have given more than once; the average gift this tax year (whole cents, rounded half up, no floats).
+- **Campaigns:** each running campaign with raised, goal and bar, and a link to start or manage them.
+- Paid donations only; the contribution to Givezy is never included. Only the charity's own admins (and platform admins) can read these figures (database function `charity_insights`). Monthly donors are on the existing Monthly donations card, so they aren't repeated.
