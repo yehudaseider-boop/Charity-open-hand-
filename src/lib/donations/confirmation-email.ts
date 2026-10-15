@@ -25,7 +25,7 @@ export function confirmationEmail(d: {
     `Thank you. Your donation to ${d.charityName} has gone through.`,
     "",
     `Donation to ${d.charityName}: ${formatRand(d.amountCents)}`,
-    ...(d.contributionCents > 0 ? [`Contribution to Nadiv Lev: ${formatRand(d.contributionCents)}`] : []),
+    ...(d.contributionCents > 0 ? [`Contribution to Givezy: ${formatRand(d.contributionCents)}`] : []),
     `Total paid: ${formatRand(d.totalCents)} on ${formatDate(d.paidAt)}`,
     `Reference: ${ref}`,
     "",
@@ -34,15 +34,15 @@ export function confirmationEmail(d: {
       : "You did not ask for an s18A receipt for this donation.",
     "",
     ...monthlyLines(d),
-    "You can see all your donations, and your maaser and chomesh, in the Nadiv Lev app. Sign in with this email address.",
+    "You can see all your donations, and your maaser and chomesh, in the Givezy app. Sign in with this email address.",
     "",
-    "Nadiv Lev",
+    "Givezy",
   ];
   return { subject: `Your donation to ${d.charityName} (${ref})`, text: lines.join("\n") };
 }
 
 function monthlyLines(d: { monthly?: Parameters<typeof confirmationEmail>[0]["monthly"]; manageUrl?: string; totalCents: number }): string[] {
-  const manage = `You can pause or cancel at any time in the Nadiv Lev app (Giving tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`;
+  const manage = `You can pause or cancel at any time in the Givezy app (Giving tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`;
   if (!d.monthly) return [];
   if (d.monthly.kind === "first") {
     return [

@@ -21,7 +21,7 @@ export const glossary: Record<GlossaryTerm, { title: string; body: string[] }> =
     title: "Maaser",
     body: [
       "Maaser means \"a tenth\". Many Jewish people set aside a tenth of their income for tzedaka.",
-      "Nadiv Lev helps you keep count: mark a donation as maaser and it counts towards your maaser total. Log your income and the app works out what a tenth would be.",
+      "Givezy helps you keep count: mark a donation as maaser and it counts towards your maaser total. Log your income and the app works out what a tenth would be.",
       "How maaser applies to you (for example, before or after tax) is a question for your Rabbi.",
     ],
   },
@@ -29,7 +29,7 @@ export const glossary: Record<GlossaryTerm, { title: string; body: string[] }> =
     title: "Chomesh",
     body: [
       "Chomesh means \"a fifth\". Some people give a fifth of their income: their maaser plus a further tenth.",
-      "In Nadiv Lev, chomesh is that second tenth, kept as its own total so you can see each one separately.",
+      "In Givezy, chomesh is that second tenth, kept as its own total so you can see each one separately.",
     ],
   },
   generalTzedaka: {
@@ -42,7 +42,7 @@ export const glossary: Record<GlossaryTerm, { title: string; body: string[] }> =
   givingYear: {
     title: "The giving year",
     body: [
-      "Nadiv Lev counts your yearly maaser and chomesh from Rosh Hashana (the Jewish New Year, usually in September or October) to the next Rosh Hashana.",
+      "Givezy counts your yearly maaser and chomesh from Rosh Hashana (the Jewish New Year, usually in September or October) to the next Rosh Hashana.",
       "Tax receipts use the SARS tax year instead, which runs from 1 March to the end of February.",
     ],
   },

@@ -99,7 +99,7 @@ export default async function PaymentsPage() {
 
       <section className="space-y-2 rounded-card border border-border bg-surface p-4 text-sm">
         <h2 className="font-semibold">Last 30 days, by charity</h2>
-        <p className="text-xs text-muted">From our own records of confirmed payments. Compare with the gateway&apos;s settlement report. The donation goes to the charity; the contribution is Nadiv Lev&apos;s.</p>
+        <p className="text-xs text-muted">From our own records of confirmed payments. Compare with the gateway&apos;s settlement report. The donation goes to the charity; the contribution is Givezy&apos;s.</p>
         {totals.list.length === 0 ? <p className="text-muted">No confirmed payments in the last 30 days.</p> : null}
         {totals.list.map((t) => (
           <Row key={t.charity} left={`${t.charity} · ${t.count} ${t.count === 1 ? "payment" : "payments"}`} right={`${formatRand(t.donationCents)}${t.contributionCents ? ` + ${formatRand(t.contributionCents)}` : ""}`} />

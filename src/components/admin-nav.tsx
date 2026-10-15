@@ -11,7 +11,7 @@ const tabs = [
   { href: "/admin/requests", label: "Privacy requests" },
 ];
 
-/** Tabs across the top of every Nadiv Lev admin page. */
+/** Tabs across the top of every Givezy admin page. */
 export function AdminNav() {
   const pathname = usePathname();
   return (

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Nadiv Lev brand kit. Indigo and cream carry the page; deep coral is for
+ * Givezy brand kit. Indigo and cream carry the page; deep coral is for
  * buttons and links; coral and sage are for graphics and large type only
  * (they fall below 4.5:1 on cream), so small green text uses --success.
  * Matches the phone app (apps/mobile/src/theme/tokens.ts).

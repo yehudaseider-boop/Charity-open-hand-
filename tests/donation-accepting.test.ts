@@ -1,7 +1,7 @@
 /**
  * Which charities can take a donation right now. The money model is: straight to the
  * chosen charity's own account (a split payment). A real gateway must never take a
- * payment that would land with Nadiv Lev instead.
+ * payment that would land with Givezy instead.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -60,7 +60,7 @@ describe("a real gateway (direct to the charity)", () => {
     expect((await loadDonatableCharity("meals"))?.acceptingPayments).toBe(false);
   });
 
-  it("never when the gateway is not splitting, because the money would land with Nadiv Lev", async () => {
+  it("never when the gateway is not splitting, because the money would land with Givezy", async () => {
     gateway = { name: "paystack", splitsPayments: false };
     const c = await loadDonatableCharity("meals");
     expect(c?.acceptingPayments).toBe(false);

@@ -1,4 +1,4 @@
-# Nadiv Lev go-live checklist
+# Givezy go-live checklist
 
 Started 12/10/2026. Nothing here has been done on the real (live) systems yet. Tick items off as they are done and note the date. Items marked "decision" need Yehuda or Yosef before anyone builds or switches anything on.
 
@@ -7,7 +7,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - Paystack test-mode steps are in `docs/paystack-test-script.md`.
 
 - [ ] **Gateway rates.** Left empty on purpose until Yehuda supplies them (`src/config/platform.ts`). Never guessed.
-- [ ] **Split payments verified in Paystack's test mode** (needs the Paystack test keys; this sandbox cannot reach Paystack). Check, in order: (1) subaccount creation for a South African bank account works with the bank name we hold; (2) a test donation with a charity subaccount settles the donation amount to the subaccount and the contribution to the main account, in ZAR; (3) the fee lands on the side the bearer setting says; (4) what happens when the contribution is R0 and Nadiv Lev bears the fee; (5) the `charge.success` webhook and verify call report the full amount. Then set `PAYSTACK_SPLITS=yes`. Until then Paystack takes no donations.
+- [ ] **Split payments verified in Paystack's test mode** (needs the Paystack test keys; this sandbox cannot reach Paystack). Check, in order: (1) subaccount creation for a South African bank account works with the bank name we hold; (2) a test donation with a charity subaccount settles the donation amount to the subaccount and the contribution to the main account, in ZAR; (3) the fee lands on the side the bearer setting says; (4) what happens when the contribution is R0 and Givezy bears the fee; (5) the `charge.success` webhook and verify call report the full amount. Then set `PAYSTACK_SPLITS=yes`. Until then Paystack takes no donations.
 - [ ] **Monthly giving, in Paystack's test mode:** (1) a card payment with `channels: ["card"]` returns a reusable authorisation in the verify answer; (2) `charge_authorization` with the subaccount, flat `transaction_charge` and bearer settles like a first payment; (3) a declined card shows as failed in the verify answer; (4) the `charge.success` webhook for a charged authorisation carries our reference. Then run the job against test keys for a full month.
 - [ ] **Schedule the monthly job:** a scheduler calls `/api/jobs/monthly-giving` about hourly with `Authorization: Bearer <CRON_SECRET>`; set `CRON_SECRET` on the server (long random string). Check the answer each day for `errors` and `waiting`. Hosting is not chosen yet, so the scheduler is not either.
 - [ ] **Yosef:** terms and wording for monthly donations (authorisation tick-box, emails), and card-on-file rules for recurring payments.
@@ -16,13 +16,13 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Connect every approved charity** (Admin, charity page, "Connect to gateway") before opening. A charity that is not connected shows "isn't taking online donations yet".
 - [x] **Who pays the gateway charge:** the charity, out of its donation (decided 14/10/2026). The donor-covers option comes later, see D.
 - [ ] **Pending-payment sweep.** Today a payment still pending after the gateway stops retrying needs a person to check unprocessed rows in `gateway_events`. Decide whether to add an automatic sweep. Decision.
-- [x] **Money model decided 13/10/2026: straight to the chosen charity** (Paystack split payments), not pooled. Nadiv Lev never holds a charity's donation, so the "holding funds" question and the "choice is only a suggestion" wording fall away. Still for Yosef: s18A in this model (the charity issues the certificate or Nadiv Lev issues on its behalf under the mandate, as built), and how Nadiv Lev's own contribution is treated.
+- [x] **Money model decided 13/10/2026: straight to the chosen charity** (Paystack split payments), not pooled. Givezy never holds a charity's donation, so the "holding funds" question and the "choice is only a suggestion" wording fall away. Still for Yosef: s18A in this model (the charity issues the certificate or Givezy issues on its behalf under the mandate, as built), and how Givezy's own contribution is treated.
 - [ ] **s18A loss rule**, **refunds and chargebacks**, and **what happens when a charity changes its name.** Decisions.
 - [ ] **Legal wording approved** by Yosef: Privacy Policy and Terms are drafts. Also the entity line, the fee sentence and the trademark question from the brand kit.
 - [ ] **Domain, registrar and hosting** chosen.
 - [ ] **App calendar choices:** Shabbos and Yom Tov end at sunset plus 72 minutes (confirm), whether "today" follows the phone's time zone or Johannesburg, and whether Elul shows "Shana tova" instead of "Good Shabbos".
 
-- [ ] **One name everywhere.** The phone app says Givezy; the website, payment page, emails, receipts, Privacy Policy and Terms still say Nadiv Lev. Rename them together (with Yosef for the legal pages) before anyone outside the team sees both. Decision on timing.
+- [x] **One name everywhere** (15/10/2026): the company is Givezy, and the website, payment page, emails, receipts, Privacy Policy and Terms now say Givezy. Yosef still approves the legal pages (see the legal wording item). Kept on purpose: the app's return link `nedivlev://` and its storage keys `nediv-lev.*` (renaming them would break return links and wipe people's saved data), test account emails, and old database history files.
 
 ## B. Before the switch (technical)
 

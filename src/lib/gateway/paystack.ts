@@ -14,12 +14,12 @@ import { GatewayError, type CardAuthorization, type ChargeRequest, type Checkout
  * registered as a Paystack SUBACCOUNT (settlement bank + account). A checkout started with
  * that subaccount pays the charity's line into its own bank account, and
  * `transaction_charge` (a flat amount, in cents) is what stays with the main account: the
- * donor's optional contribution to Nadiv Lev. `bearer` says who pays Paystack's own fee:
- * "subaccount" (the charity) or "account" (Nadiv Lev), from the platform setting
+ * donor's optional contribution to Givezy. `bearer` says who pays Paystack's own fee:
+ * "subaccount" (the charity) or "account" (Givezy), from the platform setting
  * `gatewayChargePaidBy`, which Yehuda has not decided yet.
  *
  * Splitting is a switch: PAYSTACK_SPLITS=yes. Off, a charity takes no payments through
- * this gateway (the money would otherwise land with Nadiv Lev). Whether Paystack splits for
+ * this gateway (the money would otherwise land with Givezy). Whether Paystack splits for
  * South African merchants, the exact settlement and fee behaviour (including when the
  * contribution is R0), and the bank list for ZA are all unverified: check in test mode
  * with docs/go-live-checklist.md before switching it on.

@@ -77,7 +77,7 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       await getEmailTransport().send({
         to: email,
         subject: "Your information has been erased",
-        text: `As you asked, we have erased the information that identifies you from Nadiv Lev.\n\n${ERASE_KEPT_TEXT}\n\nNadiv Lev`,
+        text: `As you asked, we have erased the information that identifies you from Givezy.\n\n${ERASE_KEPT_TEXT}\n\nGivezy`,
       });
     } catch (e) {
       console.error("[erase] confirmation email not sent", e);

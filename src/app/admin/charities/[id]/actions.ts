@@ -299,11 +299,11 @@ export async function changeBankDetails(id: string, _prev: FormState, formData: 
         to: before.contact_email as string,
         subject: `The bank details for ${charity.name_en} were changed`,
         text: [
-          `The bank details held by Nadiv Lev for ${charity.name_en} were changed on ${formatDate(new Date())}. The new account ends in ${last4(v.bank_account_number)}.`,
+          `The bank details held by Givezy for ${charity.name_en} were changed on ${formatDate(new Date())}. The new account ends in ${last4(v.bank_account_number)}.`,
           "",
           "If you did not ask for this, please tell us straight away.",
           "",
-          "Nadiv Lev",
+          "Givezy",
         ].join("\n"),
       });
     } catch (e) {

@@ -13,12 +13,12 @@ export type CheckoutRequest = {
   /**
    * The charity's own account at the gateway, only when this gateway splits
    * payments (see `splitsPayments`). Null means the whole payment settles to
-   * Nadiv Lev, which then owes the charity its line.
+   * Givezy, which then owes the charity its line.
    */
   charityAccountRef: string | null;
   /**
    * Who pays the gateway's own charge when a payment is split: the charity (out of its
-   * donation) or Nadiv Lev (out of its share). Decided by Yehuda; null until then, and a
+   * donation) or Givezy (out of its share). Decided by Yehuda; null until then, and a
    * split payment is never started without it.
    */
   feeBearer: "charity" | "nediv_lev" | null;

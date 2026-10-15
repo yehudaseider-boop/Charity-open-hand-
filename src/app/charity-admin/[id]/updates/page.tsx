@@ -21,7 +21,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
       <div>
         <h1 className="text-xl font-semibold">Photos and updates</h1>
         <p className="text-sm text-muted">
-          Show donors the real work. These appear on your page on the website and in the Nadiv Lev app
+          Show donors the real work. These appear on your page on the website and in the Givezy app
           {charity.status === "approved" ? "." : " once your application is approved."} Only post photos you have permission to share, and
           never show a family who receives help without their consent.
         </p>

@@ -1,10 +1,10 @@
-# Nadiv Lev
+# Givezy
 
 Charity giving platform for the Johannesburg Jewish community. Donors find
 charities in the phone app (`apps/mobile`) and pay only on the website. Each
 payment has two separate line items: the donation to the charity and an
-optional contribution to Nadiv Lev. Whether the gateway pays the charity
-directly (split payment) or Nadiv Lev pays charities out is still open.
+optional contribution to Givezy. Whether the gateway pays the charity
+directly (split payment) or Givezy pays charities out is still open.
 
 ## Running it on your computer
 

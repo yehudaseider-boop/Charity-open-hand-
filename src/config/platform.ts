@@ -8,7 +8,7 @@
  */
 
 export const platformConfig = {
-  appName: "Nadiv Lev",
+  appName: "Givezy",
   appTagline: "Give to Johannesburg's Jewish community, simply.",
 
   locale: "en-ZA",
@@ -18,7 +18,7 @@ export const platformConfig = {
   fees: {
     /**
      * No platform fee and no processing fee on donations (Yehuda, 08/10/2026).
-     * The donor may tick a box to give Nadiv Lev a separate contribution.
+     * The donor may tick a box to give Givezy a separate contribution.
      *
      * The gateway's own charge is paid by the charity, out of its donation
      * (Yehuda, 14/10/2026). Offering the donor to cover it is not built yet: it
@@ -35,7 +35,7 @@ export const platformConfig = {
   /** Minimum donation to a charity. Confirmed: R30. */
   minDonationCents: 3_000,
 
-  /** Minimum optional contribution to Nadiv Lev, when the box is ticked. Confirmed: R10. */
+  /** Minimum optional contribution to Givezy, when the box is ticked. Confirmed: R10. */
   minContributionCents: 1_000,
 
   vat: {

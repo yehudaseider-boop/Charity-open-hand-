@@ -66,7 +66,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         <Stat label="Donors" value={String(all.donor_count)} note="who have given" />
       </div>
       <p className="text-xs text-muted">
-        Amounts are the donations only. Any contribution a donor chose to add for Nadiv Lev is not included.
+        Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included.
         {" "}{taxYearLabel(taxYear.taxYear)}.
       </p>
 

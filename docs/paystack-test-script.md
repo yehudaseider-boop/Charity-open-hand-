@@ -43,9 +43,9 @@ Stop at the first one that fails. Each later check depends on the one before.
 
 ### 2. A once-off donation splits correctly
 
-- [ ] On the connected charity's page, give R100 with a R5 contribution to Nadiv Lev. Pay with the successful test card.
+- [ ] On the connected charity's page, give R100 with a R5 contribution to Givezy. Pay with the successful test card.
 - [ ] Expect: the thank-you page says paid, a confirmation email is logged, and the donation shows as paid under Admin, Payments.
-- [ ] In Paystack, open the transaction. Expect: total R105, the charity's subaccount credited R100, Nadiv Lev's main account R5, the fee on the side we chose.
+- [ ] In Paystack, open the transaction. Expect: total R105, the charity's subaccount credited R100, Givezy's main account R5, the fee on the side we chose.
 - [ ] Repeat with **no contribution (R0)**. Write down what Paystack does with the fee.
 
 ### 3. A declined card

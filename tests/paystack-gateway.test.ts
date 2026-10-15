@@ -70,7 +70,7 @@ describe("starting a checkout", () => {
     });
   });
 
-  it("Nadiv Lev bearing the fee means the main account bears it", async () => {
+  it("Givezy bearing the fee means the main account bears it", async () => {
     await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "nediv_lev" });
     expect(calls[0].body).toMatchObject({ bearer: "account", subaccount: "ACCT_charity1" });
   });

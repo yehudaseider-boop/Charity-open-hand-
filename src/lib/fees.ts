@@ -5,7 +5,7 @@
  * There is no platform fee and no processing fee (Yehuda, 08/10/2026).
  * The donor pays two separate line items:
  *   the donation to the charity        (at least the minimum donation)
- *   an optional contribution to Nadiv Lev (0, or at least its minimum)
+ *   an optional contribution to Givezy (0, or at least its minimum)
  *
  *   total = donation + contribution
  *
@@ -21,7 +21,7 @@ export type Minimums = {
 export type Pricing = {
   /** To the charity. */
   amountCents: number;
-  /** To Nadiv Lev, 0 if the box was not ticked. */
+  /** To Givezy, 0 if the box was not ticked. */
   contributionCents: number;
   totalCents: number;
 };

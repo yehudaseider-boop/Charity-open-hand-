@@ -41,7 +41,7 @@ async function page(search: Record<string, string>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ reference: ID, ...search }) } as any));
 }
-const privateBits = [/R23\.45/, /Contribution to Nadiv Lev/, /maaser/i, /Counted as/, /R180/, /NL-3F9A2C71/];
+const privateBits = [/R23\.45/, /Contribution to Givezy/, /maaser/i, /Counted as/, /R180/, /NL-3F9A2C71/];
 
 beforeEach(() => {
   outcome = "paid";
@@ -78,7 +78,7 @@ describe("confirmation page privacy", () => {
 
   it("a guest with the credential from their payment link sees their confirmation", async () => {
     const html = await page({ t: "good-credential" });
-    expect(html).toContain("Contribution to Nadiv Lev");
+    expect(html).toContain("Contribution to Givezy");
     expect(html).toContain("R23.45");
     expect(html).toContain("NL-3F9A2C71");
   });

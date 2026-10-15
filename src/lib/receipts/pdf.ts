@@ -21,7 +21,7 @@ export function loadFontCss(): string {
   ].join("\n");
 }
 
-/** The Nadiv Lev wordmark as inline SVG, for the top left of a receipt. */
+/** The Givezy wordmark as inline SVG, for the top left of a receipt. */
 export function loadLogoSvg(): string {
   return readFileSync(join(process.cwd(), "public", "brand", "nadiv-lev.svg"), "utf8");
 }
