@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Badge } from "@/components/badge";
+import { CampaignProgress } from "@/components/campaign-progress";
 import { Card } from "@/components/card";
 import { CharityBadges } from "@/components/charity-badges";
 import { Info } from "@/components/info";
@@ -10,6 +11,7 @@ import { canIssue18a } from "@/lib/charities";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { initials } from "@/lib/charity/initials";
 import { loadStories, publicImageUrl } from "@/lib/charity/queries";
+import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 
@@ -37,7 +39,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
   const receipts = canIssue18a(charity);
-  const [donatable, { photos, updates }] = await Promise.all([loadDonatableCharity(charity.slug), loadStories(charity.id, 5)]);
+  const [donatable, { photos, updates }, campaigns] = await Promise.all([loadDonatableCharity(charity.slug), loadStories(charity.id, 5), loadOpenCampaigns(charity.id)]);
   const accepting = donatable?.acceptingPayments ?? false;
   const categories = charity.charity_categories
     .map((cc) => cc.categories as unknown as { name_en: string } | null)
@@ -93,6 +95,11 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
           <Info terms={["s18a"]} label="an s18A receipt" />
         </div>
       </div>
+
+      {/* What they're raising for right now comes before the story. */}
+      {campaigns.map((c) => (
+        <CampaignProgress key={c.id} campaign={c} giveHref={accepting ? `/c/${charity.slug}/donate?campaign=${c.id}` : undefined} />
+      ))}
 
       {charity.description_en ? (
         <Card title="What they do">

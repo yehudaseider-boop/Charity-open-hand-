@@ -42,3 +42,12 @@ export async function loadCampaigns(charityId: string): Promise<CampaignRow[]> {
     giftCount: progress.get(r.id)?.count ?? 0,
   }));
 }
+
+/**
+ * A charity's campaigns that are taking gifts now (active and not past their last day), with totals.
+ * For the public charity and giving pages: row-level security only shows campaigns of approved charities.
+ */
+export async function loadOpenCampaigns(charityId: string, now: Date = new Date()): Promise<CampaignRow[]> {
+  const all = await loadCampaigns(charityId);
+  return all.filter((c) => c.status === "active" && (!c.endsAt || new Date(c.endsAt).getTime() >= now.getTime()));
+}

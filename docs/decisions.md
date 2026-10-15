@@ -621,7 +621,8 @@ From Givelify's "virtual envelopes". Built on the `campaigns` table that was in 
 - **Money:** a campaign gift is an ordinary donation to the charity, labelled with the campaign. The total counts paid gifts only (never the contribution to Givezy); refunded and charged-back gifts drop out. The database refuses a gift for another charity's campaign. The server refuses an ended campaign (status or past its last day) before recording anything.
 - **Once-off only:** campaign gifts can't be monthly (a monthly gift would outlive the campaign). Give monthly to the charity itself.
 - Drafts stay private; the public sees active and ended campaigns of approved charities only.
-- Not yet: campaigns on the website's public charity page and on Discover; giving to a campaign from the website.
+- Website (16/10/2026): running campaigns show on the charity's public page with their goal bar, and "Give to this campaign" opens the website's giving page for that campaign (once-off; the monthly option is hidden). An ended or unknown campaign falls back to a normal gift with a note. This matters because in-app giving stays off in store builds, so the website is where campaign gifts happen at launch.
+- Not yet: campaigns on the app's Discover screen.
 
 ## Insights for charities (16/10/2026)
 

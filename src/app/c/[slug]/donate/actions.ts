@@ -39,6 +39,7 @@ export async function submitDonation(
   contributionCents: number,
   shownTotalCents: number,
   fromApp: boolean,
+  campaignId: string | undefined,
   _prev: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
@@ -56,7 +57,7 @@ export async function submitDonation(
 
   const h = await headers();
   const ip = clientIp(h);
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, input: parsed.data, ip });
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, input: parsed.data, ip });
   if (!result.ok) return result;
   redirect(result.redirectUrl);
 }

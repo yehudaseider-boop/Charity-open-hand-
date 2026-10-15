@@ -18,9 +18,11 @@ type Props = {
   initialKind?: keyof typeof givingKinds;
   /** The donor came from the phone app, so the confirmation offers a way back to it. */
   fromApp: boolean;
+  /** Giving to one of the charity's campaigns: once-off only. */
+  campaign?: { id: string; title: string };
 };
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind, fromApp }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind, fromApp, campaign }: Props) {
   const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
@@ -62,7 +64,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
-        <p className="text-xs text-muted">Minimum {minimumLabel}. No Givezy fee. You can make it monthly below.</p>
+        <p className="text-xs text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
 
         <div className="space-y-2 rounded-control bg-bg p-3">
           <label className="flex items-start gap-2 text-sm">
@@ -109,6 +111,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           receiptsAvailable={receiptsAvailable}
           initialKind={initialKind}
           fromApp={fromApp}
+          campaign={campaign}
         />
       ) : null}
     </div>
@@ -140,9 +143,9 @@ function Check({ name, children, error }: { name: string; children: React.ReactN
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialKind, fromApp }: {
+function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialKind, fromApp, campaign }: {
   slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
-  initialKind?: keyof typeof givingKinds; fromApp: boolean;
+  initialKind?: keyof typeof givingKinds; fromApp: boolean; campaign?: { id: string; title: string };
 }) {
   // A new amount from the form above replaces the shown one; so does a corrected one from the server.
   const [shownQuote, setShownQuote] = useState(quote);
@@ -153,7 +156,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   }
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData) => {
-      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, prev, fd);
+      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, campaign?.id, prev, fd);
       if (next.quote) setShownQuote(next.quote);
       return next;
     },
@@ -175,6 +178,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         }}
       >
         <Breakdown q={shownQuote} charityName={charityName} />
+        {campaign ? <p className="text-sm text-muted">For the campaign: <span className="font-medium text-text">{campaign.title}</span></p> : null}
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Giving as</legend>
@@ -247,7 +251,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         <TextArea name="message" label={`Message to ${charityName}`} rows={3} />
 
-        <div className="space-y-2 rounded-control bg-bg p-3">
+        {/* Campaign gifts are once-off: a monthly gift would carry on after the campaign ends. */}
+        {campaign ? null : <div className="space-y-2 rounded-control bg-bg p-3">
           <label className="flex items-start gap-2 text-sm font-medium">
             <input type="checkbox" name="monthly" className="mt-1" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
             <span>Give {formatRand(shownQuote.totalCents)} every month</span>
@@ -263,7 +268,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
               </Check>
             </>
           ) : null}
-        </div>
+        </div>}
 
         <div className="space-y-2">
           <Check name="is_anonymous">
