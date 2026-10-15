@@ -548,3 +548,9 @@ Yehuda: the charity pays Paystack's fee, out of its donation. Later we offer the
 ## Giving first: the Give button (15/10/2026)
 
 Yehuda wants giving to be the first thing the app offers. A big round Give button sits in the middle of the tab bar, raised above it, on every tab: the logo's splash (all three shapes) on white inside a blue ring, so each colour shows (Yehuda: the logo, not a heart). It opens "Who would you like to give to?": a search, "Give again" (charities the donor gave to before, most recent first), "Your charities" (saved ones not already shown), then all charities. Choosing one goes straight to the usual give step for that charity, with "Another charity" to go back. The middle tab is a button, not a page; a link to it lands on Discover.
+
+## One branch for the app (15/10/2026)
+
+- Two sessions were publishing the phone app to the same Expo preview channel from different branches, so each publish wiped the other's work. From now on `milestone-1-foundation` is the app's branch: build on it and publish only from it.
+- Combined on 15/10/2026 (Give button and charity picker, plus the header curve, inset photos and Try again screens, plus the new Receipts and Account) and published as update group 4931e23a-9078-45d6-9ac7-2cb9517ccaa3.
+- Receipts: a "tax year so far" card (this tax year's paid s18A gifts) and each issued receipt as a slip with Download and Share. Account: initials, name and email, Giving and Receipts as tiles, then settings.
