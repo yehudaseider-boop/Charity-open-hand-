@@ -630,3 +630,13 @@ From Givelify's analytics, kept to plain counts a small charity can act on. On t
 - **Your donors:** new donors this month and donors who gave before and came back this month; the share of all their donors who have given more than once; the average gift this tax year (whole cents, rounded half up, no floats).
 - **Campaigns:** each running campaign with raised, goal and bar, and a link to start or manage them.
 - Paid donations only; the contribution to Givezy is never included. Only the charity's own admins (and platform admins) can read these figures (database function `charity_insights`). Monthly donors are on the existing Monthly donations card, so they aren't repeated.
+
+## Charity sign-up (16/10/2026)
+
+Yehuda chose this over the Paystack test run as the next step: without charities there is nothing to give to. Built:
+
+- **Emails at each step** (draft wording, `src/lib/charity/emails.ts`): "we have your application" to the charity on submit, "new application" to `ADMIN_NOTIFY_EMAIL`, "approved" with four next steps (and an honest line about s18A when the charity can't issue receipts yet), and "needs a change" with the admin's reason and a link back. A failed email never blocks or undoes the action.
+- **Guided application:** one step at a time (organisation, address, contact, bank, documents, submit) with a progress bar, steps as links with ticks, Back and Next ("Skip for now" on an unfinished step), and a list of what's missing on the submit step. Same forms and rules as before.
+- **Getting started** on the charity dashboard after approval, until all done: connected for online donations (we do this), cover photo, story, first update, first campaign, plus their public link with a Copy button.
+- **For charities page** (`/for-charities`, draft copy): free to list, straight to your bank (the provider's card fee comes off each donation, no figure until the rates are confirmed), s18A receipts done for you, monthly donors, campaigns, dashboard; how to join; what you'll need. Linked from the home page, the header (larger screens) and the footer.
+- **Invitations:** a platform admin enters a charity's name and contact email under Admin, Charities; the charity gets a link that works once for 30 days and starts the application with the name filled in. Only a hash of the link is stored; the table is readable by platform admins only and written by the server only. The list shows Sent, Started (linked) or Expired.
