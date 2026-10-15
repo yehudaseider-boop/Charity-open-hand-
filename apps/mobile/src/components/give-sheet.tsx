@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as WebBrowser from "expo-web-browser";
+import { router } from "expo-router";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { GivingKind } from "@/data/giving";
 import { useAccount } from "@/lib/account";
@@ -53,9 +54,14 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
       <View style={{ gap: 8 }}>
         <Button
           label={kind ? `${IN_APP_GIVING ? "Continue" : "Give"} as ${givingKindLabels[kind].toLowerCase()}` : IN_APP_GIVING ? "Continue to payment" : "Give on our website"}
-          disabled={!url || opening}
-          style={!url ? { opacity: 0.4 } : undefined}
+          disabled={(!url && !(IN_APP_GIVING && kind && SITE_URL)) || opening}
+          style={!url && !(IN_APP_GIVING && kind && SITE_URL) ? { opacity: 0.4 } : undefined}
           onPress={async () => {
+            if (IN_APP_GIVING && kind && SITE_URL) {
+              router.push({ pathname: "/give/[slug]", params: { slug, kind } });
+              onDone?.();
+              return;
+            }
             if (!url || opening) return;
             setOpening(true);
             setError(null);
@@ -76,7 +82,7 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
           }}
         />
         <Text variant="label" style={{ textAlign: "center" }}>
-          {kind && !SITE_URL ? "The website isn't live yet, so this button is off in the preview." : IN_APP_GIVING ? "Opens a secure payment page inside the app. You choose the amount and pay there." : "Opens in your browser. You choose the amount and pay there."}
+          {kind && !SITE_URL ? "The website isn't live yet, so this button is off in the preview." : IN_APP_GIVING ? "You choose the amount here, then pay on a secure payment page. The app never sees your card." : "Opens in your browser. You choose the amount and pay there."}
         </Text>
         {error ? <Text accessibilityRole="alert" style={{ color: colors.danger, textAlign: "center" }}>{error}</Text> : null}
       </View>

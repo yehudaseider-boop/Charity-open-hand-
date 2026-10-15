@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { imageUrl, inCause, mergeSaved, savedCharities, oneLiner, toCauses, toCharity, toPhotos, toUpdates, type CharityRow } from "../apps/mobile/src/lib/live-charities";
+import { givenBefore, imageUrl, inCause, mergeSaved, savedCharities, oneLiner, toCauses, toCharity, toPhotos, toUpdates, type CharityRow } from "../apps/mobile/src/lib/live-charities";
 
 const base = "https://example.supabase.co";
 const row = (o: Partial<CharityRow> = {}): CharityRow => ({
@@ -62,5 +62,17 @@ describe("saved charities", () => {
   it("keeps the saved order and drops charities no longer listed", () => {
     const list = [toCharity(row({ slug: "x" }), base), toCharity(row({ slug: "y" }), base)];
     expect(savedCharities(["y", "gone", "x"], list).map((c) => c.slug)).toEqual(["y", "x"]);
+  });
+});
+
+describe("givenBefore", () => {
+  const c = (slug: string) => ({ slug, nameEn: slug }) as never;
+  const list = [c("a"), c("b"), c("c")];
+  const g = (slug: string, day: number) => ({ charitySlug: slug, date: new Date(2026, 9, day) });
+  it("lists each charity once, most recent gift first, skipping charities no longer listed", () => {
+    expect(givenBefore([g("a", 1), g("b", 5), g("a", 9), g("gone", 10)], list).map((x: { slug: string }) => x.slug)).toEqual(["a", "b"]);
+  });
+  it("stops at the limit", () => {
+    expect(givenBefore([g("a", 1), g("b", 2), g("c", 3)], list, 2)).toHaveLength(2);
   });
 });

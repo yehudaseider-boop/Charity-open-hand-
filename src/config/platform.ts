@@ -20,11 +20,11 @@ export const platformConfig = {
      * No platform fee and no processing fee on donations (Yehuda, 08/10/2026).
      * The donor may tick a box to give Nadiv Lev a separate contribution.
      *
-     * Who pays the gateway's own charge is NOT decided yet (the charity, out of
-     * its donation, or Nadiv Lev). Real payments stay closed until it is; only
-     * the test gateway runs.
+     * The gateway's own charge is paid by the charity, out of its donation
+     * (Yehuda, 14/10/2026). Offering the donor to cover it is not built yet: it
+     * needs the gateway's rates below.
      */
-    gatewayChargePaidBy: null as "charity" | "nediv_lev" | null,
+    gatewayChargePaidBy: "charity" as "charity" | "nediv_lev" | null,
     /** The gateway's charge, from its rate sheet. Empty until Yehuda supplies it. */
     gatewayPercent: null as string | null,
     gatewayFixedCents: null as number | null,

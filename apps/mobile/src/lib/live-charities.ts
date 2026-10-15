@@ -90,3 +90,17 @@ export function savedCharities(slugs: string[], directory: Charity[]): Charity[]
   const bySlug = new Map(directory.map((c) => [c.slug, c]));
   return slugs.flatMap((s) => bySlug.get(s) ?? []);
 }
+
+/** Charities the donor gave to before, most recent first, each once: "Give again". */
+export function givenBefore(gifts: { charitySlug: string; date: Date }[], charities: Charity[], limit = 6): Charity[] {
+  const seen = new Set<string>();
+  const out: Charity[] = [];
+  for (const g of [...gifts].sort((a, b) => b.date.getTime() - a.date.getTime())) {
+    if (seen.has(g.charitySlug)) continue;
+    seen.add(g.charitySlug);
+    const c = charities.find((x) => x.slug === g.charitySlug);
+    if (c) out.push(c);
+    if (out.length === limit) break;
+  }
+  return out;
+}

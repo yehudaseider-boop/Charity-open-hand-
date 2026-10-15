@@ -9,7 +9,7 @@ Why this exists: the Paystack connection was written from Paystack's published i
 - [ ] **Free Paystack account** at paystack.com, country South Africa. You only need test mode, not business verification. (Confirm that this is still true when you sign up.)
 - [ ] **Switch the dashboard to Test mode** (the toggle at the top). Settings, API Keys & Webhooks, then copy the **Test Secret Key** (starts `sk_test_`). Never paste it into chat or commit it. It goes only in the website's settings (below).
 - [ ] **A test copy of the website on the internet.** Paystack must reach us at a public address to send payment messages (webhooks). Claude cannot deploy for you, so this needs a hosting choice (see "Open items" in the go-live checklist: domain, registrar and hosting). A temporary test site is fine. Do NOT use the real live site or real database.
-- [ ] **A decision needed first: who pays Paystack's fee** (donor, Nadiv Lev or the charity). Today the setting `gatewayChargePaidBy` in `src/config/platform.ts` is empty on purpose, and split payments refuse to start until it is set. For the test only, pick any value in the test copy and tell Claude; do not treat that as the real decision.
+- [ ] **Fee payer is decided: the charity (`gatewayChargePaidBy` = `"charity"`).
 
 ## Settings on the test copy of the website
 

@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import type { Charity } from "@/data/sample";
 import { haptic } from "@/lib/haptics";
 import { colors, fonts, photoCorners, radius } from "@/theme/tokens";
@@ -20,13 +20,31 @@ function Receipt18a({ issues18a }: { issues18a: boolean }) {
   );
 }
 
+/** A small "Give" pill beside the card, so the donor can give without opening the charity's page first. */
+function GiveButton({ charity, onGive }: { charity: Charity; onGive: (c: Charity) => void }) {
+  return (
+    <Pressable
+      onPress={() => {
+        haptic.tap();
+        onGive(charity);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`Give to ${charity.nameEn}`}
+      hitSlop={6}
+      style={({ pressed }) => [styles.give, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={styles.giveText}>Give</Text>
+    </Pressable>
+  );
+}
+
 /**
  * A charity in the directory. Featured: its photo with a lilac shape peeking out
  * behind it, the name set below on the page, and a Give button that goes straight to the give
  * sheet. Otherwise: a plain row in an editorial list (thumbnail, name, where and what),
  * divided by a hairline, with no box around it.
  */
-export function CharityCard({ charity, featured = false, live = false, last = false }: { charity: Charity; featured?: boolean; live?: boolean; last?: boolean }) {
+export function CharityCard({ charity, featured = false, live = false, last = false, onGive }: { charity: Charity; featured?: boolean; live?: boolean; last?: boolean; onGive?: (c: Charity) => void }) {
   const open = () => router.push(`/charity/${charity.slug}`);
   const where = [charity.area, charity.cause].filter(Boolean).join(" · ");
   if (featured) {
@@ -45,7 +63,9 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
           <PressableScale
             onPress={() => {
               haptic.press();
-              router.push(`/charity/${charity.slug}?sheet=give`);
+              // On Discover the give sheet opens right here; elsewhere, on the charity's page.
+              if (onGive) onGive(charity);
+              else router.push(`/charity/${charity.slug}?sheet=give`);
             }}
             accessibilityRole="button"
             accessibilityLabel={`Give to ${charity.nameEn}`}
@@ -65,6 +85,8 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
         {charity.area ? <Text style={styles.area}>{charity.area}</Text> : null}
         <Text variant="bodyMuted" numberOfLines={2} style={{ fontSize: 15, lineHeight: 21 }}>{charity.cause}</Text>
         <Receipt18a issues18a={charity.issues18a} />
+        {/* For the donor who doesn't need to read more: give straight from the list. */}
+        {onGive ? <View style={{ alignSelf: "flex-start", marginTop: 8 }}><GiveButton charity={charity} onGive={onGive} /></View> : null}
       </View>
     </PressableScale>
   );
@@ -78,6 +100,8 @@ const styles = StyleSheet.create({
   giveNow: { minHeight: 48, minWidth: 104, paddingHorizontal: 26, borderRadius: radius.pill, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
   giveNowText: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.onInk },
   row: { flexDirection: "row", gap: 16, alignItems: "flex-start", paddingVertical: 16 },
+  give: { minHeight: 40, minWidth: 72, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.blue, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  giveText: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
   rule: { borderBottomWidth: 1, borderBottomColor: colors.hairline },
   thumb: { width: 92, aspectRatio: 1 },
   rowText: { flex: 1, gap: 2 },

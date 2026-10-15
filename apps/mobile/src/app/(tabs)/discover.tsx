@@ -1,8 +1,12 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CauseTiles } from "@/components/cause-tiles";
 import { CharityCard } from "@/components/charity-card";
+import { GiveSheet } from "@/components/give-sheet";
+import { Sheet } from "@/components/sheet";
+import type { Charity } from "@/data/sample";
 import { Splash } from "@/components/splash";
 import { HeaderCurve } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
@@ -11,7 +15,6 @@ import { SearchIcon } from "@/components/icons";
 import { EmptyState, ErrorState, LoadingList, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { useDirectory } from "@/lib/directory";
-import { haptic } from "@/lib/haptics";
 import { inCause, savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
@@ -32,8 +35,10 @@ export default function Discover() {
   const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
   const [query, setQuery] = useState(state === "empty" ? "Bnei Akiva" : "");
   const [cause, setCause] = useState("all");
-  // Where the filter chips end, so the header curve always sits just under them (the saved row and seasonal card change the height).
+  // Where the header ends (after the cause tiles), so the curve always sits just under it (the saved row and seasonal card change the height).
   const [chipsEnd, setChipsEnd] = useState<number | null>(null);
+  // The charity whose "Give" was tapped in the list: the same give sheet as on its page.
+  const [giveTo, setGiveTo] = useState<Charity | null>(null);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -51,7 +56,7 @@ export default function Discover() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
       <HeaderCurve depth={chipsEnd ? chipsEnd + 52 : insets.top + 328} />
-      {/* Everything above the list, measured so the curve sits just under the chips. */}
+      {/* Everything above the list, measured so the curve sits just under the cause tiles. */}
       <View onLayout={(e) => setChipsEnd(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
       <View style={styles.header}>
         <View style={{ marginBottom: 18 }}><Logo width={96} /></View>
@@ -82,25 +87,10 @@ export default function Discover() {
         </View>
       ) : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} accessibilityRole="tablist">
-        {causes.map((c) => {
-          const selected = c.id === cause;
-          return (
-            <Pressable
-              key={c.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              onPress={() => {
-                haptic.tap();
-                setCause(c.id);
-              }}
-              style={[styles.filter, selected && styles.filterOn]}
-            >
-              <Text style={[styles.filterText, selected && { color: colors.onInk, fontFamily: fonts.bodySemibold }]}>{c.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={{ marginTop: space.block, gap: 12 }}>
+        <Text variant="h2" style={{ fontSize: 22, lineHeight: 28, paddingHorizontal: space.gutter }} accessibilityRole="header">Causes</Text>
+        <CauseTiles causes={causes} selected={cause} onSelect={setCause} />
+      </View>
       </View>
 
       <View style={[styles.gutter, { marginTop: space.block + 44 }]}>
@@ -123,14 +113,14 @@ export default function Discover() {
           <View style={{ gap: space.block }}>
             {featured ? (
               <FadeUp index={0}>
-                <CharityCard charity={featured} featured live={live} />
+                <CharityCard charity={featured} featured live={live} onGive={setGiveTo} />
               </FadeUp>
             ) : null}
             <View>
               {rest.length ? <Text style={styles.listHead}>{cause === "all" && !query ? "More charities" : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
               {rest.map((c, i) => (
                 <FadeUp key={c.slug} index={i + 1}>
-                  <CharityCard charity={c} live={live} last={i === rest.length - 1} />
+                  <CharityCard charity={c} live={live} last={i === rest.length - 1} onGive={setGiveTo} />
                 </FadeUp>
               ))}
             </View>
@@ -138,6 +128,9 @@ export default function Discover() {
           </View>
         )}
       </View>
+      <Sheet visible={giveTo !== null} onClose={() => setGiveTo(null)}>
+        {giveTo ? <GiveSheet charityName={giveTo.nameEn} slug={giveTo.slug} onDone={() => setGiveTo(null)} /> : null}
+      </Sheet>
     </ScrollView>
   );
 }
@@ -160,10 +153,6 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 12, outlineStyle: "none" } as object,
   listHead: { fontFamily: fonts.bodySemibold, fontSize: 14, letterSpacing: 0.3, color: colors.muted, marginBottom: 2 },
-  filters: { paddingHorizontal: space.gutter, gap: 10, marginTop: 16, paddingVertical: 4 },
-  filter: { minHeight: 44, paddingHorizontal: 18, justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
-  filterOn: { backgroundColor: colors.blue, borderColor: colors.blue },
-  filterText: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.ink },
 });
 
 /** A failure while drawing shows "Try again" and the error, not a blank page. */

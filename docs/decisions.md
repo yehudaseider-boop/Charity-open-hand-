@@ -521,3 +521,30 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Yehuda reported the Giving tab going blank in Expo Go on iPhone, twice. Not reproduced: the screen draws fully in the web preview and in an iPhone test render (jest-expo, iOS), with no errors, and the preview has no live database, so it runs on sample data.
 - Each tab now exports an `ErrorBoundary` (`apps/mobile/src/components/screen-error.tsx`): if a screen fails while drawing it shows "Something went wrong", a "Try again" button and the error's own words, instead of a blank page. Next time it happens, a screenshot shows the cause.
 - Open: the cause of the blank Giving page. Whether donors should see the technical error text is on the go-live checklist.
+
+## Taking once-off gifts inside the app (14/10/2026)
+
+Yehuda decided donors can give inside the app, with the card entered on the payment provider's own page (not website donate pages). Chosen: app screens for amount, giving kind, contribution and donor details; the provider's hosted page in an in-app sheet; once-off gifts first, monthly after; in-app payments stay off in store builds until Apple and Google confirm in writing.
+
+- **Server:** `POST /api/app/quote` and `POST /api/app/checkout` reuse the website's `quoteDonation` and `startDonation`, so the minimums, the s18A rules, the age and privacy confirmations, the rate limit (5 attempts per 10 minutes by address and email), the pending record, the consents and the split to the charity are the same as on the website. A gift is marked paid only when the provider confirms it (webhook, or verification on return). The secret key never leaves the server.
+- **Switches, both off by default:** `APP_GIVING=yes` on the server (otherwise both endpoints answer 404) and `EXPO_PUBLIC_IN_APP_GIVING=yes` in the app. With the app switch off, "Give on our website" still opens the browser.
+- **App:** `give/[slug]` screen; the give sheet hands over to it when the switch is on. The app sends whole cents, never a card number. A changed total is shown again before anything is charged.
+- **Unchanged and still open:** who pays the provider's fee (`gatewayChargePaidBy`), the gateway rates, the first run against Paystack's test mode, and the store rules. Monthly giving in the app is the next step.
+- **Store-rule risk, raised once:** Apple's rules may allow in-app donations only for approved nonprofits, possibly per listed charity; Google lists tax-exempt donations as payments outside Play Billing. Yehuda accepted this with the switch off for store builds.
+
+## Who pays Paystack's fee (14/10/2026)
+
+Yehuda: the charity pays Paystack's fee, out of its donation. Later we offer the donor the choice to cover the processing fee. `gatewayChargePaidBy` is now `"charity"`, so split payments can start (Paystack bearer = the charity's subaccount).
+
+- **Open, not built:** the donor-covers option. It needs Paystack's rate sheet (percentage, fixed amount, whether it includes VAT) in `src/config/platform.ts`; those stay empty until Yehuda supplies them, and nothing is estimated. Open question for him: when the donor covers it, is the charity to receive the full gift exactly, with the donor paying the extra, and should the receipt show the gift only?
+- Real payments still need the first Paystack test run and the store rules (see go-live checklist).
+
+## Monthly giving inside the app (14/10/2026)
+
+- The give screen has "Give every month". It uses the same server path as the website's monthly gifts (`startDonation`): the first payment is month one, the card is saved by the payment provider, and the monthly record stays pending until that payment is confirmed. The donor ticks an authorisation that names the exact total (gift plus any contribution), which is recorded as a consent. A contribution to Givezy repeats each month with the gift.
+- Pausing and cancelling stay in Account, as before. The monthly job, retries and emails are unchanged.
+- Yehuda confirmed (14/10/2026): when a donor covers the processing fee, the charity receives the full gift and the donor pays the extra; the s18A receipt shows the gift only. Still not built: it waits for Paystack's rate sheet.
+
+## Giving first: the Give button (15/10/2026)
+
+Yehuda wants giving to be the first thing the app offers. A big round Give button sits in the middle of the tab bar, raised above it, on every tab: the logo's splash (all three shapes) on white inside a blue ring, so each colour shows (Yehuda: the logo, not a heart). It opens "Who would you like to give to?": a search, "Give again" (charities the donor gave to before, most recent first), "Your charities" (saved ones not already shown), then all charities. Choosing one goes straight to the usual give step for that charity, with "Another charity" to go back. The middle tab is a button, not a page; a link to it lands on Discover.
