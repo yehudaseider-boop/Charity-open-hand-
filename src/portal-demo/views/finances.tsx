@@ -5,7 +5,7 @@ import { centsToPlain } from "@/lib/csv";
 import { DEMO_PAYOUT_SCHEDULE, DEMO_TODAY } from "../data/demo-config";
 import { addDays, showDay, showMonth, weekday } from "../data/day";
 import { localDay } from "../data/generate";
-import { dayOf, donorName, financeSummary, inRange, monthsIn, pendingSettlement, RANGE_LABELS } from "../data/selectors";
+import { dayOf, donorName, financeSummary, inRange, monthsIn, pendingSettlement, RANGE_LABELS, reversedAt, visibleToCharity } from "../data/selectors";
 import type { DemoDataset } from "../data/types";
 import { usePortal } from "../store";
 import { DateRangePicker } from "../ui/date-range";
@@ -28,7 +28,7 @@ function Finances({ data }: { data: DemoDataset }) {
   const f = useMemo(() => financeSummary(data, range), [data, range]);
   const pending = useMemo(() => pendingSettlement(data), [data]);
   const payouts = useMemo(() => data.payouts.filter((p) => inRange(p.payoutDate, range)), [data, range]);
-  const refunds = useMemo(() => data.donations.filter((d) => d.status === "refunded" && d.refundedAt && inRange(localDay(d.refundedAt), range)), [data, range]);
+  const refunds = useMemo(() => data.donations.filter((d) => { const at = reversedAt(d); return !!at && inRange(localDay(at), range); }).sort((a, b) => (reversedAt(a)! < reversedAt(b)! ? 1 : -1)), [data, range]);
   const statement = useMemo(
     () =>
       monthsIn(range).map((key) => {
@@ -39,7 +39,7 @@ function Finances({ data }: { data: DemoDataset }) {
       }),
     [data, range],
   );
-  const reconciled = f.paidOutCents + f.inTransitCents + f.awaitingCents === f.grossCents && f.grossCents - f.refundsCents - f.processingFeesCents - f.platformFeesCents === f.netCents;
+  const reconciled = f.paidOutCents + f.inTransitCents + f.awaitingCents === f.grossCents && f.grossCents - f.refundsCents - f.chargebacksCents - f.processingFeesCents - f.platformFeesCents === f.netCents;
 
   // This week's batch (Monday to Sunday) is sent next Monday and arrives that Thursday.
   const daysSinceMonday = (weekday(DEMO_TODAY) + 6) % 7;
@@ -48,8 +48,8 @@ function Finances({ data }: { data: DemoDataset }) {
   const exportReport = () =>
     exportCsv(
       "financial-report",
-      ["Month (by donation date)", "Gross donations (R)", "Refunds (R)", "Processing fees (R)", "Platform fee (R)", "Net (R)", "Paid out (R)", "On its way (R)", "Not paid out yet (R)"],
-      statement.map((m) => [showMonth(m.key), centsToPlain(m.grossCents), centsToPlain(m.refundsCents), centsToPlain(m.processingFeesCents), centsToPlain(m.platformFeesCents), centsToPlain(m.netCents), centsToPlain(m.paidOutCents), centsToPlain(m.inTransitCents), centsToPlain(m.awaitingCents)]),
+      ["Month (by donation date)", "Gross donations (R)", "Refunds (R)", "Chargebacks (R)", "Processing fees (R)", "Platform fee (R)", "Net (R)", "Paid out (R)", "On its way (R)", "Not paid out yet (R)"],
+      statement.map((m) => [showMonth(m.key), centsToPlain(m.grossCents), centsToPlain(m.refundsCents), centsToPlain(m.chargebacksCents), centsToPlain(m.processingFeesCents), centsToPlain(m.platformFeesCents), centsToPlain(m.netCents), centsToPlain(m.paidOutCents), centsToPlain(m.inTransitCents), centsToPlain(m.awaitingCents)]),
     );
   const depositExports = useDepositExports(data, payouts);
 
@@ -88,9 +88,9 @@ function Finances({ data }: { data: DemoDataset }) {
       </Callout>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Gross donations" icon="donations" value={rand(f.grossCents)} note="Paid and later refunded" />
+        <MetricCard label="Gross donations" icon="donations" value={rand(f.grossCents)} note="Paid, including later refunded or charged back" />
         <MetricCard label="Fees" icon="receipt" value={rand(f.processingFeesCents + f.platformFeesCents)} note={`Processing ${rand(f.processingFeesCents)} · Givezy platform fee R0`} />
-        <MetricCard label="Refunds" icon="refresh" value={rand(f.refundsCents)} note={`${count(refunds.length)} refunded in this period`} />
+        <MetricCard label="Refunds and chargebacks" icon="refresh" value={rand(f.refundsCents + f.chargebacksCents)} note={`Refunds ${rand(f.refundsCents)} · chargebacks ${rand(f.chargebacksCents)}`} />
         <MetricCard highlight label="Net donations" icon="wallet" value={rand(f.netCents)} note="What your charity keeps" />
       </div>
 
@@ -115,6 +115,7 @@ function Finances({ data }: { data: DemoDataset }) {
             <tbody>
               <Line label="Gross donations" value={f.grossCents} />
               <Line label="Refunds" value={-f.refundsCents} />
+              <Line label="Chargebacks" value={-f.chargebacksCents} note="Payments the card holder's bank reversed" />
               <Line label="Processing fees (placeholder rate)" value={-f.processingFeesCents} />
               <Line label="Givezy platform fee" value={-f.platformFeesCents} note="Givezy charges no platform fee" />
               <Line label="Net donations" value={f.netCents} total />
@@ -126,9 +127,6 @@ function Finances({ data }: { data: DemoDataset }) {
             <Where tone="info" label="On its way" value={f.inTransitCents} />
             <Where tone="warning" label="Settled or settling, not paid out yet" value={f.awaitingCents} />
           </div>
-          <p className="mt-3 text-xs text-gz-muted">
-            Not in these figures: {rand(f.pendingPaymentsCents)} in payments still pending and {rand(f.failedCents)} in payments that failed (never charged).
-          </p>
         </Card>
 
         <Card className="bg-gz-blue-soft/50">
@@ -141,7 +139,7 @@ function Finances({ data }: { data: DemoDataset }) {
             <Pair k={`Settled this week (${count(pending.settledCount)})`} v={rand(pending.settledCents)} />
             <Pair k={`Paid, not settled yet (${count(pending.notSettledCount)})`} v={rand(pending.notSettledCents)} />
             <Pair k="Fees" v={`− ${rand(pending.feesCents)}`} />
-            <Pair k="Refunds this week" v={`− ${rand(pending.refundsCents)}`} />
+            <Pair k="Refunds and chargebacks this week" v={`− ${rand(pending.refundsCents)}`} />
           </dl>
           <div className="mt-4 rounded-2xl bg-gz-surface p-3 text-xs text-gz-muted">
             <p className="flex items-center gap-1.5 font-semibold text-gz-ink">
@@ -163,7 +161,7 @@ function Finances({ data }: { data: DemoDataset }) {
                 <tr className="text-left text-xs text-gz-muted">
                   <th className="pb-2 font-semibold">Month</th>
                   <th className="pb-2 text-right font-semibold">Gross</th>
-                  <th className="pb-2 text-right font-semibold">Refunds</th>
+                  <th className="pb-2 text-right font-semibold">Reversed</th>
                   <th className="pb-2 text-right font-semibold">Fees</th>
                   <th className="pb-2 text-right font-semibold">Net</th>
                 </tr>
@@ -173,7 +171,7 @@ function Finances({ data }: { data: DemoDataset }) {
                   <tr key={m.key} className="border-t border-gz-hairline/70">
                     <td className="py-2">{showMonth(m.key)}</td>
                     <td className="py-2 text-right">{rand(m.grossCents)}</td>
-                    <td className="py-2 text-right text-gz-muted">{m.refundsCents ? `− ${rand(m.refundsCents)}` : "R0"}</td>
+                    <td className="py-2 text-right text-gz-muted">{m.refundsCents + m.chargebacksCents ? `− ${rand(m.refundsCents + m.chargebacksCents)}` : "R0"}</td>
                     <td className="py-2 text-right text-gz-muted">{m.processingFeesCents ? `− ${rand(m.processingFeesCents)}` : "R0"}</td>
                     <td className="py-2 text-right font-semibold">{rand(m.netCents)}</td>
                   </tr>
@@ -181,7 +179,7 @@ function Finances({ data }: { data: DemoDataset }) {
                 <tr className="border-t-2 border-gz-ink/20 font-semibold">
                   <td className="py-2">Total</td>
                   <td className="py-2 text-right">{rand(f.grossCents)}</td>
-                  <td className="py-2 text-right">{f.refundsCents ? `− ${rand(f.refundsCents)}` : "R0"}</td>
+                  <td className="py-2 text-right">{f.refundsCents + f.chargebacksCents ? `− ${rand(f.refundsCents + f.chargebacksCents)}` : "R0"}</td>
                   <td className="py-2 text-right">{f.processingFeesCents ? `− ${rand(f.processingFeesCents)}` : "R0"}</td>
                   <td className="py-2 text-right text-gz-blue">{rand(f.netCents)}</td>
                 </tr>
@@ -191,7 +189,7 @@ function Finances({ data }: { data: DemoDataset }) {
         </Card>
 
         <Card>
-          <CardHeader title="Refunds" subtitle="By the date of the refund" />
+          <CardHeader title="Refunds and chargebacks" subtitle="By the date the money was taken back" />
           {refunds.length ? (
             <ul className="divide-y divide-gz-hairline">
               {refunds.slice(0, 8).map((d) => (
@@ -199,7 +197,7 @@ function Finances({ data }: { data: DemoDataset }) {
                   <span className="min-w-0">
                     <span className="block truncate font-semibold">{donorName(lookups.donor.get(d.donorId))}</span>
                     <span className="block text-xs text-gz-muted">
-                      Donated {date(d.donatedAt)} · refunded {date(d.refundedAt!)}
+                      Donated {date(d.donatedAt)} · {d.status === "charged_back" ? "charged back" : "refunded"} {date(reversedAt(d)!)}
                     </span>
                   </span>
                   <span className="font-semibold">− {rand(d.amountCents)}</span>
@@ -207,10 +205,10 @@ function Finances({ data }: { data: DemoDataset }) {
               ))}
             </ul>
           ) : (
-            <EmptyState icon="refresh" title="No refunds in this period" />
+            <EmptyState icon="refresh" title="No refunds or chargebacks in this period" />
           )}
           {refunds.length > 8 && <p className="mt-2 text-xs text-gz-muted">And {count(refunds.length - 8)} more in the financial report.</p>}
-          <p className="mt-3 text-xs text-gz-muted">Who can refund, and whether the fee comes back, are open decisions. In the demo only Givezy refunds, and the fee is not returned.</p>
+          <p className="mt-3 text-xs text-gz-muted">A chargeback is started by the card holder&apos;s bank, not by you or Givezy. Who can refund, and whether the fee comes back, are open decisions. In the demo only Givezy refunds, and the fee is not returned.</p>
         </Card>
       </div>
 
@@ -218,7 +216,7 @@ function Finances({ data }: { data: DemoDataset }) {
         <CardHeader title="Exports for your bookkeeper" subtitle={`Plain CSV files that open in Excel or Google Sheets and import into any accounting package. Deposits ${RANGE_LABELS[rangePreset].toLowerCase()}, by the date they reached your bank. Made in your browser from demo data.`} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <ExportTile icon="bank" title="Bank deposits" body="One row per deposit, to tick off against your bank statement" onClick={depositExports.deposits} />
-          <ExportTile icon="table" title="Deposit detail" body="Every donation and refund behind each deposit, adding up to it" onClick={depositExports.detail} />
+          <ExportTile icon="table" title="Deposit detail" body="Every donation, refund and chargeback behind each deposit, adding up to it" onClick={depositExports.detail} />
           <ExportTile icon="flag" title="Deposits by campaign" body="Each deposit split by campaign, for your journal entries" onClick={depositExports.byFund} />
           <ExportTile icon="chart" title="Financial report" body="Monthly gross, refunds, fees and net" onClick={exportReport} />
           <ExportTile
@@ -227,7 +225,7 @@ function Finances({ data }: { data: DemoDataset }) {
             body="Each donation with fee, net, settlement and payout"
             onClick={() => {
               const { header, body } = donationCsvRows(
-                data.donations.filter((d) => inRange(dayOf(d), range)),
+                data.donations.filter((d) => visibleToCharity(d) && inRange(dayOf(d), range)),
                 lookups,
               );
               exportCsv("donations-with-fees", header, body);

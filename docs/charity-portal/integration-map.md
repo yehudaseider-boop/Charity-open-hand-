@@ -1,5 +1,7 @@
 # Charity portal: feature-to-backend map
 
+Status per feature, and the decisions each one waits on: [`feature-audit.md`](feature-audit.md).
+
 What each part of the prototype needs before it can run on real data. "Exists" means the table or code is already in the repository. All reads run as the signed-in charity admin (row-level security); writes to money and receipts stay server-only.
 
 | Screen and feature | Demo source | Real source | Exists? | Work needed |
@@ -16,10 +18,10 @@ What each part of the prototype needs before it can run on real data. "Exists" m
 | **Donors** directory, segments, retention | `donorStats()` | `donors` + `donations` | Yes | SQL view per charity; segments computed in SQL |
 | Anonymous handling | `anonymous` flag | `donations.is_anonymous` | Yes | Wording already agreed: hidden on public pages only |
 | "Say thank you" | toast | email adapter (Resend) | Partly | Template, rate limit, audit log; decision needed |
-| **Campaigns** list, progress, compare | `campaignStats()` | `campaigns` + `donations.campaign_id` | Yes (tables, no screens) | Create, edit and status server actions; RLS insert/update policy for charity admins |
+| **Campaigns** list, progress, compare | `campaignStats()` | `campaigns` + `donations.campaign_id` | Yes (tables, no screens) | Create, edit and status server actions (`campaigns_admin_rw` already lets charity admins write). The donation form has no campaign choice yet, so no real donation carries a campaign. "Paused" is not a database status |
 | Create and edit form | local store | server action with zod validation | No | Slug uniqueness per charity; optional Givezy review step (decision) |
 | Share link | `givezy.example` | public campaign page | No | Public campaign route and live domain |
-| **Monthly giving** summary, trends, table | `recurringSummary()`, `recurringSeries()` | `recurring_donations` + monthly donations | Yes | Add "failed" state to the design; charity sees, never changes |
+| **Monthly giving** summary, trends, table | `recurringSummary()`, `recurringSeries()` | `recurring_donations` + monthly donations | Partly | Charities cannot read `recurring_donations` (select revoked 13/10/2026): needs a `charity_*` function (amount, day, status, dates; never the card authorisation). "Failed" is in the design (15/10/2026); charity sees, never changes |
 | **Analytics** charts | selectors | SQL functions per chart | Partly | Same shapes as the selectors; cache per charity and day |
 | **Finances** gross, fees, refunds, net | `financeSummary()` | `donations` fee columns | Partly | Real gateway rates (`src/config/platform.ts`) and the fee-payer decision |
 | Payout history, next payout, reconciliation | generated weekly payouts | gateway settlements and transfers | No | New tables, filled only through `src/lib/gateway`; reconciliation check job |

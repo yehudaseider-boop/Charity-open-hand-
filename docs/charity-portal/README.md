@@ -107,8 +107,8 @@ Placeholders, clearly labelled on screen and in `demo-config.ts`: a 3% processin
 **Works in the browser:** navigation, charity switcher, date ranges (presets and custom, with errors for bad dates), search, filters, sorting, pages, chart tooltips and table views, donation, donor, monthly-donation and payout drawers, campaign create, edit, publish, pause, resume, end, reopen, copy link, team invite, role change, remove, settings forms with validation, logo upload and preview, CSV exports (real files, made in the browser), the processing-fee switch, reset.
 
 **Added 14/10/2026:**
-- **s18A receipts:** one receipt per donor per SARS tax year (tax year 2026 is closed, so its receipts show as issued with numbers; tax year 2027 shows "after year end"). Amounts are the donation only. A receipt cannot be issued while the donor's details are incomplete. Refunded, failed and pending donations never count. The receipt preview uses the repository's draft wording and shows only the last 4 digits of ID or tax numbers (hidden in the demo). Not approved charities (Sunrise Table) see an explanation instead.
-- **Needs attention:** failed monthly payments, donors missing s18A details, campaigns behind pace or ending soon, large donations and first-time donors waiting for a thank-you. Every row opens the screen that fixes it. Each figure is computed from the same dataset (tested).
+- **s18A receipts:** one receipt per donor per SARS tax year (tax year 2026 is closed, so its receipts show as issued with numbers; tax year 2027 shows "after year end"). Amounts are the donation only. The checkout already refuses an s18A request without an ID or tax number, so every receipt request has its details. Refunded and charged-back donations never count. The receipt preview uses the repository's draft wording and shows only the last 4 digits of ID or tax numbers (hidden in the demo). Not approved charities (Sunrise Table) see an explanation instead.
+- **Needs attention:** monthly donations stopped after failed payments, campaigns behind pace or ending soon, large donations and first-time donors waiting for a thank-you. Every row opens the screen that fixes it. Each figure is computed from the same dataset (tested).
 - **Follow up (Donors):** welcome new donors, thank large donors, check in with donors giving less often, win back inactive donors (the last two from 15/10/2026). Drafts are written in the charity's voice, editable, and open in the charity's own email app. Givezy sends nothing. "Done" is remembered in the browser. Win-back lists only donors who agreed to hear about appeals (a demo trait, see open decisions).
 - **Campaign pace:** an Ahead, On track or Behind badge and the amount needed each day, on the campaign page.
 - The "large donation" amount follows the setting under Settings, Notifications (R5 000 until changed).
@@ -128,6 +128,12 @@ Givelify's Analytics Studio is the functional reference for this portal, as the 
 | Import-ready exports: donations with fees by campaign, bank deposits, CSV or Excel. | Plain CSV, as agreed: **Bank deposits**, **Deposit detail** (every donation and refund line), **Deposits by campaign** (journal-ready), plus the existing financial report and donations with fees. Each file adds up to the deposits it covers. |
 | Donor engagement around those groups. | **Check in: giving less** (Decreasing donors) and **Win back inactive donors** in Follow up, and a "giving less often" row in Needs attention. |
 
+## Feature audit (15/10/2026)
+
+Every feature checked against the real database, checkout and decisions, clicked through for all three charities, and tested: [`feature-audit.md`](feature-audit.md). It lists what was fixed, how each feature will really work, its status (ready, needs building, needs a decision) and the decisions it needs.
+
+What a charity sees now matches the platform: paid, refunded and charged-back donations only (no pending or failed payments), monthly donations stopped after failed payments, the donor's message, no app-or-website or card digits (not recorded), and fees off by default (decided 09/10/2026).
+
 ## Feature-to-backend map
 
 Summary below; the table per screen is in [`integration-map.md`](integration-map.md).
@@ -145,7 +151,7 @@ These need Yehuda (and some Yosef) before the real build. They are also in `docs
 3. **Payout schedule and settlement data:** what the payment provider actually reports and how often it pays out.
 4. **Refunds:** who can refund (charity or Givezy only), and whether the fee comes back.
 5. **Campaign review:** does a new campaign go live straight away or after a Givezy check?
-6. **Failed monthly donations:** the real flow has a "failed" end state after three declines; the demo shows only active, paused and cancelled. Add the fourth state to the design?
+6. **Failed monthly donations: built into the design 15/10/2026.** A monthly donation stopped after three declines shows as "Stopped: payment failed". Failed attempts themselves stay hidden. Charities cannot read monthly donations today (select revoked 13/10/2026), so the real portal needs a charity read function: approve it?
 7. **Portal and existing `/charity-admin`:** replace the current charity screens with this design, or run both for a while?
 8. **Name:** the portal uses the Givezy brand; the website, emails and receipts still say Nadiv Lev until their rename pass.
 9. **Dark mode:** not designed. Wanted?
@@ -157,3 +163,6 @@ These need Yehuda (and some Yosef) before the real build. They are also in `docs
 15. **Giving-group rules: decided 15/10/2026, keep for now.** New for 28 days, 30-day windows, 6 each side, Consistent at 5 of 6. Revisit once real donations show the patterns. Change them in `demo-config.ts`.
 16. **Statement reference: decided 15/10/2026, placeholder.** The demo keeps `GIVEZY PO-yyyymmdd`; the real wording is checked in the payment provider's test mode (on the go-live checklist).
 17. **"Mark all as matched": decided 15/10/2026, keep it**, behind a confirmation that shows how many deposits, their total and their dates, and asks "Have you checked them?".
+18. **Campaign giving:** donors cannot choose a campaign today and there is no public campaign page, so campaign totals stay at zero on real data. Build both before the Campaigns screens go live?
+19. **Paused campaigns:** the database has draft, active and ended only. Keep pausing (a database change) or drop it from the design?
+20. **Bank deposits on real data:** confirm in the payment provider's test mode that settlement records per charity subaccount are available. If not, Finances shows donations, refunds and chargebacks only.

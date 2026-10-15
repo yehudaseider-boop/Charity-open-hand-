@@ -43,6 +43,25 @@ export function feeFor(amountCents: number, ppm: number): number {
 const FIRST = ["Thandi", "Sipho", "Lerato", "Johan", "Anika", "David", "Rachel", "Naledi", "Pieter", "Zanele", "Mohammed", "Aisha", "Priya", "Ravi", "Sarah", "Michael", "Leah", "Daniel", "Nomsa", "Kagiso", "Bongani", "Lindiwe", "Chantelle", "Ruan", "Fatima", "Yusuf", "Esther", "Ari", "Talia", "Noah", "Megan", "Grant", "Kerry", "Tshepo", "Mpho", "Ayanda", "Zoe", "Ethan", "Hannah", "Liam", "Refilwe", "Shira", "Jacques", "Nadia", "Kabelo", "Tamar", "Gareth", "Precious", "Imran", "Elize"];
 const LAST = ["Mokoena", "Naidoo", "van der Merwe", "Botha", "Cohen", "Levy", "Dlamini", "Nkosi", "Pillay", "Govender", "Smith", "Jacobs", "Adams", "Khumalo", "Mahlangu", "Steyn", "Pretorius", "Abrahams", "Friedman", "Sacks", "Patel", "Moodley", "Ndlovu", "Venter", "du Plessis", "Meyer", "Hendricks", "Sithole", "Molefe", "Goldberg", "Kruger", "Joseph", "Maseko", "Isaacs", "Chetty", "Fourie", "Shapiro", "Zulu", "Williams", "Bester"];
 const COMPANIES = ["Bluegum Joinery", "Marula Accounting", "Sandvlei Pharmacy", "Protea Print Works", "Highveld Office Supplies", "Karoo Kitchen Co", "Baobab Freight", "Fynbos Design Studio", "Jacaranda Dental", "Umoya Engineering"];
+/** 0 to 999, stable per id: used where the demo needs a trait without disturbing the random sequence. */
+function hashPercent(id: string, salt: string): number {
+  let h = 2166136261;
+  for (const c of `${salt}:${id}`) {
+    h ^= c.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 1000;
+}
+
+const MESSAGES = [
+  "In memory of my father.",
+  "Keep up the wonderful work.",
+  "For whatever is needed most.",
+  "In honour of my mother's birthday.",
+  "Thank you for what you do for the community.",
+  "A small thank you from our family.",
+];
+
 const FAILURES = ["Card declined by the bank", "Insufficient funds", "Card expired", "Authentication not completed"];
 
 /** A moment on a Johannesburg calendar day, as a UTC ISO string (Johannesburg is UTC+2, no daylight saving). */
@@ -124,7 +143,7 @@ export function generateDataset(charityId: string, feeModel: FeeModel = "charity
     let status: Donation["status"] = "paid";
     const roll = r();
     if (ageDays <= 1 && roll < 0.1) status = "pending";
-    else if (roll < (kind === "monthly" ? 0.05 : 0.03)) status = "failed";
+    else if (roll < (kind === "monthly" ? 0.012 : 0.03)) status = "failed";
     else if (roll > 0.985 && ageDays > 3) status = "refunded";
 
     let refundedAt: string | null = null;
@@ -133,10 +152,20 @@ export function generateDataset(charityId: string, feeModel: FeeModel = "charity
       if (refundDay <= DEMO_TODAY) refundedAt = at(refundDay, r);
       else status = "paid";
     }
-    const settles = status === "paid" || status === "refunded";
+    const id = `${cid}-x${seq + 1}`;
+    // A few older paid donations are reversed by the card holder's bank (a chargeback).
+    let chargedBackAt: string | null = null;
+    if (status === "paid" && ageDays > 20 && hashPercent(id, "chargeback") < 4) {
+      const cbDay = addDays(day, 15 + (hashPercent(id, "cb-day") % 30));
+      if (cbDay <= DEMO_TODAY) {
+        status = "charged_back";
+        chargedBackAt = `${cbDay}T10:00:00.000Z`;
+      }
+    }
+    const settles = status === "paid" || status === "refunded" || status === "charged_back";
     const settleDay = settles ? settlementDay(day) : null;
     return {
-      id: `${cid}-x${seq + 1}`,
+      id,
       ref: ref(),
       charityId: cid,
       donorId: donor.id,
@@ -151,6 +180,8 @@ export function generateDataset(charityId: string, feeModel: FeeModel = "charity
       settledAt: settleDay && settleDay <= DEMO_TODAY ? `${settleDay}T08:00:00.000Z` : null,
       payoutId: null,
       refundedAt,
+      chargedBackAt,
+      message: status !== "pending" && status !== "failed" && hashPercent(id, "message") < 60 ? MESSAGES[hashPercent(id, "message-text") % MESSAGES.length] : null,
       wants18a: spec.charity.s18a && r() < 0.55,
       anonymous: donor.prefersAnonymous,
       channel: r() < 0.62 ? "app" : "website",
@@ -203,11 +234,18 @@ export function generateDataset(charityId: string, feeModel: FeeModel = "charity
       }
     }
     const dayOfMonth = Number(startDay.slice(8, 10)) > 28 ? 28 : Number(startDay.slice(8, 10));
-    const plan: RecurringPlan = { id: `${cid}-r${p + 1}`, charityId: cid, donorId: donor.id, campaignId, amountCents, dayOfMonth, startedAt: at(startDay, r), status, cancelledAt, pausedAt };
+    const plan: RecurringPlan = { id: `${cid}-r${p + 1}`, charityId: cid, donorId: donor.id, campaignId, amountCents, dayOfMonth, startedAt: at(startDay, r), status, cancelledAt, pausedAt, failedAt: null };
     recurring.push(plan);
     let chargeDay = startDay;
     while (chargeDay <= lastDay) {
-      donations.push(makeDonation(donor, chargeDay, amountCents, "monthly", campaignId, plan.id));
+      const charge = makeDonation(donor, chargeDay, amountCents, "monthly", campaignId, plan.id);
+      donations.push(charge);
+      // A failed month stands for the platform's three attempts (that day, the next day, three days
+      // later). After the third the monthly donation stops: status "failed".
+      if (charge.status === "failed" && daysBetween(chargeDay, DEMO_TODAY) >= 4) {
+        Object.assign(plan, { status: "failed", failedAt: `${addDays(chargeDay, 4)}T08:00:00.000Z`, cancelledAt: null, pausedAt: null });
+        break;
+      }
       const [y, m] = chargeDay.split("-").map(Number);
       const ny = m === 12 ? y + 1 : y;
       const nm = m === 12 ? 1 : m + 1;
@@ -283,8 +321,9 @@ function buildPayouts(cid: string, donations: Donation[]): Payout[] {
       p.feesCents += d.processingFeeCents + d.platformFeeCents;
       p.donationCount++;
     }
-    if (d.status === "refunded" && d.refundedAt) {
-      const rp = weekFor(mondayOf(localDay(d.refundedAt)));
+    const reversedAt = d.status === "refunded" ? d.refundedAt : d.status === "charged_back" ? d.chargedBackAt : null;
+    if (reversedAt) {
+      const rp = weekFor(mondayOf(localDay(reversedAt)));
       if (rp) rp.refundsCents += d.amountCents;
     }
   }

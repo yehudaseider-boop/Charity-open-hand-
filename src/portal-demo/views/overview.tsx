@@ -20,6 +20,7 @@ import {
   recurringSummary,
   sameDaysLastMonth,
   summarise,
+  visibleToCharity,
 } from "../data/selectors";
 import type { DemoDataset, Donation } from "../data/types";
 import { usePortal } from "../store";
@@ -55,7 +56,7 @@ function Overview({ data }: { data: DemoDataset }) {
   }, [data, range]);
 
   const campaigns = useMemo(() => campaignStats(data).filter((c) => c.status === "active").sort((a, b) => b.raisedCents - a.raisedCents), [data]);
-  const recent = data.donations.slice(0, 7);
+  const recent = data.donations.filter(visibleToCharity).slice(0, 7);
   const owner = data.team.find((t) => t.role === "owner");
   const labels = m.series.map((p) => showMonth(p.key, m.series.length > 6));
 
@@ -167,7 +168,7 @@ function Overview({ data }: { data: DemoDataset }) {
               icon="download"
               label="Export donations"
               onClick={() => {
-                const rows = data.donations.filter((d) => inRange(dayOf(d), range));
+                const rows = data.donations.filter((d) => visibleToCharity(d) && inRange(dayOf(d), range));
                 const { header, body } = donationCsvRows(rows, lookups);
                 exportCsv("donations", header, body);
               }}
@@ -185,8 +186,8 @@ function Overview({ data }: { data: DemoDataset }) {
             <QuickAction href={`${BASE}/settings?tab=team`} icon="users" label="Invite a team member" />
           </div>
           <div className="mt-4 rounded-2xl bg-gz-cream p-3.5 text-sm">
-            <p className="font-semibold">{count(m.now.failedCount)} failed and {count(m.now.pendingCount)} pending payments</p>
-            <p className="mt-0.5 text-gz-muted">Not counted in your totals. <Link href={`${BASE}/donations?status=failed`} className="inline-flex min-h-10 items-center font-semibold text-gz-blue">Review</Link></p>
+            <p className="font-semibold">{rand(m.now.reversedCents)} refunded or charged back</p>
+            <p className="mt-0.5 text-gz-muted">Donations made in this period and later reversed. Not counted in your totals. <Link href={`${BASE}/donations?status=reversed`} className="inline-flex min-h-10 items-center font-semibold text-gz-blue">See them</Link></p>
           </div>
         </Card>
       </div>

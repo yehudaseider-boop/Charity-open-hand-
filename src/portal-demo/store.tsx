@@ -70,7 +70,7 @@ export type Toast = { id: number; tone: "success" | "error" | "info"; title: str
 
 type Persisted = { charityId: string; feeModel: FeeModel; overrides: Record<string, CharityOverrides> };
 
-const STORAGE_KEY = "givezy-portal-demo.v1";
+const STORAGE_KEY = "givezy-portal-demo.v2";
 
 function readPersisted(): Partial<Persisted> {
   try {
@@ -140,7 +140,7 @@ export function useData(): DemoDataset {
 
 export function PortalProvider({ children }: { children: React.ReactNode }) {
   const [charityId, setCharityId] = useState(DEMO_CHARITIES[1].id);
-  const [feeModel, setFeeModelState] = useState<FeeModel>("charity");
+  const [feeModel, setFeeModelState] = useState<FeeModel>("not_charity");
   const [allOverrides, setAllOverrides] = useState<Record<string, CharityOverrides>>({});
   const [raw, setRaw] = useState<DemoDataset | null>(null);
   const [loading, setLoading] = useState(true);
@@ -254,7 +254,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       largeDonationCents: parseRandToCents(overrides.notifications?.largeDonationRand ?? DEFAULT_NOTIFICATIONS.largeDonationRand) ?? DEFAULT_LARGE_DONATION_CENTS,
       resetDemo: () => {
         setAllOverrides({});
-        setFeeModelState("charity");
+        setFeeModelState("not_charity");
         setRangeState({ preset: "12m", range: presetRange("12m") });
       },
       toast,

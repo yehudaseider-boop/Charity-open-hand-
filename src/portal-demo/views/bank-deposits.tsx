@@ -2,7 +2,7 @@
 
 /**
  * Bank deposits: the bookkeeper's reconciliation view. One row per payment into the charity's bank
- * account, ticked off as it is found on the bank statement, with every donation and refund behind it.
+ * account, ticked off as it is found on the bank statement, with every donation, refund and chargeback behind it.
  * Exports are plain CSV for any accounting package.
  */
 import { useMemo, useState } from "react";
@@ -34,25 +34,25 @@ export function useDepositExports(data: DemoDataset, payouts: Payout[]) {
     deposits: () =>
       exportCsv(
         "bank-deposits",
-        ["Date in bank", "Statement reference", "Payout", "Settlements from", "Settlements to", "Sent", "Donations", "Gross (R)", "Fees (R)", "Refunds (R)", "Net deposit (R)", "Status", "Matched on statement"],
+        ["Date in bank", "Statement reference", "Payout", "Settlements from", "Settlements to", "Sent", "Donations", "Gross (R)", "Fees (R)", "Refunds and chargebacks (R)", "Net deposit (R)", "Status", "Matched on statement"],
         payouts.map((p) => [showDay(p.payoutDate), statementRef(p), p.ref, showDay(p.periodStart), showDay(p.periodEnd), showDay(p.sentDate), p.donationCount, centsToPlain(p.grossCents), centsToPlain(p.feesCents), centsToPlain(p.refundsCents), centsToPlain(p.netCents), p.status === "paid" ? "In bank" : "On its way", yesNo(!!matched[p.id])]),
       ),
     detail: () =>
       exportCsv(
         "bank-deposit-detail",
-        ["Date in bank", "Statement reference", "Line", "Date", "Donation reference", "Donor", "Donor email", "Campaign (fund)", "Type", "Gross (R)", "Fee (R)", "Refund (R)", "Net (R)"],
+        ["Date in bank", "Statement reference", "Line", "Date", "Donation reference", "Donor", "Donor email", "Campaign (fund)", "Type", "Gross (R)", "Fee (R)", "Refund or chargeback (R)", "Net (R)"],
         payouts.flatMap((p) =>
           depositLines(data, p).map((l) => {
             const donor = lookups.donor.get(l.donorId);
             const ref = data.donations.find((d) => d.id === l.donationId)?.ref ?? "";
-            return [showDay(p.payoutDate), statementRef(p), l.kind === "donation" ? "Donation" : "Refund", showDay(l.day), ref, donorName(donor), donor?.email ?? "", campaignName(l.campaignId, lookups.campaign), l.donationKind === "monthly" ? "Monthly" : "Once-off", centsToPlain(l.grossCents), centsToPlain(l.feeCents), centsToPlain(l.refundCents), centsToPlain(l.netCents)];
+            return [showDay(p.payoutDate), statementRef(p), l.kind === "donation" ? "Donation" : l.kind === "chargeback" ? "Chargeback" : "Refund", showDay(l.day), ref, donorName(donor), donor?.email ?? "", campaignName(l.campaignId, lookups.campaign), l.donationKind === "monthly" ? "Monthly" : "Once-off", centsToPlain(l.grossCents), centsToPlain(l.feeCents), centsToPlain(l.refundCents), centsToPlain(l.netCents)];
           }),
         ),
       ),
     byFund: () =>
       exportCsv(
         "bank-deposits-by-campaign",
-        ["Date in bank", "Statement reference", "Campaign (fund)", "Donations", "Gross (R)", "Fees (R)", "Refunds (R)", "Net (R)"],
+        ["Date in bank", "Statement reference", "Campaign (fund)", "Donations", "Gross (R)", "Fees (R)", "Refunds and chargebacks (R)", "Net (R)"],
         payouts.flatMap((p) => depositByFund(depositLines(data, p)).map((f) => [showDay(p.payoutDate), statementRef(p), campaignName(f.campaignId, lookups.campaign), f.count, centsToPlain(f.grossCents), centsToPlain(f.feeCents), centsToPlain(f.refundCents), centsToPlain(f.netCents)])),
       ),
   };
@@ -156,7 +156,7 @@ export function BankDepositsCard({ data, payouts, periodLabel }: { data: DemoDat
           { key: "period", header: "Settlements", cell: (p) => `${showDay(p.periodStart).slice(0, 5)} to ${showDay(p.periodEnd)}`, wide: true },
           { key: "count", header: "Donations", align: "right", sort: (p) => p.donationCount, cell: (p) => count(p.donationCount), wide: true },
           { key: "gross", header: "Gross", align: "right", sort: (p) => p.grossCents, cell: (p) => rand(p.grossCents), wide: true },
-          { key: "less", header: "Fees and refunds", align: "right", cell: (p) => <span className="text-gz-muted">− {rand(p.feesCents + p.refundsCents)}</span>, wide: true },
+          { key: "less", header: "Fees and reversals", align: "right", cell: (p) => <span className="text-gz-muted">− {rand(p.feesCents + p.refundsCents)}</span>, wide: true },
           { key: "net", header: "Deposit", align: "right", sort: (p) => p.netCents, cell: (p) => <span className="font-semibold text-gz-blue">{rand(p.netCents)}</span> },
           {
             key: "match",
@@ -198,7 +198,7 @@ function DepositDrawer({ payout, data, matchedOn, onToggle, onClose }: { payout:
   const lines = useMemo(() => depositLines(data, payout), [data, payout]);
   const funds = useMemo(() => depositByFund(lines), [lines]);
   const donations = lines.filter((l) => l.kind === "donation");
-  const refunds = lines.filter((l) => l.kind === "refund");
+  const refunds = lines.filter((l) => l.kind !== "donation");
   const exports = useDepositExports(data, [payout]);
   return (
     <Drawer
@@ -241,7 +241,7 @@ function DepositDrawer({ payout, data, matchedOn, onToggle, onClose }: { payout:
             items={[
               [`${count(payout.donationCount)} donations (gross)`, rand(payout.grossCents)],
               ["Fees", `− ${rand(payout.feesCents)}`],
-              [`Refunds made that week (${refunds.length})`, `− ${rand(payout.refundsCents)}`],
+              [`Refunds and chargebacks that week (${refunds.length})`, `− ${rand(payout.refundsCents)}`],
               ["Paid into your bank", <span key="n" className="text-gz-blue">{rand(payout.netCents)}</span>],
             ]}
           />
@@ -278,8 +278,8 @@ function DepositDrawer({ payout, data, matchedOn, onToggle, onClose }: { payout:
           </table>
         </div>
         {refunds.length > 0 && (
-          <Callout tone="neutral" title={`${refunds.length === 1 ? "A refund was" : `${refunds.length} refunds were`} taken off this deposit`}>
-            {refunds.map((l) => `${donorName(lookups.donor.get(l.donorId))}, ${rand(l.refundCents)} on ${showDay(l.day)}`).join("; ")}.
+          <Callout tone="neutral" title={`${refunds.length === 1 ? "A reversal was" : `${refunds.length} reversals were`} taken off this deposit`}>
+            {refunds.map((l) => `${l.kind === "chargeback" ? "Chargeback" : "Refund"}: ${donorName(lookups.donor.get(l.donorId))}, ${rand(l.refundCents)} on ${showDay(l.day)}`).join("; ")}.
           </Callout>
         )}
         <div>

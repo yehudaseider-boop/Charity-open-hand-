@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { receiptConfig } from "@/config/receipts";
-import { taxYearLabel, taxYearRange } from "@/lib/dates";
+import { taxYearFor, taxYearLabel, taxYearRange } from "@/lib/dates";
 import { centsToPlain } from "@/lib/csv";
 import { showDay } from "../data/day";
 import { currentTaxYear, donorName, s18aReceipts, s18aSummary, type S18aReceipt, type S18aStatus } from "../data/selectors";
@@ -13,8 +13,8 @@ import { count, date, permille, rand, randWhole } from "../ui/format";
 import { SearchInput } from "../ui/form";
 import { Icon } from "../ui/icons";
 import { MetricCard } from "../ui/metric";
-import { Drawer, Modal } from "../ui/overlay";
-import { Avatar, Badge, Button, ButtonLink, Callout, Card, CardHeader, cx, DetailList, EmptyState, PageHeader, Progress, Segmented } from "../ui/primitives";
+import { Drawer } from "../ui/overlay";
+import { Avatar, Badge, Button, ButtonLink, Callout, Card, cx, DetailList, EmptyState, PageHeader, Progress, Segmented } from "../ui/primitives";
 import { BASE } from "../ui/shell";
 import { DataTable } from "../ui/table";
 import { campaignName, Loaded, useExport, useLookups } from "./common";
@@ -26,7 +26,6 @@ export function ReceiptsView() {
 const STATUS: Record<S18aStatus, { label: string; tone: "success" | "info" | "warning"; icon?: "clock" | "alert" }> = {
   issued: { label: "Issued", tone: "success" },
   after_year_end: { label: "After year end", tone: "info", icon: "clock" },
-  needs_details: { label: "Needs details", tone: "warning", icon: "alert" },
 };
 
 export function ReceiptStatusBadge({ status }: { status: S18aStatus }) {
@@ -59,7 +58,6 @@ function NotApproved({ data }: { data: DemoDataset }) {
 }
 
 function Receipts({ data }: { data: DemoDataset }) {
-  const { toast } = usePortal();
   const lookups = useLookups(data);
   const exportCsv = useExport();
   const thisYear = currentTaxYear();
@@ -67,7 +65,6 @@ function Receipts({ data }: { data: DemoDataset }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | S18aStatus>("all");
   const [open, setOpen] = useState<S18aReceipt | null>(null);
-  const [asking, setAsking] = useState<string | null>(null);
 
   const summary = useMemo(() => s18aSummary(data, taxYear), [data, taxYear]);
   const receipts = useMemo(() => s18aReceipts(data, taxYear), [data, taxYear]);
@@ -79,7 +76,11 @@ function Receipts({ data }: { data: DemoDataset }) {
       return !needle || `${donorName(donor)} ${donor?.email ?? ""} ${r.number ?? ""}`.toLowerCase().includes(needle);
     });
   }, [receipts, q, status, lookups]);
-  const needDetails = receipts.filter((r) => r.status === "needs_details");
+  const share = useMemo(() => {
+    const paid = data.donations.filter((d) => d.status === "paid" && taxYearFor(d.donatedAt) === taxYear);
+    const asked = paid.filter((d) => d.wants18a).length;
+    return paid.length ? Math.round((asked * 1000) / paid.length) : 0;
+  }, [data, taxYear]);
 
   return (
     <div className="gz-fade-in space-y-6">
@@ -124,7 +125,7 @@ function Receipts({ data }: { data: DemoDataset }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard highlight label="Asked for a receipt" icon="receipt" value={randWhole(summary.totalCents)} note={`${count(summary.donationCount)} donations from ${count(summary.donors)} donors`} />
         <MetricCard label={summary.closed ? "Receipts issued" : "Issued after year end"} icon="check" value={count(summary.closed ? summary.issued : summary.afterYearEnd)} note={summary.closed ? "Ready for donors to download" : `On or after ${showDay(summary.end)}`} />
-        <MetricCard label="Missing donor details" icon="alert" value={count(summary.needsDetails)} note="A receipt cannot be issued without them" />
+        <MetricCard label="Donations asking for a receipt" icon="users" value={permille(share)} note="Of paid donations this tax year. The donor gives their ID or tax number at checkout." />
         <MetricCard label={summary.closed ? "Year closed" : "Days to year end"} icon="calendar" value={summary.closed ? showDay(summary.end) : count(summary.daysToYearEnd)} note={taxYearLabel(summary.taxYear)} />
       </div>
 
@@ -141,35 +142,11 @@ function Receipts({ data }: { data: DemoDataset }) {
         </Card>
       )}
 
-      {needDetails.length > 0 && (
-        <Card>
-          <CardHeader title={`${count(needDetails.length)} ${needDetails.length === 1 ? "donor needs" : "donors need"} to complete their details`} subtitle="They asked for a receipt but their name, address or ID or tax number is incomplete." />
-          <ul className="divide-y divide-gz-hairline">
-            {needDetails.slice(0, 5).map((r) => {
-              const donor = lookups.donor.get(r.donorId);
-              return (
-                <li key={r.donorId} className="flex flex-wrap items-center gap-3 py-2.5">
-                  <Avatar name={donorName(donor)} size={32} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{donorName(donor)}</span>
-                    <span className="block text-xs text-gz-muted">{donor?.email} · {rand(r.totalCents)} waiting</span>
-                  </span>
-                  <Button size="sm" variant="soft" icon="mail" onClick={() => setAsking(r.donorId)}>
-                    Draft a request
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-          {needDetails.length > 5 && <p className="mt-2 text-xs text-gz-muted">And {count(needDetails.length - 5)} more. Filter the list below by Needs details.</p>}
-        </Card>
-      )}
-
       <Card>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <SearchInput value={q} onChange={setQ} placeholder="Search donor, email or receipt number" label="Search receipts" />
           <div className="flex gap-1 overflow-x-auto" role="radiogroup" aria-label="Receipt status">
-            {(["all", "issued", "after_year_end", "needs_details"] as const).map((s) => (
+            {(["all", "issued", "after_year_end"] as const).map((s) => (
               <button key={s} type="button" role="radio" aria-checked={status === s} onClick={() => setStatus(s)} className={cx("min-h-9 shrink-0 rounded-full border px-3.5 text-sm font-semibold", status === s ? "border-gz-blue bg-gz-blue text-white" : "border-gz-hairline bg-gz-surface text-gz-ink hover:border-gz-blue/40")}>
                 {s === "all" ? "All" : STATUS[s].label}
               </button>
@@ -209,7 +186,6 @@ function Receipts({ data }: { data: DemoDataset }) {
       </Card>
 
       {open && <ReceiptDrawer receipt={open} data={data} onClose={() => setOpen(null)} />}
-      <RequestDetailsModal donorId={asking} data={data} onClose={() => setAsking(null)} onCopied={() => toast({ tone: "success", title: "Message copied", body: "Send it from your own email. Nothing was sent." })} />
     </div>
   );
 }
@@ -251,7 +227,6 @@ function ReceiptDrawer({ receipt, data, onClose }: { receipt: S18aReceipt; data:
       }
     >
       <div className="space-y-5">
-        {receipt.status === "needs_details" && <Callout tone="warning" title="Cannot be issued yet">The donor&apos;s details are incomplete. Ask them to complete them and the receipt is issued with the others.</Callout>}
         {receipt.status === "after_year_end" && <Callout tone="info" title="Issued after the tax year closes">This year ends on {showDay(range.end)}. The total can still grow until then.</Callout>}
         <div className="rounded-[22px] border border-gz-hairline bg-gz-surface p-5 shadow-gz">
           <div className="flex items-start justify-between gap-3">
@@ -293,49 +268,3 @@ function ReceiptDrawer({ receipt, data, onClose }: { receipt: S18aReceipt; data:
     </Drawer>
   );
 }
-
-function RequestDetailsModal({ donorId, data, onClose, onCopied }: { donorId: string | null; data: DemoDataset; onClose: () => void; onCopied: () => void }) {
-  const donor = data.donors.find((d) => d.id === donorId);
-  const sender = data.team.find((m) => m.role === "owner")?.name ?? data.charity.shortName;
-  const body = donor
-    ? `Dear ${donor.firstName},\n\nThank you for asking for an s18A receipt for your donations to ${data.charity.name}. Before we can issue it, SARS requires your full name, your address and your ID or tax number.\n\nPlease reply with the missing details, or update them the next time you give. We keep them private and print only the last 4 digits of your number on the receipt.\n\nWith thanks,\n${sender}\n${data.charity.name}`
-    : "";
-  const subject = `Your s18A receipt from ${data.charity.shortName}`;
-  return (
-    <Modal
-      open={!!donor}
-      onClose={onClose}
-      title="Request missing details"
-      description="A draft for you to send from your own email. Givezy sends nothing."
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
-          <Button
-            variant="secondary"
-            icon="copy"
-            onClick={() => {
-              navigator.clipboard?.writeText(body).catch(() => undefined);
-              onCopied();
-            }}
-          >
-            Copy message
-          </Button>
-          {donor && (
-            <a href={`mailto:${donor.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-gz-blue px-5 text-[15px] font-semibold text-white hover:bg-gz-blue-hover">
-              <Icon name="mail" size={18} /> Open in email
-            </a>
-          )}
-        </>
-      }
-    >
-      {donor && (
-        <div className="space-y-3 text-sm">
-          <p><span className="text-gz-muted">To:</span> {donor.email}</p>
-          <p><span className="text-gz-muted">Subject:</span> {subject}</p>
-          <pre className="whitespace-pre-wrap rounded-2xl border border-gz-hairline bg-gz-cream p-4 font-sans text-[14px] leading-relaxed">{body}</pre>
-        </div>
-      )}
-    </Modal>
-  );
-}
-

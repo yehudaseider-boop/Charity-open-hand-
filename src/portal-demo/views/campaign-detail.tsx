@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { DEMO_TODAY } from "../data/demo-config";
 import { daysBetween, showDay } from "../data/day";
-import { campaignCumulative, campaignPace, campaignStats, donorName, type PaceState } from "../data/selectors";
+import { campaignCumulative, campaignPace, campaignStats, donorName, visibleToCharity, type PaceState } from "../data/selectors";
 import type { DemoDataset, Donation } from "../data/types";
 import { usePortal } from "../store";
 import { LineChart } from "../ui/charts";
@@ -39,7 +39,7 @@ function CampaignDetail({ data, id }: { data: DemoDataset; id: string }) {
   const campaign = data.campaigns.find((c) => c.id === id);
   const stats = useMemo(() => (campaign ? campaignStats(data, [campaign])[0] : null), [data, campaign]);
   const cumulative = useMemo(() => (campaign ? campaignCumulative(data, campaign) : []), [data, campaign]);
-  const donations = useMemo(() => data.donations.filter((d) => d.campaignId === id), [data, id]);
+  const donations = useMemo(() => data.donations.filter((d) => d.campaignId === id && visibleToCharity(d)), [data, id]);
 
   if (!campaign || !stats) {
     return (
@@ -51,7 +51,6 @@ function CampaignDetail({ data, id }: { data: DemoDataset; id: string }) {
 
   const paid = donations.filter((d) => d.status === "paid");
   const topDonors = [...paid.reduce((m, d) => m.set(d.donorId, (m.get(d.donorId) ?? 0) + d.amountCents), new Map<string, number>())].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const appShare = paid.length ? Math.round((paid.filter((d) => d.channel === "app").length * 1000) / paid.length) : 0;
   const daysLeft = campaign.endDate && campaign.status !== "ended" ? daysBetween(DEMO_TODAY, campaign.endDate) : null;
   const link = campaignLink(data.charity.publicSlug, campaign.slug);
   const pace = campaignPace(stats);
@@ -119,7 +118,11 @@ function CampaignDetail({ data, id }: { data: DemoDataset; id: string }) {
         <MetricCard label="Donors" icon="users" value={count(stats.donorCount)} />
         <MetricCard label="Donations" icon="donations" value={count(stats.donationCount)} />
         <MetricCard label="Average donation" icon="chart" value={rand(stats.averageCents)} />
-        <MetricCard label={daysLeft !== null && daysLeft >= 0 ? "Days left" : "Given in the app"} icon={daysLeft !== null && daysLeft >= 0 ? "clock" : "spark"} value={daysLeft !== null && daysLeft >= 0 ? count(daysLeft) : permille(appShare)} note={daysLeft !== null && daysLeft >= 0 ? `${permille(appShare)} given in the app` : "The rest on the website"} />
+        {daysLeft !== null && daysLeft >= 0 ? (
+          <MetricCard label="Days left" icon="clock" value={count(daysLeft)} note={`Ends ${showDay(campaign.endDate!)}`} />
+        ) : (
+          <MetricCard label="Last donation" icon="calendar" value={stats.lastDonationDay ? showDay(stats.lastDonationDay) : "None yet"} note={campaign.endDate ? `Ended ${showDay(campaign.endDate)}` : "No end date"} />
+        )}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">

@@ -54,12 +54,13 @@ const DONATION_STATUS: Record<DonationStatus, [string, Tone]> = {
   pending: ["Pending", "warning"],
   failed: ["Failed", "danger"],
   refunded: ["Refunded", "neutral"],
+  charged_back: ["Charged back", "danger"],
 };
 
 export function DonationStatusBadge({ status }: { status: DonationStatus }) {
   const [label, tone] = DONATION_STATUS[status];
   return (
-    <Badge tone={tone} icon={status === "refunded" ? "refresh" : undefined}>
+    <Badge tone={tone} icon={status === "refunded" ? "refresh" : status === "charged_back" ? "arrowDown" : undefined}>
       {label}
     </Badge>
   );
@@ -85,12 +86,13 @@ const RECURRING_STATUS: Record<RecurringStatus, [string, Tone]> = {
   active: ["Active", "success"],
   paused: ["Paused", "warning"],
   cancelled: ["Cancelled", "neutral"],
+  failed: ["Stopped: payment failed", "danger"],
 };
 
 export function RecurringStatusBadge({ status }: { status: RecurringStatus }) {
   const [label, tone] = RECURRING_STATUS[status];
   return (
-    <Badge tone={tone} icon={status === "paused" ? "pause" : status === "cancelled" ? "x" : undefined}>
+    <Badge tone={tone} icon={status === "paused" ? "pause" : status === "cancelled" ? "x" : status === "failed" ? "alert" : undefined}>
       {label}
     </Badge>
   );
@@ -130,10 +132,10 @@ export function useExport() {
 }
 
 export function donationCsvRows(rows: Donation[], lookups: ReturnType<typeof useLookups>) {
-  const header = ["Reference", "Donation date", "Donor", "Donor email", "Campaign", "Type", "Status", "Amount (R)", "Processing fee (R)", "Platform fee (R)", "Net (R)", "Settled", "Payout", "s18A requested", "Anonymous on public pages"];
+  const header = ["Reference", "Donation date", "Donor", "Donor email", "Campaign", "Type", "Status", "Amount (R)", "Processing fee (R)", "Platform fee (R)", "Net (R)", "Settled", "Payout", "s18A requested", "Anonymous on public pages", "Message"];
   const body = rows.map((d) => {
     const donor = lookups.donor.get(d.donorId);
-    const net = d.status === "paid" ? d.amountCents - d.processingFeeCents - d.platformFeeCents : d.status === "refunded" ? -d.processingFeeCents : 0;
+    const net = netOf(d);
     return [
       d.ref,
       dateTime(d.donatedAt),
@@ -150,6 +152,7 @@ export function donationCsvRows(rows: Donation[], lookups: ReturnType<typeof use
       d.payoutId ? (lookups.payout.get(d.payoutId)?.ref ?? "") : "",
       d.wants18a ? "Yes" : "No",
       d.anonymous ? "Yes" : "No",
+      d.message ?? "",
     ];
   });
   return { header, body };
@@ -158,7 +161,7 @@ export function donationCsvRows(rows: Donation[], lookups: ReturnType<typeof use
 /** What the charity receives from one donation, by status. */
 export function netOf(d: Donation): number {
   if (d.status === "paid") return d.amountCents - d.processingFeeCents - d.platformFeeCents;
-  if (d.status === "refunded") return -d.processingFeeCents - d.platformFeeCents;
+  if (d.status === "refunded" || d.status === "charged_back") return -d.processingFeeCents - d.platformFeeCents;
   return 0;
 }
 
@@ -213,10 +216,17 @@ export function DonationDrawer({ donation, onClose, data }: { donation: Donation
           )}
         </Card>
 
-        {donation.status === "failed" && <Callout tone="danger" title="Payment failed">{donation.failureReason}. No money was taken.</Callout>}
-        {donation.status === "pending" && <Callout tone="warning" title="Waiting for the payment">The payment provider has not confirmed this payment yet. It is not counted in your totals until it is paid.</Callout>}
+        {donation.message && (
+          <div className="rounded-2xl bg-gz-lilac-soft p-4">
+            <p className="text-xs font-semibold text-gz-muted">Message from the donor</p>
+            <p className="mt-1 text-[15px] text-gz-ink">&ldquo;{donation.message}&rdquo;</p>
+          </div>
+        )}
         {donation.status === "refunded" && donation.refundedAt && (
           <Callout tone="neutral" title="Refunded">Refunded on {date(donation.refundedAt)}. Taken off the payout for that week. The processing fee is not returned (demo assumption, see open decisions).</Callout>
+        )}
+        {donation.status === "charged_back" && donation.chargedBackAt && (
+          <Callout tone="danger" title="Charged back">The card holder&apos;s bank reversed this payment on {date(donation.chargedBackAt)}. It was taken off the payout for that week. It does not count towards your totals or any s18A receipt.</Callout>
         )}
 
         <div>
@@ -252,8 +262,6 @@ export function DonationDrawer({ donation, onClose, data }: { donation: Donation
             items={[
               ["Campaign", campaignName(donation.campaignId, lookups.campaign)],
               ["Type", donation.kind === "monthly" ? "Monthly donation" : "Once-off"],
-              ["Given through", donation.channel === "app" ? "Givezy app" : "Website"],
-              ["Card", `Ending ${donation.cardLast4}`],
               ["s18A receipt requested", donation.wants18a ? "Yes" : "No"],
             ]}
           />
@@ -273,7 +281,7 @@ function TimelineItem({ done, label, value }: { done: boolean; label: string; va
   );
 }
 
-/** Reads a filter passed in the address (for example ?status=failed from the overview), once. */
+/** Reads a filter passed in the address (for example ?status=refunded), once. */
 export function useQueryParam(name: string): string | null {
   const [value, setValue] = useState<string | null>(null);
   useEffect(() => {

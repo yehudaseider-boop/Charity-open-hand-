@@ -12,8 +12,7 @@ import { BASE } from "../ui/shell";
 import { FOLLOW_UP_NEW_DAYS } from "../data/demo-config";
 
 const STYLE: Record<AttentionKind, { icon: IconName; tone: string }> = {
-  failed_monthly: { icon: "alert", tone: "bg-gz-danger-soft text-gz-danger" },
-  s18a_details: { icon: "receipt", tone: "bg-gz-warning-soft text-gz-warning" },
+  monthly_stopped: { icon: "alert", tone: "bg-gz-danger-soft text-gz-danger" },
   campaign_behind: { icon: "flag", tone: "bg-gz-warning-soft text-gz-warning" },
   campaign_ending: { icon: "clock", tone: "bg-gz-blue-soft text-gz-blue" },
   large_donation: { icon: "donations", tone: "bg-gz-lilac-soft text-gz-ink" },
@@ -24,10 +23,8 @@ const STYLE: Record<AttentionKind, { icon: IconName; tone: string }> = {
 function words(i: AttentionItem): { title: string; detail: string; href: string; action: string } {
   const n = count(i.count);
   switch (i.kind) {
-    case "failed_monthly":
-      return { title: `${n} monthly ${i.count === 1 ? "donor's payment" : "donors' payments"} failed`, detail: `${rand(i.amountCents ?? 0)} a month at risk. Givezy retries up to three times and emails the donor each time.`, href: `${BASE}/recurring?status=failing`, action: "See who" };
-    case "s18a_details":
-      return { title: `${n} ${i.count === 1 ? "donor needs" : "donors need"} to complete s18A details`, detail: "They asked for a tax receipt, but a receipt cannot be issued without their details.", href: `${BASE}/receipts`, action: "Review" };
+    case "monthly_stopped":
+      return { title: `${n} monthly ${i.count === 1 ? "donation" : "donations"} stopped after failed payments`, detail: `${rand(i.amountCents ?? 0)} a month lost in the last 30 days. Givezy tried three times and emailed each donor. A personal call can help them start again.`, href: `${BASE}/recurring?status=failed`, action: "See who" };
     case "campaign_behind":
       return { title: `${i.campaignName} is behind pace`, detail: `${permille(i.progressPermille ?? 0)} of the goal. It needs ${rand(i.neededPerDayCents ?? 0)} a day for the next ${count(i.daysLeft ?? 0)} days.`, href: `${BASE}/campaigns/${i.campaignId}`, action: "Open" };
     case "campaign_ending":

@@ -523,3 +523,10 @@ All automated checks pass; two independent reviews of the last two days' code fo
 - Donor groups now follow the five Givelify describes (Consistent, Occasional, New, Decreasing, Inactive) as plain, visible rules, replacing the earlier New, Active, Lapsing, Lapsed. Thresholds are placeholders in `demo-config.ts`.
 - Finances has a Bank deposits reconciliation view. Exports are plain CSV for now (Yehuda, 15/10/2026); no accounting-package formats yet.
 - Decided by Yehuda (15/10/2026): keep the giving-group cut-offs for now (New 28 days; Consistent 5 of the last 6 months); keep `GIVEZY PO-yyyymmdd` as a placeholder statement reference until the real wording is seen in test mode; keep "Mark all as matched", behind a confirmation showing the count, total and dates.
+
+### Portal prototype: feature audit (15/10/2026)
+
+- Every portal feature checked against the real database, checkout and decisions: `docs/charity-portal/feature-audit.md`. 80 data tests, 36 on-screen cross-checks and 18 interaction checks pass for all three demo charities.
+- The prototype now follows the platform: charities see only paid, refunded and charged-back donations (decided 08/10/2026); chargebacks shown; monthly donations stopped after three declines show as "Stopped: payment failed" and failed attempts stay hidden; the "missing s18A details" state is removed (the checkout requires them); app-or-website and card digits removed (not recorded); the donor's message shown; fees off by default (decided 09/10/2026).
+- Found, not yet decided: campaign giving is not in the donation form; "paused" campaigns are not a database status; charities cannot read monthly donations; no marketing consent is recorded at checkout; per-charity settlement data is unconfirmed.
+

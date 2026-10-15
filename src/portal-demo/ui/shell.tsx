@@ -61,7 +61,7 @@ function Frame({ children }: { children: ReactNode }) {
         )}
         <div className="min-w-0 flex-1">
           <TopBar onMenu={() => setMenuOpen(true)} />
-          <main className="mx-auto w-full max-w-[1320px] px-4 pb-16 pt-5 sm:px-6 lg:px-10 lg:pt-8">{children}</main>
+          <div id="gz-content" className="mx-auto w-full max-w-[1320px] px-4 pb-16 pt-5 sm:px-6 lg:px-10 lg:pt-8">{children}</div>
         </div>
       </div>
       <Toasts />

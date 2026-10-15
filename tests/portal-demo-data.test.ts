@@ -15,7 +15,6 @@ import {
   currentTaxYear,
   followUps,
   hasMarketingConsent,
-  s18aDetailsMissing,
   s18aReceipts,
   s18aSummary,
   donorStats,
@@ -26,6 +25,7 @@ import {
   recurringSummary,
   sameDaysLastMonth,
   summarise,
+  visibleToCharity,
 } from "@/portal-demo/data/selectors";
 
 const ALL = { from: DEMO_START, to: DEMO_TODAY };
@@ -88,10 +88,10 @@ describe("charity portal demo data", () => {
         expect(sum(donorStats(ds).map((d) => d.totalCents))).toBe(summarise(ds, ALL).raisedCents);
       });
 
-      it("finance: gross minus refunds is what was raised, and net adds up", () => {
+      it("finance: gross minus refunds and chargebacks is what was raised, and net adds up", () => {
         const f = financeSummary(ds, ALL);
-        expect(f.grossCents - f.refundsCents).toBe(summarise(ds, ALL).raisedCents);
-        expect(f.netCents).toBe(f.grossCents - f.refundsCents - f.processingFeesCents - f.platformFeesCents);
+        expect(f.grossCents - f.refundsCents - f.chargebacksCents).toBe(summarise(ds, ALL).raisedCents);
+        expect(f.netCents).toBe(f.grossCents - f.refundsCents - f.chargebacksCents - f.processingFeesCents - f.platformFeesCents);
         expect(f.paidOutCents + f.inTransitCents + f.awaitingCents).toBe(f.grossCents);
         expect(f.platformFeesCents).toBe(0);
       });
@@ -117,14 +117,14 @@ describe("charity portal demo data", () => {
         const monthly = paid.filter((d) => d.kind === "monthly" && localDay(d.donatedAt) >= presetRange("12m").from);
         expect(r.collectedCount).toBe(monthly.length);
         expect(r.collectedCents).toBe(sum(monthly.map((d) => d.amountCents)));
-        expect(r.active + r.paused + r.cancelled).toBe(ds.recurring.length);
+        expect(r.active + r.paused + r.cancelled + r.failedPlans).toBe(ds.recurring.length);
       });
 
       it("no fee is taken when the charity does not pay it", () => {
         const free = generateDataset(charity.id, "not_charity");
         const f = financeSummary(free, ALL);
         expect(f.processingFeesCents).toBe(0);
-        expect(f.netCents).toBe(f.grossCents - f.refundsCents);
+        expect(f.netCents).toBe(f.grossCents - f.refundsCents - f.chargebacksCents);
       });
     });
   }
@@ -155,17 +155,14 @@ describe("charity portal demo data", () => {
           });
         }
 
-        it("issues only after the tax year closes, and never without donor details", () => {
+        it("issues only after the tax year closes", () => {
           const closed = s18aReceipts(ds, currentTaxYear() - 1);
           const open = s18aReceipts(ds, currentTaxYear());
           expect(taxYearRange(currentTaxYear() - 1).end < DEMO_TODAY).toBe(true);
           expect(closed.some((r) => r.status === "issued")).toBe(true);
           expect(closed.every((r) => r.status !== "after_year_end")).toBe(true);
-          expect(open.every((r) => r.status !== "issued" && r.number === null)).toBe(true);
-          const donors = new Map(ds.donors.map((d) => [d.id, d]));
-          for (const r of [...closed, ...open]) {
-            if (s18aDetailsMissing(donors.get(r.donorId)!)) expect(r.status).toBe("needs_details");
-          }
+          expect(closed.every((r) => r.status === "issued" && r.number !== null)).toBe(true);
+          expect(open.every((r) => r.status === "after_year_end" && r.number === null)).toBe(true);
         });
 
         it("numbers are unique and run without gaps", () => {
@@ -179,7 +176,7 @@ describe("charity portal demo data", () => {
           const sm = s18aSummary(ds, currentTaxYear());
           const receipts = s18aReceipts(ds, currentTaxYear());
           expect(sm.donors).toBe(receipts.length);
-          expect(sm.issued + sm.afterYearEnd + sm.needsDetails).toBe(sm.donors);
+          expect(sm.issued + sm.afterYearEnd).toBe(sm.donors);
           expect(sm.totalCents).toBe(sum(receipts.map((r) => r.totalCents)));
           expect(sm.end).toBe("2027-02-28");
         });
@@ -244,7 +241,8 @@ describe("charity portal demo data", () => {
         expect(items.find((i) => i.kind === "giving_less")?.count ?? 0).toBe(fu.checkin.length);
         const handled = Object.fromEntries(fu.new.map((r) => [r.key, DEMO_TODAY]));
         expect(attentionItems(ds, { largeCents: large, handled }).some((i) => i.kind === "new_donors")).toBe(false);
-        if (!ds.charity.s18a) expect(items.some((i) => i.kind === "s18a_details")).toBe(false);
+        const stopped = ds.recurring.filter((p) => p.status === "failed" && p.failedAt! >= "2026-09-14");
+        expect(items.find((i) => i.kind === "monthly_stopped")?.count ?? 0).toBe(stopped.length);
       });
     }
   });
@@ -271,7 +269,9 @@ describe("charity portal demo data", () => {
       it(`${charity.shortName}: every donor is in exactly one group, and monthly donors are mostly consistent`, () => {
         const stats = donorStats(generateDataset(charity.id)).filter((d) => d.giftCount > 0);
         for (const d of stats) expect(GROUP_ORDER).toContain(d.group);
-        const monthly = stats.filter((d) => d.hasMonthly && d.firstDay! < "2026-04-01");
+        // Donors whose active monthly donation began before April have had six months of payments.
+        const longPlans = new Set(generateDataset(charity.id).recurring.filter((p) => p.status === "active" && p.startedAt < "2026-04-01").map((p) => p.donorId));
+        const monthly = stats.filter((d) => longPlans.has(d.id));
         expect(monthly.filter((d) => d.group === "consistent").length / monthly.length).toBeGreaterThan(0.8);
         for (const d of stats.filter((x) => x.group === "inactive")) expect(d.lastDay! <= "2026-04-17").toBe(true);
       });
@@ -299,6 +299,57 @@ describe("charity portal demo data", () => {
           expect(refundLines).toBeGreaterThan(0);
         });
       }
+    }
+  });
+
+  describe("what a charity may see (decided 08/10/2026)", () => {
+    for (const charity of DEMO_CHARITIES) {
+      const ds = generateDataset(charity.id);
+      it(`${charity.shortName}: the demo has pending, failed and charged-back payments to hide or show`, () => {
+        const statuses = new Set(ds.donations.map((d) => d.status));
+        for (const st of ["paid", "failed", "refunded", "charged_back"]) expect(statuses.has(st as never)).toBe(true);
+      });
+      it(`${charity.shortName}: finance figures count only paid, refunded and charged-back donations`, () => {
+        const f = financeSummary(ds, ALL);
+        const visible = ds.donations.filter(visibleToCharity);
+        expect(f.grossCents).toBe(sum(visible.map((d) => d.amountCents)));
+        expect(f.chargebacksCents).toBe(sum(ds.donations.filter((d) => d.status === "charged_back").map((d) => d.amountCents)));
+        expect(f.chargebacksCents).toBeGreaterThan(0);
+        expect(f.grossCents - f.refundsCents - f.chargebacksCents).toBe(summarise(ds, ALL).raisedCents);
+      });
+      it(`${charity.shortName}: no pending or failed payment is in a deposit, a receipt or a total`, () => {
+        const hidden = new Set(ds.donations.filter((d) => !visibleToCharity(d)).map((d) => d.id));
+        for (const p of ds.payouts) for (const l of depositLines(ds, p)) expect(hidden.has(l.donationId)).toBe(false);
+        for (const r of s18aReceipts(ds, currentTaxYear() - 1)) for (const id of r.donationIds) expect(hidden.has(id)).toBe(false);
+        for (const d of ds.donations) if (hidden.has(d.id)) expect(d.payoutId).toBeNull();
+      });
+      it(`${charity.shortName}: chargebacks come off the deposit of their week, as a chargeback line`, () => {
+        let lines = 0;
+        for (const p of ds.payouts) lines += depositLines(ds, p).filter((l) => l.kind === "chargeback").length;
+        expect(lines).toBeGreaterThan(0);
+      });
+    }
+  });
+
+  describe("monthly donations that stop after failed payments", () => {
+    for (const charity of DEMO_CHARITIES) {
+      const ds = generateDataset(charity.id);
+      it(`${charity.shortName}: a failed monthly donation has a stop date and no payments after it`, () => {
+        const failed = ds.recurring.filter((p) => p.status === "failed");
+        expect(failed.length).toBeGreaterThan(0);
+        for (const p of failed) {
+          expect(p.failedAt).not.toBeNull();
+          expect(p.cancelledAt).toBeNull();
+          const later = ds.donations.filter((d) => d.recurringId === p.id && d.donatedAt > p.failedAt!);
+          expect(later).toEqual([]);
+        }
+      });
+      it(`${charity.shortName}: "still giving" never counts more plans than were active at the start`, () => {
+        const r = recurringSummary(ds, presetRange("90d"));
+        expect(r.retentionPermille).not.toBeNull();
+        expect(r.retentionPermille!).toBeLessThanOrEqual(1000);
+        expect(r.failedPlans).toBe(ds.recurring.filter((p) => p.status === "failed").length);
+      });
     }
   });
 });

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { centsToPlain } from "@/lib/csv";
 import { DEMO_TODAY } from "../data/demo-config";
 import { addMonths, monthKey, showMonth } from "../data/day";
-import { dayOf, donorStats, firstGiftDays, presetRange, previousRange, GROUP_LABELS, GROUP_ORDER, GROUP_RULES, summarise, type DonorGroup, type DonorStats } from "../data/selectors";
+import { dayOf, donorStats, visibleToCharity, firstGiftDays, presetRange, previousRange, GROUP_LABELS, GROUP_ORDER, GROUP_RULES, summarise, type DonorGroup, type DonorStats } from "../data/selectors";
 import type { DemoDataset } from "../data/types";
 import { usePortal } from "../store";
 import { BarChart } from "../ui/charts";
@@ -244,7 +244,7 @@ function Donors({ data }: { data: DemoDataset }) {
 
 function DonorDrawer({ donor, data, lookups, onClose }: { donor: DonorStats; data: DemoDataset; lookups: ReturnType<typeof useLookups>; onClose: () => void }) {
   const { toast } = usePortal();
-  const gifts = data.donations.filter((d) => d.donorId === donor.id);
+  const gifts = data.donations.filter((d) => d.donorId === donor.id && visibleToCharity(d));
   const plans = data.recurring.filter((p) => p.donorId === donor.id);
   const months = Array.from({ length: 12 }, (_, i) => monthKey(addMonths(DEMO_TODAY, i - 11)));
   const byMonth = months.map((k) => gifts.filter((g) => g.status === "paid" && monthKey(dayOf(g)) === k).reduce((s, g) => s + g.amountCents, 0));

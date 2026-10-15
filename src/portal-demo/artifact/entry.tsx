@@ -96,10 +96,13 @@ function App() {
   const path = pathOf(route);
   const View = ROUTES.find(([re]) => re.test(path))?.[1] ?? OverviewView;
   return (
-    <PortalShell>
-      <View key={route} />
-      <CsvPreview />
-    </PortalShell>
+    // The page's one <main>, as the website's root layout provides in the Next.js app.
+    <main>
+      <PortalShell>
+        <View key={route} />
+        <CsvPreview />
+      </PortalShell>
+    </main>
   );
 }
 

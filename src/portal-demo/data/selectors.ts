@@ -3,9 +3,12 @@
  * the donations table, campaign totals and the finance figures always agree.
  *
  * Definitions used everywhere:
- *   raised      paid donations (refunded, failed and pending excluded)
- *   gross       paid + refunded donations (everything that was charged and settled or will settle)
- *   net         gross - refunds - processing fees - platform fee
+ *   raised      paid donations (refunded and charged-back excluded)
+ *   gross       paid + refunded + charged-back donations (everything that was charged and settled)
+ *   net         gross - refunds - chargebacks - processing fees - platform fee
+ * Charities never see pending or failed payments (decided 08/10/2026); they exist in the data only
+ * so the demo behaves like the platform. Monthly donations that stop after failed payments show as
+ * a monthly-donation status, not as failed payments.
  * Periods filter by DONATION date unless a function says otherwise (payouts use payout date).
  */
 import { taxYearFor, taxYearRange } from "@/lib/dates";
@@ -53,6 +56,12 @@ export function previousRange(range: DateRange): DateRange {
 }
 
 export const dayOf = (d: Donation) => localDay(d.donatedAt);
+
+/** The donations a charity may see: paid, refunded and charged back. */
+export const visibleToCharity = (d: Donation) => d.status === "paid" || d.status === "refunded" || d.status === "charged_back";
+
+/** When a donation was reversed (refund or chargeback), or null. */
+export const reversedAt = (d: Donation) => (d.status === "refunded" ? d.refundedAt : d.status === "charged_back" ? d.chargedBackAt : null);
 export const inRange = (day: string, r: DateRange) => day >= r.from && day <= r.to;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -82,9 +91,8 @@ export type PeriodSummary = {
   returningDonors: number;
   onceCents: number;
   monthlyCents: number;
-  failedCount: number;
-  pendingCount: number;
-  refundedCents: number;
+  /** Refunded and charged-back donations, by donation date. */
+  reversedCents: number;
 };
 
 export function summarise(ds: DemoDataset, range: DateRange, firsts = firstGiftDays(ds)): PeriodSummary {
@@ -103,9 +111,7 @@ export function summarise(ds: DemoDataset, range: DateRange, firsts = firstGiftD
     returningDonors: donors.size - newDonors,
     onceCents: sum(paid.filter((d) => d.kind === "once").map((d) => d.amountCents)),
     monthlyCents: sum(paid.filter((d) => d.kind === "monthly").map((d) => d.amountCents)),
-    failedCount: rows.filter((d) => d.status === "failed").length,
-    pendingCount: rows.filter((d) => d.status === "pending").length,
-    refundedCents: sum(rows.filter((d) => d.status === "refunded").map((d) => d.amountCents)),
+    reversedCents: sum(rows.filter((d) => d.status === "refunded" || d.status === "charged_back").map((d) => d.amountCents)),
   };
 }
 
@@ -138,8 +144,7 @@ export type MonthPoint = {
   returningDonors: number;
   /** Donors who had given by the end of this month. */
   cumulativeDonors: number;
-  failedCount: number;
-  refundedCents: number;
+  reversedCents: number;
 };
 
 /** One point per calendar month that overlaps the range (at least one month). */
@@ -155,15 +160,14 @@ export function monthsIn(range: DateRange): string[] {
 
 export function monthlySeries(ds: DemoDataset, range: DateRange, firsts = firstGiftDays(ds)): MonthPoint[] {
   const keys = monthsIn(range);
-  const points = new Map<string, MonthPoint>(keys.map((k) => [k, { key: k, raisedCents: 0, onceCents: 0, monthlyCents: 0, count: 0, newDonors: 0, returningDonors: 0, cumulativeDonors: 0, failedCount: 0, refundedCents: 0 }]));
+  const points = new Map<string, MonthPoint>(keys.map((k) => [k, { key: k, raisedCents: 0, onceCents: 0, monthlyCents: 0, count: 0, newDonors: 0, returningDonors: 0, cumulativeDonors: 0, reversedCents: 0 }]));
   const donorsByMonth = new Map<string, Set<string>>();
   for (const d of ds.donations) {
     const day = dayOf(d);
     if (!inRange(day, range)) continue;
     const p = points.get(monthKey(day));
     if (!p) continue;
-    if (d.status === "failed") p.failedCount++;
-    if (d.status === "refunded") p.refundedCents += d.amountCents;
+    if (d.status === "refunded" || d.status === "charged_back") p.reversedCents += d.amountCents;
     if (d.status !== "paid") continue;
     p.raisedCents += d.amountCents;
     p.count++;
@@ -332,9 +336,16 @@ export type RecurringMonth = {
   activeAtEnd: number;
   collectedCents: number;
   collectedCount: number;
-  failedCount: number;
+  /** Monthly donations that stopped this month after failed payments. */
+  stoppedFailed: number;
   cancelled: number;
   started: number;
+};
+
+/** The day a monthly donation stopped being active (cancelled, paused or failed), or null. */
+export const planStoppedDay = (p: RecurringPlan) => {
+  const stop = p.cancelledAt ?? p.pausedAt ?? p.failedAt;
+  return stop ? localDay(stop) : null;
 };
 
 export function recurringSeries(ds: DemoDataset, range: DateRange): RecurringMonth[] {
@@ -342,15 +353,15 @@ export function recurringSeries(ds: DemoDataset, range: DateRange): RecurringMon
     const monthEnd = addDays(addMonths(`${key}-01`, 1), -1);
     const charges = ds.donations.filter((d) => d.kind === "monthly" && monthKey(dayOf(d)) === key);
     const stoppedBy = (p: RecurringPlan) => {
-      const stop = p.cancelledAt ?? p.pausedAt;
-      return stop ? localDay(stop) <= monthEnd : false;
+      const stop = planStoppedDay(p);
+      return stop ? stop <= monthEnd : false;
     };
     return {
       key,
       activeAtEnd: ds.recurring.filter((p) => localDay(p.startedAt) <= monthEnd && !stoppedBy(p)).length,
       collectedCents: sum(charges.filter((d) => d.status === "paid").map((d) => d.amountCents)),
       collectedCount: charges.filter((d) => d.status === "paid").length,
-      failedCount: charges.filter((d) => d.status === "failed").length,
+      stoppedFailed: ds.recurring.filter((p) => p.failedAt && monthKey(localDay(p.failedAt)) === key).length,
       cancelled: ds.recurring.filter((p) => p.cancelledAt && monthKey(localDay(p.cancelledAt)) === key).length,
       started: ds.recurring.filter((p) => monthKey(localDay(p.startedAt)) === key).length,
     };
@@ -364,7 +375,9 @@ export type RecurringSummary = {
   expectedMonthlyCents: number;
   collectedCents: number;
   collectedCount: number;
-  failedCount: number;
+  /** Monthly donations stopped after failed payments: all of them, and in the period. */
+  failedPlans: number;
+  failedInRange: number;
   cancelledInRange: number;
   /** Plans still active out of those that existed at the start of the range, in permille. */
   retentionPermille: number | null;
@@ -372,8 +385,13 @@ export type RecurringSummary = {
 
 export function recurringSummary(ds: DemoDataset, range: DateRange): RecurringSummary {
   const charges = ds.donations.filter((d) => d.kind === "monthly" && inRange(dayOf(d), range));
-  const atStart = ds.recurring.filter((p) => localDay(p.startedAt) < range.from && !(p.cancelledAt && localDay(p.cancelledAt) < range.from) && !(p.pausedAt && localDay(p.pausedAt) < range.from));
-  const kept = atStart.filter((p) => p.status === "active").length;
+  const stopped = (p: RecurringPlan, before: string) => {
+    const day = planStoppedDay(p);
+    return day !== null && day < before;
+  };
+  // Plans active when the period began, and how many of them were still active when it ended.
+  const atStart = ds.recurring.filter((p) => localDay(p.startedAt) < range.from && !stopped(p, range.from));
+  const kept = atStart.filter((p) => !stopped(p, addDays(range.to, 1))).length;
   return {
     active: ds.recurring.filter((p) => p.status === "active").length,
     paused: ds.recurring.filter((p) => p.status === "paused").length,
@@ -381,7 +399,8 @@ export function recurringSummary(ds: DemoDataset, range: DateRange): RecurringSu
     expectedMonthlyCents: sum(ds.recurring.filter((p) => p.status === "active").map((p) => p.amountCents)),
     collectedCents: sum(charges.filter((d) => d.status === "paid").map((d) => d.amountCents)),
     collectedCount: charges.filter((d) => d.status === "paid").length,
-    failedCount: charges.filter((d) => d.status === "failed").length,
+    failedPlans: ds.recurring.filter((p) => p.status === "failed").length,
+    failedInRange: ds.recurring.filter((p) => p.failedAt && inRange(localDay(p.failedAt), range)).length,
     cancelledInRange: ds.recurring.filter((p) => p.cancelledAt && inRange(localDay(p.cancelledAt), range)).length,
     retentionPermille: atStart.length ? Math.round((kept * 1000) / atStart.length) : null,
   };
@@ -398,6 +417,7 @@ export function nextChargeDay(p: RecurringPlan): string | null {
 export type FinanceSummary = {
   grossCents: number;
   refundsCents: number;
+  chargebacksCents: number;
   processingFeesCents: number;
   platformFeesCents: number;
   netCents: number;
@@ -405,31 +425,29 @@ export type FinanceSummary = {
   paidOutCents: number;
   inTransitCents: number;
   awaitingCents: number;
-  pendingPaymentsCents: number;
-  failedCents: number;
 };
 
 /** Finance figures for donations MADE in a range (by donation date). */
 export function financeSummary(ds: DemoDataset, range: DateRange): FinanceSummary {
   const rows = ds.donations.filter((d) => inRange(dayOf(d), range));
-  const charged = rows.filter((d) => d.status === "paid" || d.status === "refunded");
+  const charged = rows.filter(visibleToCharity);
   const payoutStatus = new Map(ds.payouts.map((p) => [p.id, p.status]));
   const gross = sum(charged.map((d) => d.amountCents));
   const refunds = sum(charged.filter((d) => d.status === "refunded").map((d) => d.amountCents));
+  const chargebacks = sum(charged.filter((d) => d.status === "charged_back").map((d) => d.amountCents));
   const fees = sum(charged.map((d) => d.processingFeeCents));
   const platform = sum(charged.map((d) => d.platformFeeCents));
   const where = (s: "paid" | "in_transit" | null) => sum(charged.filter((d) => (d.payoutId ? payoutStatus.get(d.payoutId) : null) === s).map((d) => d.amountCents));
   return {
     grossCents: gross,
     refundsCents: refunds,
+    chargebacksCents: chargebacks,
     processingFeesCents: fees,
     platformFeesCents: platform,
-    netCents: gross - refunds - fees - platform,
+    netCents: gross - refunds - chargebacks - fees - platform,
     paidOutCents: where("paid"),
     inTransitCents: where("in_transit"),
     awaitingCents: where(null),
-    pendingPaymentsCents: sum(rows.filter((d) => d.status === "pending").map((d) => d.amountCents)),
-    failedCents: sum(rows.filter((d) => d.status === "failed").map((d) => d.amountCents)),
   };
 }
 
@@ -441,19 +459,19 @@ export type PendingSettlement = {
   settledCents: number;
   settledCount: number;
   feesCents: number;
-  /** Refunds made this week, taken off the next payout. */
+  /** Refunds and chargebacks made this week, taken off the next payout. */
   refundsCents: number;
   netCents: number;
 };
 
 /** Everything not yet in a payout: what the next payout will carry. */
 export function pendingSettlement(ds: DemoDataset): PendingSettlement {
-  const out = ds.donations.filter((d) => (d.status === "paid" || d.status === "refunded") && !d.payoutId);
+  const out = ds.donations.filter((d) => visibleToCharity(d) && !d.payoutId);
   const notSettled = out.filter((d) => !d.settledAt);
   const settled = out.filter((d) => d.settledAt);
   const paidOutIds = new Set(ds.payouts.map((p) => p.id));
-  // A refund is taken off the payout of the week it was made; refunds made this week are still to come.
-  const thisWeekRefunds = ds.donations.filter((d) => d.status === "refunded" && d.refundedAt && !refundInPayout(d, ds, paidOutIds));
+  // A refund or chargeback is taken off the payout of the week it happened; this week's are still to come.
+  const thisWeekRefunds = ds.donations.filter((d) => reversedAt(d) && !refundInPayout(d, ds, paidOutIds));
   const fees = sum(out.map((d) => d.processingFeeCents + d.platformFeeCents));
   const refunds = sum(thisWeekRefunds.map((d) => d.amountCents));
   const gross = sum(out.map((d) => d.amountCents));
@@ -469,7 +487,7 @@ export function pendingSettlement(ds: DemoDataset): PendingSettlement {
 }
 
 function refundInPayout(d: Donation, ds: DemoDataset, ids: Set<string>): boolean {
-  const day = localDay(d.refundedAt!);
+  const day = localDay(reversedAt(d)!);
   return ds.payouts.some((p) => ids.has(p.id) && day >= p.periodStart && day <= p.periodEnd);
 }
 
@@ -503,13 +521,15 @@ export function demoFlag(id: string, salt: string, percent: number): boolean {
   return (h >>> 0) % 100 < percent;
 }
 
-/** Demo trait: the donor's s18A details (name, address, ID or tax number) are incomplete. */
-export const s18aDetailsMissing = (d: Donor) => demoFlag(d.id, "s18a", d.type === "individual" ? 9 : 4);
-
 /** Demo trait: the donor agreed to hear about appeals (marketing consent). Thank-yous do not need it. */
 export const hasMarketingConsent = (d: Donor) => demoFlag(d.id, "marketing", 65);
 
-export type S18aStatus = "issued" | "after_year_end" | "needs_details";
+/**
+ * The platform's checkout will not take an s18A request without the details a receipt needs (ID or
+ * tax number, or a company's registration number), so a receipt is either issued or waiting for
+ * the tax year to close.
+ */
+export type S18aStatus = "issued" | "after_year_end";
 
 export type S18aReceipt = {
   /** Null until issued. */
@@ -531,12 +551,11 @@ export function isTaxYearClosed(taxYear: number): boolean {
 
 /**
  * One annual receipt per donor per tax year, covering paid donations that asked for an s18A
- * receipt. Refunded, failed and pending donations never count. A receipt cannot be issued while
- * the donor's details are incomplete. Charities without s18A approval have none.
+ * receipt. Refunded, charged-back, failed and pending donations never count. Receipts are issued
+ * after the tax year closes. Charities without s18A approval have none.
  */
 export function s18aReceipts(ds: DemoDataset, taxYear: number): S18aReceipt[] {
   if (!ds.charity.s18a) return [];
-  const donors = new Map(ds.donors.map((d) => [d.id, d]));
   const byDonor = new Map<string, Donation[]>();
   for (const d of ds.donations) {
     if (d.status !== "paid" || !d.wants18a || taxYearFor(d.donatedAt) !== taxYear) continue;
@@ -547,8 +566,7 @@ export function s18aReceipts(ds: DemoDataset, taxYear: number): S18aReceipt[] {
   const ordered = [...byDonor.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
   let n = 0;
   return ordered.map(([donorId, list]) => {
-    const missing = s18aDetailsMissing(donors.get(donorId)!);
-    const status: S18aStatus = missing ? "needs_details" : closed ? "issued" : "after_year_end";
+    const status: S18aStatus = closed ? "issued" : "after_year_end";
     return {
       number: status === "issued" ? `${ds.charity.initials}-${taxYear}-${String(++n).padStart(4, "0")}` : null,
       taxYear,
@@ -573,7 +591,6 @@ export type S18aSummary = {
   donors: number;
   issued: number;
   afterYearEnd: number;
-  needsDetails: number;
 };
 
 export function s18aSummary(ds: DemoDataset, taxYear: number): S18aSummary {
@@ -593,7 +610,6 @@ export function s18aSummary(ds: DemoDataset, taxYear: number): S18aSummary {
     donors: receipts.length,
     issued: receipts.filter((r) => r.status === "issued").length,
     afterYearEnd: receipts.filter((r) => r.status === "after_year_end").length,
-    needsDetails: receipts.filter((r) => r.status === "needs_details").length,
   };
 }
 
@@ -687,7 +703,7 @@ export function followUps(ds: DemoDataset, largeCents: number, stats: DonorStats
   return out;
 }
 
-export type AttentionKind = "failed_monthly" | "large_donation" | "new_donors" | "giving_less" | "campaign_behind" | "campaign_ending" | "s18a_details";
+export type AttentionKind = "monthly_stopped" | "large_donation" | "new_donors" | "giving_less" | "campaign_behind" | "campaign_ending";
 
 export type AttentionItem = {
   key: string;
@@ -709,15 +725,9 @@ export function attentionItems(ds: DemoDataset, opts: { largeCents: number; hand
   const stats = donorStats(ds);
   const fu = followUps(ds, opts.largeCents, stats);
 
-  const latest = new Map<string, Donation>();
-  for (const d of ds.donations) if (d.recurringId && !latest.has(d.recurringId)) latest.set(d.recurringId, d);
-  const failing = ds.recurring.filter((p) => p.status === "active" && latest.get(p.id)?.status === "failed");
-  if (failing.length) items.push({ key: "failed_monthly", kind: "failed_monthly", priority: 1, count: failing.length, amountCents: sum(failing.map((p) => p.amountCents)) });
-
-  if (ds.charity.s18a) {
-    const missing = s18aReceipts(ds, currentTaxYear()).filter((r) => r.status === "needs_details").length;
-    if (missing) items.push({ key: "s18a_details", kind: "s18a_details", priority: 1, count: missing });
-  }
+  // Monthly donations that stopped after failed payments in the last 30 days: worth a personal call.
+  const stopped = ds.recurring.filter((p) => p.status === "failed" && p.failedAt && daysBetween(localDay(p.failedAt), DEMO_TODAY) <= 30);
+  if (stopped.length) items.push({ key: "monthly_stopped", kind: "monthly_stopped", priority: 1, count: stopped.length, amountCents: sum(stopped.map((p) => p.amountCents)) });
 
   for (const c of campaignStats(ds)) {
     const pace = campaignPace(c);
@@ -744,7 +754,7 @@ export const statementRef = (p: Payout) => `GIVEZY ${p.ref}`;
 
 export type DepositLine = {
   payoutId: string;
-  kind: "donation" | "refund";
+  kind: "donation" | "refund" | "chargeback";
   donationId: string;
   /** Donation date for a donation line; refund date for a refund line. */
   day: string;
@@ -768,10 +778,11 @@ export function depositLines(ds: DemoDataset, payout: Payout): DepositLine[] {
       const fee = d.processingFeeCents + d.platformFeeCents;
       lines.push({ payoutId: payout.id, kind: "donation", donationId: d.id, day: dayOf(d), donorId: d.donorId, campaignId: d.campaignId, donationKind: d.kind, grossCents: d.amountCents, feeCents: fee, refundCents: 0, netCents: d.amountCents - fee });
     }
-    if (d.status === "refunded" && d.refundedAt) {
-      const day = localDay(d.refundedAt);
+    const reversed = reversedAt(d);
+    if (reversed) {
+      const day = localDay(reversed);
       if (day >= payout.periodStart && day <= payout.periodEnd) {
-        lines.push({ payoutId: payout.id, kind: "refund", donationId: d.id, day, donorId: d.donorId, campaignId: d.campaignId, donationKind: d.kind, grossCents: 0, feeCents: 0, refundCents: d.amountCents, netCents: -d.amountCents });
+        lines.push({ payoutId: payout.id, kind: d.status === "charged_back" ? "chargeback" : "refund", donationId: d.id, day, donorId: d.donorId, campaignId: d.campaignId, donationKind: d.kind, grossCents: 0, feeCents: 0, refundCents: d.amountCents, netCents: -d.amountCents });
       }
     }
   }

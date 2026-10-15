@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { dayOf, donorName, inRange, RANGE_LABELS } from "../data/selectors";
+import { dayOf, donorName, inRange, RANGE_LABELS, visibleToCharity } from "../data/selectors";
 import type { DemoDataset, Donation, DonationStatus } from "../data/types";
 import { usePortal } from "../store";
 import { DateRangePicker } from "../ui/date-range";
@@ -10,6 +10,9 @@ import { FilterSelect, SearchInput } from "../ui/form";
 import { Avatar, Badge, Button, Card, EmptyState, PageHeader } from "../ui/primitives";
 import { DataTable, type Column } from "../ui/table";
 import { campaignName, DonationDrawer, DonationStatusBadge, donationCsvRows, Loaded, netOf, Stat, useExport, useLookups, useQueryParam } from "./common";
+
+type StatusFilter = "all" | "reversed" | Extract<DonationStatus, "paid" | "refunded" | "charged_back">;
+const STATUS_FILTERS: StatusFilter[] = ["all", "paid", "refunded", "charged_back", "reversed"];
 
 export function DonationsView() {
   return <Loaded>{(data) => <Donations data={data} />}</Loaded>;
@@ -20,22 +23,24 @@ function Donations({ data }: { data: DemoDataset }) {
   const lookups = useLookups(data);
   const exportCsv = useExport();
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<"all" | DonationStatus>("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [campaign, setCampaign] = useState("all");
   const [kind, setKind] = useState("all");
   const [open, setOpen] = useState<Donation | null>(null);
   const fromAddress = useQueryParam("status");
   const [applied, setApplied] = useState(false);
-  if (!applied && fromAddress && ["paid", "pending", "failed", "refunded"].includes(fromAddress)) {
+  if (!applied && fromAddress && STATUS_FILTERS.includes(fromAddress as StatusFilter)) {
     setApplied(true);
-    setStatus(fromAddress as DonationStatus);
+    setStatus(fromAddress as StatusFilter);
   }
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return data.donations.filter((d) => {
       if (!inRange(dayOf(d), range)) return false;
-      if (status !== "all" && d.status !== status) return false;
+      // Charities never see pending or failed payments (decided 08/10/2026).
+      if (!visibleToCharity(d)) return false;
+      if (status === "reversed" ? d.status !== "refunded" && d.status !== "charged_back" : status !== "all" && d.status !== status) return false;
       if (campaign !== "all" && (d.campaignId ?? "general") !== campaign) return false;
       if (kind !== "all" && d.kind !== kind) return false;
       if (!needle) return true;
@@ -133,9 +138,9 @@ function Donations({ data }: { data: DemoDataset }) {
             options={[
               { value: "all", label: "All statuses" },
               { value: "paid", label: "Paid" },
-              { value: "pending", label: "Pending" },
-              { value: "failed", label: "Failed" },
+              { value: "reversed", label: "Refunded or charged back" },
               { value: "refunded", label: "Refunded" },
+              { value: "charged_back", label: "Charged back" },
             ]}
           />
           <FilterSelect label="Campaign" value={campaign} onChange={setCampaign} options={campaignOptions} />
@@ -147,7 +152,7 @@ function Donations({ data }: { data: DemoDataset }) {
           )}
         </div>
         <p className="mb-3 text-xs text-gz-muted">
-          {RANGE_LABELS[rangePreset]} · by donation date · {count(rows.length)} donations. Net counts paid donations after fees; a refunded donation shows the fee that was not returned.
+          {RANGE_LABELS[rangePreset]} · by donation date · {count(rows.length)} donations. Paid, refunded and charged-back donations. Net counts paid donations after fees; a reversed donation shows the fee that was not returned.
         </p>
         <DataTable
           caption="Donations"

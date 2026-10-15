@@ -39,8 +39,7 @@ function Analytics({ data }: { data: DemoDataset }) {
       e.donors.add(d.donorId);
       byCampaign.set(k, e);
     }
-    const app = paid.filter((d) => d.channel === "app").reduce((s, d) => s + d.amountCents, 0);
-    return { now, before, series, firstTimeCents, byCampaign, app, rec: recurringSeries(data, range), dist: amountDistribution(data, range) };
+    return { now, before, series, firstTimeCents, byCampaign, rec: recurringSeries(data, range), dist: amountDistribution(data, range) };
   }, [data, range]);
 
   const labels = a.series.map((p) => showMonth(p.key, a.series.length > 6));
@@ -146,17 +145,6 @@ function Analytics({ data }: { data: DemoDataset }) {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader title="Where donors give" subtitle="Share of the amount raised in this period" />
-        <BarList
-          format={rand}
-          colour="lilac"
-          items={[
-            { key: "app", label: "Givezy app", value: a.app, note: permille(a.now.raisedCents ? Math.round((a.app * 1000) / a.now.raisedCents) : 0) },
-            { key: "web", label: "Website", value: a.now.raisedCents - a.app, note: permille(a.now.raisedCents ? Math.round(((a.now.raisedCents - a.app) * 1000) / a.now.raisedCents) : 0) },
-          ]}
-        />
-      </Card>
     </div>
   );
 }

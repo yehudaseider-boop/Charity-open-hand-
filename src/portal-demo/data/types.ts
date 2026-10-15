@@ -48,7 +48,12 @@ export type Campaign = {
   createdAt: string;
 };
 
-export type DonationStatus = "paid" | "pending" | "failed" | "refunded";
+/**
+ * The platform's donation statuses. Charities see only paid, refunded and charged-back donations
+ * (decided 08/10/2026: no details of abandoned or failed payments); pending and failed exist in the
+ * data but never reach a charity screen.
+ */
+export type DonationStatus = "paid" | "pending" | "failed" | "refunded" | "charged_back";
 
 export type Donor = {
   id: string;
@@ -85,14 +90,21 @@ export type Donation = {
   /** The payout it arrived in. Null while still pending settlement. */
   payoutId: string | null;
   refundedAt: string | null;
+  /** When the card holder's bank reversed the payment. */
+  chargedBackAt: string | null;
+  /** The donor's message to the charity, if they wrote one (charities see it). */
+  message: string | null;
   wants18a: boolean;
   anonymous: boolean;
+  /** Not recorded by the platform today, so never shown. Kept so the demo data stays stable. */
   channel: "app" | "website";
+  /** Not stored by the platform, so never shown. */
   cardLast4: string;
   failureReason: string | null;
 };
 
-export type RecurringStatus = "active" | "paused" | "cancelled";
+/** The platform's monthly-donation statuses. "failed": stopped after three declined attempts in a month. */
+export type RecurringStatus = "active" | "paused" | "cancelled" | "failed";
 
 export type RecurringPlan = {
   id: string;
@@ -105,6 +117,7 @@ export type RecurringPlan = {
   status: RecurringStatus;
   cancelledAt: string | null;
   pausedAt: string | null;
+  failedAt: string | null;
 };
 
 export type PayoutStatus = "paid" | "in_transit";
