@@ -27,6 +27,7 @@ import { loadIncome } from "@/lib/income-store";
 import type { IncomeEntry } from "@/lib/ledger";
 import { monthsInARow } from "@/lib/streak";
 import { useStoredRecord } from "@/lib/use-stored-record";
+import { tapAmounts } from "@shared/charity/suggested-amounts";
 import { charityShareText } from "@/lib/share";
 import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow";
 import { GIVE_IN_APP } from "@/lib/give-entry";
@@ -38,8 +39,6 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
 
 const noGoals: Goal[] = [];
 const noIncome: IncomeEntry[] = [];
-/** Starting amounts when the donor hasn't given here before. Suggestions only; any amount works. */
-const STARTER_AMOUNTS = [10_000, 25_000, 50_000];
 
 /**
  * Give inside the app, on one screen, in as few taps as possible: past amounts are one tap, what
@@ -61,7 +60,6 @@ export default function Give() {
   const history = preview ? sampleGifts : (account.live?.gifts ?? []);
   const elsewhere = preview ? sampleElsewhere : (account.live?.elsewhere ?? []);
   const pastAmounts = slug ? quickAmounts(history, slug) : [];
-  const quick = pastAmounts.length ? pastAmounts : STARTER_AMOUNTS;
   const owner = account.status === "signed-in" ? account.userId : null;
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   const goals = useStoredRecord<Goal[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadGoals, initial: preview ? sampleGoals : noGoals });
@@ -73,6 +71,9 @@ export default function Give() {
 
   // Asked of the server once per visit (and on "Try again"). The preview has no server.
   const [ready, setReady] = useState<ReadyReply | undefined>(undefined);
+  // One-tap amounts: the donor's own recent amounts first, then the ones the charity chose. Givezy
+  // never suggests a figure of its own, so a new donor at a charity that chose none types the amount.
+  const quick = tapAmounts(pastAmounts, ready?.ok ? ready.suggestedCents : []);
   const [readyAttempt, setReadyAttempt] = useState(0);
   const [amount, setAmount] = useState("");
   // Starts from the label passed in (older links pass ?kind=), else the one used last time at this charity.
@@ -429,7 +430,8 @@ export default function Give() {
             {charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
           </View>
           {err("amount") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert">{err("amount")}</Text> : minGift ? <Text variant="label">At least {rand(minGift)}.</Text> : null}
-          <View style={styles.chips} accessibilityLabel={pastAmounts.length ? "Amounts you gave before" : "Suggested amounts"}>
+          {quick.length ? (
+          <View style={styles.chips} accessibilityLabel={pastAmounts.length ? "Amounts you gave before" : `Amounts suggested by ${charity.nameEn}`}>
             {quick.map((c) => {
               const on = gift === c;
               return (
@@ -439,6 +441,7 @@ export default function Give() {
               );
             })}
           </View>
+          ) : null}
 
           {goal && goalLabel ? (
             <View style={{ gap: 10 }}>

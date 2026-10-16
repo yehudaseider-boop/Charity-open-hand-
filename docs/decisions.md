@@ -745,7 +745,7 @@ Yehuda asked for a check of the whole product and a charity dashboard with prope
 
 - This month next to last month, the tax year, what monthly donors bring in every month, and all donors with the all-time total.
 - **Needs you this week:** new donors to thank, monthly donations declined and being retried, stopped or cancelled in the last 30 days (with the Rand a month lost), paused in the last 30 days, donors who haven't given in 6 months, campaigns ending within a week, refunds and chargebacks. Each line links to where the charity can act.
-- **Your donors** in four groups, each a link to the filtered Donors list: New (first gift in the last 30 days, like Givelify's four weeks), Coming back (more than once, in the last 6 months), Gave once (in the last 6 months), Lapsed (nothing in 6 months). **For Yehuda to confirm:** 6 months is our choice; Pushpay uses 120 days and Givelify 12 months.
+- **Your donors** in four groups, each a link to the filtered Donors list: New (first gift in the last 30 days, like Givelify's four weeks), Coming back (more than once, in the last 6 months), Gave once (in the last 6 months), Lapsed (nothing in 6 months). Yehuda confirmed 6 months (16/10/2026); Pushpay uses 120 days and Givelify 12 months.
 - **Your biggest supporters:** the top five by all-time total.
 - **Donations by month:** the last 12 calendar months (empty months shown as empty, not skipped), each bar split into monthly and once-off, this month outlined.
 
@@ -761,3 +761,9 @@ Second round of fixes from the same review (16/10/2026):
 - Not changed: the admin "erase a donor with no account" form still clears what was typed on a mistake (platform team only, minor).
 
 **Website in the v2 look** (16/10/2026, same review): the home page, a charity's public page and the giving page now match the app and the dashboard. Home opens on a blue block with orange and lavender splashes, a white Fredoka headline and one orange "Find a charity" button with the pressable navy edge. The charity page has a blue splash block when there is no cover photo, the charity's impact line as "Your rand at work", and an orange "Give to {charity}" button. The giving page has the amount on a pale lilac card with a large amount box, and the final Pay button is the screen's one orange button. A `.pressable` style (solid navy edge that sinks when pressed) is in `globals.css`. Checked at 375px and desktop width.
+
+## Each charity chooses its suggested amounts (16/10/2026)
+
+Yehuda: "let the charity choose" (instead of the R100, R250 and R500 starter amounts the app had, which were never confirmed). On its Profile page a charity can set up to three amounts (each at least the minimum donation, no repeats, shown smallest first), saved in `charities.suggested_amounts_cents` (migration `20261016000014`). The give screens show one-tap amounts in this order: the donor's own recent amounts first, then the charity's, three at most (`src/lib/charity/suggested-amounts.ts`, shared with the app). Givezy never suggests a figure of its own: a new donor at a charity that set none types the amount. The website's giving page shows the charity's amounts as buttons that fill in the amount box.
+
+**Vercel production branch** (16/10/2026): Yehuda wasn't sure, so the recommendation stands: keep the test site deploying from `milestone-1-foundation` until launch, so `main` is untouched; switch it to `main` as a launch step (go-live checklist).

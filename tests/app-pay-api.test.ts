@@ -50,7 +50,7 @@ describe("before and after the payment page", () => {
   it("reads whether the charity can take the gift, the campaign and the minimums", async () => {
     const seen: unknown[] = [];
     const r = await checkReady("https://x.test", "a", "c1", async (url, body) => (seen.push([url, body]), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 } }));
-    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: null, savedCardsOpen: false, savedCard: null });
+    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null });
     expect(seen[0]).toEqual(["https://x.test/api/app/ready", { slug: "a", campaignId: "c1" }]);
   });
   it("offline is a plain message, not the website hand-off", async () => {

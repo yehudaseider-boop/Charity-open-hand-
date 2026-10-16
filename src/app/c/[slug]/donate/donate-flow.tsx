@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
 import { TermsAndPrivacyLinks } from "@/components/legal";
@@ -13,6 +13,8 @@ type Props = {
   charityName: string;
   receiptsAvailable: boolean;
   minimumLabel: string;
+  /** The charity's own suggested amounts, in cents (it may have none). */
+  suggestedCents?: number[];
   contributionMinimumLabel: string;
   /** The label the donor chose in the app, carried over. */
   initialLabel?: string;
@@ -24,10 +26,11 @@ type Props = {
   account?: { email: string; savedIdLast4: string | null };
 };
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialLabel, fromApp, campaign, account }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, fromApp, campaign, account }: Props) {
   const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
+  const amountRef = useRef<HTMLInputElement>(null);
   // The details form stays on screen (and keeps what the donor typed) while they
   // change the amount; it just can't be paid until the new amount is confirmed.
   // If the next amount is refused (too small, not a number) the last good quote and everything typed stays,
@@ -49,11 +52,31 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
         }}
       >
         <label htmlFor="amount" className="block font-display text-xl text-indigo">How much would you like to give?</label>
+        {suggestedCents.length ? (
+          <div className="flex flex-wrap gap-2" role="group" aria-label={`Amounts suggested by ${charityName}`}>
+            {suggestedCents.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => {
+                  if (!amountRef.current) return;
+                  amountRef.current.value = c % 100 ? `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}` : String(c / 100);
+                  amountRef.current.focus();
+                  setEditingAmount(true);
+                }}
+                className="rounded-full border-[1.5px] border-brand bg-surface px-4 py-2 font-semibold text-brand hover:bg-brand-soft"
+              >
+                {formatRand(c)}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="flex gap-2">
           <div className="flex min-w-0 flex-1 items-center rounded-control border-[1.5px] border-border bg-surface px-4 focus-within:border-brand">
             <span className="font-display text-2xl text-indigo">R</span>
             <input
               id="amount"
+              ref={amountRef}
               name="amount"
               inputMode="decimal"
               autoComplete="off"

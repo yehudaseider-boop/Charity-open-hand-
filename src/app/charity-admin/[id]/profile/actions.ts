@@ -12,6 +12,9 @@ import { isRealImage } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
 import { cleanImage } from "@/lib/charity/clean-image";
 import { notifyCharity, publicChangeEmail } from "@/lib/charity/emails";
+import { parseSuggestedAmounts } from "@/lib/charity/suggested-amounts";
+import { platformConfig } from "@/config/platform";
+import { formatRand } from "@/lib/money";
 
 /** An approved charity is public with a "Verified" badge: tell us when its name or pictures change, so we can look. */
 async function tellReviewer(charity: { id: string; status: string; name_en: string }, what: string) {
@@ -37,6 +40,12 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
   const parsed = profileSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   const v = parsed.data;
+  const suggested = parseSuggestedAmounts(
+    [1, 2, 3].map((n) => formData.get(`suggested_${n}`)?.toString()),
+    platformConfig.minDonationCents,
+    formatRand(platformConfig.minDonationCents),
+  );
+  if (!suggested.ok) return { ok: false, message: "Please check the highlighted fields.", fieldErrors: suggested.fieldErrors };
   const categoryIds = formData.getAll("category_ids").map(String).filter(isUuid);
 
   const supabase = await createClient();
@@ -48,6 +57,7 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
       funds_use_en: v.funds_use_en ?? null,
       thank_you_en: v.thank_you_en ?? null,
       impact_en: v.impact_en ?? null,
+      suggested_amounts_cents: suggested.cents,
       website: v.website ?? null,
     })
     .eq("id", charityId)
