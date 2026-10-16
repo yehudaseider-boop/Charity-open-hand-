@@ -3,8 +3,8 @@ import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
-import { Splash } from "@/components/splash";
-import { HeaderCurve } from "@/components/backdrop";
+import { BlueHeader } from "@/components/backdrop";
+import { GoalRing } from "@/components/goal-ring";
 import { FadeUp } from "@/components/fade-up";
 import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
@@ -16,7 +16,7 @@ import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, jhbToday, rand } from "@/lib/format";
 import { byCharity, groupByMonth, percentOf } from "@/lib/giving";
-import { goalProgress, knownLabels, MAX_GOALS, type Goal } from "@/lib/goals";
+import { goalProgress, knownLabels, MAX_GOALS, monthTiles, type Goal } from "@/lib/goals";
 import { loadGoals, saveGoals, setAsideGoals } from "@/lib/goals-store";
 import { useJewishMode } from "@/lib/jewish-mode";
 import { JEWISH_LABELS } from "@shared/donations/labels";
@@ -35,7 +35,7 @@ import { useStoredRecord } from "@/lib/use-stored-record";
 import type { SaveResult } from "@/lib/stored-result";
 import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 
-/** Screen 7: Giving, with the donor's goals. */
+/** Progress (was Giving): the main goal as a big ring on blue, month by month, then the donor's records and history. */
 export default function Giving() {
   const insets = useSafeAreaInsets();
   const account = useAccount();
@@ -131,6 +131,10 @@ export default function Giving() {
   const byLabel = labelTotals(yearGifts);
   const [openGift, setOpenGift] = useState<Gift | null>(null);
   const usesIncome = goals.some((g) => g.basis === "income");
+  const main = goals[0] ?? null;
+  const mainProgress = main ? goalProgress(main, goalRows, income, now) : null;
+  const mainPct = mainProgress?.targetCents ? Math.floor((mainProgress.givenCents * 100) / mainProgress.targetCents) : 0;
+  const tiles = main ? monthTiles(main, goalRows, now) : [];
 
   const addIncome = (e: { cents: number; date: string; note: string }) => {
     if (!incomeReady) return;
@@ -178,15 +182,38 @@ export default function Giving() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined}
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
-        <HeaderCurve depth={insets.top + 112} />
-        <View>
-          <Text variant="h1" accessibilityRole="header">Giving</Text>
-          <View style={styles.arc}><Splash size={84} /></View>
-        </View>
-        {/* Room for the header curve. */}
-        <View style={{ height: 20 }} />
-
+        contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
+        <BlueHeader paddingTop={insets.top + 20}>
+          <Text style={styles.headTitle} accessibilityRole="header">Progress</Text>
+          {main && mainProgress && state === "ready" && goalsLoaded && !goalsProblem ? (
+            <View style={{ gap: 18, marginTop: 8 }}>
+              <View style={styles.ringRow}>
+                <GoalRing percent={mainPct} size={140} onBlue stroke={14} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.headKicker}>{main.name} · {mainProgress.window.label}</Text>
+                  <Text style={styles.headAmount}>{rand(mainProgress.givenCents)}</Text>
+                  <Text style={styles.headLine}>
+                    {mainProgress.targetCents === null ? "Log your income to see the goal" : `of ${rand(mainProgress.targetCents)}`}
+                  </Text>
+                  {mainProgress.targetCents !== null ? (
+                    <Text style={styles.headLine}>{mainProgress.leftCents > 0 ? `${rand(mainProgress.leftCents)} to go` : "Goal reached"}</Text>
+                  ) : null}
+                </View>
+              </View>
+              <View style={styles.tiles} accessibilityLabel="Months with a gift">
+                {tiles.map((t, i) => (
+                  <View key={i} style={styles.tileWrap}>
+                    <View style={[styles.tile, t.given ? styles.tileGiven : t.future ? styles.tileFuture : styles.tileEmpty, t.current && styles.tileNow]} />
+                    <Text style={styles.tileLabel}>{t.label.slice(0, 1)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.headLine}>Your giving, your goals and what you have given elsewhere, in one place.</Text>
+          )}
+        </BlueHeader>
+        <View style={{ paddingHorizontal: space.gutter, gap: space.block }}>
         {state === "loading" ? (
           <View style={{ gap: space.block }}>
             <SkeletonBlock height={190} />
@@ -250,31 +277,45 @@ export default function Giving() {
               </View>
             ) : (
               <View style={{ gap: 26 }}>
+                {/* One chip per goal opens it to change; the first is the ring above. */}
+                <View style={styles.goalChips}>
+                  {goals.map((g) => (
+                    <Pressable key={g.id} accessibilityRole="button" accessibilityLabel={`Change ${g.name}`} onPress={() => { setSaved(false); setEditing(g.id); }} style={styles.goalChip}>
+                      <Text style={styles.goalChipText}>{g.name}</Text>
+                    </Pressable>
+                  ))}
+                  {goals.length < MAX_GOALS ? (
+                    <Pressable accessibilityRole="button" onPress={() => { setSaved(false); setEditing("new"); }} style={[styles.goalChip, styles.goalChipAdd]}>
+                      <Text style={[styles.goalChipText, { color: colors.blue }]}>Add a goal</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 {goals.map((g, i) => {
-                  const pr = goalProgress(g, goalRows, income, now);
+                  const pr = i === 0 && mainProgress ? mainProgress : goalProgress(g, goalRows, income, now);
                   return (
                     <View key={g.id} style={{ gap: 10 }}>
-                      {pr.targetCents === null ? (
+                      {i === 0 ? null : pr.targetCents === null ? (
                         <View style={{ gap: 6 }}>
                           <Text style={styles.stripKicker}>{g.name} · {pr.window.label}</Text>
                           <Text variant="amount" style={{ fontSize: 34, lineHeight: 38 }}>{rand(pr.givenCents)} given</Text>
                           <Text variant="bodyMuted">This goal is a share of your income. Log your income below and we work out the amount.</Text>
                         </View>
                       ) : (
-                        <MaaserProgress title={g.name} givenCents={pr.givenCents} targetCents={pr.targetCents} period={g.period} periodLabel={pr.window.label} endLabel={pr.window.endLabel} compact={i > 0} />
+                        <MaaserProgress title={g.name} givenCents={pr.givenCents} targetCents={pr.targetCents} period={g.period} periodLabel={pr.window.label} endLabel={pr.window.endLabel} compact />
                       )}
+                      {i === 0 && pr.targetCents === null ? (
+                        <Text variant="bodyMuted">{g.name} is a share of your income. Log your income below and we work out the amount.</Text>
+                      ) : null}
                       {pr.perMonthCents > 0 ? (
-                        <Text variant="bodyMuted">About {rand(pr.perMonthCents)} a month over the {pr.window.monthsLeft} {pr.window.monthsLeft === 1 ? "month" : "months"} left.</Text>
+                        <Text variant="bodyMuted">{i === 0 ? `${g.name}: about` : "About"} {rand(pr.perMonthCents)} a month over the {pr.window.monthsLeft} {pr.window.monthsLeft === 1 ? "month" : "months"} left.</Text>
                       ) : null}
                       <Text variant="label">{g.counts ? `Counts gifts labelled ${g.counts.join(", ")}.` : "Counts all your giving, including giving you logged elsewhere."}</Text>
-                      <TextLink label="Change" onPress={() => { setSaved(false); setEditing(g.id); }} />
                     </View>
                   );
                 })}
                 {saved ? (
                   <Text variant="label" style={{ paddingHorizontal: 4, color: colors.successText }} accessibilityLiveRegion="polite">Goal saved.</Text>
                 ) : null}
-                {goals.length < MAX_GOALS ? <TextLink label="Add another goal" onPress={() => { setSaved(false); setEditing("new"); }} /> : null}
                 <TextLink label="Find a charity" onPress={() => router.push("/discover")} />
               </View>
             )}
@@ -482,6 +523,7 @@ export default function Giving() {
             ) : null}
           </>
         )}
+        </View>
       </ScrollView>
 
       <Sheet visible={open !== null} onClose={() => { setOpen(null); setConfirmCancel(false); setRecurringError(null); }}>
@@ -615,7 +657,23 @@ const newEntryId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
-  arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
+  headTitle: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
+  headKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilac },
+  headAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
+  headLine: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
+  ringRow: { flexDirection: "row", alignItems: "center", gap: 18 },
+  tiles: { flexDirection: "row", gap: 4 },
+  tileWrap: { flex: 1, alignItems: "center", gap: 4 },
+  tile: { width: "100%", height: 22, borderRadius: 7 },
+  tileGiven: { backgroundColor: colors.orange },
+  tileEmpty: { backgroundColor: colors.navy },
+  tileFuture: { borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.lilac },
+  tileNow: { borderWidth: 2, borderColor: colors.onInk },
+  tileLabel: { fontFamily: fonts.bodySemibold, fontSize: 11, color: colors.lilacSoft },
+  goalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
+  goalChipAdd: { borderStyle: "dashed", borderColor: colors.blue },
+  goalChipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   heading: { fontSize: 22, lineHeight: 28 },
   // Lists are ruled like a ledger: lines above and below, no box.
   list: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },

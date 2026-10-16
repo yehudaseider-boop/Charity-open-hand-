@@ -2,24 +2,30 @@ import { parseRandToCents } from "@shared/money";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
 import { Field } from "@/components/field";
-import { CheckIcon } from "@/components/icons";
+import { GiftSent, type SentGift } from "@/components/gift-sent";
+import { Blob } from "@/components/blob";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
-import { gifts as sampleGifts } from "@/data/giving";
+import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleGoals } from "@/data/giving";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
 import { cleanLabel, LEGACY_KIND_LABELS } from "@shared/donations/labels";
 import { useAccount } from "@/lib/account";
 import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
-import { rand } from "@/lib/format";
+import { jhbToday, rand } from "@/lib/format";
+import { counts, goalProgress, type Goal } from "@/lib/goals";
+import { loadGoals } from "@/lib/goals-store";
+import { monthsInARow } from "@/lib/streak";
+import { useStoredRecord } from "@/lib/use-stored-record";
+import { charityShareText } from "@/lib/share";
 import { openGivingPage, refreshAfterGiving } from "@/lib/give-flow";
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
@@ -27,6 +33,10 @@ import { openSite, openUrl } from "@/lib/open-site";
 import { afterPaymentMessage, centsToInput, checkReady, lastLabel, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
+
+const noGoals: Goal[] = [];
+/** Starting amounts when the donor hasn't given here before. Suggestions only; any amount works. */
+const STARTER_AMOUNTS = [10_000, 25_000, 50_000];
 
 /**
  * Give inside the app, on one screen, in as few taps as possible: past amounts are one tap, what
@@ -41,12 +51,18 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
  */
 export default function Give() {
   const insets = useSafeAreaInsets();
-  const { slug, kind: kindParam, label: labelParam, campaign: campaignParam } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string }>();
+  const { slug, kind: kindParam, label: labelParam, campaign: campaignParam, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
   const { charity, failed, retry } = useCharity(slug);
   const account = useAccount();
   const preview = account.status === "preview";
   const history = preview ? sampleGifts : (account.live?.gifts ?? []);
-  const quick = slug ? quickAmounts(history, slug) : [];
+  const elsewhere = preview ? sampleElsewhere : (account.live?.elsewhere ?? []);
+  const pastAmounts = slug ? quickAmounts(history, slug) : [];
+  const quick = pastAmounts.length ? pastAmounts : STARTER_AMOUNTS;
+  const owner = account.status === "signed-in" ? account.userId : null;
+  const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
+  const goals = useStoredRecord<Goal[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadGoals, initial: preview ? sampleGoals : noGoals });
+  const goal = goals.value[0] ?? null;
 
   // Asked of the server once per visit (and on "Try again"). The preview has no server.
   const [ready, setReady] = useState<ReadyReply | undefined>(undefined);
@@ -84,7 +100,15 @@ export default function Give() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<false | "opening" | "checking">(false);
   // Paid (or finished and being confirmed), shown here for donors whose giving history won't show it.
-  const [done, setDone] = useState<null | { cents: number; email: string; confirming: boolean }>(null);
+  const [done, setDone] = useState<SentGift | null>(null);
+  // Preview of the after-gift screen for design review: ?demo=sent.
+  const [demoShown, setDemoShown] = useState(false);
+
+  // The proud screen says thank you here, so the tabs' "a donation arrived" thank-you doesn't pop up again over it.
+  const { arrived, dismissArrived } = account;
+  useEffect(() => {
+    if (done && arrived.length) dismissArrived();
+  }, [done, arrived, dismissArrived]);
 
   useEffect(() => {
     let live = true;
@@ -170,24 +194,13 @@ export default function Give() {
     );
   }
 
+  const finish = () => {
+    dismissArrived();
+    if (router.canGoBack()) router.back();
+    else router.replace("/home");
+  };
   if (done) {
-    return (
-      <View style={styles.screen}>
-        <TopBar title="Thank you" />
-        <View style={{ padding: space.gutter, gap: 14, alignItems: "center" }}>
-          <View style={styles.badge}>
-            <CheckIcon size={34} color={colors.onInk} />
-          </View>
-          <Text variant="h1" style={{ fontSize: 30, lineHeight: 36, textAlign: "center" }} accessibilityRole="header">Thank you</Text>
-          <Text style={styles.doneBody}>
-            {done.confirming
-              ? `We're confirming your ${rand(done.cents)} to ${charity.nameEn}. Your confirmation email goes to ${done.email} in a minute. Please don't pay again.`
-              : `Your ${rand(done.cents)} to ${charity.nameEn} went through. A confirmation is on its way to ${done.email}.`}
-          </Text>
-          <Button label="Done" onPress={() => (router.canGoBack() ? router.back() : router.replace("/discover"))} style={{ alignSelf: "stretch" }} />
-        </View>
-      </View>
-    );
+    return <GiftSent gift={done} charityName={charity.nameEn} impact={charity.impact ?? null} shareText={charityShareText(SITE_URL, charity)} onDone={finish} />;
   }
 
   // The campaign counts only once the server says it is still running (so a gift never quietly
@@ -206,6 +219,31 @@ export default function Give() {
   const savedLast4 = server?.savedIdLast4 ?? null;
   const usingSavedId = s18aAvailable && want18a && Boolean(savedLast4) && useSavedId;
   const showDetailFields = !remembered || editingDetails;
+
+  /** What the after-gift screen shows: this gift added to the goal and the streak, and honest badges. */
+  function sentSummary(cents: number, mail: string, confirming: boolean): SentGift {
+    const today = jhbToday();
+    const rows = [...history, ...elsewhere, { date: today, cents, label: cleanLabel(label) }];
+    const pr = goal && counts(goal, cleanLabel(label)) ? goalProgress(goal, rows, [], today) : null;
+    const badges = [
+      history.length === 0 ? "First gift on Givezy" : null,
+      isMonthly ? "Monthly giver" : null,
+      s18aAvailable && want18a ? "s18A receipt at tax time" : null,
+      pr && goal ? `Counts towards ${goal.name}` : null,
+    ].filter((b): b is string => Boolean(b));
+    return {
+      cents,
+      email: mail,
+      confirming,
+      goal: pr && goal && pr.targetCents ? { name: goal.name, percent: Math.floor((pr.givenCents * 100) / pr.targetCents), givenCents: pr.givenCents, targetCents: pr.targetCents } : null,
+      streak: monthsInARow(rows.map((r) => r.date), today),
+      badges,
+    };
+  }
+  if (demo === "sent" && !SITE_URL && !demoShown) {
+    setDemoShown(true);
+    setDone(sentSummary(18_000, "sarah@example.co.za", false));
+  }
 
   function check() {
     const e: Record<string, string> = {};
@@ -301,19 +339,18 @@ export default function Give() {
     }
     haptic.success();
     void refreshAfterGiving(account.refresh);
-    // A signed-in donor giving with their account's email sees the thank-you in the Giving tab
-    // (already open underneath; replace would stack a second tab bar). Anyone else, here.
-    const intoHistory = account.status === "signed-in" && (account.email ?? "").toLowerCase() === details.email.toLowerCase();
-    if (intoHistory) router.dismissTo("/giving");
-    else setDone({ cents: total, email: details.email, confirming: outcome !== "paid" });
+    setDone(sentSummary(total, details.email, outcome !== "paid"));
   }
 
   const err = (k: string) => errors[k];
   const buttonLabel = busy === "opening" ? "Opening the payment page" : busy === "checking" ? "Checking your payment" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
+  // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
+  const goalLabel = goal?.counts?.[0] ?? null;
+  const counting = goal ? counts(goal, cleanLabel(label)) : false;
 
   return (
     <View style={styles.screen}>
-      <TopBar title={`Give to ${charity.nameEn}`} fallback="/discover" />
+      <TopBar title={`Giving to ${charity.nameEn}`} fallback="/discover" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: space.gutter, gap: 18, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           {campaign ? <CampaignCard campaign={campaign} compact /> : null}
@@ -322,21 +359,55 @@ export default function Give() {
               <Text>That campaign has ended. Your gift goes to {charity.nameEn}.</Text>
             </View>
           ) : null}
-          <View style={{ gap: 10 }}>
-            <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} error={err("amount")} placeholder="0" helper={minGift ? `At least ${rand(minGift)}.` : undefined} />
-            {quick.length ? (
-              <View style={styles.chips} accessibilityLabel="Amounts you gave before">
-                {quick.map((c) => {
-                  const on = gift === c;
+          {/* The amount, big, on blue, with what a gift does in the charity's own words. */}
+          <View style={styles.amountCard}>
+            <Blob size={120} color={colors.orange} rotate={20} style={{ right: -48, top: -52 }} />
+            <Blob size={90} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -50, bottom: -64 }} />
+            <Text style={styles.amountKicker}>Your gift</Text>
+            <View style={styles.amountRow}>
+              <Text style={styles.amountR}>R</Text>
+              <TextInput
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={colors.lilac}
+                accessibilityLabel="Amount in Rand"
+                style={styles.amountInput}
+              />
+            </View>
+            {charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
+          </View>
+          {err("amount") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert">{err("amount")}</Text> : minGift ? <Text variant="label">At least {rand(minGift)}.</Text> : null}
+          <View style={styles.chips} accessibilityLabel={pastAmounts.length ? "Amounts you gave before" : "Suggested amounts"}>
+            {quick.map((c) => {
+              const on = gift === c;
+              return (
+                <Pressable key={c} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Give ${rand(c)}`} accessibilityState={{ selected: on }} style={[styles.chip, on && styles.chipOn]}>
+                  <Text style={[styles.chipText, on && { color: colors.onInk }]}>{rand(c)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {goal && goalLabel ? (
+            <View style={{ gap: 10 }}>
+              <Text style={styles.question}>Count this gift towards {goal.name}?</Text>
+              <View style={styles.chips} accessibilityRole="radiogroup">
+                {([true, false] as const).map((yes) => {
+                  const on = counting === yes;
                   return (
-                    <Pressable key={c} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Give ${rand(c)}`} accessibilityState={{ selected: on }} style={[styles.chip, on && styles.chipOn]}>
-                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{rand(c)}</Text>
+                    <Pressable key={String(yes)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setLabel(yes ? goalLabel : null); }} style={[styles.chip, on && styles.chipOn]}>
+                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{yes ? "Yes, count it" : "Not this time"}</Text>
                     </Pressable>
                   );
                 })}
               </View>
-            ) : null}
-          </View>
+            </View>
+          ) : goal ? (
+            <Text variant="bodyMuted">Every gift counts towards {goal.name}.</Text>
+          ) : null}
+          {/* "Cover the card fee" stays hidden until the payment provider's rates are in the platform config: the fee is never a made-up figure. */}
 
           <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
 
@@ -470,7 +541,7 @@ export default function Give() {
 
           {message ? <Text accessibilityRole="alert" style={{ color: SITE_URL ? colors.danger : colors.ink }}>{message}</Text> : null}
           <View style={{ gap: 8 }}>
-            <Button label={buttonLabel} disabled={busy !== false} onPress={give} />
+            <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
             <Text variant="label" style={{ textAlign: "center" }}>
               {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}. ` : ""}You enter your card on a secure payment page, never in the app.
             </Text>
@@ -484,14 +555,19 @@ export default function Give() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.blue, justifyContent: "center", backgroundColor: colors.surface },
-  chipOn: { backgroundColor: colors.blue },
-  chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.blue },
-  footer: { paddingHorizontal: space.gutter, paddingTop: 12, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1, borderTopColor: colors.hairline },
+  chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, justifyContent: "center", backgroundColor: colors.surface },
+  chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
+  footer: { paddingHorizontal: space.gutter, paddingTop: 12, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1.5, borderTopColor: colors.lightPurple },
+  amountCard: { padding: 20, gap: 4, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
+  amountKicker: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.lilac },
+  amountRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  amountR: { fontFamily: fonts.display, fontSize: 44, lineHeight: 56, color: colors.onInk },
+  amountInput: { flex: 1, fontFamily: fonts.display, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
+  amountImpact: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft },
+  question: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy },
   giver: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   note: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   links: { flexDirection: "row", gap: 18, marginLeft: 36 },
   link: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue, textDecorationLine: "underline" },
-  badge: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center", marginTop: 12 },
-  doneBody: { fontSize: 17, lineHeight: 25, textAlign: "center" },
 });

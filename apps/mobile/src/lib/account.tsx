@@ -1,6 +1,8 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import { POLICY_VERSION } from "@shared/policy";
 import type { Gift, Receipt, Recurring } from "@/data/giving";
 import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
@@ -41,6 +43,8 @@ type AccountValue = {
   accessToken(): Promise<string | null>;
   sendCode(email: string): Promise<{ ok: true } | { ok: false; message: string }>;
   verifyCode(email: string, code: string): Promise<{ ok: true } | { ok: false; message: string }>;
+  /** Google or Apple, on the provider's own page. Only offered once SOCIAL_SIGN_IN is on. */
+  signInWith(provider: "google" | "apple"): Promise<{ ok: true } | { ok: false; message: string }>;
   agree(): Promise<{ ok: true } | { ok: false; message: string }>;
   refresh(): Promise<void>;
   signOut(): Promise<void>;
@@ -334,6 +338,18 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
         return error ? { ok: false, message: "That code didn't work or has expired. Check it, or ask for a new one." } : { ok: true };
+      },
+      async signInWith(provider) {
+        if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
+        const returnTo = Linking.createURL("auth");
+        const { data, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: returnTo, skipBrowserRedirect: true } });
+        if (error || !data.url) return { ok: false, message: "That sign-in isn't available right now. Please use your email." };
+        const r = await WebBrowser.openAuthSessionAsync(data.url, returnTo);
+        if (r.type !== "success") return { ok: false, message: "Sign-in was cancelled." };
+        const code = new URL(r.url).searchParams.get("code");
+        if (!code) return { ok: false, message: "That sign-in didn't finish. Please try again, or use your email." };
+        const { error: e2 } = await supabase.auth.exchangeCodeForSession(code);
+        return e2 ? { ok: false, message: "That sign-in didn't finish. Please try again, or use your email." } : { ok: true };
       },
       async agree() {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };

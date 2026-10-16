@@ -11,6 +11,7 @@ export type CharityRow = {
   name_en: string;
   description_en: string | null;
   funds_use_en: string | null;
+  impact_en?: string | null;
   cover_path: string | null;
   suburb: string | null;
   city: string | null;
@@ -23,7 +24,7 @@ export type PhotoRow = { id: string; storage_path: string; caption_en: string | 
 export type UpdateRow = { id: string; body_en: string; photo_path: string | null; created_at: string };
 
 export const CHARITY_COLUMNS =
-  "id, slug, name_en, description_en, funds_use_en, cover_path, suburb, city, is_s18a, mandate_signed_at, charity_categories(category_id)";
+  "id, slug, name_en, description_en, funds_use_en, impact_en, cover_path, suburb, city, is_s18a, mandate_signed_at, charity_categories(category_id)";
 
 /** Public images live in the charity-public bucket. */
 export function imageUrl(base: string, path: string | null): string | null {
@@ -54,6 +55,7 @@ export function toCharity(row: CharityRow, base: string): Charity {
     issues18a: row.is_s18a && row.mandate_signed_at !== null,
     about: [row.description_en ?? "", row.funds_use_en ?? ""],
     coverUrl: imageUrl(base, row.cover_path),
+    impact: row.impact_en?.trim() || null,
   };
 }
 

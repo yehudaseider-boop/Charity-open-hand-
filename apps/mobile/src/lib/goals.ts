@@ -160,3 +160,21 @@ export function knownLabels(rows: { label: string | null }[], extra: readonly st
   }
   return [...seen.values()].sort((a, b) => b.n - a.n || a.label.localeCompare(b.label)).map((s) => s.label);
 }
+
+export type MonthTile = { label: string; given: boolean; future: boolean; current: boolean };
+
+/**
+ * One tile per month of the goal's year (a monthly goal shows the tax year): given when a gift
+ * that counts towards the goal was made that month, future for months still to come.
+ */
+export function monthTiles(goal: Goal, rows: Row[], today: Date): MonthTile[] {
+  const w = goalWindow(goal.period === "year" ? goal : { period: "year", year: "tax" }, today);
+  const key = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+  const given = new Set(rows.filter((r) => counts(goal, r.label)).map((r) => key(r.date)));
+  const now = key(today);
+  const tiles: MonthTile[] = [];
+  for (let m = key(w.start); m <= key(w.end); m++) {
+    tiles.push({ label: MONTHS[m % 12].slice(0, 3), given: given.has(m), future: m > now, current: m === now });
+  }
+  return tiles;
+}

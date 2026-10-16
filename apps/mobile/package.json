@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@expo-google-fonts/fraunces": "^0.4.1",
+    "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/fredoka": "^0.4.1",
     "@expo-google-fonts/heebo": "^0.4.2",
-    "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~57.0.17",
     "@supabase/supabase-js": "^2.117.3",
     "expo": "~57.0.29",

@@ -4,16 +4,16 @@
  * Kept dependency-free.
  */
 export const brandColors = {
-  cream: "#FEFDF7",
+  cream: "#FFFFFF", // page background (white in v2)
   surface: "#FFFFFF",
-  ink: "#102848", // navy: body text
-  blue: "#1848A8", // headlines, buttons, links
-  blueSoft: "#E8EEFB",
-  muted: "#5B6B84",
-  hairline: "#E6E3D8",
-  hairlineSoft: "#F0EEE6", // table rules on white
-  orange: "#F88038", // graphics only, never text
-  lilac: "#CCB3FB",
-  lilacSoft: "#F1EAFE",
+  ink: "#092577", // deep navy: body text
+  blue: "#1749B5", // headlines, buttons, links
+  blueSoft: "#E5D9FF",
+  muted: "#34466A", // slate
+  hairline: "#E5D9FF", // light purple
+  hairlineSoft: "#F2ECFF", // table rules on white
+  orange: "#FF914D", // graphics and calls to action, navy text on it
+  lilac: "#C9B4FA",
+  lilacSoft: "#F2ECFF",
   danger: "#B3261E",
 } as const;

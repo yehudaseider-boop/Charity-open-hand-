@@ -7,7 +7,7 @@ import { QuickGive } from "@/components/quick-give";
 import { Sheet } from "@/components/sheet";
 import { ThankYou } from "@/components/thank-you";
 import { haptic } from "@/lib/haptics";
-import { AccountIcon, DiscoverIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
+import { AccountIcon, DiscoverIcon, HomeIcon, ProgressIcon } from "@/components/icons";
 import { Splash } from "@/components/splash";
 import { colors, fonts, lift, radius } from "@/theme/tokens";
 
@@ -54,7 +54,7 @@ function GiveButton({ onPress }: { onPress: () => void }) {
 const styles = StyleSheet.create({
   giveSlot: { flex: 1, alignItems: "center" },
   giveWrap: { alignItems: "center", marginTop: -30 },
-  giveCircle: { width: 70, height: 70, borderRadius: 35, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: colors.blue, ...lift, shadowOpacity: 0.28, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  giveCircle: { width: 70, height: 70, borderRadius: 35, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: colors.blue, borderBottomWidth: 6, borderBottomColor: colors.navy, ...lift, shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   giveLabel: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 20, color: colors.blue, marginTop: 0 },
   pill: { width: 56, height: 32, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   pillOn: { backgroundColor: colors.blueSoft },
@@ -63,9 +63,9 @@ const styles = StyleSheet.create({
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   // Keep the last tab's background while a pushed screen (a charity page) is on top, so it doesn't swap underneath.
-  const first = usePathname().split("/")[1] || "discover";
-  const tab = (["discover", "giving", "receipts", "account"] as const).find((t) => t === first);
-  const [variant, setVariant] = useState<BackdropVariant>(tab ?? "discover");
+  const first = usePathname().split("/")[1] || "home";
+  const tab = (["home", "discover", "giving", "receipts", "account"] as const).find((t) => t === first);
+  const [variant, setVariant] = useState<BackdropVariant>(tab ?? "home");
   if (tab && tab !== variant) setVariant(tab);
   const [giving, setGiving] = useState(false);
   return (
@@ -79,15 +79,17 @@ export default function TabsLayout() {
         animation: "fade",
         tabBarActiveTintColor: colors.blue,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 0, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, height: 68 + insets.bottom, paddingTop: 8, paddingBottom: insets.bottom + 4, ...lift, shadowOffset: { width: 0, height: -6 } },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 1.5, borderTopColor: colors.lightPurple, height: 68 + insets.bottom, paddingTop: 8, paddingBottom: insets.bottom + 4 },
         sceneStyle: { backgroundColor: "transparent" },
       }}
     >
+      <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: label("Home"), tabBarIcon: icon(HomeIcon) }} />
       <Tabs.Screen name="discover" options={{ title: "Discover", tabBarLabel: label("Discover"), tabBarIcon: icon(DiscoverIcon) }} />
-      <Tabs.Screen name="giving" options={{ title: "Giving", tabBarLabel: label("Giving"), tabBarIcon: icon(GivingIcon) }} />
       <Tabs.Screen name="give-now" options={{ title: "Give", tabBarButton: () => <GiveButton onPress={() => setGiving(true)} /> }} />
-      <Tabs.Screen name="receipts" options={{ title: "Receipts", tabBarLabel: label("Receipts"), tabBarIcon: icon(ReceiptsIcon) }} />
+      <Tabs.Screen name="giving" options={{ title: "Progress", tabBarLabel: label("Progress"), tabBarIcon: icon(ProgressIcon) }} />
       <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: label("Account"), tabBarIcon: icon(AccountIcon) }} />
+      {/* Receipts are opened from Account (and Home); the page keeps its address. */}
+      <Tabs.Screen name="receipts" options={{ title: "Receipts", href: null }} />
     </Tabs>
     <Sheet visible={giving} onClose={() => setGiving(false)}>
       <QuickGive onDone={() => setGiving(false)} />

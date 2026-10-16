@@ -1,47 +1,56 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { parseRandToCents } from "@shared/money";
 import { Backdrop } from "@/components/backdrop";
-import { Button } from "@/components/button";
-import { Drop } from "@/components/splash";
+import { Blob } from "@/components/blob";
+import { Button, TextLink } from "@/components/button";
 import { FadeUp } from "@/components/fade-up";
+import { Field } from "@/components/field";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
-import { SkeletonBlock } from "@/components/states";
-import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
-import { haptic } from "@/lib/haptics";
 import { useAccount } from "@/lib/account";
+import { saveCausePrefs } from "@/lib/cause-prefs";
+import { causeList } from "@/lib/directory";
+import { rand } from "@/lib/format";
 import { saveGoals } from "@/lib/goals-store";
-import { useJewishMode } from "@/lib/jewish-mode";
-import { JEWISH_LABELS } from "@shared/donations/labels";
+import { haptic } from "@/lib/haptics";
 import { notify } from "@/lib/open-site";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
-import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
+import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
+/** The onboarding steps after the welcome screen. */
 const STEPS = 3;
 
-const how = [
-  { title: "Find a charity here", body: "See what each charity does and whether it issues s18A receipts." },
-  { title: "Give on our website", body: "Tap Give and our website opens. You choose the amount and pay there securely." },
-  { title: "It all comes back to the app", body: "Sign in with the email you gave with. Your donations, receipts and giving goal show up here." },
+/** Goal names to start from; the donor names their own goal, so maaser is one option, never the default. */
+const GOAL_NAMES = ["Giving goal", "Maaser", "Tithe"] as const;
+
+const SAFE = [
+  { title: "Your card goes on a secure page", body: "You enter it on our payment partner's own secure page, never in this app." },
+  { title: "Kept there, not with us", body: "For monthly gifts, your card is kept by the payment partner, so next month needs no typing. Givezy never sees or stores it." },
+  { title: "Givezy never holds the money", body: "Your gift goes from the payment partner straight to the charity's bank account." },
 ];
 
 /**
- * First open: three short screens (what Givezy is, how giving works, an
- * optional maaser target). Skippable, and shown once per phone.
- * `?welcome=1&step=2` shows it again for design review.
+ * First open: the blue welcome, then three steps: the causes you care about, your giving goal, and
+ * how two-tap giving is kept safe. Skippable, and shown once per phone.
+ * `?welcome=1&step=2` shows it again for design review (step 0 is the welcome).
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
-  const jewish = useJewishMode();
   const account = useAccount();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
   const forced = p.welcome === "1";
   const [seen, setSeen] = useState<boolean | null>(forced ? false : null);
-  const [step, setStep] = useState(() => Math.min(STEPS, Math.max(1, Number(p.step) || 1)));
+  const [step, setStep] = useState(() => Math.min(STEPS, Math.max(0, Number(p.step) || 0)));
+  const [picked, setPicked] = useState<string[]>([]);
+  const [goalName, setGoalName] = useState<string>("Giving goal");
+  const [ownName, setOwnName] = useState("");
+  const [writingOwn, setWritingOwn] = useState(false);
+  const [yearly, setYearly] = useState("");
+  const [amountError, setAmountError] = useState<string | undefined>();
 
   useEffect(() => {
     if (!forced) hasBeenWelcomed().then(setSeen);
@@ -50,66 +59,41 @@ export default function Welcome() {
   // Android's back button steps back through the welcome rather than closing the app.
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (step <= 1) return false;
+      if (step <= 0) return false;
       setStep(step - 1);
       return true;
     });
     return () => sub.remove();
   }, [step]);
 
-  if (seen === null) return <View style={styles.screen} />;
-  if (seen) return <Redirect href="/discover" />;
+  if (seen === null) return <View style={styles.blueScreen} />;
+  if (seen) return <Redirect href="/home" />;
 
   const finish = () => {
     markWelcomed();
-    router.replace("/discover");
+    router.replace("/home");
   };
-  const next = () => {
-    setStep((s) => Math.min(STEPS, s + 1));
-  };
+  const next = () => setStep((s) => Math.min(STEPS, s + 1));
+  const yearlyCents = parseRandToCents(yearly);
+  const perMonth = yearlyCents && yearlyCents > 0 ? Math.ceil(yearlyCents / 12 / 100) * 100 : null;
+  const causes = causeList().filter((c) => c.id !== "all");
 
-
-  const skip =
-    step < STEPS ? (
-      <Pressable accessibilityRole="button" accessibilityLabel="Skip the introduction" hitSlop={8} onPress={finish} style={[styles.skip, { top: insets.top + 8 }]}>
-        <Text style={[type.button, { fontSize: 16, color: colors.blue }]}>Skip</Text>
-      </Pressable>
-    ) : null;
-
-  const dots = (
-    <View style={styles.dots} accessible accessibilityLabel={`Step ${step} of ${STEPS}`}>
-      {Array.from({ length: STEPS }, (_, i) => (
-        <View key={i} style={[styles.dot, i + 1 === step && styles.dotOn]} />
-      ))}
-    </View>
-  );
-
-  if (step === 1) {
+  if (step === 0) {
     return (
-      <View style={styles.screen}>
-        <View style={styles.hero}>
-          <LinearGradient colors={[colors.lilacSoft, colors.cream]} locations={[0, 1]} style={StyleSheet.absoluteFill} />
-          <View style={{ position: "absolute", right: -50, top: insets.top + 40 }}><Drop size={130} color={colors.lilac} rotate={16} opacity={0.55} /></View>
-          <View style={{ position: "absolute", left: -40, bottom: 10 }}><Drop size={150} color={colors.orange} rotate={-22} opacity={0.3} /></View>
-          <FadeUp style={styles.heroLogo}>
-            <Logo width={260} tagline />
-          </FadeUp>
-          {skip}
-        </View>
-
-        <View style={[styles.content, { paddingBottom: insets.bottom + space.md }]}>
-          <FadeUp>
-            <Text variant="hero" accessibilityRole="header">
-              Give to the causes you care about.
-            </Text>
-            <Text variant="bodyMuted" style={styles.support}>
-              Find charities you trust, give in a few taps, and keep all your giving in one place.
-            </Text>
-          </FadeUp>
-          <View style={styles.actions}>
-            {dots}
-            <Button label="Next" onPress={next} />
-          </View>
+      <View style={[styles.blueScreen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+        <Blob size={260} color={colors.orange} rotate={25} style={{ right: -110, top: insets.top + 90 }} />
+        <Blob size={200} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -110, top: insets.top + 150 }} />
+        <View style={styles.gutter}><Logo width={150} white /></View>
+        <View style={{ flex: 1 }} />
+        <FadeUp style={[styles.gutter, { gap: 14 }]}>
+          <Text style={styles.welcomeTitle} accessibilityRole="header">Give in two taps.</Text>
+          <Text style={styles.welcomeLine}>All your giving, finally in one place. Every charity checked by us.</Text>
+        </FadeUp>
+        <View style={[styles.gutter, { gap: 6, marginTop: 28 }]}>
+          <Button variant="white" label="Get started" onPress={next} />
+          <Pressable onPress={() => { markWelcomed(); router.replace("/account"); }} accessibilityRole="link" style={styles.alreadyLink}>
+            <Text style={styles.alreadyText}>I already have an account</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -118,70 +102,111 @@ export default function Welcome() {
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <Backdrop variant="page" />
-      {skip}
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter, paddingTop: insets.top + 56, paddingBottom: insets.bottom + space.md, gap: space.block }}
-      >
-        {step === 2 ? (
-          <FadeUp key="how" style={{ flex: 1, gap: space.block }}>
-            <Text variant="h1" accessibilityRole="header">
-              Giving happens on our website.
-            </Text>
-            <View style={{ gap: 20 }}>
-              {how.map((s, i) => (
-                <View key={s.title} style={styles.step}>
-                  <View style={styles.number}>
-                    <Text style={styles.numberText}>{i + 1}</Text>
-                  </View>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter, paddingTop: insets.top + 16, paddingBottom: insets.bottom + space.md, gap: space.block }}>
+        <View style={styles.topRow}>
+          {/* Three segments: where you are in the setup. */}
+          <View style={styles.bar} accessible accessibilityLabel={`Step ${step} of ${STEPS}`}>
+            {Array.from({ length: STEPS }, (_, i) => (
+              <View key={i} style={[styles.segment, i < step && styles.segmentOn]} />
+            ))}
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Skip the setup" hitSlop={8} onPress={finish} style={styles.skip}>
+            <Text style={styles.skipText}>Skip</Text>
+          </Pressable>
+        </View>
+
+        {step === 1 ? (
+          <FadeUp key="causes" style={{ flex: 1, gap: space.block }}>
+            <View style={{ gap: 8 }}>
+              <Text variant="h1" accessibilityRole="header">What do you care about?</Text>
+              <Text variant="bodyMuted">Pick as many as you like. We show you these first.</Text>
+            </View>
+            <View style={styles.chips}>
+              {causes.map((c) => {
+                const on = picked.includes(c.id);
+                return (
+                  <Pressable
+                    key={c.id}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    onPress={() => {
+                      haptic.tap();
+                      setPicked((ps) => (on ? ps.filter((x) => x !== c.id) : [...ps, c.id]));
+                    }}
+                    style={[styles.chip, on && styles.chipOn]}
+                  >
+                    {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
+                    <Text style={[styles.chipText, on && { color: colors.onInk }]}>{c.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={{ flex: 1 }} />
+            <Button label="Next" onPress={() => { void saveCausePrefs(picked); next(); }} />
+          </FadeUp>
+        ) : step === 2 ? (
+          <FadeUp key="goal" style={{ flex: 1, gap: space.block }}>
+            <View style={{ gap: 8 }}>
+              <Text variant="h1" accessibilityRole="header">Name your goal.</Text>
+              <Text variant="bodyMuted">Optional. Only you see it, and you can change it any time.</Text>
+            </View>
+            <View style={styles.chips} accessibilityRole="radiogroup">
+              {GOAL_NAMES.map((n) => {
+                const on = !writingOwn && goalName === n;
+                return (
+                  <Pressable key={n} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setWritingOwn(false); setGoalName(n); }} style={[styles.chip, on && styles.chipOn]}>
+                    <Text style={[styles.chipText, on && { color: colors.onInk }]}>{n}</Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable accessibilityRole="radio" accessibilityState={{ selected: writingOwn }} onPress={() => { haptic.tap(); setWritingOwn(true); }} style={[styles.chip, writingOwn && styles.chipOn]}>
+                <Text style={[styles.chipText, writingOwn && { color: colors.onInk }]}>Write your own</Text>
+              </Pressable>
+            </View>
+            {writingOwn ? <Field label="Your goal's name" value={ownName} onChangeText={setOwnName} maxLength={40} /> : null}
+            <Field label="How much a year?" prefix="R" keyboardType="decimal-pad" value={yearly} onChangeText={setYearly} placeholder="0" error={amountError} />
+            <View style={styles.previewCard}>
+              <Text style={styles.previewKicker}>That&apos;s about</Text>
+              <Text style={styles.previewAmount}>{perMonth ? `${rand(perMonth)} a month` : "R__ a month"}</Text>
+            </View>
+            <View style={{ flex: 1 }} />
+            <Button
+              label="Next"
+              onPress={async () => {
+                if (!yearly.trim()) return next(); // no goal for now
+                if (!yearlyCents || yearlyCents <= 0) return setAmountError("Enter an amount in Rand, for example 12000");
+                setAmountError(undefined);
+                const name = (writingOwn ? ownName.trim() : goalName) || "Giving goal";
+                const saved = await saveGoals(
+                  [{ id: `${Date.now()}`, name: name.slice(0, 40), basis: "fixed", percentPpm: null, fixedCents: yearlyCents, period: "year", year: "tax", counts: null }],
+                  account.status === "signed-in" ? account.userId : null,
+                );
+                if (!saved.ok) return notify("Your goal was not saved", "It could not be saved on this phone. Please try again, or skip and set it later on the Progress tab.");
+                haptic.success();
+                next();
+              }}
+            />
+            <TextLink label="Not now" onPress={next} />
+          </FadeUp>
+        ) : (
+          <FadeUp key="safe" style={{ flex: 1, gap: space.block }}>
+            <View style={{ gap: 8 }}>
+              <Text variant="h1" accessibilityRole="header">Two-tap giving, kept safe.</Text>
+              <Text variant="bodyMuted">How giving works, so you know where your card and your money go.</Text>
+            </View>
+            <View style={{ gap: 12 }}>
+              {SAFE.map((s, i) => (
+                <View key={s.title} style={styles.safeCard}>
+                  <View style={styles.safeNumber}><Text style={styles.safeNumberText}>{i + 1}</Text></View>
                   <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 18 }}>{s.title}</Text>
+                    <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy }}>{s.title}</Text>
                     <Text variant="bodyMuted">{s.body}</Text>
                   </View>
                 </View>
               ))}
             </View>
-            <View style={styles.promise}>
-              <View style={{ marginTop: 3 }}>
-                <CheckIcon />
-              </View>
-              <Text style={{ flex: 1, fontSize: 17 }}>Givezy charges no fee on donations.</Text>
-            </View>
             <View style={{ flex: 1 }} />
-            <View style={styles.actions}>
-              {dots}
-              <Button label="Next" onPress={next} />
-            </View>
-          </FadeUp>
-        ) : (
-          <FadeUp key="target" style={{ gap: space.md }}>
-            <Text variant="h1" accessibilityRole="header">
-              Set a giving goal.
-            </Text>
-            <Text variant="bodyMuted">Optional. Set a goal and the app shows how much you have given towards it. You can change it any time on the Giving tab.</Text>
-            {/* Goals are saved per person, so wait until we know who is using the phone. */}
-            {account.status === "loading" || account.status === "agreeing" ? (
-              <SkeletonBlock height={320} />
-            ) : (
-            <GoalEditor
-              initial={null}
-              title="Your goal"
-              labels={jewish ? [...JEWISH_LABELS] : []}
-              jewish={jewish}
-              onSave={async (g) => {
-                haptic.success();
-                const saved = await saveGoals([g], account.status === "signed-in" ? account.userId : null);
-                if (!saved.ok) {
-                  notify("Your goal was not saved", "It could not be saved on this phone. Please try again, or skip for now and set it later on the Giving tab.");
-                  return;
-                }
-                finish();
-              }}
-              onCancel={finish}
-              cancelLabel="Skip for now"
-            />
-            )}
-            {dots}
+            <Button variant="cta" label="Start giving" onPress={finish} />
           </FadeUp>
         )}
       </ScrollView>
@@ -190,19 +215,27 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
-  hero: { flex: 1, minHeight: 300, overflow: "hidden", borderBottomLeftRadius: 48, borderBottomRightRadius: 48 },
-  heroLogo: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 40 },
-  logo: { position: "absolute", left: space.gutter, zIndex: 2 },
-  skip: { position: "absolute", right: space.gutter, zIndex: 3, minHeight: touch, minWidth: touch, alignItems: "flex-end", justifyContent: "center" },
-  content: { paddingHorizontal: space.gutter, marginTop: 24 },
-  support: { marginTop: 12, fontSize: 17, lineHeight: 25 },
-  actions: { marginTop: space.block, gap: 16 },
-  dots: { flexDirection: "row", justifyContent: "center", gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.lilac },
-  dotOn: { width: 28, backgroundColor: colors.orange },
-  step: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
-  number: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
-  numberText: { fontFamily: fonts.display, fontSize: 19, color: colors.onInk },
-  promise: { flexDirection: "row", gap: 10, padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  screen: { flex: 1, backgroundColor: colors.cream },
+  blueScreen: { flex: 1, backgroundColor: colors.blue, overflow: "hidden" },
+  gutter: { paddingHorizontal: space.gutter },
+  welcomeTitle: { fontFamily: fonts.display, fontSize: 52, lineHeight: 56, color: colors.onInk },
+  welcomeLine: { fontFamily: fonts.bodyMedium, fontSize: 19, lineHeight: 27, color: colors.lilacSoft },
+  alreadyLink: { minHeight: touch, alignItems: "center", justifyContent: "center" },
+  alreadyText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.onInk, textDecorationLine: "underline" },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+  bar: { flex: 1, flexDirection: "row", gap: 6 },
+  segment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.lightPurple },
+  segmentOn: { backgroundColor: colors.blue },
+  skip: { minHeight: touch, minWidth: touch, alignItems: "flex-end", justifyContent: "center" },
+  skipText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 46, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
+  chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
+  previewCard: { padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft, gap: 2 },
+  previewKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.muted },
+  previewAmount: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, color: colors.navy },
+  safeCard: { flexDirection: "row", gap: 14, padding: 16, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.lightPurple },
+  safeNumber: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.orange, alignItems: "center", justifyContent: "center" },
+  safeNumberText: { fontFamily: fonts.display, fontSize: 18, color: colors.navy },
 });

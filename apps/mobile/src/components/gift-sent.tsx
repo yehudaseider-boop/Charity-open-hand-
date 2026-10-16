@@ -1,0 +1,105 @@
+import { ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { rand } from "@/lib/format";
+import { colors, fonts, radius, space } from "@/theme/tokens";
+import { Blob } from "./blob";
+import { Button } from "./button";
+import { GoalRing } from "./goal-ring";
+import { CheckIcon } from "./icons";
+import { ShareButton } from "./share-button";
+import { Text } from "./text";
+
+export type SentGift = {
+  cents: number;
+  email: string;
+  /** Finished on the payment page, but the provider hasn't confirmed it yet. */
+  confirming: boolean;
+  /** The donor's main goal with this gift counted, if they set one and it counts. */
+  goal: { name: string; percent: number; givenCents: number; targetCents: number } | null;
+  /** Months in a row with a gift, this one included. */
+  streak: number;
+  badges: string[];
+};
+
+const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
+
+/**
+ * After a gift: the amount on blue, what it does in the charity's own words (left out when the
+ * charity hasn't written one), the goal ring, the streak, a few honest badges, and sharing the cause
+ * without the amount.
+ */
+export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gift: SentGift; charityName: string; impact: string | null; shareText: string | null; onDone: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: colors.cream }} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+      <View style={[styles.top, { paddingTop: insets.top + 28 }]}>
+        <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Blob size={170} color={colors.orange} rotate={25} style={{ right: -95, top: insets.top - 110 }} />
+          <Blob size={130} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -100, bottom: -60 }} />
+        </View>
+        <View style={styles.tick}><CheckIcon size={28} color={colors.blue} /></View>
+        <Text style={styles.kicker} accessibilityRole="header">
+          {gift.confirming ? "Confirming your gift" : "Gift sent"} · {rand(gift.cents)}
+        </Text>
+        <Text style={styles.big}>{impact ?? `Thank you for giving to ${charityName}.`}</Text>
+        <Text style={styles.sub}>
+          {gift.confirming
+            ? `Your confirmation goes to ${gift.email} in a minute. Please don't pay again.`
+            : `A confirmation is on its way to ${gift.email}.`}
+        </Text>
+      </View>
+
+      <View style={styles.body}>
+        {gift.goal ? (
+          <View style={styles.card}>
+            <GoalRing percent={gift.goal.percent} size={96} stroke={10} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.cardKicker}>{gift.goal.name}</Text>
+              <Text style={styles.cardAmount}>{rand(gift.goal.givenCents)}</Text>
+              <Text variant="bodyMuted" style={{ fontSize: 15 }}>of {rand(gift.goal.targetCents)}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {gift.streak > 1 ? (
+          <View style={styles.streak}>
+            <View style={styles.streakDot} />
+            <Text style={{ flex: 1, color: colors.navy, fontFamily: fonts.bodySemibold, fontSize: 16 }}>{months(gift.streak)} in a row of giving.</Text>
+          </View>
+        ) : null}
+
+        {gift.badges.length ? (
+          <View style={styles.badges}>
+            {gift.badges.map((b) => (
+              <View key={b} style={styles.badge}><Text style={styles.badgeText}>{b}</Text></View>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={{ gap: 8, alignItems: "center" }}>
+          <ShareButton text={shareText} label={`Share ${charityName} on WhatsApp`} />
+          <Text variant="label">Share the cause. Your amount stays private.</Text>
+        </View>
+
+        <Button label="Done" onPress={onDone} />
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  top: { backgroundColor: colors.blue, paddingHorizontal: space.gutter, paddingBottom: 64, gap: 10, overflow: "hidden" },
+  tick: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  kicker: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lilac },
+  big: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
+  sub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
+  body: { paddingHorizontal: space.gutter, marginTop: -40, gap: space.block },
+  card: { flexDirection: "row", alignItems: "center", gap: 18, padding: 18, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.lightPurple },
+  cardKicker: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.blue },
+  cardAmount: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, color: colors.navy },
+  streak: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  streakDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.orange },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  badge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.lightPurple },
+  badgeText: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.navy },
+});

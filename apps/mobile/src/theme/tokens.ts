@@ -1,29 +1,33 @@
 /**
- * Givezy brand tokens. Every screen uses these and nothing else.
+ * Givezy brand tokens, v2 (decided 16/10/2026). Every screen uses these and nothing else.
  *
- * Colours are read off the Givezy logo: blue wordmark, navy tagline, an orange and a lilac
- * splash, on warm cream. Blue carries headlines, tabs, buttons and links. Navy is body text.
- * Orange is the one bright accent per screen (the heart, a big number, a splash). Lilac is
- * for soft highlight cards and play. Bright orange and lilac fall below 4.5:1 on cream, so
- * they are for graphics and large type only: small orange text uses `orangeText`.
+ * Blue carries headlines, buttons, tabs and big colour-block sections (white text on it). Deep navy
+ * is for headlines on light grounds, body text on lilac, and the 4px "pressable" edge under
+ * buttons. Orange is one call to action per screen, splashes, goal rings and streaks: text on
+ * orange is navy, never white. Lavender, light purple and pale lilac are for splashes, card borders,
+ * ring tracks and soft cards; peach only for background splashes. Slate is secondary text. Pages
+ * are white.
  */
 export const colors = {
-  cream: "#FEFDF7", // page background (from the logo)
-  surface: "#FFFFFF", // raised surface, forms
-  ink: "#102848", // navy: body text (14.5:1)
-  blue: "#1848A8", // primary: headlines, buttons, links, tabs, selected (8.1:1 on cream, white on it 8.3:1)
-  blueSoft: "#E8EEFB", // pale blue tint for selected chips and quiet cards (blue text on it 7.1:1)
-  muted: "#5B6B84", // secondary text (5.3:1)
-  hairline: "#E6E3D8", // warm border, derived from cream
-  orange: "#F88038", // the accent: heart, big numbers, splashes (2.5:1: graphics and large type only)
-  orangeText: "#B84A0A", // small orange text (5.1:1 on cream)
-  orangeSoft: "#FEEBDC", // pale orange tint (orangeText on it 4.5:1)
-  lilac: "#CCB3FB", // splashes and play (navy text on it 8.0:1)
-  lilacSoft: "#F1EAFE", // soft highlight cards (navy text on it 12.6:1)
-  sage: "#2E9D6B", // s18A badge icon and outline, progress (3.4:1: graphics only)
-  successText: "#1F6B4A", // darker green for small success text (6.3:1)
+  cream: "#FFFFFF", // page background (white in v2; the name stays so every screen follows)
+  surface: "#FFFFFF", // cards and forms
+  ink: "#092577", // deep navy: body text and headlines on light grounds
+  navy: "#092577", // deep navy: the pressable edge under buttons, text on orange and lilac
+  blue: "#1749B5", // confirmed logo blue: headlines, buttons, tabs, colour-block sections (white on it 7.0:1)
+  blueSoft: "#E5D9FF", // selected chips and quiet tints (light purple)
+  muted: "#34466A", // slate: secondary text (9.6:1 on white)
+  hairline: "#E5D9FF", // light purple: card borders and dividers
+  orange: "#FF914D", // the one call to action, splashes, goal rings, streaks (navy text on it)
+  orangeText: "#B84A0A", // small orange text, if ever needed (5.1:1 on white)
+  orangeSoft: "#FFEBDD", // peach tint: background splashes only
+  peach: "#FFEBDD", // peach tint: background splashes only
+  lilac: "#C9B4FA", // soft lavender: splashes, the edge under white buttons
+  lightPurple: "#E5D9FF", // card borders, ring tracks
+  lilacSoft: "#F2ECFF", // pale lilac: soft cards
+  sage: "#2E9D6B", // s18A tick and success graphics (graphics only)
+  successText: "#1F6B4A", // small success text (6.3:1)
   danger: "#B3261E", // errors and destructive actions only (6.4:1)
-  onInk: "#FFFFFF", // text on buttons
+  onInk: "#FFFFFF", // text on blue
 } as const;
 
 export const fonts = {
@@ -31,28 +35,29 @@ export const fonts = {
   display: "Fredoka_600SemiBold",
   /** Big numbers and amounts of delight: Fredoka 700. */
   displayBold: "Fredoka_700Bold",
-  /** Everything else: Inter 400, 500, 600. */
-  body: "Inter_400Regular",
-  bodyMedium: "Inter_500Medium",
-  bodySemibold: "Inter_600SemiBold",
-  /** Hebrew text, set beside Inter. */
+  /** Everything else: DM Sans 400, 500, 600, 700. */
+  body: "DMSans_400Regular",
+  bodyMedium: "DMSans_500Medium",
+  bodySemibold: "DMSans_600SemiBold",
+  bodyBold: "DMSans_700Bold",
+  /** Hebrew text, set beside DM Sans. */
   hebrew: "Heebo_400Regular",
   hebrewBold: "Heebo_600SemiBold",
 } as const;
 
-/** Amounts: Inter 600 with tabular figures, so columns of Rand line up. */
+/** Amounts: DM Sans 600 with tabular figures, so columns of Rand line up. */
 export const tabular = { fontFamily: fonts.bodySemibold, fontVariant: ["tabular-nums" as const] };
 
 /** Type scale: body never below 16, labels never below 14, buttons 17 semibold. */
 export const type = {
-  hero: { fontFamily: fonts.display, fontSize: 42, lineHeight: 46, color: colors.blue },
-  h1: { fontFamily: fonts.display, fontSize: 32, lineHeight: 37, color: colors.blue },
-  h2: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: colors.blue },
+  hero: { fontFamily: fonts.display, fontSize: 42, lineHeight: 46, color: colors.navy },
+  h1: { fontFamily: fonts.display, fontSize: 32, lineHeight: 37, color: colors.navy },
+  h2: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: colors.navy },
   amount: { fontFamily: fonts.displayBold, fontVariant: ["tabular-nums" as const], fontSize: 48, lineHeight: 52, color: colors.blue },
   body: { fontFamily: fonts.body, fontSize: 17, lineHeight: 25, color: colors.ink },
   bodyMuted: { fontFamily: fonts.body, fontSize: 16, lineHeight: 24, color: colors.muted },
   label: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 20, color: colors.muted },
-  button: { fontFamily: fonts.bodySemibold, fontSize: 17, lineHeight: 22 },
+  button: { fontFamily: fonts.bodyBold, fontSize: 18, lineHeight: 23 },
 } as const;
 
 export const space = {
@@ -63,9 +68,9 @@ export const space = {
 } as const;
 
 export const radius = {
-  card: 28, // cards and sheets: big, soft corners
-  control: 20, // inputs and small controls
-  pill: 999, // buttons, chips, tags
+  card: 24, // cards and sheets: big, soft corners
+  control: 18, // inputs, buttons and small controls
+  pill: 999, // chips and tags
 } as const;
 
 /** Corners for charity photos: plain rounded rectangles, big for hero photos and small for thumbnails. */
@@ -77,7 +82,7 @@ export const photoCorners = {
 
 /** A soft, blue-tinted lift for cards, so they float a little off the cream. */
 export const lift = {
-  shadowColor: "#1848A8",
+  shadowColor: "#1749B5",
   shadowOpacity: 0.1,
   shadowRadius: 18,
   shadowOffset: { width: 0, height: 8 },

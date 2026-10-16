@@ -8,7 +8,16 @@ import { Button, TextLink } from "./button";
 import { Field } from "./field";
 import { Text } from "./text";
 
-/** Sign in with an emailed 6-digit code. No password. The same account as the website. */
+/**
+ * Google and Apple sign-in show only once they are set up in Supabase (and Apple's and Google's
+ * consoles): EXPO_PUBLIC_SOCIAL_SIGN_IN=yes. Until then, email sign-in only.
+ */
+const SOCIAL_SIGN_IN = process.env.EXPO_PUBLIC_SOCIAL_SIGN_IN === "yes";
+
+/**
+ * Sign in: Google or Apple when switched on, else an emailed 6-digit code. No password. The same
+ * account as the website. Sits under the blue "Let's get you set up." header on Account.
+ */
 export function SignIn() {
   const account = useAccount();
   const [email, setEmail] = useState("");
@@ -17,16 +26,33 @@ export function SignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const social = async (provider: "google" | "apple") => {
+    setBusy(true);
+    setError(null);
+    const r = await account.signInWith(provider);
+    setBusy(false);
+    if (!r.ok) setError(r.message);
+  };
+
   if (!sentTo) {
     return (
       <View style={styles.card}>
-        <Text variant="h2" style={styles.title}>Sign in</Text>
-        <Text variant="bodyMuted">
-          Use the email you give with. Every donation made with it, on the website or from the app, shows up here.
-        </Text>
+        {SOCIAL_SIGN_IN ? (
+          <>
+            <Button variant="white" label="Continue with Google" disabled={busy} onPress={() => social("google")} />
+            <Button variant="dark" label="Continue with Apple" disabled={busy} onPress={() => social("apple")} />
+            <View style={styles.or}>
+              <View style={styles.rule} />
+              <Text variant="label">or use email</Text>
+              <View style={styles.rule} />
+            </View>
+          </>
+        ) : (
+          <Text variant="bodyMuted">Use the email you give with. Every gift made with it, on the website or in the app, shows up here.</Text>
+        )}
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" error={error ?? undefined} />
         <Button
-          label={busy ? "Sending…" : "Email me a code"}
+          label={busy ? "Sending…" : "Send me a sign-in code"}
           disabled={busy}
           onPress={async () => {
             if (!looksLikeEmail(email)) return setError("Enter a valid email address.");
@@ -114,9 +140,11 @@ function Check({ checked, onPress, label }: { checked: boolean; onPress: () => v
 }
 
 const styles = StyleSheet.create({
-  card: { gap: 14, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
+  card: { gap: 14, padding: 20, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
+  or: { flexDirection: "row", alignItems: "center", gap: 10 },
+  rule: { flex: 1, height: 1.5, backgroundColor: colors.lightPurple },
   title: { fontSize: 22, lineHeight: 28 },
   check: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44 },
-  box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.hairline, alignItems: "center", justifyContent: "center", marginTop: 2 },
+  box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.lilac, alignItems: "center", justifyContent: "center", marginTop: 2 },
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
 });

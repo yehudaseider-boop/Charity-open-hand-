@@ -36,6 +36,8 @@ export type Charity = {
   updates?: CharityUpdate[];
   /** Active campaigns with their running totals. */
   campaigns?: Campaign[];
+  /** The charity's own impact line ("R180 feeds a family for a week"). Only ever from the charity. */
+  impact?: string | null;
 };
 
 /** A charity's campaign: a goal in Rand and what has been given to it so far (paid gifts only). */
@@ -60,6 +62,7 @@ const gallery = (urls: string[], captions: string[]) => urls.slice(1).map((url, 
 export const charities: Charity[] = [
   {
     slug: "northcliff-meals-fund",
+    impact: "[Impact line from the charity, for example what R180 pays for]",
     nameEn: "Northcliff Meals Fund",
     nameHe: "קרן ארוחות נורת'קליף",
     cause: "Weekly food parcels for families in need",
