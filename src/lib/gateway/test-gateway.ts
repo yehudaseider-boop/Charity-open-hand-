@@ -108,11 +108,20 @@ export const testGateway: PaymentGateway = {
   async parseWebhook(rawBody, headers): Promise<WebhookEvent | null> {
     const sig = headers.get("x-test-signature") ?? "";
     if (!safeEqual(sig, testGatewaySign(rawBody))) return null;
-    const body = JSON.parse(rawBody) as { id: string; outcome: string; reference: string };
+    const body = JSON.parse(rawBody) as { id: string; outcome: string; reference: string; amount?: number; resolution?: string };
+    const type: WebhookEvent["type"] =
+      body.outcome === "success" ? "payment_succeeded"
+      : body.outcome === "failed" ? "payment_failed"
+      : body.outcome === "refunded" ? "refund_processed"
+      : body.outcome === "dispute" ? "dispute_opened"
+      : body.outcome === "dispute_resolved" ? "dispute_resolved"
+      : "other";
     return {
       eventId: body.id,
-      type: body.outcome === "success" ? "payment_succeeded" : body.outcome === "failed" ? "payment_failed" : "other",
+      type,
       reference: body.reference,
+      amountCents: type === "refund_processed" && Number.isSafeInteger(body.amount) ? (body.amount as number) : null,
+      detail: type === "dispute_resolved" ? (body.resolution ?? null) : null,
       raw: body,
     };
   },

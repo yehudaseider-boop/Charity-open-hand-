@@ -771,3 +771,12 @@ Yehuda: "let the charity choose" (instead of the R100, R250 and R500 starter amo
 ## Group challenges built, then removed (16/10/2026)
 
 Yehuda's "giving with friends" idea was built as group challenges (a supporter starts one for a charity, friends give, one ring shows how full it is) and then removed the same day: "keep it simple for now and see if people adopt this app." Nothing was ever given to one. The code is in the history (commit `d3cc3fd`) and the mock-up is at https://claude.ai/artifact/95hrbcacj9nfNJoqf3Y8uR, so it can come back once there are real donors to test it with. The database part was added (`20261016000015`) and taken out again (`20261016000016`).
+
+## Refunds and chargebacks (16/10/2026, built over Shabbos)
+
+Before, a refund or dispute at the payment provider left the donation "paid", so it kept counting in the charity's totals, campaign progress and the donor's s18A receipt. Now:
+
+- **A full refund** (the gateway's refund event for the whole amount the donor paid) marks the donation refunded by itself. It then drops out of everything that counts paid donations.
+- **Everything else is held for a person** on Admin, Payments ("Held for a person"): a partial refund, a refund without an amount, a refund we can't match to a donation, and every dispute (opened or resolved). Each donation item has "Mark refunded" and "Mark charged back" buttons (with a confirmation, logged), to use after checking the gateway's dashboard. Disputes never change a donation by themselves, because who won is not yet confirmed from Paystack's messages.
+- **s18A receipts:** if a refunded or charged-back donation is on an issued receipt, the receipt is listed there to void and re-issue.
+- Paystack's exact field names for refund and dispute events are not published in a form we could verify; the adapter reads the likely ones and anything unrecognised is held, never acted on. Checked in the Paystack test run (step 9).

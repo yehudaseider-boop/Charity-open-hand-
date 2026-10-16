@@ -181,12 +181,37 @@ export const paystackGateway: PaymentGateway = {
     const gotBytes = Buffer.from(got, "hex");
     const expectedBytes = Buffer.from(expected, "hex");
     if (!/^[0-9a-f]{128}$/i.test(got) || gotBytes.length !== expectedBytes.length || !timingSafeEqual(gotBytes, expectedBytes)) return null;
-    const body = JSON.parse(rawBody) as { event: string; data?: { id?: number; reference?: string } };
+    type Data = {
+      id?: number;
+      reference?: string;
+      amount?: number;
+      resolution?: string;
+      status?: string;
+      transaction_reference?: string;
+      transaction?: { reference?: string };
+    };
+    const body = JSON.parse(rawBody) as { event: string; data?: Data };
+    const d = body.data ?? {};
+    // Refunds and disputes name the original payment. The field names are not confirmed against a live
+    // payload yet: VERIFY in Paystack's test mode (docs/paystack-test-script.md). Unknown shapes leave the
+    // reference empty, so the event is held for a person instead of changing anything.
+    const original = d.transaction_reference ?? d.transaction?.reference ?? null;
+    const type: WebhookEvent["type"] =
+      body.event === "charge.success" ? "payment_succeeded"
+      : body.event === "charge.failed" ? "payment_failed"
+      : body.event === "refund.processed" ? "refund_processed"
+      : body.event === "charge.dispute.create" ? "dispute_opened"
+      : body.event === "charge.dispute.resolve" ? "dispute_resolved"
+      : "other";
+    const isPayment = type === "payment_succeeded" || type === "payment_failed";
     return {
       // Paystack events carry no event id; event type + transaction id is unique. VERIFY.
-      eventId: `${body.event}:${body.data?.id ?? body.data?.reference ?? "unknown"}`,
-      type: body.event === "charge.success" ? "payment_succeeded" : body.event === "charge.failed" ? "payment_failed" : "other",
-      reference: body.data?.reference ?? null,
+      eventId: `${body.event}:${d.id ?? d.reference ?? original ?? "unknown"}`,
+      type,
+      reference: isPayment ? (d.reference ?? null) : original,
+      // Paystack amounts are in the smallest unit (cents for rand). VERIFY for refunds.
+      amountCents: type === "refund_processed" && Number.isSafeInteger(d.amount) ? (d.amount as number) : null,
+      detail: type === "dispute_resolved" ? (d.resolution ?? d.status ?? null) : null,
       raw: body,
     };
   },

@@ -169,6 +169,18 @@ describe("webhook signature", () => {
     expect((await paystackGateway.parseWebhook(other, headers(sign(other))))?.type).toBe("other");
   });
 
+  it("reads refunds and disputes, naming the original payment", async () => {
+    const refund = JSON.stringify({ event: "refund.processed", data: { id: 7, amount: 18000, transaction_reference: base.reference } });
+    expect(await paystackGateway.parseWebhook(refund, headers(sign(refund)))).toMatchObject({ type: "refund_processed", reference: base.reference, amountCents: 18000, eventId: "refund.processed:7" });
+    const opened = JSON.stringify({ event: "charge.dispute.create", data: { id: 8, transaction: { reference: base.reference } } });
+    expect(await paystackGateway.parseWebhook(opened, headers(sign(opened)))).toMatchObject({ type: "dispute_opened", reference: base.reference });
+    const resolved = JSON.stringify({ event: "charge.dispute.resolve", data: { id: 9, resolution: "declined", transaction: { reference: base.reference } } });
+    expect(await paystackGateway.parseWebhook(resolved, headers(sign(resolved)))).toMatchObject({ type: "dispute_resolved", reference: base.reference, detail: "declined" });
+    // A refund whose shape we don't recognise names no payment, so it is held for a person.
+    const odd = JSON.stringify({ event: "refund.processed", data: { id: 10, amount: 100 } });
+    expect(await paystackGateway.parseWebhook(odd, headers(sign(odd)))).toMatchObject({ type: "refund_processed", reference: null });
+  });
+
   it("rejects a wrong signature, a changed body and a missing header", async () => {
     expect(await paystackGateway.parseWebhook(body, headers("0".repeat(128)))).toBeNull();
     expect(await paystackGateway.parseWebhook(body + " ", headers(sign(body)))).toBeNull();

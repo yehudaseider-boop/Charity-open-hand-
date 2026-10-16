@@ -4,6 +4,20 @@ import { monthlyHealth, staleEvents, stalePending, totalsByCharity, MONTHLY_OVER
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { RemoveButton } from "@/components/forms/remove-button";
+import { markDonation } from "./actions";
+
+/** What each held item is, in plain words. */
+const heldLabel: Record<string, string> = {
+  "donation.amount_mismatch": "Amount did not match",
+  "webhook.unmatched_payment": "Payment with no matching donation",
+  "donation.refund_review": "Refund to check (partial, or the amount was not given)",
+  "refund.unmatched": "Refund for a payment we could not find",
+  "donation.dispute_opened": "Dispute (chargeback) opened",
+  "donation.dispute_resolved": "Dispute resolved: check who won",
+  "receipt.needs_reissue": "An issued s18A receipt includes a refunded or charged-back donation: void and re-issue it",
+};
+const HELD = Object.keys(heldLabel);
 
 export const metadata: Metadata = { title: "Payments" };
 
@@ -35,11 +49,19 @@ export default async function PaymentsPage() {
   const [pending, events, review, paid, monthly] = await Promise.all([
     db.from("donations").select("id, created_at, total_charged_cents, charities(name_en)").eq("status", "pending").order("created_at").limit(500),
     db.from("gateway_events").select("id, gateway, event_type, received_at, payload").is("processed_at", null).order("received_at").limit(200),
-    db.from("audit_log").select("id, action, created_at, entity_id").in("action", ["donation.amount_mismatch", "webhook.unmatched_payment"]).gte("created_at", since).order("created_at", { ascending: false }).limit(50),
+    db.from("audit_log").select("id, action, created_at, entity_id, details").in("action", HELD).gte("created_at", since).order("created_at", { ascending: false }).limit(50),
     allRows((a, b) => db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").gte("paid_at", since).order("id").range(a, b)),
     allRows((a, b) => db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).order("id").range(a, b)),
   ]);
   for (const r of [pending, events, review, paid, monthly]) if (r.error) throw r.error;
+  // The current state of each donation a held item is about, so a handled one says so.
+  const heldDonationIds = (review.data ?? []).filter((a) => (a.action as string).startsWith("donation.") && a.entity_id).map((a) => a.entity_id as string);
+  const statusById = new Map<string, string>();
+  if (heldDonationIds.length) {
+    const { data: rows, error: statusError } = await db.from("donations").select("id, status").in("id", heldDonationIds);
+    if (statusError) throw statusError;
+    for (const r of rows ?? []) statusById.set(r.id as string, r.status as string);
+  }
 
   const stuckPayments = stalePending(
     (pending.data ?? []).map((r) => ({ id: r.id as string, created_at: r.created_at as string, total_charged_cents: r.total_charged_cents as number, charity: nameOf(r.charities) })),
@@ -86,10 +108,33 @@ export default async function PaymentsPage() {
       </Section>
 
       <Section title="Held for a person (last 30 days)" empty="None." count={review.data?.length ?? 0}>
-        <p className="mb-2 text-xs text-muted">A payment whose amount did not match, or one we could not match to a donation. Check each in the gateway&apos;s dashboard.</p>
-        {(review.data ?? []).map((a) => (
-          <Row key={a.id as string} left={a.action === "donation.amount_mismatch" ? "Amount did not match" : "Payment with no matching donation"} right={formatDate(a.created_at as string)} />
-        ))}
+        <p className="mb-2 text-xs text-muted">
+          Payments, refunds and disputes the system would not decide on its own. Check each in the gateway&apos;s dashboard. A full refund is marked
+          automatically; for anything else, mark the donation here once you have checked it. Refunded and charged-back donations stop counting
+          in the charity&apos;s totals, campaigns and s18A receipts.
+        </p>
+        {(review.data ?? []).map((a) => {
+          const donationId = (a.action as string).startsWith("donation.") ? (a.entity_id as string | null) : null;
+          const status = donationId ? statusById.get(donationId) : undefined;
+          return (
+            <div key={a.id as string} className="border-t border-border py-1.5 first:border-t-0">
+              <Row left={heldLabel[a.action as string] ?? (a.action as string)} right={formatDate(a.created_at as string)} />
+              {donationId && status === "paid" ? (
+                <div className="flex flex-wrap gap-3 pt-1 text-xs">
+                  <span className="text-muted">Donation {donationId.slice(0, 8)}</span>
+                  <form action={markDonation.bind(null, donationId, "refunded")}>
+                    <RemoveButton label="Mark refunded" what={`donation ${donationId.slice(0, 8)}`} confirmText="Mark this donation refunded? It stops counting for the charity and on s18A receipts. Only do this once the gateway shows the refund." />
+                  </form>
+                  <form action={markDonation.bind(null, donationId, "charged_back")}>
+                    <RemoveButton label="Mark charged back" what={`donation ${donationId.slice(0, 8)}`} confirmText="Mark this donation charged back? It stops counting for the charity and on s18A receipts. Only do this once the gateway shows the dispute was lost." />
+                  </form>
+                </div>
+              ) : donationId && status ? (
+                <p className="pt-1 text-xs text-muted">Donation {donationId.slice(0, 8)} is now {status.replace("_", " ")}.</p>
+              ) : null}
+            </div>
+          );
+        })}
       </Section>
 
       <Section title="Monthly donations" empty="" count={health.failed.length + health.overdue}>

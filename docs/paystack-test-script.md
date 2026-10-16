@@ -81,6 +81,12 @@ The job normally runs on the charge day. To test now, ask Claude to move that mo
 
 - [ ] Admin, charity, **Change the bank details**. Expect: the charity shows "isn't taking online donations yet" until reconnected (step 1 again).
 
+### 9. Refunds and disputes
+
+- [ ] Refund one paid test donation in full from the Paystack dashboard. Expect: within a minute the donation shows Refunded on the charity's Donations page and drops out of its totals. If it doesn't, Admin, Payments shows "Refund for a payment we could not find": send Claude the refund event from the Paystack dashboard (Settings, API keys and webhooks, the webhook log), because the field names for refunds are not confirmed yet.
+- [ ] Refund part of another donation. Expect: nothing changes by itself; Admin, Payments shows "Refund to check" with buttons to mark it.
+- [ ] If Paystack's test mode can open a dispute, open one. Expect: "Dispute (chargeback) opened" on Admin, Payments. Nothing changes by itself.
+
 ## What to send back to Claude
 
 For each step: passed or failed, and for any failure the exact message, plus the Paystack dashboard's description of the transaction. Never send the secret key.
