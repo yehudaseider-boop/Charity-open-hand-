@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { ERASE_KEPT_TEXT, eraseDonor, hasAccountFor } from "@/lib/privacy/erase";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { FormState } from "@/lib/form";
 
 /** Close a privacy request with a short reply the person sees on their "Your information" page. */
 export async function closeRequest(id: string, formData: FormData) {
@@ -53,14 +54,19 @@ export async function eraseForRequest(id: string, formData: FormData) {
 
 const emailSchema = z.object({ email: z.email(), again: z.email() });
 
-/** Erase a donor who never had an account, found by the email address they gave with. The admin types it twice. */
-export async function eraseByEmail(formData: FormData) {
+/**
+ * Erase a donor who gave as a guest (no account) and asked by email. A mistake (the two addresses differ, the box isn't ticked, the
+ * address has an account) is shown next to the form and what was typed stays. Success goes to the summary.
+ */
+export async function eraseByEmailForm(_prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requirePlatformAdmin();
-  const parsed = emailSchema.safeParse({ email: String(formData.get("email") ?? "").trim(), again: String(formData.get("again") ?? "").trim() });
-  if (!parsed.success || parsed.data.email.toLowerCase() !== parsed.data.again.toLowerCase() || formData.get("checked") !== "on") {
-    redirect("/admin/requests?erased=check");
-  }
-  if (await hasAccountFor(parsed.data.email)) redirect("/admin/requests?erased=hasaccount");
+  const email = String(formData.get("email") ?? "").trim();
+  const again = String(formData.get("again") ?? "").trim();
+  const parsed = emailSchema.safeParse({ email, again });
+  if (!parsed.success) return { ok: false, message: "Nothing was erased. Check the email address.", fieldErrors: { email: "Enter a valid email address" } };
+  if (parsed.data.email.toLowerCase() !== parsed.data.again.toLowerCase()) return { ok: false, message: "Nothing was erased.", fieldErrors: { again: "The two addresses are not the same" } };
+  if (formData.get("checked") !== "on") return { ok: false, message: "Nothing was erased. Tick the box to confirm you have checked who is asking." };
+  if (await hasAccountFor(parsed.data.email)) return { ok: false, message: "Nothing was erased. That address has a sign-in account, so erase it from the person's own delete request above." };
   const summary = await eraseDonor({ email: parsed.data.email, actorUserId: admin.userId });
   revalidatePath("/admin/requests");
   redirect(`/admin/requests?erased=guest&donors=${summary.donors}`);
