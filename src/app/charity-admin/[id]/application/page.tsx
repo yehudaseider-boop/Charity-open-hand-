@@ -39,7 +39,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
     <div className="space-y-4">
       <div>
         <Link href="/charity-admin" className="text-sm text-muted">← Your charities</Link>
-        <h1 className="mt-1 text-xl font-semibold">{charity.name_en}</h1>
+        <h1 className="mt-1 font-display text-2xl text-indigo">{charity.name_en}</h1>
         <div className="mt-2"><Badge tone={status.tone}>{status.label}</Badge></div>
       </div>
 

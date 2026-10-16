@@ -184,6 +184,7 @@
 - Give screen: "Count this gift towards my goal?" shows only when the main goal counts certain labels; Yes puts that goal's label on the gift. A goal that counts all giving just says every gift counts. Starting amounts when the donor hasn't given to that charity before are R100, R250 and R500 (suggestions only; any amount works).
 - "Cover the card fee" is not shown until the payment provider's rates are in `src/config/platform.ts`.
 - The trust line "Every charity checked by us" stays only while that check really happens before listing.
+- Charity dashboard in the v2 look (16/10/2026): blue colour-block header with the charity name and the tabs, wider layout on desktop, stat tiles, orange campaign bars and a monthly bar chart. No change to what charities can see or do.
 
 - Expo app for donors (iOS, Android, plus a web preview for review). Charity
   and admin screens stay on the website.

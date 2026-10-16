@@ -16,12 +16,12 @@ import { formatRand } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+function Stat({ label, value, note, strong = false }: { label: string; value: string; note?: string; strong?: boolean }) {
   return (
-    <div className="rounded-card border border-border bg-surface p-4">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
-      {note ? <p className="mt-0.5 text-xs text-muted">{note}</p> : null}
+    <div className={`rounded-card p-5 ${strong ? "bg-indigo text-white" : "bg-honey-soft"}`}>
+      <p className={`text-sm font-medium ${strong ? "text-honey" : "text-muted"}`}>{label}</p>
+      <p className="mt-1 font-display text-3xl leading-tight">{value}</p>
+      {note ? <p className={`mt-1 text-sm ${strong ? "text-white/80" : "text-muted"}`}>{note}</p> : null}
     </div>
   );
 }
@@ -37,7 +37,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   if (charity.status === "suspended") {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold">{charity.name_en}</h1>
+        <h1 className="font-display text-2xl text-indigo">{charity.name_en}</h1>
         <Notice tone="danger">
           <p className="font-medium">Your page is paused</p>
           <p className="mt-1">While it is paused, your page is hidden and donors can&apos;t give to you. Monthly donations aren&apos;t collected. Your past donations and receipts are kept.</p>
@@ -55,7 +55,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   if (charity.status !== "approved") {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold">{charity.name_en}</h1>
+        <h1 className="font-display text-2xl text-indigo">{charity.name_en}</h1>
         <Notice tone="warning">
           Donations start once your application is approved.{" "}
           <Link href={`${base}/application`} className="underline">Go to your registration details</Link>.
@@ -88,8 +88,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const attention = all.refunded_count + all.charged_back_count;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{charity.name_en}</h1>
+    <div className="space-y-5">
+      <h1 className="font-display text-2xl text-indigo">Overview</h1>
 
       {/* Shown until everything is done: what helps donors find you and give. */}
       {startDone < start.length ? (
@@ -115,8 +115,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         </Card>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3">
-        <Stat label="This month" value={formatRand(month.paid_cents)} note={plural(month.paid_count, "donation")} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat strong label="This month" value={formatRand(month.paid_cents)} note={plural(month.paid_count, "donation")} />
         <Stat label={`Tax year ${taxYear.taxYear}`} value={formatRand(year.paid_cents)} note={plural(year.paid_count, "donation")} />
         <Stat label="All time" value={formatRand(all.paid_cents)} note={plural(all.paid_count, "donation")} />
         <Stat label="Donors" value={String(all.donor_count)} note="who have given" />
@@ -136,6 +136,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         </Card>
       ) : null}
 
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="space-y-5">
       <Card title="Your donors">
         {all.paid_count === 0 ? (
           <p className="text-sm text-muted">These fill in once donations start coming in.</p>
@@ -170,9 +172,12 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                     <span>{formatRand(c.raisedCents)}{c.targetCents ? <span className="text-muted"> of {formatRand(c.targetCents)}</span> : null}</span>
                   </div>
                   {c.targetCents ? (
-                    <div className="mt-1 h-2 rounded-full bg-honey-soft" aria-hidden>
-                      <div className="h-2 rounded-full bg-honey" style={{ width: `${Math.max(2, pct)}%` }} />
+                    <>
+                    <div className="mt-2 h-3 rounded-full bg-brand-soft" aria-hidden>
+                      <div className="h-3 rounded-full bg-coral" style={{ width: `${Math.max(2, pct)}%` }} />
                     </div>
+                    <p className="mt-1 text-xs text-muted">{pct}% of the goal</p>
+                    </>
                   ) : null}
                 </li>
               );
@@ -210,36 +215,51 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         )}
       </Card>
 
+        </div>
+        <div className="space-y-5">
       <Card title="Donations by month">
         {chart.length === 0 ? (
           <p className="text-sm text-muted">No paid donations yet. They appear here once the first one comes in.</p>
         ) : (
-          <ul className="space-y-2 text-sm">
-            {chart.map((m) => {
-              const [y, mm] = m.month.split("-");
-              return (
-                <li key={m.month}>
-                  <div className="flex justify-between gap-3">
+          <>
+            {/* Bars for the eye; the list underneath is what screen readers read. */}
+            <div className="flex h-48 items-end gap-1.5" aria-hidden>
+              {chart.map((m, i) => (
+                <div key={m.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                  <div
+                    title={`${formatRand(m.amountCents)}, ${plural(m.donationCount, "donation")}`}
+                    className={`w-full rounded-t-lg ${i === chart.length - 1 ? "bg-coral" : "bg-brand"}`}
+                    style={{ height: `${Math.max(3, Math.round((m.amountCents / max) * 100))}%` }}
+                  />
+                  <span className="text-[11px] text-muted">{m.month.split("-")[1]}</span>
+                </div>
+              ))}
+            </div>
+            <ul className="mt-4 space-y-1 text-sm">
+              {[...chart].reverse().map((m) => {
+                const [y, mm] = m.month.split("-");
+                return (
+                  <li key={m.month} className="flex justify-between gap-3">
                     <span>{mm}/{y}</span>
                     <span>{formatRand(m.amountCents)} <span className="text-muted">({plural(m.donationCount, "donation")})</span></span>
-                  </div>
-                  <div className="mt-1 h-2 rounded-full bg-honey-soft" aria-hidden>
-                    <div className="h-2 rounded-full bg-honey" style={{ width: `${Math.max(2, Math.round((m.amountCents / max) * 100))}%` }} />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </Card>
 
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-2 text-sm">
-        <Link href={`${base}/donations`} className="rounded-control border border-border px-3 py-2">Donations</Link>
-        <Link href={`${base}/donors`} className="rounded-control border border-border px-3 py-2">Donors</Link>
-        <Link href={`${base}/monthly`} className="rounded-control border border-border px-3 py-2">Monthly</Link>
-        <Link href={`${base}/receipts`} className="rounded-control border border-border px-3 py-2">Receipts</Link>
-        <Link href={`${base}/poster`} className="rounded-control border border-border px-3 py-2">QR poster</Link>
-        <a href={`${base}/export/donations`} className="rounded-control border border-border px-3 py-2">Download donations (CSV)</a>
+        <Link href={`${base}/donations`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Donations</Link>
+        <Link href={`${base}/donors`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Donors</Link>
+        <Link href={`${base}/monthly`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Monthly</Link>
+        <Link href={`${base}/receipts`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Receipts</Link>
+        <Link href={`${base}/poster`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">QR poster</Link>
+        <a href={`${base}/export/donations`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Download donations (CSV)</a>
       </div>
     </div>
   );

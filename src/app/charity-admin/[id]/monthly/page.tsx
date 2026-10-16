@@ -52,7 +52,7 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Monthly donations</h1>
+      <h1 className="font-display text-2xl text-indigo">Monthly donations</h1>
       <p className="text-sm text-muted">
         Donors who give the same amount every month. Givezy collects it on the day they chose. Donors pause, restart or cancel it themselves; you can&apos;t change it from here.
       </p>

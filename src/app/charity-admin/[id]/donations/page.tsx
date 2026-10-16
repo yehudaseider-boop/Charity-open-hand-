@@ -55,7 +55,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold">Donations</h1>
+        <h1 className="font-display text-2xl text-indigo">Donations</h1>
         {/* Paid only by default, so the bookkeeper's total is income received. */}
         <div className="text-right text-sm">
           <a href={csvHref} className="text-brand underline">

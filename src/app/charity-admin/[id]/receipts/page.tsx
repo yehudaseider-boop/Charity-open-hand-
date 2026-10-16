@@ -36,7 +36,7 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">s18A receipts</h1>
+      <h1 className="font-display text-2xl text-indigo">s18A receipts</h1>
       {canIssue18a(charity) ? (
         <Notice>
           One receipt is issued for each donor, once a year, after the tax year ends. The current tax year runs from {formatDate(taxYear.from)} to {formatDate(taxYear.end)} (SARS calls it tax year {taxYear.taxYear}).

@@ -28,7 +28,7 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
   return (
     <div className="space-y-4">
       <div className="space-y-2 print:hidden">
-        <h1 className="text-xl font-semibold">QR poster</h1>
+        <h1 className="font-display text-2xl text-indigo">QR poster</h1>
         <p className="text-sm text-muted">
           Put this up where your community sees it: a notice board, your front desk, a table at an event. People point
           their phone camera at the code and land on your Givezy page, ready to give.

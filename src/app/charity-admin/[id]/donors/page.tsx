@@ -31,7 +31,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold">Donors</h1>
+        <h1 className="font-display text-2xl text-indigo">Donors</h1>
         <a href={`/charity-admin/${id}/export/donors`} className="text-sm text-brand underline">Download CSV</a>
       </div>
       <p className="text-sm text-muted">

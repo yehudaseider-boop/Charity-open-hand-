@@ -19,7 +19,7 @@ export default async function ProfilePage({ params }: PageProps<"/charity-admin/
     <div className="space-y-4">
       <div>
         <Link href="/charity-admin" className="text-sm text-muted">← Your charities</Link>
-        <h1 className="mt-1 text-xl font-semibold">Public profile</h1>
+        <h1 className="mt-1 font-display text-2xl text-indigo">Public profile</h1>
         {charity.status === "approved" ? (
           <Link href={`/c/${charity.slug}`} className="text-sm text-brand underline">View your public page</Link>
         ) : (

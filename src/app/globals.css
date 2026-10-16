@@ -91,3 +91,9 @@ h3 {
 :lang(he) {
   font-family: var(--font-hebrew);
 }
+
+/* Organic splash shapes for blue colour-block headers (decorative only). */
+.blob {
+  border-radius: 50% 40% 55% 45% / 45% 55% 40% 50%;
+  pointer-events: none;
+}

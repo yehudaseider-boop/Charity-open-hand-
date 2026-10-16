@@ -19,7 +19,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Photos and updates</h1>
+        <h1 className="font-display text-2xl text-indigo">Photos and updates</h1>
         <p className="text-sm text-muted">
           Show donors the real work. These appear on your page on the website and in the Givezy app
           {charity.status === "approved" ? "." : " once your application is approved."} Only post photos you have permission to share, and

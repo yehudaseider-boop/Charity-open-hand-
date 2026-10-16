@@ -25,7 +25,7 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Campaigns</h1>
+        <h1 className="font-display text-2xl text-indigo">Campaigns</h1>
         <p className="text-sm text-muted">
           Raise for one thing at a time, like winter food parcels or a new roof. Donors give to it in the Givezy app or on your Givezy page, and see how close you are to the goal.
           The money comes to you like any other donation. You can run up to 3 at a time.

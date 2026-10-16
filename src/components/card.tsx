@@ -11,7 +11,7 @@ export function Card({
     <section className="rounded-card border border-border bg-surface p-5">
       {title ? (
         <div className="mb-3 flex items-start justify-between gap-3">
-          <h2 className="font-semibold">{title}</h2>
+          <h2 className="font-display text-lg text-indigo">{title}</h2>
           {aside}
         </div>
       ) : null}

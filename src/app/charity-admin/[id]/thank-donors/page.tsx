@@ -35,7 +35,7 @@ export default async function ThankDonorsPage({ params }: PageProps<"/charity-ad
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Thank donors</h1>
+        <h1 className="font-display text-2xl text-indigo">Thank donors</h1>
         <p className="text-sm text-muted">
           A short thank-you is the biggest reason people give again. Write it once and we email it to everyone who gave that month,
           with their first name. You don&apos;t need their addresses, and they can stop these emails at any time. One thank-you per month.
