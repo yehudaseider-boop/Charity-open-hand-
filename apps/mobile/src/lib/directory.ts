@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { causes as sampleCauses, charities as sampleCharities, findCharity, type Cause, type Charity } from "@/data/sample";
-import { CHARITY_COLUMNS, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
+import { CHARITY_COLUMNS, raisingNow, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type RaisingNow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
 import { supabase } from "./supabase";
 
 /**
@@ -8,19 +8,29 @@ import { supabase } from "./supabase";
  * security only ever returns approved ones to the public). Preview: sample data.
  */
 const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-type Directory = { charities: Charity[]; causes: Cause[] };
+type Directory = { charities: Charity[]; causes: Cause[]; raising: RaisingNow[] };
 let cached: Directory | null = null;
+
+/** The preview's campaigns, from the sample charities. */
+function sampleRaising(): RaisingNow[] {
+  return sampleCharities.flatMap((charity) => (charity.campaigns ?? []).map((campaign) => ({ campaign, charity })));
+}
 
 async function loadDirectory(): Promise<Directory> {
   const db = supabase!;
-  const [charities, categories] = await Promise.all([
+  const [charities, categories, campaigns] = await Promise.all([
     db.from("charities").select(CHARITY_COLUMNS).eq("status", "approved").order("name_en").limit(500),
     db.from("categories").select("id, name_en").order("sort_order"),
+    // Row-level security only shows campaigns of approved charities.
+    db.from("campaigns").select("id, charity_id, title, description, target_cents, ends_at").eq("status", "active").order("created_at", { ascending: false }).limit(30),
   ]);
   if (charities.error) throw charities.error;
   if (categories.error) throw categories.error;
   const list = ((charities.data ?? []) as unknown as CharityRow[]).map((r) => toCharity(r, base));
-  return { charities: list, causes: toCauses((categories.data ?? []) as CategoryRow[], list) };
+  // Campaigns are a bonus: if they can't load, Discover still works without the row.
+  const rows = campaigns.error ? [] : ((campaigns.data ?? []) as (CampaignRow & { charity_id: string })[]);
+  const progress = rows.length ? await db.rpc("campaign_progress", { p_campaign_ids: rows.map((c) => c.id) }) : { data: [] };
+  return { charities: list, causes: toCauses((categories.data ?? []) as CategoryRow[], list), raising: raisingNow(rows, (progress.data ?? []) as ProgressRow[], list) };
 }
 
 /** Cause names, if the directory has loaded (live) or from the sample (preview). */
@@ -30,7 +40,7 @@ export function causeList(): Cause[] {
 
 export function useDirectory() {
   const live = supabase !== null;
-  const [data, setData] = useState<Directory | null>(live ? cached : { charities: sampleCharities, causes: sampleCauses });
+  const [data, setData] = useState<Directory | null>(live ? cached : { charities: sampleCharities, causes: sampleCauses, raising: sampleRaising() });
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {

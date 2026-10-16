@@ -4,15 +4,16 @@ import { ddmmyyyy, jhbDay, rand } from "@/lib/format";
 import { campaignPercent } from "@/lib/live-charities";
 import { colors, fonts, radius } from "@/theme/tokens";
 import { Button } from "./button";
+import { ShareButton } from "./share-button";
 import { Text } from "./text";
 
 /** A campaign: its name, what it's for, a goal bar that fills as people give, and (optionally) a Give button. */
-export function CampaignCard({ campaign, onGive, compact = false }: { campaign: Campaign; onGive?: () => void; compact?: boolean }) {
+export function CampaignCard({ campaign, onGive, shareText, charityName, compact = false }: { campaign: Campaign; onGive?: () => void; shareText?: string | null; charityName?: string; compact?: boolean }) {
   const pct = campaignPercent(campaign);
   const c = campaign;
   return (
     <View style={styles.card}>
-      <Text style={styles.kicker}>Campaign</Text>
+      <Text style={styles.kicker}>{charityName ? `Campaign · ${charityName}` : "Campaign"}</Text>
       <Text style={styles.title}>{c.title}</Text>
       {!compact && c.description ? <Text style={{ fontSize: 16, lineHeight: 23 }}>{c.description}</Text> : null}
       <View style={{ gap: 6, marginTop: 4 }}>
@@ -31,6 +32,7 @@ export function CampaignCard({ campaign, onGive, compact = false }: { campaign: 
         </Text>
       </View>
       {onGive ? <Button label="Give to this campaign" onPress={onGive} style={{ marginTop: 6 }} /> : null}
+      {shareText !== undefined ? <ShareButton text={shareText} label={`Share ${c.title} on WhatsApp`} /> : null}
     </View>
   );
 }

@@ -131,3 +131,24 @@ export function campaignPercent(c: Pick<Campaign, "raisedCents" | "targetCents">
   if (!c.targetCents || c.targetCents <= 0) return 0;
   return Math.min(100, Math.floor((c.raisedCents * 100) / c.targetCents));
 }
+
+export type RaisingNow = { campaign: Campaign; charity: Charity };
+
+/**
+ * "Raising now" on Discover: running campaigns of charities in the directory, the closest to their
+ * goal first (a nearly-full bar is the strongest nudge), then the newest. At most `max`.
+ */
+export function raisingNow(rows: (CampaignRow & { charity_id: string })[], progress: ProgressRow[], charities: Charity[], max = 6, now: Date = new Date()): RaisingNow[] {
+  const byId = new Map(charities.filter((c) => c.id).map((c) => [c.id!, c]));
+  const out: RaisingNow[] = [];
+  for (const r of rows) {
+    const charity = byId.get(r.charity_id);
+    const [campaign] = toCampaigns([r], progress, now);
+    if (charity && campaign) out.push({ campaign, charity });
+  }
+  return out
+    .map((x, i) => ({ x, i, pct: campaignPercent(x.campaign) }))
+    .sort((a, b) => b.pct - a.pct || a.i - b.i)
+    .slice(0, max)
+    .map(({ x }) => x);
+}

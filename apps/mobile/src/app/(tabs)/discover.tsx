@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CauseTiles } from "@/components/cause-tiles";
+import { RaisingNowRow } from "@/components/raising-now";
 import { CharityCard } from "@/components/charity-card";
 import { GiveSheet } from "@/components/give-sheet";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
@@ -113,6 +114,11 @@ export default function Discover() {
           />
         ) : (
           <View style={{ gap: space.block }}>
+            {!query && cause === "all" && directory.data?.raising.length ? (
+              <View style={{ marginHorizontal: -space.gutter }}>
+                <RaisingNowRow items={directory.data.raising} />
+              </View>
+            ) : null}
             {featured ? (
               <FadeUp index={0}>
                 <CharityCard charity={featured} featured live={live} onGive={onGive} />

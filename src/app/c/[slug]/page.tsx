@@ -30,7 +30,15 @@ const loadCharity = cache(async (slug: string) => {
 
 export async function generateMetadata({ params }: PageProps<"/c/[slug]">): Promise<Metadata> {
   const charity = await loadCharity((await params).slug);
-  return charity ? { title: charity.name_en, description: charity.description_en ?? undefined } : {};
+  if (!charity) return {};
+  // What WhatsApp and other apps show when someone shares the page: name, a line about the work, the cover photo.
+  const image = publicImageUrl(charity.cover_path) ?? publicImageUrl(charity.logo_path);
+  const description = charity.description_en?.slice(0, 200) ?? `Give to ${charity.name_en} on Givezy.`;
+  return {
+    title: charity.name_en,
+    description,
+    openGraph: { title: `Give to ${charity.name_en}`, description, siteName: "Givezy", locale: "en_ZA", type: "website", images: [{ url: image ?? "/logo.png" }] },
+  };
 }
 
 export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {

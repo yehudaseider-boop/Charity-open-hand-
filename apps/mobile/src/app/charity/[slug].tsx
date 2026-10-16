@@ -13,10 +13,12 @@ import { CampaignCard } from "@/components/campaign-card";
 import { GiveSheet } from "@/components/give-sheet";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { openUrl } from "@/lib/open-site";
+import { campaignShareText, charityShareText } from "@/lib/share";
+import { ShareButton } from "@/components/share-button";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { HebrewText, Text } from "@/components/text";
-import { ddmmyyyy } from "@/lib/format";
+import { ddmmyyyy, rand } from "@/lib/format";
 import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
@@ -93,7 +95,11 @@ export default function CharityDetail() {
           {(charity.campaigns ?? []).length ? (
             <View style={{ gap: 12, marginTop: space.block }}>
               {(charity.campaigns ?? []).map((c) => (
-                <CampaignCard key={c.id} campaign={c} onGive={() => (GIVE_IN_APP ? openGiveScreen(charity.slug, { campaign: c.id }) : openUrl(donateUrl(SITE_URL, charity.slug, null, c.id)))} />
+                <CampaignCard
+                  key={c.id}
+                  campaign={c}
+                  shareText={campaignShareText(SITE_URL, charity, { id: c.id, title: c.title, raised: rand(c.raisedCents), target: c.targetCents ? rand(c.targetCents) : null })}
+                  onGive={() => (GIVE_IN_APP ? openGiveScreen(charity.slug, { campaign: c.id }) : openUrl(donateUrl(SITE_URL, charity.slug, null, c.id)))} />
               ))}
             </View>
           ) : null}
@@ -158,6 +164,8 @@ export default function CharityDetail() {
         <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace("/discover"))} accessibilityRole="button" accessibilityLabel="Back" style={styles.round}>
           <BackIcon />
         </Pressable>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+        <ShareButton variant="round" text={charityShareText(SITE_URL, charity)} label={`Share ${charity.nameEn} on WhatsApp`} />
         <Pressable
           onPress={() => {
             haptic.press();
@@ -177,6 +185,7 @@ export default function CharityDetail() {
             <HeartIcon filled={saved} size={24} />
           </Animated.View>
         </Pressable>
+        </View>
       </View>
 
       {/* Sticky give bar */}

@@ -695,3 +695,8 @@ The Donations page takes a period: any time, this month, last month, this tax ye
 - **"Use my SA ID number ending 1234"** for signed-in donors, on the website's giving page and the app's give screen, when the charity can issue s18A receipts. The number comes from the encrypted copy kept with the donor's last s18A gift and is filled in on the server: only the last four digits ever reach the browser or the phone. It works only with the account's own email address (the receipt goes there), and "A different number" is one tap away. The app proves who is signed in by sending its sign-in token to our server only; password sign-ins are refused, as on the website.
 - **Message to the charity** in the app (optional, up to 500 characters), as on the website.
 - Signed-in donors on the website get their email filled in.
+
+## Share on WhatsApp, and Raising now on Discover (16/10/2026)
+
+- **Share on WhatsApp:** a share button by the heart on every charity page, and "Share on WhatsApp" on each campaign card. It opens WhatsApp with a short message ready ("Northcliff Meals Fund is raising for Pesach parcels. R31 400 of R50 000 raised so far. Give here: <link>"), falling back to the phone's share sheet. Links go to the charity's page, or the campaign's giving page, on our website. The website now gives those pages link previews (name, a line about the work, the cover photo, else the Givezy logo), which WhatsApp shows in the chat. Sharing waits until the website address is set in the app.
+- **Raising now:** a row of running campaigns at the top of Discover (when not searching or filtering), each with its charity, goal and bar, the closest to its goal first. Tapping opens the charity. If campaigns fail to load, Discover still works without the row.

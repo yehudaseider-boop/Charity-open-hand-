@@ -12,7 +12,16 @@ import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { DonateFlow } from "./donate-flow";
 
-export const metadata: Metadata = { title: "Donate" };
+/** A shared campaign link shows the campaign and its charity in WhatsApp's preview. */
+export async function generateMetadata({ params, searchParams }: PageProps<"/c/[slug]/donate">): Promise<Metadata> {
+  const charity = await loadDonatableCharity((await params).slug);
+  if (!charity) return { title: "Donate" };
+  const sp = await searchParams;
+  const campaign = typeof sp.campaign === "string" ? (await loadOpenCampaigns(charity.id)).find((c) => c.id === sp.campaign) : undefined;
+  const title = campaign ? `${campaign.title}: give to ${charity.name_en}` : `Give to ${charity.name_en}`;
+  const description = campaign?.description?.slice(0, 200) ?? `Give to ${charity.name_en} on Givezy.`;
+  return { title: "Donate", description, openGraph: { title, description, siteName: "Givezy", locale: "en_ZA", type: "website", images: [{ url: "/logo.png" }] } };
+}
 
 export default async function DonatePage({ params, searchParams }: PageProps<"/c/[slug]/donate">) {
   const { slug } = await params;

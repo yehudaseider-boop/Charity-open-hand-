@@ -13,6 +13,9 @@ const heebo = Heebo({ variable: "--font-heebo", subsets: ["hebrew"], weight: ["4
 export const metadata: Metadata = {
   title: { default: platformConfig.appName, template: `%s | ${platformConfig.appName}` },
   description: platformConfig.appTagline,
+  // Full addresses for link previews (the Givezy logo when a page has no picture of its own).
+  ...(process.env.SITE_URL ? { metadataBase: new URL(process.env.SITE_URL) } : {}),
+  openGraph: { siteName: platformConfig.appName, locale: "en_ZA", type: "website", images: [{ url: "/logo.png" }] },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
