@@ -92,7 +92,7 @@ describe("erasing a donor by their account", () => {
     expect(calls).toEqual([
       "rpc",
       "email",
-      ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"].map((t) => `${t}:deleted:user_id=${USER}`),
+      ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"].map((t) => `${t}:deleted:user_id=${USER}`),
       "consents:kind=account",
       "deleteUser",
       "audit",

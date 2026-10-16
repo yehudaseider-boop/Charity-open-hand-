@@ -21,6 +21,10 @@ export const appCheckoutSchema = appQuoteSchema.extend({
   campaignId: z.uuid().optional(),
   /** "Use my ID ending 1234": the server fills in the number for the signed-in donor. */
   useSavedId: z.boolean().optional(),
+  /** Keep the card used for this once-off gift, for next time (signed in; only when saved cards are switched on). */
+  saveCard: z.boolean().optional(),
+  /** Pay with the saved card instead of the payment page (signed in; only when saved cards are switched on). */
+  useSavedCard: z.boolean().optional(),
   details: z.object({
     donor_type: z.enum(["individual", "company", "trust"]),
     email: z.string().max(200),
@@ -73,6 +77,12 @@ export function toCheckoutInput(details: AppCheckoutBody["details"]):
 
 /** Off unless APP_GIVING=yes on the server: the in-app payment API stays closed in production until we choose. */
 export const appGivingOpen = (env: Record<string, string | undefined> = process.env) => env.APP_GIVING === "yes";
+
+/**
+ * Off unless SAVED_CARDS=yes on the server: saving a card for once-off gifts stays closed until the consent
+ * wording and the app stores' answers are in (see docs/go-live-checklist.md). Needs APP_GIVING too.
+ */
+export const savedCardsOpen = (env: Record<string, string | undefined> = process.env) => appGivingOpen(env) && env.SAVED_CARDS === "yes";
 
 /** The give screen asks, as it opens, whether it can take this gift (and the campaign, if one was chosen). */
 export const appReadySchema = z.object({ slug: z.string().min(1).max(120), campaignId: z.uuid().optional() });

@@ -69,6 +69,8 @@ export type ChargeRequest = {
   charityAccountRef: string | null;
   feeBearer: "charity" | "nediv_lev" | null;
   description: string;
+  /** A monthly collection (the default) or a once-off gift charged to the donor's saved card. Recorded with the charge. */
+  monthly?: boolean;
 };
 
 export type WebhookEvent = {

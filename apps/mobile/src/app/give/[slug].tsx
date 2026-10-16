@@ -26,11 +26,11 @@ import { loadGoals } from "@/lib/goals-store";
 import { monthsInARow } from "@/lib/streak";
 import { useStoredRecord } from "@/lib/use-stored-record";
 import { charityShareText } from "@/lib/share";
-import { openGivingPage, refreshAfterGiving } from "@/lib/give-flow";
+import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow";
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { openSite, openUrl } from "@/lib/open-site";
-import { afterPaymentMessage, centsToInput, checkReady, lastLabel, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
+import { afterPaymentMessage, cardLabel, centsToInput, checkReady, lastLabel, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -87,6 +87,9 @@ export default function Give() {
   const [idNumber, setIdNumber] = useState("");
   // Signed in with an earlier s18A gift: reuse that ID number (the server fills it in; only the last four digits reach the phone).
   const [useSavedId, setUseSavedId] = useState(true);
+  // Saved card (switched off until SAVED_CARDS is on in the app and on the server): pay with the one kept, or a new card.
+  const [useSavedCard, setUseSavedCard] = useState(true);
+  const [saveCard, setSaveCard] = useState(false);
   const [note, setNote] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   // Switched on, the donor still chooses "in honour of" or "in memory of": never chosen for them.
@@ -219,6 +222,13 @@ export default function Give() {
   const savedLast4 = server?.savedIdLast4 ?? null;
   const usingSavedId = s18aAvailable && want18a && Boolean(savedLast4) && useSavedId;
   const showDetailFields = !remembered || editingDetails;
+  // Saved cards need a signed-in donor giving with their account's own email, and a once-off gift (monthly gifts are set up on the payment page).
+  // Design review: ?demo=card shows the saved-card choices in the preview, which has no server.
+  const demoCard = preview && demo === "card" && SAVED_CARDS;
+  const cardsOpen = demoCard || (SAVED_CARDS && server?.savedCardsOpen === true && account.status === "signed-in" && !isMonthly && email.trim().toLowerCase() === (account.email ?? "").toLowerCase());
+  const savedCard = demoCard ? { brand: "visa", last4: "4242", expires: "12/2030" } : cardsOpen ? (server?.savedCard ?? null) : null;
+  const payWithSaved = Boolean(savedCard) && useSavedCard;
+  const offerSave = cardsOpen && !payWithSaved;
 
   /** What the after-gift screen shows: this gift added to the goal and the streak, and honest badges. */
   function sentSummary(cents: number, mail: string, confirming: boolean): SentGift {
@@ -299,12 +309,24 @@ export default function Give() {
     };
     const r = await startPayment(
       SITE_URL,
-      { slug: charity!.slug, giftCents: gift!, contributionCents: contribution ?? 0, shownTotalCents: total, campaignId, useSavedId: usingSavedId || undefined, details },
+      {
+        slug: charity!.slug,
+        giftCents: gift!,
+        contributionCents: contribution ?? 0,
+        shownTotalCents: total,
+        campaignId,
+        useSavedId: usingSavedId || undefined,
+        saveCard: (offerSave && saveCard) || undefined,
+        useSavedCard: payWithSaved || undefined,
+        details,
+      },
       undefined,
-      usingSavedId ? await account.accessToken() : null,
+      usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
     );
     if (!r.ok) {
       setBusy(false);
+      // A declined saved card: offer the payment page, where another card can be used.
+      if (r.savedCardDeclined) setUseSavedCard(false);
       setMessage(r.quote ? `${r.message} The total is now ${rand(r.quote.totalCents)}.` : r.message);
       if (r.quote) setAuthorisedTotal(null);
       if (r.fieldErrors) setErrors(r.fieldErrors);
@@ -314,13 +336,16 @@ export default function Give() {
     if (remember) await saveDetails(account.userId, mine);
     else if (remembered) await forgetDetails(account.userId);
 
-    let shown: "returned" | "closed";
-    try {
-      shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
-    } catch {
-      setBusy(false);
-      setMessage("We couldn't open the payment page. Please try again.");
-      return;
+    let shown: "returned" | "closed" = "returned";
+    // Paid with the saved card: there is no payment page, only the check below.
+    if (!r.charged) {
+      try {
+        shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
+      } catch {
+        setBusy(false);
+        setMessage("We couldn't open the payment page. Please try again.");
+        return;
+      }
     }
     // Closing the page doesn't say whether the donor paid: ask. Coming back from a finished
     // payment, the provider's confirmation can take a few seconds, so ask once more.
@@ -343,7 +368,7 @@ export default function Give() {
   }
 
   const err = (k: string) => errors[k];
-  const buttonLabel = busy === "opening" ? "Opening the payment page" : busy === "checking" ? "Checking your payment" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
+  const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card" : "Opening the payment page") : busy === "checking" ? "Checking your payment" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
   // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
   const goalLabel = goal?.counts?.[0] ?? null;
   const counting = goal ? counts(goal, cleanLabel(label)) : false;
@@ -508,6 +533,33 @@ export default function Give() {
             </View>
           ) : null}
 
+          {/* How you pay: the card kept for next time, or a new card on the payment page. */}
+          {cardsOpen ? (
+            <View style={{ gap: 10 }}>
+              <Text style={styles.question}>How would you like to pay?</Text>
+              {savedCard ? (
+                <View style={styles.chips} accessibilityRole="radiogroup">
+                  {([true, false] as const).map((saved) => {
+                    const on = useSavedCard === saved;
+                    return (
+                      <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setUseSavedCard(saved); }} style={[styles.chip, on && styles.chipOn]}>
+                        <Text style={[styles.chipText, on && { color: colors.onInk }]}>{saved ? cardLabel(savedCard) : "A different card"}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+              {offerSave ? (
+                <SwitchRow
+                  label="Save my card for next time"
+                  description="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
+                  value={saveCard}
+                  onChange={setSaveCard}
+                />
+              ) : null}
+            </View>
+          ) : null}
+
           {isMonthly && total ? (
             <View style={{ gap: 8 }}>
               <Text variant="bodyMuted">
@@ -543,7 +595,8 @@ export default function Give() {
           <View style={{ gap: 8 }}>
             <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
             <Text variant="label" style={{ textAlign: "center" }}>
-              {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}. ` : ""}You enter your card on a secure payment page, never in the app.
+              {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}. ` : ""}
+              {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
             </Text>
           </View>
         </View>

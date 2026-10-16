@@ -7,8 +7,13 @@
 export type Pricing = { amountCents: number; contributionCents: number; totalCents: number };
 export type QuoteReply = { ok: true; quote: Pricing } | { ok: false; message: string };
 export type CheckoutReply =
-  | { ok: true; redirectUrl: string; reference: string; token: string }
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing };
+  | { ok: true; redirectUrl: string; charged?: undefined; reference: string; token: string }
+  /** Paid with the saved card: no payment page. Ask for the outcome (the charge is only a first indication). */
+  | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing; savedCardDeclined?: boolean };
+
+/** The card kept for next time: what is safe to show ("Visa ending 4242"), never the card itself. */
+export type SavedCard = { brand: string | null; last4: string | null; expires: string | null };
 
 export type DonorDetails = {
   donor_type: "individual";
@@ -66,7 +71,19 @@ export function requestQuote(site: string, slug: string, giftCents: number, cont
 
 export function startPayment(
   site: string,
-  args: { slug: string; giftCents: number; contributionCents: number; shownTotalCents: number; campaignId?: string; useSavedId?: boolean; details: DonorDetails },
+  args: {
+    slug: string;
+    giftCents: number;
+    contributionCents: number;
+    shownTotalCents: number;
+    campaignId?: string;
+    useSavedId?: boolean;
+    /** Keep the card used for this once-off gift, for next time (signed in, saved cards switched on). */
+    saveCard?: boolean;
+    /** Pay with the saved card, no payment page (signed in, saved cards switched on). */
+    useSavedCard?: boolean;
+    details: DonorDetails;
+  },
   post: Post = fetchPost,
   token?: string | null,
 ) {
@@ -75,7 +92,7 @@ export function startPayment(
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; savedIdLast4: string | null }
+  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; savedIdLast4: string | null; savedCardsOpen: boolean; savedCard: SavedCard | null }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
@@ -87,12 +104,72 @@ export async function checkReady(site: string, slug: string, campaignId: string 
     const j = json as Record<string, unknown> | null;
     if (j?.ok === true && typeof j.minGiftCents === "number" && typeof j.minContributionCents === "number") {
       const last4 = typeof j.savedIdLast4 === "string" && /^\d{4}$/.test(j.savedIdLast4) ? j.savedIdLast4 : null;
-      return { ok: true, accepting: j.accepting === true, receiptsAvailable: j.receiptsAvailable === true, campaignOpen: j.campaignOpen === true, minGiftCents: j.minGiftCents, minContributionCents: j.minContributionCents, savedIdLast4: last4 };
+      return {
+        ok: true,
+        accepting: j.accepting === true,
+        receiptsAvailable: j.receiptsAvailable === true,
+        campaignOpen: j.campaignOpen === true,
+        minGiftCents: j.minGiftCents,
+        minContributionCents: j.minContributionCents,
+        savedIdLast4: last4,
+        savedCardsOpen: j.savedCardsOpen === true,
+        savedCard: cleanSavedCard(j.savedCard),
+      };
     }
   } catch {
     // fall through
   }
   return { ok: false, message: NETWORK };
+}
+
+/** A saved card as the server describes it: brand, last four digits and expiry only; anything else is dropped. */
+export function cleanSavedCard(v: unknown): SavedCard | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const last4 = typeof o.last4 === "string" && /^\d{4}$/.test(o.last4) ? o.last4 : null;
+  if (!last4) return null;
+  const brand = typeof o.brand === "string" && o.brand.trim() ? o.brand.trim().slice(0, 20) : null;
+  const expires = typeof o.expires === "string" && /^\d{2}\/\d{4}$/.test(o.expires) ? o.expires : null;
+  return { brand, last4, expires };
+}
+
+/** "Visa ending 4242", or "Card ending 4242" when the brand is not known. */
+export function cardLabel(card: SavedCard): string {
+  const b = (card.brand ?? "").trim();
+  const name = b ? b.charAt(0).toUpperCase() + b.slice(1).toLowerCase() : "Card";
+  return `${name} ending ${card.last4}`;
+}
+
+type Send = (method: "GET" | "DELETE", url: string, token: string) => Promise<{ status: number; json: unknown }>;
+
+const fetchSend: Send = async (method, url, token) => {
+  const res = await fetch(url, { method, headers: { authorization: `Bearer ${token}` } });
+  return { status: res.status, json: await res.json().catch(() => null) };
+};
+
+export type SavedCardReply = { ok: true; card: SavedCard | null } | { ok: false; closed?: true; message: string };
+
+/** The donor's saved card, for the Account screen. A 404 means saved cards are switched off on the server. */
+export async function fetchSavedCard(site: string, token: string, send: Send = fetchSend): Promise<SavedCardReply> {
+  try {
+    const { status, json } = await send("GET", api(site, "saved-card"), token);
+    if (status === 404) return { ok: false, closed: true, message: "Saved cards aren't switched on yet." };
+    if ((json as { ok?: unknown } | null)?.ok === true) return { ok: true, card: cleanSavedCard((json as { card?: unknown }).card) };
+  } catch {
+    // fall through
+  }
+  return { ok: false, message: NETWORK };
+}
+
+/** Remove the saved card, at once. */
+export async function removeSavedCard(site: string, token: string, send: Send = fetchSend): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const { json } = await send("DELETE", api(site, "saved-card"), token);
+    if ((json as { ok?: unknown } | null)?.ok === true) return { ok: true };
+  } catch {
+    // fall through
+  }
+  return { ok: false, message: "We couldn't remove your card just now. Please try again." };
 }
 
 export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found";

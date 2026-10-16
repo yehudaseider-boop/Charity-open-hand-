@@ -13,6 +13,7 @@ import { Text } from "@/components/text";
 import { sampleDonor } from "@/data/giving";
 import { useAccount } from "@/lib/account";
 import { setJewishMode, useJewishMode } from "@/lib/jewish-mode";
+import { SavedCardRow } from "@/components/saved-card-row";
 import { SwitchRow } from "@/components/switch-row";
 import { openSite } from "@/lib/open-site";
 import { colors, fonts, radius, space } from "@/theme/tokens";
@@ -86,6 +87,7 @@ export default function Account() {
             <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.blueSoft} onPress={() => router.push("/receipts")} />
           </View>
 
+          <SavedCardRow />
           {preferences}
           <SettingsGroup title="App" cells={support} />
           <SettingsGroup

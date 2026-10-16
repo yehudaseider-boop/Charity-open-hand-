@@ -21,7 +21,7 @@ describe("app pay api", () => {
   });
 });
 
-import { cleanRemembered, lastLabel, quickAmounts } from "../apps/mobile/src/lib/pay-api";
+import { cardLabel, cleanRemembered, cleanSavedCard, fetchSavedCard, lastLabel, quickAmounts, removeSavedCard } from "../apps/mobile/src/lib/pay-api";
 
 describe("fewer taps", () => {
   const g = (slug: string, cents: number, day: number, label: string | null = null) => ({ charitySlug: slug, cents, date: new Date(2026, 9, day), label, monthly: false });
@@ -50,7 +50,7 @@ describe("before and after the payment page", () => {
   it("reads whether the charity can take the gift, the campaign and the minimums", async () => {
     const seen: unknown[] = [];
     const r = await checkReady("https://x.test", "a", "c1", async (url, body) => (seen.push([url, body]), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 } }));
-    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: null });
+    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: null, savedCardsOpen: false, savedCard: null });
     expect(seen[0]).toEqual(["https://x.test/api/app/ready", { slug: "a", campaignId: "c1" }]);
   });
   it("offline is a plain message, not the website hand-off", async () => {
@@ -83,5 +83,50 @@ describe("saved ID number in the app", () => {
     expect(r.ok && r.savedIdLast4).toBe("9087");
     const odd = await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: { ok: true, accepting: true, receiptsAvailable: true, campaignOpen: false, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: "8001015009087" } }));
     expect(odd.ok && odd.savedIdLast4).toBeNull();
+  });
+});
+
+describe("saved card in the app", () => {
+  it("shows only brand, last four digits and expiry, and drops anything else the server sends", () => {
+    expect(cleanSavedCard({ brand: "visa", last4: "4242", expires: "12/2030", code: "AUTH_SECRET" })).toEqual({ brand: "visa", last4: "4242", expires: "12/2030" });
+    expect(cleanSavedCard({ brand: "visa", last4: "42" })).toBeNull();
+    expect(cleanSavedCard(null)).toBeNull();
+    expect(cleanSavedCard({ last4: "4242", expires: "soon" })).toEqual({ brand: null, last4: "4242", expires: null });
+  });
+
+  it("names the card for the donor", () => {
+    expect(cardLabel({ brand: "visa", last4: "4242", expires: null })).toBe("Visa ending 4242");
+    expect(cardLabel({ brand: null, last4: "4242", expires: null })).toBe("Card ending 4242");
+  });
+
+  it("reads the switch and the card from the ready check", async () => {
+    const reply = { ok: true, accepting: true, minGiftCents: 3000, minContributionCents: 1000, savedCardsOpen: true, savedCard: { brand: "mastercard", last4: "5100", expires: "01/2029" } };
+    const r = await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: reply }), "tok");
+    expect(r.ok && r.savedCardsOpen).toBe(true);
+    expect(r.ok && r.savedCard?.last4).toBe("5100");
+    const off = await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: { ...reply, savedCardsOpen: undefined, savedCard: undefined } }));
+    expect(off.ok && off.savedCardsOpen).toBe(false);
+    expect(off.ok && off.savedCard).toBeNull();
+  });
+
+  it("loads and removes the saved card with the donor's token", async () => {
+    const seen: string[] = [];
+    const send = async (method: string, url: string, token: string) => {
+      seen.push(`${method} ${url} ${token}`);
+      return { status: 200, json: method === "GET" ? { ok: true, card: { brand: "visa", last4: "4242", expires: "12/2030" } } : { ok: true } };
+    };
+    const got = await fetchSavedCard("https://x.test/", "tok", send);
+    expect(got.ok && got.card?.last4).toBe("4242");
+    expect((await removeSavedCard("https://x.test", "tok", send)).ok).toBe(true);
+    expect(seen).toEqual(["GET https://x.test/api/app/saved-card tok", "DELETE https://x.test/api/app/saved-card tok"]);
+  });
+
+  it("says plainly when saved cards are off, or the network is down", async () => {
+    const closed = await fetchSavedCard("https://x.test", "tok", async () => ({ status: 404, json: null }));
+    expect(!closed.ok && closed.closed).toBe(true);
+    const down = await fetchSavedCard("https://x.test", "tok", async () => { throw new Error("offline"); });
+    expect(!down.ok && down.message).toMatch(/connection/);
+    const failed = await removeSavedCard("https://x.test", "tok", async () => ({ status: 500, json: null }));
+    expect(!failed.ok && failed.message).toMatch(/couldn't remove/);
   });
 });

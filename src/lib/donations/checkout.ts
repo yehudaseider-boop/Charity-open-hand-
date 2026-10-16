@@ -4,9 +4,11 @@ import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
-import { getGateway, GatewayError } from "@/lib/gateway";
+import { getGateway, GatewayError, isGatewayRefusal } from "@/lib/gateway";
 import { formatRand } from "@/lib/money";
 import { savedIdNumber } from "./saved-id";
+import { savedCardsOpen } from "./app-api";
+import { loadSavedCardToken, requestCardSave } from "./saved-card";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -48,8 +50,14 @@ export function quoteDonation(giftCents: number, contributionCents: number): Quo
 
 export type StartResult =
   /** `reference` and `token` let the phone app ask whether this payment went through (api/app/status). */
-  | { ok: true; redirectUrl: string; reference: string; token: string }
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote };
+  | { ok: true; redirectUrl: string; charged?: undefined; reference: string; token: string }
+  /**
+   * Paid with the donor's saved card: there is no payment page. The charge is only a first indication;
+   * the app asks api/app/status, which checks with the payment provider before anything counts as paid.
+   */
+  | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
+  /** `savedCardDeclined`: the provider refused the saved card, so the app should offer the payment page with another card. */
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean };
 
 /**
  * Record a pending donation and hand the donor to the gateway.
@@ -72,6 +80,13 @@ export async function startDonation(args: {
    * last s18A gift holds the number. Used only with that account's own email address.
    */
   useSavedIdOf?: { userId: string; email: string };
+  /**
+   * Once-off gift: keep the card used, for next time. The signed-in account (checked by the caller) that
+   * will own the card. Only when saved cards are switched on, and only with that account's own email address.
+   */
+  saveCardFor?: { userId: string; email: string };
+  /** Once-off gift: charge the account's saved card instead of sending the donor to the payment page. Same rules. */
+  useSavedCardOf?: { userId: string; email: string };
 }): Promise<StartResult> {
   const charity = await loadDonatableCharity(args.charitySlug);
   if (!charity || !charity.acceptingPayments) {
@@ -90,6 +105,24 @@ export async function startDonation(args: {
 
   const fieldErrors = checkDonorDetails(input, charity.receiptsAvailable);
   if (Object.keys(fieldErrors).length) return { ok: false, message: "Please check the highlighted fields.", fieldErrors };
+
+  // Saved cards: once-off gifts only, signed-in account only, and only the account's own email.
+  const cardAccount = args.saveCardFor ?? args.useSavedCardOf;
+  let savedToken: { code: string; gateway: string } | null = null;
+  if (cardAccount) {
+    if (!savedCardsOpen()) return { ok: false, message: "Saving a card isn't switched on yet. Please pay on the payment page." };
+    if (args.saveCardFor && args.useSavedCardOf) return { ok: false, message: "Choose either a new card or your saved card." };
+    if (input.monthly === "on") return { ok: false, message: "Monthly gifts are set up on the payment page. Switch off saved cards for this gift." };
+    if (cardAccount.email.trim().toLowerCase() !== input.email.trim().toLowerCase()) {
+      return { ok: false, message: "Your card goes with your account's email address. Give with that email, or use the payment page.", fieldErrors: { email: "Use your account's email address" } };
+    }
+    if (args.useSavedCardOf) {
+      savedToken = await loadSavedCardToken(args.useSavedCardOf.userId);
+      if (!savedToken || savedToken.gateway !== getGateway().name) {
+        return { ok: false, message: "We couldn't find your saved card. Please pay on the payment page." };
+      }
+    }
+  }
 
   const campaign = args.campaignId ? await loadOpenCampaign(args.campaignId, charity.id) : null;
   if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity." };
@@ -223,6 +256,13 @@ export async function startDonation(args: {
     if (auth.error) throw auth.error;
   }
 
+  if (args.saveCardFor) {
+    // The donor ticked "Save my card": what they agreed to, and the card is kept once this payment is confirmed.
+    const keep = await db.from("consents").insert({ kind: "saved_card", policy_version: legalConfig.policyVersion, donation_id: donationId });
+    if (keep.error) throw keep.error;
+    await requestCardSave(donationId, args.saveCardFor.userId);
+  }
+
   // The donor's own label for the gift, if they gave one. Kept in a table only the donor
   // can read: charities never see it.
   const label = givingLabelOf(v);
@@ -234,6 +274,34 @@ export async function startDonation(args: {
   // Sent only to the donor, in the address the gateway returns them to.
   const confirmationToken = await issueConfirmationToken(donationId);
 
+  if (savedToken) {
+    // Their saved card: no payment page. A refusal (declined, expired) ends this gift; anything else
+    // (a timeout, an outage) leaves it pending, because the charge may have gone through and a second
+    // charge must never follow. Either way the answer only counts once confirmed with the provider.
+    const failGift = async () => {
+      await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", donationId).eq("status", "pending");
+      return { ok: false as const, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
+    };
+    try {
+      const { status } = await gateway.chargeAuthorization({
+        reference: donationId,
+        authorizationCode: savedToken.code,
+        email: v.email,
+        totalCents: fees.totalCents,
+        lines: { charityCents: fees.amountCents, contributionCents: fees.contributionCents },
+        charityAccountRef: charity.splitAccountRef,
+        feeBearer: platformConfig.fees.gatewayChargePaidBy,
+        description: `Donation to ${charity.name_en}`,
+        monthly: false,
+      });
+      if (status === "failed") return await failGift();
+    } catch (e) {
+      if (isGatewayRefusal(e)) return await failGift();
+      console.error(e);
+    }
+    return { ok: true, charged: true, reference: donationId, token: confirmationToken };
+  }
+
   try {
     const site = process.env.SITE_URL ?? "";
     const { redirectUrl } = await gateway.createCheckout({
@@ -243,7 +311,7 @@ export async function startDonation(args: {
       charityAccountRef: charity.splitAccountRef,
       feeBearer: platformConfig.fees.gatewayChargePaidBy,
       email: v.email,
-      saveCard: monthly,
+      saveCard: monthly || Boolean(args.saveCardFor),
       returnUrl: `${site}/donate/return?reference=${donationId}&t=${confirmationToken}${args.fromApp ? "&from=app" : ""}`,
       description: `Donation to ${charity.name_en}`,
     });

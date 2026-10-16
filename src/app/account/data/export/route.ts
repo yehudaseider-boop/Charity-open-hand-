@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { decrypt } from "@/lib/crypto";
+import { loadSavedCardInfo } from "@/lib/donations/saved-card";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -69,6 +70,9 @@ export async function GET() {
     }
   };
 
+  // The saved card, as brand, last four digits and expiry only. The stored token is never included.
+  const savedCard = await loadSavedCardInfo(user.id).catch(() => null);
+
   const body = {
     about: "Everything Givezy holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are UTC.",
     downloaded_at: new Date().toISOString(),
@@ -77,6 +81,7 @@ export async function GET() {
     donor_details: donors.data ?? [],
     donations,
     monthly_donations: monthly.data ?? [],
+    saved_card: savedCard,
     giving_kinds: kinds.data ?? [],
     s18a_receipts: myReceipts.data ?? [],
     agreements: consents.data ?? [],

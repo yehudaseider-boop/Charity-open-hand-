@@ -86,8 +86,8 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
 
   if (userId) {
     // Their own records kept against the account go in every case, also when the account itself has to stay
-    // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, maaser settings.
-    for (const table of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"]) {
+    // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, maaser settings, the saved card.
+    for (const table of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"]) {
       const { error: ownError } = await db.from(table).delete().eq("user_id", userId);
       if (ownError) throw new Error(`Could not erase their ${table.replace(/_/g, " ")}: ${ownError.message}`);
     }

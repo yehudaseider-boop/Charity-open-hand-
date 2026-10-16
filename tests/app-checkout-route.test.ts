@@ -42,8 +42,10 @@ vi.mock("@/lib/donations/confirmation-access", () => ({ issueConfirmationToken: 
 vi.mock("@/lib/donations/charity", () => ({
   loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: true, splitAccountRef: "ACCT_1" }),
 }));
+vi.mock("@/lib/donations/saved-card", () => ({ loadSavedCardToken: async () => null, requestCardSave: async () => {} }));
 vi.mock("@/lib/gateway", () => ({
   GatewayError: class extends Error {},
+  isGatewayRefusal: () => false,
   getGateway: () => ({
     name: "test",
     createCheckout: async (req: Record<string, unknown>) => {

@@ -63,5 +63,7 @@ export async function submitDonation(
   const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
   const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, input: parsed.data, ip, useSavedIdOf });
   if (!result.ok) return result;
+  // The website never charges a saved card (only the app does), so there is always a payment page.
+  if (!result.redirectUrl) return { ok: false, message: "We couldn't start the payment. Please try again." };
   redirect(result.redirectUrl);
 }

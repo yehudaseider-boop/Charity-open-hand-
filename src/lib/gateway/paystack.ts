@@ -165,7 +165,7 @@ export const paystackGateway: PaymentGateway = {
         currency: "ZAR",
         reference: req.reference,
         ...splitOrNone(req, paystackGateway.splitsPayments),
-        metadata: { description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: true },
+        metadata: { description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: req.monthly ?? true },
       }),
     });
     return { status: data.status === "success" ? ("success" as const) : ["failed", "reversed"].includes(data.status) ? ("failed" as const) : ("pending" as const) };

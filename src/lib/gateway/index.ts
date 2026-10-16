@@ -4,7 +4,7 @@ import { testGateway } from "./test-gateway";
 import type { PaymentGateway } from "./types";
 
 export type { PaymentGateway } from "./types";
-export { GatewayError } from "./types";
+export { GatewayError, isGatewayRefusal } from "./types";
 
 /** The gateway in use, chosen by the PAYMENT_GATEWAY environment variable. */
 export function getGateway(): PaymentGateway {

@@ -4,6 +4,7 @@ import { taxYearFor } from "@/lib/dates";
 import { gatewayByName } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyDonationPaid } from "./notify";
+import { cardSaveWaitingFor, finishCardSave } from "./saved-card";
 import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyHandledElsewhere, monthlyWaitingFor } from "./recurring";
 
 export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
@@ -38,6 +39,7 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
   if (!donation) return "not_found";
   if (donation.status === "paid") {
     await finishMonthlySetup(donation, reference);
+    await finishCardKeeping(donation, reference);
     return "paid";
   }
   if (donation.status !== "pending" && donation.status !== "failed") return donation.status as ConfirmOutcome;
@@ -66,6 +68,9 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (updated?.length) {
       // Set up the monthly donation first (a failure here is retried: see the paid branch above).
       const monthly = donation.recurring_id ? await activateMonthlyDonation(donation.id, tx) : "none";
+      // The donor asked us to keep this card for next time. A failure must not hold back their confirmation
+      // email: the request stays, and the next look at this paid gift (see the paid branch above) tries again.
+      await finishCardSave(donation.id, tx, donation.gateway).catch((e) => console.error("[saved-card] card not kept yet", e));
       // A concurrent call that finished the monthly set-up first has already sent the email.
       if (!(donation.recurring_id && monthly === "none" && (await monthlyHandledElsewhere(donation.id)))) {
         await notifyDonationPaid(donation.id, { monthly });
@@ -77,6 +82,7 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (now === "paid") {
       // The other call may have died before the monthly set-up finished: finish it here too.
       await finishMonthlySetup(donation, reference);
+      await finishCardKeeping(donation, reference);
       return "paid";
     }
     if (now === "pending" || now === "failed") throw new PersistenceError("save the paid donation");
@@ -113,6 +119,13 @@ async function finishMonthlySetup(donation: { id: string; gateway: string; recur
   if (again.status !== "success") return;
   const monthly = await activateMonthlyDonation(donation.id, again);
   if (monthly !== "none") await notifyDonationPaid(donation.id, { monthly });
+}
+
+/** A paid gift whose card was meant to be kept but was not (the first confirmation died part-way): do it now. */
+async function finishCardKeeping(donation: { id: string; gateway: string }, reference: string): Promise<void> {
+  if (!(await cardSaveWaitingFor(donation.id))) return;
+  const again = await gatewayByName(donation.gateway).verifyTransaction(reference);
+  if (again.status === "success") await finishCardSave(donation.id, again, donation.gateway);
 }
 
 async function currentStatus(donationId: string): Promise<string> {

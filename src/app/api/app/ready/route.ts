@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { platformConfig } from "@/config/platform";
-import { appGivingOpen, appReadySchema } from "@/lib/donations/app-api";
+import { appGivingOpen, appReadySchema, savedCardsOpen } from "@/lib/donations/app-api";
+import { loadSavedCardInfo } from "@/lib/donations/saved-card";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { loadOpenCampaign } from "@/lib/donations/checkout";
 import { appAccount } from "@/lib/app-auth";
@@ -19,8 +20,12 @@ export async function POST(request: NextRequest) {
   const accepting = Boolean(charity?.acceptingPayments);
   const campaignOpen = charity && body.data.campaignId ? Boolean(await loadOpenCampaign(body.data.campaignId, charity.id)) : false;
   // A signed-in donor sees "Use my ID ending 1234" (the last four digits only).
-  const who = charity?.receiptsAvailable ? await appAccount(request) : null;
+  const account = await appAccount(request);
+  const who = charity?.receiptsAvailable ? account : null;
   const savedIdLast4 = who ? await savedIdLast4For(who.userId) : null;
+  // Saved cards, when switched on: offer to keep a card, or pay with the one kept (brand and last four digits only).
+  const cardsOpen = savedCardsOpen();
+  const savedCard = cardsOpen && account ? await loadSavedCardInfo(account.userId) : null;
   return NextResponse.json({
     ok: true,
     accepting,
@@ -29,5 +34,7 @@ export async function POST(request: NextRequest) {
     minGiftCents: platformConfig.minDonationCents,
     minContributionCents: platformConfig.minContributionCents,
     savedIdLast4,
+    savedCardsOpen: cardsOpen,
+    savedCard,
   });
 }
