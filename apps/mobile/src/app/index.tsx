@@ -26,7 +26,7 @@ const STEPS = 3;
 const how = [
   { title: "Find a charity here", body: "See what each charity does and whether it issues s18A receipts." },
   { title: "Give on our website", body: "Tap Give and our website opens. You choose the amount and pay there securely." },
-  { title: "It all comes back to the app", body: "Sign in with the email you gave with. Your donations, receipts, maaser and chomesh show up here." },
+  { title: "It all comes back to the app", body: "Sign in with the email you gave with. Your donations, receipts and giving goal show up here." },
 ];
 
 /**
@@ -101,10 +101,10 @@ export default function Welcome() {
         <View style={[styles.content, { paddingBottom: insets.bottom + space.md }]}>
           <FadeUp>
             <Text variant="hero" accessibilityRole="header">
-              Give to the causes that carry our community.
+              Give to the causes you care about.
             </Text>
             <Text variant="bodyMuted" style={styles.support}>
-              Find charities, give on our website, and keep your maaser and chomesh in one place.
+              Find charities you trust, give in a few taps, and keep all your giving in one place.
             </Text>
           </FadeUp>
           <View style={styles.actions}>

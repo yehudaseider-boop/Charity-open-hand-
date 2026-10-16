@@ -9,7 +9,7 @@
 
 export const platformConfig = {
   appName: "Givezy",
-  appTagline: "Give to Johannesburg's Jewish community, simply.",
+  appTagline: "Give to the causes you care about, simply.",
 
   locale: "en-ZA",
   timeZone: "Africa/Johannesburg",

@@ -108,7 +108,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
             ))}
           </ul>
           <div className="mt-4 border-t border-border pt-3 text-sm">
-            <p className="mb-2">Share your Givezy page with your community:</p>
+            <p className="mb-2">Share your Givezy page with your supporters:</p>
             <CopyLink url={publicLink} />
             <Link href={`${base}/poster`} className="mt-2 inline-block text-brand underline">Print a QR poster for your notice board</Link>
           </div>
@@ -179,7 +179,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
             })}
           </ul>
         ) : (
-          <p className="text-sm text-muted">Raising for something specific, like Pesach parcels? Start a campaign with a goal, and donors see how close you are.</p>
+          <p className="text-sm text-muted">Raising for something specific, like winter food parcels? Start a campaign with a goal, and donors see how close you are.</p>
         )}
         <Link href={`${base}/campaigns`} className="mt-3 inline-block text-sm text-brand underline">{activeCampaigns.length ? "Manage campaigns" : "Start a campaign"}</Link>
       </Card>

@@ -23,6 +23,7 @@ import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
+import { useJewishMode } from "@/lib/jewish-mode";
 import { colors, fonts, photoCorners, space, touch } from "@/theme/tokens";
 
 /** Screen 3: charity detail. The give sheet rises over it and hands the donor to the website. */
@@ -41,6 +42,7 @@ export default function CharityDetail() {
   const { live, charity, failed, retry } = useCharity(params.slug);
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const savedList = useSaved();
+  const jewish = useJewishMode();
   const [pop] = useState(() => new Animated.Value(1));
   const [scrollY] = useState(() => new Animated.Value(0));
 
@@ -81,7 +83,7 @@ export default function CharityDetail() {
 
         <View style={styles.sheet}>
           <Text variant="h1" accessibilityRole="header" style={{ fontSize: 34, lineHeight: 39 }}>{charity.nameEn}</Text>
-          {charity.nameHe ? <HebrewText style={styles.hebrew}>{charity.nameHe}</HebrewText> : null}
+          {jewish && charity.nameHe ? <HebrewText style={styles.hebrew}>{charity.nameHe}</HebrewText> : null}
 
           {charity.about[0] ? <Text style={styles.lead}>{charity.about[0]}</Text> : null}
           {charity.about[1] ? (

@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "QR poster" };
 
 /**
  * A printable A4 poster: the charity's name, a large QR code to its Givezy page, and one line on how
- * to use it. For a shul notice board, a front desk or an event table.
+ * to use it. For a notice board, a front desk or an event table.
  */
 export default async function PosterPage({ params }: PageProps<"/charity-admin/[id]/poster">) {
   const { id } = await params;
@@ -30,7 +30,7 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
       <div className="space-y-2 print:hidden">
         <h1 className="text-xl font-semibold">QR poster</h1>
         <p className="text-sm text-muted">
-          Put this up where your community sees it: the shul notice board, your front desk, a table at an event. People point
+          Put this up where your community sees it: a notice board, your front desk, a table at an event. People point
           their phone camera at the code and land on your Givezy page, ready to give.
         </p>
         <div className="flex flex-wrap gap-2">

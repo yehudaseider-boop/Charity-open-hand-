@@ -27,7 +27,7 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
       <div>
         <h1 className="text-xl font-semibold">Campaigns</h1>
         <p className="text-sm text-muted">
-          Raise for one thing at a time, like Pesach food parcels or a new Sefer Torah. Donors give to it in the Givezy app or on your Givezy page, and see how close you are to the goal.
+          Raise for one thing at a time, like winter food parcels or a new roof. Donors give to it in the Givezy app or on your Givezy page, and see how close you are to the goal.
           The money comes to you like any other donation. You can run up to 3 at a time.
         </p>
       </div>

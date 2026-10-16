@@ -23,7 +23,7 @@ export default async function AgreePage({ searchParams }: PageProps<"/agree">) {
       <DraftNotice />
       <p className="text-sm text-muted">
         {platformConfig.appName} keeps your email address and your giving records so you can see them here and in the app.
-        Only you see your maaser and chomesh. We never sell your information or send you marketing.
+        Only you see your giving goal and the labels you give your donations. We never sell your information or send you marketing.
       </p>
       <form action={agreeToPolicy} className="space-y-3">
         <input type="hidden" name="next" value={next} />

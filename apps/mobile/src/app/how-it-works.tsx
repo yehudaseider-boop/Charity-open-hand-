@@ -10,8 +10,8 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
 
 const steps = [
   { title: "Find a charity", body: "Search by name, cause or area. Every charity page shows whether it issues s18A receipts." },
-  { title: "Give on our website", body: "Choose maaser, chomesh or general tzedaka here, then tap Give. Our website opens, where you enter the amount and pay securely. We never see or store your card details." },
-  { title: "Back in the app", body: "Sign in with the email you gave with. Every donation, and your maaser and chomesh, shows up here." },
+  { title: "Give on our website", body: "Tap Give and choose the amount. You pay on a secure payment page. We never see or store your card details." },
+  { title: "Back in the app", body: "Sign in with the email you gave with. Every donation, and how you are doing against your giving goal, shows up here." },
   { title: "Get your receipt", body: "If the charity issues s18A receipts, you get one annual receipt covering all your donations to it." },
 ];
 

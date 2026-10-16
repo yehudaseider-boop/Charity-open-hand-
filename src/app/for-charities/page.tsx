@@ -14,7 +14,7 @@ const reasons = [
   { title: "Straight to your bank", body: "Each donation is paid into your own bank account by our payment provider. Givezy never holds your money. The provider's card fee comes off each donation." },
   { title: "s18A receipts, done for you", body: "If you have s18A approval and sign our receipting mandate, we issue your donors' receipts in your name once a year. No spreadsheets at tax time." },
   { title: "Monthly donors", body: "Donors can give the same amount every month until they cancel. You see who gives monthly and how much comes in." },
-  { title: "Campaigns with a goal", body: "Raising for Pesach parcels or a new Sefer Torah? Start a campaign with a goal and donors watch it fill up." },
+  { title: "Campaigns with a goal", body: "Raising for winter food parcels or a new roof? Start a campaign with a goal and donors watch it fill up." },
   { title: "Your own dashboard", body: "See every donation, your donors, monthly totals and how your campaigns are doing. Download it all when you need to." },
 ];
 
@@ -28,9 +28,9 @@ export default function ForCharitiesPage() {
   return (
     <div className="space-y-8">
       <section className="rounded-card border border-border bg-gradient-to-br from-brand-soft to-surface p-6 sm:p-8">
-        <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Let your community give to you in a few taps</h1>
+        <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Let your supporters give to you in a few taps</h1>
         <p className="mt-3">
-          {platformConfig.appName} helps donors find local charities, give from their phone, and keep track of their maaser and chomesh.
+          {platformConfig.appName} helps donors find local charities, give from their phone, and keep track of their giving.
           Listing your organisation is free.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">

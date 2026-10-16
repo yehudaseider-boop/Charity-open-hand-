@@ -10,14 +10,16 @@ import { Text } from "./text";
  * and the name under it. Charities' causes are set by admins, so the icon is picked from words in
  * the name, with a heart for anything we don't recognise.
  */
-type IconName = "all" | "food" | "book" | "shul" | "medical" | "kids" | "clothes" | "home" | "heart";
+type IconName = "all" | "food" | "book" | "shul" | "medical" | "kids" | "clothes" | "home" | "paw" | "leaf" | "heart";
 
 export function iconForCause(id: string, label: string): IconName {
   if (id === "all") return "all";
   const t = label.toLowerCase();
   if (/food|meal|welfare|hunger|parcel/.test(t)) return "food";
   if (/torah|educat|school|yeshiv|learn|kollel|study/.test(t)) return "book";
-  if (/shul|synagog|communit/.test(t)) return "shul";
+  if (/shul|synagog|church|mosque|temple|faith|worship|communit/.test(t)) return "shul";
+  if (/animal|pet|wildlife|rescue/.test(t)) return "paw";
+  if (/environment|nature|climate|green|tree/.test(t)) return "leaf";
   if (/medic|health|hospital|bikur|care/.test(t)) return "medical";
   if (/child|kid|toy|youth|camp/.test(t)) return "kids";
   if (/cloth|shoe|wear/.test(t)) return "clothes";
@@ -70,6 +72,19 @@ function CauseIcon({ name, color }: { name: IconName; color: string }) {
         <>
           <Path d="M4 11l8-6.5 8 6.5" {...s} />
           <Path d="M6 9.5V20h12V9.5M10 20v-5h4v5" {...s} />
+        </>
+      ) : name === "paw" ? (
+        <>
+          <Path d="M12 13c-3 0-5 3-5 5 0 1.5 1.5 2 3 1.5s2.5-.5 4 0 3 0 3-1.5c0-2-2-5-5-5z" {...s} />
+          <Circle cx="6.5" cy="10" r="1.6" {...s} />
+          <Circle cx="9.5" cy="6.5" r="1.6" {...s} />
+          <Circle cx="14.5" cy="6.5" r="1.6" {...s} />
+          <Circle cx="17.5" cy="10" r="1.6" {...s} />
+        </>
+      ) : name === "leaf" ? (
+        <>
+          <Path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z" {...s} />
+          <Path d="M5 19l8-8" {...s} />
         </>
       ) : (
         <Path d="M12 19.5s-7.5-4.4-7.5-9.6A4.2 4.2 0 0112 7.6a4.2 4.2 0 017.5 2.3c0 5.2-7.5 9.6-7.5 9.6z" {...s} />

@@ -13,6 +13,8 @@ import { SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { sampleDonor } from "@/data/giving";
 import { useAccount } from "@/lib/account";
+import { setJewishMode, useJewishMode } from "@/lib/jewish-mode";
+import { SwitchRow } from "@/components/switch-row";
 import { openSite } from "@/lib/open-site";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -31,6 +33,21 @@ export default function Account() {
   // Legal pages live on the website (one source of truth). Apple requires a
   // privacy policy link in the app, and a way to start deleting your account.
   const open = (path: string) => () => openSite(path);
+  const jewish = useJewishMode();
+  // Available signed in or not: it lives on this phone only.
+  const preferences = (
+    <View style={{ gap: 8 }}>
+      <Text variant="label" style={{ paddingHorizontal: 4 }}>Preferences</Text>
+      <View style={styles.prefs}>
+        <SwitchRow
+          label="Jewish calendar and maaser"
+          description="The Hebrew date, Shabbos and Yom Tov touches, and maaser and chomesh in your giving. Saved on this phone only."
+          value={jewish}
+          onChange={setJewishMode}
+        />
+      </View>
+    </View>
+  );
   const support = [
     { label: "How Givezy works", onPress: () => router.push("/how-it-works") },
     { label: "Privacy Policy", onPress: open("/privacy") },
@@ -66,10 +83,11 @@ export default function Account() {
 
           {/* The two places people come back to, as big tiles rather than list rows. */}
           <View style={styles.tiles}>
-            <Tile label="Giving and maaser" icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
+            <Tile label={jewish ? "Giving and maaser" : "Your giving"} icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
             <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.blueSoft} onPress={() => router.push("/receipts")} />
           </View>
 
+          {preferences}
           <SettingsGroup title="App" cells={support} />
           <SettingsGroup
             title="Your information"
@@ -88,7 +106,7 @@ export default function Account() {
             <View style={styles.prompt}>
               <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Keep your giving in one place</Text>
               <Text variant="bodyMuted">
-                Sign in with your email to see every donation and keep track of maaser and chomesh. No password needed.
+                Sign in with your email to see every donation and keep track of your giving goal. No password needed.
               </Text>
               <Button label="Show a sample account" onPress={() => setDemoSignedIn(true)} />
               <Text variant="label">Preview: real sign-in switches on once the live service is connected.</Text>
@@ -96,6 +114,7 @@ export default function Account() {
           ) : (
             <SignIn />
           )}
+          {preferences}
           <SettingsGroup title="App" cells={support} />
         </>
       )}
@@ -114,6 +133,7 @@ function Tile({ label, icon, tint, onPress }: { label: string; icon: React.React
 }
 
 const styles = StyleSheet.create({
+  prefs: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
   profile: { flexDirection: "row", alignItems: "center", gap: 16 },
   avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.lilac, alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: fonts.display, fontSize: 26, color: colors.blue },

@@ -700,3 +700,14 @@ The Donations page takes a period: any time, this month, last month, this tax ye
 
 - **Share on WhatsApp:** a share button by the heart on every charity page, and "Share on WhatsApp" on each campaign card. It opens WhatsApp with a short message ready ("Northcliff Meals Fund is raising for Pesach parcels. R31 400 of R50 000 raised so far. Give here: <link>"), falling back to the phone's share sheet. Links go to the charity's page, or the campaign's giving page, on our website. The website now gives those pages link previews (name, a line about the work, the cover photo, else the Givezy logo), which WhatsApp shows in the chat. Sharing waits until the website address is set in the app.
 - **Raising now:** a row of running campaigns at the top of Discover (when not searching or filtering), each with its charity, goal and bar, the closest to its goal first. Tapping opens the charity. If campaigns fail to load, Discover still works without the row.
+
+## Givezy is for everyone; Jewish touches are a switch (16/10/2026)
+
+Yehuda decided the app should not be geared towards Jews only. Step 1 of 4:
+
+- **Neutral by default.** The app greets with "Good morning / afternoon / evening" and today's date. The Hebrew date, Shabbos and Yom Tov greetings, the week-ahead lines, seasonal prompts and Hebrew charity names show only with **Account, Preferences, "Jewish calendar and maaser"** switched on. That setting is kept on the phone only and never sent to our server, because it reveals religion (special personal information under POPIA).
+- General wording on the welcome screens, sign-in, How Givezy works, the website (tagline "Give to the causes you care about, simply."), the For charities page, emails and the charity dashboard's examples.
+- Sample charities and causes for the preview are general (food, education, health, animals, faith communities). New cause icons for animals and the environment; churches, mosques and temples get the place-of-worship icon.
+- The test database now has general causes (food and welfare, children and youth, education, health, animals, faith communities, elderly care, disability, housing, environment, disaster relief, arts and culture). The live database needs the same list (go-live checklist).
+
+Next: own labels instead of maaser/chomesh/tzedaka (step 2), a giving goal as a % of income or a fixed amount (step 3), big photo cards on Discover (step 4).

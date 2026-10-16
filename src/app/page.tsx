@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 const steps = [
   { title: "Find a charity", body: "Browse registered charities by name, cause or area." },
   { title: "Give in a minute", body: `Choose an amount (from ${formatRand(platformConfig.minDonationCents)}) and pay securely. Givezy charges no fee on donations.` },
-  { title: "Keep track", body: "Mark each donation as maaser, chomesh or tzedaka. If you ask for one, your s18A receipt comes once a year." },
+  { title: "Keep track", body: "Set a giving goal and see every donation in one place. If you ask for one, your s18A receipt comes once a year." },
 ];
 
 export default async function Home() {
@@ -27,7 +27,7 @@ export default async function Home() {
       <section className="rounded-card bg-gradient-to-br from-brand-soft to-surface border border-border p-6 sm:p-8">
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">{platformConfig.appTagline}</h1>
         <p className="mt-3 text-text">
-          Give to registered charities in a few taps, keep your maaser and chomesh in one place, and get your s18A receipts
+          Give to registered South African charities in a few taps, keep all your giving in one place, and get your s18A receipts
           without chasing anyone.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -51,7 +51,7 @@ export default async function Home() {
             </li>
           ))}
         </ol>
-        <Info terms={["tzedaka", "maaser", "chomesh", "s18a"]} label="maaser, chomesh or s18A" />
+        <Info terms={["s18a"]} label="an s18A receipt" />
       </section>
 
       {charities && charities.length > 0 ? (
@@ -89,7 +89,7 @@ export default async function Home() {
 
       <section className="rounded-card border border-border bg-surface p-5 text-sm">
         <p className="font-semibold">Use the {platformConfig.appName} app</p>
-        <p className="mt-1 text-muted">See every donation, track maaser and chomesh against your income, and find your receipts. Coming to the App Store and Google Play.</p>
+        <p className="mt-1 text-muted">See every donation, track your giving goal, and find your receipts. Coming to the App Store and Google Play.</p>
       </section>
     </div>
   );

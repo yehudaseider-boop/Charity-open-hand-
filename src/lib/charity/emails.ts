@@ -54,7 +54,7 @@ export function approvedEmail(to: string, charityName: string, charityId: string
       "1. Add a cover photo and a few words about your work.",
       "2. Post a short update about what donations did lately.",
       "3. Start a campaign if you're raising for something specific.",
-      "4. Share your Givezy page with your community.",
+      "4. Share your Givezy page with your supporters.",
       "",
       `Your dashboard: ${base}/charity-admin/${charityId}`,
       "",
@@ -179,7 +179,7 @@ export function inviteEmail(to: string, charityName: string, link: string): Emai
     to,
     subject: `An invitation to list ${charityName} on Givezy`,
     text: [
-      `We'd like to invite ${charityName} to join Givezy, where the community gives to local charities in a few taps.`,
+      `We'd like to invite ${charityName} to join Givezy, where people give to local charities in a few taps.`,
       "",
       "Listing is free. Donations go straight to your bank account, and if you have s18A approval we issue your donors' tax receipts for you.",
       "",

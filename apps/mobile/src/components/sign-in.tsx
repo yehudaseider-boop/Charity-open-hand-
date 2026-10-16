@@ -22,7 +22,7 @@ export function SignIn() {
       <View style={styles.card}>
         <Text variant="h2" style={styles.title}>Sign in</Text>
         <Text variant="bodyMuted">
-          Use the email you give with. Every donation made with it, on the website or from the app, shows up here with your maaser and chomesh.
+          Use the email you give with. Every donation made with it, on the website or from the app, shows up here.
         </Text>
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" error={error ?? undefined} />
         <Button
@@ -78,7 +78,7 @@ export function Agree() {
     <View style={styles.card}>
       <Text variant="h2" style={styles.title}>Before you continue</Text>
       <Text variant="bodyMuted">
-        We keep your email and your giving records so you can see them here. Only you see your maaser and chomesh. We never sell your
+        We keep your email and your giving records so you can see them here. Only you see your giving goal and the labels you give your donations. We never sell your
         information or send you marketing.
       </Text>
       <Check checked={terms} onPress={() => setTerms((v) => !v)} label="I agree to the Terms and the Privacy Policy." />

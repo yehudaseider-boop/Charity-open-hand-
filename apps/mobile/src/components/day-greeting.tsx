@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { dayLine, greeting, seasonalAppeal, weekAhead } from "@/lib/jewish-calendar";
+import { ddmmyyyy, jhbToday } from "@/lib/format";
+import { useJewishMode } from "@/lib/jewish-mode";
 import { colors, fonts, radius } from "@/theme/tokens";
 import { Text } from "./text";
 
@@ -11,6 +13,16 @@ import { Text } from "./text";
  */
 export function DayGreeting({ large = false }: { large?: boolean }) {
   const now = useNow();
+  const jewish = useJewishMode();
+  if (!jewish) {
+    // For everyone: the time of day in Johannesburg and today's date.
+    return (
+      <View style={{ gap: 2 }} accessibilityRole="text">
+        <Text accessibilityRole={large ? "header" : undefined} style={large ? styles.helloLarge : styles.hello}>{plainGreeting(now)}</Text>
+        <Text variant="label">{weekday(now)} {ddmmyyyy(jhbToday())}</Text>
+      </View>
+    );
+  }
   const hello = greeting(now);
   return (
     <View style={{ gap: 2 }} accessibilityRole="text">
@@ -25,7 +37,9 @@ export function DayGreeting({ large = false }: { large?: boolean }) {
 
 /** A gentle prompt in the weeks before Rosh Hashana, Purim and Pesach. Nothing the rest of the year. */
 export function SeasonalCard() {
-  const appeal = seasonalAppeal(useNow());
+  const now = useNow();
+  const jewish = useJewishMode();
+  const appeal = jewish ? seasonalAppeal(now) : null;
   if (!appeal) return null;
   return (
     <View accessible style={styles.card}>
@@ -33,6 +47,17 @@ export function SeasonalCard() {
       <Text style={styles.cardBody}>{appeal.body}</Text>
     </View>
   );
+}
+
+/** "Good morning" before 12:00, "Good afternoon" until 17:00, then "Good evening" (Johannesburg time). */
+export function plainGreeting(now: Date): string {
+  const hour = (now.getUTCHours() + 2) % 24;
+  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+function weekday(now: Date): string {
+  return WEEKDAYS[new Date(now.getTime() + 2 * 3_600_000).getUTCDay()];
 }
 
 function useNow(): Date {

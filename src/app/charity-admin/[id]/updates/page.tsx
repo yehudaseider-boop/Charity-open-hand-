@@ -67,7 +67,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
             ))}
           </ul>
         ) : (
-          <p className="mb-3 text-sm text-muted">No photos yet. Photos of the work itself (parcels, the shiur, the shul) mean the most to donors.</p>
+          <p className="mb-3 text-sm text-muted">No photos yet. Photos of the work itself (parcels, a class, your building) mean the most to donors.</p>
         )}
         {photos.length < MAX_PHOTOS ? <PhotoForm action={addPhoto.bind(null, id)} /> : <p className="text-sm text-muted">Remove a photo to add another.</p>}
       </Card>

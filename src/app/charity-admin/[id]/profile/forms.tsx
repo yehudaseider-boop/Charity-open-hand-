@@ -18,7 +18,7 @@ export function ProfileForm({ action, charity, categories, selected }: {
       <TextArea name="description_en" label="What you do" defaultValue={charity.description_en}
         hint="A few sentences donors read first. Who you help and how." />
       <TextArea name="funds_use_en" label="How donations are used" defaultValue={charity.funds_use_en}
-        hint="What a donation pays for, for example Shabbos parcels for families or a teacher's salary. Specific is best." />
+        hint="What a donation pays for, for example food parcels for families or a teacher's salary. Specific is best." />
       <TextArea name="thank_you_en" label="Thank-you note to donors" defaultValue={charity.thank_you_en}
         hint="Shown in the Givezy app when a donation to you arrives. Up to 300 characters, in your own words." />
       <TextField name="website" label="Website" type="url" defaultValue={charity.website} hint="For example https://example.org.za" />
