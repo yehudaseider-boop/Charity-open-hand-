@@ -199,7 +199,7 @@ describe("giving saved on the phone for offline use", () => {
 
 describe("saved copy size", () => {
   it("keeps the newest 500 donations", () => {
-    const many = Array.from({ length: 600 }, (_, i) => ({ id: `g${i}`, date: new Date(2026, 0, 1, 0, i), charitySlug: "m", charityName: "M", cents: 100, monthly: false, with18a: false, kind: "tzedaka" as const }));
+    const many = Array.from({ length: 600 }, (_, i) => ({ id: `g${i}`, date: new Date(2026, 0, 1, 0, i), charitySlug: "m", charityName: "M", cents: 100, monthly: false, with18a: false, label: null }));
     const back = fromCache(toCache({ gifts: many, recurring: [], receipts: [], elsewhere: [], loadedAt: new Date() }))!;
     expect(back.gifts).toHaveLength(500);
     expect(back.gifts[0].id).toBe("g599");

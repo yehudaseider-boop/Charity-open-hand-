@@ -14,7 +14,6 @@ export const JEWISH_LABELS = ["Maaser", "Chomesh", "Tzedaka"] as const;
 /** Trimmed, single-spaced, no control characters, at most 40 characters; null when empty. */
 export function cleanLabel(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  // eslint-disable-next-line no-control-regex
   const s = raw.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, LABEL_MAX).trim();
   return s || null;
 }
