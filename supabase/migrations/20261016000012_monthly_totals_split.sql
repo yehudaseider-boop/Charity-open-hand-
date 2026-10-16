@@ -2,7 +2,10 @@
 -- Same rules as before: paid donations only, the contribution to Givezy never included,
 -- months in Johannesburg time. The new column is the part that came from monthly donations.
 
-drop function public.charity_monthly_totals(uuid, int);
+-- The return type changes, so the old function is renamed out of the way (and closed to everyone)
+-- rather than dropped.
+alter function public.charity_monthly_totals(uuid, int) rename to charity_monthly_totals_before_split;
+revoke execute on function public.charity_monthly_totals_before_split(uuid, int) from public, anon, authenticated;
 
 create function public.charity_monthly_totals(p_charity_id uuid, p_months int default 24)
 returns table (month date, donation_count bigint, amount_cents bigint, monthly_cents bigint)

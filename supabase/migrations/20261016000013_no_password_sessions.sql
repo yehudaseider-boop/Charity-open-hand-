@@ -13,7 +13,6 @@ declare t record;
 begin
   for t in select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
            where n.nspname = 'public' and c.relkind in ('r', 'p') loop
-    execute format('drop policy if exists no_password_sessions on public.%I', t.relname);
     execute format(
       'create policy no_password_sessions on public.%I as restrictive for all to authenticated
          using (public.signed_in_without_password()) with check (public.signed_in_without_password())',
