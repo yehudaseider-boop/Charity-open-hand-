@@ -1,7 +1,7 @@
 import { parseRandToCents } from "@shared/money";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
@@ -30,7 +30,7 @@ import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { openSite, openUrl } from "@/lib/open-site";
-import { afterPaymentMessage, cardLabel, centsToInput, checkReady, lastLabel, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
+import { afterPaymentMessage, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -102,6 +102,10 @@ export default function Give() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<false | "opening" | "checking">(false);
+  // Two taps in the same frame both see busy as false; the ref stops the second at once.
+  const busyRef = useRef(false);
+  // A saved-card charge whose answer was lost is asked about again under the same id, never charged twice.
+  const attemptRef = useRef<string | null>(null);
   // Paid (or finished and being confirmed), shown here for donors whose giving history won't show it.
   const [done, setDone] = useState<SentGift | null>(null);
   // Preview of the after-gift screen for design review: ?demo=sent.
@@ -275,7 +279,16 @@ export default function Give() {
   }
 
   async function give() {
-    if (busy) return;
+    if (busy || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await giveOnce();
+    } finally {
+      busyRef.current = false;
+    }
+  }
+
+  async function giveOnce() {
     const e = check();
     setErrors(e);
     setMessage(null);
@@ -318,11 +331,14 @@ export default function Give() {
         useSavedId: usingSavedId || undefined,
         saveCard: (offerSave && saveCard) || undefined,
         useSavedCard: payWithSaved || undefined,
+        attemptId: payWithSaved ? (attemptRef.current ??= newAttemptId()) : undefined,
         details,
       },
       undefined,
       usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
     );
+    // Any answer from our server ends this attempt; no answer keeps its id for the next tap.
+    if (r.ok || !("noReply" in r)) attemptRef.current = null;
     if (!r.ok) {
       setBusy(false);
       // A declined saved card: offer the payment page, where another card can be used.

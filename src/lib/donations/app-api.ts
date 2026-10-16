@@ -25,6 +25,8 @@ export const appCheckoutSchema = appQuoteSchema.extend({
   saveCard: z.boolean().optional(),
   /** Pay with the saved card instead of the payment page (signed in; only when saved cards are switched on). */
   useSavedCard: z.boolean().optional(),
+  /** One id per give attempt, so asking twice never charges a saved card twice. */
+  attemptId: z.string().uuid().optional(),
   details: z.object({
     donor_type: z.enum(["individual", "company", "trust"]),
     email: z.string().max(200),

@@ -253,6 +253,28 @@ describe("signing in from the app", () => {
     });
   });
 
+  it("a password session on the same account sees and changes nothing", async () => {
+    await tx(async () => {
+      await guestDonor("taken@example.co.za");
+      const u = await newUser("taken@example.co.za", true);
+      await as(u);
+      expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(1);
+      await run("insert into public.favourites (user_id, charity_id) values ($1, $2)", [u, ids.meals]);
+      expect((await run("select id from public.donors where user_id = $1", [u])).rows).toHaveLength(1);
+      // Someone who registered this address with a password earlier signs in with it.
+      await as(u, "password");
+      expect((await run("select id from public.donors where user_id = $1", [u])).rows).toHaveLength(0);
+      expect((await run("select charity_id from public.favourites where user_id = $1", [u])).rows).toHaveLength(0);
+      expect((await run("update public.donors set phone = '0820000000' where user_id = $1 returning id", [u])).rows).toHaveLength(0);
+      await run("savepoint p");
+      await expect(run("insert into public.favourites (user_id, charity_id) values ($1, $2)", [u, ids.meals])).rejects.toThrow(/row-level security/);
+      await run("rollback to savepoint p");
+      await run("savepoint q");
+      await expect(run("select public.set_my_recurring_status(gen_random_uuid(), 'paused')")).rejects.toThrow(/emailed code/);
+      await run("rollback to savepoint q");
+    });
+  });
+
   it("does nothing for an unconfirmed email, and never takes a donor record an account already has", async () => {
     await tx(async () => {
       await guestDonor("pending@example.co.za");

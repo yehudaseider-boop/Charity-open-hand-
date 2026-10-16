@@ -25,6 +25,13 @@ export function thisMonth(now: Date): Period {
   return { from: sa(first), to: sa(next) };
 }
 
+/** Last calendar month, Johannesburg time. */
+export function lastMonth(now: Date): Period {
+  const [y, m] = saDate(now).split("-").map(Number);
+  const first = m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, "0")}-01`;
+  return { from: sa(first), to: thisMonth(now).from };
+}
+
 /** The current SARS tax year (1 March to the end of February), and its number. */
 export function thisTaxYear(now: Date): Period & { taxYear: number; end: string } {
   const taxYear = taxYearFor(now);

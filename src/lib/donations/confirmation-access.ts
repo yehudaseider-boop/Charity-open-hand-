@@ -20,6 +20,16 @@ export async function issueConfirmationToken(donationId: string): Promise<string
   return token;
 }
 
+/** A fresh credential for an existing donation (the app asked again about the same saved-card gift). */
+export async function reissueConfirmationToken(donationId: string): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  const { error } = await createAdminClient()
+    .from("donation_confirmations")
+    .upsert({ donation_id: donationId, token_hash: hash(token) }, { onConflict: "donation_id" });
+  if (error) throw error;
+  return token;
+}
+
 /** True only for the credential issued with this donation. */
 export async function confirmationTokenMatches(donationId: string, token: string | undefined): Promise<boolean> {
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false;

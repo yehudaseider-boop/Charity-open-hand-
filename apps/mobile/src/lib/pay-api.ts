@@ -52,7 +52,8 @@ async function call<T extends { ok: boolean; message?: string }>(post: Post, url
   } catch {
     // fall through
   }
-  return { ok: false, message: NETWORK } as T;
+  // `noReply`: the request may or may not have reached our server.
+  return { ok: false, message: NETWORK, noReply: true } as unknown as T;
 }
 
 const api = (site: string, path: string) => `${site.replace(/\/+$/, "")}/api/app/${path}`;
@@ -82,6 +83,8 @@ export function startPayment(
     saveCard?: boolean;
     /** Pay with the saved card, no payment page (signed in, saved cards switched on). */
     useSavedCard?: boolean;
+    /** One id per give attempt (see `newAttemptId`), so asking again never charges a saved card twice. */
+    attemptId?: string;
     details: DonorDetails;
   },
   post: Post = fetchPost,
@@ -226,4 +229,24 @@ export function centsToInput(cents: number): string {
   const c = cents % 100;
   const whole = (cents - c) / 100;
   return c ? `${whole}.${String(c).padStart(2, "0")}` : String(whole);
+}
+
+/**
+ * A random id (uuid v4) for one give attempt. Not a secret: the server only uses it to recognise the
+ * same attempt asked twice, and checks it belongs to the same charity and email.
+ */
+export function newAttemptId(random: (n: number) => Uint8Array = defaultRandom): string {
+  const b = random(16);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function defaultRandom(n: number): Uint8Array {
+  const out = new Uint8Array(n);
+  const c = (globalThis as { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } }).crypto;
+  if (c?.getRandomValues) return c.getRandomValues(out);
+  for (let i = 0; i < n; i++) out[i] = Math.floor(Math.random() * 256);
+  return out;
 }

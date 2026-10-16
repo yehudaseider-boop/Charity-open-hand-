@@ -309,14 +309,24 @@ describe("the end of the month", () => {
 describe("a charge the gateway refuses outright", () => {
   it("counts as a failed attempt: retry later, email the donor, no re-sending", async () => {
     chargeRefused = true;
+    confirmWith = () => { throw new Error("Transaction reference not found"); };
     const s = await runMonthlyCharges(deps());
     expect(s).toMatchObject({ failed: 1, errors: [] });
     expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: new Date(NOW.getTime() + 24 * 3_600_000).toISOString() }]);
     expect(failedEmails).toEqual([{ final: false }]);
   });
 
+  it("asks the gateway after a refusal, and goes by what it recorded", async () => {
+    chargeRefused = true;
+    confirmWith = () => "paid";
+    const s = await runMonthlyCharges(deps());
+    expect(s).toMatchObject({ paid: 1, failed: 0 });
+    expect(world.failures).toEqual([]);
+  });
+
   it("the third refusal stops the monthly donation", async () => {
     chargeRefused = true;
+    confirmWith = () => "failed";
     world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 2 })];
     const s = await runMonthlyCharges(deps());
     expect(s).toMatchObject({ failed: 1, stopped: 1 });

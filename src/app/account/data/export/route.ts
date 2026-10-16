@@ -3,6 +3,7 @@ import { logAudit } from "@/lib/audit";
 import { decrypt } from "@/lib/crypto";
 import { loadSavedCardInfo } from "@/lib/donations/saved-card";
 import { hitRateLimit } from "@/lib/rate-limit";
+import { signedInWithPassword } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -13,7 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new NextResponse("Please sign in.", { status: 401 });
+  // Givezy signs people in with an emailed code only; a password session gets nothing (src/lib/auth.ts).
+  if (!user || (await signedInWithPassword(supabase))) return new NextResponse("Please sign in.", { status: 401 });
   if (await hitRateLimit("data-export", [`user:${user.id}`], 5, 60)) {
     return new NextResponse("Too many downloads. Please try again in an hour.", { status: 429 });
   }

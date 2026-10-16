@@ -15,6 +15,8 @@ let chargeResult: () => Promise<{ status: string }> = async () => ({ status: "pe
 let refusal = false;
 let stored: { code: string; gateway: string } | null = { code: "AUTH_SECRET", gateway: "test" };
 const requests: { donationId: string; userId: string }[] = [];
+/** A donation already recorded under the attempt id the app sends. */
+let prior: Record<string, unknown> | null = null;
 
 function builder(table: string) {
   const b: Record<string, unknown> = {};
@@ -22,7 +24,7 @@ function builder(table: string) {
   b.insert = (row: Record<string, unknown>) => (ops.push({ table, op: "insert", row }), b);
   b.update = (row: Record<string, unknown>) => (ops.push({ table, op: "update", row }), b);
   b.single = async () => ({ data: { id: "donor-1" }, error: null });
-  b.maybeSingle = async () => ({ data: null, error: null });
+  b.maybeSingle = async () => ({ data: table === "donations" ? prior : null, error: null });
   b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok);
   return b;
 }
@@ -34,7 +36,7 @@ vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
 vi.mock("@/lib/donations/saved-id", () => ({ savedIdNumber: async () => "8001015009087", savedIdLast4: async () => "9087" }));
-vi.mock("@/lib/donations/confirmation-access", () => ({ issueConfirmationToken: async () => "tok" }));
+vi.mock("@/lib/donations/confirmation-access", () => ({ issueConfirmationToken: async () => "tok", reissueConfirmationToken: async () => "tok2" }));
 vi.mock("@/lib/donations/saved-card", () => ({
   loadSavedCardToken: async () => stored,
   requestCardSave: async (donationId: string, userId: string) => void requests.push({ donationId, userId }),
@@ -66,6 +68,7 @@ beforeEach(() => {
   requests.length = 0;
   chargeResult = async () => ({ status: "pending" });
   refusal = false;
+  prior = null;
   stored = { code: "AUTH_SECRET", gateway: "test" };
   signedIn = { userId: "u1", email: "A@example.com" };
   process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -184,5 +187,42 @@ describe("paying with the saved card", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, charged: true });
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);
+  });
+});
+
+describe("asking twice about the same saved-card gift", () => {
+  const attemptId = "6f1c2c1e-0d2a-4c4b-9a59-2b8d6d7c1a11";
+  it("uses the app's attempt id as the donation's reference", async () => {
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId });
+    expect(charges[0]).toMatchObject({ reference: attemptId });
+  });
+
+  it("never charges again: the first answer comes back", async () => {
+    prior = { status: "pending", charity_id: "c1", total_charged_cents: 10_000, donation_checkout_details: { email: "a@example.com" } };
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId, token: "tok2" });
+    expect(charges).toHaveLength(0);
+    expect(ops.filter((o) => o.op === "insert")).toHaveLength(0);
+  });
+
+  it("a declined first try stays declined", async () => {
+    prior = { status: "failed", charity_id: "c1", total_charged_cents: 10_000, donation_checkout_details: { email: "a@example.com" } };
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
+    expect(charges).toHaveLength(0);
+  });
+
+  it("refuses an id that belongs to another gift (different amount, email or charity)", async () => {
+    for (const p of [
+      { total_charged_cents: 25_000, charity_id: "c1", email: "a@example.com" },
+      { total_charged_cents: 10_000, charity_id: "c2", email: "a@example.com" },
+      { total_charged_cents: 10_000, charity_id: "c1", email: "b@example.com" },
+    ]) {
+      prior = { status: "paid", charity_id: p.charity_id, total_charged_cents: p.total_charged_cents, donation_checkout_details: { email: p.email } };
+      const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+      expect((await res.json()).ok).toBe(false);
+    }
+    expect(charges).toHaveLength(0);
   });
 });

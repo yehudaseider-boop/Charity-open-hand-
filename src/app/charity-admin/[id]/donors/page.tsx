@@ -7,6 +7,7 @@ import { loadDonors } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { donorGroup, donorGroups, isDonorGroup } from "@/lib/charity/insights";
 
 export const metadata: Metadata = { title: "Donors" };
 
@@ -20,13 +21,19 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const q = safeSearch(typeof sp.q === "string" ? sp.q : "");
   const page = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
 
+  const group = isDonorGroup(sp.group) ? sp.group : null;
+
   const all = await loadDonors(id);
+  const now = new Date();
   const needle = q.toLowerCase();
-  const donors = needle ? all.filter((d) => d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)) : all;
+  const donors = all.filter(
+    (d) => (!group || donorGroup(d, now) === group) && (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
+  );
   const pages = Math.max(1, Math.ceil(donors.length / PAGE));
   const shown = donors.slice((page - 1) * PAGE, page * PAGE);
   const base = `/charity-admin/${id}/donors`;
-  const href = (p: number) => `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
+  const href = (p: number, g: string | null = group) =>
+    `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
 
   return (
     <div className="space-y-4">
@@ -38,7 +45,22 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record gifts. Where a donor asked for one, Givezy issues the s18A receipt in your name.
       </p>
 
+      <nav aria-label="Donor groups" className="flex flex-wrap gap-2 text-sm">
+        {[{ key: null, label: "All" }, ...donorGroups].map((g) => (
+          <Link
+            key={g.key ?? "all"}
+            href={href(1, g.key)}
+            aria-current={group === g.key ? "page" : undefined}
+            className={`rounded-full border px-3.5 py-1.5 font-medium ${group === g.key ? "border-brand bg-brand text-brand-contrast" : "border-border bg-surface text-brand hover:bg-brand-soft"}`}
+          >
+            {g.label}
+          </Link>
+        ))}
+      </nav>
+      {group ? <p className="text-xs text-muted">{donorGroups.find((g) => g.key === group)?.hint}.</p> : null}
+
       <form action={base} className="flex gap-2">
+        {group ? <input type="hidden" name="group" value={group} /> : null}
         <input
           name="q"
           defaultValue={q}
@@ -50,7 +72,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
       </form>
 
       {shown.length === 0 ? (
-        <p className="text-sm text-muted">{q ? "No donors match." : "No donors yet. People appear here once their first donation is paid."}</p>
+        <p className="text-sm text-muted">{q || group ? "No donors match." : "No donors yet. People appear here once their first donation is paid."}</p>
       ) : (
         <ul className="space-y-2">
           {shown.map((d) => (

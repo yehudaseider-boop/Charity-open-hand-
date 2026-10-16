@@ -57,8 +57,10 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok || !body?.status) {
     // Only a 404, or Paystack saying in words that it has no such transaction, counts as "never received".
     const notFound = res.status === 404 || /transaction reference not found|transaction not found/i.test(body?.message ?? "");
-    // Paystack answered and said no (a 4xx other than "not found" or "too many requests", or a 2xx with status false).
-    const refused = !notFound && ((res.status >= 400 && res.status < 500 && res.status !== 429) || (res.ok && body?.status === false));
+    // Paystack answered and said no to this request: 400, 402 or 422, or a 2xx with status false. A 401 or 403
+    // means our key is wrong or was changed, and a 5xx or 429 that Paystack is struggling: those are outages,
+    // never a declined card, so monthly donors are not stopped and saved cards not dropped because of them.
+    const refused = !notFound && ([400, 402, 422].includes(res.status) || (res.ok && body?.status === false));
     throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused });
   }
   return body.data as T;

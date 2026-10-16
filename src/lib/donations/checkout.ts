@@ -14,9 +14,10 @@ import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
-import { issueConfirmationToken } from "./confirmation-access";
+import { issueConfirmationToken, reissueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
 import { checkDonorDetails, givingLabelOf, type CheckoutInput } from "./validation";
+import { isUuid } from "@/lib/ids";
 import { parseDedication } from "./dedication";
 
 export type Quote = Pricing;
@@ -87,6 +88,11 @@ export async function startDonation(args: {
   saveCardFor?: { userId: string; email: string };
   /** Once-off gift: charge the account's saved card instead of sending the donor to the payment page. Same rules. */
   useSavedCardOf?: { userId: string; email: string };
+  /**
+   * With a saved card: one id per give attempt, made by the app. Asking again with the same id (a lost
+   * answer, a second tap) returns the first answer instead of charging the card a second time.
+   */
+  attemptId?: string;
 }): Promise<StartResult> {
   const charity = await loadDonatableCharity(args.charitySlug);
   if (!charity || !charity.acceptingPayments) {
@@ -148,6 +154,26 @@ export async function startDonation(args: {
   const parsedDedication = parseDedication(v.dedication_kind, v.dedication_name);
   const dedication = parsedDedication && !("error" in parsedDedication) ? parsedDedication : null;
   const db = createAdminClient();
+  const attemptId = savedToken && args.attemptId && isUuid(args.attemptId) ? args.attemptId : null;
+  if (attemptId) {
+    const { data: prior, error: priorError } = await db
+      .from("donations")
+      .select("status, charity_id, total_charged_cents, donation_checkout_details(email)")
+      .eq("id", attemptId)
+      .maybeSingle();
+    if (priorError) throw priorError;
+    if (prior) {
+      const details = prior.donation_checkout_details as { email: string | null } | { email: string | null }[] | null;
+      const priorEmail = (Array.isArray(details) ? details[0]?.email : details?.email) ?? "";
+      if (prior.charity_id !== charity.id || priorEmail.toLowerCase() !== v.email.toLowerCase() || Number(prior.total_charged_cents) !== fees.totalCents) {
+        return { ok: false, message: "Something went wrong. Please close this screen and try again." };
+      }
+      if (prior.status === "failed") {
+        return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
+      }
+      return { ok: true, charged: true, reference: attemptId, token: await reissueConfirmationToken(attemptId) };
+    }
+  }
   const donorId = await findOrCreateDonor(v, want18a);
   // Signed in with this same (confirmed) email: the donation joins their account now,
   // not at their next sign-in. Never for a different address.
@@ -162,7 +188,7 @@ export async function startDonation(args: {
   }
   const nowDate = new Date();
   const now = nowDate.toISOString();
-  const donationId = randomUUID();
+  const donationId = attemptId ?? randomUUID();
   const gateway = getGateway();
 
   // A monthly donation: the first payment below is month one. The monthly record waits

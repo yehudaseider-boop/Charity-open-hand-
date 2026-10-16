@@ -40,10 +40,12 @@ export async function loadMonthlyTotals(charityId: string, months = 12) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("charity_monthly_totals", { p_charity_id: charityId, p_months: months });
   if (error) throw new Error(error.message);
-  return ((data ?? []) as { month: string; donation_count: number; amount_cents: number }[]).map((r) => ({
+  return ((data ?? []) as { month: string; donation_count: number; amount_cents: number; monthly_cents: number }[]).map((r) => ({
     month: r.month,
     donationCount: n(r.donation_count),
     amountCents: n(r.amount_cents),
+    /** The part that came from monthly donations; the rest was once-off. */
+    monthlyCents: n(r.monthly_cents),
   }));
 }
 

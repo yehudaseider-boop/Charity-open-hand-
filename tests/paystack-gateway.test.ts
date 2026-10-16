@@ -269,6 +269,13 @@ describe("how Paystack's errors are read", () => {
     expect(e.refused).toBe(false);
   });
 
+  it("a wrong or changed key (401, 403) is an outage, never a declined card", async () => {
+    answerWith(401, { status: false, message: "Invalid key" });
+    expect(await verifyError()).toMatchObject({ refused: false, notFound: false });
+    answerWith(403, { status: false, message: "Forbidden" });
+    expect(await verifyError()).toMatchObject({ refused: false, notFound: false });
+  });
+
   it("an outage, a rate limit or the network failing is neither", async () => {
     answerWith(502, { status: false, message: "Bad gateway" });
     expect(await verifyError()).toMatchObject({ refused: false, notFound: false });

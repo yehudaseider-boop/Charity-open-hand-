@@ -147,9 +147,20 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         }
       }
 
+      // After a refusal, ask the gateway what it recorded (this also marks the attempt failed); a refusal
+      // it has no transaction for is still a failed attempt.
+      const settle = async (): Promise<ConfirmOutcome> => {
+        if (!refused) return deps.confirm(donationId);
+        try {
+          return await deps.confirm(donationId);
+        } catch (e) {
+          if (deps.isNotFound(e)) return "failed";
+          throw e;
+        }
+      };
       let outcome: ConfirmOutcome;
       try {
-        outcome = refused ? "failed" : await deps.confirm(donationId);
+        outcome = await settle();
       } catch (e) {
         // A pending attempt the gateway says it has never heard of: the run that made it died (or the
         // charge was refused) before the charge reached the gateway. Only then is it sent again, under the
@@ -161,7 +172,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
           summary.waiting.push({ id: r.id, reason: "no longer active" });
           continue;
         }
-        outcome = refused ? "failed" : await deps.confirm(donationId);
+        outcome = await settle();
       }
       if (outcome === "paid") {
         await store.recordPaid(r.id, period, next);

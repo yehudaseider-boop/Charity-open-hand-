@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     useSavedIdOf: body.data.useSavedId ? account : undefined,
     saveCardFor: body.data.saveCard ? account : undefined,
     useSavedCardOf: body.data.useSavedCard ? account : undefined,
+    attemptId: body.data.attemptId,
   });
   return NextResponse.json(result, { status: result.ok ? 200 : result.fieldErrors ? 422 : 409 });
 }
