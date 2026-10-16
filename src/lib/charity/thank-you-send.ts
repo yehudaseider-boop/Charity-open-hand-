@@ -65,7 +65,15 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
     if (claim.error.code === "23505") return { ok: false, message: "You've already thanked the donors for that month." };
     throw claim.error;
   }
-  const recipients = await thankYouRecipients(args.charityId, args.month);
+  // Nothing sent yet: hand the month back, so the charity can try again.
+  const release = () => db.from("charity_thank_yous").delete().eq("id", claim.data.id);
+  let recipients: Awaited<ReturnType<typeof thankYouRecipients>>;
+  try {
+    recipients = await thankYouRecipients(args.charityId, args.month);
+  } catch (e) {
+    await release();
+    throw e;
+  }
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   const transport = getEmailTransport();
   let sent = 0;
@@ -84,6 +92,10 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
       console.error("[thank-you] not sent", e instanceof Error ? e.message : e);
       failed++;
     }
+  }
+  if (sent === 0 && failed > 0) {
+    await release();
+    return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
   }
   await db.from("charity_thank_yous").update({ recipient_count: sent }).eq("id", claim.data.id);
   await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, sent, failed } });

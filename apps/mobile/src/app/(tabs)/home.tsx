@@ -15,15 +15,18 @@ import { useAccount } from "@/lib/account";
 import { useDirectory } from "@/lib/directory";
 import { rand, jhbToday } from "@/lib/format";
 import { openGiveScreen } from "@/lib/give-entry";
-import { goalProgress, type Goal } from "@/lib/goals";
+import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
+import { loadIncome } from "@/lib/income-store";
 import { inCause, savedCharities } from "@/lib/live-charities";
 import { loadCausePrefs } from "@/lib/cause-prefs";
+import type { IncomeEntry } from "@/lib/ledger";
 import { useSaved } from "@/lib/saved";
 import { useStoredRecord } from "@/lib/use-stored-record";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
 const noGoals: Goal[] = [];
+const noIncome: IncomeEntry[] = [];
 
 /**
  * Home: a hello, the donor's main goal as a ring on a blue card, their causes as photo cards, and a
@@ -37,6 +40,8 @@ export default function Home() {
   const owner = signedIn ? account.userId : null;
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   const goals = useStoredRecord<Goal[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadGoals, initial: preview ? sampleGoals : noGoals });
+  // Income logged on the Progress tab, so a goal set as a share of income shows its real target here.
+  const income = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
   const directory = useDirectory();
   const all = directory.data?.charities ?? [];
   const saved = savedCharities(useSaved().slugs, all);
@@ -53,8 +58,8 @@ export default function Home() {
   const elsewhere = preview ? sampleElsewhere : (account.live?.elsewhere ?? []);
   const firstGift = gifts.length === 0;
   const goal = goals.value[0] ?? null;
-  const progress = goal ? goalProgress(goal, [...gifts, ...elsewhere], [], jhbToday()) : null;
-  const counted = goal && progress ? [...gifts, ...elsewhere].filter((g) => g.date >= progress.window.start && g.date <= progress.window.end).length : 0;
+  const progress = goal ? goalProgress(goal, [...gifts, ...elsewhere], income.value, jhbToday()) : null;
+  const counted = goal && progress ? [...gifts, ...elsewhere].filter((g) => g.date >= progress.window.start && g.date <= progress.window.end && counts(goal, g.label)).length : 0;
   const pct = progress?.targetCents ? Math.floor((progress.givenCents * 100) / progress.targetCents) : 0;
   const initial = (account.email ?? (preview ? "Sarah" : "?")).slice(0, 1).toUpperCase();
 
@@ -76,7 +81,12 @@ export default function Home() {
         <View style={styles.goalCard}>
           <Blob size={100} color={colors.orange} rotate={20} style={{ right: -55, top: -60 }} />
           <Blob size={90} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -50, bottom: -60 }} />
-          {goals.status !== "ready" && !preview ? (
+          {goals.status === "problem" && !preview ? (
+            <View style={{ gap: 12 }}>
+              <Text style={styles.goalSub}>Your goals could not be opened on this phone. Nothing has been changed.</Text>
+              <Button variant="white" label="Open Progress" onPress={() => router.push("/giving")} />
+            </View>
+          ) : goals.status !== "ready" && !preview ? (
             <SkeletonBlock height={120} />
           ) : goal && progress ? (
             <View style={styles.goalRow}>

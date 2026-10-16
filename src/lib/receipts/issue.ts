@@ -10,7 +10,7 @@
 import { taxYearRange } from "@/lib/dates";
 import type { EmailTransport } from "@/lib/email";
 import { buildReceiptEmail } from "./email";
-import { buildReceiptDetails, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
+import { buildReceiptDetails, missingForSars, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped, type SeveralIdentities } from "./plan";
 
 export type IssuedReceipt = { id: string; reference: string; charityId: string; details: ReceiptDetails; pdfPath: string | null };
@@ -112,6 +112,8 @@ export async function runReceiptsJob(args: {
         periodEnd: end,
         issuedAt: args.now,
       });
+      const missing = missingForSars(details);
+      if (missing.length) throw new Error(`Not issued: the receipt is missing ${missing.join(" and ")}`);
       const issued = await store.issue(r, charity, details);
       summary.issued += 1;
       await store.savePdf(issued, await args.render({ details: issued.details, reference: issued.reference }));

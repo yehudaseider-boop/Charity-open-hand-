@@ -14,6 +14,31 @@ import { Text } from "./text";
  */
 const SOCIAL_SIGN_IN = process.env.EXPO_PUBLIC_SOCIAL_SIGN_IN === "yes";
 
+const SOMETHING_WRONG = "Something went wrong. Please check your connection and try again.";
+
+/**
+ * Runs one sign-in step with the buttons switched off, and always switches them back on: a step
+ * that throws shows the general error instead of leaving every button disabled.
+ */
+async function step(
+  setBusy: (b: boolean) => void,
+  setError: (e: string | null) => void,
+  go: () => Promise<{ ok: true } | { ok: false; message: string }>,
+  onOk?: () => void,
+) {
+  setBusy(true);
+  setError(null);
+  try {
+    const r = await go();
+    if (r.ok) onOk?.();
+    else setError(r.message);
+  } catch {
+    setError(SOMETHING_WRONG);
+  } finally {
+    setBusy(false);
+  }
+}
+
 /**
  * Sign in: Google or Apple when switched on, else an emailed 6-digit code. No password. The same
  * account as the website. Sits under the blue "Let's get you set up." header on Account.
@@ -26,13 +51,7 @@ export function SignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const social = async (provider: "google" | "apple") => {
-    setBusy(true);
-    setError(null);
-    const r = await account.signInWith(provider);
-    setBusy(false);
-    if (!r.ok) setError(r.message);
-  };
+  const social = (provider: "google" | "apple") => step(setBusy, setError, () => account.signInWith(provider));
 
   if (!sentTo) {
     return (
@@ -56,12 +75,7 @@ export function SignIn() {
           disabled={busy}
           onPress={async () => {
             if (!looksLikeEmail(email)) return setError("Enter a valid email address.");
-            setBusy(true);
-            setError(null);
-            const r = await account.sendCode(email);
-            setBusy(false);
-            if (r.ok) setSentTo(email.trim());
-            else setError(r.message);
+            await step(setBusy, setError, () => account.sendCode(email), () => setSentTo(email.trim()));
           }}
         />
       </View>
@@ -79,11 +93,7 @@ export function SignIn() {
         onPress={async () => {
           const c = cleanCode(code);
           if (!c) return setError("Enter the 6 digits from the email.");
-          setBusy(true);
-          setError(null);
-          const r = await account.verifyCode(sentTo, c);
-          setBusy(false);
-          if (!r.ok) setError(r.message);
+          await step(setBusy, setError, () => account.verifyCode(sentTo, c));
         }}
       />
       <TextLink label="Use a different email" onPress={() => { setSentTo(null); setCode(""); setError(null); }} />
@@ -118,12 +128,7 @@ export function Agree() {
         label={busy ? "Saving…" : "Continue"}
         disabled={!terms || !age || busy}
         style={!terms || !age ? { opacity: 0.4 } : undefined}
-        onPress={async () => {
-          setBusy(true);
-          const r = await account.agree();
-          setBusy(false);
-          if (!r.ok) setError(r.message);
-        }}
+        onPress={() => step(setBusy, setError, () => account.agree())}
       />
       <TextLink label="Sign out" onPress={() => account.signOut()} />
     </View>

@@ -50,7 +50,7 @@ export default async function ThankDonorsPage({ params }: PageProps<"/charity-ad
             <ThankYouForm
               action={sendThankDonors.bind(null, id, month)}
               defaultBody={charity.thank_you_en ?? ""}
-              confirm={`Email this thank-you to ${count} ${count === 1 ? "donor" : "donors"} who gave in ${monthLabel(month)}? You can only send one for this month.`}
+              confirm={`Email this thank-you to ${count} ${count === 1 ? "donor" : "donors"} who gave in ${monthLabel(month)}? You can only send one for this month${month === months[0] ? ", and the month isn't over: people who give later this month won't get it" : ""}.`}
             />
           ) : (
             <p className="text-sm text-muted">Nobody to thank for this month yet.</p>

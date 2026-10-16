@@ -748,3 +748,14 @@ Yehuda asked for a check of the whole product and a charity dashboard with prope
 - **Your donors** in four groups, each a link to the filtered Donors list: New (first gift in the last 30 days, like Givelify's four weeks), Coming back (more than once, in the last 6 months), Gave once (in the last 6 months), Lapsed (nothing in 6 months). **For Yehuda to confirm:** 6 months is our choice; Pushpay uses 120 days and Givelify 12 months.
 - **Your biggest supporters:** the top five by all-time total.
 - **Donations by month:** the last 12 calendar months (empty months shown as empty, not skipped), each bar split into monthly and once-off, this month outlined.
+
+Second round of fixes from the same review (16/10/2026):
+
+- **Thank-you emails:** a send that fails before anything goes out hands the month back, so the charity can try again. Thanking the current month warns that people who give later that month won't get it.
+- **Admin Payments page** reads every row page by page (it stopped at 1 000 before, so totals were too low).
+- **Charity side:** the Donations empty state is right when a period filter is on; the QR poster uses the v2 navy from the brand colours; the admin receipt search keeps apostrophes and dots; an erased donor reads the same on Monthly as everywhere else.
+- **Download my information** now includes the details typed at each checkout and the donor details as printed on their s18A receipts.
+- **Monthly collections:** if copying the donor's details onto a month's attempt fails, the attempt is removed and made afresh next run, never charged without them.
+- **s18A receipts:** the job refuses a receipt missing the donor's or charity's address (it is listed as failed, to fix and re-run). Receipt emails say "s18A receipt". Receipts use DM Sans like the website (Inter removed).
+- **App:** goals set as a share of income show their real target on Home and after a gift, and only count gifts the goal applies to; the small Give button on charity cards is reachable with a screen reader; "First gift on Givezy" shows only when we know it is true; sign-in buttons never stay greyed out after an error; the give screen and the app start never load forever; Home explains when goals can't be opened; income and "given elsewhere" dates use Johannesburg's date; the last hard-coded colours moved into the theme tokens.
+- Not changed: the admin "erase a donor with no account" form still clears what was typed on a mistake (platform team only, minor).

@@ -28,6 +28,10 @@ export const colors = {
   successText: "#1F6B4A", // small success text (6.3:1)
   danger: "#B3261E", // errors and destructive actions only (6.4:1)
   onInk: "#FFFFFF", // text on blue
+  navyEdge: "#04123D", // deep navy at half brightness: the pressable edge under navy buttons
+  scrim: "rgba(9,37,119,0.45)", // deep navy veil behind pop-ups
+  scrimSoft: "rgba(9,37,119,0.35)", // lighter veil behind bottom sheets
+  creamClear: "rgba(255,255,255,0)", // the page colour, see-through: where a fade to the page starts
 } as const;
 
 export const fonts = {

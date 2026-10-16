@@ -23,6 +23,8 @@ import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
 import { jhbToday, rand } from "@/lib/format";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
+import { loadIncome } from "@/lib/income-store";
+import type { IncomeEntry } from "@/lib/ledger";
 import { monthsInARow } from "@/lib/streak";
 import { useStoredRecord } from "@/lib/use-stored-record";
 import { charityShareText } from "@/lib/share";
@@ -35,6 +37,7 @@ import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
 const noGoals: Goal[] = [];
+const noIncome: IncomeEntry[] = [];
 /** Starting amounts when the donor hasn't given here before. Suggestions only; any amount works. */
 const STARTER_AMOUNTS = [10_000, 25_000, 50_000];
 
@@ -63,6 +66,10 @@ export default function Give() {
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   const goals = useStoredRecord<Goal[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadGoals, initial: preview ? sampleGoals : noGoals });
   const goal = goals.value[0] ?? null;
+  // Income logged on the Progress tab, so a goal set as a share of income has its real target.
+  const income = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
+  // "First gift" only when we know for sure: signed in, fresh giving history from the server, and none in it.
+  const firstEver = account.status === "signed-in" && account.live !== null && !account.live.fromCache && account.live.gifts.length === 0;
 
   // Asked of the server once per visit (and on "Try again"). The preview has no server.
   const [ready, setReady] = useState<ReadyReply | undefined>(undefined);
@@ -139,7 +146,9 @@ export default function Give() {
     let live = true;
     accessToken()
       .then((token) => checkReady(SITE_URL, slug, campaignParam, undefined, token))
-      .then((r) => live && setReady(r));
+      .then((r) => live && setReady(r))
+      // Anything unexpected shows "Try again", never an endless skeleton.
+      .catch(() => live && setReady({ ok: false, message: "We couldn't reach Givezy. Please check your connection and try again." }));
     return () => {
       live = false;
     };
@@ -238,9 +247,9 @@ export default function Give() {
   function sentSummary(cents: number, mail: string, confirming: boolean): SentGift {
     const today = jhbToday();
     const rows = [...history, ...elsewhere, { date: today, cents, label: cleanLabel(label) }];
-    const pr = goal && counts(goal, cleanLabel(label)) ? goalProgress(goal, rows, [], today) : null;
+    const pr = goal && counts(goal, cleanLabel(label)) ? goalProgress(goal, rows, income.value, today) : null;
     const badges = [
-      history.length === 0 ? "First gift on Givezy" : null,
+      firstEver ? "First gift on Givezy" : null,
       isMonthly ? "Monthly giver" : null,
       s18aAvailable && want18a ? "s18A receipt at tax time" : null,
       pr && goal ? `Counts towards ${goal.name}` : null,

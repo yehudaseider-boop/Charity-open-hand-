@@ -2,7 +2,7 @@
  * The receipt as a printable web page (A4). It is turned into a PDF by
  * headless Chrome, because that handles Hebrew (right to left) correctly.
  * Layout follows the Givezy look: logo top left on white, Fredoka for the
- * title, Inter for every field. Colours come from brand-colors.ts. The wording and fields come from the charity's
+ * title, DM Sans for every field. Colours come from brand-colors.ts. The wording and fields come from the charity's
  * advisers (config/receipts.ts), not from the design.
  * Pure: everything it prints comes from the stored snapshot.
  */
@@ -49,13 +49,13 @@ export function buildReceiptHtml(args: {
 ${args.fontCss ?? ""}
 @page { size: A4; margin: 18mm 16mm; }
 * { box-sizing: border-box; }
-body { font-family: "Inter", "Heebo", sans-serif; font-size: 10.5pt; line-height: 1.45; color: ${colours.ink}; background: ${colours.surface}; margin: 0; font-variant-numeric: tabular-nums; }
+body { font-family: "DM Sans", "Heebo", sans-serif; font-size: 10.5pt; line-height: 1.45; color: ${colours.ink}; background: ${colours.surface}; margin: 0; font-variant-numeric: tabular-nums; }
 .brand { margin: 0 0 8mm; }
 .brand img { height: 10mm; width: auto; display: block; }
 .brand .name { font-weight: 600; font-size: 14pt; color: ${colours.blue}; }
-h1 { font-family: "Fredoka", "Inter", sans-serif; font-weight: 600; font-size: 22pt; color: ${colours.blue}; margin: 0 0 2mm; }
+h1 { font-family: "Fredoka", "DM Sans", sans-serif; font-weight: 600; font-size: 22pt; color: ${colours.blue}; margin: 0 0 2mm; }
 h2 { font-size: 10.5pt; font-weight: 600; color: ${colours.blue}; margin: 7mm 0 1.5mm; }
-.he { font-family: "Heebo", "Inter", sans-serif; }
+.he { font-family: "Heebo", "DM Sans", sans-serif; }
 .head { border-bottom: 1px solid ${colours.hairline}; padding-bottom: 4mm; display: flex; justify-content: space-between; gap: 8mm; }
 .muted { color: ${colours.muted}; }
 .ref { text-align: right; }

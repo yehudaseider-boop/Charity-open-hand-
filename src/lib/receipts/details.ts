@@ -61,6 +61,18 @@ export type ReceiptDetails = {
 
 const lines = (...parts: (string | null | undefined)[]) => parts.map((p) => p?.trim()).filter((p): p is string => Boolean(p));
 
+/**
+ * What SARS needs on an s18A receipt that this one lacks (section 18A(2)): the donor's and the
+ * charity's names and addresses. Empty when nothing is missing.
+ */
+export function missingForSars(d: ReceiptDetails): string[] {
+  const out: string[] = [];
+  if (!d.donor.name) out.push("the donor's name");
+  if (!d.donor.address.length) out.push("the donor's address");
+  if (!d.charity.address.length) out.push("the charity's address");
+  return out;
+}
+
 export function buildReceiptDetails(args: {
   charity: CharityRow;
   donor: DonorRow;
@@ -100,7 +112,7 @@ export function buildReceiptDetails(args: {
     period,
     wording: {
       title: receiptConfig.wording.title,
-      statement: receiptConfig.wording.statement.replace("{charity}", c.legal_name_en).replace("{period}", period),
+      statement: receiptConfig.wording.statement.replaceAll("{charity}", c.legal_name_en).replaceAll("{period}", period),
     },
     issued_on: formatDate(args.issuedAt),
   };

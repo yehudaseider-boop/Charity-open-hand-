@@ -4,6 +4,7 @@ import { decrypt } from "@/lib/crypto";
 import { loadSavedCardInfo } from "@/lib/donations/saved-card";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { signedInWithPassword } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -53,9 +54,21 @@ export async function GET() {
     donations.push(...((data ?? []) as Record<string, unknown>[]));
     if (!data || data.length < 1000) break;
   }
+  // The details typed at each checkout (donors can't read this table themselves). Only for this person's
+  // own donations, found above through row-level security. ID and tax numbers as the last 4 digits.
+  const checkoutDetails: Record<string, unknown>[] = [];
+  const donationIds = donations.map((d) => d.id as string);
+  for (let i = 0; i < donationIds.length; i += 200) {
+    const { data, error } = await createAdminClient()
+      .from("donation_checkout_details")
+      .select("donation_id, donor_type, email, first_name, last_name, organisation_name, registration_number, contact_person, phone, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, created_at")
+      .in("donation_id", donationIds.slice(i, i + 200));
+    if (error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+    checkoutDetails.push(...((data ?? []) as Record<string, unknown>[]));
+  }
   const [myReceipts, monthly] = donorIds.length
     ? await Promise.all([
-        supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference").in("donor_id", donorIds),
+        supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, donor_as_printed:details->donor").in("donor_id", donorIds),
         supabase
           .from("recurring_donations")
           .select("id, created_at, status, amount_cents, contribution_cents, charge_day, next_charge_at, card_brand, card_last4, card_exp, wants_18a, is_anonymous, message, dedication_kind, dedication_name, ended_reason, charities(name_en)")
@@ -82,6 +95,7 @@ export async function GET() {
     // ID and tax numbers as their last 4 digits only: a donor record can be shared by everyone who gave with one email.
     donor_details: donors.data ?? [],
     donations,
+    details_given_at_checkout: checkoutDetails,
     monthly_donations: monthly.data ?? [],
     saved_card: savedCard,
     giving_kinds: kinds.data ?? [],

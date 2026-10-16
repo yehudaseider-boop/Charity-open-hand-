@@ -13,6 +13,18 @@ const nameOf = (v: unknown): string => {
   return row?.name_en ?? "Charity";
 };
 
+/** The database answers at most 1 000 rows at a time, so a long list is read page by page (up to 50 000). */
+async function allRows<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
+  const data: T[] = [];
+  for (let from = 0; from < 50_000; from += 1000) {
+    const r = await page(from, from + 999);
+    if (r.error) return { data: null, error: r.error, capped: false };
+    data.push(...(r.data ?? []));
+    if (!r.data || r.data.length < 1000) return { data, error: null, capped: false };
+  }
+  return { data, error: null, capped: true };
+}
+
 /** Payment health for the platform team: what is stuck, what needs a person, and what came in. */
 export default async function PaymentsPage() {
   await requirePlatformAdmin();
@@ -24,8 +36,8 @@ export default async function PaymentsPage() {
     db.from("donations").select("id, created_at, total_charged_cents, charities(name_en)").eq("status", "pending").order("created_at").limit(500),
     db.from("gateway_events").select("id, gateway, event_type, received_at, payload").is("processed_at", null).order("received_at").limit(200),
     db.from("audit_log").select("id, action, created_at, entity_id").in("action", ["donation.amount_mismatch", "webhook.unmatched_payment"]).gte("created_at", since).order("created_at", { ascending: false }).limit(50),
-    db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").gte("paid_at", since).limit(5000),
-    db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).limit(5000),
+    allRows((a, b) => db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").gte("paid_at", since).order("id").range(a, b)),
+    allRows((a, b) => db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).order("id").range(a, b)),
   ]);
   for (const r of [pending, events, review, paid, monthly]) if (r.error) throw r.error;
 
@@ -110,7 +122,7 @@ export default async function PaymentsPage() {
             <span>{formatRand(totals.donationCents)}{totals.contributionCents ? ` + ${formatRand(totals.contributionCents)}` : ""}</span>
           </div>
         ) : null}
-        {(paid.data?.length ?? 0) >= 5000 ? <p className="text-xs text-warning">Showing the first 5 000 payments only.</p> : null}
+        {paid.capped ? <p className="text-xs text-warning">Showing the first 50 000 payments only.</p> : null}
       </section>
     </div>
   );

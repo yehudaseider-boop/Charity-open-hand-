@@ -199,7 +199,11 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => settle(data.session));
+    supabase.auth
+      .getSession()
+      .then(({ data }) => settle(data.session))
+      // A session that cannot be read counts as signed out, never an endless loading screen.
+      .catch(() => settle(null));
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       // A routine token refresh is the same person: no need to re-check anything.
       if (event === "TOKEN_REFRESHED") return setSession(s);

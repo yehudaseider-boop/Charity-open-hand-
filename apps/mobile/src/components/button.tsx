@@ -15,7 +15,7 @@ const look: Record<Variant, { bg: string; text: string; edge: string; border?: s
   secondary: { bg: colors.surface, text: colors.blue, edge: colors.lilac, border: colors.lightPurple },
   white: { bg: colors.surface, text: colors.blue, edge: colors.lilac },
   /** Navy, white text (Continue with Apple). */
-  dark: { bg: colors.navy, text: colors.onInk, edge: "#04123D" },
+  dark: { bg: colors.navy, text: colors.onInk, edge: colors.navyEdge },
 };
 
 /**

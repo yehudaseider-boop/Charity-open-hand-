@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useLabelSuggestions } from "@/lib/use-labels";
-import { dateToIso, parseDdMmYyyy, todayDdMmYyyy } from "@/lib/ledger";
+import { ddmmyyyy, jhbToday } from "@/lib/format";
+import { dateToIso, parseDdMmYyyy } from "@/lib/ledger";
 import { parseRandToCents } from "@shared/money";
 import { colors } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
@@ -12,7 +13,7 @@ import { Text } from "./text";
 /** Log income (for a goal set as a share of income). It stays on this phone only. */
 export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; date: string; note: string }) => void; onCancel: () => void }) {
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(todayDdMmYyyy());
+  const [date, setDate] = useState(() => ddmmyyyy(jhbToday()));
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<{ amount?: string; date?: string }>({});
 
@@ -29,7 +30,7 @@ export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; 
         label="Save"
         onPress={() => {
           const cents = parseRandToCents(amount);
-          const iso = parseDdMmYyyy(date, dateToIso(new Date()));
+          const iso = parseDdMmYyyy(date, dateToIso(jhbToday()));
           const e = {
             amount: cents && cents > 0 ? undefined : "Enter an amount in Rand, for example 25000 or 25000.50.",
             date: iso ? undefined : "Use a real date that is not in the future, like 09/10/2026.",
@@ -46,7 +47,7 @@ export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; 
 /** Log giving made outside the app: cash, an appeal, another charity. */
 export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: number; date: string; recipient: string; label: string | null }) => Promise<string | null>; onCancel: () => void }) {
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(todayDdMmYyyy());
+  const [date, setDate] = useState(() => ddmmyyyy(jhbToday()));
   const [recipient, setRecipient] = useState("");
   const [label, setLabel] = useState<string | null>(null);
   const suggestions = useLabelSuggestions();
@@ -69,7 +70,7 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
         disabled={busy}
         onPress={async () => {
           const cents = parseRandToCents(amount);
-          const iso = parseDdMmYyyy(date, dateToIso(new Date()));
+          const iso = parseDdMmYyyy(date, dateToIso(jhbToday()));
           const who = recipient.trim();
           const e = {
             amount: cents && cents > 0 ? undefined : "Enter an amount in Rand, for example 180 or 180.50.",

@@ -30,11 +30,22 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
   const pct = campaign?.targetCents ? campaignPercent(campaign) : null;
   const causeName = causeList().find((c) => c.id === charity.causeId)?.label;
   const kicker = [causeName, charity.area].filter(Boolean).join(" · ");
+  // The whole card is one button for screen readers, so the small Give button inside it is offered as an action on the card.
+  const give = onGive
+    ? () => {
+        haptic.tap();
+        onGive(charity);
+      }
+    : undefined;
   return (
     <PressableScale
       onPress={() => router.push(`/charity/${charity.slug}`)}
       accessibilityRole="button"
       accessibilityLabel={`${charity.nameEn}. ${charity.cause}`}
+      accessibilityActions={give ? [{ name: "give", label: `Give to ${charity.nameEn}` }] : undefined}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === "give") give?.();
+      }}
       style={width ? { ...styles.card, width } : styles.card}
       to={0.98}
     >
@@ -51,13 +62,13 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
             <View style={styles.track}><View style={[styles.fill, { width: `${Math.max(pct, 3)}%` }]} /></View>
             <View style={styles.footer}>
               <Text style={styles.progressText} numberOfLines={1}>{campaign!.title} · {pct}% of goal</Text>
-              {onGive ? <SmallGive charity={charity} onGive={onGive} /> : null}
+              {give ? <SmallGive charity={charity} onGive={give} /> : null}
             </View>
           </View>
-        ) : onGive ? (
+        ) : give ? (
           <View style={[styles.footer, { marginTop: 4 }]}>
             <View />
-            <SmallGive charity={charity} onGive={onGive} />
+            <SmallGive charity={charity} onGive={give} />
           </View>
         ) : null}
       </View>
@@ -65,13 +76,10 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
   );
 }
 
-function SmallGive({ charity, onGive }: { charity: Charity; onGive: (c: Charity) => void }) {
+function SmallGive({ charity, onGive }: { charity: Charity; onGive: () => void }) {
   return (
     <PressableScale
-      onPress={() => {
-        haptic.tap();
-        onGive(charity);
-      }}
+      onPress={onGive}
       accessibilityRole="button"
       accessibilityLabel={`Give to ${charity.nameEn}`}
       style={styles.give}
