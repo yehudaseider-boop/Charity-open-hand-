@@ -197,7 +197,7 @@ export function inviteEmail(to: string, charityName: string, link: string): Emai
  */
 export function donationReceivedEmail(
   to: string,
-  d: { charityName: string; charityId: string; amountCents: number; monthly: boolean; campaignTitle: string | null; challengeTitle?: string | null },
+  d: { charityName: string; charityId: string; amountCents: number; monthly: boolean; campaignTitle: string | null },
   base = site(),
 ): EmailMessage {
   const what = d.monthly ? "a monthly donation" : "a donation";
@@ -205,38 +205,13 @@ export function donationReceivedEmail(
     to,
     subject: `${d.charityName} received ${formatRand(d.amountCents)} on Givezy`,
     text: [
-      `${d.charityName} has received ${what} of ${formatRand(d.amountCents)} through Givezy${d.campaignTitle ? `, for your campaign "${d.campaignTitle}"` : d.challengeTitle ? `, through the supporter challenge "${d.challengeTitle}"` : ""}.`,
+      `${d.charityName} has received ${what} of ${formatRand(d.amountCents)} through Givezy${d.campaignTitle ? `, for your campaign "${d.campaignTitle}"` : ""}.`,
       "",
       "The money is paid into your bank account by our payment provider. Who gave, and any message or dedication, is on your dashboard.",
       "",
       `Your dashboard: ${base}/charity-admin/${d.charityId}/donations`,
       "",
       `You can turn these emails off on your profile page: ${base}/charity-admin/${d.charityId}/profile`,
-      ...sign,
-    ].join("\n"),
-  };
-}
-
-/**
- * A supporter started a group challenge for the charity. It is live; the charity can stop it from its
- * Campaigns page. The starter's chosen name only, never their email.
- */
-export function challengeStartedEmail(
-  to: string,
-  d: { charityName: string; charityId: string; starterName: string; title: string; targetCents: number; slug: string },
-  base = site(),
-): EmailMessage {
-  return {
-    to,
-    subject: `${d.starterName} started a challenge for ${d.charityName} on Givezy`,
-    text: [
-      `${d.starterName} has started a group challenge for ${d.charityName}: "${d.title}", with a goal of ${formatRand(d.targetCents)}.`,
-      "",
-      "Their friends and family can now give to it. Every gift goes straight to your bank account like any other donation, and shows on your dashboard marked with the challenge.",
-      "",
-      `See the challenge: ${base}/g/${d.slug}`,
-      "",
-      `If it isn't right for your charity, you can stop it on your Campaigns page: ${base}/charity-admin/${d.charityId}/campaigns`,
       ...sign,
     ].join("\n"),
   };

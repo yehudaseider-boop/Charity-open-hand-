@@ -6,7 +6,7 @@ import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { gettingStarted } from "@/lib/charity/checklist";
 import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
-import { CopyLink } from "@/components/copy-link";
+import { CopyLink } from "./copy-link";
 import { allTime, averageCents, ERASED_DONOR, isErasedEmail, lastMonth, monthlySummary, repeatPercent, saDate, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
 import { countDonorGroups, donorGroups, endsWithinAWeek, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";

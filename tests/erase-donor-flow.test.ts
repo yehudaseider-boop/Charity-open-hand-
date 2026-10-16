@@ -93,7 +93,6 @@ describe("erasing a donor by their account", () => {
       "rpc",
       "email",
       ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"].map((t) => `${t}:deleted:user_id=${USER}`),
-      `group_challenges:update:${JSON.stringify({ starter_name: "A supporter", started_by: null })}`,
       "consents:kind=account",
       "deleteUser",
       "audit",

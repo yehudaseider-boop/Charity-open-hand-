@@ -91,9 +91,6 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       const { error: ownError } = await db.from(table).delete().eq("user_id", userId);
       if (ownError) throw new Error(`Could not erase their ${table.replace(/_/g, " ")}: ${ownError.message}`);
     }
-    // A challenge they started stays for the charity's records, without their name or their account.
-    const { error: challengeError } = await db.from("group_challenges").update({ starter_name: "A supporter", started_by: null }).eq("started_by", userId);
-    if (challengeError) throw new Error(`Could not erase their name from challenges: ${challengeError.message}`);
     const blocked = await accountBlocker(userId);
     if (blocked) {
       summary.note = blocked;

@@ -12,9 +12,6 @@ import { formatRand } from "@/lib/money";
 import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { DonateFlow } from "./donate-flow";
-import { ChallengeBar } from "@/components/challenge-ring";
-import { loadChallenge } from "@/lib/challenges/queries";
-import { challengeOpen } from "@/lib/challenges/rules";
 
 /** A shared campaign link shows the campaign and its charity in WhatsApp's preview. */
 export async function generateMetadata({ params, searchParams }: PageProps<"/c/[slug]/donate">): Promise<Metadata> {
@@ -38,9 +35,6 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   if (!charity) notFound();
   // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift).
   const campaign = typeof sp.campaign === "string" ? (await loadOpenCampaigns(charity.id)).find((c) => c.id === sp.campaign) : undefined;
-  // Giving to a group challenge for this charity (by its web address); an ended or stopped one falls back to a normal gift.
-  const found = !campaign && typeof sp.challenge === "string" ? await loadChallenge(sp.challenge) : null;
-  const challenge = found && found.charityId === charity.id && challengeOpen(found) ? found : null;
   const viewer = await getViewer();
   const account = viewer?.email ? { email: viewer.email, savedIdLast4: charity.receiptsAvailable ? await savedIdLast4(viewer.userId) : null } : undefined;
 
@@ -51,17 +45,6 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
         <h1 className="mt-1 text-3xl leading-tight">Give to {charity.name_en}</h1>
       </div>
       {campaign && charity.acceptingPayments ? <CampaignProgress campaign={campaign} compact /> : null}
-      {challenge && charity.acceptingPayments ? (
-        <section className="space-y-2 rounded-card bg-honey-soft p-5">
-          <p className="text-sm font-semibold text-brand">Group challenge, started by {challenge.starterName}</p>
-          <p className="font-display text-xl leading-snug text-indigo">{challenge.title}</p>
-          <ChallengeBar raisedCents={challenge.raisedCents} targetCents={challenge.targetCents} />
-          <p className="text-sm"><span className="font-semibold">{formatRand(challenge.raisedCents)}</span><span className="text-muted"> of {formatRand(challenge.targetCents)}</span></p>
-        </section>
-      ) : null}
-      {typeof sp.challenge === "string" && !campaign && !challenge ? (
-        <Card><p className="text-sm">That challenge has ended. You can still give to {charity.name_en} below.</p></Card>
-      ) : null}
       {typeof sp.campaign === "string" && !campaign ? (
         <Card><p className="text-sm">That campaign has ended. You can still give to {charity.name_en} below.</p></Card>
       ) : null}
@@ -75,7 +58,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           contributionMinimumLabel={formatRand(platformConfig.minContributionCents)}
           initialLabel={initialLabel}
           fromApp={fromApp}
-          campaign={campaign ? { id: campaign.id, title: campaign.title } : challenge ? { id: challenge.id, title: challenge.title, kind: "challenge" } : undefined}
+          campaign={campaign ? { id: campaign.id, title: campaign.title } : undefined}
           account={account}
         />
       ) : (

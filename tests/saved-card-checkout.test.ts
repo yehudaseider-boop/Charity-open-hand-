@@ -226,19 +226,3 @@ describe("asking twice about the same saved-card gift", () => {
     expect(charges).toHaveLength(0);
   });
 });
-
-describe("a gift to a group challenge", () => {
-  it("is refused when the challenge has ended or isn't this charity's, before anything is recorded or charged", async () => {
-    const { startDonation } = await import("@/lib/donations/checkout");
-    const { checkoutSchema } = await import("@/lib/donations/validation");
-    const input = checkoutSchema.parse({ donor_type: "individual", email: "a@example.com", first_name: "Dana", last_name: "Levi", age_confirmed: "on", popia_consent: "on" });
-    const r = await startDonation({
-      charitySlug: "meals", giftCents: 10_000, contributionCents: 0, shownTotalCents: 10_000, ip: "1.1.1.1",
-      challengeId: "6f1c2c1e-0d2a-4c4b-9a59-2b8d6d7c1a11",
-      input,
-    });
-    expect(r).toMatchObject({ ok: false, message: expect.stringMatching(/challenge has ended/) });
-    expect(ops.filter((o) => o.op === "insert")).toHaveLength(0);
-    expect(charges).toHaveLength(0);
-  });
-});

@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChallengeBar } from "@/components/challenge-ring";
-import { loadRunningChallenges } from "@/lib/challenges/queries";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Badge } from "@/components/badge";
@@ -15,7 +13,6 @@ import { initials } from "@/lib/charity/initials";
 import { loadStories, publicImageUrl } from "@/lib/charity/queries";
 import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { formatDate } from "@/lib/dates";
-import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 
 const loadCharity = cache(async (slug: string) => {
@@ -50,7 +47,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
   const receipts = canIssue18a(charity);
-  const [donatable, { photos, updates }, campaigns, challenges] = await Promise.all([loadDonatableCharity(charity.slug), loadStories(charity.id, 5), loadOpenCampaigns(charity.id), loadRunningChallenges(charity.id)]);
+  const [donatable, { photos, updates }, campaigns] = await Promise.all([loadDonatableCharity(charity.slug), loadStories(charity.id, 5), loadOpenCampaigns(charity.id)]);
   const accepting = donatable?.acceptingPayments ?? false;
   const categories = charity.charity_categories
     .map((cc) => cc.categories as unknown as { name_en: string } | null)
@@ -120,29 +117,6 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
       {campaigns.map((c) => (
         <CampaignProgress key={c.id} campaign={c} giveHref={accepting ? `/c/${charity.slug}/donate?campaign=${c.id}` : undefined} />
       ))}
-
-      {accepting ? (
-        <section className="space-y-3 rounded-card border-[1.5px] border-border p-5">
-          <h2 className="font-display text-xl">Challenges for {charity.name_en}</h2>
-          {challenges.length ? (
-            <ul className="space-y-3">
-              {challenges.slice(0, 5).map((g) => (
-                <li key={g.id}>
-                  <Link href={`/g/${g.slug}`} className="block space-y-2 rounded-control bg-honey-soft p-3 hover:bg-brand-soft">
-                    <span className="block font-semibold text-indigo">{g.title}</span>
-                    <span className="block text-xs text-muted">Started by {g.starterName}</span>
-                    <ChallengeBar raisedCents={g.raisedCents} targetCents={g.targetCents} />
-                    <span className="block text-sm"><span className="font-semibold">{formatRand(g.raisedCents)}</span><span className="text-muted"> of {formatRand(g.targetCents)}</span></span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted">Get your friends, family or colleagues behind {charity.name_en}: set a goal together and watch it fill up.</p>
-          )}
-          <Link href={`/c/${charity.slug}/challenge`} className="inline-block text-sm font-semibold text-brand underline">Start a challenge</Link>
-        </section>
-      ) : null}
 
       {charity.description_en ? (
         <Card title="What they do">

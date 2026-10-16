@@ -768,15 +768,6 @@ Yehuda: "let the charity choose" (instead of the R100, R250 and R500 starter amo
 
 **Vercel production branch** (16/10/2026): Yehuda wasn't sure, so the recommendation stands: keep the test site deploying from `milestone-1-foundation` until launch, so `main` is untouched; switch it to `main` as a launch step (go-live checklist).
 
-## Group challenges (16/10/2026)
+## Group challenges built, then removed (16/10/2026)
 
-Yehuda's "giving with friends" idea, shipped as group challenges after he approved the mock-up ("Love it, let's ship"). He skipped the two questions, so the recommended answers apply: a challenge **goes live at once** (the charity is emailed and can stop it), and **only signed-in donors can start one** (anyone can give to it).
-
-- **Starting:** from a charity's page, "Start a challenge": a name, why you're doing it, a goal in Rand (at least the minimum donation), an optional last day, and the name to show ("Started by Sarah"; never their email). At most 5 running per person, and 5 starts an hour.
-- **The challenge page** (`/g/[slug]`): a blue header, one big ring (raised, goal, percentage), how many people gave and the last day, the reason, one orange "Give to this challenge" button, "Share on WhatsApp" and a copy-link box, "Halfway there" or "Goal reached", and the charity. Never who gave or how much each person gave. Link previews show the title, the total and the charity.
-- **Giving:** an ordinary once-off donation to the charity, labelled with the challenge (`donations.challenge_id`). The database refuses a gift for another charity's challenge, or one that is both a campaign and a challenge gift. The server refuses a stopped or ended challenge before recording anything. The thank-you page links back to the challenge to share it, and "try again" keeps it.
-- **Totals:** paid gifts only, the gift only (never the contribution to Givezy); refunded and charged-back gifts drop out; "people" counts different donors.
-- **Charity side:** challenges are listed on the Campaigns page with their bar, totals and a Stop button. The charity is emailed when one starts; the person who started it is emailed when it is stopped. The "you received a donation" email names the challenge.
-- **Privacy:** the public reads challenges only through `challenge_public` (no account id). Only the server writes. Erasing a person replaces their name on any challenge with "A supporter" and removes their account from it.
-- Lists show a thin bar (the charity's public page); the challenge page shows the ring.
-- **Not yet:** challenges inside the phone app (shared links open the website, where the giving happens at launch anyway), and challenges on Discover.
+Yehuda's "giving with friends" idea was built as group challenges (a supporter starts one for a charity, friends give, one ring shows how full it is) and then removed the same day: "keep it simple for now and see if people adopt this app." Nothing was ever given to one. The code is in the history (commit `d3cc3fd`) and the mock-up is at https://claude.ai/artifact/95hrbcacj9nfNJoqf3Y8uR, so it can come back once there are real donors to test it with. The database part was added (`20261016000015`) and taken out again (`20261016000016`).

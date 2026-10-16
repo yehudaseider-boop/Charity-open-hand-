@@ -74,8 +74,6 @@ export async function startDonation(args: {
   fromApp?: boolean;
   /** Given to one of this charity's active campaigns (once-off gifts only). */
   campaignId?: string;
-  /** Given to a running group challenge for this charity (once-off gifts only). */
-  challengeId?: string;
   input: CheckoutInput;
   ip: string;
   /**
@@ -135,10 +133,6 @@ export async function startDonation(args: {
   const campaign = args.campaignId ? await loadOpenCampaign(args.campaignId, charity.id) : null;
   if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity." };
   if (campaign && input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
-  if (args.campaignId && args.challengeId) return { ok: false, message: "Something went wrong. Please try again." };
-  const challenge = args.challengeId ? await loadOpenChallenge(args.challengeId, charity.id) : null;
-  if (args.challengeId && !challenge) return { ok: false, message: "This challenge has ended. You can still give to the charity." };
-  if (challenge && input.monthly === "on") return { ok: false, message: "Challenge gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
 
   const quoted = quoteDonation(args.giftCents, args.contributionCents);
   if (!quoted.ok) return { ok: false, message: quoted.message };
@@ -235,7 +229,6 @@ export async function startDonation(args: {
     gateway_ref: donationId,
     recurring_id: recurringId,
     ...(campaign ? { campaign_id: campaign.id } : {}),
-    ...(challenge ? { challenge_id: challenge.id } : {}),
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,
@@ -434,21 +427,6 @@ export async function loadOpenCampaign(id: string, charityId: string): Promise<{
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data } = await createAdminClient()
     .from("campaigns")
-    .select("id, ends_at")
-    .eq("id", id)
-    .eq("charity_id", charityId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (!data) return null;
-  if (data.ends_at && new Date(data.ends_at).getTime() < Date.now()) return null;
-  return { id: data.id };
-}
-
-/** A group challenge for this charity that is taking gifts now (not stopped, not past its last day). */
-export async function loadOpenChallenge(id: string, charityId: string): Promise<{ id: string } | null> {
-  if (!isUuid(id)) return null;
-  const { data } = await createAdminClient()
-    .from("group_challenges")
     .select("id, ends_at")
     .eq("id", id)
     .eq("charity_id", charityId)
