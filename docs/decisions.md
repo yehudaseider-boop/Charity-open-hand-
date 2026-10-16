@@ -689,3 +689,9 @@ Yehuda chose this as the next build: a thank-you is the biggest reason donors gi
 ## Bookkeeper filters on Donations (16/10/2026)
 
 The Donations page takes a period: any time, this month, last month, this tax year, last tax year, or the charity's own dates (Johannesburg calendar days, both ends included, by the day the payment went through). A totals line shows what was received for everything the filters match (not just the page on screen), with refunds and chargebacks shown separately and not counted. The CSV download uses exactly the same filters (period, status, search), so the file matches the screen; with "All" it is paid donations only, "Every status" gives the rest. The file name carries the dates.
+
+## Faster repeat giving (16/10/2026)
+
+- **"Use my SA ID number ending 1234"** for signed-in donors, on the website's giving page and the app's give screen, when the charity can issue s18A receipts. The number comes from the encrypted copy kept with the donor's last s18A gift and is filled in on the server: only the last four digits ever reach the browser or the phone. It works only with the account's own email address (the receipt goes there), and "A different number" is one tap away. The app proves who is signed in by sending its sign-in token to our server only; password sign-ins are refused, as on the website.
+- **Message to the charity** in the app (optional, up to 500 characters), as on the website.
+- Signed-in donors on the website get their email filled in.

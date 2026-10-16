@@ -35,9 +35,12 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { g
 const limits: { bucket: string; keys: string[]; limit: number }[] = [];
 vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async (bucket: string, keys: string[], limit: number) => (limits.push({ bucket, keys, limit }), false) }));
 vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
+let signedIn: { userId: string; email: string } | null = null;
+vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
+vi.mock("@/lib/donations/saved-id", () => ({ savedIdNumber: async () => "8001015009087", savedIdLast4: async () => "9087" }));
 vi.mock("@/lib/donations/confirmation-access", () => ({ issueConfirmationToken: async () => "tok" }));
 vi.mock("@/lib/donations/charity", () => ({
-  loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: false, splitAccountRef: "ACCT_1" }),
+  loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: true, splitAccountRef: "ACCT_1" }),
 }));
 vi.mock("@/lib/gateway", () => ({
   GatewayError: class extends Error {},
@@ -69,6 +72,8 @@ beforeEach(() => {
   ops.length = 0;
   checkouts.length = 0;
   limits.length = 0;
+  signedIn = null;
+  process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
   campaignRow = null;
   process.env.APP_GIVING = "yes";
   process.env.SITE_URL = "https://site.test";
@@ -113,6 +118,23 @@ describe("app checkout endpoint", () => {
     expect(limits).toHaveLength(0);
     await call({ ...gift, details });
     expect(limits.map((l) => [l.keys[0].split(":")[0], l.limit])).toEqual([["email", 5], ["ip", 30]]);
+  });
+
+  it("fills in the saved ID number for the signed-in donor giving with their own email", async () => {
+    signedIn = { userId: "u1", email: "A@example.com" };
+    const res = await call({ ...gift, useSavedId: true, details: { ...details, wants_18a: true } });
+    expect(res.status).toBe(200);
+    const saved = ops.find((o) => o.table === "donation_checkout_details" && o.op === "insert")?.row;
+    expect(saved?.id_number_last4).toBe("9087");
+  });
+
+  it("never uses a saved ID number without a signed-in donor, or with another email", async () => {
+    const guest = await call({ ...gift, useSavedId: true, details: { ...details, wants_18a: true } });
+    expect(guest.status).toBe(422);
+    signedIn = { userId: "u1", email: "someone.else@example.com" };
+    const other = await call({ ...gift, useSavedId: true, details: { ...details, wants_18a: true } });
+    expect((await other.json()).fieldErrors.id_number).toMatch(/goes with your account's email/);
+    expect(checkouts).toHaveLength(0);
   });
 
   it("stops when the total changed, and returns the new figures", async () => {

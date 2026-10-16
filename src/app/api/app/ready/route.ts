@@ -3,6 +3,8 @@ import { platformConfig } from "@/config/platform";
 import { appGivingOpen, appReadySchema } from "@/lib/donations/app-api";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { loadOpenCampaign } from "@/lib/donations/checkout";
+import { appAccount } from "@/lib/app-auth";
+import { savedIdLast4 as savedIdLast4For } from "@/lib/donations/saved-id";
 
 /**
  * Asked by the app's give screen before the donor fills anything in: is giving in the app open,
@@ -16,6 +18,9 @@ export async function POST(request: NextRequest) {
   const charity = await loadDonatableCharity(body.data.slug);
   const accepting = Boolean(charity?.acceptingPayments);
   const campaignOpen = charity && body.data.campaignId ? Boolean(await loadOpenCampaign(body.data.campaignId, charity.id)) : false;
+  // A signed-in donor sees "Use my ID ending 1234" (the last four digits only).
+  const who = charity?.receiptsAvailable ? await appAccount(request) : null;
+  const savedIdLast4 = who ? await savedIdLast4For(who.userId) : null;
   return NextResponse.json({
     ok: true,
     accepting,
@@ -23,5 +28,6 @@ export async function POST(request: NextRequest) {
     campaignOpen,
     minGiftCents: platformConfig.minDonationCents,
     minContributionCents: platformConfig.minContributionCents,
+    savedIdLast4,
   });
 }

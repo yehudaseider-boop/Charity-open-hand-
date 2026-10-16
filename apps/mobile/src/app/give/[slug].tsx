@@ -64,6 +64,9 @@ export default function Give() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [want18a, setWant18a] = useState(false);
   const [idNumber, setIdNumber] = useState("");
+  // Signed in with an earlier s18A gift: reuse that ID number (the server fills it in; only the last four digits reach the phone).
+  const [useSavedId, setUseSavedId] = useState(true);
+  const [note, setNote] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   // Switched on, the donor still chooses "in honour of" or "in memory of": never chosen for them.
   const [dedicating, setDedicating] = useState(false);
@@ -94,14 +97,17 @@ export default function Give() {
     };
   }, [account.userId]);
 
+  const { accessToken } = account;
   useEffect(() => {
     if (!GIVE_IN_APP || !SITE_URL || !slug) return;
     let live = true;
-    checkReady(SITE_URL, slug, campaignParam).then((r) => live && setReady(r));
+    accessToken()
+      .then((token) => checkReady(SITE_URL, slug, campaignParam, undefined, token))
+      .then((r) => live && setReady(r));
     return () => {
       live = false;
     };
-  }, [slug, campaignParam, readyAttempt]);
+  }, [slug, campaignParam, readyAttempt, accessToken]);
 
   const websiteUrl = slug ? donateUrl(SITE_URL, slug, kind, campaignParam) : null;
   const closedHere = !GIVE_IN_APP || (ready && !ready.ok && ready.closed);
@@ -192,6 +198,8 @@ export default function Give() {
   const isMonthly = monthly && !campaignId;
   const authorised = isMonthly && total !== null && authorisedTotal === total;
   const s18aAvailable = server ? server.receiptsAvailable : charity.issues18a;
+  const savedLast4 = server?.savedIdLast4 ?? null;
+  const usingSavedId = s18aAvailable && want18a && Boolean(savedLast4) && useSavedId;
   const showDetailFields = !remembered || editingDetails;
 
   function check() {
@@ -204,7 +212,8 @@ export default function Give() {
     if (!first.trim()) e.first_name = "Enter your first name";
     if (!last.trim()) e.last_name = "Enter your surname";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
-    if (s18aAvailable && want18a && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
+    if (s18aAvailable && want18a && !usingSavedId && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
+    if (usingSavedId && email.trim().toLowerCase() !== (account.email ?? "").toLowerCase()) e.id_number = `Your saved ID number goes with ${account.email}. Give with that email, or use a different number.`;
     if (dedicating && !dedicate) e.dedication_kind = "Choose in honour of or in memory of";
     if (dedicating && !dedicationName.trim()) e.dedication_name = "Enter their name, or switch the dedication off";
     if (isMonthly && !authorised) e.monthly_authorised = "Please confirm you authorise the monthly payments";
@@ -235,7 +244,8 @@ export default function Give() {
       last_name: last.trim(),
       phone: phone.trim() || undefined,
       wants_18a: s18aAvailable && want18a,
-      id_number: s18aAvailable && want18a ? idNumber.trim() || undefined : undefined,
+      id_number: s18aAvailable && want18a && !usingSavedId ? idNumber.trim() || undefined : undefined,
+      message: note.trim() || undefined,
       giving_kind: kind!,
       is_anonymous: anonymous,
       dedication_kind: dedicating && dedicate ? dedicate : undefined,
@@ -245,7 +255,12 @@ export default function Give() {
       age_confirmed: agreed,
       popia_consent: agreed,
     };
-    const r = await startPayment(SITE_URL, { slug: charity!.slug, giftCents: gift!, contributionCents: contribution ?? 0, shownTotalCents: total, campaignId, details });
+    const r = await startPayment(
+      SITE_URL,
+      { slug: charity!.slug, giftCents: gift!, contributionCents: contribution ?? 0, shownTotalCents: total, campaignId, useSavedId: usingSavedId || undefined, details },
+      undefined,
+      usingSavedId ? await account.accessToken() : null,
+    );
     if (!r.ok) {
       setBusy(false);
       setMessage(r.quote ? `${r.message} The total is now ${rand(r.quote.totalCents)}.` : r.message);
@@ -368,7 +383,23 @@ export default function Give() {
           {s18aAvailable ? (
             <>
               <SwitchRow label="I want an s18A receipt" description="For your tax return. This charity can issue them." value={want18a} onChange={setWant18a} />
-              {want18a ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" error={err("id_number")} /> : null}
+              {want18a && savedLast4 ? (
+                <View style={{ gap: 8 }}>
+                  <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Your ID number">
+                    {([true, false] as const).map((saved) => {
+                      const on = useSavedId === saved;
+                      return (
+                        <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setUseSavedId(saved); }} style={[styles.chip, on && styles.chipOn]}>
+                          <Text style={[styles.chipText, on && { color: colors.onInk }]}>{saved ? `My ID ending ${savedLast4}` : "A different number"}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {useSavedId ? <Text variant="label">From your last s18A gift. Kept safely on our server, never on this phone.</Text> : null}
+                  {useSavedId && err("id_number") ? <Text variant="label" style={{ color: colors.danger }}>{err("id_number")}</Text> : null}
+                </View>
+              ) : null}
+              {want18a && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" error={err("id_number")} /> : null}
             </>
           ) : null}
           <SwitchRow
@@ -376,6 +407,16 @@ export default function Give() {
             description={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
             value={anonymous}
             onChange={setAnonymous}
+          />
+
+          <Field
+            label={`Message to ${charity.nameEn} (optional)`}
+            value={note}
+            onChangeText={setNote}
+            multiline
+            maxLength={500}
+            error={err("message")}
+            helper="The charity sees it with your donation."
           />
 
           {/* Optional: in honour of, or in memory of, someone. */}

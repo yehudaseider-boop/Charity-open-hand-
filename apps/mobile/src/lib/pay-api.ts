@@ -35,13 +35,13 @@ export type DonorDetails = {
   popia_consent: boolean;
 };
 
-type Post = (url: string, body: unknown) => Promise<{ status: number; json: unknown }>;
+type Post = (url: string, body: unknown, token?: string | null) => Promise<{ status: number; json: unknown }>;
 
 const NETWORK = "We couldn't reach Givezy. Please check your connection and try again.";
 
-async function call<T extends { ok: boolean; message?: string }>(post: Post, url: string, body: unknown): Promise<T> {
+async function call<T extends { ok: boolean; message?: string }>(post: Post, url: string, body: unknown, token?: string | null): Promise<T> {
   try {
-    const { json } = await post(url, body);
+    const { json } = await post(url, body, token);
     if (json && typeof json === "object" && typeof (json as { ok?: unknown }).ok === "boolean") return json as T;
   } catch {
     // fall through
@@ -51,8 +51,11 @@ async function call<T extends { ok: boolean; message?: string }>(post: Post, url
 
 const api = (site: string, path: string) => `${site.replace(/\/+$/, "")}/api/app/${path}`;
 
-export const fetchPost: Post = async (url, body) => {
-  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+export const fetchPost: Post = async (url, body, token) => {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  // Signed in: tells our server who is giving (for "use my ID ending 1234"). Never sent elsewhere.
+  if (token) headers.authorization = `Bearer ${token}`;
+  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
   return { status: res.status, json: await res.json().catch(() => null) };
 };
 
@@ -62,26 +65,28 @@ export function requestQuote(site: string, slug: string, giftCents: number, cont
 
 export function startPayment(
   site: string,
-  args: { slug: string; giftCents: number; contributionCents: number; shownTotalCents: number; campaignId?: string; details: DonorDetails },
+  args: { slug: string; giftCents: number; contributionCents: number; shownTotalCents: number; campaignId?: string; useSavedId?: boolean; details: DonorDetails },
   post: Post = fetchPost,
+  token?: string | null,
 ) {
-  return call<CheckoutReply>(post, api(site, "checkout"), args);
+  return call<CheckoutReply>(post, api(site, "checkout"), args, token);
 }
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number }
+  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; savedIdLast4: string | null }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
 
-export async function checkReady(site: string, slug: string, campaignId: string | undefined, post: Post = fetchPost): Promise<ReadyReply> {
+export async function checkReady(site: string, slug: string, campaignId: string | undefined, post: Post = fetchPost, token?: string | null): Promise<ReadyReply> {
   try {
-    const { status, json } = await post(api(site, "ready"), { slug, campaignId });
+    const { status, json } = await post(api(site, "ready"), { slug, campaignId }, token);
     if (status === 404) return { ok: false, closed: true };
     const j = json as Record<string, unknown> | null;
     if (j?.ok === true && typeof j.minGiftCents === "number" && typeof j.minContributionCents === "number") {
-      return { ok: true, accepting: j.accepting === true, receiptsAvailable: j.receiptsAvailable === true, campaignOpen: j.campaignOpen === true, minGiftCents: j.minGiftCents, minContributionCents: j.minContributionCents };
+      const last4 = typeof j.savedIdLast4 === "string" && /^\d{4}$/.test(j.savedIdLast4) ? j.savedIdLast4 : null;
+      return { ok: true, accepting: j.accepting === true, receiptsAvailable: j.receiptsAvailable === true, campaignOpen: j.campaignOpen === true, minGiftCents: j.minGiftCents, minContributionCents: j.minContributionCents, savedIdLast4: last4 };
     }
   } catch {
     // fall through

@@ -20,9 +20,11 @@ type Props = {
   fromApp: boolean;
   /** Giving to one of the charity's campaigns: once-off only. */
   campaign?: { id: string; title: string };
+  /** Signed in: their email, and the last four digits of the ID number from their last s18A gift. */
+  account?: { email: string; savedIdLast4: string | null };
 };
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind, fromApp, campaign }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind, fromApp, campaign, account }: Props) {
   const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
@@ -112,6 +114,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           initialKind={initialKind}
           fromApp={fromApp}
           campaign={campaign}
+          account={account}
         />
       ) : null}
     </div>
@@ -143,10 +146,14 @@ function Check({ name, children, error }: { name: string; children: React.ReactN
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialKind, fromApp, campaign }: {
+function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialKind, fromApp, campaign, account }: {
   slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
   initialKind?: keyof typeof givingKinds; fromApp: boolean; campaign?: { id: string; title: string };
+  account?: { email: string; savedIdLast4: string | null };
 }) {
+  // A signed-in donor can reuse the ID number from their last s18A gift. Only its last four digits
+  // reach the browser; the server fills in the number.
+  const [useSavedId, setUseSavedId] = useState(Boolean(account?.savedIdLast4));
   // A new amount from the form above replaces the shown one; so does a corrected one from the server.
   const [shownQuote, setShownQuote] = useState(quote);
   const [lastQuote, setLastQuote] = useState(quote);
@@ -204,7 +211,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
             <TextField name="last_name" label="Surname" required autoComplete="family-name" />
           </>
         )}
-        <TextField name="email" label="Email" type="email" required autoComplete="email" hint="Your confirmation goes here." />
+        <TextField name="email" label="Email" type="email" required autoComplete="email" defaultValue={account?.email} hint="Your confirmation goes here." />
         <TextField name="phone" label="Phone" type="tel" autoComplete="tel" hint="Optional." />
 
         {receiptsAvailable ? (
@@ -219,10 +226,33 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                 <p className="text-xs text-muted">
                   You&apos;ll get one s18A receipt for all your donations to {charityName} each tax year.
                 </p>
-                {org ? null : (
-                  <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." />
-                )}
-                <TextField name="tax_reference" label="Income tax number" inputMode="numeric" hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
+                {!org && account?.savedIdLast4 ? (
+                  <fieldset className="space-y-1 text-sm">
+                    <legend className="sr-only">Your ID number</legend>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="id_choice" checked={useSavedId} onChange={() => setUseSavedId(true)} />
+                      Use my SA ID number ending {account.savedIdLast4}
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="id_choice" checked={!useSavedId} onChange={() => setUseSavedId(false)} />
+                      Use a different number
+                    </label>
+                    {useSavedId ? (
+                      <>
+                        <input type="hidden" name="use_saved_id" value="on" />
+                        <p className="text-xs text-muted">From your last s18A gift. Give with your account&apos;s email ({account.email}) to use it.</p>
+                      </>
+                    ) : null}
+                  </fieldset>
+                ) : null}
+                {org || !(account?.savedIdLast4 && useSavedId) ? (
+                  <>
+                    {org ? null : (
+                      <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." />
+                    )}
+                    <TextField name="tax_reference" label="Income tax number" inputMode="numeric" hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
+                  </>
+                ) : null}
               </div>
             ) : null}
           </div>

@@ -14,6 +14,8 @@ vi.mock("@/lib/donations/checkout", () => ({ loadOpenCampaign: async () => (camp
 vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: async () => (confirmed++, "paid") }));
 vi.mock("@/lib/donations/confirmation-access", () => ({ confirmationTokenMatches: async (_r: string, t: string) => t === "a".repeat(43) }));
 vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => false }));
+vi.mock("@/lib/app-auth", () => ({ appAccount: async () => null }));
+vi.mock("@/lib/donations/saved-id", () => ({ savedIdLast4: async () => "9087" }));
 
 const ready = (await import("@/app/api/app/ready/route")).POST;
 const status = (await import("@/app/api/app/status/route")).POST;
@@ -35,7 +37,7 @@ describe("app ready check", () => {
   it("says whether the charity can take a payment, the campaign is open, and the minimums", async () => {
     campaignOpen = true;
     const r = await (await ready(req({ slug: "a", campaignId: REF }))).json();
-    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: true, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 });
+    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: true, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: null });
   });
   it("a charity not connected for payments is not accepting", async () => {
     charity = { id: "c1", acceptingPayments: false, receiptsAvailable: false };

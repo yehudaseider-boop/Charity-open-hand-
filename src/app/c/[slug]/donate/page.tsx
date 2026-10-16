@@ -8,6 +8,8 @@ import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { givingKinds } from "@/lib/donations/validation";
 import { formatRand } from "@/lib/money";
+import { getViewer } from "@/lib/auth";
+import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { DonateFlow } from "./donate-flow";
 
 export const metadata: Metadata = { title: "Donate" };
@@ -23,6 +25,8 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   if (!charity) notFound();
   // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift).
   const campaign = typeof sp.campaign === "string" ? (await loadOpenCampaigns(charity.id)).find((c) => c.id === sp.campaign) : undefined;
+  const viewer = await getViewer();
+  const account = viewer?.email ? { email: viewer.email, savedIdLast4: charity.receiptsAvailable ? await savedIdLast4(viewer.userId) : null } : undefined;
 
   return (
     <div className="space-y-4">
@@ -44,6 +48,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           initialKind={initialKind}
           fromApp={fromApp}
           campaign={campaign ? { id: campaign.id, title: campaign.title } : undefined}
+          account={account}
         />
       ) : (
         <Card><p className="text-sm">{charity.name_en} isn&apos;t taking online donations yet.</p></Card>

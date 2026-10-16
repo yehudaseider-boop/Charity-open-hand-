@@ -37,6 +37,8 @@ type AccountValue = {
   /** Donations that arrived since the donor last looked: the app thanks them. */
   arrived: Gift[];
   dismissArrived(): void;
+  /** The signed-in donor's current access token, so our own server knows who is giving (null when signed out). */
+  accessToken(): Promise<string | null>;
   sendCode(email: string): Promise<{ ok: true } | { ok: false; message: string }>;
   verifyCode(email: string, code: string): Promise<{ ok: true } | { ok: false; message: string }>;
   agree(): Promise<{ ok: true } | { ok: false; message: string }>;
@@ -305,6 +307,13 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [status, refresh]);
 
+  // Stable while the sign-in state is the same, so screens can ask the server once.
+  const accessToken = useCallback(async () => {
+    if (!supabase || status !== "signed-in") return null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  }, [status]);
+
   const value = useMemo<AccountValue>(
     () => ({
       status,
@@ -315,6 +324,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       refreshing,
       arrived,
       dismissArrived: () => setArrived([]),
+      accessToken,
       async sendCode(email) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
@@ -371,7 +381,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
       },
     }),
-    [status, session, live, loadError, refreshing, refresh, arrived],
+    [status, session, live, loadError, refreshing, refresh, arrived, accessToken],
   );
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;

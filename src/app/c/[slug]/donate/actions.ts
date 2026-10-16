@@ -6,6 +6,7 @@ import { quoteDonation, startDonation, type Quote } from "@/lib/donations/checko
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { checkoutSchema, cleanPhone } from "@/lib/donations/validation";
 import { clientIp } from "@/lib/client-ip";
+import { getViewer } from "@/lib/auth";
 import { formToObject } from "@/lib/form";
 import { parseRandToCents } from "@/lib/money";
 
@@ -57,7 +58,10 @@ export async function submitDonation(
 
   const h = await headers();
   const ip = clientIp(h);
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, input: parsed.data, ip });
+  // "Use my ID ending 1234": only for the signed-in person, checked here on the server.
+  const viewer = formData.get("use_saved_id") === "on" ? await getViewer() : null;
+  const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, input: parsed.data, ip, useSavedIdOf });
   if (!result.ok) return result;
   redirect(result.redirectUrl);
 }

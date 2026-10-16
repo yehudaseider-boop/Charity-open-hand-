@@ -6,6 +6,7 @@ import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import { formatRand } from "@/lib/money";
+import { savedIdNumber } from "./saved-id";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -66,18 +67,33 @@ export async function startDonation(args: {
   campaignId?: string;
   input: CheckoutInput;
   ip: string;
+  /**
+   * The donor ticked "use my ID ending 1234": the signed-in account (checked by the caller) whose
+   * last s18A gift holds the number. Used only with that account's own email address.
+   */
+  useSavedIdOf?: { userId: string; email: string };
 }): Promise<StartResult> {
   const charity = await loadDonatableCharity(args.charitySlug);
   if (!charity || !charity.acceptingPayments) {
     return { ok: false, message: "This charity can't take online donations right now." };
   }
 
-  const fieldErrors = checkDonorDetails(args.input, charity.receiptsAvailable);
+  let input = args.input;
+  const saved = args.useSavedIdOf;
+  if (saved && input.wants_18a === "on" && input.donor_type === "individual" && !input.id_number && !input.tax_reference) {
+    const mismatch = "Your saved ID number goes with your account's email address. Use that email, or type the number.";
+    if (saved.email.trim().toLowerCase() !== input.email.trim().toLowerCase()) return { ok: false, message: mismatch, fieldErrors: { id_number: mismatch } };
+    const id = await savedIdNumber(saved.userId);
+    if (!id) return { ok: false, message: "Please check the highlighted fields.", fieldErrors: { id_number: "Enter your SA ID number" } };
+    input = { ...input, id_number: id };
+  }
+
+  const fieldErrors = checkDonorDetails(input, charity.receiptsAvailable);
   if (Object.keys(fieldErrors).length) return { ok: false, message: "Please check the highlighted fields.", fieldErrors };
 
   const campaign = args.campaignId ? await loadOpenCampaign(args.campaignId, charity.id) : null;
   if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity." };
-  if (campaign && args.input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
+  if (campaign && input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
 
   const quoted = quoteDonation(args.giftCents, args.contributionCents);
   if (!quoted.ok) return { ok: false, message: quoted.message };
@@ -89,11 +105,11 @@ export async function startDonation(args: {
   // Only attempts that would reach the payment page count. One email gets 5 tries in 10 minutes;
   // one address gets more, because a shul's Wi-Fi or a mobile network puts many donors behind it.
   const limited =
-    (await hitRateLimit("checkout", [`email:${args.input.email.toLowerCase()}`], 5, 10)) ||
+    (await hitRateLimit("checkout", [`email:${input.email.toLowerCase()}`], 5, 10)) ||
     (await hitRateLimit("checkout-ip", [`ip:${args.ip}`], 30, 10));
   if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
 
-  const v = args.input;
+  const v = input;
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
   // Already checked in checkDonorDetails, so here it is a dedication or none.
   const parsedDedication = parseDedication(v.dedication_kind, v.dedication_name);

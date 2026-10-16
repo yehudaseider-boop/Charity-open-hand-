@@ -19,6 +19,8 @@ export const appCheckoutSchema = appQuoteSchema.extend({
   shownTotalCents: cents,
   /** One of the charity's campaigns, when the gift is for it. */
   campaignId: z.uuid().optional(),
+  /** "Use my ID ending 1234": the server fills in the number for the signed-in donor. */
+  useSavedId: z.boolean().optional(),
   details: z.object({
     donor_type: z.enum(["individual", "company", "trust"]),
     email: z.string().max(200),

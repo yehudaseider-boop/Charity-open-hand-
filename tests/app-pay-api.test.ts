@@ -50,7 +50,7 @@ describe("before and after the payment page", () => {
   it("reads whether the charity can take the gift, the campaign and the minimums", async () => {
     const seen: unknown[] = [];
     const r = await checkReady("https://x.test", "a", "c1", async (url, body) => (seen.push([url, body]), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 } }));
-    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 });
+    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: null });
     expect(seen[0]).toEqual(["https://x.test/api/app/ready", { slug: "a", campaignId: "c1" }]);
   });
   it("offline is a plain message, not the website hand-off", async () => {
@@ -72,5 +72,16 @@ describe("before and after the payment page", () => {
     expect(centsToInput(18_000)).toBe("180");
     expect(centsToInput(18_050)).toBe("180.50");
     expect(centsToInput(125_005)).toBe("1250.05");
+  });
+});
+
+describe("saved ID number in the app", () => {
+  it("sends the sign-in token to our server only, and reads back four digits at most", async () => {
+    const seen: (string | null | undefined)[] = [];
+    const r = await checkReady("https://x.test", "a", undefined, async (_u, _b, token) => (seen.push(token), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: true, campaignOpen: false, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: "9087" } }), "tok");
+    expect(seen).toEqual(["tok"]);
+    expect(r.ok && r.savedIdLast4).toBe("9087");
+    const odd = await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: { ok: true, accepting: true, receiptsAvailable: true, campaignOpen: false, minGiftCents: 3_000, minContributionCents: 1_000, savedIdLast4: "8001015009087" } }));
+    expect(odd.ok && odd.savedIdLast4).toBeNull();
   });
 });
