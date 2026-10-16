@@ -675,3 +675,13 @@ From the charity-side review:
 - **Search** on Donations, Donors and Monthly keeps emails and names as typed (dots, apostrophes), quoted safely in the database filter.
 - **Erased donors** show as "Erased at the donor's request", with no placeholder address on screen, in exports or as an email link.
 - Wording: Givezy (not the charity) issues s18A receipts; the tax year line reads properly; the dashboard says the provider's card fee comes off before the money reaches the bank; "contact us" points to the support contact.
+
+## Thank-you emails (16/10/2026)
+
+Yehuda chose this as the next build: a thank-you is the biggest reason donors give again. On the charity's new "Thank donors" tab (also linked from "Your donors" on the dashboard), the charity writes up to 1 000 characters for one of the last three months, and Givezy emails it to everyone who gave that month (paid gifts only), once per address, opening "Dear <first name>,". Draft wording.
+
+- The charity never sees or downloads addresses for this; nothing about amounts or other donors is in the email.
+- One thank-you per charity per month of donations (database rule), so donors aren't flooded.
+- Each email has a link to stop thank-you emails from all charities. The link asks first (so an email scanner opening it changes nothing). Opt-outs and links are kept as hashes of the address, readable only by the server. Erased donors are never emailed.
+- Sent one by one from the server: fine for small charities; a charity with thousands of donors in a month would need a queue (not built).
+- Privacy Policy draft updated; Yosef to confirm (go-live checklist).

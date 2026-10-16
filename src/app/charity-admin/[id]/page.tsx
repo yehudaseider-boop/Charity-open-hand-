@@ -143,7 +143,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
           <ul className="space-y-2 text-sm">
             <li>
               <span className="font-semibold">{plural(insights.newDonors, "new donor")}</span> this month
-              {insights.returningDonors ? <>, and {plural(insights.returningDonors, "donor")} who gave before came back</> : null}.
+              {insights.returningDonors ? <>, and {plural(insights.returningDonors, "donor")} who gave before came back</> : null}.{" "}
+              <Link href={`${base}/thank-donors`} className="text-brand underline">Thank them</Link>
             </li>
             <li>
               <span className="font-semibold">{repeatPercent(insights.repeatDonors, insights.allDonors)}%</span> of your donors have given more than once

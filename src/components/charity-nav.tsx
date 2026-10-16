@@ -8,6 +8,7 @@ const tabs = [
   { href: "/donations", label: "Donations" },
   { href: "/donors", label: "Donors" },
   { href: "/monthly", label: "Monthly" },
+  { href: "/thank-donors", label: "Thank donors" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/receipts", label: "Receipts" },
   { href: "/application", label: "Registration" },
