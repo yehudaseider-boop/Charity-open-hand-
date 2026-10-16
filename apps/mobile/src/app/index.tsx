@@ -35,7 +35,7 @@ const SAFE = [
 
 /**
  * First open: the blue welcome, then three steps: the causes you care about, your giving goal, and
- * how two-tap giving is kept safe. Skippable, and shown once per phone.
+ * how giving is kept safe. Skippable, and shown once per phone.
  * `?welcome=1&step=2` shows it again for design review (step 0 is the welcome).
  */
 export default function Welcome() {
@@ -86,7 +86,7 @@ export default function Welcome() {
         <View style={styles.gutter}><Logo width={150} white /></View>
         <View style={{ flex: 1 }} />
         <FadeUp style={[styles.gutter, { gap: 14 }]}>
-          <Text style={styles.welcomeTitle} accessibilityRole="header">Give in two taps.</Text>
+          <Text style={styles.welcomeTitle} accessibilityRole="header">Give in a few taps.</Text>
           <Text style={styles.welcomeLine}>All your giving, finally in one place. Every charity checked by us.</Text>
         </FadeUp>
         <View style={[styles.gutter, { gap: 6, marginTop: 28 }]}>
@@ -191,7 +191,7 @@ export default function Welcome() {
         ) : (
           <FadeUp key="safe" style={{ flex: 1, gap: space.block }}>
             <View style={{ gap: 8 }}>
-              <Text variant="h1" accessibilityRole="header">Two-tap giving, kept safe.</Text>
+              <Text variant="h1" accessibilityRole="header">Giving in a few taps, kept safe.</Text>
               <Text variant="bodyMuted">How giving works, so you know where your card and your money go.</Text>
             </View>
             <View style={{ gap: 12 }}>
