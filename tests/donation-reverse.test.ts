@@ -47,12 +47,14 @@ beforeEach(() => {
 });
 
 describe("refunds", () => {
-  it("a full refund marks the donation refunded, once", async () => {
+  it("a full refund marks the donation refunded; a repeat changes nothing else", async () => {
     await handleRefund("ref-1", 20_000, "evt");
     expect(donations[0].status).toBe("refunded");
     expect(audits.map((a) => a.action)).toEqual(["donation.refunded"]);
+    // Only an unfinished event is ever processed again (finished ones are skipped by the webhook route).
     await handleRefund("ref-1", 20_000, "evt");
-    expect(audits.map((a) => a.action)).toEqual(["donation.refunded"]);
+    expect(donations[0].status).toBe("refunded");
+    expect(audits.map((a) => a.action)).not.toContain("donation.refund_review");
   });
 
   it("a partial refund or an unknown amount changes nothing and is held for a person", async () => {
@@ -73,6 +75,13 @@ describe("refunds", () => {
     expect(await reverseDonation("d1", "charged_back", "admin-1", "marked by an admin")).toBe("done");
     expect(donations[0].status).toBe("charged_back");
     expect(audits.map((a) => [a.action, a.entityId])).toEqual([["donation.charged_back", "d1"], ["receipt.needs_reissue", "rcpt-1"]]);
+  });
+
+  it("a retry after a failed first try still flags the receipt", async () => {
+    receiptLinks = [{ receipt_id: "rcpt-1", donation_id: "d1" }];
+    donations[0].status = "refunded"; // the first try changed it, then failed before logging
+    await handleRefund("ref-1", 20_000, "evt");
+    expect(audits.map((a) => a.action)).toEqual(["donation.refunded", "receipt.needs_reissue"]);
   });
 
   it("only a paid donation can be reversed", async () => {

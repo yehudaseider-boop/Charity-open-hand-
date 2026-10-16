@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 
 export type ReverseKind = "refunded" | "charged_back";
-export type ReverseOutcome = "done" | "not_paid" | "not_found";
+export type ReverseOutcome = "done" | "already" | "not_paid" | "not_found";
 
 type Found = { id: string; status: string; total_charged_cents: number };
 
@@ -35,17 +35,24 @@ export async function reverseDonation(donationId: string, kind: ReverseKind, act
     .eq("status", "paid")
     .select("id");
   if (error) throw error;
+  let outcome: ReverseOutcome = "done";
   if (!data?.length) {
-    const { data: row } = await db.from("donations").select("id").eq("id", donationId).maybeSingle();
-    return row ? "not_paid" : "not_found";
+    const { data: row, error: readError } = await db.from("donations").select("status").eq("id", donationId).maybeSingle();
+    if (readError) throw readError;
+    if (!row) return "not_found";
+    // Already moved by an earlier try that failed before it finished: finish the follow-up below again,
+    // so a receipt that needs re-issuing is never missed.
+    if (row.status !== kind) return "not_paid";
+    outcome = "already";
   }
   await logAudit({ actorUserId, action: kind === "refunded" ? "donation.refunded" : "donation.charged_back", entityType: "donation", entityId: donationId, details: { how } });
   // An s18A receipt already issued with this donation on it is now wrong: a person voids and re-issues it.
-  const { data: links } = await db.from("s18a_receipt_donations").select("receipt_id, s18a_receipts!inner(status)").eq("donation_id", donationId).eq("s18a_receipts.status", "issued");
+  const { data: links, error: linkError } = await db.from("s18a_receipt_donations").select("receipt_id, s18a_receipts!inner(status)").eq("donation_id", donationId).eq("s18a_receipts.status", "issued");
+  if (linkError) throw linkError;
   for (const l of links ?? []) {
     await logAudit({ actorUserId, action: "receipt.needs_reissue", entityType: "s18a_receipt", entityId: l.receipt_id as string, details: { donationId, kind } });
   }
-  return "done";
+  return outcome;
 }
 
 /**
@@ -60,7 +67,7 @@ export async function handleRefund(reference: string | null, amountCents: number
   }
   if (amountCents !== null && amountCents === d.total_charged_cents) {
     const outcome = await reverseDonation(d.id, "refunded", null, "the payment provider refunded the full amount");
-    if (outcome === "done" || d.status === "refunded") return;
+    if (outcome === "done" || outcome === "already") return;
   }
   await logAudit({ actorUserId: null, action: "donation.refund_review", entityType: "donation", entityId: d.id, details: { amountCents, paidCents: d.total_charged_cents, status: d.status } });
 }
