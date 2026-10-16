@@ -1,6 +1,3 @@
-// Relative import: the website's tests compile this file, where "@/" means the website.
-import type { GivingKind } from "../data/giving";
-
 /**
  * The website address, set with EXPO_PUBLIC_SITE_URL when we have a domain.
  * Payments happen on our website's payment page only. The app has no card fields
@@ -9,10 +6,10 @@ import type { GivingKind } from "../data/giving";
  */
 export const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL;
 
-/** The charity's donation page, with the donor's maaser/chomesh/tzedaka choice (and campaign, if any) carried over. */
-export function donateUrl(site: string | undefined, slug: string, kind: GivingKind | null, campaign?: string): string | null {
+/** The charity's donation page, with the donor's label (and campaign, if any) carried over. */
+export function donateUrl(site: string | undefined, slug: string, label: string | null, campaign?: string): string | null {
   if (!site || !site.startsWith("https://")) return null;
-  const q = [kind ? `kind=${kind}` : "", campaign ? `campaign=${encodeURIComponent(campaign)}` : "", "from=app"].filter(Boolean).join("&");
+  const q = [label ? `label=${encodeURIComponent(label)}` : "", campaign ? `campaign=${encodeURIComponent(campaign)}` : "", "from=app"].filter(Boolean).join("&");
   return `${site.replace(/\/+$/, "")}/c/${encodeURIComponent(slug)}/donate?${q}`;
 }
 

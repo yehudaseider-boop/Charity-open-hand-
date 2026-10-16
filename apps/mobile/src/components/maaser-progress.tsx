@@ -29,10 +29,10 @@ export function MaaserProgress({
   const remaining = targetCents - givenCents;
   const sentence =
     remaining > 0
-      ? `${rand(remaining)} to go to reach your target by ${endLabel}.`
+      ? `${rand(remaining)} to go to reach your goal by ${endLabel}.`
       : remaining === 0
-        ? `You've reached your target for this ${period}.`
-        : `You've given ${rand(-remaining)} more than your target this ${period}.`;
+        ? `You've reached your goal for this ${period}.`
+        : `You've given ${rand(-remaining)} more than your goal this ${period}.`;
 
   return (
     <View style={{ gap: compact ? 6 : 10 }} accessible accessibilityLabel={`${title}: ${rand(givenCents)} given of ${rand(targetCents)}. ${sentence}`}>

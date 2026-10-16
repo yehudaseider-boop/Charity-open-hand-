@@ -146,10 +146,10 @@ export function supabaseMonthlyStore(): MonthlyStore {
       const details = must(await db.from("donation_checkout_details").select("*").eq("donation_id", rec.first_donation_id).maybeSingle(), "read the donor's details");
       const copy = await db.from("donation_checkout_details").insert({ ...details, donation_id: donationId });
       if (copy.error) throw new Error(`Could not copy the donor's details: ${copy.error.message}`);
-      const kind = await db.from("donation_giving_kinds").select("kind").eq("donation_id", rec.first_donation_id).maybeSingle();
+      const kind = await db.from("donation_giving_kinds").select("kind, label").eq("donation_id", rec.first_donation_id).maybeSingle();
       if (kind.data) {
-        const k = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: kind.data.kind });
-        if (k.error) throw new Error(`Could not copy the giving choice: ${k.error.message}`);
+        const k = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: kind.data.kind, label: kind.data.label });
+        if (k.error) throw new Error(`Could not copy the donor's label: ${k.error.message}`);
       }
     },
 

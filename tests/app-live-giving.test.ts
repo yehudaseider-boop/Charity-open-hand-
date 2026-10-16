@@ -8,16 +8,16 @@ const row = (o: Partial<DonationRow>): DonationRow => ({
 });
 
 describe("toGifts", () => {
-  it("counts paid donations only, with the donor's own maaser/chomesh/tzedaka choice", () => {
+  it("counts paid donations only, with the donor's own label (old fixed choices read as labels)", () => {
     const gifts = toGifts(
-      [row({ id: "a" }), row({ id: "b", status: "refunded" }), row({ id: "c", status: "pending", paid_at: null }), row({ id: "d", amount_cents: 5000, recurring_id: "r1", charities: [charity] })],
-      [{ donation_id: "a", kind: "chomesh" }],
+      [row({ id: "a" }), row({ id: "b", status: "refunded" }), row({ id: "c", status: "pending", paid_at: null }), row({ id: "d", amount_cents: 5000, recurring_id: "r1", charities: [charity] }), row({ id: "e" })],
+      [{ donation_id: "a", kind: "chomesh", label: null }, { donation_id: "e", kind: null, label: "Work giving" }],
     );
-    expect(gifts.map((g) => g.id).sort()).toEqual(["a", "d"]);
-    const a = gifts.find((g) => g.id === "a")!;
-    expect(a).toMatchObject({ cents: 18_000, kind: "chomesh", charityName: "Meals Fund", charitySlug: "meals", monthly: false, with18a: true });
-    // No recorded choice (older donation) counts as general tzedaka, never as maaser.
-    expect(gifts.find((g) => g.id === "d")).toMatchObject({ kind: "tzedaka", monthly: true, cents: 5_000 });
+    expect(gifts.map((g) => g.id).sort()).toEqual(["a", "d", "e"]);
+    expect(gifts.find((g) => g.id === "a")).toMatchObject({ cents: 18_000, label: "Chomesh", charityName: "Meals Fund", charitySlug: "meals", monthly: false, with18a: true });
+    expect(gifts.find((g) => g.id === "e")?.label).toBe("Work giving");
+    // No label: none is made up.
+    expect(gifts.find((g) => g.id === "d")).toMatchObject({ label: null, monthly: true, cents: 5_000 });
   });
 
   it("puts the newest first", () => {
@@ -54,7 +54,7 @@ describe("sign-in helpers", () => {
   });
 });
 
-import { cleanIncome, dateToIso, incomeBetween, owedFromIncome, parseDdMmYyyy, toElsewhere } from "../apps/mobile/src/lib/ledger";
+import { cleanIncome, dateToIso, incomeBetween, parseDdMmYyyy, toElsewhere } from "../apps/mobile/src/lib/ledger";
 
 describe("typed dates", () => {
   const today = "2026-10-09";
@@ -98,25 +98,19 @@ describe("income and maaser owed", () => {
     expect(incomeBetween(entries, "2026-10-01", "2026-10-31")).toBe(2_600_000);
   });
 
-  it("works out a tenth for maaser and a further tenth for chomesh, to the cent", () => {
-    expect(owedFromIncome(2_500_000, false)).toEqual({ maaserCents: 250_000, chomeshCents: 0 });
-    expect(owedFromIncome(2_500_000, true)).toEqual({ maaserCents: 250_000, chomeshCents: 250_000 });
-    expect(owedFromIncome(12_345, true)).toEqual({ maaserCents: 1_235, chomeshCents: 1_235 }); // 1 234.5 rounds half up
-    expect(owedFromIncome(0, true)).toEqual({ maaserCents: 0, chomeshCents: 0 });
-  });
 });
 
 describe("giving made elsewhere", () => {
-  it("keeps the donor's own choice and ignores anything with an unknown one", () => {
+  it("keeps the donor's own label; old fixed choices read as labels, anything else as none", () => {
     const out = toElsewhere([
-      { id: "a", entry_date: "2026-06-10", recipient_text: "Shul appeal (cash)", amount_cents: "72000", kind: "maaser" },
+      { id: "a", entry_date: "2026-06-10", recipient_text: "School fun run (cash)", amount_cents: "72000", kind: "maaser" },
       { id: "b", entry_date: "2026-07-01", recipient_text: "Other", amount_cents: 5000, kind: "gift" },
-      { id: "c", entry_date: "2026-08-01", recipient_text: "Pushka", amount_cents: 1800, kind: "tzedaka" },
+      { id: "c", entry_date: "2026-08-01", recipient_text: "Collection box", amount_cents: 1800, label: "Family" },
     ]);
-    expect(out.map((e) => e.id)).toEqual(["c", "a"]);
-    expect(out[1]).toMatchObject({ cents: 72_000, kind: "maaser", recipient: "Shul appeal (cash)" });
-    expect(out[1].date.getFullYear()).toBe(2026);
-    expect(out[1].date.getDate()).toBe(10);
+    expect(out.map((e) => [e.id, e.label])).toEqual([["c", "Family"], ["b", null], ["a", "Maaser"]]);
+    expect(out[2]).toMatchObject({ cents: 72_000, recipient: "School fun run (cash)" });
+    expect(out[2].date.getFullYear()).toBe(2026);
+    expect(out[2].date.getDate()).toBe(10);
   });
 });
 
@@ -176,10 +170,10 @@ describe("thanking for new donations", () => {
 
 describe("giving saved on the phone for offline use", () => {
   const live = {
-    gifts: [{ id: "a", date: new Date("2026-09-01T08:00:00Z"), charitySlug: "meals", charityName: "Meals Fund", cents: 18000, monthly: false, with18a: true, kind: "maaser" as const, thankYou: "Thank you" }],
+    gifts: [{ id: "a", date: new Date("2026-09-01T08:00:00Z"), charitySlug: "meals", charityName: "Meals Fund", cents: 18000, monthly: false, with18a: true, label: "Work giving" as string | null, thankYou: "Thank you" }],
     recurring: [{ id: "r", charitySlug: "meals", charityName: "Meals Fund", cents: 5000, nextDate: null, status: "paused" as const, syncing: true }],
     receipts: [{ id: "x", taxYear: 2027, charityName: "Meals Fund", number: "MF-1", cents: 18000, issued: new Date("2026-09-02T08:00:00Z") }],
-    elsewhere: [{ id: "e", date: new Date("2026-08-01T00:00:00Z"), recipient: "Shul appeal", cents: 3600, kind: "chomesh" as const }],
+    elsewhere: [{ id: "e", date: new Date("2026-08-01T00:00:00Z"), recipient: "Collection box", cents: 3600, label: null as string | null }],
     loadedAt: new Date("2026-09-03T10:15:00Z"),
   };
 

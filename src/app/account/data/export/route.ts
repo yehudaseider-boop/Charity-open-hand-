@@ -20,13 +20,13 @@ export async function GET() {
   const [profile, donors, kinds, consents, requests, favourites, maaserSettings, income, external, notes] = await Promise.all([
     supabase.from("profiles").select("email, full_name, created_at").eq("id", user.id).maybeSingle(),
     supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, created_at").eq("user_id", user.id),
-    supabase.from("donation_giving_kinds").select("donation_id, kind"),
+    supabase.from("donation_giving_kinds").select("donation_id, kind, label"),
     supabase.from("consents").select("kind, policy_version, accepted_at").eq("user_id", user.id).order("accepted_at"),
     supabase.from("data_requests").select("kind, details, status, response, created_at, closed_at").eq("user_id", user.id),
     supabase.from("favourites").select("created_at, charities(name_en)").eq("user_id", user.id),
     supabase.from("maaser_settings").select("target_percent_ppm, updated_at").eq("user_id", user.id),
     supabase.from("maaser_income_entries").select("entry_date, amount_encrypted, note_encrypted, created_at").eq("user_id", user.id),
-    supabase.from("external_giving_entries").select("entry_date, amount_cents, recipient_text, created_at").eq("user_id", user.id),
+    supabase.from("external_giving_entries").select("entry_date, amount_cents, recipient_text, label, created_at").eq("user_id", user.id),
     supabase.from("donation_private_notes").select("donation_id, note, created_at").eq("user_id", user.id),
   ]);
 

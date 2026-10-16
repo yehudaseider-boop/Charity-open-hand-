@@ -12,17 +12,19 @@ import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
-import { gifts as sampleGifts, type GivingKind } from "@/data/giving";
+import { gifts as sampleGifts } from "@/data/giving";
+import { LabelPicker } from "@/components/label-picker";
+import { useLabelSuggestions } from "@/lib/use-labels";
+import { cleanLabel, LEGACY_KIND_LABELS } from "@shared/donations/labels";
 import { useAccount } from "@/lib/account";
 import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
 import { rand } from "@/lib/format";
 import { openGivingPage, refreshAfterGiving } from "@/lib/give-flow";
 import { GIVE_IN_APP } from "@/lib/give-entry";
-import { givingKindLabels } from "@/lib/giving";
 import { haptic } from "@/lib/haptics";
 import { openSite, openUrl } from "@/lib/open-site";
-import { afterPaymentMessage, centsToInput, checkReady, lastKind, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
+import { afterPaymentMessage, centsToInput, checkReady, lastLabel, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -39,7 +41,7 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
  */
 export default function Give() {
   const insets = useSafeAreaInsets();
-  const { slug, kind: kindParam, campaign: campaignParam } = useLocalSearchParams<{ slug: string; kind?: string; campaign?: string }>();
+  const { slug, kind: kindParam, label: labelParam, campaign: campaignParam } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string }>();
   const { charity, failed, retry } = useCharity(slug);
   const account = useAccount();
   const preview = account.status === "preview";
@@ -50,8 +52,11 @@ export default function Give() {
   const [ready, setReady] = useState<ReadyReply | undefined>(undefined);
   const [readyAttempt, setReadyAttempt] = useState(0);
   const [amount, setAmount] = useState("");
-  const startKind = kindParam && Object.hasOwn(givingKindLabels, kindParam) ? (kindParam as GivingKind) : slug ? lastKind(history, slug) : null;
-  const [kind, setKind] = useState<GivingKind | null>(startKind);
+  // Starts from the label passed in (older links pass ?kind=), else the one used last time at this charity.
+  const legacy = kindParam && Object.hasOwn(LEGACY_KIND_LABELS, kindParam) ? LEGACY_KIND_LABELS[kindParam] : null;
+  const startLabel = cleanLabel(labelParam) || legacy || (slug ? lastLabel(history, slug) : null);
+  const [label, setLabel] = useState<string | null>(startLabel);
+  const labelSuggestions = useLabelSuggestions();
   const [monthly, setMonthly] = useState(false);
   const [extra, setExtra] = useState(false);
   const [extraAmount, setExtraAmount] = useState("");
@@ -109,7 +114,7 @@ export default function Give() {
     };
   }, [slug, campaignParam, readyAttempt, accessToken]);
 
-  const websiteUrl = slug ? donateUrl(SITE_URL, slug, kind, campaignParam) : null;
+  const websiteUrl = slug ? donateUrl(SITE_URL, slug, label, campaignParam) : null;
   const closedHere = !GIVE_IN_APP || (ready && !ready.ok && ready.closed);
   if (closedHere) {
     return (
@@ -208,7 +213,6 @@ export default function Give() {
     else if (gift < minGift) e.amount = `The smallest donation is ${rand(minGift)}`;
     if (extra && !contribution) e.extra = "Enter your contribution in Rand, or switch it off";
     else if (extra && contribution !== null && contribution < minExtra) e.extra = `The smallest contribution is ${rand(minExtra)}, or switch it off`;
-    if (!kind) e.giving_kind = "Choose what this donation counts as";
     if (!first.trim()) e.first_name = "Enter your first name";
     if (!last.trim()) e.last_name = "Enter your surname";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
@@ -246,7 +250,7 @@ export default function Give() {
       wants_18a: s18aAvailable && want18a,
       id_number: s18aAvailable && want18a && !usingSavedId ? idNumber.trim() || undefined : undefined,
       message: note.trim() || undefined,
-      giving_kind: kind!,
+      giving_label: cleanLabel(label) ?? undefined,
       is_anonymous: anonymous,
       dedication_kind: dedicating && dedicate ? dedicate : undefined,
       dedication_name: dedicating ? dedicationName.trim() : undefined,
@@ -334,20 +338,7 @@ export default function Give() {
             ) : null}
           </View>
 
-          <View style={{ gap: 8 }}>
-            <Text variant="label" style={{ color: colors.ink }}>Counts as (only you see this)</Text>
-            <View style={styles.chips} accessibilityRole="radiogroup">
-              {(Object.keys(givingKindLabels) as GivingKind[]).map((k) => {
-                const on = kind === k;
-                return (
-                  <Pressable key={k} onPress={() => { haptic.tap(); setKind(k); }} accessibilityRole="radio" accessibilityState={{ selected: on }} style={[styles.chip, on && styles.chipOn]}>
-                    <Text style={[styles.chipText, on && { color: colors.onInk }]}>{givingKindLabels[k]}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {err("giving_kind") ? <Text variant="label" style={{ color: colors.danger }}>{err("giving_kind")}</Text> : null}
-          </View>
+          <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
 
           {campaignId ? null : <SwitchRow label="Give every month" description="The same amount each month until you cancel." value={monthly} onChange={setMonthly} />}
           <SwitchRow

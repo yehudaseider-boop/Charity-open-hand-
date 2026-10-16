@@ -711,3 +711,11 @@ Yehuda decided the app should not be geared towards Jews only. Step 1 of 4:
 - The test database now has general causes (food and welfare, children and youth, education, health, animals, faith communities, elderly care, disability, housing, environment, disaster relief, arts and culture). The live database needs the same list (go-live checklist).
 
 Next: own labels instead of maaser/chomesh/tzedaka (step 2), a giving goal as a % of income or a fixed amount (step 3), big photo cards on Discover (step 4).
+
+## Own labels and giving goals (16/10/2026)
+
+Steps 2 and 3 of making Givezy for everyone:
+
+- **Labels instead of maaser / chomesh / tzedaka.** Each gift can carry the donor's own label ("Work giving", "Family"), optional and private to them, on the website's giving page, the app's give screen, the website hand-off sheet and "given elsewhere". One tap on a label used before; with the Jewish switch on, Maaser, Chomesh and Tzedaka are offered too. Old choices became labels ("Maaser", "Chomesh", "Tzedaka"); older app versions that still send the fixed choice keep working. Database: `label` columns on `donation_giving_kinds` and `external_giving_entries` (migration `20261016000008_giving_labels.sql`, applied to the test project). The tax pack totals by label.
+- **Giving goals replace the maaser target.** Up to three goals, each a set amount ("R12 000 a year") or a share of income ("10%", which is maaser), per month or per year (the SARS tax year; Rosh Hashana to Rosh Hashana with the Jewish switch on), counting all giving or only gifts with chosen labels. A share of income uses the income log, still kept on the phone only. Maaser and Chomesh are ready-made goals with the Jewish switch on, never the default. Goals stay on the phone; anyone's old maaser/chomesh targets carry over as goals.
+- The Giving tab shows each goal's progress and about how much a month is left; "This tax year in numbers" totals by label.

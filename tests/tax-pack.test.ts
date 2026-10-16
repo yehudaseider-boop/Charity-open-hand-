@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildTaxPack, parseTaxYear, type PackDonationRow } from "@/lib/tax-pack/build";
 
 const row = (over: Partial<PackDonationRow>): PackDonationRow => ({
-  id: "d1", paidAt: "2026-10-01T10:00:00Z", charityName: "Northcliff Meals Fund", amountCents: 50_000, wants18a: true, monthly: false, kind: "maaser", ...over,
+  id: "d1", paidAt: "2026-10-01T10:00:00Z", charityName: "Northcliff Meals Fund", amountCents: 50_000, wants18a: true, monthly: false, label: "Maaser", ...over,
 });
 
 describe("the annual tax pack", () => {
@@ -35,14 +35,14 @@ describe("the annual tax pack", () => {
     ]);
   });
 
-  it("lists donations oldest first and totals maaser, chomesh and general tzedaka", () => {
+  it("lists donations oldest first and totals the donor's own labels, whatever their case", () => {
     const pack = buildTaxPack(2027, [
-      row({ id: "late", paidAt: "2026-12-01T08:00:00Z", kind: "chomesh", amountCents: 7_000 }),
-      row({ id: "early", paidAt: "2026-04-01T08:00:00Z", kind: null, amountCents: 3_000 }),
-      row({ id: "mid", paidAt: "2026-08-01T08:00:00Z", kind: "nonsense", amountCents: 1_000 }),
+      row({ id: "late", paidAt: "2026-12-01T08:00:00Z", label: "Work giving", amountCents: 7_000 }),
+      row({ id: "early", paidAt: "2026-04-01T08:00:00Z", label: null, amountCents: 3_000 }),
+      row({ id: "mid", paidAt: "2026-08-01T08:00:00Z", label: "work GIVING ", amountCents: 1_000 }),
     ], []);
     expect(pack.lines.map((l) => l.id)).toEqual(["early", "mid", "late"]);
-    expect(pack.byKind).toEqual({ maaser: 0, chomesh: 7_000, tzedaka: 4_000 });
+    expect(pack.byLabel).toEqual([{ label: "work GIVING", cents: 8_000 }, { label: "No label", cents: 3_000 }]);
   });
 
   it("shows issued receipts only, and keeps a dedication only when it has words", () => {

@@ -49,13 +49,13 @@ describe("app giving helpers", () => {
 });
 
 describe("app hand-off to the website", () => {
-  it("opens the charity's donation page with the giving kind chosen in the app", () => {
-    expect(donateUrl("https://example.co.za", "northcliff-meals-fund", "chomesh")).toBe(
-      "https://example.co.za/c/northcliff-meals-fund/donate?kind=chomesh&from=app",
+  it("opens the charity's donation page with the donor's label carried over", () => {
+    expect(donateUrl("https://example.co.za", "northcliff-meals-fund", "Work giving")).toBe(
+      "https://example.co.za/c/northcliff-meals-fund/donate?label=Work%20giving&from=app",
     );
-    expect(donateUrl("https://example.co.za/", "a b", "maaser")).toBe("https://example.co.za/c/a%20b/donate?kind=maaser&from=app");
+    expect(donateUrl("https://example.co.za/", "a b", "Maaser")).toBe("https://example.co.za/c/a%20b/donate?label=Maaser&from=app");
   });
-  it("carries a campaign over, and leaves the giving kind for the donor when none was chosen", () => {
+  it("carries a campaign over, and no label when none was chosen", () => {
     expect(donateUrl("https://example.co.za", "a", null, "c0ffee00-0000-4000-8000-000000000001")).toBe(
       "https://example.co.za/c/a/donate?campaign=c0ffee00-0000-4000-8000-000000000001&from=app",
     );

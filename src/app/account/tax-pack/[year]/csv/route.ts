@@ -6,7 +6,6 @@ import { parseTaxYear } from "@/lib/tax-pack/build";
 import { loadTaxPack } from "@/lib/tax-pack/load";
 
 const HEADER = ["Date", "Charity", "Amount (R)", "s18A receipt asked for", "On an issued s18A receipt", "Counted as", "Monthly", "Dedication"];
-const kindLabel = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "General tzedaka" } as const;
 
 /** The signed-in donor's tax pack as a spreadsheet: one row per paid donation in the tax year. */
 export async function GET(_request: Request, ctx: RouteContext<"/account/tax-pack/[year]/csv">) {
@@ -17,7 +16,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/account/tax-pac
   const viewer = await requireViewer(`/account/tax-pack/${year}`);
 
   const pack = await loadTaxPack(viewer.userId, year);
-  const rows = (pack?.lines ?? []).map((l) => [formatDate(l.paidAt), l.charityName, centsToPlain(l.cents), l.s18a ? "Yes" : "No", l.receipted ? "Yes" : "No", kindLabel[l.kind], l.monthly ? "Yes" : "No", l.dedication ?? ""]);
+  const rows = (pack?.lines ?? []).map((l) => [formatDate(l.paidAt), l.charityName, centsToPlain(l.cents), l.s18a ? "Yes" : "No", l.receipted ? "Yes" : "No", l.label ?? "", l.monthly ? "Yes" : "No", l.dedication ?? ""]);
   return new NextResponse(toCsv(HEADER, rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

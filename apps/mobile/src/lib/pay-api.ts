@@ -27,7 +27,8 @@ export type DonorDetails = {
   /** Given in honour of, or in memory of, someone: the charity sees it, it is not on the s18A receipt. */
   dedication_kind?: "honour" | "memory";
   dedication_name?: string;
-  giving_kind: "maaser" | "chomesh" | "tzedaka";
+  /** The donor's own label for the gift, if any (private to them). */
+  giving_label?: string;
   is_anonymous?: boolean;
   monthly?: boolean;
   monthly_authorised?: boolean;
@@ -110,7 +111,7 @@ export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">): s
   return "We haven't had word of this payment yet. If you didn't finish paying, nothing was charged and you can try again. If you did, please wait for your confirmation email before giving again.";
 }
 
-type PastGift = { charitySlug: string; cents: number; date: Date; kind: string; monthly: boolean };
+type PastGift = { charitySlug: string; cents: number; date: Date; label: string | null; monthly: boolean };
 
 /**
  * One-tap amounts, taken only from the donor's own past gifts (we never suggest a figure of our
@@ -126,10 +127,10 @@ export function quickAmounts(gifts: PastGift[], slug: string, max = 3): number[]
   return out;
 }
 
-/** What the donor's last gift to this charity counted as, to start from. */
-export function lastKind(gifts: PastGift[], slug: string): "maaser" | "chomesh" | "tzedaka" | null {
+/** The label of the donor's last gift to this charity, to start from. */
+export function lastLabel(gifts: PastGift[], slug: string): string | null {
   const g = [...gifts].filter((x) => x.charitySlug === slug).sort((a, b) => b.date.getTime() - a.date.getTime())[0];
-  return g && (g.kind === "maaser" || g.kind === "chomesh" || g.kind === "tzedaka") ? g.kind : null;
+  return g?.label ?? null;
 }
 
 /** The donor's own details, kept on this phone only when they ask us to remember them. Never ID or tax numbers. */

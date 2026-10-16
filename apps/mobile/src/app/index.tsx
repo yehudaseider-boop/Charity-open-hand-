@@ -10,13 +10,13 @@ import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
 import { SkeletonBlock } from "@/components/states";
-import { TargetEditor } from "@/components/target-editor";
+import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
-import { ddmmyyyy } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
-import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
 import { useAccount } from "@/lib/account";
-import { saveTarget } from "@/lib/targets";
+import { saveGoals } from "@/lib/goals-store";
+import { useJewishMode } from "@/lib/jewish-mode";
+import { JEWISH_LABELS } from "@shared/donations/labels";
 import { notify } from "@/lib/open-site";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
 import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
@@ -36,6 +36,7 @@ const how = [
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
+  const jewish = useJewishMode();
   const account = useAccount();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
   const forced = p.welcome === "1";
@@ -67,8 +68,6 @@ export default function Welcome() {
     setStep((s) => Math.min(STEPS, s + 1));
   };
 
-  const now = new Date();
-  const hYear = hebrewYearFor(now);
 
   const skip =
     step < STEPS ? (
@@ -157,23 +156,23 @@ export default function Welcome() {
         ) : (
           <FadeUp key="target" style={{ gap: space.md }}>
             <Text variant="h1" accessibilityRole="header">
-              Keep track of your maaser.
+              Set a giving goal.
             </Text>
-            <Text variant="bodyMuted">Optional. Set a target and the app shows how much you have given towards it. You can change it any time on the Giving tab.</Text>
-            {/* Targets are saved per person, so wait until we know who is using the phone. */}
+            <Text variant="bodyMuted">Optional. Set a goal and the app shows how much you have given towards it. You can change it any time on the Giving tab.</Text>
+            {/* Goals are saved per person, so wait until we know who is using the phone. */}
             {account.status === "loading" || account.status === "agreeing" ? (
               <SkeletonBlock height={320} />
             ) : (
-            <TargetEditor
+            <GoalEditor
               initial={null}
-              title="Your target"
-              yearEnd={ddmmyyyy(givingYearRange(hYear).end)}
-              monthsLeft={monthsLeftInGivingYear(now, hYear)}
-              onSave={async (t) => {
+              title="Your goal"
+              labels={jewish ? [...JEWISH_LABELS] : []}
+              jewish={jewish}
+              onSave={async (g) => {
                 haptic.success();
-                const saved = await saveTarget(t, account.status === "signed-in" ? account.userId : null);
+                const saved = await saveGoals([g], account.status === "signed-in" ? account.userId : null);
                 if (!saved.ok) {
-                  notify("Your target was not saved", "It could not be saved on this phone. Please try again, or skip for now and set it later on the Giving tab.");
+                  notify("Your goal was not saved", "It could not be saved on this phone. Please try again, or skip for now and set it later on the Giving tab.");
                   return;
                 }
                 finish();

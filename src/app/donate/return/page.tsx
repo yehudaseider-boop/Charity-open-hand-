@@ -5,7 +5,7 @@ import { KeepChecking } from "./keep-checking";
 import { confirmPayment } from "@/lib/donations/confirm";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
-import { givingKinds } from "@/lib/donations/validation";
+import { labelOf } from "@/lib/donations/labels";
 import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
 import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -42,7 +42,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind), charities(name_en, slug)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind, label), charities(name_en, slug)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (await confirmationTokenMatches(ref, t)) {
@@ -52,13 +52,14 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     }
   }
   const charity = d?.charities as unknown as { name_en: string; slug: string } | undefined;
-  const kindRow = d?.donation_giving_kinds as unknown as { kind: string } | { kind: string }[] | null | undefined;
-  const givingKind = (Array.isArray(kindRow) ? kindRow[0] : kindRow)?.kind;
+  type LabelRow = { kind: string | null; label: string | null };
+  const kindRow = d?.donation_giving_kinds as unknown as LabelRow | LabelRow[] | null | undefined;
+  const givingLabel = labelOf(Array.isArray(kindRow) ? kindRow[0] : kindRow);
 
-  // Trying again from the phone app's sheet keeps the way back to the app and the giving choice.
+  // Trying again from the phone app's sheet keeps the way back to the app and the donor's label.
   const retryParams = new URLSearchParams();
   if (fromApp) retryParams.set("from", "app");
-  if (givingKind && givingKind in givingKinds) retryParams.set("kind", givingKind);
+  if (givingLabel) retryParams.set("label", givingLabel);
   // A campaign gift tries again for the same campaign (the donate page says if it has ended since).
   if (d?.campaign_id) retryParams.set("campaign", d.campaign_id);
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
@@ -81,9 +82,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           A confirmation is on its way to your email.{" "}
           {d.wants_18a ? "This donation will be on your annual s18A receipt after the tax year closes." : null}
         </p>
-        {givingKind && givingKind in givingKinds ? (
+        {givingLabel ? (
           <p className="mt-2 text-sm text-muted">
-            Counted as {givingKinds[givingKind as keyof typeof givingKinds].toLowerCase()} in your records.
+            Labelled &quot;{givingLabel}&quot; in your records.
           </p>
         ) : null}
         {fromApp ? (

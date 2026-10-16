@@ -5,7 +5,6 @@ import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
 import { TermsAndPrivacyLinks } from "@/components/legal";
 import { TextArea, TextField } from "@/components/forms/fields";
-import { givingKinds } from "@/lib/donations/validation";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
 
@@ -15,7 +14,8 @@ type Props = {
   receiptsAvailable: boolean;
   minimumLabel: string;
   contributionMinimumLabel: string;
-  initialKind?: keyof typeof givingKinds;
+  /** The label the donor chose in the app, carried over. */
+  initialLabel?: string;
   /** The donor came from the phone app, so the confirmation offers a way back to it. */
   fromApp: boolean;
   /** Giving to one of the charity's campaigns: once-off only. */
@@ -24,7 +24,7 @@ type Props = {
   account?: { email: string; savedIdLast4: string | null };
 };
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialKind, fromApp, campaign, account }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, contributionMinimumLabel, initialLabel, fromApp, campaign, account }: Props) {
   const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
@@ -111,7 +111,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           slug={slug}
           charityName={charityName}
           receiptsAvailable={receiptsAvailable}
-          initialKind={initialKind}
+          initialLabel={initialLabel}
           fromApp={fromApp}
           campaign={campaign}
           account={account}
@@ -146,9 +146,9 @@ function Check({ name, children, error }: { name: string; children: React.ReactN
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialKind, fromApp, campaign, account }: {
+function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialLabel, fromApp, campaign, account }: {
   slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
-  initialKind?: keyof typeof givingKinds; fromApp: boolean; campaign?: { id: string; title: string };
+  initialLabel?: string; fromApp: boolean; campaign?: { id: string; title: string };
   account?: { email: string; savedIdLast4: string | null };
 }) {
   // A signed-in donor can reuse the ID number from their last s18A gift. Only its last four digits
@@ -262,20 +262,13 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           </p>
         )}
 
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">This donation is from</legend>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(givingKinds).map(([value, label]) => (
-              <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
-                <input type="radio" name="giving_kind" value={value} required defaultChecked={value === initialKind} />
-                {label}
-              </label>
-            ))}
-          </div>
-          <p className="text-xs text-muted">Counts towards your maaser and chomesh in the Givezy app. Only you see this.</p>
-          <Info terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
-          {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
-        </fieldset>
+        <TextField
+          name="giving_label"
+          label="Your label (optional)"
+          defaultValue={initialLabel}
+          autoDirection
+          hint="Only you see it, in your giving records. For example: Work giving, Family, or Maaser."
+        />
 
         <Dedicate error={state.fieldErrors?.dedication_name} />
 
@@ -310,7 +303,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           </Check>
           <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
             I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my
-            donation. Givezy keeps my maaser, chomesh or tzedaka choice privately, for my own records.
+            donation. Givezy keeps any label I give it privately, for my own records.
           </Check>
         </div>
 

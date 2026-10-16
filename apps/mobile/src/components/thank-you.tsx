@@ -4,7 +4,6 @@ import { Animated, Modal, StyleSheet, View } from "react-native";
 import { gifts as sampleGifts, type Gift } from "@/data/giving";
 import { useAccount } from "@/lib/account";
 import { ddmmyyyy, rand } from "@/lib/format";
-import { givingKindLabels } from "@/lib/giving";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { colors, radius, space } from "@/theme/tokens";
@@ -54,7 +53,7 @@ export function ThankYou() {
           <Text variant="h1" style={{ fontSize: 30, lineHeight: 36, textAlign: "center" }}>Thank you</Text>
           {one ? (
             <Text style={styles.body}>
-              Your {rand(one.cents)} to {one.charityName} arrived on {ddmmyyyy(one.date)}. It counts as {givingKindLabels[one.kind].toLowerCase()}.
+              Your {rand(one.cents)} to {one.charityName} arrived on {ddmmyyyy(one.date)}.{one.label ? ` Labelled "${one.label}".` : ""}
             </Text>
           ) : (
             <Text style={styles.body}>{list.length} donations arrived, {rand(total)} in all. They are in your giving history.</Text>

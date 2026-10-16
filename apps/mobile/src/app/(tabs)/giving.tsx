@@ -11,31 +11,31 @@ import { MaaserProgress } from "@/components/maaser-progress";
 import { Sheet } from "@/components/sheet";
 import { EmptyState, ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
-import { InfoButton } from "@/components/info-button";
-import { TargetEditor, type Target } from "@/components/target-editor";
+import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
-import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleMaaserTarget, type Gift, type Recurring } from "@/data/giving";
+import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, jhbToday, rand } from "@/lib/format";
-import { byCharity, givingKindLabels, groupByMonth, inGivingYear, monthlyToReach, percentOf, sumOfKind } from "@/lib/giving";
-import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
+import { byCharity, groupByMonth, percentOf } from "@/lib/giving";
+import { goalProgress, knownLabels, MAX_GOALS, type Goal } from "@/lib/goals";
+import { loadGoals, saveGoals, setAsideGoals } from "@/lib/goals-store";
+import { useJewishMode } from "@/lib/jewish-mode";
+import { JEWISH_LABELS } from "@shared/donations/labels";
+import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
 import { useAccount } from "@/lib/account";
 import { loadIncome, saveIncome, startNewIncomeLog } from "@/lib/income-store";
-import { dateToIso, incomeBetween, isoToDate, owedFromIncome, type Elsewhere, type IncomeEntry } from "@/lib/ledger";
+import { isoToDate, type Elsewhere, type IncomeEntry } from "@/lib/ledger";
 import { useScreenState } from "@/lib/screen-state";
 import { useDirectory } from "@/lib/directory";
 import { savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
 import { confirmThen, notify } from "@/lib/open-site";
-import { loadTarget, saveTarget, setAsideTarget } from "@/lib/targets";
 import { RecordProblem } from "@/components/record-problem";
 import { useStoredRecord } from "@/lib/use-stored-record";
 import type { SaveResult } from "@/lib/stored-result";
 import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 
-const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-/** Screen 7: Giving, with maaser. */
+/** Screen 7: Giving, with the donor's goals. */
 export default function Giving() {
   const insets = useSafeAreaInsets();
   const account = useAccount();
@@ -54,25 +54,32 @@ export default function Giving() {
           : "ready";
   const p = useLocalSearchParams<{ demo?: string; sheet?: string }>();
   const newDonor = preview ? demoState === "empty" : !signedIn;
-  const previewTarget = !preview || newDonor || p.demo === "first" ? null : sampleMaaserTarget;
-  // Targets are personal and stay on this phone (in its secure storage), never on our servers.
-  // Each person has their own targets and income log on the phone; wait until we know who it is.
+  const previewGoals = !preview || newDonor || p.demo === "first" ? noGoals : sampleGoals;
+  const jewish = useJewishMode();
+  // Goals are personal and stay on this phone (in its secure storage), never on our servers.
+  // Each person has their own goals and income log on the phone; wait until we know who it is.
   const owner = signedIn ? account.userId : null;
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   // A record that could not be read is never treated as empty: nothing is saved over it until it
   // has loaded, or the person chooses to start again (the old text is kept aside).
-  const targetRecord = useStoredRecord<Target | null>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadTarget, initial: previewTarget });
-  const target = targetRecord.value;
-  const targetLoaded = targetRecord.status === "ready";
-  const targetProblem = targetRecord.reason;
+  const goalsRecord = useStoredRecord<Goal[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadGoals, initial: previewGoals });
+  const goals = goalsRecord.value;
+  const goalsLoaded = goalsRecord.status === "ready";
+  const goalsProblem = goalsRecord.reason;
   // A failed save belongs to the person it was for: someone else signing in never sees it.
-  const [targetSaveFailedFor, setTargetSaveFailedFor] = useState<{ owner: string | null } | null>(null);
-  const targetSaveFailed = targetSaveFailedFor !== null && targetSaveFailedFor.owner === owner;
-  const persistTarget = async (t: Target, forOwner: string | null) => {
-    const r = await saveTarget(t, forOwner);
-    setTargetSaveFailedFor(r.ok ? null : { owner: forOwner });
+  const [goalsSaveFailedFor, setGoalsSaveFailedFor] = useState<{ owner: string | null } | null>(null);
+  const goalsSaveFailed = goalsSaveFailedFor !== null && goalsSaveFailedFor.owner === owner;
+  const persistGoals = async (g: Goal[], forOwner: string | null) => {
+    const r = await saveGoals(g, forOwner);
+    setGoalsSaveFailedFor(r.ok ? null : { owner: forOwner });
   };
-  // Income (for maaser) stays on this phone only. Nothing is logged until the saved log has loaded.
+  const putGoals = (next: Goal[]) => {
+    goalsRecord.setValue(next);
+    if (!preview) void persistGoals(next, owner);
+    setEditing(null);
+    setSaved(true);
+  };
+  // Income (for a goal set as a share of income) stays on this phone only. Nothing is logged until the saved log has loaded.
   const incomeRecord = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
   const income = incomeRecord.value;
   const incomeReady = incomeRecord.status === "ready";
@@ -97,7 +104,8 @@ export default function Giving() {
   const [logging, setLogging] = useState<"income" | "elsewhere" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [recurringError, setRecurringError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
+  // Which goal is open in the editor: its id, "new", or none.
+  const [editing, setEditing] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [sampleRecurringState, setRecurring] = useState<Recurring[]>(newDonor ? [] : sampleRecurring);
   const recurring = preview ? sampleRecurringState : (account.live?.recurring ?? []);
@@ -105,47 +113,25 @@ export default function Giving() {
 
   const directory = useDirectory();
   const savedList = savedCharities(useSaved().slugs, directory.data?.charities ?? []);
-  // Today as a Johannesburg calendar day: months and the giving year follow South African dates.
+  // Today as a Johannesburg calendar day: months and years follow South African dates.
   const now = jhbToday();
-  const hYear = hebrewYearFor(now);
-  const { start: yearStart, end: yearEndDate } = givingYearRange(hYear);
-  const yearEnd = ddmmyyyy(yearEndDate);
-  const yearLabel = `Rosh Hashana ${hYear}: ${ddmmyyyy(yearStart)} to ${yearEnd}`;
+  const taxYear = taxYearFor(now);
   const myGifts = preview ? (newDonor ? [] : gifts) : (account.live?.gifts ?? []);
   const elsewhere: Elsewhere[] = preview ? previewElsewhere : (account.live?.elsewhere ?? []);
-  const yearGifts = inGivingYear(myGifts, hYear);
+  // "This year in numbers" follows the SARS tax year, like the receipts.
+  const yearGifts = myGifts.filter((g) => taxYearFor(g.date) === taxYear);
   const giftsTotal = yearGifts.reduce((t, g) => t + g.cents, 0);
-  // The whole calendar month, even the days before Rosh Hashana, as for income and giving elsewhere.
   const monthGifts = myGifts.filter((g) => g.date.getMonth() === now.getMonth() && g.date.getFullYear() === now.getFullYear());
   const monthTotal = monthGifts.reduce((t, g) => t + g.cents, 0);
   const charities = byCharity(yearGifts);
   const with18a = yearGifts.filter((g) => g.with18a).reduce((t, g) => t + g.cents, 0);
-  const monthsLeft = monthsLeftInGivingYear(now, hYear);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const stop = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const inMonth = <T extends { date: Date }>(rows: T[]) => rows.filter((r) => r.date >= monthStart && r.date < stop);
-  const byMonth = target?.period === "month";
-  // Gifts and "given elsewhere" entries in the target's period, each marked maaser, chomesh or general tzedaka.
-  const periodRows = [
-    ...(byMonth ? monthGifts : yearGifts),
-    ...(byMonth ? inMonth(elsewhere) : inGivingYear(elsewhere, hYear)),
-  ];
-  const maaserGiven = sumOfKind(periodRows, "maaser");
-  const chomeshGiven = sumOfKind(periodRows, "chomesh");
-  const tzedakaGiven = sumOfKind(periodRows, "tzedaka");
-  const periodEnd = byMonth ? ddmmyyyy(monthEndDate) : yearEnd;
-  const periodLabel = byMonth ? `${monthNames[now.getMonth()]} ${now.getFullYear()}` : yearLabel;
-  const maaserLeft = target === null ? 0 : Math.max(0, target.maaserCents - maaserGiven);
-  const chomeshLeft = target?.chomeshCents ? Math.max(0, target.chomeshCents - chomeshGiven) : 0;
-  const remaining = maaserLeft + chomeshLeft;
+  // Everything that can count towards a goal: donations through Givezy and giving logged elsewhere.
+  const goalRows = [...myGifts, ...elsewhere];
+  const labels = knownLabels(goalRows, jewish ? JEWISH_LABELS : []);
+  const byLabel = labelTotals(yearGifts);
   const [openGift, setOpenGift] = useState<Gift | null>(null);
+  const usesIncome = goals.some((g) => g.basis === "income");
 
-  // Income logged in the target's period: a tenth is maaser, and a further tenth chomesh if kept.
-  const periodFrom = byMonth ? dateToIso(monthStart) : dateToIso(yearStart);
-  const periodTo = byMonth ? dateToIso(monthEndDate) : dateToIso(yearEndDate);
-  const periodIncome = incomeBetween(income, periodFrom, periodTo);
-  const owed = owedFromIncome(periodIncome, Boolean(target?.chomeshCents));
   const addIncome = (e: { cents: number; date: string; note: string }) => {
     if (!incomeReady) return;
     const next = [{ id: newEntryId(), ...e }, ...income].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
@@ -175,9 +161,9 @@ export default function Giving() {
     setRecurringError(r.ok ? null : r.message);
     if (r.ok) setOpen(null);
   };
-  const saveElsewhere = async (e: { cents: number; date: string; recipient: string; kind: "maaser" | "chomesh" | "tzedaka" }): Promise<string | null> => {
+  const saveElsewhere = async (e: { cents: number; date: string; recipient: string; label: string | null }): Promise<string | null> => {
     if (preview) {
-      setPreviewElsewhere((rows) => [{ id: `p${Date.now()}`, date: isoToDate(e.date), recipient: e.recipient, cents: e.cents, kind: e.kind }, ...rows]);
+      setPreviewElsewhere((rows) => [{ id: `p${Date.now()}`, date: isoToDate(e.date), recipient: e.recipient, cents: e.cents, label: e.label }, ...rows]);
       setLogging(null);
       return null;
     }
@@ -215,141 +201,90 @@ export default function Giving() {
             {account.status === "signed-out" ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
-                <Text variant="bodyMuted">Sign in with the email you give with. Every donation shows up here, and counts towards your maaser and chomesh.</Text>
+                <Text variant="bodyMuted">Sign in with the email you give with. Every donation shows up here, and counts towards your giving goal.</Text>
                 <Button label="Sign in" onPress={() => router.push("/account")} />
               </View>
             ) : null}
-            {targetSaveFailed && target ? (
+            {goalsSaveFailed ? (
               <RecordProblem
-                title="Your targets are not saved yet"
+                title="Your goals are not saved yet"
                 body="They show here, but could not be saved on this phone, so they would be lost when the app closes. Please try saving again."
                 retryLabel="Try saving again"
-                onRetry={() => void persistTarget(target, owner)}
+                onRetry={() => void persistGoals(goals, owner)}
               />
             ) : null}
-            {targetProblem ? (
+            {goalsProblem ? (
               <RecordProblem
-                title="We couldn't open your targets"
+                title="We couldn't open your goals"
                 body={
-                  targetProblem === "unreadable"
-                    ? "Your targets are still saved on this phone. Nothing has been changed. Please try again."
-                    : "The saved targets on this phone can't be read. Nothing has been changed yet. You can try again, or set the old ones aside and enter new targets (the old ones are kept on this phone)."
+                  goalsProblem === "unreadable"
+                    ? "Your goals are still saved on this phone. Nothing has been changed. Please try again."
+                    : "The saved goals on this phone can't be read. Nothing has been changed yet. You can try again, or set the old ones aside and set new goals (the old ones are kept on this phone)."
                 }
-                onRetry={targetRecord.retry}
-                secondaryLabel={targetProblem === "corrupt" ? "Set the old targets aside and start again" : undefined}
-                onSecondary={() => confirmThen("Start new targets?", "The old targets are kept aside on this phone, and you can enter new ones.", "Start again", () => void startAgain(() => setAsideTarget(owner), targetRecord.retry, "targets"))}
+                onRetry={goalsRecord.retry}
+                secondaryLabel={goalsProblem === "corrupt" ? "Set the old goals aside and start again" : undefined}
+                onSecondary={() => confirmThen("Start new goals?", "The old goals are kept aside on this phone, and you can set new ones.", "Start again", () => void startAgain(() => setAsideGoals(owner), goalsRecord.retry, "goals"))}
               />
             ) : account.status === "agreeing" ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>One more step</Text>
-                <Text variant="bodyMuted">Agree to the Terms and Privacy Policy on the Account tab, and your giving and targets appear here.</Text>
+                <Text variant="bodyMuted">Agree to the Terms and Privacy Policy on the Account tab, and your giving and goals appear here.</Text>
                 <Button label="Go to Account" onPress={() => router.push("/account")} />
               </View>
-            ) : !targetLoaded ? (
+            ) : !goalsLoaded ? (
               <SkeletonBlock height={190} />
-            ) : target === null || editing ? (
-              <TargetEditor
-                initial={target}
-                yearEnd={yearEnd}
-                monthsLeft={monthsLeft}
-                onSave={(t) => {
-                  targetRecord.setValue(t);
-                  if (!preview) void persistTarget(t, owner);
-                  setEditing(false);
-                  setSaved(true);
-                }}
-                onCancel={target ? () => setEditing(false) : undefined}
+            ) : editing !== null ? (
+              <GoalEditor
+                initial={goals.find((g) => g.id === editing) ?? null}
+                labels={labels}
+                jewish={jewish}
+                onSave={(g) => putGoals(goals.some((x) => x.id === g.id) ? goals.map((x) => (x.id === g.id ? g : x)) : [...goals, g].slice(0, MAX_GOALS))}
+                onCancel={() => setEditing(null)}
+                onRemove={goals.some((g) => g.id === editing) ? () => confirmThen("Remove this goal?", "Your giving stays as it is. Only the goal goes.", "Remove", () => putGoals(goals.filter((g) => g.id !== editing))) : undefined}
               />
-            ) : (
-              <View style={{ gap: 22 }}>
-                <MaaserProgress title="Maaser" givenCents={maaserGiven} targetCents={target.maaserCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} />
-                {target.chomeshCents ? (
-                  <MaaserProgress title="Chomesh" givenCents={chomeshGiven} targetCents={target.chomeshCents} period={target.period} periodLabel={periodLabel} endLabel={periodEnd} compact />
-                ) : null}
-              <View style={styles.strip}>
-                {remaining > 0 ? (
-                  <>
-                    <Text style={styles.stripKicker}>Still to give</Text>
-                    <Text variant="amount" style={{ fontSize: 34, lineHeight: 38 }}>{rand(remaining)}</Text>
-                    <Text style={{ fontSize: 16, lineHeight: 23, color: colors.ink }}>
-                      {target.chomeshCents ? `${rand(maaserLeft)} maaser and ${rand(chomeshLeft)} chomesh, ` : ""}
-                      {byMonth
-                        ? `still to give by ${periodEnd}, the end of this month.`
-                        : `still to give by ${yearEnd}. About ${rand(monthlyToReach(remaining, monthsLeft))} a month over the ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left.`}
-                    </Text>
-                    <TextLink label="Find a charity" onPress={() => router.push("/discover")} />
-                  </>
-                ) : (
-                  <View style={{ gap: 4 }}>
-                    <Text style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.display, color: colors.blue }}>
-                      You&apos;ve given your {target.chomeshCents ? "maaser and chomesh" : "maaser"} for this {target.period}.
-                    </Text>
-                    <Text style={{ fontSize: 16, lineHeight: 24, color: colors.ink }}>Tizku l&apos;mitzvos.</Text>
-                  </View>
-                )}
+            ) : goals.length === 0 ? (
+              <View style={styles.card}>
+                <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Set a giving goal</Text>
+                <Text variant="bodyMuted">A set amount, like R12 000 a year, or a share of your income, like 10%. See how you&apos;re doing as you give. Only you see it.</Text>
+                <Button label="Set a goal" onPress={() => { setSaved(false); setEditing("new"); }} />
               </View>
-                <View style={styles.tzedakaRow}>
-                  <Text style={{ flexShrink: 1, fontSize: 16 }}>General tzedaka this {target.period}</Text>
-                  <View style={{ flex: 1 }}><InfoButton terms={["generalTzedaka"]} /></View>
-                  <Text style={{ fontSize: 16, fontFamily: fonts.bodySemibold }}>{rand(tzedakaGiven)}</Text>
-                </View>
+            ) : (
+              <View style={{ gap: 26 }}>
+                {goals.map((g, i) => {
+                  const pr = goalProgress(g, goalRows, income, now);
+                  return (
+                    <View key={g.id} style={{ gap: 10 }}>
+                      {pr.targetCents === null ? (
+                        <View style={{ gap: 6 }}>
+                          <Text style={styles.stripKicker}>{g.name} · {pr.window.label}</Text>
+                          <Text variant="amount" style={{ fontSize: 34, lineHeight: 38 }}>{rand(pr.givenCents)} given</Text>
+                          <Text variant="bodyMuted">This goal is a share of your income. Log your income below and we work out the amount.</Text>
+                        </View>
+                      ) : (
+                        <MaaserProgress title={g.name} givenCents={pr.givenCents} targetCents={pr.targetCents} period={g.period} periodLabel={pr.window.label} endLabel={pr.window.endLabel} compact={i > 0} />
+                      )}
+                      {pr.perMonthCents > 0 ? (
+                        <Text variant="bodyMuted">About {rand(pr.perMonthCents)} a month over the {pr.window.monthsLeft} {pr.window.monthsLeft === 1 ? "month" : "months"} left.</Text>
+                      ) : null}
+                      <Text variant="label">{g.counts ? `Counts gifts labelled ${g.counts.join(", ")}.` : "Counts all your giving, including giving you logged elsewhere."}</Text>
+                      <TextLink label="Change" onPress={() => { setSaved(false); setEditing(g.id); }} />
+                    </View>
+                  );
+                })}
                 {saved ? (
-                  <Text variant="label" style={{ paddingHorizontal: 4, color: colors.successText }} accessibilityLiveRegion="polite">
-                    Targets saved.
-                  </Text>
+                  <Text variant="label" style={{ paddingHorizontal: 4, color: colors.successText }} accessibilityLiveRegion="polite">Goal saved.</Text>
                 ) : null}
-                <Text variant="label" style={{ paddingHorizontal: 4 }}>
-                  General tzedaka doesn&apos;t count towards maaser or chomesh. Includes donations you logged as given elsewhere. Only you see your targets.
-                </Text>
-                <TextLink label="Change targets" onPress={() => { setSaved(false); setEditing(true); }} />
+                {goals.length < MAX_GOALS ? <TextLink label="Add another goal" onPress={() => { setSaved(false); setEditing("new"); }} /> : null}
+                <TextLink label="Find a charity" onPress={() => router.push("/discover")} />
               </View>
             )}
-
 
             {/* Your records: income (kept on this phone) and giving made elsewhere. */}
             {preview || signedIn ? (
               <View style={{ gap: 12 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <Text variant="h2" style={styles.heading}>Your records</Text>
-                  <InfoButton terms={["maaser", "chomesh", "generalTzedaka", "givingYear"]} label="maaser, chomesh and the giving year" />
-                </View>
-                {income.length > 0 && target !== null ? (
-                  <View style={styles.card}>
-                    <Text variant="label">Owed from your income, {byMonth ? "this month" : "this giving year"}</Text>
-                    <Text variant="bodyMuted">You logged {rand(periodIncome)}. A tenth is maaser{target.chomeshCents ? ", and a further tenth is chomesh" : ""}.</Text>
-                    <View style={styles.list}>
-                      <View style={styles.row}>
-                        <Text style={{ flex: 1, fontSize: 17 }}>Maaser owed</Text>
-                        <Text style={{ fontSize: 17 }}>{rand(owed.maaserCents)}</Text>
-                      </View>
-                      <View style={[styles.row, styles.divider]}>
-                        <Text style={{ flex: 1, fontSize: 17 }}>Maaser given</Text>
-                        <Text style={{ fontSize: 17 }}>{rand(maaserGiven)}</Text>
-                      </View>
-                      <View style={[styles.row, styles.divider]}>
-                        <Text style={{ flex: 1, fontSize: 17, fontFamily: fonts.bodySemibold }}>Maaser still to give</Text>
-                        <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{rand(Math.max(0, owed.maaserCents - maaserGiven))}</Text>
-                      </View>
-                      {target.chomeshCents ? (
-                        <>
-                          <View style={[styles.row, styles.divider]}>
-                            <Text style={{ flex: 1, fontSize: 17 }}>Chomesh owed</Text>
-                            <Text style={{ fontSize: 17 }}>{rand(owed.chomeshCents)}</Text>
-                          </View>
-                          <View style={[styles.row, styles.divider]}>
-                            <Text style={{ flex: 1, fontSize: 17 }}>Chomesh given</Text>
-                            <Text style={{ fontSize: 17 }}>{rand(chomeshGiven)}</Text>
-                          </View>
-                          <View style={[styles.row, styles.divider]}>
-                            <Text style={{ flex: 1, fontSize: 17, fontFamily: fonts.bodySemibold }}>Chomesh still to give</Text>
-                            <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{rand(Math.max(0, owed.chomeshCents - chomeshGiven))}</Text>
-                          </View>
-                        </>
-                      ) : null}
-                    </View>
-                  </View>
-                ) : income.length > 0 ? (
-                  <Text variant="bodyMuted">Set a maaser target above to see what your income means for maaser.</Text>
+                <Text variant="h2" style={styles.heading}>Your records</Text>
+                {usesIncome && income.length === 0 ? (
+                  <Text variant="bodyMuted">Log your income so a goal set as a share of income can work out its amount.</Text>
                 ) : null}
 
                 {incomeProblem ? (
@@ -410,19 +345,19 @@ export default function Giving() {
                           onAccessibilityAction={(ev) => ev.nativeEvent.actionName === "delete" && confirmRemove("entry", () => removeElsewhereEntry(e.id))}
                           accessibilityRole="button"
                           accessibilityHint="Press and hold to remove"
-                          accessibilityLabel={`${e.recipient}, ${rand(e.cents)}, ${ddmmyyyy(e.date)}, ${givingKindLabels[e.kind]}`}
+                          accessibilityLabel={`${e.recipient}, ${rand(e.cents)}, ${ddmmyyyy(e.date)}${e.label ? `, ${e.label}` : ""}`}
                           style={[styles.row, i > 0 && styles.divider]}
                         >
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{e.recipient}</Text>
-                            <Text variant="bodyMuted" style={{ fontSize: 16 }}>{ddmmyyyy(e.date)} · {givingKindLabels[e.kind]}</Text>
+                            <Text variant="bodyMuted" style={{ fontSize: 16 }}>{ddmmyyyy(e.date)}{e.label ? ` · ${e.label}` : ""}</Text>
                           </View>
                           <Text style={{ fontSize: 17 }}>{rand(e.cents)}</Text>
                         </Pressable>
                       ))}
                     </View>
                     {elsewhere.length > 12 && !showAllElsewhere ? <TextLink label={`Show all ${elsewhere.length}`} onPress={() => setShowAllElsewhere(true)} /> : null}
-                    <Text variant="label">These count towards your maaser and chomesh. Press and hold an entry to remove it.</Text>
+                    <Text variant="label">These count towards your goals. Press and hold an entry to remove it.</Text>
                   </View>
                 ) : null}
               </View>
@@ -430,11 +365,11 @@ export default function Giving() {
 
             {myGifts.length > 0 ? (
               <View style={{ gap: 12 }}>
-                <Text variant="h2" style={styles.heading}>This year in numbers</Text>
+                <Text variant="h2" style={styles.heading}>This tax year in numbers</Text>
+                <Text variant="label">{taxYearRangeLabel(taxYear)}</Text>
                 <Text style={styles.summary}>
-                  This year you gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}.
+                  You gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}.
                 </Text>
-                {/* The month can include days before Rosh Hashana, so it is its own line, not "part of" the year. */}
                 {monthTotal > 0 ? <Text variant="bodyMuted">This month so far: {rand(monthTotal)}.</Text> : null}
                 {charities.length > 0 ? (
                   <View style={styles.list}>
@@ -462,15 +397,17 @@ export default function Giving() {
                     <Text style={{ fontSize: 17 }}>{rand(giftsTotal - with18a)}</Text>
                   </View>
                 </View>
-                <View style={styles.list}>
-                  {(["maaser", "chomesh", "tzedaka"] as const).map((k, i) => (
-                    <View key={k} style={[styles.row, i > 0 && styles.divider]}>
-                      <View style={[styles.dot, { backgroundColor: kindColour[k] }]} />
-                      <Text style={{ flex: 1, fontSize: 17 }}>{givingKindLabels[k]}</Text>
-                      <Text style={{ fontSize: 17 }}>{rand(sumOfKind(yearGifts, k))}</Text>
-                    </View>
-                  ))}
-                </View>
+                {byLabel.some((l) => l.label !== null) ? (
+                  <View style={styles.list}>
+                    {byLabel.map((l, i) => (
+                      <View key={l.label ?? "none"} style={[styles.row, i > 0 && styles.divider]}>
+                        <View style={[styles.dot, { backgroundColor: labelColour(l.label) }]} />
+                        <Text style={{ flex: 1, fontSize: 17 }}>{l.label ?? "No label"}</Text>
+                        <Text style={{ fontSize: 17 }}>{rand(l.cents)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             ) : null}
 
@@ -513,7 +450,7 @@ export default function Giving() {
             <View style={{ gap: 16 }}>
               <Text variant="h2" style={styles.heading}>History</Text>
               {myGifts.length === 0 ? (
-                <EmptyState title="No donations yet" body="Donations you make on our website appear here once the payment goes through, and count towards your maaser." action={{ label: "Find a charity", onPress: () => router.push("/discover") }} />
+                <EmptyState title="No donations yet" body="Donations you make appear here once the payment goes through, and count towards your goals." action={{ label: "Find a charity", onPress: () => router.push("/discover") }} />
               ) : (
                 groupByMonth(myGifts).map((g, gi) => (
                   <FadeUp key={g.label} index={gi} style={{ gap: 6 }}>
@@ -521,11 +458,11 @@ export default function Giving() {
                     <View style={styles.list}>
                       {g.rows.map((gift, i) => (
                         <Pressable key={gift.id} onPress={() => setOpenGift(gift)} accessibilityRole="button" accessibilityLabel={`${gift.charityName}, ${rand(gift.cents)}, ${ddmmyyyy(gift.date)}`} style={[styles.row, i > 0 && styles.divider]}>
-                          <View style={[styles.dot, { backgroundColor: kindColour[gift.kind] }]} />
+                          <View style={[styles.dot, { backgroundColor: labelColour(gift.label) }]} />
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
                             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                              {ddmmyyyy(gift.date)} · {givingKindLabels[gift.kind]}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No s18A"}
+                              {ddmmyyyy(gift.date)}{gift.label ? ` · ${gift.label}` : ""}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No s18A"}
                             </Text>
                           </View>
                           <Text style={{ fontSize: 17 }}>{rand(gift.cents)}</Text>
@@ -630,7 +567,7 @@ export default function Giving() {
             </View>
             <View style={styles.list}>
               <DetailRow label="Date" value={ddmmyyyy(openGift.date)} />
-              <DetailRow label="Counted as" value={givingKindLabels[openGift.kind]} divider />
+              <DetailRow label="Label" value={openGift.label ?? "None"} divider />
               <DetailRow label="Type" value={openGift.monthly ? "Monthly" : "Once-off"} divider />
               <DetailRow label="s18A receipt" value={openGift.with18a ? "Yes" : "No"} divider />
             </View>
@@ -651,9 +588,28 @@ function DetailRow({ label, value, divider }: { label: string; value: string; di
   );
 }
 
-/** Each kind of giving keeps one colour everywhere: maaser blue, chomesh orange, tzedaka lilac. */
-const kindColour = { maaser: colors.blue, chomesh: colors.orange, tzedaka: colors.lilac } as const;
+/** Each label keeps one colour everywhere (picked from the label's letters); no label is grey. */
+const PALETTE = [colors.blue, colors.orange, colors.lilac, colors.sage];
+function labelColour(label: string | null): string {
+  if (!label) return colors.hairline;
+  let h = 0;
+  for (const ch of label.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
 
+/** Totals by label, largest first; gifts without one under null. Same label whatever the case. */
+function labelTotals(rows: { cents: number; label: string | null }[]): { label: string | null; cents: number }[] {
+  const m = new Map<string, { label: string | null; cents: number }>();
+  for (const r of rows) {
+    const key = r.label ? r.label.toLowerCase() : "";
+    const t = m.get(key) ?? { label: r.label, cents: 0 };
+    t.cents += r.cents;
+    m.set(key, t);
+  }
+  return [...m.values()].sort((a, b) => b.cents - a.cents);
+}
+
+const noGoals: Goal[] = [];
 const noIncome: IncomeEntry[] = [];
 const newEntryId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 

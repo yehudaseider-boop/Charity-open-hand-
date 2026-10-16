@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
 import { issueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
-import { checkDonorDetails, type CheckoutInput } from "./validation";
+import { checkDonorDetails, givingLabelOf, type CheckoutInput } from "./validation";
 import { parseDedication } from "./dedication";
 
 export type Quote = Pricing;
@@ -223,10 +223,13 @@ export async function startDonation(args: {
     if (auth.error) throw auth.error;
   }
 
-  // The donor's own choice (maaser, chomesh or general tzedaka). Kept in a table
-  // only the donor can read: charities never see it.
-  const kind = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: v.giving_kind });
-  if (kind.error) throw kind.error;
+  // The donor's own label for the gift, if they gave one. Kept in a table only the donor
+  // can read: charities never see it.
+  const label = givingLabelOf(v);
+  if (label) {
+    const kept = await db.from("donation_giving_kinds").insert({ donation_id: donationId, label });
+    if (kept.error) throw kept.error;
+  }
 
   // Sent only to the donor, in the address the gateway returns them to.
   const confirmationToken = await issueConfirmationToken(donationId);

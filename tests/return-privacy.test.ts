@@ -16,7 +16,7 @@ const row = {
   total_charged_cents: 20_345,
   paid_at: "2026-10-11T10:00:00Z",
   wants_18a: true,
-  donation_giving_kinds: { kind: "maaser" },
+  donation_giving_kinds: { kind: null, label: "Maaser" },
   charities: { name_en: "Northcliff Meals Fund", slug: "northcliff-meals-fund" },
 };
 
@@ -49,7 +49,7 @@ async function page(search: Record<string, string | string[]>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ reference: ID, ...search }) } as any));
 }
-const privateBits = [/R23\.45/, /Contribution to Givezy/, /maaser/i, /Counted as/, /R180/, /NL-3F9A2C71/];
+const privateBits = [/R23\.45/, /Contribution to Givezy/, /maaser/i, /Labelled/, /R180/, /NL-3F9A2C71/];
 
 beforeEach(() => {
   outcome = "paid";
@@ -83,7 +83,7 @@ describe("confirmation page privacy", () => {
     sessionRow = row;
     const html = await page({});
     expect(html).toContain("R23.45");
-    expect(html).toContain("Counted as maaser");
+    expect(html).toContain("Labelled &quot;Maaser&quot;");
   });
 
   it("a guest with the credential from their payment link sees their confirmation", async () => {
@@ -133,7 +133,7 @@ describe("trying again", () => {
     outcome = "failed";
     sessionRow = { ...row, campaign_id: "c0ffee00-0000-4000-8000-000000000001" } as typeof row;
     const html = await page({});
-    expect(html).toContain('href="/c/northcliff-meals-fund/donate?kind=maaser&amp;campaign=c0ffee00-0000-4000-8000-000000000001"');
+    expect(html).toContain('href="/c/northcliff-meals-fund/donate?label=Maaser&amp;campaign=c0ffee00-0000-4000-8000-000000000001"');
   });
 });
 

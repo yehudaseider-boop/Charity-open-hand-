@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { isValidSaIdNumber } from "@/lib/sa-id";
 import { parseDedication } from "./dedication";
+import { cleanLabel } from "./labels";
 
 const str = (max = 200) => z.string().max(max).optional();
 const yes = z.literal("on").optional();
 
-/** What a gift is counted as in the donor's own records. The donor must choose; there is no default. */
-export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "General tzedaka" } as const;
+/** The old fixed choice, still accepted from older app versions and links (read as a label). */
+export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "Tzedaka" } as const;
 
 /** Checkout form, as sent. Cross-field rules are applied in checkDonorDetails. */
 export const checkoutSchema = z.object({
@@ -30,7 +31,10 @@ export const checkoutSchema = z.object({
   /** Optional: given in honour of, or in memory of, someone (the name is checked in checkDonorDetails). */
   dedication_kind: z.enum(["none", "honour", "memory"]).optional(),
   dedication_name: str(200),
-  giving_kind: z.enum(["maaser", "chomesh", "tzedaka"], { error: "Choose maaser, chomesh or general tzedaka" }),
+  /** The donor's own label for this gift, optional and private to them ("Work giving", "Maaser"). */
+  giving_label: z.string().max(80).optional(),
+  /** Older app versions send the fixed choice instead; it becomes the label. */
+  giving_kind: z.enum(["maaser", "chomesh", "tzedaka"]).optional(),
   is_anonymous: yes,
   /** Give this amount every month until the donor cancels. */
   monthly: yes,
@@ -77,4 +81,9 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
 
 export function cleanPhone(v: string | undefined) {
   return v?.replace(/[\s()-]/g, "") || undefined;
+}
+
+/** The label to keep with a gift: what the donor typed, else an older app's fixed choice. */
+export function givingLabelOf(v: Pick<CheckoutInput, "giving_label" | "giving_kind">): string | null {
+  return cleanLabel(v.giving_label) ?? (v.giving_kind ? givingKinds[v.giving_kind] : null);
 }

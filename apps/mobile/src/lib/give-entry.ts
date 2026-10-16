@@ -10,6 +10,6 @@ import { SITE_URL } from "./website";
  */
 export const GIVE_IN_APP = (IN_APP_GIVING && Boolean(SITE_URL)) || supabase === null;
 
-export function openGiveScreen(slug: string, extra: { kind?: string; campaign?: string } = {}) {
+export function openGiveScreen(slug: string, extra: { label?: string; campaign?: string } = {}) {
   router.push({ pathname: "/give/[slug]", params: { slug, ...extra } });
 }

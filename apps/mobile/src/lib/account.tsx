@@ -2,7 +2,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { POLICY_VERSION } from "@shared/policy";
-import type { Gift, GivingKind, Receipt, Recurring } from "@/data/giving";
+import type { Gift, Receipt, Recurring } from "@/data/giving";
 import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
 import { cacheKey, forgetGivingCache, writeGivingCache } from "./giving-cache";
 import { secureStorage } from "./secure-storage";
@@ -44,7 +44,7 @@ type AccountValue = {
   agree(): Promise<{ ok: true } | { ok: false; message: string }>;
   refresh(): Promise<void>;
   signOut(): Promise<void>;
-  addElsewhere(e: { cents: number; date: string; recipient: string; kind: GivingKind }): Promise<Result>;
+  addElsewhere(e: { cents: number; date: string; recipient: string; label: string | null }): Promise<Result>;
   removeElsewhere(id: string): Promise<Result>;
   setRecurringStatus(id: string, status: "active" | "paused" | "cancelled"): Promise<Result>;
 };
@@ -78,17 +78,17 @@ async function loadLive(userId: string): Promise<Live> {
   const donorIds = (donors ?? []).map((d) => d.id as string);
   // Giving logged by hand belongs to the account itself, not to a donor record.
   const elsewhere = await allPages<ElsewhereRow>((a, b) =>
-    db.from("external_giving_entries").select("id, entry_date, recipient_text, amount_cents, kind").eq("user_id", userId).order("entry_date", { ascending: false }).order("id").range(a, b),
+    db.from("external_giving_entries").select("id, entry_date, recipient_text, amount_cents, kind, label").eq("user_id", userId).order("entry_date", { ascending: false }).order("id").range(a, b),
   );
   const loggedElsewhere = toElsewhere(elsewhere);
   if (donorIds.length === 0) return { gifts: [], recurring: [], receipts: [], elsewhere: loggedElsewhere, loadedAt: new Date() };
 
   const [donations, recurring, receipts] = await Promise.all([
-    // Each donation carries its own maaser/chomesh/tzedaka choice.
-    allPages<DonationRow & { donation_giving_kinds: { kind: string } | { kind: string }[] | null }>((a, b) =>
+    // Each donation carries the donor's own label, if they gave one.
+    allPages<DonationRow & { donation_giving_kinds: { kind: string | null; label: string | null } | { kind: string | null; label: string | null }[] | null }>((a, b) =>
       db
         .from("donations")
-        .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en), donation_giving_kinds(kind)")
+        .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en), donation_giving_kinds(kind, label)")
         .in("donor_id", donorIds)
         .eq("status", "paid")
         .order("paid_at", { ascending: false })
@@ -105,7 +105,7 @@ async function loadLive(userId: string): Promise<Live> {
   for (const r of [recurring, receipts]) if (r.error) throw r.error;
   const kinds: KindRow[] = donations.flatMap((d) => {
     const k = Array.isArray(d.donation_giving_kinds) ? d.donation_giving_kinds[0] : d.donation_giving_kinds;
-    return k ? [{ donation_id: d.id, kind: k.kind }] : [];
+    return k ? [{ donation_id: d.id, kind: k.kind, label: k.label }] : [];
   });
   return {
     gifts: toGifts(donations, kinds),
@@ -360,7 +360,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
           amount_cents: e.cents,
           entry_date: e.date,
           recipient_text: e.recipient,
-          kind: e.kind,
+          label: e.label,
         });
         if (error) return { ok: false, message: "We couldn't save that. Please try again." };
         await refresh();

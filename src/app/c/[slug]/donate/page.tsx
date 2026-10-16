@@ -7,6 +7,7 @@ import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { givingKinds } from "@/lib/donations/validation";
+import { cleanLabel } from "@/lib/donations/labels";
 import { formatRand } from "@/lib/money";
 import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
@@ -25,11 +26,11 @@ export async function generateMetadata({ params, searchParams }: PageProps<"/c/[
 
 export default async function DonatePage({ params, searchParams }: PageProps<"/c/[slug]/donate">) {
   const { slug } = await params;
-  // The phone app sends the donor here with their maaser, chomesh or tzedaka choice already made.
+  // The phone app sends the donor here with their label already chosen (older versions send ?kind=).
   const sp = await searchParams;
-  const kind = sp.kind;
   const fromApp = sp.from === "app";
-  const initialKind = typeof kind === "string" && Object.hasOwn(givingKinds, kind) ? (kind as keyof typeof givingKinds) : undefined;
+  const kind = typeof sp.kind === "string" && Object.hasOwn(givingKinds, sp.kind) ? givingKinds[sp.kind as keyof typeof givingKinds] : null;
+  const initialLabel = cleanLabel(sp.label) ?? kind ?? undefined;
   const charity = await loadDonatableCharity(slug);
   if (!charity) notFound();
   // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift).
@@ -54,7 +55,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           receiptsAvailable={charity.receiptsAvailable}
           minimumLabel={formatRand(platformConfig.minDonationCents)}
           contributionMinimumLabel={formatRand(platformConfig.minContributionCents)}
-          initialKind={initialKind}
+          initialLabel={initialLabel}
           fromApp={fromApp}
           campaign={campaign ? { id: campaign.id, title: campaign.title } : undefined}
           account={account}
