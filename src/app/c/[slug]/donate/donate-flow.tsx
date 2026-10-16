@@ -40,7 +40,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
   return (
     <div className="space-y-4">
       <form
-        className="space-y-3 rounded-card border border-border bg-surface p-5"
+        className="space-y-3 rounded-card bg-honey-soft p-5 sm:p-6"
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
@@ -48,10 +48,10 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           startTransition(() => requestQuote(fd));
         }}
       >
-        <label htmlFor="amount" className="block text-sm font-medium">How much would you like to give?</label>
+        <label htmlFor="amount" className="block font-display text-xl text-indigo">How much would you like to give?</label>
         <div className="flex gap-2">
-          <div className="flex min-w-0 flex-1 items-center rounded-control border border-border bg-surface px-3">
-            <span className="text-muted">R</span>
+          <div className="flex min-w-0 flex-1 items-center rounded-control border-[1.5px] border-border bg-surface px-4 focus-within:border-brand">
+            <span className="font-display text-2xl text-indigo">R</span>
             <input
               id="amount"
               name="amount"
@@ -59,16 +59,16 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
               autoComplete="off"
               required
               onChange={() => setEditingAmount(true)}
-              className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
+              className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl text-navy outline-none"
             />
           </div>
-          <button disabled={quoting} className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60">
+          <button disabled={quoting} className="pressable rounded-control bg-brand px-5 py-3 font-bold text-brand-contrast disabled:opacity-60">
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
         <p className="text-xs text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
 
-        <div className="space-y-2 rounded-control bg-bg p-3">
+        <div className="space-y-2 rounded-control bg-surface p-3">
           <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
@@ -311,7 +311,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
 
         {stale ? <p role="status" className="text-sm text-muted">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
-        <button disabled={pending || stale} className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast disabled:opacity-60">
+        <button disabled={pending || stale} className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy disabled:opacity-60">
           {pending ? "Please wait…" : monthly ? `Pay ${formatRand(shownQuote.totalCents)} now, then monthly` : `Pay ${formatRand(shownQuote.totalCents)}`}
         </button>
         {state.message ? <p role="status" className="text-sm text-danger">{state.message}</p> : null}

@@ -20,7 +20,7 @@ const loadCharity = cache(async (slug: string) => {
   const { data } = await supabase
     .from("charities")
     .select(
-      "id, slug, name_en, legal_name_en, description_en, funds_use_en, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(categories(name_en))",
+      "id, slug, name_en, legal_name_en, description_en, funds_use_en, impact_en, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(categories(name_en))",
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -58,25 +58,28 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
 
   return (
     <article className="space-y-4">
-      <div className="overflow-hidden rounded-card border border-border bg-surface">
+      <div className="overflow-hidden rounded-card border-[1.5px] border-border bg-surface">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt="" className="aspect-[3/1] w-full object-cover" />
         ) : (
-          <div className="aspect-[3/1] w-full bg-gradient-to-br from-brand-soft to-bg" />
+          <div aria-hidden className="relative aspect-[3/1] w-full overflow-hidden bg-brand">
+            <span className="blob absolute -right-10 -top-12 h-32 w-32 bg-coral sm:h-48 sm:w-48" />
+            <span className="blob absolute -bottom-12 left-1/3 h-24 w-32 rotate-12 bg-honey" />
+          </div>
         )}
-        <div className="space-y-4 p-5">
+        <div className="space-y-4 p-5 sm:p-6">
           <div className="flex items-end gap-3">
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logo} alt="" className="-mt-14 h-20 w-20 shrink-0 rounded-card border-4 border-surface bg-surface object-cover" />
             ) : (
-              <div aria-hidden className="-mt-14 flex h-20 w-20 shrink-0 items-center justify-center rounded-card border-4 border-surface bg-brand text-2xl font-bold text-brand-contrast">
+              <div aria-hidden className="-mt-14 flex h-20 w-20 shrink-0 items-center justify-center rounded-card border-4 border-surface bg-brand font-display text-2xl text-white">
                 {monogram}
               </div>
             )}
             <div className="min-w-0 pb-1">
-              <h1 className="text-2xl font-semibold leading-tight">{charity.name_en}</h1>
+              <h1 className="text-3xl leading-tight">{charity.name_en}</h1>
               {area ? <p className="text-sm text-muted">{area}</p> : null}
             </div>
           </div>
@@ -84,15 +87,21 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
             <CharityBadges charity={charity} />
             {categories.map((c) => <Badge key={c.name_en}>{c.name_en}</Badge>)}
           </div>
+          {charity.impact_en ? (
+            <div className="rounded-card bg-honey-soft p-4">
+              <p className="text-sm font-semibold text-brand">Your rand at work</p>
+              <p className="mt-1 font-display text-xl leading-snug text-navy">{charity.impact_en}</p>
+            </div>
+          ) : null}
           {accepting ? (
             <Link
               href={`/c/${charity.slug}/donate`}
-              className="block w-full rounded-control bg-brand px-4 py-3 text-center text-lg font-semibold text-brand-contrast"
+              className="pressable block w-full rounded-control bg-coral px-4 py-3.5 text-center text-lg font-bold text-navy"
             >
-              Donate
+              Give to {charity.name_en}
             </Link>
           ) : (
-            <p className="rounded-control bg-bg p-3 text-center text-sm text-muted">Online giving opens soon.</p>
+            <p className="rounded-control bg-honey-soft p-3 text-center text-sm text-muted">Online giving opens soon.</p>
           )}
           <p className="text-xs text-muted">
             {receipts
