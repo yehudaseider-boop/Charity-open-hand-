@@ -685,3 +685,7 @@ Yehuda chose this as the next build: a thank-you is the biggest reason donors gi
 - Each email has a link to stop thank-you emails from all charities. The link asks first (so an email scanner opening it changes nothing). Opt-outs and links are kept as hashes of the address, readable only by the server. Erased donors are never emailed.
 - Sent one by one from the server: fine for small charities; a charity with thousands of donors in a month would need a queue (not built).
 - Privacy Policy draft updated; Yosef to confirm (go-live checklist).
+
+## Bookkeeper filters on Donations (16/10/2026)
+
+The Donations page takes a period: any time, this month, last month, this tax year, last tax year, or the charity's own dates (Johannesburg calendar days, both ends included, by the day the payment went through). A totals line shows what was received for everything the filters match (not just the page on screen), with refunds and chargebacks shown separately and not counted. The CSV download uses exactly the same filters (period, status, search), so the file matches the screen; with "All" it is paid donations only, "Every status" gives the rest. The file name carries the dates.

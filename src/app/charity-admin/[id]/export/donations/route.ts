@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { addressLine, donationStatus, donorName, isDonationStatus, shownEmail } from "@/lib/charity/dashboard";
+import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charity/dashboard";
+import { applyDonationFilters, parseDonationFilters, periodText } from "@/lib/charity/donation-filters";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
 import { centsToPlain, toCsv } from "@/lib/csv";
@@ -20,20 +21,23 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
   const who = await authoriseExport(id);
   if (who instanceof NextResponse) return who;
 
-  const raw = request.nextUrl.searchParams.get("status") ?? "paid";
-  const status = isDonationStatus(raw) ? raw : raw === "all" ? null : "paid";
+  // The same filters as the Donations page. No status given means paid only.
+  const params = Object.fromEntries(request.nextUrl.searchParams);
+  const filters = parseDonationFilters({ ...params, status: params.status ?? "paid" });
+  const status = filters.status === "all" ? null : filters.status;
   const supabase = await createClient();
   const rows: DonationRow[] = [];
   for (let from = 0; ; from += 1000) {
-    let q = supabase.from("charity_donations").select(DONATION_FIELDS).eq("charity_id", id).order("created_at", { ascending: false }).order("id").range(from, from + 999);
-    if (status) q = q.eq("status", status);
-    const { data, error } = await q;
+    const { data, error } = await applyDonationFilters(
+      supabase.from("charity_donations").select(DONATION_FIELDS).eq("charity_id", id).order("created_at", { ascending: false }).order("id").range(from, from + 999),
+      filters,
+    );
     if (error) return new NextResponse("Could not read the donations.", { status: 500 });
     rows.push(...((data ?? []) as unknown as DonationRow[]));
     if (!data || data.length < 1000) break;
   }
 
-  await audit({ actorUserId: who.userId, action: "charity.donations_exported", entityType: "charity", entityId: id, details: { rows: rows.length, status } });
+  await audit({ actorUserId: who.userId, action: "charity.donations_exported", entityType: "charity", entityId: id, details: { rows: rows.length, status, period: periodText(filters), search: Boolean(filters.q) } });
   const csv = toCsv(
     HEADER,
     rows.map((d) => [
@@ -57,5 +61,5 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       d.message,
     ]),
   );
-  return csvResponse(csv, `donations-${status ?? "all"}.csv`);
+  return csvResponse(csv, `donations-${status ?? "all"}${filters.fromDate ? `-${filters.fromDate}-to-${filters.toDate}` : ""}.csv`);
 }
