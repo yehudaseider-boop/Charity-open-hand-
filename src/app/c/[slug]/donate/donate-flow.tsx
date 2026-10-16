@@ -276,6 +276,18 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                     <TextField name="tax_reference" label="Income tax number" inputMode="numeric" hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
                   </>
                 ) : null}
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-medium">{org ? "Registered address" : "Your address"}</legend>
+                  <p className="text-xs text-muted">
+                    SARS needs it on the receipt.
+                    {!org && account?.savedIdLast4 && useSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
+                  </p>
+                  <TextField name="address_line1" label="Street address" autoComplete="address-line1" />
+                  <TextField name="address_line2" label="Unit, complex or building" autoComplete="address-line2" />
+                  <TextField name="suburb" label="Suburb" autoComplete="address-level3" />
+                  <TextField name="city" label="City or town" autoComplete="address-level2" />
+                  <TextField name="postal_code" label="Postal code" inputMode="numeric" autoComplete="postal-code" />
+                </fieldset>
               </div>
             ) : null}
           </div>

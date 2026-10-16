@@ -780,3 +780,7 @@ Before, a refund or dispute at the payment provider left the donation "paid", so
 - **Everything else is held for a person** on Admin, Payments ("Held for a person"): a partial refund, a refund without an amount, a refund we can't match to a donation, and every dispute (opened or resolved). Each donation item has "Mark refunded" and "Mark charged back" buttons (with a confirmation, logged), to use after checking the gateway's dashboard. Disputes never change a donation by themselves, because who won is not yet confirmed from Paystack's messages.
 - **s18A receipts:** if a refunded or charged-back donation is on an issued receipt, the receipt is listed there to void and re-issue.
 - Paystack's exact field names for refund and dispute events are not published in a form we could verify; the adapter reads the likely ones and anything unrecognised is held, never acted on. Checked in the Paystack test run (step 9).
+
+## s18A receipts ask for the donor's address (16/10/2026, built over Shabbos)
+
+Section 18A(2) asks for the donor's name and address on the receipt, and the receipt job already refuses a receipt without it. So ticking "I want an s18A receipt" now also asks for the address (street, optional unit or suburb, city or town, 4-digit postal code), on the website and in the app. A signed-in donor using "my ID ending 1234" can leave it empty: the server uses the address from that same earlier s18A gift, never sent to the phone. No address is asked for when no receipt is wanted.

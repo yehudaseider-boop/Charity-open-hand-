@@ -6,7 +6,7 @@ import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { getGateway, GatewayError, isGatewayRefusal } from "@/lib/gateway";
 import { formatRand } from "@/lib/money";
-import { savedIdNumber } from "./saved-id";
+import { savedAddress, savedIdNumber } from "./saved-id";
 import { savedCardsOpen } from "./app-api";
 import { loadSavedCardToken, requestCardSave } from "./saved-card";
 import { hitRateLimit } from "@/lib/rate-limit";
@@ -107,6 +107,11 @@ export async function startDonation(args: {
     const id = await savedIdNumber(saved.userId);
     if (!id) return { ok: false, message: "Please check the highlighted fields.", fieldErrors: { id_number: "Enter your SA ID number" } };
     input = { ...input, id_number: id };
+    // The address from the same earlier s18A gift, when none is typed this time.
+    if (!input.address_line1 && !input.city && !input.postal_code) {
+      const address = await savedAddress(saved.userId);
+      if (address) input = { ...input, ...Object.fromEntries(Object.entries(address).map(([k, v]) => [k, v ?? undefined])) };
+    }
   }
 
   const fieldErrors = checkDonorDetails(input, charity.receiptsAvailable);

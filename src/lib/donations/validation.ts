@@ -60,9 +60,13 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
 
   if (v.phone && !/^(\+27|0)\d{9}$/.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
 
-  // s18A details: an ID or income tax number only, for now. Address and phone
-  // are left out until Yehuda confirms what an s18A receipt must show.
+  // s18A details: an ID or income tax number, and the donor's address (section 18A(2) asks for the
+  // donor's name and address on the receipt; the receipt job refuses one without it).
   if (want18a) {
+    if (!v.address_line1) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
+    if (!v.city) e.city = "Enter your city or town";
+    if (!v.postal_code) e.postal_code = "Enter your postal code";
+    else if (!/^\d{4}$/.test(v.postal_code)) e.postal_code = "Postal codes are 4 digits";
     if (v.donor_type === "individual") {
       if (!v.id_number && !v.tax_reference) e.id_number = "Enter your SA ID number or income tax number";
       if (v.id_number && !isValidSaIdNumber(v.id_number)) e.id_number = "That doesn't look like a valid SA ID number";

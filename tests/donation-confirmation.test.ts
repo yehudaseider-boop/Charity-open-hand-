@@ -31,10 +31,19 @@ describe("s18A details", () => {
   const person = (extra: Record<string, string>) =>
     checkoutSchema.parse({ donor_type: "individual", email: "a@b.co.za", first_name: "A", last_name: "B", giving_kind: "maaser", age_confirmed: "on", popia_consent: "on", wants_18a: "on", ...extra });
 
-  it("needs an ID number or a tax number, but not an address or phone", () => {
-    expect(checkDonorDetails(person({}), true)).toHaveProperty("id_number");
-    expect(checkDonorDetails(person({ tax_reference: "0123456789" }), true)).toEqual({});
-    expect(checkDonorDetails(person({ id_number: "8001015009087" }), true)).toEqual({});
+  const home = { address_line1: "12 Main Road", city: "Johannesburg", postal_code: "2195" };
+
+  it("needs an ID number or a tax number, and the donor's address (SARS asks for it), but not a phone", () => {
+    expect(checkDonorDetails(person({ ...home }), true)).toHaveProperty("id_number");
+    expect(checkDonorDetails(person({ ...home, tax_reference: "0123456789" }), true)).toEqual({});
+    expect(checkDonorDetails(person({ ...home, id_number: "8001015009087" }), true)).toEqual({});
+    expect(Object.keys(checkDonorDetails(person({ id_number: "8001015009087" }), true)).sort()).toEqual(["address_line1", "city", "postal_code"]);
+    expect(checkDonorDetails(person({ ...home, id_number: "8001015009087", postal_code: "21" }), true)).toEqual({ postal_code: "Postal codes are 4 digits" });
+  });
+
+  it("asks for no address when no s18A receipt is wanted", () => {
+    const noReceipt = checkoutSchema.parse({ donor_type: "individual", email: "a@b.co.za", first_name: "A", last_name: "B", age_confirmed: "on", popia_consent: "on" });
+    expect(checkDonorDetails(noReceipt, true)).toEqual({});
   });
 
   it("still checks the numbers that are given", () => {

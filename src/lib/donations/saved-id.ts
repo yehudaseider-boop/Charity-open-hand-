@@ -8,7 +8,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * never sent to the browser or the phone, only its last four digits. Only for the person whose
  * account (confirmed by signing in with an emailed code) the earlier gifts belong to.
  */
-async function latest(userId: string): Promise<{ encrypted: string; last4: string } | null> {
+export type SavedAddress = { address_line1: string; address_line2: string | null; suburb: string | null; city: string; postal_code: string };
+
+async function latest(userId: string): Promise<{ encrypted: string; last4: string; address: SavedAddress | null } | null> {
   const db = createAdminClient();
   const { data: donors } = await db.from("donors").select("id").eq("user_id", userId).eq("donor_type", "individual").is("erased_at", null);
   const donorIds = (donors ?? []).map((d) => d.id as string);
@@ -18,7 +20,7 @@ async function latest(userId: string): Promise<{ encrypted: string; last4: strin
   if (!giftIds.length) return null;
   const { data: details } = await db
     .from("donation_checkout_details")
-    .select("donation_id, id_number_encrypted, id_number_last4")
+    .select("donation_id, id_number_encrypted, id_number_last4, address_line1, address_line2, suburb, city, postal_code")
     .in("donation_id", giftIds)
     .not("id_number_encrypted", "is", null)
     .is("erased_at", null);
@@ -26,7 +28,12 @@ async function latest(userId: string): Promise<{ encrypted: string; last4: strin
   const byGift = new Map((details ?? []).map((d) => [d.donation_id as string, d]));
   for (const id of giftIds) {
     const d = byGift.get(id);
-    if (d?.id_number_encrypted && d.id_number_last4) return { encrypted: d.id_number_encrypted as string, last4: d.id_number_last4 as string };
+    if (d?.id_number_encrypted && d.id_number_last4) {
+      const address = d.address_line1 && d.city && d.postal_code
+        ? { address_line1: d.address_line1 as string, address_line2: (d.address_line2 as string | null) ?? null, suburb: (d.suburb as string | null) ?? null, city: d.city as string, postal_code: d.postal_code as string }
+        : null;
+      return { encrypted: d.id_number_encrypted as string, last4: d.id_number_last4 as string, address };
+    }
   }
   return null;
 }
@@ -40,4 +47,9 @@ export async function savedIdLast4(userId: string): Promise<string | null> {
 export async function savedIdNumber(userId: string): Promise<string | null> {
   const found = await latest(userId);
   return found ? decrypt(found.encrypted) : null;
+}
+
+/** The address given with that same last s18A gift, if it had one. Server only. */
+export async function savedAddress(userId: string): Promise<SavedAddress | null> {
+  return (await latest(userId))?.address ?? null;
 }

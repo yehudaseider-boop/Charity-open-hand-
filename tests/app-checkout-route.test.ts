@@ -37,7 +37,11 @@ vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async (bucket: string, keys: 
 vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
-vi.mock("@/lib/donations/saved-id", () => ({ savedIdNumber: async () => "8001015009087", savedIdLast4: async () => "9087" }));
+vi.mock("@/lib/donations/saved-id", () => ({
+  savedIdNumber: async () => "8001015009087",
+  savedIdLast4: async () => "9087",
+  savedAddress: async () => ({ address_line1: "12 Main Road", address_line2: null, suburb: "Linden", city: "Johannesburg", postal_code: "2195" }),
+}));
 vi.mock("@/lib/donations/confirmation-access", () => ({ issueConfirmationToken: async () => "tok" }));
 vi.mock("@/lib/donations/charity", () => ({
   loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: true, splitAccountRef: "ACCT_1" }),
@@ -128,6 +132,8 @@ describe("app checkout endpoint", () => {
     expect(res.status).toBe(200);
     const saved = ops.find((o) => o.table === "donation_checkout_details" && o.op === "insert")?.row;
     expect(saved?.id_number_last4).toBe("9087");
+    // The address from the same earlier s18A gift, as none was typed.
+    expect(saved).toMatchObject({ address_line1: "12 Main Road", city: "Johannesburg", postal_code: "2195" });
   });
 
   it("never uses a saved ID number without a signed-in donor, or with another email", async () => {

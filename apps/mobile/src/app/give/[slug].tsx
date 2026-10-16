@@ -93,6 +93,12 @@ export default function Give() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [want18a, setWant18a] = useState(false);
   const [idNumber, setIdNumber] = useState("");
+  // The donor's address, for the s18A receipt (SARS asks for it). With "my ID ending 1234" it can be left
+  // empty: the server then uses the address from that same earlier gift.
+  const [street, setStreet] = useState("");
+  const [suburb, setSuburb] = useState("");
+  const [town, setTown] = useState("");
+  const [postal, setPostal] = useState("");
   // Signed in with an earlier s18A gift: reuse that ID number (the server fills it in; only the last four digits reach the phone).
   const [useSavedId, setUseSavedId] = useState(true);
   // Saved card (switched off until SAVED_CARDS is on in the app and on the server): pay with the one kept, or a new card.
@@ -279,6 +285,11 @@ export default function Give() {
     if (!last.trim()) e.last_name = "Enter your surname";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
     if (s18aAvailable && want18a && !usingSavedId && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
+    if (s18aAvailable && want18a && !usingSavedId) {
+      if (!street.trim()) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
+      if (!town.trim()) e.city = "Enter your city or town";
+      if (!/^\d{4}$/.test(postal.trim())) e.postal_code = "Enter your 4-digit postal code";
+    }
     if (usingSavedId && email.trim().toLowerCase() !== (account.email ?? "").toLowerCase()) e.id_number = `Your saved ID number goes with ${account.email}. Give with that email, or use a different number.`;
     if (dedicating && !dedicate) e.dedication_kind = "Choose in honour of or in memory of";
     if (dedicating && !dedicationName.trim()) e.dedication_name = "Enter their name, or switch the dedication off";
@@ -320,6 +331,10 @@ export default function Give() {
       phone: phone.trim() || undefined,
       wants_18a: s18aAvailable && want18a,
       id_number: s18aAvailable && want18a && !usingSavedId ? idNumber.trim() || undefined : undefined,
+      address_line1: s18aAvailable && want18a ? street.trim() || undefined : undefined,
+      suburb: s18aAvailable && want18a ? suburb.trim() || undefined : undefined,
+      city: s18aAvailable && want18a ? town.trim() || undefined : undefined,
+      postal_code: s18aAvailable && want18a ? postal.trim() || undefined : undefined,
       message: note.trim() || undefined,
       giving_label: cleanLabel(label) ?? undefined,
       is_anonymous: anonymous,
@@ -515,6 +530,17 @@ export default function Give() {
                 </View>
               ) : null}
               {want18a && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" error={err("id_number")} /> : null}
+              {want18a ? (
+                <View style={{ gap: 10 }}>
+                  <Text variant="label">
+                    Your address. SARS needs it on the receipt.{usingSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
+                  </Text>
+                  <Field label="Street address" value={street} onChangeText={setStreet} autoComplete="street-address" error={err("address_line1")} />
+                  <Field label="Suburb" value={suburb} onChangeText={setSuburb} error={err("suburb")} />
+                  <Field label="City or town" value={town} onChangeText={setTown} autoComplete="postal-address-locality" error={err("city")} />
+                  <Field label="Postal code" value={postal} onChangeText={setPostal} keyboardType="number-pad" autoComplete="postal-code" maxLength={4} error={err("postal_code")} />
+                </View>
+              ) : null}
             </>
           ) : null}
           <SwitchRow
