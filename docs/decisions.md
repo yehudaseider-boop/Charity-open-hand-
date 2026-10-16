@@ -767,3 +767,16 @@ Second round of fixes from the same review (16/10/2026):
 Yehuda: "let the charity choose" (instead of the R100, R250 and R500 starter amounts the app had, which were never confirmed). On its Profile page a charity can set up to three amounts (each at least the minimum donation, no repeats, shown smallest first), saved in `charities.suggested_amounts_cents` (migration `20261016000014`). The give screens show one-tap amounts in this order: the donor's own recent amounts first, then the charity's, three at most (`src/lib/charity/suggested-amounts.ts`, shared with the app). Givezy never suggests a figure of its own: a new donor at a charity that set none types the amount. The website's giving page shows the charity's amounts as buttons that fill in the amount box.
 
 **Vercel production branch** (16/10/2026): Yehuda wasn't sure, so the recommendation stands: keep the test site deploying from `milestone-1-foundation` until launch, so `main` is untouched; switch it to `main` as a launch step (go-live checklist).
+
+## Group challenges (16/10/2026)
+
+Yehuda's "giving with friends" idea, shipped as group challenges after he approved the mock-up ("Love it, let's ship"). He skipped the two questions, so the recommended answers apply: a challenge **goes live at once** (the charity is emailed and can stop it), and **only signed-in donors can start one** (anyone can give to it).
+
+- **Starting:** from a charity's page, "Start a challenge": a name, why you're doing it, a goal in Rand (at least the minimum donation), an optional last day, and the name to show ("Started by Sarah"; never their email). At most 5 running per person, and 5 starts an hour.
+- **The challenge page** (`/g/[slug]`): a blue header, one big ring (raised, goal, percentage), how many people gave and the last day, the reason, one orange "Give to this challenge" button, "Share on WhatsApp" and a copy-link box, "Halfway there" or "Goal reached", and the charity. Never who gave or how much each person gave. Link previews show the title, the total and the charity.
+- **Giving:** an ordinary once-off donation to the charity, labelled with the challenge (`donations.challenge_id`). The database refuses a gift for another charity's challenge, or one that is both a campaign and a challenge gift. The server refuses a stopped or ended challenge before recording anything. The thank-you page links back to the challenge to share it, and "try again" keeps it.
+- **Totals:** paid gifts only, the gift only (never the contribution to Givezy); refunded and charged-back gifts drop out; "people" counts different donors.
+- **Charity side:** challenges are listed on the Campaigns page with their bar, totals and a Stop button. The charity is emailed when one starts; the person who started it is emailed when it is stopped. The "you received a donation" email names the challenge.
+- **Privacy:** the public reads challenges only through `challenge_public` (no account id). Only the server writes. Erasing a person replaces their name on any challenge with "A supporter" and removes their account from it.
+- Lists show a thin bar (the charity's public page); the challenge page shows the ring.
+- **Not yet:** challenges inside the phone app (shared links open the website, where the giving happens at launch anyway), and challenges on Discover.

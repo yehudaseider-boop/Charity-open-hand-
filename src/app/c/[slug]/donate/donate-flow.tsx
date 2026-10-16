@@ -8,6 +8,9 @@ import { TextArea, TextField } from "@/components/forms/fields";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
 
+/** A campaign the charity runs, or a group challenge a supporter started. */
+type Target = { id: string; title: string; kind?: "campaign" | "challenge" };
+
 type Props = {
   slug: string;
   charityName: string;
@@ -20,8 +23,8 @@ type Props = {
   initialLabel?: string;
   /** The donor came from the phone app, so the confirmation offers a way back to it. */
   fromApp: boolean;
-  /** Giving to one of the charity's campaigns: once-off only. */
-  campaign?: { id: string; title: string };
+  /** Giving to one of the charity's campaigns, or to a group challenge: once-off only. */
+  campaign?: Target;
   /** Signed in: their email, and the last four digits of the ID number from their last s18A gift. */
   account?: { email: string; savedIdLast4: string | null };
 };
@@ -171,7 +174,7 @@ function Check({ name, children, error }: { name: string; children: React.ReactN
 
 function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialLabel, fromApp, campaign, account }: {
   slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
-  initialLabel?: string; fromApp: boolean; campaign?: { id: string; title: string };
+  initialLabel?: string; fromApp: boolean; campaign?: Target;
   account?: { email: string; savedIdLast4: string | null };
 }) {
   // A signed-in donor can reuse the ID number from their last s18A gift. Only its last four digits
@@ -186,7 +189,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   }
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData) => {
-      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, campaign?.id, prev, fd);
+      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, campaign?.kind === "challenge" ? undefined : campaign?.id, campaign?.kind === "challenge" ? campaign.id : undefined, prev, fd);
       if (next.quote) setShownQuote(next.quote);
       return next;
     },
@@ -208,7 +211,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         }}
       >
         <Breakdown q={shownQuote} charityName={charityName} />
-        {campaign ? <p className="text-sm text-muted">For the campaign: <span className="font-medium text-text">{campaign.title}</span></p> : null}
+        {campaign ? <p className="text-sm text-muted">For the {campaign.kind === "challenge" ? "challenge" : "campaign"}: <span className="font-medium text-text">{campaign.title}</span></p> : null}
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Giving as</legend>

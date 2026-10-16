@@ -7,7 +7,10 @@ import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
-import { endCampaign, startCampaign } from "./actions";
+import { endCampaign, startCampaign, stopChallenge } from "./actions";
+import { ChallengeBar } from "@/components/challenge-ring";
+import { loadCharityChallenges } from "@/lib/challenges/queries";
+import { challengeOpen } from "@/lib/challenges/rules";
 import { CampaignForm } from "./forms";
 
 export const metadata: Metadata = { title: "Campaigns" };
@@ -16,7 +19,7 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/campaigns`);
   const { charity } = await loadCharityForManager(id);
-  const campaigns = await loadCampaigns(id);
+  const [campaigns, challenges] = await Promise.all([loadCampaigns(id), loadCharityChallenges(id)]);
   const now = new Date();
   const active = campaigns.filter((c) => isRunning(c, now));
   // Ended by hand, or past its last day.
@@ -57,6 +60,45 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
           </ul>
         </Card>
       ) : null}
+
+      <Card title="Challenges started by your supporters">
+        <p className="text-sm text-muted">
+          A supporter can start a challenge for you, set a goal and share it with friends, family or colleagues. Gifts come to you like any other donation, marked with the challenge.
+          We email you when one starts. If a challenge isn&apos;t right for you, stop it here.
+        </p>
+        {challenges.length ? (
+          <ul className="mt-3 divide-y divide-border">
+            {challenges.map((g) => {
+              const open = challengeOpen(g, now);
+              return (
+                <li key={g.id} className="space-y-2 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <a href={`/g/${g.slug}`} className="font-medium text-brand underline">{g.title}</a>
+                      <p className="text-xs text-muted">
+                        Started by {g.starterName} on {formatDate(g.createdAt)}
+                        {g.status === "stopped" ? " · stopped" : !open ? " · ended" : g.endsAt ? ` · until ${formatDate(g.endsAt)}` : ""}
+                      </p>
+                    </div>
+                    {open ? (
+                      <form action={stopChallenge.bind(null, id, g.id)}>
+                        <RemoveButton label="Stop" what={g.title} confirmText={`Stop "${g.title}"? People won't be able to give to it any more. Gifts already made stay with you, and ${g.starterName} is told by email.`} />
+                      </form>
+                    ) : null}
+                  </div>
+                  <ChallengeBar raisedCents={g.raisedCents} targetCents={g.targetCents} />
+                  <p className="text-sm">
+                    {formatRand(g.raisedCents)} of {formatRand(g.targetCents)}{" "}
+                    <span className="text-muted">({g.giftCount} {g.giftCount === 1 ? "gift" : "gifts"} from {g.people} {g.people === 1 ? "person" : "people"})</span>
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm">None yet. Your supporters can start one from your Givezy page.</p>
+        )}
+      </Card>
 
       {past.length ? (
         <Card title="Ended">

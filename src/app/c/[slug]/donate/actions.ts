@@ -41,6 +41,7 @@ export async function submitDonation(
   shownTotalCents: number,
   fromApp: boolean,
   campaignId: string | undefined,
+  challengeId: string | undefined,
   _prev: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
@@ -61,7 +62,7 @@ export async function submitDonation(
   // "Use my ID ending 1234": only for the signed-in person, checked here on the server.
   const viewer = formData.get("use_saved_id") === "on" ? await getViewer() : null;
   const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, input: parsed.data, ip, useSavedIdOf });
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, challengeId, input: parsed.data, ip, useSavedIdOf });
   if (!result.ok) return result;
   // The website never charges a saved card (only the app does), so there is always a payment page.
   if (!result.redirectUrl) return { ok: false, message: "We couldn't start the payment. Please try again." };

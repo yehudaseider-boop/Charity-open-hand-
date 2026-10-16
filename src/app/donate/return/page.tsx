@@ -42,7 +42,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind, label), charities(name_en, slug)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, challenge_id, group_challenges(slug, title), donation_giving_kinds(kind, label), charities(name_en, slug)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (await confirmationTokenMatches(ref, t)) {
@@ -62,6 +62,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (givingLabel) retryParams.set("label", givingLabel);
   // A campaign gift tries again for the same campaign (the donate page says if it has ended since).
   if (d?.campaign_id) retryParams.set("campaign", d.campaign_id);
+  // A challenge gift goes back to the same challenge, and the thank-you links to it, where people share it.
+  const challenge = d?.group_challenges as unknown as { slug: string; title: string } | null | undefined;
+  if (challenge) retryParams.set("challenge", challenge.slug);
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
 
   if (outcome === "paid" && d && charity) {
@@ -91,6 +94,11 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
             Back to the Givezy app
           </a>
+        ) : null}
+        {challenge ? (
+          <Link href={`/g/${challenge.slug}`} className="mt-4 block rounded-control border-2 border-brand px-4 py-3 text-center font-semibold text-brand">
+            See &quot;{challenge.title}&quot; and share it
+          </Link>
         ) : null}
         <Link href={`/c/${charity.slug}`} className="mt-3 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
       </Card>

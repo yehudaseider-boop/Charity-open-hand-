@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-/** The charity's public link, with a button that copies it. */
+/** A public link (a charity page or a challenge), with a button that copies it. */
 export function CopyLink({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   return (
