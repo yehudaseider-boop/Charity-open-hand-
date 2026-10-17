@@ -824,6 +824,6 @@ Most of the "at launch" list was already built: the donor list (name, contact, t
 - **"Gives monthly" / "Monthly paused"** on each donor in the list.
 - **"Who has a receipt"** on the s18A receipts page: per tax year, how many donors asked for an s18A receipt, how many have one, and the amount still to be receipted. The running tax year says when its receipts come.
 
-Not built, waiting on Yehuda:
-- **The fee line on the income summary.** The suggestion named a 3% fee; Givezy's decided model is no Givezy fee, with the payment provider's charge paid by the charity, and those rates are still empty in `src/config/platform.ts`. The line goes in once the rates are in, never with a guessed figure.
-- **A paid tier.** Campaigns and impact updates are built and free today. Moving them behind a paid tier is a pricing decision.
+Settled the same day (Yehuda):
+- **No fee line on the income summary.** "We haven't decided on a fee." The 3% in the suggestion was not a decision. Nothing shows a fee until Givezy's fee (if any) and the payment provider's rates are decided and in `src/config/platform.ts`.
+- **No paid tier.** Campaigns and impact updates stay free for every charity.
