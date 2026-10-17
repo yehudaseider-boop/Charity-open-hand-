@@ -16,6 +16,8 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
+    // Stops the run with one clear message when the local test database is not running.
+    globalSetup: ["tests/global-setup.ts"],
     // Database tests share the local Supabase and must not run in parallel.
     fileParallelism: false,
   },
