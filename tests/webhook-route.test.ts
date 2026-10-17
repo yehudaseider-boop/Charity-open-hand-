@@ -12,6 +12,7 @@ const confirmPayment = vi.fn(async (_ref: string) => "paid");
 
 vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: (ref: string) => confirmPayment(ref) }));
 vi.mock("@/lib/gateway", () => ({
+  getGateway: () => ({ name: "test" }),
   gatewayByName: () => ({
     name: "test",
     parseWebhook: async (raw: string) => {

@@ -362,8 +362,10 @@ export default function Give() {
       undefined,
       usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
     );
-    // Any answer from our server ends this attempt; no answer keeps its id for the next tap.
-    if (r.ok || !("noReply" in r)) attemptRef.current = null;
+    // Any answer from our server ends this attempt. No answer keeps its id for the next tap, and so
+    // does "already used with other details": the first tap may have charged, so a changed amount
+    // keeps hitting the same id (and the server's refusal) until this screen is closed.
+    if (r.ok || (!("noReply" in r) && !r.attemptMismatch)) attemptRef.current = null;
     if (!r.ok) {
       setBusy(false);
       // A declined saved card: offer the payment page, where another card can be used.
@@ -392,12 +394,17 @@ export default function Give() {
     // payment, the provider's confirmation can take a few seconds, so ask once more.
     setBusy("checking");
     let outcome = await paymentStatus(SITE_URL, r.reference, r.token);
-    if (outcome === "pending" && shown === "returned") {
+    // A saved-card charge has no payment page to come back from, so "pending" is not an answer:
+    // ask a few more times before giving up.
+    const asks = r.charged ? 4 : shown === "returned" ? 1 : 0;
+    for (let i = 0; i < asks && outcome === "pending"; i++) {
       await new Promise((ok) => setTimeout(ok, 3_000));
       outcome = await paymentStatus(SITE_URL, r.reference, r.token);
     }
     setBusy(false);
-    const finished = outcome === "paid" || (outcome === "pending" && shown === "returned");
+    // Back from the payment page, the website only sends the donor to the app once the gift is paid,
+    // so "returned" with the provider still catching up counts. A saved-card charge counts only when paid.
+    const finished = outcome === "paid" || (outcome === "pending" && shown === "returned" && !r.charged);
     if (!finished) {
       haptic.tap();
       setMessage(afterPaymentMessage(outcome === "paid" ? "pending" : outcome));

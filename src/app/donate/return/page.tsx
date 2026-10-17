@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/card";
 import { KeepChecking } from "./keep-checking";
-import { confirmPayment } from "@/lib/donations/confirm";
+import { confirmPayment, savedOutcome } from "@/lib/donations/confirm";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { labelOf } from "@/lib/donations/labels";
@@ -10,8 +10,6 @@ import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
 import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { headers } from "next/headers";
-import { clientIp } from "@/lib/client-ip";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 
@@ -31,13 +29,20 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // confirming rather than showing an error page. Nothing here says "paid" unless it is saved.
   // Each load can ask the payment provider about the payment, so one visitor gets a generous but
   // limited number of checks (a donor needs about 13); past that the page just says "still confirming".
-  const limited = await hitRateLimit("return-check", [`ip:${clientIp(await headers())}`], 40, 10).catch(() => false);
-  const outcome = limited
-    ? ("pending" as const)
-    : await confirmPayment(ref).catch((e) => {
-        console.error(e);
-        return "pending" as const;
-      });
+  // Only the donor (holding the credential from their payment link) may make us ask the payment
+  // provider: donation ids are not secret, and the webhook settles every payment anyway. Anyone
+  // else sees the saved state only.
+  const holdsToken = ref ? await confirmationTokenMatches(ref, t) : false;
+  // Per donation: donors behind one shared address (a shul's Wi-Fi) must not block each other.
+  const limited = holdsToken ? await hitRateLimit("return-check", [`ref:${ref}`], 40, 10).catch(() => false) : false;
+  const outcome = !holdsToken
+    ? await savedOutcome(ref)
+    : limited
+      ? ("pending" as const)
+      : await confirmPayment(ref).catch((e) => {
+          console.error(e);
+          return "pending" as const;
+        });
 
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
@@ -45,7 +50,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en)";
   let d = null;
   if (ref && outcome !== "not_found") {
-    if (await confirmationTokenMatches(ref, t)) {
+    if (holdsToken) {
       d = (await createAdminClient().from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
     } else {
       d = (await (await createClient()).from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;

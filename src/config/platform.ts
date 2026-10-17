@@ -35,6 +35,9 @@ export const platformConfig = {
   /** Minimum donation to a charity. Confirmed: R30. */
   minDonationCents: 3_000,
 
+  /** Largest single gift we accept online: R1 000 000. Above that, a typo is far more likely than a gift. */
+  maxDonationCents: 100_000_000,
+
   /** Minimum optional contribution to Givezy, when the box is ticked. Confirmed: R10. */
   minContributionCents: 1_000,
 

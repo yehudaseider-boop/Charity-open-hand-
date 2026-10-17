@@ -84,7 +84,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/webhook
   // (Admin, Payments). Signed by the gateway, so trusted; repeats change nothing twice.
   if (event.type === "refund_processed" || event.type === "dispute_opened" || event.type === "dispute_resolved") {
     try {
-      if (event.type === "refund_processed") await handleRefund(event.reference, event.amountCents ?? null, eventRowId);
+      if (event.type === "refund_processed") await handleRefund(event.reference, event.amountCents ?? null, eventRowId, event.currency ?? null);
       else await handleDispute(event.reference, event.type === "dispute_opened" ? "opened" : "resolved", event.detail ?? null, eventRowId);
     } catch (e) {
       console.error(`[webhook] ${gateway.name} event ${event.eventId} not finished`, e);

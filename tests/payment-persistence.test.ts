@@ -19,7 +19,7 @@ const cardWaiting = vi.fn(async (_id: string) => false);
 const cardSave = vi.fn(async (_id: string, _tx: unknown, _gateway: string): Promise<string> => "none");
 vi.mock("@/lib/donations/saved-card", () => ({ cardSaveWaitingFor: (id: string) => cardWaiting(id), finishCardSave: (id: string, tx: unknown, g: string) => cardSave(id, tx, g) }));
 vi.mock("@/lib/donations/notify", () => ({ notifyDonationPaid: (id: string) => notify(id) }));
-vi.mock("@/lib/gateway", () => ({ gatewayByName: () => ({ verifyTransaction: verify }) }));
+vi.mock("@/lib/gateway", () => ({ gatewayByName: () => ({ verifyTransaction: verify }), getGateway: () => ({ name: "test" }) }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: () => ({

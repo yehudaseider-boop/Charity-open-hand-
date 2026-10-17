@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
+import { getViewer } from "@/lib/auth";
 import { hasSecondStep } from "@/lib/mfa";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -12,7 +13,8 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function authoriseExport(id: string): Promise<{ userId: string } | NextResponse> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // The viewer, not just any user: a session started with a password sees nothing (see auth.ts).
+  const user = await getViewer();
   if (!user || !/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not found", { status: 404 });
   const [{ data: manages }, { data: isAdmin }] = await Promise.all([
     supabase.rpc("is_charity_admin", { target: id }),
@@ -20,10 +22,10 @@ export async function authoriseExport(id: string): Promise<{ userId: string } | 
   ]);
   if (!manages && !isAdmin) return new NextResponse("Not found", { status: 404 });
   if (!(await hasSecondStep())) return new NextResponse("Please complete your second step first.", { status: 403 });
-  if (await hitRateLimit("charity-export", [`user:${user.id}`], 10, 10)) {
+  if (await hitRateLimit("charity-export", [`user:${user.userId}`], 10, 10)) {
     return new NextResponse("Too many downloads. Please wait a few minutes and try again.", { status: 429 });
   }
-  return { userId: user.id };
+  return { userId: user.userId };
 }
 
 export function csvResponse(text: string, filename: string) {

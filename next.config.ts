@@ -14,8 +14,8 @@ const supabaseOrigin = (() => {
 /**
  * Content security policy without nonces (see the Next.js CSP guide).
  * frame-ancestors 'none' stops other sites showing our pages in a frame
- * (clickjacking on checkout). form-action is left open on purpose: checkout
- * redirects to the payment provider's hosted page.
+ * (clickjacking on checkout). form-action 'self': our forms only post to us; the
+ * payment provider's page is reached by a server-side redirect, not a form post.
  */
 const csp = [
   "default-src 'self'",
@@ -26,6 +26,7 @@ const csp = [
   `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
+  "form-action 'self'",
   "frame-ancestors 'none'",
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");

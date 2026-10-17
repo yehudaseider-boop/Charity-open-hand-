@@ -10,7 +10,8 @@ export type CheckoutReply =
   | { ok: true; redirectUrl: string; charged?: undefined; reference: string; token: string }
   /** Paid with the saved card: no payment page. Ask for the outcome (the charge is only a first indication). */
   | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing; savedCardDeclined?: boolean };
+  /** `attemptMismatch`: this attempt id was already used with other details, so the app keeps the id (see give screen). */
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing; savedCardDeclined?: boolean; attemptMismatch?: boolean };
 
 /** The card kept for next time: what is safe to show ("Visa ending 4242"), never the card itself. */
 export type SavedCard = { brand: string | null; last4: string | null; expires: string | null };
@@ -56,7 +57,12 @@ async function call<T extends { ok: boolean; message?: string }>(post: Post, url
   return { ok: false, message: NETWORK, noReply: true } as unknown as T;
 }
 
-const api = (site: string, path: string) => `${site.replace(/\/+$/, "")}/api/app/${path}`;
+/** Our server's address. The sign-in token travels with some calls, so never over plain http. */
+const api = (site: string, path: string) => {
+  const base = site.replace(/\/+$/, "");
+  if (!/^https:\/\//.test(base)) throw new Error("The site address must start with https://");
+  return `${base}/api/app/${path}`;
+};
 
 export const fetchPost: Post = async (url, body, token) => {
   const headers: Record<string, string> = { "content-type": "application/json" };

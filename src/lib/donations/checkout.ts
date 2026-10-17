@@ -58,7 +58,7 @@ export type StartResult =
    */
   | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
   /** `savedCardDeclined`: the provider refused the saved card, so the app should offer the payment page with another card. */
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean };
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean; attemptMismatch?: boolean };
 
 /**
  * Record a pending donation and hand the donor to the gateway.
@@ -171,7 +171,9 @@ export async function startDonation(args: {
       const details = prior.donation_checkout_details as { email: string | null } | { email: string | null }[] | null;
       const priorEmail = (Array.isArray(details) ? details[0]?.email : details?.email) ?? "";
       if (prior.charity_id !== charity.id || priorEmail.toLowerCase() !== v.email.toLowerCase() || Number(prior.total_charged_cents) !== fees.totalCents) {
-        return { ok: false, message: "Something went wrong. Please close this screen and try again." };
+        // The same attempt with different details: the app keeps the attempt id, so a changed
+        // amount can never become a second charge on this screen.
+        return { ok: false, attemptMismatch: true, message: "Something went wrong. Please close this screen and try again." };
       }
       if (prior.status === "failed") {
         return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };

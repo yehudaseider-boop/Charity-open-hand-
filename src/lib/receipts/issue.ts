@@ -140,13 +140,17 @@ export async function runReceiptsJob(args: {
       try {
         const pdf = await store.readPdf(r);
         const mail = buildReceiptEmail({ details: r.details, reference: r.reference, siteUrl: args.mailer.siteUrl, platformName: args.mailer.platformName });
-        await args.mailer.transport.send({
+        const sent = await args.mailer.transport.send({
           to: r.email,
           ...mail,
           attachments: [{ filename: `${r.reference}.pdf`, content: pdf, contentType: "application/pdf" }],
         });
-        await store.markEmailed(r);
-        summary.emailed += 1;
+        // Only a real send marks the receipt emailed: the console transport (local runs) and skipped
+        // addresses leave it for a later run with a real transport.
+        if (sent === "sent") {
+          await store.markEmailed(r);
+          summary.emailed += 1;
+        }
       } catch (e) {
         summary.emailFailed += 1;
         console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);

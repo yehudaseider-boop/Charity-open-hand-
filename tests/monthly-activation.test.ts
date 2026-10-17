@@ -17,7 +17,7 @@ const verify = vi.fn();
 const notify = vi.fn(async (_id: string, _o?: unknown) => {});
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/donations/notify", () => ({ notifyDonationPaid: (id: string, o?: unknown) => notify(id, o) }));
-vi.mock("@/lib/gateway", () => ({ gatewayByName: () => ({ verifyTransaction: verify }) }));
+vi.mock("@/lib/gateway", () => ({ gatewayByName: () => ({ verifyTransaction: verify }), getGateway: () => ({ name: "test" }) }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {

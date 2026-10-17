@@ -250,7 +250,7 @@ describe("emailing receipts", () => {
   const render = async () => Buffer.from("%PDF-test");
   const sentTo = () => {
     const sent: EmailMessage[] = [];
-    const transport = { name: "test", send: async (m: EmailMessage) => void sent.push(m) };
+    const transport = { name: "test", send: async (m: EmailMessage) => { sent.push(m); return "sent" as const; } };
     return { sent, mailer: { transport, siteUrl: "https://example.co.za", platformName: "Givezy" } };
   };
 
@@ -305,7 +305,7 @@ describe("emailing receipts", () => {
     const { store, emailed } = setup([don({ id: "a" }), don({ id: "b", donorId: "u2" })]);
     const sent: string[] = [];
     let fail = true;
-    const transport = { name: "test", send: async (m: EmailMessage) => { if (fail && m.to.includes("r1")) throw new Error("provider down"); sent.push(m.to); } };
+    const transport = { name: "test", send: async (m: EmailMessage) => { if (fail && m.to.includes("r1")) throw new Error("provider down"); sent.push(m.to); return "sent" as const; } };
     const mailer = { transport, siteUrl: "https://example.co.za", platformName: "Givezy" };
     const first = await runReceiptsJob({ store, render, ...base, mailer });
     expect(first).toMatchObject({ emailed: 1, emailFailed: 1 });

@@ -492,7 +492,7 @@ export default function Giving() {
             <View style={{ gap: 12 }}>
               <Text variant="h2" style={styles.heading}>Monthly donations</Text>
               {recurring.length === 0 ? (
-                <Text variant="bodyMuted">No monthly donations yet. Tick the monthly option on the payment page when you give.</Text>
+                <Text variant="bodyMuted">No monthly donations yet. Switch on &quot;Give every month&quot; when you give.</Text>
               ) : (
                 <View style={styles.list}>
                   {recurring.map((r, i) => (

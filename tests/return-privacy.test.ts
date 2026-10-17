@@ -26,7 +26,11 @@ let confirmCalls = 0;
 let overLimit = false;
 let sessionRow: typeof row | null = null; // what row-level security lets the visitor read
 let askedRef = "";
-vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: async (ref: string) => ((askedRef = ref), confirmCalls++, outcome) }));
+vi.mock("@/lib/donations/confirm", () => ({
+  confirmPayment: async (ref: string) => ((askedRef = ref), confirmCalls++, outcome),
+  // Without the donor's credential the page shows only what is saved, and never asks the provider.
+  savedOutcome: async () => outcome,
+}));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }) }));
 vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit }));
 vi.mock("@/lib/donations/confirmation-access", () => ({
@@ -120,14 +124,24 @@ describe("confirmation page privacy", () => {
 describe("checking with the payment provider", () => {
   it("a visitor over the limit gets 'still confirming' without the provider being asked", async () => {
     overLimit = true;
-    const html = await page({});
+    const html = await page({ t: "good-credential" });
     expect(confirmCalls).toBe(0);
     expect(html).toContain("We&#x27;re confirming your payment");
   });
 
-  it("under the limit, the payment is checked", async () => {
-    await page({});
+  it("under the limit, the donor's own visit checks the payment", async () => {
+    await page({ t: "good-credential" });
     expect(confirmCalls).toBe(1);
+  });
+
+  it("without the credential the provider is never asked: a donation id alone shows the saved state only", async () => {
+    outcome = "pending";
+    const html = await page({});
+    expect(confirmCalls).toBe(0);
+    expect(html).toContain("We&#x27;re confirming your payment");
+    outcome = "paid";
+    expect(await page({})).toContain("Your payment went through");
+    expect(confirmCalls).toBe(0);
   });
 
   it("the provider adding its own reference to our address still finds the donation", async () => {

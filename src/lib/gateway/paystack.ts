@@ -185,6 +185,7 @@ export const paystackGateway: PaymentGateway = {
       id?: number;
       reference?: string;
       amount?: number;
+      currency?: string;
       resolution?: string;
       status?: string;
       transaction_reference?: string;
@@ -211,6 +212,7 @@ export const paystackGateway: PaymentGateway = {
       reference: isPayment ? (d.reference ?? null) : original,
       // Paystack amounts are in the smallest unit (cents for rand). VERIFY for refunds.
       amountCents: type === "refund_processed" && Number.isSafeInteger(d.amount) ? (d.amount as number) : null,
+      currency: type === "refund_processed" && typeof d.currency === "string" ? d.currency : null,
       detail: type === "dispute_resolved" ? (d.resolution ?? d.status ?? null) : null,
       raw: body,
     };

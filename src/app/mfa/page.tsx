@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { SupportContact } from "@/components/legal";
+import { signedInWithPassword } from "@/lib/auth";
 import { safeNextPath } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 import { CodeField, Enrol } from "./enrol";
@@ -13,13 +14,17 @@ export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
   const next = safeNextPath(sp.next);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/mfa?next=${encodeURIComponent(next)}`)}`);
+  // Only sessions started with an emailed code reach the second step (see auth.ts).
+  if (!user || (await signedInWithPassword(supabase))) redirect(`/login?next=${encodeURIComponent(`/mfa?next=${encodeURIComponent(next)}`)}`);
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.currentLevel === "aal2") redirect(next);
 
   const { data: factors } = await supabase.auth.mfa.listFactors();
   const verified = factors?.totp?.[0]; // listFactors returns verified factors here
-  const error = sp.error === "code" ? "That code didn't work. Check the code and try again." : null;
+  const error =
+    sp.error === "code" ? "That code didn't work. Check the code and try again."
+    : sp.error === "busy" ? "Too many tries. Please wait 15 minutes and try again."
+    : null;
 
   return (
     <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">

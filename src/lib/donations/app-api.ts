@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { platformConfig } from "@/config/platform";
 import { checkoutSchema, cleanPhone, type CheckoutInput } from "./validation";
 
 /**
@@ -7,7 +8,7 @@ import { checkoutSchema, cleanPhone, type CheckoutInput } from "./validation";
  * booleans here and become the checkout form's "on" before the shared rules run.
  */
 const flag = z.boolean().optional();
-const cents = z.number().int().min(0).max(100_000_000);
+const cents = z.number().int().min(0).max(platformConfig.maxDonationCents);
 
 export const appQuoteSchema = z.object({
   slug: z.string().min(1).max(120),

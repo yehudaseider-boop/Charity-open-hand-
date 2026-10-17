@@ -275,6 +275,26 @@ describe("signing in from the app", () => {
     });
   });
 
+  it("a charity admin's session started with a password manages nothing, even with a second step", async () => {
+    await tx(async () => {
+      await as(ids.mealsAdmin);
+      expect((await run("select public.is_charity_admin($1) as ok", [ids.meals])).rows[0].ok).toBe(true);
+      await run("select * from public.charity_donor_list($1)", [ids.meals]); // allowed: no error
+      // Someone who registered the admin's email with a password before they ever signed in, and
+      // added their own authenticator: aal2, but not the emailed code.
+      await as(ids.mealsAdmin, "password");
+      expect((await run("select public.is_charity_admin($1) as ok", [ids.meals])).rows[0].ok).toBe(false);
+      expect((await run("select public.has_second_step() as ok")).rows[0].ok).toBe(false);
+      await run("savepoint d");
+      await expect(run("select * from public.charity_donor_list($1)", [ids.meals])).rejects.toThrow(/Not allowed/);
+      await run("rollback to savepoint d");
+      expect((await run("select count(*)::int as n from public.charity_donations where charity_id = $1", [ids.meals])).rows[0].n).toBe(0);
+      await run("savepoint e");
+      await expect(run("select public.agree_to_policy('2026-10')")).rejects.toThrow(/emailed code/);
+      await run("rollback to savepoint e");
+    });
+  });
+
   it("does nothing for an unconfirmed email, and never takes a donor record an account already has", async () => {
     await tx(async () => {
       await guestDonor("pending@example.co.za");

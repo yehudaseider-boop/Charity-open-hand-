@@ -1,7 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { taxYearFor } from "@/lib/dates";
-import { gatewayByName } from "@/lib/gateway";
+import { gatewayByName, getGateway } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyDonationPaid } from "./notify";
 import { cardSaveWaitingFor, finishCardSave } from "./saved-card";
@@ -27,6 +27,16 @@ export class PersistenceError extends Error {
  * "failed" unless that state is saved, so callers can retry safely (the
  * webhook answers with an error so the gateway sends the event again).
  */
+/** What we already know about a payment, without asking the payment provider. */
+export async function savedOutcome(reference: string): Promise<ConfirmOutcome> {
+  if (!/^[0-9a-f-]{36}$/i.test(reference)) return "not_found";
+  const { data, error } = await createAdminClient().from("donations").select("status").eq("gateway_ref", reference).maybeSingle();
+  if (error) throw new PersistenceError("read the donation", error);
+  if (!data) return "not_found";
+  if (data.status === "paid" || data.status === "failed" || data.status === "review") return data.status;
+  return "pending";
+}
+
 export async function confirmPayment(reference: string): Promise<ConfirmOutcome> {
   if (!/^[0-9a-f-]{36}$/i.test(reference)) return "not_found";
   const db = createAdminClient();
@@ -44,6 +54,11 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
   }
   if (donation.status !== "pending" && donation.status !== "failed") return donation.status as ConfirmOutcome;
 
+  // After a gateway change, an old pending payment can't be checked any more: a person decides.
+  if (donation.gateway !== getGateway().name) {
+    console.warn(`[confirm] donation ${donation.id} is on gateway "${donation.gateway}", not the active one`);
+    return "review";
+  }
   const tx = await gatewayByName(donation.gateway).verifyTransaction(reference);
 
   if (tx.status === "success") {
@@ -57,7 +72,11 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
       });
       return "review";
     }
-    const paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
+    let paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
+    if (Number.isNaN(paidAt.getTime())) {
+      console.warn(`[confirm] unreadable paid_at from the gateway for ${donation.id}: ${String(tx.paidAt)}`);
+      paidAt = new Date();
+    }
     const { data: updated, error } = await db
       .from("donations")
       .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt) })

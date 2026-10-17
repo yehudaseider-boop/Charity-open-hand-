@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { clientIp } from "@/lib/client-ip";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { siteOrigin } from "@/lib/request-origin";
 import { safeNextPath } from "@/lib/safe-path";
@@ -16,9 +17,11 @@ export async function sendLoginLink(formData: FormData) {
   // Keep what they typed if we send them back with a message.
   const back = (error: string) => `/login?error=${error}&next=${encodeURIComponent(next)}&email=${encodeURIComponent(email.slice(0, 200))}`;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect(back("email"));
-  if (await hitRateLimit("login-link", [`email:${email.toLowerCase()}`], 5, 60)) redirect(back("busy"));
+  const h = await headers();
+  // Per address, so one person can't be flooded, and per IP, so one visitor can't flood many addresses.
+  if (await hitRateLimit("login-link", [`email:${email.toLowerCase()}`, `ip:${clientIp(h)}`], 5, 60)) redirect(back("busy"));
 
-  const origin = siteOrigin((await headers()).get("origin") ?? "");
+  const origin = siteOrigin(h.get("origin") ?? "");
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
@@ -38,7 +41,7 @@ export async function verifyLoginCode(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const back = `/login?sent=1&error=code&next=${encodeURIComponent(next)}&email=${encodeURIComponent(email.slice(0, 200))}`;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6,10}$/.test(code)) redirect(back);
-  if (await hitRateLimit("login-code", [`email:${email.toLowerCase()}`], 10, 60)) redirect(back);
+  if (await hitRateLimit("login-code", [`email:${email.toLowerCase()}`, `ip:${clientIp(await headers())}`], 10, 60)) redirect(back);
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
   if (error || !data.user) redirect(back);

@@ -18,7 +18,9 @@ import { Text } from "./text";
  */
 export function ThankYou() {
   const account = useAccount();
-  const demo = useGlobalSearchParams<{ demo?: string }>().demo === "thanks";
+  // Preview only: a link must never make the live app show a gift as arrived.
+  const params = useGlobalSearchParams<{ demo?: string }>();
+  const demo = account.status === "preview" && params.demo === "thanks";
   const [demoOpen, setDemoOpen] = useState(demo);
   const [lastDemo, setLastDemo] = useState(demo);
   if (demo !== lastDemo) {

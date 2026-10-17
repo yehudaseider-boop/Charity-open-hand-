@@ -84,6 +84,8 @@ export type WebhookEvent = {
   reference: string | null;
   /** For a refund: the amount refunded, in cents, when the gateway says. */
   amountCents?: number | null;
+  /** For a refund: the currency of that amount, when the gateway says ("ZAR"). Anything else is held for a person. */
+  currency?: string | null;
   /** For a resolved dispute: the gateway's own word for the outcome, kept for the person who checks it. */
   detail?: string | null;
   raw: unknown;

@@ -788,3 +788,30 @@ Section 18A(2) asks for the donor's name and address on the receipt, and the rec
 ## 17/10/2026: Donor "giving so far" and impact on the website thank-you
 - The app's Progress tab already had the giving goal ring and this tax year's totals by charity. It now lets the donor switch to an earlier tax year or "All time" (totals by charity, s18A split and labels follow the choice).
 - The website's thank-you page now shows the charity's impact line ("What your gift does") once the payment is confirmed and the donor's details are shown, like the app's thank-you screen. Left out when the charity hasn't written one.
+
+## 17/10/2026: Full security and bug review (six independent reviewers, every finding verified)
+
+Yehuda: "check all code and fix any bugs and make sure we are 100% safe and secure". Six read-only reviewers covered the database, money and payments, sign-in and admin, receipts and email, the phone app, and the public website and API. No critical findings. Everything confirmed against the code was fixed the same day; the rest is on the go-live list with a reason.
+
+**Fixed**
+- **A session started with a password could still reach a charity's donors through the dashboard functions and the CSV exports** if it had added its own authenticator (two reviewers found this independently). The 16/10 rule lived on tables only; the dashboard reads through functions that check `is_charity_admin`, which checked the second step alone. `has_second_step()` now also requires the emailed-code sign-in, so every function, view and policy built on it inherits the rule (migration `20261017000001`). The exports and the second-step pages start from the viewer too, and a password session can no longer record "agreed" or enrol an authenticator. Ten wrong second-step codes in 15 minutes now wait.
+- **A charged-back first payment did not stop the monthly donation.** It now cancels it and drops the card (each further collection would be another chargeback); an opened dispute pauses it until a person has looked. A refund leaves it running (a goodwill refund is not a dispute). A refund in another currency is never matched by its number alone.
+- **Sign-in link sending** was limited per address only: a script could send thousands of Givezy emails to different addresses. Now also limited per visitor.
+- **A missing `SITE_URL` in production** fell back to the browser's own address for sign-in links; it now fails instead.
+- **The test gateway** is refused outright wherever `VERCEL_ENV=production`, so no switch can open it on the live site.
+- **The thank-you page** asked the payment provider about a payment for anyone who knew the donation id (ids are not secret). Only the donor's own visit (with the credential from their payment link) does now; everyone else sees the saved state, which the webhook keeps right. Outcome checks are limited per donation instead of per shared address (a shul's Wi-Fi no longer blocks other donors).
+- **Receipts were marked "emailed" even when nothing went out** (the console transport on a local run, or an erased address). The transport now says whether it sent, and only a real send marks the receipt. A receipt with a refunded or charged-back gift on it is never emailed as it stands.
+- **`EMAIL_ALLOWLIST`** for test sites: email goes only to listed addresses or domains, so a test checkout can never email a real donor.
+- **Phone app, saved-card path (switched off):** after a lost reply, a changed amount could have become a second charge; the app now keeps the attempt id until the screen closes. A saved-card charge still pending is no longer shown as sent with the goal ring and streak advanced; the app asks a few more times and otherwise keeps the form. A crafted link could make the live app show a sample "gift arrived"; preview only now. The app refuses a non-https site address for its own API.
+- **One largest gift, R1 000 000**, in `src/config/platform.ts` and enforced where the website and app both price a gift (the website had no ceiling; the app had its own).
+- **Database:** donors can no longer write the encrypted ID columns from the browser (the server never reads them from there); `authenticated` loses insert and delete on charities, charity admins and categories (policies already refused, privileges now do too); the suggested-amounts check refuses a null element and has a ceiling; a processed donation can never be deleted and no link can be added to an issued receipt, by anyone, server included.
+- **Smaller:** a donation left on a gateway that is no longer active is held for a person instead of failing the webhook forever; an unreadable payment date from the gateway no longer breaks confirmation; a charity's thank-you body loses control and direction-override characters; email subjects are one line; `form-action 'self'` in the CSP; a `robots.txt` keeping sign-in, admin and confirmation pages out of search engines.
+
+**Not changed, with the reason**
+- The CSP still allows inline scripts. Moving to nonces touches every page and Next's own scripts; there is no script injection point today (every piece of user text renders as text). Later list.
+- Browser uploads to the charity's own storage folder skip the server's image cleaning. The bucket limits size and type; the server actions already clean what they upload. Later list.
+- Charity documents open inline from their signed link rather than downloading. Different origin from Givezy; later list.
+- Audit rows and used invitations keep an admin's email after an erasure (platform admins only). On the privacy list for Yosef.
+- The phone app's third sign-in or pause tap in the same instant: harmless (the second call fails or repeats), left as is.
+
+**Checked and clean:** webhook signatures (constant-time, raw body), idempotency, no floats anywhere in money, no XSS sinks, no secrets in either bundle, no service-role use from client code, every table under row-level security, tax-year boundaries at Johannesburg midnight, receipt numbering under concurrent runs, per-user storage in the app after switching accounts.
