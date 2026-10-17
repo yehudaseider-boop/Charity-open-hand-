@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
 import { ERASED_DONOR, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
-import { loadDonors } from "@/lib/charity/dashboard-queries";
+import { loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
-import { donorGroup, donorGroups, isDonorGroup } from "@/lib/charity/insights";
+import { donorGroup, donorGroups, isDonorGroup, monthlyByDonor } from "@/lib/charity/insights";
 
 export const metadata: Metadata = { title: "Donors" };
 
@@ -23,7 +23,8 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
 
   const group = isDonorGroup(sp.group) ? sp.group : null;
 
-  const all = await loadDonors(id);
+  const [all, monthlyGifts, monthly] = await Promise.all([loadDonors(id), loadMonthlyGifts(id), loadMonthlyDonations(id)]);
+  const givesMonthly = monthlyByDonor(monthlyGifts, monthly);
   const now = new Date();
   const needle = q.toLowerCase();
   const donors = all.filter(
@@ -86,6 +87,8 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                     {d.donation_count} {d.donation_count === 1 ? "donation" : "donations"}, last on {formatDate(d.last_paid_at)}
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
+                    {givesMonthly.get(d.donor_id) === "active" ? <Badge tone="success">Gives monthly</Badge> : null}
+                    {givesMonthly.get(d.donor_id) === "paused" ? <Badge>Monthly paused</Badge> : null}
                     {d.donor_type !== "individual" ? <Badge>{d.donor_type === "company" ? "Company" : "Trust"}</Badge> : null}
                     {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                     {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}

@@ -90,3 +90,59 @@ export function lastMonths(rows: MonthTotal[], todaySa: string, n = 12): MonthTo
   }
   return out.reverse();
 }
+
+/**
+ * Which donors give monthly right now: a donor with a running monthly donation is "active"; one whose
+ * only monthly donation is paused is "paused". Built from the donor's own gifts (each monthly payment
+ * carries its monthly donation's id) and the monthly donations' statuses.
+ */
+export function monthlyByDonor(
+  gifts: { donor_id: string; recurring_id: string | null }[],
+  monthly: Pick<MonthlyRow, "recurring_id" | "status">[],
+): Map<string, "active" | "paused"> {
+  const status = new Map(monthly.map((m) => [m.recurring_id, m.status]));
+  const out = new Map<string, "active" | "paused">();
+  for (const g of gifts) {
+    const s = g.recurring_id ? status.get(g.recurring_id) : undefined;
+    if (s === "active") out.set(g.donor_id, "active");
+    else if (s === "paused" && out.get(g.donor_id) !== "active") out.set(g.donor_id, "paused");
+  }
+  return out;
+}
+
+export type ReceiptYear = {
+  taxYear: number;
+  /** The tax year that is still running: its receipts come after it ends. */
+  current: boolean;
+  /** Donors who asked for an s18A receipt for a paid gift that year. */
+  donors: number;
+  /** Of those, donors with every such gift on an issued receipt. */
+  receipted: number;
+  /** Paid gifts that asked for a receipt and are not on an issued receipt yet. */
+  waitingCents: number;
+};
+
+/**
+ * s18A progress per tax year, newest first: who asked for a receipt and who has one. Only paid gifts
+ * count (a refunded gift needs no receipt). `onIssuedReceipt` holds the ids of gifts on an issued receipt.
+ */
+export function receiptProgress(
+  gifts: { id: string; donor_id: string; tax_year: number | null; amount_cents: number; wants_18a: boolean; status: string }[],
+  onIssuedReceipt: Set<string>,
+  currentTaxYear: number,
+): ReceiptYear[] {
+  const years = new Map<number, { donors: Set<string>; waiting: Set<string>; waitingCents: number }>();
+  for (const g of gifts) {
+    if (g.status !== "paid" || !g.wants_18a || g.tax_year === null) continue;
+    const y = years.get(g.tax_year) ?? { donors: new Set<string>(), waiting: new Set<string>(), waitingCents: 0 };
+    y.donors.add(g.donor_id);
+    if (!onIssuedReceipt.has(g.id)) {
+      y.waiting.add(g.donor_id);
+      y.waitingCents += Number(g.amount_cents);
+    }
+    years.set(g.tax_year, y);
+  }
+  return [...years]
+    .sort(([a], [b]) => b - a)
+    .map(([taxYear, y]) => ({ taxYear, current: taxYear >= currentTaxYear, donors: y.donors.size, receipted: y.donors.size - y.waiting.size, waitingCents: y.waitingCents }));
+}

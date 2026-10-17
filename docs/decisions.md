@@ -815,3 +815,15 @@ Yehuda: "check all code and fix any bugs and make sure we are 100% safe and secu
 - The phone app's third sign-in or pause tap in the same instant: harmless (the second call fails or repeats), left as is.
 
 **Checked and clean:** webhook signatures (constant-time, raw body), idempotency, no floats anywhere in money, no XSS sinks, no secrets in either bundle, no service-role use from client code, every table under row-level security, tax-year boundaries at Johannesburg midnight, receipt numbering under concurrent runs, per-user storage in the app after switching accounts.
+
+## 17/10/2026: The charity dashboard fills itself, no CRM
+
+Yehuda (after a chat about charity CRMs): add only what Givezy can fill with its own data; small SA charities won't leave their spreadsheets, but they will use a dashboard that fills itself. Skip volunteers, case management, events and full email marketing.
+
+Most of the "at launch" list was already built: the donor list (name, contact, total, number of gifts, last gift, s18A and "anonymous publicly"), the donor journey (new, coming back, gave once, lapsed after 6 months), income this month against last month with monthly and once-off split, and CSV exports of donors and donations. Added now:
+- **"Gives monthly" / "Monthly paused"** on each donor in the list.
+- **"Who has a receipt"** on the s18A receipts page: per tax year, how many donors asked for an s18A receipt, how many have one, and the amount still to be receipted. The running tax year says when its receipts come.
+
+Not built, waiting on Yehuda:
+- **The fee line on the income summary.** The suggestion named a 3% fee; Givezy's decided model is no Givezy fee, with the payment provider's charge paid by the charity, and those rates are still empty in `src/config/platform.ts`. The line goes in once the rates are in, never with a guessed figure.
+- **A paid tier.** Campaigns and impact updates are built and free today. Moving them behind a paid tier is a pricing decision.

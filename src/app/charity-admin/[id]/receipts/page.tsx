@@ -6,6 +6,8 @@ import { canIssue18a } from "@/lib/charities";
 import { SupportContact } from "@/components/legal";
 import { thisTaxYear } from "@/lib/charity/dashboard";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { loadReceiptGifts } from "@/lib/charity/dashboard-queries";
+import { receiptProgress } from "@/lib/charity/insights";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
@@ -33,6 +35,8 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
     if (!data || data.length < 1000) break;
   }
   const taxYear = thisTaxYear(new Date());
+  const { gifts, onIssued } = await loadReceiptGifts(id);
+  const progress = receiptProgress(gifts, onIssued, taxYear.taxYear);
 
   return (
     <div className="space-y-4">
@@ -47,6 +51,37 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
           Your charity can&apos;t issue s18A receipts yet: it needs confirmed s18A approval and a signed receipting mandate.
         </Notice>
       )}
+
+      {progress.length > 0 ? (
+        <Card>
+          <h2 className="font-display text-lg text-indigo">Who has a receipt</h2>
+          <ul className="mt-2 divide-y divide-border text-sm">
+            {progress.map((y) => (
+              <li key={y.taxYear} className="flex items-start justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="font-medium">{y.current ? `Tax year ${y.taxYear} so far` : taxYearLabel(y.taxYear)}</p>
+                  <p className="text-muted">
+                    {y.donors} {y.donors === 1 ? "donor" : "donors"} asked for an s18A receipt
+                    {y.current
+                      ? `. Receipts are issued after ${formatDate(taxYear.end)}.`
+                      : y.receipted === y.donors
+                        ? ", and every one has it."
+                        : `: ${y.receipted} receipted, ${y.donors - y.receipted} still to come.`}
+                  </p>
+                </div>
+                {y.waitingCents > 0 ? (
+                  <div className="shrink-0 text-right">
+                    <p className="font-semibold">{formatRand(y.waitingCents)}</p>
+                    <p className="text-xs text-muted">{y.current ? "to be receipted" : "not receipted yet"}</p>
+                  </div>
+                ) : (
+                  <Badge tone="success">All receipted</Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {receipts && receipts.length > 0 ? (
         <ul className="space-y-2">

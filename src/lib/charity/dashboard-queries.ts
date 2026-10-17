@@ -89,6 +89,42 @@ export async function loadMonthlyDonations(charityId: string): Promise<MonthlyRo
   return rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents), paid_count: n(r.paid_count), paid_cents: n(r.paid_cents) }));
 }
 
+/** Rows of `charity_donations` (paid, refunded or charged back), read page by page. */
+async function allCharityDonations<T>(charityId: string, fields: string, narrow: (q: any) => any = (q) => q): Promise<T[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const supabase = await createClient();
+  const rows: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await narrow(supabase.from("charity_donations").select(fields).eq("charity_id", charityId)).order("id").range(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as T[]));
+    if (!data || data.length < 1000) break;
+  }
+  return rows;
+}
+
+/** Each donor's monthly payments, to mark who gives monthly on the donor list. */
+export function loadMonthlyGifts(charityId: string) {
+  return allCharityDonations<{ donor_id: string; recurring_id: string | null }>(charityId, "donor_id, recurring_id", (q) => q.not("recurring_id", "is", null));
+}
+
+/** Paid gifts that asked for an s18A receipt, and which of them are on an issued receipt. */
+export async function loadReceiptGifts(charityId: string) {
+  const gifts = await allCharityDonations<{ id: string; donor_id: string; tax_year: number | null; amount_cents: number; wants_18a: boolean; status: string }>(
+    charityId,
+    "id, donor_id, tax_year, amount_cents, wants_18a, status",
+    (q) => q.eq("status", "paid").eq("wants_18a", true),
+  );
+  const supabase = await createClient();
+  const onIssued = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("charity_receipt_donations").select("donation_id").eq("charity_id", charityId).eq("status", "issued").order("donation_id").range(from, from + 999);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) onIssued.add(r.donation_id as string);
+    if (!data || data.length < 1000) break;
+  }
+  return { gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })), onIssued };
+}
+
 export const DONATION_FIELDS =
   "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
 
