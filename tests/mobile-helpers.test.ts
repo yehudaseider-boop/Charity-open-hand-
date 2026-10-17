@@ -27,7 +27,7 @@ describe("app tax year (SARS)", () => {
   });
 });
 
-import { groupByMonth, maaserTargetCents, totalInTaxYear } from "../apps/mobile/src/lib/giving";
+import { groupByMonth, maaserTargetCents, taxYearsGiven, totalInTaxYear } from "../apps/mobile/src/lib/giving";
 
 describe("app giving helpers", () => {
   const rows = [
@@ -64,5 +64,17 @@ describe("app hand-off to the website", () => {
     expect(donateUrl("http://example.co.za", "x", "tzedaka")).toBeNull();
     expect(donateUrl("", "x", "tzedaka")).toBeNull();
     expect(donateUrl(undefined, "x", "tzedaka")).toBeNull();
+  });
+});
+
+describe("app giving: tax years given", () => {
+  it("lists the tax years with gifts, newest first, always with the current one", () => {
+    const rows = [
+      { date: new Date(2025, 1, 28) }, // 28/02/2025: tax year 2025
+      { date: new Date(2025, 2, 1) }, // 01/03/2025: tax year 2026
+      { date: new Date(2025, 5, 10) },
+    ];
+    expect(taxYearsGiven(rows, 2027)).toEqual([2027, 2026, 2025]);
+    expect(taxYearsGiven([], 2027)).toEqual([2027]);
   });
 });

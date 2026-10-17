@@ -17,7 +17,7 @@ const row = {
   paid_at: "2026-10-11T10:00:00Z",
   wants_18a: true,
   donation_giving_kinds: { kind: null, label: "Maaser" },
-  charities: { name_en: "Northcliff Meals Fund", slug: "northcliff-meals-fund" },
+  charities: { name_en: "Northcliff Meals Fund", slug: "northcliff-meals-fund", impact_en: "R180 feeds a family of four for a week." as string | null },
 };
 
 let outcome = "paid";
@@ -91,6 +91,17 @@ describe("confirmation page privacy", () => {
     expect(html).toContain("Contribution to Givezy");
     expect(html).toContain("R23.45");
     expect(html).toContain("NL-3F9A2C71");
+  });
+
+  it("the donor sees what their gift does, in the charity's words, and nothing when it has none", async () => {
+    sessionRow = row;
+    expect(await page({})).toContain("R180 feeds a family of four for a week.");
+    sessionRow = { ...row, charities: { ...row.charities, impact_en: "  " } };
+    expect(await page({})).not.toContain("What your gift does");
+  });
+
+  it("the impact line is never shown without the donor's details either", async () => {
+    expect(await page({})).not.toContain("What your gift does");
   });
 
   it("the return-to-app button still shows without the credential", async () => {

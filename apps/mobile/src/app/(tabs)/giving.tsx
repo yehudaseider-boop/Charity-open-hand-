@@ -15,7 +15,7 @@ import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, jhbToday, rand } from "@/lib/format";
-import { byCharity, groupByMonth, percentOf } from "@/lib/giving";
+import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving";
 import { goalProgress, knownLabels, MAX_GOALS, monthTiles, type Goal } from "@/lib/goals";
 import { loadGoals, saveGoals, setAsideGoals } from "@/lib/goals-store";
 import { useJewishMode } from "@/lib/jewish-mode";
@@ -118,8 +118,11 @@ export default function Giving() {
   const taxYear = taxYearFor(now);
   const myGifts = preview ? (newDonor ? [] : gifts) : (account.live?.gifts ?? []);
   const elsewhere: Elsewhere[] = preview ? previewElsewhere : (account.live?.elsewhere ?? []);
-  // "This year in numbers" follows the SARS tax year, like the receipts.
-  const yearGifts = myGifts.filter((g) => taxYearFor(g.date) === taxYear);
+  // "In numbers" follows the SARS tax year, like the receipts: this one, an earlier one, or all time.
+  const years = taxYearsGiven(myGifts, taxYear);
+  const [pickedYear, setPickedYear] = useState<number | "all">(taxYear);
+  const shownYear = pickedYear === "all" || years.includes(pickedYear) ? pickedYear : taxYear;
+  const yearGifts = shownYear === "all" ? myGifts : myGifts.filter((g) => taxYearFor(g.date) === shownYear);
   const giftsTotal = yearGifts.reduce((t, g) => t + g.cents, 0);
   const monthGifts = myGifts.filter((g) => g.date.getMonth() === now.getMonth() && g.date.getFullYear() === now.getFullYear());
   const monthTotal = monthGifts.reduce((t, g) => t + g.cents, 0);
@@ -406,12 +409,32 @@ export default function Giving() {
 
             {myGifts.length > 0 ? (
               <View style={{ gap: 12 }}>
-                <Text variant="h2" style={styles.heading}>This tax year in numbers</Text>
-                <Text variant="label">{taxYearRangeLabel(taxYear)}</Text>
-                <Text style={styles.summary}>
-                  You gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}.
+                <Text variant="h2" style={styles.heading}>
+                  {shownYear === "all" ? "All your giving" : shownYear === taxYear ? "This tax year in numbers" : `Tax year ${shownYear} in numbers`}
                 </Text>
-                {monthTotal > 0 ? <Text variant="bodyMuted">This month so far: {rand(monthTotal)}.</Text> : null}
+                {years.length > 1 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space.gutter }} contentContainerStyle={styles.yearChips} accessibilityRole="radiogroup" accessibilityLabel="Which tax year">
+                    {[...years, "all" as const].map((y) => {
+                      const selected = y === shownYear;
+                      return (
+                        <Pressable key={y} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setPickedYear(y)} style={[styles.goalChip, selected && styles.yearChipOn]}>
+                          <Text style={[styles.goalChipText, selected && { color: colors.onInk }]}>
+                            {y === "all" ? "All time" : y === taxYear ? "This tax year" : `Tax year ${y}`}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+                <Text variant="label">{shownYear === "all" ? `Since your first donation on ${ddmmyyyy(myGifts.reduce((a, g) => (g.date < a ? g.date : a), myGifts[0].date))}` : taxYearRangeLabel(shownYear)}</Text>
+                {yearGifts.length === 0 ? (
+                  <Text variant="bodyMuted">No donations yet this tax year.</Text>
+                ) : (
+                  <Text style={styles.summary}>
+                    You gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}.
+                  </Text>
+                )}
+                {shownYear === taxYear && monthTotal > 0 ? <Text variant="bodyMuted">This month so far: {rand(monthTotal)}.</Text> : null}
                 {charities.length > 0 ? (
                   <View style={styles.list}>
                     {charities.map((c, i) => (
@@ -674,6 +697,8 @@ const styles = StyleSheet.create({
   goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
   goalChipAdd: { borderStyle: "dashed", borderColor: colors.blue },
   goalChipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
+  yearChips: { gap: 8, paddingHorizontal: space.gutter },
+  yearChipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   heading: { fontSize: 22, lineHeight: 28 },
   // Lists are ruled like a ledger: lines above and below, no box.
   list: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },

@@ -42,7 +42,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind, label), charities(name_en, slug)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (await confirmationTokenMatches(ref, t)) {
@@ -51,7 +51,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       d = (await (await createClient()).from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
     }
   }
-  const charity = d?.charities as unknown as { name_en: string; slug: string } | undefined;
+  const charity = d?.charities as unknown as { name_en: string; slug: string; impact_en: string | null } | undefined;
   type LabelRow = { kind: string | null; label: string | null };
   const kindRow = d?.donation_giving_kinds as unknown as LabelRow | LabelRow[] | null | undefined;
   const givingLabel = labelOf(Array.isArray(kindRow) ? kindRow[0] : kindRow);
@@ -67,6 +67,13 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "paid" && d && charity) {
     return (
       <Card title="Thank you">
+        {/* What the gift does, in the charity's own words (left out when it hasn't written one). */}
+        {charity.impact_en?.trim() ? (
+          <div className="mb-4 rounded-card bg-honey-soft p-4">
+            <p className="text-sm font-semibold text-brand">What your gift does</p>
+            <p className="mt-1 font-display text-xl leading-snug text-navy">{charity.impact_en.trim()}</p>
+          </div>
+        ) : null}
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (

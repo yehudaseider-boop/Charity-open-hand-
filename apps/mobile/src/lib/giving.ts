@@ -46,6 +46,13 @@ export function percentOf(partCents: number, totalCents: number): number {
   return totalCents > 0 ? Math.round((partCents * 100) / totalCents) : 0;
 }
 
+/** The SARS tax years the donor gave in, newest first, always with the current one at the top. */
+export function taxYearsGiven(rows: { date: Date }[], current: number): number[] {
+  const years = new Set(rows.map((r) => taxYearFor(r.date)).filter((y) => y <= current));
+  years.add(current);
+  return [...years].sort((a, b) => b - a);
+}
+
 /** Totals per charity, largest first. */
 export function byCharity<T extends { charityName: string; cents: number }>(rows: T[]): { name: string; cents: number }[] {
   const m = new Map<string, number>();

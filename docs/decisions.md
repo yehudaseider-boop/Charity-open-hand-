@@ -784,3 +784,7 @@ Before, a refund or dispute at the payment provider left the donation "paid", so
 ## s18A receipts ask for the donor's address (16/10/2026, built over Shabbos)
 
 Section 18A(2) asks for the donor's name and address on the receipt, and the receipt job already refuses a receipt without it. So ticking "I want an s18A receipt" now also asks for the address (street, optional unit or suburb, city or town, 4-digit postal code), on the website and in the app. A signed-in donor using "my ID ending 1234" can leave it empty: the server uses the address from that same earlier s18A gift, never sent to the phone. No address is asked for when no receipt is wanted.
+
+## 17/10/2026: Donor "giving so far" and impact on the website thank-you
+- The app's Progress tab already had the giving goal ring and this tax year's totals by charity. It now lets the donor switch to an earlier tax year or "All time" (totals by charity, s18A split and labels follow the choice).
+- The website's thank-you page now shows the charity's impact line ("What your gift does") once the payment is confirmed and the donor's details are shown, like the app's thank-you screen. Left out when the charity hasn't written one.
