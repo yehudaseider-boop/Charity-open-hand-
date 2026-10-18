@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
@@ -15,7 +15,8 @@ import { useAccount } from "@/lib/account";
 import { setJewishMode, useJewishMode } from "@/lib/jewish-mode";
 import { SavedCardRow } from "@/components/saved-card-row";
 import { SwitchRow } from "@/components/switch-row";
-import { openSite } from "@/lib/open-site";
+import { notify, openSite } from "@/lib/open-site";
+import { helpLine, helpMailto } from "@/lib/help";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
 /**
@@ -48,7 +49,14 @@ export default function Account() {
       </View>
     </View>
   );
+  // A person to talk to: the support email once there is one, else reply to any email from us.
+  const getHelp = () => {
+    const mail = helpMailto();
+    if (mail) Linking.openURL(mail).catch(() => notify("Get help", helpLine()));
+    else notify("Get help", helpLine());
+  };
   const support = [
+    { label: "Get help", onPress: getHelp },
     { label: "How Givezy works", onPress: () => router.push("/how-it-works") },
     { label: "Privacy Policy", onPress: open("/privacy") },
     { label: "Terms", onPress: open("/terms") },

@@ -31,12 +31,14 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       .from("charity_donations")
       .select(DONATION_FIELDS, { count: "exact" })
       .eq("charity_id", id)
+      .order("paid_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .range((page - 1) * PAGE, page * PAGE - 1),
     filters,
   );
   const [{ data, count, error }, totals] = await Promise.all([query, loadTotals(supabase, id, filters)]);
-  if (error) throw error;
+  // A page past the end (an old link, a typed number) is the database saying "out of range": show page 1's link instead of an error.
+  if (error && error.code !== "PGRST103") throw error;
   const rows = (data ?? []) as unknown as DonationRow[];
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
 
@@ -86,7 +88,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
           aria-label="Search by donor name or email"
           className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
         />
-        <button className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Show</button>
+        <button className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
         </div>
       </form>
 
@@ -146,9 +148,9 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
 
       {pages > 1 ? (
         <div className="flex items-center justify-between text-sm">
-          {page > 1 ? <Link href={href({ page: page - 1 })} className="text-brand underline">← Newer</Link> : <span />}
+          {page > 1 ? <Link href={href({ page: page - 1 })} className="text-brand underline">← Previous</Link> : <span />}
           <span className="text-muted">Page {page} of {pages}</span>
-          {page < pages ? <Link href={href({ page: page + 1 })} className="text-brand underline">Older →</Link> : <span />}
+          {page < pages ? <Link href={href({ page: page + 1 })} className="text-brand underline">Next →</Link> : <span />}
         </div>
       ) : null}
     </div>

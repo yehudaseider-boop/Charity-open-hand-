@@ -1,8 +1,12 @@
 import { z } from "zod";
 
-const optional = (max = 200) => z.string().max(max).optional();
+const tooLong = (max: number) => `Keep it to ${max.toLocaleString("en-ZA").replace(/[\s,]/g, " ")} characters`;
+const optional = (max = 200) => z.string().max(max, tooLong(max)).optional();
 const required = (label: string, max = 200) =>
-  z.string({ error: `${label} is required` }).min(1, `${label} is required`).max(max);
+  z
+    .string({ error: (issue) => (issue.input === undefined ? `Enter the ${label.toLowerCase()}` : undefined) })
+    .min(1, `Enter the ${label.toLowerCase()}`)
+    .max(max, tooLong(max));
 
 /** Hebrew fields must contain Hebrew letters (stops English pasted in by mistake). */
 const hebrew = (max = 200) =>
@@ -44,7 +48,7 @@ export const contactSchema = z.object({
   contact_email: z.email("Enter a valid email address"),
   contact_phone: z
     .string()
-    .regex(/^(\+27|0)\d{9}$/, "Use a South African number, e.g. 082 123 4567")
+    .regex(/^(\+27|0)\d{9}$/, "Use a South African number, for example 082 123 4567")
     .optional()
     .transform((v) => v),
 });
@@ -70,13 +74,17 @@ export const bankSchema = z.object({
 });
 
 export const profileSchema = z.object({
-  name_en: required("Display name", 120),
+  name_en: required("Name", 120),
   description_en: optional(3000),
   funds_use_en: optional(1500),
   thank_you_en: optional(300),
   impact_en: optional(140),
+  // "example.org.za" is how people type it: https:// is added for them.
   website: z
-    .url({ protocol: /^https?$/, error: "Enter a full web address, starting with https://" })
+    .preprocess(
+      (v) => (typeof v === "string" && v.trim() && !/^[a-z]+:\/\//i.test(v.trim()) ? `https://${v.trim()}` : v),
+      z.url({ protocol: /^https?$/, error: "Enter your website address, for example example.org.za" }),
+    )
     .optional(),
 });
 
@@ -100,6 +108,6 @@ export function normalisePhone(v: string | undefined) {
 }
 
 /** A short update from a charity, and a photo caption. */
-export const updateSchema = z.object({ body_en: z.string().min(1, "Write your update").max(500, "Keep it to 500 characters") });
+export const updateSchema = z.object({ body_en: z.string({ error: (i) => (i.input === undefined ? "Write your update" : undefined) }).min(1, "Write your update").max(500, "Keep it to 500 characters") });
 export const photoSchema = z.object({ caption_en: optional(120) });
 export const MAX_PHOTOS = 12;

@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     campaignOpen,
     minGiftCents: platformConfig.minDonationCents,
     minContributionCents: platformConfig.minContributionCents,
+    maxGiftCents: platformConfig.maxDonationCents,
     savedIdLast4,
     suggestedCents: charity?.suggestedCents ?? [],
     savedCardsOpen: cardsOpen,

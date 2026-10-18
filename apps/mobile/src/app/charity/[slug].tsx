@@ -86,7 +86,7 @@ export default function CharityDetail() {
         </View>
 
         <View style={styles.sheet}>
-          {kicker ? <Text style={styles.kickerCaps}>{kicker.toUpperCase()}</Text> : null}
+          {kicker ? <Text style={styles.kickerCaps}>{kicker}</Text> : null}
           <Text accessibilityRole="header" style={styles.name}>{charity.nameEn}</Text>
           {jewish && charity.nameHe ? <HebrewText style={styles.hebrew}>{charity.nameHe}</HebrewText> : null}
           {charity.about[0] ? <Text style={styles.lead}>{charity.about[0]}</Text> : null}
@@ -216,7 +216,7 @@ export default function CharityDetail() {
       {/* Sticky give bar */}
       <View style={[styles.giveBar, { paddingBottom: insets.bottom + 12 }]}>
         <LinearGradient colors={[colors.creamClear, colors.cream]} style={styles.fade} pointerEvents="none" />
-        <Button variant="cta" label={`Give to ${charity.nameEn}`} onPress={() => (GIVE_IN_APP ? openGiveScreen(charity.slug) : setSheetOpen(true))} />
+        <Button variant="cta" label="Give" onPress={() => (GIVE_IN_APP ? openGiveScreen(charity.slug) : setSheetOpen(true))} />
       </View>
 
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)}>
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   cover: { height: 320, borderBottomLeftRadius: 36, borderBottomRightRadius: 36, overflow: "hidden", backgroundColor: colors.lilacSoft },
   badgeOnCover: { position: "absolute", left: space.gutter, bottom: 18 },
   sheet: { paddingHorizontal: space.gutter, paddingTop: 22 },
-  kickerCaps: { fontFamily: fonts.bodyBold, fontSize: 12, letterSpacing: 0.8, color: colors.blue, marginBottom: 6 },
+  kickerCaps: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.blue, marginBottom: 6 },
   name: { fontFamily: fonts.display, fontSize: 34, lineHeight: 39, color: colors.blue },
   hebrew: { fontSize: 19, color: colors.muted, marginTop: 2, textAlign: "right" },
   lead: { fontSize: 18, lineHeight: 27, color: colors.ink, marginTop: 14 },

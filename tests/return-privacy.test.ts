@@ -154,11 +154,11 @@ describe("checking with the payment provider", () => {
 });
 
 describe("trying again", () => {
-  it("a declined campaign gift tries again for the same campaign and giving choice", async () => {
+  it("a declined campaign gift tries again for the same campaign , giving choice and amount", async () => {
     outcome = "failed";
     sessionRow = { ...row, campaign_id: "c0ffee00-0000-4000-8000-000000000001" } as typeof row;
     const html = await page({});
-    expect(html).toContain('href="/c/northcliff-meals-fund/donate?label=Maaser&amp;campaign=c0ffee00-0000-4000-8000-000000000001"');
+    expect(html).toContain('href="/c/northcliff-meals-fund/donate?label=Maaser&amp;campaign=c0ffee00-0000-4000-8000-000000000001&amp;amount=18000"');
   });
 });
 

@@ -1,8 +1,9 @@
 import { parseRandToCents } from "@shared/money";
+import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
@@ -33,12 +34,27 @@ import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { openSite, openUrl } from "@/lib/open-site";
-import { afterPaymentMessage, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
+import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
+import { helpLine } from "@/lib/help";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
 const noGoals: Goal[] = [];
 const noIncome: IncomeEntry[] = [];
+
+/** How a problem is named in "2 things to fix: ...". */
+const FIELD_NAMES: Record<string, string> = {
+  amount: "the amount", extra: "your contribution", first_name: "your first name", last_name: "your surname", email: "your email",
+  phone: "your phone number", id_number: "your ID number", address_line1: "your street address", suburb: "your suburb", city: "your city or town",
+  postal_code: "your postal code", dedication_kind: "the dedication", dedication_name: "the dedication", monthly_authorised: "the monthly authorisation",
+  agreed: "the agreement tick", age_confirmed: "the agreement tick", popia_consent: "the agreement tick", message: "your message",
+};
+/** Which part of the form a problem is in, for scrolling to it. */
+const SECTION_OF: Record<string, string> = {
+  amount: "amount", extra: "extra", first_name: "details", last_name: "details", email: "details", phone: "details",
+  id_number: "s18a", address_line1: "s18a", suburb: "s18a", city: "s18a", postal_code: "s18a", dedication_kind: "dedication",
+  dedication_name: "dedication", monthly_authorised: "monthly", agreed: "agree", age_confirmed: "agree", popia_consent: "agree", message: "note",
+};
 
 /**
  * Give inside the app, on one screen, in as few taps as possible: past amounts are one tap, what
@@ -114,7 +130,16 @@ export default function Give() {
   // The monthly authorisation names an exact total: it counts only for the total that was ticked.
   const [authorisedTotal, setAuthorisedTotal] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<string | null>(null);
+  // What happened, as a red error or a calm note while we wait; `help` adds how to reach a person.
+  const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean } | null>(null);
+  const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => setMessageState(text ? { text, tone, help } : null);
+  // Where each part of the form sits, so a failed tap scrolls to the first thing to fix.
+  const scrollRef = useRef<ScrollView>(null);
+  const [sectionY, setSectionY] = useState<Record<string, number>>({});
+  const at = (key: string) => (e: LayoutChangeEvent) => {
+    const y = e.nativeEvent.layout.y;
+    setSectionY((was) => (was[key] === y ? was : { ...was, [key]: y }));
+  };
   const [busy, setBusy] = useState<false | "opening" | "checking">(false);
   // Two taps in the same frame both see busy as false; the ref stops the second at once.
   const busyRef = useRef(false);
@@ -190,7 +215,15 @@ export default function Give() {
       <View style={styles.screen}>
         <TopBar title="Give" />
         <View style={{ padding: space.gutter, gap: space.md }}>
-          {failed || serverFailed ? (
+          {serverFailed && !failed ? (
+            <View style={{ gap: 12 }} accessibilityRole="alert">
+              <Text variant="h2">We can&apos;t open giving in the app right now</Text>
+              <Text variant="bodyMuted">Nothing has been charged. Check your connection and try again, or give on our website instead.</Text>
+              <Button label="Try again" onPress={retryAll} />
+              <Button label="Give on our website" variant="secondary" onPress={() => openUrl(websiteUrl)} />
+              <Text variant="label">{helpLine()}</Text>
+            </View>
+          ) : failed ? (
             <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retryAll} />
           ) : charity === null ? (
             <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
@@ -233,6 +266,7 @@ export default function Give() {
   const campaign = campaignId ? ((charity.campaigns ?? []).find((c) => c.id === campaignId) ?? null) : null;
   const minGift = server?.minGiftCents ?? 0;
   const minExtra = server?.minContributionCents ?? 0;
+  const maxGift = server?.maxGiftCents ?? null;
   const gift = parseRandToCents(amount);
   const contribution = extra ? parseRandToCents(extraAmount) : 0;
   const total = gift !== null && contribution !== null ? gift + contribution : null;
@@ -279,12 +313,14 @@ export default function Give() {
     const e: Record<string, string> = {};
     if (!gift) e.amount = "Enter an amount in Rand, for example 180 or 180.50";
     else if (gift < minGift) e.amount = `The smallest donation is ${rand(minGift)}`;
+    else if (maxGift !== null && gift > maxGift) e.amount = `The largest donation in the app is ${rand(maxGift)}. For more, please contact us.`;
     if (extra && !contribution) e.extra = "Enter your contribution in Rand, or switch it off";
     else if (extra && contribution !== null && contribution < minExtra) e.extra = `The smallest contribution is ${rand(minExtra)}, or switch it off`;
     if (!first.trim()) e.first_name = "Enter your first name";
     if (!last.trim()) e.last_name = "Enter your surname";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
     if (s18aAvailable && want18a && !usingSavedId && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
+    else if (s18aAvailable && want18a && !usingSavedId && !isValidSaIdNumber(idNumber)) e.id_number = "That doesn't look like a valid SA ID number. Check the 13 digits";
     if (s18aAvailable && want18a && !usingSavedId) {
       if (!street.trim()) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
       if (!town.trim()) e.city = "Enter your city or town";
@@ -297,6 +333,16 @@ export default function Give() {
     if (!agreed) e.agreed = "Please confirm so we can record your donation";
     if ((e.first_name || e.last_name || e.email) && remembered) setEditingDetails(true);
     return e;
+  }
+
+  /** "2 things to fix: your surname and postal code." and scroll up to the first of them. */
+  function showProblems(e: Record<string, string>) {
+    const keys = Object.keys(e);
+    const names = [...new Set(keys.map((k) => FIELD_NAMES[k] ?? "a highlighted field"))];
+    const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+    setMessage(names.length === 1 ? `One thing to fix: ${list}.` : `${names.length} things to fix: ${list}.`);
+    const ys = keys.map((k) => sectionY[SECTION_OF[k] ?? ""]).filter((y): y is number => typeof y === "number");
+    if (ys.length) scrollRef.current?.scrollTo({ y: Math.max(0, Math.min(...ys) - 12), animated: true });
   }
 
   async function give() {
@@ -315,11 +361,11 @@ export default function Give() {
     setMessage(null);
     if (Object.keys(e).length || total === null) {
       haptic.tap();
-      setMessage("Please check the highlighted fields.");
+      showProblems(e);
       return;
     }
     if (!SITE_URL) {
-      setMessage(`This is the preview, so no payment is taken. On the live app this opens the secure payment page for ${rand(total)}.`);
+      setMessage(`This is the preview, so no payment is taken. On the live app this opens the secure payment page for ${rand(total)}.`, "info");
       return;
     }
     setBusy("opening");
@@ -362,17 +408,34 @@ export default function Give() {
       undefined,
       usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
     );
-    // Any answer from our server ends this attempt. No answer keeps its id for the next tap, and so
-    // does "already used with other details": the first tap may have charged, so a changed amount
-    // keeps hitting the same id (and the server's refusal) until this screen is closed.
-    if (r.ok || (!("noReply" in r) && !r.attemptMismatch)) attemptRef.current = null;
+    // A refusal ends this attempt. No answer keeps its id for the next tap, and so does "already
+    // used with other details": the first tap may have charged, so a changed amount keeps hitting
+    // the same id (and the server's refusal) until this screen is closed. A saved-card charge keeps
+    // its id until we know it was paid or declined (below), so "try again" can never charge twice.
+    if (!r.ok && !("noReply" in r) && !r.attemptMismatch) attemptRef.current = null;
+    if (r.ok && !r.charged) attemptRef.current = null;
     if (!r.ok) {
       setBusy(false);
       // A declined saved card: offer the payment page, where another card can be used.
       if (r.savedCardDeclined) setUseSavedCard(false);
+      if ("noReply" in r) {
+        setMessage(
+          payWithSaved
+            ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your details are still here. Tap Give again: we check first, and never charge twice."
+            : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and tap Give again.",
+          payWithSaved ? "wait" : "error",
+        );
+        return;
+      }
+      if (r.fieldErrors) {
+        setErrors(r.fieldErrors);
+        // A problem with a detail folded away under "Giving as" opens it, so it can be seen and fixed.
+        if (remembered && ["first_name", "last_name", "email", "phone"].some((k) => r.fieldErrors?.[k])) setEditingDetails(true);
+        showProblems(r.fieldErrors);
+        return;
+      }
       setMessage(r.quote ? `${r.message} The total is now ${rand(r.quote.totalCents)}.` : r.message);
       if (r.quote) setAuthorisedTotal(null);
-      if (r.fieldErrors) setErrors(r.fieldErrors);
       return;
     }
     const mine = { first_name: details.first_name, last_name: details.last_name, email: details.email, phone: details.phone ?? "" };
@@ -386,7 +449,7 @@ export default function Give() {
         shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
       } catch {
         setBusy(false);
-        setMessage("We couldn't open the payment page. Please try again.");
+        setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here: tap Give to try again.");
         return;
       }
     }
@@ -405,9 +468,12 @@ export default function Give() {
     // Back from the payment page, the website only sends the donor to the app once the gift is paid,
     // so "returned" with the provider still catching up counts. A saved-card charge counts only when paid.
     const finished = outcome === "paid" || (outcome === "pending" && shown === "returned" && !r.charged);
+    // Paid or declined settles a saved-card attempt; anything else keeps its id, so "Give" asks again instead of charging again.
+    if (r.charged && (outcome === "paid" || outcome === "failed")) attemptRef.current = null;
     if (!finished) {
       haptic.tap();
-      setMessage(afterPaymentMessage(outcome === "paid" ? "pending" : outcome));
+      const o = outcome === "paid" ? "pending" : outcome;
+      setMessage(afterPaymentMessage(o, Boolean(r.charged)), afterPaymentTone(o), true);
       return;
     }
     haptic.success();
@@ -425,7 +491,7 @@ export default function Give() {
     <View style={styles.screen}>
       <TopBar title={`Giving to ${charity.nameEn}`} fallback="/discover" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: space.gutter, gap: 18, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: space.gutter, gap: 18, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           {campaign ? <CampaignCard campaign={campaign} compact /> : null}
           {campaignEnded ? (
             <View style={styles.note} accessibilityRole="alert">
@@ -433,7 +499,7 @@ export default function Give() {
             </View>
           ) : null}
           {/* The amount, big, on blue, with what a gift does in the charity's own words. */}
-          <View style={styles.amountCard}>
+          <View style={styles.amountCard} onLayout={at("amount")}>
             <Blob size={120} color={colors.orange} rotate={20} style={{ right: -48, top: -52 }} />
             <Blob size={90} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -50, bottom: -64 }} />
             <Text style={styles.amountKicker}>Your gift</Text>
@@ -446,7 +512,7 @@ export default function Give() {
                 placeholder="0"
                 placeholderTextColor={colors.lilac}
                 accessibilityLabel="Amount in Rand"
-                style={styles.amountInput}
+                style={[styles.amountInput, amount.length > 9 ? { fontSize: 34, lineHeight: 44 } : amount.length > 6 ? { fontSize: 44, lineHeight: 54 } : null]}
               />
             </View>
             {charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
@@ -493,10 +559,10 @@ export default function Give() {
             value={extra}
             onChange={setExtra}
           />
-          {extra ? <Field label="Contribution" prefix="R" keyboardType="decimal-pad" value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `At least ${rand(minExtra)}.` : undefined} /> : null}
+          {extra ? <View onLayout={at("extra")}><Field label="Contribution" prefix="R" keyboardType="decimal-pad" value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `At least ${rand(minExtra)}.` : undefined} /></View> : null}
 
           {showDetailFields ? (
-            <View style={{ gap: 14 }}>
+            <View style={{ gap: 14 }} onLayout={at("details")}>
               <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>About you</Text>
               <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
               <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
@@ -505,7 +571,7 @@ export default function Give() {
               <SwitchRow label="Remember my details on this phone" description="Your name, email and phone, so next time you don't type them. Never your ID number." value={remember} onChange={setRemember} />
             </View>
           ) : (
-            <View style={styles.giver}>
+            <View style={styles.giver} onLayout={at("details")}>
               <View style={{ flex: 1 }}>
                 <Text variant="label">Giving as</Text>
                 <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 16 }} numberOfLines={1}>{first} {last}</Text>
@@ -518,7 +584,7 @@ export default function Give() {
           )}
 
           {s18aAvailable ? (
-            <>
+            <View style={{ gap: 18 }} onLayout={at("s18a")}>
               <SwitchRow label="I want an s18A receipt" description="For your tax return. This charity can issue them." value={want18a} onChange={setWant18a} />
               {want18a && savedLast4 ? (
                 <View style={{ gap: 8 }}>
@@ -536,7 +602,7 @@ export default function Give() {
                   {useSavedId && err("id_number") ? <Text variant="label" style={{ color: colors.danger }}>{err("id_number")}</Text> : null}
                 </View>
               ) : null}
-              {want18a && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" error={err("id_number")} /> : null}
+              {want18a && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" maxLength={13} error={err("id_number")} helper="13 digits. Kept safely on our server for your receipt, never on this phone." /> : null}
               {want18a ? (
                 <View style={{ gap: 10 }}>
                   <Text variant="label">
@@ -548,7 +614,7 @@ export default function Give() {
                   <Field label="Postal code" value={postal} onChangeText={setPostal} keyboardType="number-pad" autoComplete="postal-code" maxLength={4} error={err("postal_code")} />
                 </View>
               ) : null}
-            </>
+            </View>
           ) : null}
           <SwitchRow
             label="Give anonymously"
@@ -557,6 +623,7 @@ export default function Give() {
             onChange={setAnonymous}
           />
 
+          <View onLayout={at("note")}>
           <Field
             label={`Message to ${charity.nameEn} (optional)`}
             value={note}
@@ -566,6 +633,7 @@ export default function Give() {
             error={err("message")}
             helper="The charity sees it with your donation."
           />
+          </View>
 
           {/* Optional: in honour of, or in memory of, someone. */}
           <SwitchRow
@@ -578,7 +646,7 @@ export default function Give() {
             }}
           />
           {dedicating ? (
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 8 }} onLayout={at("dedication")}>
               <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Dedication">
                 {(["honour", "memory"] as const).map((k) => {
                   const on = dedicate === k;
@@ -622,9 +690,9 @@ export default function Give() {
           ) : null}
 
           {isMonthly && total ? (
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 8 }} onLayout={at("monthly")}>
               <Text variant="bodyMuted">
-                Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Monthly gifts are by card only. You can pause or cancel any time in the Giving tab.
+                Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Monthly donations are by card only. You can pause or cancel any time on the Progress tab.
               </Text>
               <CheckRow
                 label={`I authorise Givezy to collect ${rand(total)} from my card every month until I cancel.`}
@@ -634,25 +702,32 @@ export default function Give() {
               />
             </View>
           ) : null}
-        </ScrollView>
-        {/* Pinned: the agreement and the Give button are always in reach. */}
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
-          <CheckRow
-            label={`I am 18 or older. I agree to the Terms and the Privacy Policy, and that my details are shared with ${charity.nameEn} so they can record my donation.`}
-            value={agreed}
-            onChange={setAgreed}
-            error={err("agreed") ?? err("age_confirmed") ?? err("popia_consent")}
-          />
-          <View style={styles.links}>
-            <Pressable onPress={() => openSite("/terms")} accessibilityRole="link" hitSlop={8}>
-              <Text style={styles.link}>Read the Terms</Text>
-            </Pressable>
-            <Pressable onPress={() => openSite("/privacy")} accessibilityRole="link" hitSlop={8}>
-              <Text style={styles.link}>Read the Privacy Policy</Text>
-            </Pressable>
+          {/* The agreement, at the end of the form. Only the total and the Give button stay pinned. */}
+          <View style={{ gap: 10 }} onLayout={at("agree")}>
+            <CheckRow
+              label={`I am 18 or older. I agree to the Terms and the Privacy Policy, and that my details are shared with ${charity.nameEn} so they can record my donation.`}
+              value={agreed}
+              onChange={setAgreed}
+              error={err("agreed") ?? err("age_confirmed") ?? err("popia_consent")}
+            />
+            <View style={styles.links}>
+              <Pressable onPress={() => openSite("/terms")} accessibilityRole="link" hitSlop={8}>
+                <Text style={styles.link}>Read the Terms</Text>
+              </Pressable>
+              <Pressable onPress={() => openSite("/privacy")} accessibilityRole="link" hitSlop={8}>
+                <Text style={styles.link}>Read the Privacy Policy</Text>
+              </Pressable>
+            </View>
           </View>
-
-          {message ? <Text accessibilityRole="alert" style={{ color: SITE_URL ? colors.danger : colors.ink }}>{message}</Text> : null}
+        </ScrollView>
+        {/* Pinned: what happened (if anything), the exact total and the Give button. */}
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
+          {message ? (
+            <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={message.tone === "error" ? undefined : styles.waitNote}>
+              <Text style={{ color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
+              {message.help ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
+            </View>
+          ) : null}
           <View style={{ gap: 8 }}>
             <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
             <Text variant="label" style={{ textAlign: "center" }}>
@@ -682,6 +757,7 @@ const styles = StyleSheet.create({
   question: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy },
   giver: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   note: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
+  waitNote: { padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   links: { flexDirection: "row", gap: 18, marginLeft: 36 },
   link: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue, textDecorationLine: "underline" },
 });

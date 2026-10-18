@@ -8,7 +8,8 @@ import { CharityPhotoCard } from "@/components/charity-photo-card";
 import { GoalRing } from "@/components/goal-ring";
 import { ReceiptsIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
-import { SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
+import { useScreenState } from "@/lib/screen-state";
 import { Text } from "@/components/text";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleGoals } from "@/data/giving";
 import { useAccount } from "@/lib/account";
@@ -43,7 +44,8 @@ export default function Home() {
   // Income logged on the Progress tab, so a goal set as a share of income shows its real target here.
   const income = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
   const directory = useDirectory();
-  const all = directory.data?.charities ?? [];
+  const demoState = useScreenState();
+  const all = preview && demoState === "empty" ? [] : (directory.data?.charities ?? []);
   const saved = savedCharities(useSaved().slugs, all);
   // The causes picked when the app was first opened (on this phone only).
   const [picked, setPicked] = useState<string[]>([]);
@@ -56,7 +58,8 @@ export default function Home() {
 
   const gifts = preview ? sampleGifts : (account.live?.gifts ?? []);
   const elsewhere = preview ? sampleElsewhere : (account.live?.elsewhere ?? []);
-  const firstGift = gifts.length === 0;
+  // "First gift" only when we know: fresh giving from the server with none in it (not while it loads or fails).
+  const firstGift = preview ? demoState === "empty" : account.status === "signed-in" && account.live !== null && !account.live.fromCache && gifts.length === 0;
   const goal = goals.value[0] ?? null;
   const progress = goal ? goalProgress(goal, [...gifts, ...elsewhere], income.value, jhbToday()) : null;
   const counted = goal && progress ? [...gifts, ...elsewhere].filter((g) => g.date >= progress.window.start && g.date <= progress.window.end && counts(goal, g.label)).length : 0;
@@ -116,7 +119,17 @@ export default function Home() {
             <Text style={styles.seeAll}>See all</Text>
           </Pressable>
         </View>
-        {causes.length ? (
+        {(preview && demoState === "error") || (directory.failed && !causes.length) ? (
+          <View style={styles.gutter}>
+            <ErrorState body="We can't load charities right now. Check your connection, then try again." onRetry={directory.retry} />
+          </View>
+        ) : (preview && demoState === "loading") || (!directory.data && !directory.failed) ? (
+          <View style={styles.gutter}><SkeletonBlock height={260} /></View>
+        ) : !causes.length ? (
+          <View style={styles.gutter}>
+            <EmptyState title="No charities here yet" body="New charities join Givezy every week. Have a look again soon." action={{ label: "Go to Discover", onPress: () => router.push("/discover") }} />
+          </View>
+        ) : causes.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingHorizontal: space.gutter }}>
             {causes.map((c) => (
               <CharityPhotoCard key={c.slug} charity={c} live={directory.live} width={268} onGive={(ch) => openGiveScreen(ch.slug)} />

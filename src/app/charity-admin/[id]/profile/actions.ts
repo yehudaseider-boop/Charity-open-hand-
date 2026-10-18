@@ -39,14 +39,20 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
   const viewer = await requireViewer();
   const { charity, categoryIds: categoriesBefore } = await loadCharityForManager(charityId);
   const parsed = profileSchema.safeParse(formToObject(formData));
-  if (!parsed.success) return zodErrors(parsed.error);
-  const v = parsed.data;
   const suggested = parseSuggestedAmounts(
     [1, 2, 3].map((n) => formData.get(`suggested_${n}`)?.toString()),
     platformConfig.minDonationCents,
     formatRand(platformConfig.minDonationCents),
   );
-  if (!suggested.ok) return { ok: false, message: "Please check the highlighted fields.", fieldErrors: suggested.fieldErrors };
+  // Every problem at once, so nobody fixes one lot and then meets another.
+  if (!parsed.success || !suggested.ok) {
+    return {
+      ok: false,
+      message: "Please fix the highlighted fields.",
+      fieldErrors: { ...(parsed.success ? {} : zodErrors(parsed.error).fieldErrors), ...(suggested.ok ? {} : suggested.fieldErrors) },
+    };
+  }
+  const v = parsed.data;
   const categoryIds = formData.getAll("category_ids").map(String).filter(isUuid);
 
   const supabase = await createClient();

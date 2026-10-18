@@ -96,6 +96,14 @@ export function SignIn() {
           await step(setBusy, setError, () => account.verifyCode(sentTo, c));
         }}
       />
+      <TextLink
+        label={busy ? "Sending…" : "Send a new code"}
+        onPress={() => {
+          if (busy) return;
+          setCode("");
+          void step(setBusy, setError, () => account.sendCode(sentTo), () => setError(null));
+        }}
+      />
       <TextLink label="Use a different email" onPress={() => { setSentTo(null); setCode(""); setError(null); }} />
     </View>
   );
@@ -120,7 +128,7 @@ export function Agree() {
       <Check checked={terms} onPress={() => setTerms((v) => !v)} label="I agree to the Terms and the Privacy Policy." />
       <View style={{ flexDirection: "row", gap: 16, paddingLeft: 36 }}>
         <TextLink label="Read the Terms" onPress={() => open("/terms")} />
-        <TextLink label="Privacy Policy" onPress={() => open("/privacy")} />
+        <TextLink label="Read the Privacy Policy" onPress={() => open("/privacy")} />
       </View>
       <Check checked={age} onPress={() => setAge((v) => !v)} label="I am 18 or older." />
       {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}

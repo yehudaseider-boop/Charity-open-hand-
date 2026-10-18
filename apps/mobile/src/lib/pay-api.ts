@@ -101,7 +101,7 @@ export function startPayment(
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null }
+  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
@@ -120,6 +120,7 @@ export async function checkReady(site: string, slug: string, campaignId: string 
         campaignOpen: j.campaignOpen === true,
         minGiftCents: j.minGiftCents,
         minContributionCents: j.minContributionCents,
+        maxGiftCents: Number.isSafeInteger(j.maxGiftCents) && (j.maxGiftCents as number) > 0 ? (j.maxGiftCents as number) : null,
         savedIdLast4: last4,
         suggestedCents: Array.isArray(j.suggestedCents) ? j.suggestedCents.filter((c): c is number => Number.isSafeInteger(c) && c > 0).slice(0, 3) : [],
         savedCardsOpen: j.savedCardsOpen === true,
@@ -191,11 +192,21 @@ export async function paymentStatus(site: string, reference: string, token: stri
   return o === "paid" || o === "failed" || o === "review" || o === "not_found" ? o : "pending";
 }
 
-/** What to tell the donor after the payment page closes, when the gift isn't confirmed as paid. */
-export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">): string {
-  if (outcome === "failed") return "The payment didn't go through and nothing was charged. You can try again, or use another card.";
+/**
+ * What to tell the donor when a gift isn't confirmed as paid: what did and didn't happen, and the one
+ * thing to do now. `savedCard`: charged to a kept card, so there was no payment page to "finish".
+ */
+export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, savedCard = false): string {
+  if (outcome === "failed") return "Your card was declined and nothing was charged. Your details are still here: tap Give to try again, or use another card.";
   if (outcome === "review") return "Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.";
-  return "We haven't had word of this payment yet. If you didn't finish paying, nothing was charged and you can try again. If you did, please wait for your confirmation email before giving again.";
+  if (savedCard) return "Your bank is still confirming this payment. Please don't give again. We'll email you when it's through, and it will show in Progress.";
+  return "We haven't heard from the payment provider yet. If you didn't finish paying, nothing was charged and you can tap Give again. If you did pay, please don't give again: wait for your confirmation email before giving again.";
+}
+
+/** How a message looks: a red error, or a calm note while we wait for an answer. */
+export type MessageTone = "error" | "wait";
+export function afterPaymentTone(outcome: Exclude<PaymentOutcome, "paid">): MessageTone {
+  return outcome === "failed" ? "error" : "wait";
 }
 
 type PastGift = { charitySlug: string; cents: number; date: Date; label: string | null; monthly: boolean };

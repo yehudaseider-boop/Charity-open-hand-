@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/card";
+import { SupportContact } from "@/components/legal";
 import { KeepChecking } from "./keep-checking";
 import { confirmPayment, savedOutcome } from "@/lib/donations/confirm";
 import { formatDate } from "@/lib/dates";
@@ -67,6 +68,8 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (givingLabel) retryParams.set("label", givingLabel);
   // A campaign gift tries again for the same campaign (the donate page says if it has ended since).
   if (d?.campaign_id) retryParams.set("campaign", d.campaign_id);
+  // A declined card tries again with the same amount filled in (the donor's own figure, not a secret).
+  if (outcome === "failed" && d?.amount_cents) retryParams.set("amount", String(d.amount_cents));
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
 
   if (outcome === "paid" && d && charity) {
@@ -124,12 +127,25 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     );
   }
   if (outcome === "failed") {
+    const retryHref = charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities";
     return (
       <Card title="Payment didn't go through">
-        <p className="text-sm">Nothing was charged. You can try again.</p>
-        <Link href={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} className="mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
-          Try again
-        </Link>
+        <p className="text-sm">
+          Nothing was charged. This usually means the card was declined or the payment page was closed. You can try again with the same card or a different one.
+        </p>
+        {fromApp ? (
+          <>
+            <a href={APP_RETURN_LINK} className="pressable mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
+              Back to the Givezy app
+            </a>
+            <Link href={retryHref} className="mt-3 inline-block text-sm text-brand underline">Try again on the website</Link>
+          </>
+        ) : (
+          <Link href={retryHref} className="pressable mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
+            Try again
+          </Link>
+        )}
+        <p className="mt-4 text-sm text-muted">Need help? <HelpLine /></p>
       </Card>
     );
   }
@@ -137,6 +153,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Card title="We're checking this payment">
         <p className="text-sm">Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
+        <p className="mt-3 text-sm text-muted">Questions in the meantime? <HelpLine /></p>
       </Card>
     );
   }
@@ -150,8 +167,15 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   }
   return (
     <Card title="Donation not found">
-      <p className="text-sm text-muted">We couldn&apos;t find that donation. If you were charged, your confirmation email has the reference.</p>
+      <p className="text-sm text-muted">
+        We couldn&apos;t find that donation. If money left your account, send us the date and the amount and we&apos;ll find it: <HelpLine />
+      </p>
       <Link href="/charities" className="mt-4 inline-block text-sm text-brand underline">Find a charity</Link>
     </Card>
   );
+}
+
+/** A person to reach: the support address once there is one. */
+function HelpLine() {
+  return <><SupportContact />.</>;
 }

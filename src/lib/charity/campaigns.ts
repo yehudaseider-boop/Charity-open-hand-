@@ -22,7 +22,12 @@ export function checkCampaign(raw: Record<string, string | undefined>, today: st
   const fieldErrors: Record<string, string> = {};
   if (!parsed.success) for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
   const targetCents = parseRandToCents(raw.target ?? "");
-  if (!fieldErrors.target && (targetCents === null || targetCents < 100)) fieldErrors.target = "Enter the goal in Rand, for example 50000";
+  if (!fieldErrors.target) {
+    if (/\d,\d{3}\b/.test(raw.target ?? "")) fieldErrors.target = "Use a space or nothing for thousands, for example 50000 or 50 000";
+    else if (targetCents === null) fieldErrors.target = "Enter the goal in Rand, for example 50000";
+    else if (targetCents < 10_000) fieldErrors.target = "Goals start at R100";
+    else if (targetCents > 10_000_000_000) fieldErrors.target = "Goals can be up to R100 000 000";
+  }
   if (raw.ends_on && !fieldErrors.ends_on && raw.ends_on < today) fieldErrors.ends_on = "Choose today or a later date";
   if (!parsed.success || Object.keys(fieldErrors).length) return { ok: false, fieldErrors };
   return {

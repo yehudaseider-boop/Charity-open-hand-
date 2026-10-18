@@ -65,7 +65,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
       {charity.status === "approved" ? (
         <Notice tone="success">
           Approved. You can update your public profile any time.{" "}
-          <Link href={`/charity-admin/${id}/profile`} className="underline">Edit profile</Link>
+          <Link href={`/charity-admin/${id}/profile`} className="underline">Public profile</Link>
         </Notice>
       ) : null}
 

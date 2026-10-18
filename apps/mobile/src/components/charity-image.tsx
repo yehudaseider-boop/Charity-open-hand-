@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Image, StyleSheet, View, type ViewStyle } from "react-native";
 import { initials } from "@shared/charity/initials";
 import type { Charity } from "@/data/sample";
@@ -32,14 +33,16 @@ export function CharityImage({
   bare?: boolean;
 }) {
   const shape = [styles.box, rounded && { borderRadius: compact ? radius.control : radius.card }, style];
-  if (charity.coverUrl) {
+  // A photo that can't load (no connection, moved) shows the blue block instead of an empty box.
+  const [broken, setBroken] = useState<string | null>(null);
+  if (charity.coverUrl && broken !== charity.coverUrl) {
     return (
       <View style={shape}>
-        <Image source={{ uri: charity.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`Photo from ${charity.nameEn}`} />
+        <Image source={{ uri: charity.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`Photo from ${charity.nameEn}`} onError={() => setBroken(charity.coverUrl ?? null)} />
       </View>
     );
   }
-  if (live || bare) {
+  if (live || bare || broken) {
     const s = compact ? 0.45 : 1;
     return (
       <View style={[shape, styles.centre, styles.blue]} accessible={false}>

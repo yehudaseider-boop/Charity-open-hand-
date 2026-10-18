@@ -20,7 +20,7 @@ export function parseSuggestedAmounts(typed: (string | null | undefined)[], minC
     const c = parseRandToCents(text);
     if (c === null) fieldErrors[key] = "Enter an amount in Rand, for example 180";
     else if (c < minCents) fieldErrors[key] = `The smallest donation is ${minLabel}`;
-    else if (c > 100_000_000) fieldErrors[key] = "Choose a smaller amount";
+    else if (c > 100_000_000) fieldErrors[key] = "Suggested amounts can be up to R1 000 000";
     else if (cents.includes(c)) fieldErrors[key] = "You already have this amount";
     else cents.push(c);
   });

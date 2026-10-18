@@ -82,7 +82,9 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
     case "address_saved":
       return { what: "Your address is saved.", next: { label: "Next: your contact person", href: app("contact") } };
     case "contact_saved":
-      return { what: `Your contact person is saved. We'll email ${d.email ? String(d.email) : "them"} about your application.`, next: { label: "Next: your bank account", href: app("bank") } };
+      return c.approved
+        ? { what: `Your contact person is saved. We'll email ${d.email ? String(d.email) : "them"} about your charity.`, next: { label: "Back to your overview", href: c.base } }
+        : { what: `Your contact person is saved. We'll email ${d.email ? String(d.email) : "them"} about your application.`, next: { label: "Next: your bank account", href: app("bank") } };
     case "bank_saved":
       return { what: `Your bank account ending ${String(d.last4 ?? "")} is saved. We check it before you go live.`, next: { label: "Next: upload your documents", href: app("documents") } };
     case "document_uploaded":
@@ -132,6 +134,18 @@ export function describeUndone(kind: ActionKind, d: Details): string {
       return "This can't be taken back.";
   }
 }
+
+/** The dashboard page an action's panel belongs on. */
+export function pageOf(kind: ActionKind): string {
+  if (["profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off"].includes(kind)) return "profile";
+  if (kind.startsWith("campaign_")) return "campaigns";
+  if (kind.startsWith("update_") || kind.startsWith("photo_")) return "updates";
+  if (kind === "thank_you_sent") return "thank-donors";
+  return "application";
+}
+
+/** A panel is for the moment just after the action: links opened a day later show nothing. */
+export const PANEL_HOURS = 24;
 
 export function isActionKind(s: unknown): s is ActionKind {
   return typeof s === "string" && KINDS.has(s as ActionKind);

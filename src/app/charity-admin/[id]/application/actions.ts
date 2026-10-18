@@ -36,7 +36,11 @@ const back = (charityId: string, step: string, done: string) => `/charity-admin/
 
 /** Turn a database refusal (from our guard triggers) into a readable message. */
 function refusal(error: { message: string } | null, rows: unknown[] | null): FormState | null {
-  if (error) return { ok: false, message: error.message };
+  if (error) {
+    console.error("[application]", error.message);
+    if (/locked|submitted/i.test(error.message)) return { ok: false, message: "Your application has been submitted, so your details are locked while we review them." };
+    return { ok: false, message: "That didn't save, so nothing was changed. Please try again." };
+  }
   if (!rows || rows.length === 0) return { ok: false, message: "You can't edit this charity." };
   return null;
 }

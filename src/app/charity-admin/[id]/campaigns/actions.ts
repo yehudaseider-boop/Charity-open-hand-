@@ -17,7 +17,7 @@ export async function startCampaign(charityId: string, _prev: FormState, formDat
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
   const checked = checkCampaign(formToObject(formData), saDate(new Date()));
-  if (!checked.ok) return { ok: false, message: "Please check the highlighted fields.", fieldErrors: checked.fieldErrors };
+  if (!checked.ok) return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: checked.fieldErrors };
   const v = checked.value;
   const supabase = await createClient();
   const { data: made, error } = await supabase.from("campaigns").insert({

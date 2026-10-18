@@ -31,6 +31,9 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   const fromApp = sp.from === "app";
   const kind = typeof sp.kind === "string" && Object.hasOwn(givingKinds, sp.kind) ? givingKinds[sp.kind as keyof typeof givingKinds] : null;
   const initialLabel = cleanLabel(sp.label) ?? kind ?? undefined;
+  // Trying again after a declined card keeps the amount the donor chose.
+  const again = typeof sp.amount === "string" && /^\d{1,12}$/.test(sp.amount) ? Number(sp.amount) : 0;
+  const initialAmountCents = again > 0 && again <= platformConfig.maxDonationCents ? again : undefined;
   const charity = await loadDonatableCharity(slug);
   if (!charity) notFound();
   // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift).
@@ -57,6 +60,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           suggestedCents={charity.suggestedCents}
           contributionMinimumLabel={formatRand(platformConfig.minContributionCents)}
           initialLabel={initialLabel}
+          initialAmountCents={initialAmountCents}
           fromApp={fromApp}
           campaign={campaign ? { id: campaign.id, title: campaign.title } : undefined}
           account={account}

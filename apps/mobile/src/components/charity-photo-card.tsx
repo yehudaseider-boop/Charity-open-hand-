@@ -54,7 +54,7 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
         <CheckedBadge issues18a={charity.issues18a} style={styles.badgeOnPhoto} />
       </View>
       <View style={styles.body}>
-        {kicker ? <Text style={styles.kicker} numberOfLines={1}>{kicker.toUpperCase()}</Text> : null}
+        {kicker ? <Text style={styles.kicker} numberOfLines={1}>{kicker}</Text> : null}
         <Text style={styles.name} numberOfLines={2}>{charity.nameEn}</Text>
         <Text variant="bodyMuted" numberOfLines={2} style={{ fontSize: 15, lineHeight: 21 }}>{charity.cause}</Text>
         {pct !== null ? (
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   badge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.navy },
   body: { padding: 16, gap: 4 },
-  kicker: { fontFamily: fonts.bodyBold, fontSize: 12, letterSpacing: 0.8, color: colors.blue },
+  kicker: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.blue },
   name: { fontFamily: fonts.display, fontSize: 21, lineHeight: 26, color: colors.navy },
   track: { height: 8, borderRadius: 4, backgroundColor: colors.lightPurple, overflow: "hidden" },
   fill: { height: 8, borderRadius: 4, backgroundColor: colors.orange },

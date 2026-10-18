@@ -1,9 +1,9 @@
 "use client";
 
-import { startTransition, useActionState, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
-import { TermsAndPrivacyLinks } from "@/components/legal";
+import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
 import { TextArea, TextField } from "@/components/forms/fields";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
@@ -18,6 +18,8 @@ type Props = {
   contributionMinimumLabel: string;
   /** The label the donor chose in the app, carried over. */
   initialLabel?: string;
+  /** Trying again after a declined card: the amount they chose last time. */
+  initialAmountCents?: number;
   /** The donor came from the phone app, so the confirmation offers a way back to it. */
   fromApp: boolean;
   /** Giving to one of the charity's campaigns: once-off only. */
@@ -26,8 +28,37 @@ type Props = {
   account?: { email: string; savedIdLast4: string | null };
 };
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, fromApp, campaign, account }: Props) {
-  const [quoteState, requestQuote, quoting] = useActionState(getQuote.bind(null, slug), { ok: false } as QuoteState);
+/** As the donor would type it: 180, 180.50. */
+const centsToInput = (c: number) => (c % 100 ? `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}` : String(c / 100));
+
+/**
+ * A dropped connection or a server error at Continue or Pay stays on this page, with everything typed
+ * kept, and says plainly that nothing was charged (the card is only ever entered on the payment page,
+ * so nothing can be charged before it opens). Next's own redirect to the payment page still goes through.
+ */
+function offlineOrDown(e: unknown, step: "quote" | "pay"): { ok: false; message: string } {
+  const digest = (e as { digest?: unknown } | null)?.digest;
+  if (typeof digest === "string" && digest.startsWith("NEXT_")) throw e;
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  if (step === "quote") {
+    return { ok: false, message: offline ? "You're offline. Check your connection and press Continue again." : "We couldn't check that amount just now. Please press Continue again in a moment." };
+  }
+  return {
+    ok: false,
+    message: offline
+      ? "You're offline, so your payment wasn't started. Nothing was charged. What you typed is still here. Check your connection and press Pay again."
+      : "We couldn't start your payment. Nothing was charged. What you typed is still here. Please try again in a minute.",
+  };
+}
+
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account }: Props) {
+  const [quoteState, requestQuote, quoting] = useActionState(async (prev: QuoteState, fd: FormData): Promise<QuoteState> => {
+    try {
+      return await getQuote(slug, prev, fd);
+    } catch (e) {
+      return offlineOrDown(e, "quote");
+    }
+  }, { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -39,10 +70,13 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
   const fresh = quoteState.ok ? quoteState.quote : undefined;
   if (fresh && fresh !== kept) setKept(fresh);
   const quote = fresh ?? kept;
+  // The amount's problem sits right under the box, and goes once the donor edits it.
+  const amountError = !quoteState.ok && quoteState.message && !editingAmount ? quoteState.message : null;
 
   return (
     <div className="space-y-4">
       <form
+        noValidate
         className="space-y-3 rounded-card bg-honey-soft p-5 sm:p-6"
         onSubmit={(e) => {
           e.preventDefault();
@@ -60,7 +94,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                 type="button"
                 onClick={() => {
                   if (!amountRef.current) return;
-                  amountRef.current.value = c % 100 ? `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}` : String(c / 100);
+                  amountRef.current.value = centsToInput(c);
                   amountRef.current.focus();
                   setEditingAmount(true);
                 }}
@@ -81,6 +115,10 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
               inputMode="decimal"
               autoComplete="off"
               required
+              maxLength={16}
+              defaultValue={initialAmountCents ? centsToInput(initialAmountCents) : undefined}
+              aria-invalid={amountError ? true : undefined}
+              aria-describedby={amountError ? "amount-error" : undefined}
               onChange={() => setEditingAmount(true)}
               className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl text-navy outline-none"
             />
@@ -89,6 +127,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
+        {amountError ? <p id="amount-error" role="alert" className="text-sm text-danger">{amountError}</p> : null}
         <p className="text-xs text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
 
         <div className="space-y-2 rounded-control bg-surface p-3">
@@ -116,6 +155,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                   inputMode="decimal"
                   autoComplete="off"
                   required
+                  maxLength={16}
                   onChange={() => setEditingAmount(true)}
                   className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
                 />
@@ -124,7 +164,6 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             </div>
           ) : null}
         </div>
-        {!quoteState.ok && quoteState.message ? <p role="alert" className="text-sm text-danger">{quoteState.message}</p> : null}
       </form>
 
       {quote ? (
@@ -185,10 +224,14 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
     setShownQuote(quote);
   }
   const [state, dispatch, pending] = useActionState(
-    async (prev: CheckoutState, fd: FormData) => {
-      const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, campaign?.id, prev, fd);
-      if (next.quote) setShownQuote(next.quote);
-      return next;
+    async (prev: CheckoutState, fd: FormData): Promise<CheckoutState> => {
+      try {
+        const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, campaign?.id, prev, fd);
+        if (next.quote) setShownQuote(next.quote);
+        return { ...next, failedToStart: false };
+      } catch (e) {
+        return { ...offlineOrDown(e, "pay"), failedToStart: true };
+      }
     },
     { ok: false } as CheckoutState,
   );
@@ -196,10 +239,20 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   const [want18a, setWant18a] = useState(false);
   const [monthly, setMonthly] = useState(false);
   const org = donorType !== "individual";
+  const formRef = useRef<HTMLFormElement>(null);
+  // After a refusal, take the donor to the first thing to fix (it may be far above the Pay button).
+  useEffect(() => {
+    if (!state.fieldErrors) return;
+    const first = formRef.current?.querySelector<HTMLElement>("[aria-invalid=true]");
+    first?.focus();
+    first?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [state]);
 
   return (
     <FormStateProvider state={state}>
       <form
+        ref={formRef}
+        noValidate
         className="space-y-4 rounded-card border border-border bg-surface p-5"
         onSubmit={(e) => {
           e.preventDefault();
@@ -224,28 +277,28 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         {org ? (
           <>
-            <TextField name="organisation_name" label={donorType === "company" ? "Company name" : "Trust name"} required autoComplete="organization" />
-            <TextField name="registration_number" label="Registration number" required={want18a} />
-            <TextField name="contact_person" label="Contact person" required autoComplete="name" />
+            <TextField name="organisation_name" label={donorType === "company" ? "Company name" : "Trust name"} required autoComplete="organization" maxLength={200} />
+            <TextField name="registration_number" label="Registration number" required={want18a} maxLength={40} />
+            <TextField name="contact_person" label="Contact person" required autoComplete="name" maxLength={120} />
           </>
         ) : (
           <>
-            <TextField name="first_name" label="First name" required autoComplete="given-name" />
-            <TextField name="last_name" label="Surname" required autoComplete="family-name" />
+            <TextField name="first_name" label="First name" required autoComplete="given-name" maxLength={80} />
+            <TextField name="last_name" label="Surname" required autoComplete="family-name" maxLength={80} />
           </>
         )}
-        <TextField name="email" label="Email" type="email" required autoComplete="email" defaultValue={account?.email} hint="Your confirmation goes here." />
-        <TextField name="phone" label="Phone" type="tel" autoComplete="tel" hint="Optional." />
+        <TextField name="email" label="Email" type="email" required autoComplete="email" defaultValue={account?.email} hint="Your confirmation goes here." maxLength={254} />
+        <TextField name="phone" label="Phone" type="tel" autoComplete="tel" hint="Only for questions about your donation." maxLength={20} />
 
         {receiptsAvailable ? (
           <div className="space-y-3 rounded-control bg-bg p-3">
             <label className="flex items-start gap-2 text-sm font-medium">
               <input type="checkbox" name="wants_18a" className="mt-1" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
-              <span>I want an s18A tax receipt</span>
+              <span>I want an s18A receipt</span>
             </label>
             <Info terms={["s18a"]} label="an s18A receipt" />
-            {want18a ? (
-              <div className="space-y-3">
+            {/* Hidden, not removed, so unticking and ticking again keeps what was typed. Disabled, it isn't sent. */}
+            <fieldset hidden={!want18a} disabled={!want18a} className="space-y-3">
                 <p className="text-xs text-muted">
                   You&apos;ll get one s18A receipt for all your donations to {charityName} each tax year.
                 </p>
@@ -271,9 +324,9 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                 {org || !(account?.savedIdLast4 && useSavedId) ? (
                   <>
                     {org ? null : (
-                      <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." />
+                      <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." maxLength={13} />
                     )}
-                    <TextField name="tax_reference" label="Income tax number" inputMode="numeric" hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
+                    <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={10} hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
                   </>
                 ) : null}
                 <fieldset className="space-y-3">
@@ -282,14 +335,13 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                     SARS needs it on the receipt.
                     {!org && account?.savedIdLast4 && useSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
                   </p>
-                  <TextField name="address_line1" label="Street address" autoComplete="address-line1" />
-                  <TextField name="address_line2" label="Unit, complex or building" autoComplete="address-line2" />
-                  <TextField name="suburb" label="Suburb" autoComplete="address-level3" />
-                  <TextField name="city" label="City or town" autoComplete="address-level2" />
-                  <TextField name="postal_code" label="Postal code" inputMode="numeric" autoComplete="postal-code" />
+                  <TextField name="address_line1" label="Street address" autoComplete="address-line1" maxLength={200} />
+                  <TextField name="address_line2" label="Unit, complex or building" autoComplete="address-line2" maxLength={200} />
+                  <TextField name="suburb" label="Suburb" autoComplete="address-level3" maxLength={80} />
+                  <TextField name="city" label="City or town" autoComplete="address-level2" maxLength={80} />
+                  <TextField name="postal_code" label="Postal code" inputMode="numeric" autoComplete="postal-code" maxLength={4} />
                 </fieldset>
-              </div>
-            ) : null}
+            </fieldset>
           </div>
         ) : (
           <p className="rounded-control bg-warning-soft p-3 text-xs text-warning">
@@ -299,7 +351,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         <TextField
           name="giving_label"
-          label="Your label (optional)"
+          label="Your label"
+          maxLength={80}
           defaultValue={initialLabel}
           autoDirection
           hint="Only you see it, in your giving records. For example: Work giving, Family, or Maaser."
@@ -307,7 +360,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         <Dedicate error={state.fieldErrors?.dedication_name} />
 
-        <TextArea name="message" label={`Message to ${charityName}`} rows={3} />
+        <TextArea name="message" label={`Message to ${charityName}`} rows={3} maxLength={500} />
 
         {/* Campaign gifts are once-off: a monthly gift would carry on after the campaign ends. */}
         {campaign ? null : <div className="space-y-2 rounded-control bg-bg p-3">
@@ -349,7 +402,12 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         <button disabled={pending || stale} className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy disabled:opacity-60">
           {pending ? "Please wait…" : monthly ? `Pay ${formatRand(shownQuote.totalCents)} now, then monthly` : `Pay ${formatRand(shownQuote.totalCents)}`}
         </button>
-        {state.message ? <p role="status" className="text-sm text-danger">{state.message}</p> : null}
+        {state.message ? (
+          <div role="alert" className="space-y-1 text-sm text-danger">
+            <p>{state.message}</p>
+            {state.failedToStart ? <p className="text-muted">If it keeps happening: <SupportContact />.</p> : null}
+          </div>
+        ) : null}
         <p className="text-xs text-muted">You&apos;ll enter your card details on the payment provider&apos;s secure page. We never see or store them.</p>
       </form>
     </FormStateProvider>
@@ -373,9 +431,9 @@ function Dedicate({ error }: { error?: string }) {
           </label>
         ))}
       </div>
-      {kind !== "none" ? (
-        <TextField name="dedication_name" label="Their name" required autoDirection hint={`${charityLabel(kind)} The charity sees this name; it is not on your s18A receipt.`} />
-      ) : null}
+      <fieldset hidden={kind === "none"} disabled={kind === "none"}>
+        <TextField name="dedication_name" label="Their name" required autoDirection maxLength={200} hint={`${charityLabel(kind === "memory" ? "memory" : "honour")} The charity sees this name; it is not on your s18A receipt.`} />
+      </fieldset>
       {error && kind === "none" ? <p className="text-xs text-danger">{error}</p> : null}
     </fieldset>
   );

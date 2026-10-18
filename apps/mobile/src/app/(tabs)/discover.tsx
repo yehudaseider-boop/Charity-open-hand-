@@ -137,7 +137,7 @@ function CauseOfTheWeek({ charity, live }: { charity: Charity; live: boolean }) 
       <View style={styles.weekShade} />
       <CheckedBadge issues18a={charity.issues18a} style={{ alignSelf: "flex-start" }} />
       <View style={{ flex: 1 }} />
-      <Text style={styles.weekKicker}>CAUSE OF THE WEEK</Text>
+      <Text style={styles.weekKicker}>Cause of the week</Text>
       <Text style={styles.weekName} numberOfLines={2}>{charity.nameEn}</Text>
       <Text style={styles.weekLine} numberOfLines={2}>{charity.cause}</Text>
     </PressableScale>
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   listHead: { fontFamily: fonts.bodyBold, fontSize: 14, letterSpacing: 0.3, color: colors.muted },
   week: { minHeight: 300, borderRadius: radius.card, overflow: "hidden", padding: 18, gap: 4 },
   weekShade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.navy, opacity: 0.55 },
-  weekKicker: { fontFamily: fonts.bodyBold, fontSize: 12, letterSpacing: 0.8, color: colors.lilac },
+  weekKicker: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.lilac },
   weekName: { fontFamily: fonts.display, fontSize: 30, lineHeight: 35, color: colors.onInk },
   weekLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft },
 });

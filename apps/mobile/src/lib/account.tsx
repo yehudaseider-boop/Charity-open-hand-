@@ -55,6 +55,13 @@ type AccountValue = {
 
 const AccountContext = createContext<AccountValue | null>(null);
 
+const NO_CONNECTION = "We couldn't reach Givezy. Check your connection and try again.";
+
+/** No connection or no answer, as opposed to a real "no" from the sign-in service. */
+function isNetworkError(error: { name?: string; status?: number }): boolean {
+  return error.name === "AuthRetryableFetchError" || error.status === 0 || error.status === undefined;
+}
+
 export function useAccount(): AccountValue {
   const v = useContext(AccountContext);
   if (!v) throw new Error("useAccount must be used inside AccountProvider");
@@ -336,12 +343,17 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       async sendCode(email) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
-        return error ? { ok: false, message: "We couldn't send the code. Please check the address and try again in a minute." } : { ok: true };
+        if (!error) return { ok: true };
+        if (isNetworkError(error)) return { ok: false, message: NO_CONNECTION };
+        if (error.status === 429) return { ok: false, message: "We've just sent you a code. Please wait a minute before asking for another." };
+        return { ok: false, message: "We couldn't send the code. Please check the address and try again in a minute." };
       },
       async verifyCode(email, code) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
-        return error ? { ok: false, message: "That code didn't work or has expired. Check it, or ask for a new one." } : { ok: true };
+        if (!error) return { ok: true };
+        if (isNetworkError(error)) return { ok: false, message: `${NO_CONNECTION} Your code still works for a few minutes.` };
+        return { ok: false, message: "That code didn't work or has expired. Check it, or tap Send a new code." };
       },
       async signInWith(provider) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };

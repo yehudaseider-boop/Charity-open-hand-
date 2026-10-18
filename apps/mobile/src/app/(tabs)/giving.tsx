@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
@@ -14,7 +14,9 @@ import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
 import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
-import { ddmmyyyy, jhbToday, rand } from "@/lib/format";
+import { ddmmyyyy, hhmm, jhbToday, rand } from "@/lib/format";
+import { openGiveScreen } from "@/lib/give-entry";
+import { helpLine } from "@/lib/help";
 import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving";
 import { goalProgress, knownLabels, MAX_GOALS, monthTiles, type Goal } from "@/lib/goals";
 import { loadGoals, saveGoals, setAsideGoals } from "@/lib/goals-store";
@@ -72,12 +74,14 @@ export default function Giving() {
   const persistGoals = async (g: Goal[], forOwner: string | null) => {
     const r = await saveGoals(g, forOwner);
     setGoalsSaveFailedFor(r.ok ? null : { owner: forOwner });
+    return r.ok;
   };
-  const putGoals = (next: Goal[]) => {
+  const putGoals = (next: Goal[], said = "Goal saved.") => {
     goalsRecord.setValue(next);
-    if (!preview) void persistGoals(next, owner);
     setEditing(null);
-    setSaved(true);
+    if (preview) return setSaved(said);
+    setSaved("Saving…");
+    void persistGoals(next, owner).then((ok) => setSaved(ok ? said : null));
   };
   // Income (for a goal set as a share of income) stays on this phone only. Nothing is logged until the saved log has loaded.
   const incomeRecord = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
@@ -106,7 +110,16 @@ export default function Giving() {
   const [recurringError, setRecurringError] = useState<string | null>(null);
   // Which goal is open in the editor: its id, "new", or none.
   const [editing, setEditing] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // "Saving…", then "Goal saved." once the phone has kept it (never before).
+  const [saved, setSaved] = useState<string | null>(null);
+  // What just happened, with a way to take it back, for a few seconds after a removal or a monthly change.
+  const [undo, setUndo] = useState<{ text: string; label?: string; run?: () => void } | null>(null);
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), 10_000);
+    return () => clearTimeout(t);
+  }, [undo]);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [sampleRecurringState, setRecurring] = useState<Recurring[]>(newDonor ? [] : sampleRecurring);
   const recurring = preview ? sampleRecurringState : (account.live?.recurring ?? []);
   const [open, setOpen] = useState<Recurring | null>(preview ? (sampleRecurring.find((r) => r.id === p.sheet) ?? null) : null);
@@ -148,25 +161,54 @@ export default function Giving() {
   };
   const removeIncome = (id: string) => {
     if (!incomeReady) return;
+    const before = income;
     const next = income.filter((e) => e.id !== id);
     incomeRecord.setValue(next);
     void persistIncome(next, owner);
+    setUndo({ text: "Income entry removed.", label: "Undo", run: () => { incomeRecord.setValue(before); void persistIncome(before, owner); setUndo({ text: "Taken back. The income entry is back." }); } });
   };
-  const confirmRemove = (what: string, go: () => void) => confirmThen(`Remove this ${what}?`, "This can't be undone.", "Remove", go);
+  // Removing is quick to take back, so it happens straight away with Undo instead of asking first.
+  const confirmRemove = (_what: string, go: () => void) => go();
   const removeElsewhereEntry = (id: string) => {
-    if (preview) return setPreviewElsewhere((rows) => rows.filter((r) => r.id !== id));
+    const was = elsewhere.find((e) => e.id === id);
+    if (preview) {
+      setPreviewElsewhere((rows) => rows.filter((r) => r.id !== id));
+      if (was) setUndo({ text: `Removed ${was.recipient}.`, label: "Undo", run: () => { setPreviewElsewhere((rows) => [was, ...rows]); setUndo({ text: "Taken back. It's back in your records." }); } });
+      return;
+    }
+    setRemoving(id);
     account.removeElsewhere(id).then((r) => {
-      if (!r.ok) notify("Not removed", r.message);
+      setRemoving(null);
+      if (!r.ok) return setUndo({ text: `We couldn't remove it, so it's still in your records. ${r.message}` });
+      if (!was) return;
+      const iso = `${was.date.getFullYear()}-${String(was.date.getMonth() + 1).padStart(2, "0")}-${String(was.date.getDate()).padStart(2, "0")}`;
+      setUndo({
+        text: `Removed ${was.recipient}.`,
+        label: "Undo",
+        run: () => {
+          setUndo({ text: "Putting it back…" });
+          account.addElsewhere({ cents: was.cents, date: iso, recipient: was.recipient, label: was.label }).then((a) =>
+            setUndo({ text: a.ok ? "Taken back. It's back in your records." : `We couldn't put it back. ${a.message}` }),
+          );
+        },
+      });
     });
   };
   const changeRecurring = async (id: string, status: "active" | "paused" | "cancelled") => {
     if (busy) return;
+    const which = recurring.find((r) => r.id === id);
     setBusy(true);
     const r = await account.setRecurringStatus(id, status);
     setBusy(false);
     setConfirmCancel(false);
-    setRecurringError(r.ok ? null : r.message);
-    if (r.ok) setOpen(null);
+    const verb = status === "paused" ? "pause" : status === "active" ? "resume" : "cancel";
+    setRecurringError(r.ok ? null : `We couldn't ${verb} it, so your monthly donation is unchanged. Check your connection and try again.`);
+    if (!r.ok) return;
+    setOpen(null);
+    const name = which?.charityName ?? "this charity";
+    if (status === "paused") setUndo({ text: `Paused your monthly donation to ${name}. Nothing more is collected until you resume.`, label: "Resume", run: () => void changeRecurring(id, "active") });
+    else if (status === "active") setUndo({ text: `Resumed your monthly donation to ${name}.` });
+    else setUndo({ text: `Cancellation of your monthly donation to ${name} is requested. Nothing more is collected once the payment provider confirms.` });
   };
   const saveElsewhere = async (e: { cents: number; date: string; recipient: string; label: string | null }): Promise<string | null> => {
     if (preview) {
@@ -228,6 +270,16 @@ export default function Giving() {
         ) : (
           <>
             {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
+            {undo ? (
+              <View style={styles.undoBar} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                <Text style={{ flex: 1, fontSize: 16, lineHeight: 22, color: colors.navy }}>{undo.text}</Text>
+                {undo.run && undo.label ? (
+                  <Pressable onPress={undo.run} accessibilityRole="button" hitSlop={8} style={styles.undoBtn}>
+                    <Text style={{ fontFamily: fonts.bodyBold, color: colors.blue }}>{undo.label}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
             {account.status === "signed-out" ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
@@ -270,25 +322,29 @@ export default function Giving() {
                 jewish={jewish}
                 onSave={(g) => putGoals(goals.some((x) => x.id === g.id) ? goals.map((x) => (x.id === g.id ? g : x)) : [...goals, g].slice(0, MAX_GOALS))}
                 onCancel={() => setEditing(null)}
-                onRemove={goals.some((g) => g.id === editing) ? () => confirmThen("Remove this goal?", "Your giving stays as it is. Only the goal goes.", "Remove", () => putGoals(goals.filter((g) => g.id !== editing))) : undefined}
+                onRemove={goals.some((g) => g.id === editing) ? () => {
+                  const before = goals;
+                  putGoals(goals.filter((g) => g.id !== editing), "Goal removed. Your giving stays as it is.");
+                  setUndo({ text: "Goal removed. Your giving stays as it is.", label: "Undo", run: () => { putGoals(before, "Taken back. Your goal is back."); setUndo(null); } });
+                } : undefined}
               />
             ) : goals.length === 0 ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Set a giving goal</Text>
                 <Text variant="bodyMuted">A set amount, like R12 000 a year, or a share of your income, like 10%. See how you&apos;re doing as you give. Only you see it.</Text>
-                <Button label="Set a goal" onPress={() => { setSaved(false); setEditing("new"); }} />
+                <Button label="Set a goal" onPress={() => { setSaved(null); setEditing("new"); }} />
               </View>
             ) : (
               <View style={{ gap: 26 }}>
                 {/* One chip per goal opens it to change; the first is the ring above. */}
                 <View style={styles.goalChips}>
                   {goals.map((g) => (
-                    <Pressable key={g.id} accessibilityRole="button" accessibilityLabel={`Change ${g.name}`} onPress={() => { setSaved(false); setEditing(g.id); }} style={styles.goalChip}>
+                    <Pressable key={g.id} accessibilityRole="button" accessibilityLabel={`Change ${g.name}`} onPress={() => { setSaved(null); setEditing(g.id); }} style={styles.goalChip}>
                       <Text style={styles.goalChipText}>{g.name}</Text>
                     </Pressable>
                   ))}
                   {goals.length < MAX_GOALS ? (
-                    <Pressable accessibilityRole="button" onPress={() => { setSaved(false); setEditing("new"); }} style={[styles.goalChip, styles.goalChipAdd]}>
+                    <Pressable accessibilityRole="button" onPress={() => { setSaved(null); setEditing("new"); }} style={[styles.goalChip, styles.goalChipAdd]}>
                       <Text style={[styles.goalChipText, { color: colors.blue }]}>Add a goal</Text>
                     </Pressable>
                   ) : null}
@@ -317,7 +373,7 @@ export default function Giving() {
                   );
                 })}
                 {saved ? (
-                  <Text variant="label" style={{ paddingHorizontal: 4, color: colors.successText }} accessibilityLiveRegion="polite">Goal saved.</Text>
+                  <Text variant="label" style={{ paddingHorizontal: 4, color: saved === "Saving…" ? colors.ink : colors.successText }} accessibilityLiveRegion="polite">{saved}</Text>
                 ) : null}
                 <TextLink label="Find a charity" onPress={() => router.push("/discover")} />
               </View>
@@ -373,7 +429,7 @@ export default function Giving() {
                       ))}
                     </View>
                     {income.length > 12 && !showAllIncome ? <TextLink label={`Show all ${income.length}`} onPress={() => setShowAllIncome(true)} /> : null}
-                    <Text variant="label">Press and hold an entry to remove it.</Text>
+                    <Text variant="label">Press and hold an entry to remove it. You can take it back straight after.</Text>
                   </View>
                 ) : null}
 
@@ -390,18 +446,18 @@ export default function Giving() {
                           accessibilityRole="button"
                           accessibilityHint="Press and hold to remove"
                           accessibilityLabel={`${e.recipient}, ${rand(e.cents)}, ${ddmmyyyy(e.date)}${e.label ? `, ${e.label}` : ""}`}
-                          style={[styles.row, i > 0 && styles.divider]}
+                          style={[styles.row, i > 0 && styles.divider, removing === e.id && { opacity: 0.4 }]}
                         >
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{e.recipient}</Text>
-                            <Text variant="bodyMuted" style={{ fontSize: 16 }}>{ddmmyyyy(e.date)}{e.label ? ` · ${e.label}` : ""}</Text>
+                            <Text variant="bodyMuted" style={{ fontSize: 16 }}>{removing === e.id ? "Removing…" : `${ddmmyyyy(e.date)}${e.label ? ` · ${e.label}` : ""}`}</Text>
                           </View>
                           <Text style={{ fontSize: 17 }}>{rand(e.cents)}</Text>
                         </Pressable>
                       ))}
                     </View>
                     {elsewhere.length > 12 && !showAllElsewhere ? <TextLink label={`Show all ${elsewhere.length}`} onPress={() => setShowAllElsewhere(true)} /> : null}
-                    <Text variant="label">These count towards your goals. Press and hold an entry to remove it.</Text>
+                    <Text variant="label">These count towards your goals. Press and hold an entry to remove it. You can take it back straight after.</Text>
                   </View>
                 ) : null}
               </View>
@@ -542,7 +598,7 @@ export default function Giving() {
             ) : null}
             {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample giving history for design review</Text> : null}
             {signedIn && account.live ? (
-              <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(account.live.loadedAt)}. Pull down to refresh.</Text>
+              <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(account.live.loadedAt)} at {hhmm(account.live.loadedAt)}. Pull down to refresh.</Text>
             ) : null}
           </>
         )}
@@ -561,7 +617,9 @@ export default function Giving() {
               <>
                 {open.status === "failed" ? (
                   <View style={{ gap: 10 }}>
-                    <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. To carry on giving monthly, start a new monthly donation on the charity&apos;s page.</Text>
+                    <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. To carry on giving monthly, start a new one with a card that works.</Text>
+                    <Button variant="secondary" label={`Give to ${open.charityName} again`} onPress={() => { const slug = open.charitySlug; setOpen(null); openGiveScreen(slug); }} />
+                    <Text variant="label">{helpLine()}</Text>
                     <Button label={busy ? "Removing…" : "Remove it from my list"} disabled={busy} onPress={() => confirmThen("Remove this monthly donation?", "It has already stopped and nothing more is charged. It will no longer show in your list.", "Remove", () => changeRecurring(open.id, "cancelled"))} />
                   </View>
                 ) : open.status === "cancelled" ? (
@@ -588,7 +646,7 @@ export default function Giving() {
                 <Text variant="label">
                   {open.syncing
                     ? "Your change is saved and waiting for the payment provider to apply it."
-                    : "Your change takes effect at once. Past donations stay in your history."}
+                    : "Changes apply straight away, or once the payment provider confirms them. Past donations stay in your history."}
                 </Text>
               </>
             ) : (
@@ -715,6 +773,8 @@ const styles = StyleSheet.create({
   cancel: { minHeight: touch, alignItems: "center", justifyContent: "center" },
   tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
   card: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
+  undoBar: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
+  undoBtn: { minHeight: touch, justifyContent: "center", paddingHorizontal: 6 },
 });
 
 /** A failure while drawing shows "Try again" and the error, not a blank page. */

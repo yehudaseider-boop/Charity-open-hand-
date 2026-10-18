@@ -37,11 +37,13 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
           <Blob size={170} color={colors.orange} rotate={25} style={{ right: -95, top: insets.top - 110 }} />
           <Blob size={130} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -100, bottom: -60 }} />
         </View>
-        <View style={styles.tick}><CheckIcon size={28} color={colors.blue} /></View>
+        {gift.confirming ? null : <View style={styles.tick}><CheckIcon size={28} color={colors.blue} /></View>}
         <Text style={styles.kicker} accessibilityRole="header">
           {gift.confirming ? "Confirming your gift" : "Gift sent"} · {rand(gift.cents)}
         </Text>
-        <Text style={styles.big}>{impact ?? `Thank you for giving to ${charityName}.`}</Text>
+        <Text style={styles.big}>
+          {gift.confirming ? "Waiting for the payment provider to confirm. This usually takes a minute." : (impact ?? `Thank you for giving to ${charityName}.`)}
+        </Text>
         <Text style={styles.sub}>
           {gift.confirming
             ? `Your confirmation goes to ${gift.email} in a minute. Please don't pay again.`
@@ -50,7 +52,15 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
       </View>
 
       <View style={styles.body}>
-        {gift.goal ? (
+        {gift.confirming ? (
+          <View style={styles.streak}>
+            <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>
+              Your gift shows in Progress, with your goal and streak, as soon as it&apos;s confirmed. You don&apos;t need to do anything else.
+            </Text>
+          </View>
+        ) : null}
+
+        {!gift.confirming && gift.goal ? (
           <View style={styles.card}>
             <GoalRing percent={gift.goal.percent} size={96} stroke={10} />
             <View style={{ flex: 1, gap: 2 }}>
@@ -61,14 +71,14 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
           </View>
         ) : null}
 
-        {gift.streak > 1 ? (
+        {!gift.confirming && gift.streak > 1 ? (
           <View style={styles.streak}>
             <View style={styles.streakDot} />
             <Text style={{ flex: 1, color: colors.navy, fontFamily: fonts.bodySemibold, fontSize: 16 }}>{months(gift.streak)} in a row of giving.</Text>
           </View>
         ) : null}
 
-        {gift.badges.length ? (
+        {!gift.confirming && gift.badges.length ? (
           <View style={styles.badges}>
             {gift.badges.map((b) => (
               <View key={b} style={styles.badge}><Text style={styles.badgeText}>{b}</Text></View>

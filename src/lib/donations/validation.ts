@@ -3,7 +3,8 @@ import { isValidSaIdNumber } from "@/lib/sa-id";
 import { parseDedication } from "./dedication";
 import { cleanLabel } from "./labels";
 
-const str = (max = 200) => z.string().max(max).optional();
+/** An optional text field, with a plain message when it is too long. */
+const str = (max: number, what: string) => z.string().max(max, `Please keep ${what} to ${max} characters or fewer`).optional();
 const yes = z.literal("on").optional();
 
 /** The old fixed choice, still accepted from older app versions and links (read as a label). */
@@ -13,26 +14,26 @@ export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "Tze
 export const checkoutSchema = z.object({
   donor_type: z.enum(["individual", "company", "trust"]),
   email: z.email("Enter a valid email address"),
-  first_name: str(80),
-  last_name: str(80),
-  organisation_name: str(),
-  registration_number: str(40),
-  contact_person: str(120),
-  phone: str(20),
+  first_name: str(80, "your first name"),
+  last_name: str(80, "your surname"),
+  organisation_name: str(200, "the name"),
+  registration_number: str(40, "the registration number"),
+  contact_person: str(120, "the contact person"),
+  phone: str(20, "the phone number"),
   wants_18a: yes,
-  id_number: str(20),
-  tax_reference: str(20),
-  address_line1: str(),
-  address_line2: str(),
-  suburb: str(80),
-  city: str(80),
-  postal_code: str(4),
-  message: str(500),
+  id_number: str(20, "the ID number"),
+  tax_reference: str(20, "the income tax number"),
+  address_line1: str(200, "the street address"),
+  address_line2: str(200, "this line"),
+  suburb: str(80, "the suburb"),
+  city: str(80, "the city or town"),
+  postal_code: z.string().max(4, "Postal codes are 4 digits").optional(),
+  message: str(500, "your message"),
   /** Optional: given in honour of, or in memory of, someone (the name is checked in checkDonorDetails). */
   dedication_kind: z.enum(["none", "honour", "memory"]).optional(),
-  dedication_name: str(200),
+  dedication_name: str(200, "their name"),
   /** The donor's own label for this gift, optional and private to them ("Work giving", "Maaser"). */
-  giving_label: z.string().max(80).optional(),
+  giving_label: str(80, "your label"),
   /** Older app versions send the fixed choice instead; it becomes the label. */
   giving_kind: z.enum(["maaser", "chomesh", "tzedaka"]).optional(),
   is_anonymous: yes,

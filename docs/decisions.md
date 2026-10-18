@@ -837,3 +837,17 @@ Yehuda: "We need to make our core flow: what just happened, they can take it bac
 - **The two that can't be taken back ask first, on the page** (Yehuda's choice: ask first, then no undo): sending the monthly thank-you email and submitting the registration. The check says plainly that it can't be taken back. The phone's own "Are you sure?" pop-ups are gone from the dashboard: removals use Undo instead.
 - Each action is kept in `charity_actions` (migration `20261018000001`, server-only, 30 days) so the panel and Undo work across page loads.
 - Removed or replaced files are kept so Undo can put them back; cleaning them up later is on the go-live list.
+
+## 18/10/2026: Evidence of quality: designing the moments when things go wrong
+
+Yehuda asked to apply five rules: design the un-glamorous moments (status, undo, recovery), keep flows consistent, recover well from failures (a way to reach a person), test by breaking things (Wi-Fi off, empty data), and design empty and error states. Three testers broke the app, the website's donate path and the charity dashboard on purpose; every finding was checked and fixed:
+
+- **A lost connection or a server error never throws a form away.** The donate page, the dashboard forms and the app's give screen keep everything typed, say plainly whether anything was charged ("Nothing was charged"), and offer the way on. A declined card says why it usually happens, keeps the amount for the retry, and from the app goes back to the app.
+- **All the problems at once, and the page takes you to the first.** The donate form shows every field to fix in one go, in plain words ("Postal codes are 4 digits", not the library's own wording), and scrolls to the first one. Same on the dashboard and in the app.
+- **The R1 000 000 typo guard now applies on the website too** (the app already had it). Zero reads as below the minimum. "1,250" is refused with a plain message, on purpose: SA uses the comma as the decimal mark, so 1,250 could mean R1.25.
+- **Unticking the s18A box keeps the ID and address** (and the dedication name) in case the donor ticks it again; hidden fields are never sent.
+- **A person to reach** on every failure screen (see the support email on the go-live list).
+- App: a server-down screen with "Try again" and "Give on our website", undo for removals and pauses on the Progress tab, "Get help" on Account, honest "Waiting for the payment provider" while a gift confirms, no ticks or streaks until it is paid.
+- Dashboard: "Saving…"-style button words while working, the first wrong field focused, an error page that keeps the tabs, and the done panel only on the page and day it belongs to.
+
+**Left for later:** the app's charity list doesn't yet open offline (the giving history does); the test payment page can be pressed twice with the back button (test-only, the real confirmation already ignores a repeat); the CSP nonce (as before).

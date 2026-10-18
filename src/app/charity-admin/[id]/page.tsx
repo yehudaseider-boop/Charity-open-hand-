@@ -15,7 +15,7 @@ import { loadDonors, loadInsights, loadMonthlyDonations, loadMonthlyTotals, load
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export const metadata: Metadata = { title: "Overview" };
 
 function Stat({ label, value, note, strong = false }: { label: string; value: string; note?: string; strong?: boolean }) {
   return (
@@ -188,8 +188,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                       <>No donations yet this tax year.</>
                     ) : (
                       <>
-                        The average gift this tax year is <span className="font-semibold">{formatRand(averageCents(year.paid_cents, year.paid_count))}</span>
-                        <span className="text-muted"> ({plural(year.paid_count, "gift")})</span>.
+                        The average donation this tax year is <span className="font-semibold">{formatRand(averageCents(year.paid_cents, year.paid_count))}</span>
+                        <span className="text-muted"> ({plural(year.paid_count, "donation")})</span>.
                       </>
                     )}
                   </li>
@@ -204,7 +204,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                 {top.map((d, i) => (
                   <li key={d.donor_id} className="flex items-baseline justify-between gap-3">
                     <span className="min-w-0 truncate"><span className="text-muted">{i + 1}.</span> {isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</span>
-                    <span className="shrink-0">{formatRand(d.total_cents)} <span className="text-muted">({plural(d.donation_count, "gift")})</span></span>
+                    <span className="shrink-0">{formatRand(d.total_cents)} <span className="text-muted">({plural(d.donation_count, "donation")})</span></span>
                   </li>
                 ))}
               </ol>
@@ -327,7 +327,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         <Link href={`${base}/monthly`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Monthly</Link>
         <Link href={`${base}/receipts`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Receipts</Link>
         <Link href={`${base}/poster`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">QR poster</Link>
-        <a href={`${base}/export/donations`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Download donations (CSV)</a>
+        <a href={`${base}/export/donations`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Download paid donations (CSV)</a>
       </div>
     </div>
   );

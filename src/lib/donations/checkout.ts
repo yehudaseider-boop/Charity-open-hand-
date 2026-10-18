@@ -29,9 +29,13 @@ export type QuoteResult =
 const minimums = {
   minDonationCents: platformConfig.minDonationCents,
   minContributionCents: platformConfig.minContributionCents,
+  maxDonationCents: platformConfig.maxDonationCents,
 };
 
 function feeErrorMessage(e: FeeError): string {
+  if (e.code === "above_maximum") {
+    return `The most you can give online in one go is ${formatRand(platformConfig.maxDonationCents)}. Check the amount, or for a bigger gift please contact the charity directly.`;
+  }
   if (e.code === "below_minimum") return `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.`;
   if (e.code === "contribution_below_minimum") {
     return `The minimum contribution to ${platformConfig.appName} is ${formatRand(platformConfig.minContributionCents)}.`;

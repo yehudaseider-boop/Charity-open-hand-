@@ -7,7 +7,7 @@ import { loadCategories, loadCharityForManager, publicImageUrl } from "@/lib/cha
 import { saveDonationEmails, saveProfile, uploadImage } from "./actions";
 import { DonationEmailsForm, ImageForm, ProfileForm } from "./forms";
 
-export const metadata: Metadata = { title: "Edit profile" };
+export const metadata: Metadata = { title: "Public profile" };
 
 export default async function ProfilePage({ params, searchParams }: PageProps<"/charity-admin/[id]/profile">) {
   const { id } = await params;
