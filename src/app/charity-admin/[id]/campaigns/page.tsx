@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card, Notice } from "@/components/card";
+import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
 import { isRunning, progressPercent } from "@/lib/charity/campaigns";
@@ -12,8 +13,9 @@ import { CampaignForm } from "./forms";
 
 export const metadata: Metadata = { title: "Campaigns" };
 
-export default async function CampaignsPage({ params }: PageProps<"/charity-admin/[id]/campaigns">) {
+export default async function CampaignsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/campaigns">) {
   const { id } = await params;
+  const sp = await searchParams;
   await requireViewer(`/charity-admin/${id}/campaigns`);
   const { charity } = await loadCharityForManager(id);
   const campaigns = await loadCampaigns(id);
@@ -32,11 +34,13 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
         </p>
       </div>
 
+      <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/campaigns`} />
+
       {charity.status !== "approved" ? <Notice tone="warning">Campaigns appear to donors once your application is approved.</Notice> : null}
 
       {active.length < 3 ? (
         <Card title="Start a campaign">
-          <CampaignForm action={startCampaign.bind(null, id)} />
+          <CampaignForm key={formKey(sp)} action={startCampaign.bind(null, id)} />
         </Card>
       ) : null}
 
@@ -48,7 +52,7 @@ export default async function CampaignsPage({ params }: PageProps<"/charity-admi
                 <div className="flex justify-between gap-3">
                   <p className="font-medium">{c.title}</p>
                   <form action={endCampaign.bind(null, id, c.id)}>
-                    <RemoveButton label="End" what={c.title} confirmText={`End "${c.title}"? Donors won't be able to give to it any more. Gifts already made stay with you.`} />
+                    <RemoveButton label="End" what={c.title} ask={false} />
                   </form>
                 </div>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={c.endsAt} />

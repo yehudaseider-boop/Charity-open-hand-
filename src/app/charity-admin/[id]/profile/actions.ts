@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { recordAction } from "@/lib/charity/charity-actions";
 import { logAudit } from "@/lib/audit";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES, profileSchema } from "@/lib/charity/validation";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/ids";
 import { isRealImage } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
@@ -36,7 +37,7 @@ function failed(error: unknown): FormState {
 
 export async function saveProfile(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
-  const { charity } = await loadCharityForManager(charityId);
+  const { charity, categoryIds: categoriesBefore } = await loadCharityForManager(charityId);
   const parsed = profileSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   const v = parsed.data;
@@ -49,19 +50,17 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
   const categoryIds = formData.getAll("category_ids").map(String).filter(isUuid);
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("charities")
-    .update({
-      name_en: v.name_en,
-      description_en: v.description_en ?? null,
-      funds_use_en: v.funds_use_en ?? null,
-      thank_you_en: v.thank_you_en ?? null,
-      impact_en: v.impact_en ?? null,
-      suggested_amounts_cents: suggested.cents,
-      website: v.website ?? null,
-    })
-    .eq("id", charityId)
-    .select("id");
+  const after = {
+    name_en: v.name_en,
+    description_en: v.description_en ?? null,
+    funds_use_en: v.funds_use_en ?? null,
+    thank_you_en: v.thank_you_en ?? null,
+    impact_en: v.impact_en ?? null,
+    suggested_amounts_cents: suggested.cents,
+    website: v.website ?? null,
+  };
+  const before = Object.fromEntries(Object.keys(after).map((k) => [k, (charity as unknown as Record<string, unknown>)[k] ?? null]));
+  const { data, error } = await supabase.from("charities").update(after).eq("id", charityId).select("id");
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "You can't edit this charity." };
 
@@ -87,8 +86,9 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     details: renamed ? { name_from: charity.name_en, name_to: v.name_en } : undefined,
   });
   if (renamed) await tellReviewer(charity, `its name, from "${charity.name_en}" to "${v.name_en}"`);
+  const done = await recordAction(charityId, viewer.userId, "profile_saved", {}, { type: "restore", table: "charities", before, after, categories: categoriesBefore });
   revalidate(charityId, charity.slug);
-  return { ok: true, message: "Profile saved." };
+  redirect(`/charity-admin/${charityId}/profile?done=${done}`);
 }
 
 export async function uploadImage(
@@ -118,27 +118,30 @@ export async function uploadImage(
   const { error } = await supabase.from("charities").update({ [column]: path }).eq("id", charityId);
   if (error) return failed(error);
 
+  // The previous image file is kept, so "Undo" can put it back.
   const old = kind === "logo" ? charity.logo_path : charity.cover_path;
-  // Only ever delete this charity's own files (the stored path could have been tampered with).
-  if (old && old.startsWith(`${charityId}/`) && !old.includes("..")) {
-    await createAdminClient().storage.from("charity-public").remove([old]);
-  }
   await logAudit({ actorUserId: viewer.userId, action: `charity.${kind}_changed`, entityType: "charity", entityId: charityId });
   await tellReviewer(charity, kind === "logo" ? "its logo" : "its cover image");
+  const done = await recordAction(charityId, viewer.userId, kind === "logo" ? "logo_changed" : "cover_changed", {}, {
+    type: "restore", table: "charities", before: { [column]: old ?? null }, after: { [column]: path }, dropFile: { bucket: "charity-public", path },
+  });
   revalidate(charityId, charity.slug);
-  return { ok: true, message: kind === "logo" ? "Logo updated." : "Cover image updated." };
+  redirect(`/charity-admin/${charityId}/profile?done=${done}`);
 }
 
 /** Turn "a donation came in" emails on or off for this charity. */
 export async function saveDonationEmails(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
-  await loadCharityForManager(charityId);
+  const { priv } = await loadCharityForManager(charityId);
   const on = formData.get("notify_donations") === "on";
   const supabase = await createClient();
   const { data, error } = await supabase.from("charity_private").update({ notify_donations: on }).eq("charity_id", charityId).select("charity_id");
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "You can't change this charity's settings." };
   await logAudit({ actorUserId: viewer.userId, action: on ? "charity.donation_emails_on" : "charity.donation_emails_off", entityType: "charity", entityId: charityId });
+  const done = await recordAction(charityId, viewer.userId, on ? "donation_emails_on" : "donation_emails_off", {}, {
+    type: "restore", table: "charity_private", before: { notify_donations: priv?.notify_donations !== false }, after: { notify_donations: on },
+  });
   revalidatePath(`/charity-admin/${charityId}/profile`);
-  return { ok: true, message: on ? "Saved. We'll email you when a donation comes in." : "Saved. We won't email you about each donation." };
+  redirect(`/charity-admin/${charityId}/profile?done=${done}`);
 }

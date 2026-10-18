@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { logAudit } from "@/lib/audit";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { recordAction } from "@/lib/charity/charity-actions";
 import { IMAGE_MIME, MAX_PHOTOS, MAX_UPLOAD_BYTES, photoSchema, updateSchema } from "@/lib/charity/validation";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -56,27 +58,35 @@ export async function postUpdate(charityId: string, _prev: FormState, formData: 
   if ("error" in photo) return photo.error!;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("charity_updates").insert({ charity_id: charityId, body_en: parsed.data.body_en, photo_path: photo.path });
+  const { data: made, error } = await supabase.from("charity_updates").insert({ charity_id: charityId, body_en: parsed.data.body_en, photo_path: photo.path }).select("id").single();
   if (error) {
     await removeFile(charityId, photo.path);
     return { ok: false, message: "We couldn't post that. Please try again." };
   }
   await logAudit({ actorUserId: viewer.userId, action: "charity.update_posted", entityType: "charity", entityId: charityId });
+  const done = await recordAction(charityId, viewer.userId, "update_posted", {}, {
+    type: "delete", table: "charity_updates", id: made.id as string, file: photo.path ? { bucket: "charity-public", path: photo.path } : null,
+  });
   revalidate(charityId, charity.slug);
-  return { ok: true, message: "Posted." };
+  redirect(`/charity-admin/${charityId}/updates?done=${done}`);
 }
 
 export async function removeUpdate(charityId: string, updateId: string): Promise<void> {
   const viewer = await requireViewer();
   if (!isUuid(updateId)) return;
   const { charity } = await loadCharityForManager(charityId);
+  // The whole row, so "Undo" can put it back exactly; its photo file is kept for the same reason.
+  const { data: row, error: readError } = await createAdminClient().from("charity_updates").select("*").eq("id", updateId).eq("charity_id", charityId).maybeSingle();
+  if (readError) throw readError;
+  if (!row) return;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("charity_updates").delete().eq("id", updateId).eq("charity_id", charityId).select("photo_path");
+  const { data, error } = await supabase.from("charity_updates").delete().eq("id", updateId).eq("charity_id", charityId).select("id");
   if (error) throw error;
   if (!data?.length) return;
-  await removeFile(charityId, data[0].photo_path);
   await logAudit({ actorUserId: viewer.userId, action: "charity.update_removed", entityType: "charity", entityId: charityId });
+  const done = await recordAction(charityId, viewer.userId, "update_removed", {}, { type: "reinsert", table: "charity_updates", row });
   revalidate(charityId, charity.slug);
+  redirect(`/charity-admin/${charityId}/updates?done=${done}`);
 }
 
 export async function addPhoto(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -90,25 +100,33 @@ export async function addPhoto(charityId: string, _prev: FormState, formData: Fo
 
   const photo = await uploadIfAny(charityId, "photos", formData, true);
   if ("error" in photo) return photo.error!;
-  const { error } = await supabase.from("charity_photos").insert({ charity_id: charityId, storage_path: photo.path!, caption_en: parsed.data.caption_en ?? null });
+  const { data: made, error } = await supabase.from("charity_photos").insert({ charity_id: charityId, storage_path: photo.path!, caption_en: parsed.data.caption_en ?? null }).select("id").single();
   if (error) {
     await removeFile(charityId, photo.path);
     return { ok: false, message: /up to 12/.test(error.message) ? `You can have up to ${MAX_PHOTOS} photos. Remove one first.` : "We couldn't add that photo. Please try again." };
   }
   await logAudit({ actorUserId: viewer.userId, action: "charity.photo_added", entityType: "charity", entityId: charityId });
+  const done = await recordAction(charityId, viewer.userId, "photo_added", {}, {
+    type: "delete", table: "charity_photos", id: made.id as string, file: { bucket: "charity-public", path: photo.path! },
+  });
   revalidate(charityId, charity.slug);
-  return { ok: true, message: "Photo added." };
+  redirect(`/charity-admin/${charityId}/updates?done=${done}`);
 }
 
 export async function removePhoto(charityId: string, photoId: string): Promise<void> {
   const viewer = await requireViewer();
   if (!isUuid(photoId)) return;
   const { charity } = await loadCharityForManager(charityId);
+  // The whole row, so "Undo" can put it back exactly; the file is kept for the same reason.
+  const { data: row, error: readError } = await createAdminClient().from("charity_photos").select("*").eq("id", photoId).eq("charity_id", charityId).maybeSingle();
+  if (readError) throw readError;
+  if (!row) return;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("charity_photos").delete().eq("id", photoId).eq("charity_id", charityId).select("storage_path");
+  const { data, error } = await supabase.from("charity_photos").delete().eq("id", photoId).eq("charity_id", charityId).select("id");
   if (error) throw error;
   if (!data?.length) return;
-  await removeFile(charityId, data[0].storage_path);
   await logAudit({ actorUserId: viewer.userId, action: "charity.photo_removed", entityType: "charity", entityId: charityId });
+  const done = await recordAction(charityId, viewer.userId, "photo_removed", {}, { type: "reinsert", table: "charity_photos", row });
   revalidate(charityId, charity.slug);
+  redirect(`/charity-admin/${charityId}/updates?done=${done}`);
 }

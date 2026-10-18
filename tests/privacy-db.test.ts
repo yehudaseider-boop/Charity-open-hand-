@@ -275,6 +275,16 @@ describe("signing in from the app", () => {
     });
   });
 
+  it("the dashboard's action history is closed to browsers, even to the charity's own admins", async () => {
+    await tx(async () => {
+      await as(ids.mealsAdmin);
+      await run("savepoint a");
+      await expect(run("select * from public.charity_actions")).rejects.toThrow(/permission denied/);
+      await run("rollback to savepoint a");
+      await expect(run("insert into public.charity_actions (charity_id, kind) values ($1, 'profile_saved')", [ids.meals])).rejects.toThrow(/permission denied/);
+    });
+  });
+
   it("a charity admin's session started with a password manages nothing, even with a second step", async () => {
     await tx(async () => {
       await as(ids.mealsAdmin);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card, Notice } from "@/components/card";
+import { DonePanel } from "@/components/done-panel";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
@@ -15,8 +16,9 @@ export const metadata: Metadata = { title: "Thank donors" };
  * Write one thank-you and Givezy emails it to everyone who gave in that month. The charity never
  * sees or downloads the addresses for this, and donors can stop these emails with one link.
  */
-export default async function ThankDonorsPage({ params }: PageProps<"/charity-admin/[id]/thank-donors">) {
+export default async function ThankDonorsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/thank-donors">) {
   const { id } = await params;
+  const sp = await searchParams;
   await requireViewer(`/charity-admin/${id}/thank-donors`);
   const { charity } = await loadCharityForManager(id);
   const supabase = await createClient();
@@ -42,6 +44,8 @@ export default async function ThankDonorsPage({ params }: PageProps<"/charity-ad
         </p>
       </div>
 
+      <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/thank-donors`} />
+
       {charity.status !== "approved" ? <Notice tone="warning">You can thank donors once your page is live.</Notice> : null}
 
       {open.map(({ month, count }) => (
@@ -50,7 +54,7 @@ export default async function ThankDonorsPage({ params }: PageProps<"/charity-ad
             <ThankYouForm
               action={sendThankDonors.bind(null, id, month)}
               defaultBody={charity.thank_you_en ?? ""}
-              confirm={`Email this thank-you to ${count} ${count === 1 ? "donor" : "donors"} who gave in ${monthLabel(month)}? You can only send one for this month${month === months[0] ? ", and the month isn't over: people who give later this month won't get it" : ""}.`}
+              confirm={`Email this thank-you to ${count} ${count === 1 ? "donor" : "donors"} who gave in ${monthLabel(month)}? Once sent it can't be taken back, and you can only send one for this month${month === months[0] ? ". The month isn't over: people who give later this month won't get it" : ""}.`}
             />
           ) : (
             <p className="text-sm text-muted">Nobody to thank for this month yet.</p>

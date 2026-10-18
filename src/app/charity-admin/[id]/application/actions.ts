@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { recordAction } from "@/lib/charity/charity-actions";
 import { logAudit } from "@/lib/audit";
 import { legalConfig } from "@/config/legal";
 import { requireViewer } from "@/lib/auth";
@@ -25,7 +27,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isRealDocument } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
 
-const saved: FormState = { ok: true, message: "Saved." };
+/** The values of these columns as they are now, for "Undo". */
+function pick(row: unknown, cols: string[]): Record<string, unknown> {
+  return Object.fromEntries(cols.map((c) => [c, (row as Record<string, unknown> | null)?.[c] ?? null]));
+}
+
+const back = (charityId: string, step: string, done: string) => `/charity-admin/${charityId}/application?step=${step}&done=${done}`;
 
 /** Turn a database refusal (from our guard triggers) into a readable message. */
 function refusal(error: { message: string } | null, rows: unknown[] | null): FormState | null {
@@ -47,55 +54,53 @@ async function loadEditable(charityId: string) {
 }
 
 export async function saveOrganisation(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  await requireViewer();
-  const { locked } = await loadEditable(charityId);
+  const viewer = await requireViewer();
+  const { data: loaded, locked } = await loadEditable(charityId);
   if (locked) return locked;
   const parsed = organisationSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   const v = parsed.data;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("charities")
-    .update({
-      name_en: v.name_en,
-      legal_name_en: v.legal_name_en,
-      npo_number: v.npo_number ?? null,
-      pbo_number: v.pbo_number ?? null,
-      s18a_reference: v.s18a_reference ?? null,
-    })
-    .eq("id", charityId)
-    .select("id");
+  const after = {
+    name_en: v.name_en,
+    legal_name_en: v.legal_name_en,
+    npo_number: v.npo_number ?? null,
+    pbo_number: v.pbo_number ?? null,
+    s18a_reference: v.s18a_reference ?? null,
+  };
+  const before = pick(loaded.charity, Object.keys(after));
+  const { data, error } = await supabase.from("charities").update(after).eq("id", charityId).select("id");
   const fail = refusal(error, data);
   if (fail) return fail;
+  const done = await recordAction(charityId, viewer.userId, "organisation_saved", {}, { type: "restore", table: "charities", before, after });
   revalidatePath(`/charity-admin/${charityId}/application`);
-  return saved;
+  redirect(back(charityId, "organisation", done));
 }
 
 export async function saveAddress(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  await requireViewer();
-  const { locked } = await loadEditable(charityId);
+  const viewer = await requireViewer();
+  const { data: loaded, locked } = await loadEditable(charityId);
   if (locked) return locked;
   const parsed = addressSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   const v = parsed.data;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("charities")
-    .update({
-      address_line1: v.address_line1,
-      address_line2: v.address_line2 ?? null,
-      suburb: v.suburb ?? null,
-      city: v.city,
-      postal_code: v.postal_code,
-    })
-    .eq("id", charityId)
-    .select("id");
+  const after = {
+    address_line1: v.address_line1,
+    address_line2: v.address_line2 ?? null,
+    suburb: v.suburb ?? null,
+    city: v.city,
+    postal_code: v.postal_code,
+  };
+  const before = pick(loaded.charity, Object.keys(after));
+  const { data, error } = await supabase.from("charities").update(after).eq("id", charityId).select("id");
   const fail = refusal(error, data);
   if (fail) return fail;
+  const done = await recordAction(charityId, viewer.userId, "address_saved", {}, { type: "restore", table: "charities", before, after });
   revalidatePath(`/charity-admin/${charityId}/application`);
-  return saved;
+  redirect(back(charityId, "address", done));
 }
 
 export async function saveContact(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -108,11 +113,9 @@ export async function saveContact(charityId: string, _prev: FormState, formData:
   const v = parsed.data;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("charity_private")
-    .update({ contact_name: v.contact_name, contact_email: v.contact_email, contact_phone: v.contact_phone ?? null })
-    .eq("charity_id", charityId)
-    .select("charity_id");
+  const after = { contact_name: v.contact_name, contact_email: v.contact_email, contact_phone: v.contact_phone ?? null };
+  const contactBefore = pick(before, Object.keys(after));
+  const { data, error } = await supabase.from("charity_private").update(after).eq("charity_id", charityId).select("charity_id");
   const fail = refusal(error, data);
   if (fail) return fail;
   // Our emails about bank changes and approval go to this address: tell the old one when it moves.
@@ -121,8 +124,9 @@ export async function saveContact(charityId: string, _prev: FormState, formData:
     await logAudit({ actorUserId: viewer.userId, action: "charity.contact_email_changed", entityType: "charity", entityId: charityId });
     await notifyCharity(contactChangedEmail(oldEmail, charity.name_en, v.contact_email));
   }
+  const done = await recordAction(charityId, viewer.userId, "contact_saved", { email: v.contact_email }, { type: "restore", table: "charity_private", before: contactBefore, after });
   revalidatePath(`/charity-admin/${charityId}/application`);
-  return saved;
+  redirect(back(charityId, "contact", done));
 }
 
 export async function saveBank(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -134,16 +138,19 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
   const v = parsed.data;
 
   const supabase = await createClient();
+  const after = {
+    bank_name: v.bank_name,
+    bank_account_holder: v.bank_account_holder,
+    bank_account_number_encrypted: encrypt(v.bank_account_number),
+    bank_account_last4: last4(v.bank_account_number),
+    bank_branch_code: v.bank_branch_code,
+  };
+  // The details as they were (the account number stays encrypted), for "Undo". Never sent to the browser.
+  const { data: was, error: readError } = await createAdminClient().from("charity_private").select(Object.keys(after).join(", ")).eq("charity_id", charityId).maybeSingle();
+  if (readError) return { ok: false, message: "That didn't save. Please try again." };
   const { data, error } = await supabase
     .from("charity_private")
-    .update({
-      bank_name: v.bank_name,
-      bank_account_holder: v.bank_account_holder,
-      bank_account_number_encrypted: encrypt(v.bank_account_number),
-      bank_account_last4: last4(v.bank_account_number),
-      bank_branch_code: v.bank_branch_code,
-      bank_verified_at: null,
-    })
+    .update({ ...after, bank_verified_at: null })
     .eq("charity_id", charityId)
     .select("charity_id");
   const fail = refusal(error, data);
@@ -155,8 +162,12 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
     entityId: charityId,
     details: { bank_name: v.bank_name, last4: last4(v.bank_account_number) },
   });
+  // Taking it back puts the previous details back; they are checked again before going live either way.
+  const done = await recordAction(charityId, viewer.userId, "bank_saved", { last4: last4(v.bank_account_number) }, {
+    type: "restore", table: "charity_private", before: pick(was, Object.keys(after)), after,
+  });
   revalidatePath(`/charity-admin/${charityId}/application`);
-  return saved;
+  redirect(back(charityId, "bank", done));
 }
 
 export async function uploadDocument(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -195,37 +206,42 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
     return { ok: false, message: "The upload didn't work. Please try again." };
   }
 
-  const { error } = await supabase.from("charity_documents").insert({
+  const { data: made, error } = await supabase.from("charity_documents").insert({
     charity_id: charityId,
     document_type: type,
     storage_path: path,
     file_name: file.name.slice(0, 200),
     signed_on: type === "receipting_mandate" ? signedOn : null,
     uploaded_by: viewer.userId,
-  });
+  }).select("id").single();
   if (error) {
     await createAdminClient().storage.from("charity-documents").remove([path]);
     console.error(error);
     return { ok: false, message: /submitted/.test(error.message) ? "Documents can't be added once the application is submitted." : "That didn't save. Please try again." };
   }
+  const done = await recordAction(charityId, viewer.userId, "document_uploaded", { fileName: file.name.slice(0, 200), label: documentTypes[type] }, {
+    type: "delete", table: "charity_documents", id: made.id as string, file: { bucket: "charity-documents", path },
+  });
   revalidatePath(`/charity-admin/${charityId}/application`);
-  return { ok: true, message: "Uploaded." };
+  redirect(back(charityId, "documents", done));
 }
 
 export async function removeDocument(charityId: string, documentId: string): Promise<void> {
-  await requireViewer();
+  const viewer = await requireViewer();
   const { data, locked } = await loadEditable(charityId);
   if (locked) return;
   const doc = data.documents.find((d) => d.id === documentId);
   if (!doc) return;
+  // The whole row, so "Undo" can put it back exactly; the file is kept for the same reason.
+  const { data: row, error: readError } = await createAdminClient().from("charity_documents").select("*").eq("id", documentId).eq("charity_id", charityId).maybeSingle();
+  if (readError) throw readError;
+  if (!row) return;
   const supabase = await createClient();
   const { error } = await supabase.from("charity_documents").delete().eq("id", documentId);
   if (error) throw error;
-  // Only ever this charity's own files (the database also refuses any other path).
-  if (doc.storage_path.startsWith(`${charityId}/`) && !doc.storage_path.includes("..")) {
-    await createAdminClient().storage.from("charity-documents").remove([doc.storage_path]);
-  }
+  const done = await recordAction(charityId, viewer.userId, "document_removed", { fileName: doc.file_name }, { type: "reinsert", table: "charity_documents", row });
   revalidatePath(`/charity-admin/${charityId}/application`);
+  redirect(back(charityId, "documents", done));
 }
 
 export async function submitApplication(charityId: string, _prev: FormState, formData?: FormData): Promise<FormState> {
@@ -267,6 +283,8 @@ export async function submitApplication(charityId: string, _prev: FormState, for
   // Tell the charity we have it, and tell us there is one to review.
   await notifyCharity(applicationReceivedEmail(data.priv?.contact_email ?? viewer.email ?? "", data.charity.name_en));
   if (process.env.ADMIN_NOTIFY_EMAIL) await notifyCharity(newApplicationEmail(process.env.ADMIN_NOTIFY_EMAIL, data.charity.name_en, charityId));
+  // A submission can't be taken back (we've been told and are reviewing): the page asked first.
+  const done = await recordAction(charityId, viewer.userId, "application_submitted", {}, null);
   revalidatePath(`/charity-admin/${charityId}/application`);
-  return { ok: true, message: "Submitted. We've emailed you a confirmation, and we'll let you know once it has been reviewed." };
+  redirect(`/charity-admin/${charityId}/application?done=${done}`);
 }

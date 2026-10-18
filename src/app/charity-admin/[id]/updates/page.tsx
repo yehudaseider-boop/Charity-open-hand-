@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card } from "@/components/card";
+import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager, loadStories, publicImageUrl } from "@/lib/charity/queries";
@@ -10,8 +11,10 @@ import { PhotoForm, UpdateForm } from "./forms";
 
 export const metadata: Metadata = { title: "Photos and updates" };
 
-export default async function UpdatesPage({ params }: PageProps<"/charity-admin/[id]/updates">) {
+export default async function UpdatesPage({ params, searchParams }: PageProps<"/charity-admin/[id]/updates">) {
   const { id } = await params;
+  const sp = await searchParams;
+  const k = formKey(sp);
   await requireViewer(`/charity-admin/${id}/updates`);
   const { charity } = await loadCharityForManager(id);
   const { photos, updates } = await loadStories(id);
@@ -27,8 +30,10 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
         </p>
       </div>
 
+      <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/updates`} />
+
       <Card title="Post an update">
-        <UpdateForm action={postUpdate.bind(null, id)} />
+        <UpdateForm key={k} action={postUpdate.bind(null, id)} />
       </Card>
 
       {updates.length ? (
@@ -43,7 +48,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border border-border object-cover" /> : null}
                   <form action={removeUpdate.bind(null, id, u.id)}>
-                    <RemoveButton what={`the update from ${formatDate(u.created_at)}`} />
+                    <RemoveButton what={`the update from ${formatDate(u.created_at)}`} ask={false} />
                   </form>
                 </li>
               );
@@ -61,7 +66,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
                 <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} className="aspect-square w-full rounded-card border border-border object-cover" />
                 {p.caption_en ? <p className="text-xs text-muted">{p.caption_en}</p> : null}
                 <form action={removePhoto.bind(null, id, p.id)}>
-                  <RemoveButton what={p.caption_en ? `the photo "${p.caption_en}"` : "this photo"} />
+                  <RemoveButton what={p.caption_en ? `the photo "${p.caption_en}"` : "this photo"} ask={false} />
                 </form>
               </li>
             ))}
@@ -69,7 +74,7 @@ export default async function UpdatesPage({ params }: PageProps<"/charity-admin/
         ) : (
           <p className="mb-3 text-sm text-muted">No photos yet. Photos of the work itself (parcels, a class, your building) mean the most to donors.</p>
         )}
-        {photos.length < MAX_PHOTOS ? <PhotoForm action={addPhoto.bind(null, id)} /> : <p className="text-sm text-muted">Remove a photo to add another.</p>}
+        {photos.length < MAX_PHOTOS ? <PhotoForm key={k} action={addPhoto.bind(null, id)} /> : <p className="text-sm text-muted">Remove a photo to add another.</p>}
       </Card>
     </div>
   );

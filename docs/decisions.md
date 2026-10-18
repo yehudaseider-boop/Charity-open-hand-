@@ -827,3 +827,13 @@ Most of the "at launch" list was already built: the donor list (name, contact, t
 Settled the same day (Yehuda):
 - **No fee line on the income summary.** "We haven't decided on a fee." The 3% in the suggestion was not a decision. Nothing shows a fee until Givezy's fee (if any) and the payment provider's rates are decided and in `src/config/platform.ts`.
 - **No paid tier.** Campaigns and impact updates stay free for every charity.
+
+## 18/10/2026: The dashboard's core flow: what just happened, take it back, what next
+
+Yehuda: "We need to make our core flow: what just happened, they can take it back, what to do next." Charity dashboard first (his choice); the app follows once he has felt it.
+
+- After every dashboard action a panel at the top of that page says **what just happened** in plain words ("'Winter food parcels' is live. Donors can give to it now."), offers **Undo** for 30 minutes, and gives **one next step** as the page's orange button ("Next: post an update about it"). All the words live in `src/lib/charity/done.ts`.
+- Undo covers all 17 undoable actions: profile, logo and cover, donation emails, starting and ending a campaign, posting and removing updates and photos, every registration step including bank details, and uploading and removing documents. Undo never overwrites newer work (if it was changed again since, it says so and keeps the newer version), never removes a campaign someone has given to (end it instead), runs once even if tapped twice, and never touches registration details once the application is submitted.
+- **The two that can't be taken back ask first, on the page** (Yehuda's choice: ask first, then no undo): sending the monthly thank-you email and submitting the registration. The check says plainly that it can't be taken back. The phone's own "Are you sure?" pop-ups are gone from the dashboard: removals use Undo instead.
+- Each action is kept in `charity_actions` (migration `20261018000001`, server-only, 30 days) so the panel and Undo work across page loads.
+- Removed or replaced files are kept so Undo can put them back; cleaning them up later is on the go-live list.

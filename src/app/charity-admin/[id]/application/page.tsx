@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
+import { DonePanel, formKey } from "@/components/done-panel";
 import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/charity-summary";
 import { requireViewer } from "@/lib/auth";
 import { applicationChecklist, applicationSteps, currentStep, isComplete } from "@/lib/charity/checklist";
@@ -22,7 +23,8 @@ export const metadata: Metadata = { title: "Registration" };
 
 export default async function ApplicationPage({ params, searchParams }: PageProps<"/charity-admin/[id]/application">) {
   const { id } = await params;
-  const { step: asked } = (await searchParams) as { step?: string };
+  const sp = await searchParams;
+  const { step: asked } = sp as { step?: string };
   await requireViewer(`/charity-admin/${id}/application`);
   const { charity, priv, documents } = await loadCharityForManager(id);
   const editable = charity.status === "draft" || charity.status === "rejected";
@@ -42,6 +44,8 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
         <h1 className="mt-1 font-display text-2xl text-indigo">{charity.name_en}</h1>
         <div className="mt-2"><Badge tone={status.tone}>{status.label}</Badge></div>
       </div>
+
+      <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/application?step=${step.key}`} />
 
       {charity.status === "suspended" ? (
         <Notice tone="danger">
@@ -92,7 +96,8 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
             </nav>
           </div>
 
-          <Card title={`Step ${at + 1} of ${steps.length}: ${step.label}`}>
+          {/* A fresh form after each action: an upload or bank number isn't left filled in. */}
+          <Card key={formKey(sp, step.key)} title={`Step ${at + 1} of ${steps.length}: ${step.label}`}>
             <p className="mb-3 text-sm text-muted">{step.hint}</p>
             {step.key === "organisation" ? <OrganisationForm action={saveOrganisation.bind(null, id)} charity={charity} /> : null}
             {step.key === "address" ? <AddressForm action={saveAddress.bind(null, id)} charity={charity} /> : null}

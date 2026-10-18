@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { recordAction } from "@/lib/charity/charity-actions";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { checkThankYou, recentMonths } from "@/lib/charity/thank-you";
+import { checkThankYou, monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { sendThankYou } from "@/lib/charity/thank-you-send";
 import type { FormState } from "@/lib/form";
 
@@ -18,6 +20,7 @@ export async function sendThankDonors(charityId: string, month: string, _prev: F
   const r = await sendThankYou({ charityId, charityName: charity.name_en, month, body: checked.body, userId: viewer.userId });
   revalidatePath(`/charity-admin/${charityId}/thank-donors`);
   if (!r.ok) return { ok: false, message: r.message };
-  if (!r.sent && !r.failed) return { ok: true, message: "Saved. Nobody was left to email for that month." };
-  return { ok: true, message: `Sent to ${r.sent} ${r.sent === 1 ? "donor" : "donors"}.${r.failed ? ` ${r.failed} could not be sent.` : ""}` };
+  // Sent emails can't be called back, so there is no undo: the page asked first.
+  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed }, null);
+  redirect(`/charity-admin/${charityId}/thank-donors?done=${done}`);
 }

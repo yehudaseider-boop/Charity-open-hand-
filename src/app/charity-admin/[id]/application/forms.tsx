@@ -97,8 +97,8 @@ export const charityDeclarations = [
 
 export function SubmitForm({ action }: { action: (state: FormState, formData: FormData) => Promise<FormState> }) {
   return (
-    <ActionForm action={action} submitLabel="Submit for review"
-      confirm="Submit now? You won't be able to change your details or bank account while we review them.">
+    <ActionForm action={action} submitLabel="Submit for review" confirmLabel="Yes, submit"
+      confirm="Submit now? Once submitted it can't be taken back, and you won't be able to change your details or bank account while we review them.">
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Declarations</legend>
         {charityDeclarations.map(([name, text]) => (
