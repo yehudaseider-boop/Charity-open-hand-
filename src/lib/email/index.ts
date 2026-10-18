@@ -9,6 +9,8 @@ export type EmailMessage = {
   subject: string;
   text: string;
   html?: string;
+  /** Where a reply goes (for example the charity, on a thank-you sent in its name). */
+  replyTo?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
 };
 
@@ -58,6 +60,7 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
           subject: m.subject.replace(/[\r\n]+/g, " "),
           text: m.text,
           ...(m.html ? { html: m.html } : {}),
+          ...(m.replyTo ? { reply_to: m.replyTo } : {}),
           ...(m.attachments?.length
             ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
             : {}),

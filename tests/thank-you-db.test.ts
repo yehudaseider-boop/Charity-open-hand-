@@ -61,3 +61,21 @@ describe("thank-you tables", () => {
     });
   });
 });
+
+describe("personal thank-yous", () => {
+  it("once a week per donor, and closed to everyone but the server", async () => {
+    await tx(async () => {
+      const donor = (await run("insert into public.donors (email, first_name) values ('thanks.test@example.com', 'Thandi') returning id")).rows[0].id;
+      await run("insert into public.charity_donor_thanks (charity_id, donor_id, week_start, body) values ($1, $2, '2026-10-12', 'Thank you so much.')", [ids.meals, donor]);
+      await run("savepoint p");
+      await expect(run("insert into public.charity_donor_thanks (charity_id, donor_id, week_start, body) values ($1, $2, '2026-10-12', 'Thank you again.')", [ids.meals, donor])).rejects.toThrow(/duplicate/);
+      await run("rollback to savepoint p");
+      for (const who of [null, ids.mealsAdmin]) {
+        await as(who);
+        await run("savepoint q");
+        await expect(run("select * from public.charity_donor_thanks")).rejects.toThrow(/permission denied/);
+        await run("rollback to savepoint q");
+      }
+    });
+  });
+});

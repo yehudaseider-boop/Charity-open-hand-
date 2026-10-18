@@ -48,15 +48,49 @@ export function checkThankYou(raw: string): { ok: true; body: string } | { ok: f
   return { ok: true, body };
 }
 
-/** One donor's thank-you. Their first name only: never amounts, other donors or anything else. */
-export function thankYouEmail(
+/** Monday of the week (Johannesburg calendar) as "yyyy-mm-dd": a donor is thanked personally at most once in it. */
+export function weekStart(now: Date): string {
+  const [y, m, d] = saDate(now).split("-").map(Number);
+  const day = new Date(Date.UTC(y, m - 1, d));
+  const back = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() - back);
+  return day.toISOString().slice(0, 10);
+}
+
+/** A charity's personal thank-you to one donor. Their first name and the charity's words only. */
+export function oneDonorThankYouEmail(
   to: string,
-  v: { charityName: string; firstName: string | null; month: string; body: string; stopUrl: string },
+  v: { charityName: string; firstName: string | null; body: string; stopUrl: string; replyTo: string | null },
 ): EmailMessage {
   const name = v.firstName?.trim();
   return {
     to,
     subject: `A thank-you from ${v.charityName}`,
+    ...(v.replyTo ? { replyTo: v.replyTo } : {}),
+    text: [
+      name ? `Dear ${name},` : "Hello,",
+      "",
+      v.body,
+      "",
+      `From ${v.charityName}`,
+      "",
+      "",
+      v.replyTo ? `${v.charityName} sent this through Givezy. Reply to this email to reach them.` : `${v.charityName} sent this through Givezy.`,
+      `You're getting this because you gave to ${v.charityName} on Givezy. To stop thank-you emails from charities: ${v.stopUrl}`,
+    ].join("\n"),
+  };
+}
+
+/** One donor's thank-you. Their first name only: never amounts, other donors or anything else. */
+export function thankYouEmail(
+  to: string,
+  v: { charityName: string; firstName: string | null; month: string; body: string; stopUrl: string; replyTo?: string | null },
+): EmailMessage {
+  const name = v.firstName?.trim();
+  return {
+    to,
+    subject: `A thank-you from ${v.charityName}`,
+    ...(v.replyTo ? { replyTo: v.replyTo } : {}),
     text: [
       name ? `Dear ${name},` : "Hello,",
       "",

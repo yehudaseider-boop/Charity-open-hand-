@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
+import { DonePanel, formKey } from "@/components/done-panel";
+import { lastThanked, optedOut } from "@/lib/charity/thank-you-send";
+import { thankOneDonor } from "./actions";
+import { ThankOneForm } from "./thank-form";
 import { requireViewer } from "@/lib/auth";
 import { ERASED_DONOR, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
 import { loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charity/dashboard-queries";
@@ -17,7 +21,7 @@ const PAGE = 25;
 export default async function DonorsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/donors">) {
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/donors`);
-  await loadCharityForManager(id);
+  const { charity } = await loadCharityForManager(id);
   const sp = await searchParams;
   const q = safeSearch(typeof sp.q === "string" ? sp.q : "");
   const page = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
@@ -36,6 +40,13 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const base = `/charity-admin/${id}/donors`;
   const href = (p: number, g: string | null = group) =>
     `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
+  // "Say thank you": only once the page is live, never to erased donors or anyone who asked not to get them.
+  const canThank = charity.status === "approved";
+  const [thanked, stopped] = canThank
+    ? await Promise.all([lastThanked(id, shown.map((d) => d.donor_id)), optedOut(shown.filter((d) => shownEmail(d.email)).map((d) => d.email))])
+    : [new Map<string, string>(), new Set<string>()];
+  const here = href(page);
+  const key = formKey(sp);
 
   return (
     <div className="space-y-4">
@@ -43,6 +54,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         <h1 className="font-display text-2xl text-indigo">Donors</h1>
         <a href={`/charity-admin/${id}/export/donors`} className="text-sm text-brand underline">Download donors (CSV)</a>
       </div>
+      <DonePanel charity={charity} sp={sp} here={base} />
       <p className="text-sm text-muted">
         People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record donations. Where a donor asked for one, Givezy issues the s18A receipt in your name.
       </p>
@@ -97,6 +109,16 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                 </div>
                 <p className="shrink-0 font-semibold">{formatRand(d.total_cents)}</p>
               </div>
+              {canThank && shownEmail(d.email) ? (
+                stopped.has(d.email.trim().toLowerCase()) ? (
+                  <p className="mt-2 text-xs text-muted">Asked not to get thank-you emails from charities.</p>
+                ) : (
+                  <>
+                    {thanked.get(d.donor_id) ? <p className="mt-2 text-xs text-muted">Last thanked personally on {formatDate(thanked.get(d.donor_id)!)}.</p> : null}
+                    <ThankOneForm key={`${d.donor_id}-${key}`} action={thankOneDonor.bind(null, id, d.donor_id, here)} name={d.display_name || "this donor"} />
+                  </>
+                )
+              ) : null}
             </li>
           ))}
         </ul>

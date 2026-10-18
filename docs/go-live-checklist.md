@@ -80,3 +80,4 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 HTML version of the confirmation email, yahrzeit giving, real charity photos from the charities. (Tax pack and dedications were built on 15/10/2026.)
 
 - [ ] Donor-covers-the-fee option: needs Paystack's rate sheet (percentage, fixed amount, VAT included or not) and Yehuda's answer on how the receipt shows it. Fee payer itself is decided: the charity.
+- [ ] Apply migration `20261018000002_donor_thank_yous.sql` (personal thank-yous) to the hosted database, together with the other migrations not yet applied there.

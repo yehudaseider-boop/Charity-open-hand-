@@ -12,12 +12,12 @@ import type { FormState } from "@/lib/form";
 export async function sendThankDonors(charityId: string, month: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   // Throws unless the signed-in person (with their second step) manages this charity.
-  const { charity } = await loadCharityForManager(charityId);
+  const { charity, priv } = await loadCharityForManager(charityId);
   if (charity.status !== "approved") return { ok: false, message: "You can thank donors once your page is live." };
   if (!recentMonths(new Date()).includes(month)) return { ok: false, message: "Choose one of the last three months." };
   const checked = checkThankYou(String(formData.get("body") ?? ""));
   if (!checked.ok) return { ok: false, fieldErrors: { body: checked.message } };
-  const r = await sendThankYou({ charityId, charityName: charity.name_en, month, body: checked.body, userId: viewer.userId });
+  const r = await sendThankYou({ charityId, charityName: charity.name_en, month, body: checked.body, userId: viewer.userId, replyTo: priv?.contact_email ?? null });
   revalidatePath(`/charity-admin/${charityId}/thank-donors`);
   if (!r.ok) return { ok: false, message: r.message };
   // Sent emails can't be called back, so there is no undo: the page asked first.

@@ -26,10 +26,11 @@ export type ActionKind =
   | "document_uploaded"
   | "document_removed"
   | "application_submitted"
-  | "thank_you_sent";
+  | "thank_you_sent"
+  | "donor_thanked";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
-export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent"];
+export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked"];
 
 export type Details = Record<string, string | number | boolean | null | undefined>;
 export type Context = { base: string; publicUrl: string | null; approved: boolean };
@@ -106,6 +107,11 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         next: { label: "See who gave", href: `${c.base}/donors` },
       };
     }
+    case "donor_thanked":
+      return {
+        what: `Your thank-you went to ${String(d.name ?? "your donor")}.${d.replyTo ? ` If they reply, it goes to ${String(d.replyTo)}.` : ""}`,
+        next: { label: "Back to your donors", href: `${c.base}/donors` },
+      };
   }
 }
 
@@ -131,6 +137,7 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "document_removed": return `Taken back. ${quote(d.fileName)} is back.`;
     case "application_submitted":
     case "thank_you_sent":
+    case "donor_thanked":
       return "This can't be taken back.";
   }
 }
@@ -141,6 +148,7 @@ export function pageOf(kind: ActionKind): string {
   if (kind.startsWith("campaign_")) return "campaigns";
   if (kind.startsWith("update_") || kind.startsWith("photo_")) return "updates";
   if (kind === "thank_you_sent") return "thank-donors";
+  if (kind === "donor_thanked") return "donors";
   return "application";
 }
 
@@ -153,7 +161,7 @@ export function isActionKind(s: unknown): s is ActionKind {
 const KINDS = new Set<ActionKind>([
   "profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off", "campaign_started", "campaign_ended",
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
-  "document_uploaded", "document_removed", "application_submitted", "thank_you_sent",
+  "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
 ]);
 
 /** Undo is offered while it is recent, not yet taken back, and the action stored what it needs. */

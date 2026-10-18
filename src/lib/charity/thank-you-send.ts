@@ -4,7 +4,7 @@ import { logAudit } from "@/lib/audit";
 import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
-import { emailHash, monthPeriod, thankYouEmail } from "./thank-you";
+import { emailHash, monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
 
 export type Recipient = { email: string; firstName: string | null };
 
@@ -54,7 +54,7 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
 export type SendResult = { ok: true; sent: number; failed: number } | { ok: false; message: string };
 
 /** Send the charity's thank-you for one month. Only once per month: the row is claimed first. */
-export async function sendThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string }): Promise<SendResult> {
+export async function sendThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string; replyTo?: string | null }): Promise<SendResult> {
   const db = createAdminClient();
   const claim = await db
     .from("charity_thank_yous")
@@ -86,7 +86,7 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
       continue;
     }
     try {
-      await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}` }));
+      await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }));
       sent++;
     } catch (e) {
       console.error("[thank-you] not sent", e instanceof Error ? e.message : e);
@@ -100,6 +100,104 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
   await db.from("charity_thank_yous").update({ recipient_count: sent }).eq("id", claim.data.id);
   await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, sent, failed } });
   return { ok: true, sent, failed };
+}
+
+export type DonorThankResult = { ok: true; name: string } | { ok: false; message: string };
+
+/**
+ * A charity's personal thank-you to one of its donors (someone with a paid gift to it). At most once a
+ * week per donor: the week is claimed first, and handed back if the email couldn't go. Call only after
+ * checking the signed-in person manages this charity: it reads with the service role.
+ */
+export async function sendDonorThankYou(args: {
+  charityId: string;
+  charityName: string;
+  donorId: string;
+  body: string;
+  userId: string;
+  replyTo: string | null;
+}): Promise<DonorThankResult> {
+  const db = createAdminClient();
+  const { data: gift, error } = await db
+    .from("donations")
+    .select("id, donation_checkout_details(email, first_name, last_name, donor_type, organisation_name, contact_person, erased_at)")
+    .eq("charity_id", args.charityId)
+    .eq("donor_id", args.donorId)
+    .eq("status", "paid")
+    .order("paid_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const raw = gift?.donation_checkout_details as unknown;
+  const d = (Array.isArray(raw) ? raw[0] : raw) as {
+    email: string | null; first_name: string | null; last_name: string | null; donor_type: string; organisation_name: string | null; contact_person: string | null; erased_at: string | null;
+  } | null;
+  if (!d?.email || d.erased_at || isErasedEmail(d.email)) return { ok: false, message: "This donor's details have been removed, so they can't be emailed." };
+  const individual = d.donor_type === "individual";
+  const name = (individual ? [d.first_name, d.last_name].filter(Boolean).join(" ") : d.organisation_name) || "this donor";
+  const greeting = individual ? d.first_name : d.contact_person?.split(/\s+/)[0] ?? null;
+  const hash = emailHash(d.email);
+  const { data: stopped, error: stopError } = await db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", hash).maybeSingle();
+  if (stopError) throw stopError;
+  if (stopped) return { ok: false, message: `${name} asked not to get thank-you emails from charities, so nothing was sent.` };
+
+  const claim = await db
+    .from("charity_donor_thanks")
+    .insert({ charity_id: args.charityId, donor_id: args.donorId, week_start: weekStart(new Date()), body: args.body, sent_by: args.userId })
+    .select("id")
+    .single();
+  if (claim.error) {
+    if (claim.error.code === "23505") return { ok: false, message: `You've already thanked ${name} this week, so nothing was sent. You can thank them again from Monday.` };
+    throw claim.error;
+  }
+  const release = () => db.from("charity_donor_thanks").delete().eq("id", claim.data.id);
+  const token = randomBytes(32).toString("base64url");
+  const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), email_hash: hash });
+  if (saved.error) {
+    await release();
+    return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
+  }
+  const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
+  try {
+    await getEmailTransport().send(
+      oneDonorThankYouEmail(d.email.trim(), { charityName: args.charityName, firstName: greeting, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }),
+    );
+  } catch (e) {
+    console.error("[thank-you] personal thank-you not sent", e instanceof Error ? e.message : e);
+    await release();
+    return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
+  }
+  await logAudit({ actorUserId: args.userId, action: "charity.donor_thanked", entityType: "charity", entityId: args.charityId, details: { donorId: args.donorId } });
+  return { ok: true, name };
+}
+
+/** When each of these donors was last thanked personally by this charity (service role: check access first). */
+export async function lastThanked(charityId: string, donorIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!donorIds.length) return out;
+  const { data, error } = await createAdminClient()
+    .from("charity_donor_thanks")
+    .select("donor_id, sent_at")
+    .eq("charity_id", charityId)
+    .in("donor_id", donorIds)
+    .order("sent_at", { ascending: false });
+  if (error) throw error;
+  for (const r of data ?? []) if (!out.has(r.donor_id as string)) out.set(r.donor_id as string, r.sent_at as string);
+  return out;
+}
+
+/** Which of these addresses asked not to get thank-you emails (service role: check access first). */
+export async function optedOut(emails: string[]): Promise<Set<string>> {
+  const byHash = new Map(emails.map((e) => [emailHash(e), e.trim().toLowerCase()]));
+  const out = new Set<string>();
+  if (!byHash.size) return out;
+  const { data, error } = await createAdminClient().from("thank_you_opt_outs").select("email_hash").in("email_hash", [...byHash.keys()]);
+  if (error) throw error;
+  for (const r of data ?? []) {
+    const e = byHash.get(r.email_hash as string);
+    if (e) out.add(e);
+  }
+  return out;
 }
 
 /** The "stop these emails" link. True when the link was ours (the opt-out is then saved). */

@@ -39,9 +39,9 @@ describe("what just happened, and what next", () => {
     expect(describeDone("bank_saved", {}, ctx).next!.href).toBe("/charity-admin/c1/application?step=documents");
   });
 
-  it("after Undo, every action says what is back; the two that can't be taken back say so", () => {
+  it("after Undo, every action says what is back; the ones that can't be taken back say so", () => {
     for (const kind of ALL) expect(describeUndone(kind, { title: "Roof" }).length, kind).toBeGreaterThan(10);
-    expect(ASK_FIRST).toEqual(["application_submitted", "thank_you_sent"]);
+    expect(ASK_FIRST).toEqual(["application_submitted", "thank_you_sent", "donor_thanked"]);
     for (const kind of ASK_FIRST) expect(describeUndone(kind, {})).toBe("This can't be taken back.");
   });
 });

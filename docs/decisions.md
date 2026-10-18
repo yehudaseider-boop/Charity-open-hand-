@@ -874,3 +874,12 @@ Yehuda asked for the quality rules on the donor app (un-glamorous moments, consi
 - The sample-data version (what Expo Go shows without a live server) behaves like the live one: cancelling asks first, pausing has Undo.
 
 **Left as is:** goal and log amounts have no upper limit beyond the length of the box (11 characters); a cap would be a new platform value, so it waits for Yehuda if he wants one.
+
+## 18/10/2026: Charities can thank one donor personally
+
+Yehuda chose three new dashboard features (weekly email to the charity, annual report, thank one donor), built in that order starting with this one; emails to lapsed or campaign donors stay off until consent wording has had a legal look.
+
+- **"Say thank you"** on each donor's row (Donors page, live charities only): a short message, up to 1 000 characters. Givezy sends it in the charity's name: the donor's first name (or a company's contact person) above it, "From [charity]" below, and **replies go to the charity's contact email**. The monthly thank-you to everyone now also replies to the charity's contact email.
+- It **asks first** ("An email can't be called back once it's sent"), then shows what happened on the page. There is no undo, like the monthly thank-you.
+- **At most once a week per donor** (Monday to Sunday, Johannesburg time), so no donor is flooded; the row says "Last thanked personally on dd/mm/yyyy". Never to erased donors, or to anyone who used "stop thank-you emails" (the row says so). Each email carries that stop link.
+- Kept in `charity_donor_thanks` (migration `20261018000002`, server-only).
