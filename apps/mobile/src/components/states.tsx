@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
 import { colors, radius, space } from "@/theme/tokens";
-import { Button } from "./button";
+import { Button, TextLink } from "./button";
 import { ddmmyyyy, hhmm, jhbDay } from "@/lib/format";
 import { Text } from "./text";
 
@@ -33,12 +33,14 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
   );
 }
 
-export function ErrorState({ body, onRetry }: { body: string; onRetry: () => void }) {
+/** `away`: a second way on, for screens with no tab bar (so an error is never a dead end). */
+export function ErrorState({ body, onRetry, away }: { body: string; onRetry: () => void; away?: { label: string; onPress: () => void } }) {
   return (
     <View style={styles.box} accessibilityRole="alert">
       <Text variant="h2" style={{ textAlign: "center" }}>Something went wrong</Text>
       <Text variant="bodyMuted" style={{ textAlign: "center" }}>{body}</Text>
       <View style={{ marginTop: 8, alignSelf: "stretch" }}><Button label="Try again" onPress={onRetry} /></View>
+      {away ? <TextLink label={away.label} onPress={away.onPress} /> : null}
     </View>
   );
 }

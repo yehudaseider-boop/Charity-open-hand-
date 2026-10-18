@@ -52,7 +52,7 @@ export default function CharityDetail() {
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 40, paddingHorizontal: space.gutter, gap: space.block }]}>
         {failed ? (
-          <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retry} />
+          <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retry} away={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
         ) : (
           <>
             <SkeletonBlock height={220} />

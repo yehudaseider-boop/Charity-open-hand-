@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RaisingNowRow } from "@/components/raising-now";
 import { CharityPhotoCard, CheckedBadge } from "@/components/charity-photo-card";
@@ -12,7 +12,7 @@ import type { Charity } from "@/data/sample";
 import { FadeUp } from "@/components/fade-up";
 import { PressableScale } from "@/components/pressable-scale";
 import { SearchIcon } from "@/components/icons";
-import { EmptyState, ErrorState, LoadingList, SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, LoadingList, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { useDirectory } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
@@ -51,7 +51,12 @@ export default function Discover() {
   const rest = results.filter((c) => c !== featured);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={live ? <RefreshControl refreshing={directory.refreshing} onRefresh={directory.refresh} /> : undefined}
+    >
       <View style={[styles.gutter, { gap: 14 }]}>
         <Text variant="h1" accessibilityRole="header">Find a cause</Text>
         <View style={styles.searchBlock}>
@@ -68,6 +73,7 @@ export default function Discover() {
             />
           </View>
         </View>
+        {directory.offlineSince ? <OfflineNote savedAt={directory.offlineSince} /> : null}
         <SeasonalCard />
       </View>
 

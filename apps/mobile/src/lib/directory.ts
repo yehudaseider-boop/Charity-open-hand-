@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { causes as sampleCauses, charities as sampleCharities, findCharity, type Cause, type Charity } from "@/data/sample";
 import { CHARITY_COLUMNS, raisingNow, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type RaisingNow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
 import { supabase } from "./supabase";
+import { secureStorage } from "./secure-storage";
 
 /**
  * The charity directory. Live: approved charities from the database (row-level
@@ -10,6 +11,42 @@ import { supabase } from "./supabase";
 const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 type Directory = { charities: Charity[]; causes: Cause[]; raising: RaisingNow[] };
 let cached: Directory | null = null;
+/** When `cached` came from the phone's saved copy, the time it was saved; null once fresh from the server. */
+let cachedSavedAt: Date | null = null;
+
+/**
+ * The last directory seen, kept on the phone so Discover and Home still open without a connection.
+ * Public information only (approved charities), so it is kept after sign-out. Capped so it stays small.
+ */
+const SAVED_KEY = "nediv-lev.directory";
+const SAVED_MAX_CHARITIES = 120;
+let lastSaved = "";
+
+async function readSaved(): Promise<{ savedAt: Date; data: Directory } | null> {
+  try {
+    const raw = await secureStorage.getItem(SAVED_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as { savedAt?: string; data?: Directory };
+    const savedAt = new Date(v.savedAt ?? "");
+    if (!v.data || !Array.isArray(v.data.charities) || !Array.isArray(v.data.causes) || Number.isNaN(savedAt.getTime())) return null;
+    lastSaved = JSON.stringify(v.data);
+    return { savedAt, data: { charities: v.data.charities, causes: v.data.causes, raising: Array.isArray(v.data.raising) ? v.data.raising : [] } };
+  } catch {
+    return null;
+  }
+}
+
+async function writeSaved(d: Directory): Promise<void> {
+  const trimmed: Directory = { charities: d.charities.slice(0, SAVED_MAX_CHARITIES), causes: d.causes, raising: d.raising.slice(0, 10) };
+  const json = JSON.stringify(trimmed);
+  if (json === lastSaved) return;
+  try {
+    await secureStorage.setItem(SAVED_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data: trimmed }));
+    lastSaved = json;
+  } catch {
+    // Not saved: offline, Discover shows "Try again" instead of the last list.
+  }
+}
 
 /** The preview's campaigns, from the sample charities. */
 function sampleRaising(): RaisingNow[] {
@@ -41,19 +78,39 @@ export function causeList(): Cause[] {
 export function useDirectory() {
   const live = supabase !== null;
   const [data, setData] = useState<Directory | null>(live ? cached : { charities: sampleCharities, causes: sampleCauses, raising: sampleRaising() });
+  const [savedAt, setSavedAt] = useState<Date | null>(live ? cachedSavedAt : null);
   const [failed, setFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!live) return;
     let current = true;
+    // While the server answers, show the saved copy (if this is the first load since the app opened).
+    if (!cached) {
+      readSaved().then((saved) => {
+        if (!current || !saved || cached) return;
+        cached = saved.data;
+        cachedSavedAt = saved.savedAt;
+        setData(saved.data);
+        setSavedAt(saved.savedAt);
+      });
+    }
     loadDirectory().then(
       (next) => {
         if (!current) return;
         cached = next;
+        cachedSavedAt = null;
         setData(next);
+        setSavedAt(null);
         setFailed(false);
+        setRefreshing(false);
+        void writeSaved(next);
       },
-      () => current && setFailed(true),
+      () => {
+        if (!current) return;
+        setFailed(true);
+        setRefreshing(false);
+      },
     );
     return () => {
       current = false;
@@ -63,7 +120,14 @@ export function useDirectory() {
     setFailed(false);
     setAttempt((n) => n + 1);
   }, []);
-  return { live, data, failed, retry };
+  /** Pull to refresh: the list stays while it checks. */
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    setAttempt((n) => n + 1);
+  }, []);
+  /** Offline with a saved list: show it with "this is what was saved on…". */
+  const offlineSince = failed && savedAt ? savedAt : null;
+  return { live, data, failed, retry, refresh, refreshing, offlineSince };
 }
 
 /** One approved charity with its photos and latest updates; null when there is none with that name. */
