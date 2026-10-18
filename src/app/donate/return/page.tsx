@@ -157,6 +157,15 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       </Card>
     );
   }
+  if (outcome === "reversed") {
+    return (
+      <Card title="This donation was refunded">
+        <p className="text-sm">The money went back to your card, so nothing is owed on this donation. The confirmation email you got for it no longer applies.</p>
+        {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link> : <Link href="/charities" className="mt-4 inline-block text-sm text-brand underline">Find a charity</Link>}
+        <p className="mt-4 text-sm text-muted">Questions? <HelpLine /></p>
+      </Card>
+    );
+  }
   if (outcome === "pending") {
     return (
       <Card title="We're confirming your payment">

@@ -432,7 +432,7 @@ function Dedicate({ error }: { error?: string }) {
         ))}
       </div>
       <fieldset hidden={kind === "none"} disabled={kind === "none"}>
-        <TextField name="dedication_name" label="Their name" required autoDirection maxLength={200} hint={`${charityLabel(kind === "memory" ? "memory" : "honour")} The charity sees this name; it is not on your s18A receipt.`} />
+        <TextField name="dedication_name" label="Their name" required autoDirection maxLength={80} hint={`${charityLabel(kind === "memory" ? "memory" : "honour")} The charity sees this name; it is not on your s18A receipt.`} />
       </fieldset>
       {error && kind === "none" ? <p className="text-xs text-danger">{error}</p> : null}
     </fieldset>

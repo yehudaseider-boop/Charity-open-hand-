@@ -96,7 +96,8 @@ export function ActionForm({
                 type="button"
                 autoFocus
                 onClick={() => {
-                  const held = asking;
+                  // What is in the form now, in case something was edited while the question was open.
+                  const held = formRef.current ? new FormData(formRef.current) : asking;
                   setAsking(null);
                   startTransition(() => dispatch(held));
                 }}

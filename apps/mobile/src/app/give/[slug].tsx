@@ -68,6 +68,9 @@ const SECTION_OF: Record<string, string> = {
  * campaign is still running. After the payment page closes, the app asks whether it went
  * through: paid is thanked, anything else keeps the form so the donor can try again.
  */
+/** Exactly what one tap of Give sent, kept for the thank-you and for holding an unresolved saved-card attempt. */
+type Snapshot = { cents: number; contributionCents: number; email: string; monthly: boolean; label: string | null; amountText?: string; extraText?: string; extra?: boolean };
+
 export default function Give() {
   const insets = useSafeAreaInsets();
   const { slug, kind: kindParam, label: labelParam, campaign: campaignParam, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
@@ -103,7 +106,9 @@ export default function Give() {
   const [extraAmount, setExtraAmount] = useState("");
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
-  const [email, setEmail] = useState(account.email ?? "");
+  // What was typed, else the account's address (which may arrive after this screen opened from a link).
+  const [emailTyped, setEmail] = useState<string | null>(null);
+  const email = emailTyped ?? account.email ?? "";
   const [phone, setPhone] = useState("");
   const [remember, setRemember] = useState(false);
   const [remembered, setRemembered] = useState<RememberedDetails | null>(null);
@@ -135,7 +140,10 @@ export default function Give() {
   const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean } | null>(null);
   const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => setMessageState(text ? { text, tone, help } : null);
   // A payment we haven't heard back about: the footer offers "Check again" instead of a second gift.
-  const [unsettled, setUnsettled] = useState<{ reference: string; token: string; charged: boolean } | null>(null);
+  const [unsettled, setUnsettled] = useState<{ reference: string; token: string; charged: boolean; summary: Snapshot } | null>(null);
+  // A saved-card charge we haven't heard back about: the form is held to exactly what was sent (same amount,
+  // card, email) until the server says paid or declined, so no second donation can be started around it.
+  const [heldAttempt, setHeldAttempt] = useState<Snapshot | null>(null);
   // Where each part of the form sits, so a failed tap scrolls to the first thing to fix.
   const scrollRef = useRef<ScrollView>(null);
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
@@ -273,7 +281,8 @@ export default function Give() {
   const gift = parseRandToCents(amount);
   const contribution = extra ? parseRandToCents(extraAmount) : 0;
   const total = gift !== null && contribution !== null ? gift + contribution : null;
-  const isMonthly = monthly && !campaignId;
+  // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
+  const isMonthly = monthly && !campaignId && !heldAttempt;
   const authorised = isMonthly && total !== null && authorisedTotal === total;
   const s18aAvailable = server ? server.receiptsAvailable : charity.issues18a;
   const savedLast4 = server?.savedIdLast4 ?? null;
@@ -284,25 +293,26 @@ export default function Give() {
   const demoCard = preview && demo === "card" && SAVED_CARDS;
   const cardsOpen = demoCard || (SAVED_CARDS && server?.savedCardsOpen === true && account.status === "signed-in" && !isMonthly && email.trim().toLowerCase() === (account.email ?? "").toLowerCase());
   const savedCard = demoCard ? { brand: "visa", last4: "4242", expires: "12/2030" } : cardsOpen ? (server?.savedCard ?? null) : null;
-  const payWithSaved = Boolean(savedCard) && useSavedCard;
+  const payWithSaved = heldAttempt !== null || (Boolean(savedCard) && useSavedCard);
   const offerSave = cardsOpen && !payWithSaved;
 
   /** What the after-gift screen shows: this gift added to the goal and the streak, and honest badges. */
   /** `cents` is the gift to the charity only: a contribution to Givezy never counts towards a goal. */
-  function sentSummary(cents: number, contributionCents: number, mail: string, confirming: boolean): SentGift {
+  function sentSummary(s: Snapshot, confirming: boolean): SentGift {
+    const { cents, contributionCents, email: mail, monthly: wasMonthly } = s;
     const today = jhbToday();
-    const rows = [...history, ...elsewhere, { date: today, cents, label: cleanLabel(label) }];
-    const pr = goal && counts(goal, cleanLabel(label)) ? goalProgress(goal, rows, income.value, today) : null;
+    const rows = [...history, ...elsewhere, { date: today, cents, label: cleanLabel(s.label) }];
+    const pr = goal && counts(goal, cleanLabel(s.label)) ? goalProgress(goal, rows, income.value, today) : null;
     const badges = [
       firstEver ? "First gift on Givezy" : null,
-      isMonthly ? "Monthly giver" : null,
+      wasMonthly ? "Monthly giver" : null,
       s18aAvailable && want18a ? "s18A receipt at tax time" : null,
       pr && goal ? `Counts towards ${goal.name}` : null,
     ].filter((b): b is string => Boolean(b));
     return {
       cents,
       contributionCents,
-      monthly: isMonthly,
+      monthly: wasMonthly,
       email: mail,
       confirming,
       goal: pr && goal && pr.targetCents ? { name: goal.name, percent: Math.floor((pr.givenCents * 100) / pr.targetCents), givenCents: pr.givenCents, targetCents: pr.targetCents } : null,
@@ -312,7 +322,7 @@ export default function Give() {
   }
   if (demo === "sent" && !SITE_URL && !demoShown) {
     setDemoShown(true);
-    setDone(sentSummary(18_000, 0, "sarah@example.co.za", false));
+    setDone(sentSummary({ cents: 18_000, contributionCents: 0, email: "sarah@example.co.za", monthly: false, label }, false));
   }
 
   function check() {
@@ -397,6 +407,7 @@ export default function Give() {
       age_confirmed: agreed,
       popia_consent: agreed,
     };
+    const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extra ? extraAmount : "", extra };
     const r = await startPayment(
       SITE_URL,
       {
@@ -420,16 +431,35 @@ export default function Give() {
     // its id until we know it was paid or declined (below), so "try again" can never charge twice.
     if (!r.ok && !("noReply" in r) && !r.attemptMismatch) attemptRef.current = null;
     if (r.ok && !r.charged) attemptRef.current = null;
+    if (attemptRef.current === null) setHeldAttempt(null);
     if (!r.ok) {
       setBusy(false);
       // A declined saved card: offer the payment page, where another card can be used.
       if (r.savedCardDeclined) setUseSavedCard(false);
       if ("noReply" in r) {
+        if (payWithSaved) setHeldAttempt(sent);
         setMessage(
           payWithSaved
-            ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your details are still here. Tap Give again: we check first, and never charge twice."
+            ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your gift is held exactly as it was. Tap Give again: we check first, and never charge twice."
             : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and tap Give again.",
           payWithSaved ? "wait" : "error",
+          true,
+        );
+        return;
+      }
+      if (r.attemptMismatch) {
+        // The amount or email was changed while a saved-card charge is unresolved: put the gift back as it
+        // was sent, so the next tap asks about that charge instead of starting a new one.
+        const held = heldAttempt ?? sent;
+        setHeldAttempt(held);
+        setAmount(held.amountText ?? amount);
+        setExtra(held.extra ?? extra);
+        setExtraAmount(held.extraText ?? extraAmount);
+        setEmail(held.email);
+        setMonthly(false);
+        setMessage(
+          `We're still checking your earlier gift of ${rand(held.cents + held.contributionCents)} from your saved card, so it has been put back as it was. Tap Give again: we check first, and never charge twice.`,
+          "wait",
           true,
         );
         return;
@@ -441,7 +471,7 @@ export default function Give() {
         showProblems(r.fieldErrors);
         return;
       }
-      setMessage(r.quote ? `${r.message} The total is now ${rand(r.quote.totalCents)}.` : r.message, "error", !r.quote);
+      setMessage(r.message, "error", !r.quote);
       if (r.quote) setAuthorisedTotal(null);
       return;
     }
@@ -476,39 +506,50 @@ export default function Give() {
     // so "returned" with the provider still catching up counts. A saved-card charge counts only when paid.
     const finished = outcome === "paid" || (outcome === "pending" && shown === "returned" && !r.charged);
     // Paid or declined settles a saved-card attempt; anything else keeps its id, so "Give" asks again instead of charging again.
-    if (r.charged && (outcome === "paid" || outcome === "failed")) attemptRef.current = null;
+    if (r.charged && (outcome === "paid" || outcome === "failed" || outcome === "reversed")) {
+      attemptRef.current = null;
+      setHeldAttempt(null);
+    }
     if (!finished) {
       haptic.tap();
       const o = outcome === "paid" ? "pending" : outcome;
-      setUnsettled(o === "pending" || o === "review" ? { reference: r.reference, token: r.token, charged: Boolean(r.charged) } : null);
+      setUnsettled(o === "pending" || o === "review" ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent } : null);
       setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date()), afterPaymentTone(o), true);
       return;
     }
     haptic.success();
     void refreshAfterGiving(account.refresh);
-    setDone(sentSummary(gift ?? 0, contribution ?? 0, details.email, outcome !== "paid"));
+    setDone(sentSummary(sent, outcome !== "paid"));
   }
 
   /** "Check again": ask the payment provider about the unsettled payment, without starting a new one. */
   async function checkAgain() {
-    if (!unsettled || busy) return;
+    if (!unsettled || busy || busyRef.current) return;
+    busyRef.current = true;
     setBusy("checking");
-    const outcome = await paymentStatus(SITE_URL, unsettled.reference, unsettled.token);
-    setBusy(false);
-    if (outcome === "paid") {
-      setUnsettled(null);
-      setMessage(null);
-      if (unsettled.charged) attemptRef.current = null;
-      haptic.success();
-      void refreshAfterGiving(account.refresh);
-      setDone(sentSummary(gift ?? 0, contribution ?? 0, email.trim(), false));
-      return;
+    try {
+      const outcome = await paymentStatus(SITE_URL, unsettled.reference, unsettled.token);
+      setBusy(false);
+      const settles = outcome === "paid" || outcome === "failed" || outcome === "not_found" || outcome === "reversed";
+      if (settles) {
+        setUnsettled(null);
+        if (unsettled.charged) {
+          attemptRef.current = null;
+          setHeldAttempt(null);
+        }
+      }
+      if (outcome === "paid") {
+        setMessage(null);
+        haptic.success();
+        void refreshAfterGiving(account.refresh);
+        // The thank-you shows what was paid, not what is in the form now.
+        setDone(sentSummary(unsettled.summary, false));
+        return;
+      }
+      setMessage(afterPaymentMessage(outcome, unsettled.charged, new Date()), afterPaymentTone(outcome), true);
+    } finally {
+      busyRef.current = false;
     }
-    if (outcome === "failed" || outcome === "not_found") {
-      setUnsettled(null);
-      if (unsettled.charged) attemptRef.current = null;
-    }
-    setMessage(afterPaymentMessage(outcome, unsettled.charged, new Date()), afterPaymentTone(outcome), true);
   }
 
   const err = (k: string) => errors[k];
@@ -583,7 +624,7 @@ export default function Give() {
 
           <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
 
-          {campaignId ? null : <SwitchRow label="Give every month" description="The same amount each month until you cancel." value={monthly} onChange={setMonthly} />}
+          {campaignId ? null : <SwitchRow label="Give every month" description={heldAttempt ? "Available again once your saved-card payment is confirmed." : "The same amount each month until you cancel."} value={isMonthly} onChange={(v) => { if (!heldAttempt) setMonthly(v); }} />}
           <SwitchRow
             label="Add a contribution to Givezy"
             description={isMonthly ? "Optional. It helps us keep Givezy running, and repeats each month with your gift." : "Optional. It helps us keep Givezy running. Your gift to the charity stays whole."}
@@ -702,7 +743,7 @@ export default function Give() {
                   {([true, false] as const).map((saved) => {
                     const on = useSavedCard === saved;
                     return (
-                      <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setUseSavedCard(saved); }} style={[styles.chip, on && styles.chipOn]}>
+                      <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: heldAttempt !== null }} onPress={() => { if (heldAttempt) return; haptic.tap(); setUseSavedCard(saved); }} style={[styles.chip, on && styles.chipOn, heldAttempt && !on && { opacity: 0.4 }]}>
                         <Text style={[styles.chipText, on && { color: colors.onInk }]}>{saved ? cardLabel(savedCard) : "A different card"}</Text>
                       </Pressable>
                     );

@@ -23,7 +23,7 @@ export function ThankOneForm({ action, name }: { action: (s: FormState, f: FormD
             required
             rows={4}
             maxLength={1000}
-            hint="Up to 1 000 characters, plain text. They see their first name above it and your charity's name below. Replies go to your contact email."
+            hint="Up to 1 000 characters. Plain text. They see their first name above it and your charity's name below. Replies go to your contact email."
           />
         </ActionForm>
       </div>

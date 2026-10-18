@@ -37,7 +37,7 @@ export default function TermsPage() {
         </ul>
       </Section>
 
-      <Section title="s18A tax receipts">
+      <Section title="s18A receipts">
         <p>
           If a charity is approved under section 18A and has signed a receipting mandate with us, we issue one receipt per
           tax year on its behalf for donations where you asked for one. A receipt covers your donations only, never a

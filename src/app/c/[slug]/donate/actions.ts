@@ -64,7 +64,10 @@ export async function submitDonation(
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
     // Everything to fix in one go, not a round at a time: the other checks run on what was typed too.
     const charity = await loadDonatableCharity(slug);
-    for (const [k, v] of Object.entries(checkDonorDetails(raw as CheckoutInput, Boolean(charity?.receiptsAvailable)))) fieldErrors[k] ??= v;
+    // With "use my ID ending 1234" the server fills in the ID and address from their earlier gift, so the
+    // s18A checks don't apply yet (startDonation runs them on the merged details).
+    const usingSavedId = formData.get("use_saved_id") === "on";
+    for (const [k, v] of Object.entries(checkDonorDetails(raw as CheckoutInput, Boolean(charity?.receiptsAvailable) && !usingSavedId))) fieldErrors[k] ??= v;
     return { ok: false, message: fixMessage(fieldErrors), fieldErrors };
   }
 

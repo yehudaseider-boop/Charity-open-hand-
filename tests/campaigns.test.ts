@@ -10,6 +10,15 @@ describe("a charity's new campaign", () => {
     expect(bad.ok).toBe(false);
     if (!bad.ok) expect(Object.keys(bad.fieldErrors).sort()).toEqual(["ends_on", "target", "title"]);
   });
+  it("says what is missing in plain words when the form is empty", () => {
+    const r = checkCampaign({}, today);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.fieldErrors.title).toBe("Give it a short name");
+      expect(r.fieldErrors.target).toBe("Enter the goal in Rand, for example 50000");
+      for (const m of Object.values(r.fieldErrors)) expect(m).not.toMatch(/Invalid input|expected string/);
+    }
+  });
   it("accepts today as the last day", () => {
     expect(checkCampaign({ title: "Chanukah", target: "1000", ends_on: today }, today).ok).toBe(true);
   });

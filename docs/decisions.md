@@ -887,3 +887,25 @@ Yehuda chose three new dashboard features (weekly email to the charity, annual r
 ## 18/10/2026: Annual report for the board or AGM
 
 New "Annual report" tab on the dashboard: one SARS tax year on one page, filled from Givezy's own records. Raised (paid donations only, with the average), donors (new this year against those who gave before), the monthly and once-off split, month by month with the best month, each campaign's total, s18A receipts (who asked, who has one, what is still to be receipted) and, apart, anything refunded or reversed. A running year says "so far" and shows months still to come as such. "Save as PDF" uses the browser's print, which hides the dashboard's header and tabs; "Download the figures (CSV)" gives the same numbers with no donor details. The footnote says gifts made outside Givezy are not included.
+
+## 18/10/2026: Full review of everything built since 17/10 (four independent reviewers, every finding verified)
+
+Yehuda asked for a check of all code. Four reviewers (security and database, money and receipts, the phone app, the dashboard and website) worked independently; each finding was read in the code before anything changed. Nothing critical was found; the website's packages have no known vulnerabilities; all automated checks pass.
+
+**Fixed**
+- **Saved-card double charge (app, high; the feature is still switched off).** When a saved-card charge got no reply, the donor could switch to "A different card", or to monthly, or change the email, and start a second donation around the unresolved one. Now the gift is held exactly as it was sent until the server says paid or declined: the card choice and the monthly switch are locked, and if the amount or email was changed the form is put back with "We're still checking your earlier gift of R… from your saved card". The "close this screen and try again" advice (which dropped the only guard) is gone.
+- **"Check again" thanks the donor for what was paid**, not for whatever is in the form by then (the summary is snapshotted when the payment goes unsettled).
+- **A refunded donation no longer says "We're confirming your payment, don't pay again" forever.** Website and app now show "This donation was refunded, so nothing is owed on it."
+- **Raw technical text on four dashboard forms** ("Invalid input: expected string, received undefined") when the postal code, bank account number, branch code, campaign name or campaign goal was left empty. Each now says what is missing, and a test covers every dashboard form.
+- **Personal thank-yous capped at 20 an hour per charity**, so a charity account can't be used to mass-mail donors in Givezy's name. A send that was skipped (email not switched on, or an address off the test allow-list) is now reported as not sent instead of "went to Sarah", for the monthly thank-you too.
+- **Erasing a donor** now also removes the charity's personal thank-yous to them and their name from the dashboard's "what just happened" rows.
+- **Annual report:** the two shares always add to 100%; "new donor" follows the same rule as the Overview (first paid gift); the average uses the shared integer helper.
+- **Monthly donation amounts** in the app and on the website account page showed gift plus contribution as one figure ("R190 a month") while the charity saw R180. Now "R180 a month (+ R10 to Givezy)".
+- **Undo of a new campaign** was refused when a donor had merely opened and closed the payment page; only real donations block it now. Undo of a profile save now notices newer category changes. Files kept for Undo are removed when the 30-day rows are purged. The confirm step sends what is in the form at the moment of "Yes".
+- **Donate page:** with "use my ID ending 1234", a typo elsewhere no longer demands the address the page said could be left empty. Dedication names are 80 characters everywhere. The app accepts a R1 000 000 gift with a contribution.
+- Smaller: the Donations page sends an out-of-range page number back to page 1; the app's charity list offline copy reaches every screen (and revives its dates); remembered donor details are forgotten on sign-out; the account's email fills in when the give screen opened before the account loaded; "A different card" and the monthly switch can't be flipped mid-attempt; redirect parameters go through the same path check as everywhere else; "s18A receipt" everywhere; "Donations" not "Gifts" on the dashboard.
+
+**Known and left, with the reason**
+- The phone app's build tooling carries three known vulnerable packages (braces, decode-uri-component, node-forge) through Expo 57. Only decode-uri-component ships in the app itself (URL parsing in Expo Router), and the worst case is a hang from a crafted link. Fixing them means an Expo upgrade; on the go-live list.
+- A receipt that needs re-issuing after a refund still counts as "has one" on the Receipts tab until an admin voids it. Cosmetic; noted.
+- Undo's "changed since" check is read-then-write, not atomic: only a same-second edit by another admin could slip past. Acceptable.

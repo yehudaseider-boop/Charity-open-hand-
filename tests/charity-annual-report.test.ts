@@ -30,6 +30,12 @@ describe("annual report", () => {
     expect(r.newDonors).toBe(1);
     expect(r.returningDonors).toBe(1);
   });
+  it("a refunded first gift doesn't make someone a returning donor (same rule as the Overview)", () => {
+    const rows = [gift("x", 50_000, "2025-06-01T10:00:00Z", { status: "refunded" }), gift("x", 20_000, "2026-04-05T10:00:00Z")];
+    const rep = annualReport(rows, 2027, new Map(), new Set(), now);
+    expect(rep.newDonors).toBe(1);
+    expect(rep.returningDonors).toBe(0);
+  });
   it("splits monthly and once-off, finds the best month and lists campaigns", () => {
     expect(r.monthlyCents).toBe(36_000);
     expect(r.onceOffCents).toBe(100_000);

@@ -40,7 +40,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 export default function CharityDetail() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ slug: string; sheet?: string; saved?: string }>();
+  const params = useLocalSearchParams<{ slug: string; sheet?: string; saved?: string; label?: string; campaign?: string }>();
   const { live, charity, failed, retry } = useCharity(params.slug);
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const savedList = useSaved();
@@ -220,7 +220,13 @@ export default function CharityDetail() {
       </View>
 
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)}>
-        <GiveSheet charityName={charity.nameEn} slug={charity.slug} onDone={() => setSheetOpen(false)} />
+        <GiveSheet
+          charityName={charity.nameEn}
+          slug={charity.slug}
+          initialLabel={typeof params.label === "string" ? params.label : null}
+          campaign={typeof params.campaign === "string" ? params.campaign : undefined}
+          onDone={() => setSheetOpen(false)}
+        />
       </Sheet>
     </View>
   );

@@ -5,7 +5,7 @@ import { ASK_FIRST, canUndo, describeDone, describeUndone, minutesLeft, UNDO_MIN
 const ALL: ActionKind[] = [
   "profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off", "campaign_started", "campaign_ended",
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
-  "document_uploaded", "document_removed", "application_submitted", "thank_you_sent",
+  "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
 ];
 const ctx = { base: "/charity-admin/c1", publicUrl: "/c/meals", approved: true };
 

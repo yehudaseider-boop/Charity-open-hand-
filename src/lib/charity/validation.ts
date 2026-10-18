@@ -40,7 +40,7 @@ export const addressSchema = z.object({
   address_line2: optional(),
   suburb: optional(80),
   city: required("City", 80),
-  postal_code: z.string().regex(/^\d{4}$/, "Postal code is 4 digits"),
+  postal_code: required("Postal code", 4).regex(/^\d{4}$/, "Postal code is 4 digits"),
 });
 
 export const contactSchema = z.object({
@@ -69,8 +69,8 @@ export const bankNames = [
 export const bankSchema = z.object({
   bank_name: z.enum(bankNames, { error: "Choose your bank" }),
   bank_account_holder: required("Account holder name"),
-  bank_account_number: z.string().regex(/^\d{6,16}$/, "Account number is 6 to 16 digits, no spaces"),
-  bank_branch_code: z.string().regex(/^\d{6}$/, "Branch code is 6 digits"),
+  bank_account_number: required("Account number", 16).regex(/^\d{6,16}$/, "Account number is 6 to 16 digits, no spaces"),
+  bank_branch_code: required("Branch code", 6).regex(/^\d{6}$/, "Branch code is 6 digits"),
 });
 
 export const profileSchema = z.object({

@@ -60,6 +60,8 @@ describe("before and after the payment page", () => {
   it("an unknown or unreachable payment status reads as still pending, never as paid", async () => {
     expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "paid" } }))).toBe("paid");
     expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "weird" } }))).toBe("pending");
+    expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "reversed" } }))).toBe("reversed");
+    expect(afterPaymentMessage("reversed")).toMatch(/refunded, so nothing is owed/);
     expect(await paymentStatus("https://x.test", "r", "t", async () => { throw new Error("offline"); })).toBe("pending");
   });
   it("tells the donor plainly whether anything was charged", () => {

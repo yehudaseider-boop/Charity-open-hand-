@@ -7,7 +7,7 @@ import { notifyDonationPaid } from "./notify";
 import { cardSaveWaitingFor, finishCardSave } from "./saved-card";
 import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyHandledElsewhere, monthlyWaitingFor } from "./recurring";
 
-export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
+export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /** The donation could not be read or written, so no final answer can be given. Safe to retry. */
 export class PersistenceError extends Error {
@@ -34,6 +34,7 @@ export async function savedOutcome(reference: string): Promise<ConfirmOutcome> {
   if (error) throw new PersistenceError("read the donation", error);
   if (!data) return "not_found";
   if (data.status === "paid" || data.status === "failed" || data.status === "review") return data.status;
+  if (data.status === "refunded" || data.status === "charged_back") return "reversed";
   return "pending";
 }
 
@@ -52,6 +53,7 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     await finishCardKeeping(donation, reference);
     return "paid";
   }
+  if (donation.status === "refunded" || donation.status === "charged_back") return "reversed";
   if (donation.status !== "pending" && donation.status !== "failed") return donation.status as ConfirmOutcome;
 
   // After a gateway change, an old pending payment can't be checked any more: a person decides.

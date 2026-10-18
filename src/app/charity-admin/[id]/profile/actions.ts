@@ -92,7 +92,7 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     details: renamed ? { name_from: charity.name_en, name_to: v.name_en } : undefined,
   });
   if (renamed) await tellReviewer(charity, `its name, from "${charity.name_en}" to "${v.name_en}"`);
-  const done = await recordAction(charityId, viewer.userId, "profile_saved", {}, { type: "restore", table: "charities", before, after, categories: categoriesBefore });
+  const done = await recordAction(charityId, viewer.userId, "profile_saved", {}, { type: "restore", table: "charities", before, after, categories: categoriesBefore, categoriesAfter: categoryIds });
   revalidate(charityId, charity.slug);
   redirect(`/charity-admin/${charityId}/profile?done=${done}`);
 }

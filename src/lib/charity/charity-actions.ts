@@ -12,7 +12,7 @@ import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 /** What taking an action back needs. Stored with the action; never sent to the browser. */
 export type Undo =
   /** Put columns back as they were, if nobody has changed them again since. */
-  | { type: "restore"; table: "charities" | "charity_private"; before: Record<string, unknown>; after: Record<string, unknown>; categories?: string[]; dropFile?: { bucket: string; path: string } }
+  | { type: "restore"; table: "charities" | "charity_private"; before: Record<string, unknown>; after: Record<string, unknown>; categories?: string[]; categoriesAfter?: string[]; dropFile?: { bucket: string; path: string } }
   /** Remove a row this action added (and its file). */
   | { type: "delete"; table: "campaigns" | "charity_updates" | "charity_photos" | "charity_documents"; id: string; file?: { bucket: string; path: string } | null }
   /** Put back a row this action removed (its file was kept for this). */
@@ -26,9 +26,33 @@ export async function recordAction(charityId: string, userId: string, kind: Acti
   const db = createAdminClient();
   const { data, error } = await db.from("charity_actions").insert({ charity_id: charityId, user_id: userId, kind, details, undo }).select("id").single();
   if (error) throw error;
-  // Kept for 30 days: enough for "what just happened", no longer.
-  await db.from("charity_actions").delete().eq("charity_id", charityId).lt("created_at", new Date(Date.now() - 30 * 86_400_000).toISOString());
+  // Kept for 30 days: enough for "what just happened", no longer. Files kept only so Undo could put them
+  // back go with the rows.
+  const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const { data: old } = await db.from("charity_actions").select("id, undo, undone_at").eq("charity_id", charityId).lt("created_at", cutoff);
+  for (const row of old ?? []) {
+    if (row.undone_at) continue;
+    const kept = keptFile(row.undo as Undo | null);
+    if (kept && kept.path.startsWith(`${charityId}/`) && !kept.path.includes("..")) await db.storage.from(kept.bucket).remove([kept.path]).catch(() => undefined);
+  }
+  await db.from("charity_actions").delete().eq("charity_id", charityId).lt("created_at", cutoff);
   return data.id as string;
+}
+
+/** The file an undo payload keeps on hand (the removed photo, the previous logo), if any. */
+function keptFile(undo: Undo | null): { bucket: string; path: string } | null {
+  if (!undo) return null;
+  if (undo.type === "reinsert") {
+    const r = undo.row as Record<string, unknown>;
+    const path = (r.storage_path ?? r.photo_path) as string | undefined;
+    return path ? { bucket: undo.table === "charity_documents" ? "charity-documents" : "charity-public", path } : null;
+  }
+  if (undo.type === "restore" && undo.dropFile) {
+    // The previous logo or cover (undo.before) was kept so it could come back.
+    const prev = Object.values(undo.before).find((v) => typeof v === "string" && v.startsWith(`${undo.dropFile!.path.split("/")[0]}/`)) as string | undefined;
+    return prev ? { bucket: undo.dropFile.bucket, path: prev } : null;
+  }
+  return null;
 }
 
 export async function loadAction(charityId: string, id: string): Promise<ActionRow | null> {
@@ -95,6 +119,12 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       if (!now) return "gone";
       // Changed again since (by this person or another admin): don't overwrite their newer work.
       if (cols.some((c) => !same((now as unknown as Record<string, unknown>)[c], undo.after[c]))) return "changed";
+      if (undo.categoriesAfter) {
+        const { data: cats, error: catError } = await db.from("charity_categories").select("category_id").eq("charity_id", charityId);
+        if (catError) throw catError;
+        const nowCats = (cats ?? []).map((c) => c.category_id as string).sort();
+        if (!same(nowCats, [...undo.categoriesAfter].sort())) return "changed";
+      }
       const { error: upError } = await db.from(undo.table).update(undo.before).eq(key, charityId);
       if (upError) throw upError;
       if (undo.categories) {
@@ -111,9 +141,12 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
     case "delete": {
       if (undo.table === "campaigns") {
         // A campaign someone has given to stays: it can be ended instead.
-        const { count, error } = await db.from("donations").select("id", { count: "exact", head: true }).eq("campaign_id", undo.id);
+        const { count, error } = await db.from("donations").select("id", { count: "exact", head: true }).eq("campaign_id", undo.id).in("status", ["paid", "refunded", "charged_back"]);
         if (error) throw error;
         if ((count ?? 0) > 0) return "given";
+        // Abandoned or declined checkouts for it aren't gifts: let them go so the campaign can be removed.
+        const { error: unlink } = await db.from("donations").update({ campaign_id: null }).eq("campaign_id", undo.id).in("status", ["pending", "failed"]);
+        if (unlink) throw unlink;
       }
       const { data, error } = await db.from(undo.table).delete().eq("id", undo.id).eq("charity_id", charityId).select("id");
       if (error) throw error;

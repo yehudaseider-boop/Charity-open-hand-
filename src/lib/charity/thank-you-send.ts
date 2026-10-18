@@ -86,8 +86,10 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
       continue;
     }
     try {
-      await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }));
-      sent++;
+      const outcome = await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }));
+      // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
+      if (outcome === "sent") sent++;
+      else failed++;
     } catch (e) {
       console.error("[thank-you] not sent", e instanceof Error ? e.message : e);
       failed++;
@@ -159,9 +161,13 @@ export async function sendDonorThankYou(args: {
   }
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   try {
-    await getEmailTransport().send(
+    const outcome = await getEmailTransport().send(
       oneDonorThankYouEmail(d.email.trim(), { charityName: args.charityName, firstName: greeting, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }),
     );
+    if (outcome !== "sent") {
+      await release();
+      return { ok: false, message: "Email isn't switched on here, so nothing was sent." };
+    }
   } catch (e) {
     console.error("[thank-you] personal thank-you not sent", e instanceof Error ? e.message : e);
     await release();

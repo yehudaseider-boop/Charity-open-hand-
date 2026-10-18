@@ -4,7 +4,7 @@
  */
 import { platformConfig } from "@/config/platform";
 import { taxYearFor, taxYearRange } from "@/lib/dates";
-import { saDate } from "./dashboard";
+import { averageCents, saDate } from "./dashboard";
 
 export type ReportGift = {
   id: string;
@@ -81,9 +81,10 @@ export function annualReport(
   const paid = inYear.filter((g) => g.status === "paid");
   const undone = inYear.filter((g) => g.status === "refunded" || g.status === "charged_back");
 
-  // A donor is new this year when their first paid donation ever (refunded ones still count as giving) is in it.
+  // A donor is new this year when their first paid donation ever is in it (the same rule as the Overview and the Donors page).
   const firstYear = new Map<string, number>();
   for (const g of all) {
+    if (g.status !== "paid") continue;
     const y = yearOf(g);
     if (y === null) continue;
     const was = firstYear.get(g.donor_id);
@@ -134,7 +135,7 @@ export function annualReport(
     returningDonors: donors.size - newDonors,
     monthlyCents,
     onceOffCents: totalCents - monthlyCents,
-    averageCents: paid.length ? Math.round(totalCents / paid.length) : 0,
+    averageCents: averageCents(totalCents, paid.length),
     months,
     bestMonth,
     campaigns: [...camp.values()].sort((a, b) => b.cents - a.cents),

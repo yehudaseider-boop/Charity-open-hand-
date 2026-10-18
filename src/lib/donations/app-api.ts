@@ -17,7 +17,8 @@ export const appQuoteSchema = z.object({
 });
 
 export const appCheckoutSchema = appQuoteSchema.extend({
-  shownTotalCents: cents,
+  /** Gift plus contribution, so it can be up to twice the single-gift ceiling. */
+  shownTotalCents: z.number().int().min(0).max(2 * platformConfig.maxDonationCents),
   /** One of the charity's campaigns, when the gift is for it. */
   campaignId: z.uuid().optional(),
   /** "Use my ID ending 1234": the server fills in the number for the signed-in donor. */

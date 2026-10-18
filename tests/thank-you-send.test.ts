@@ -9,7 +9,7 @@ let optedOut: string[] = [];
 let claimed = false;
 const tokens: Record<string, string>[] = [];
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
-vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ send: async (m: { to: string; text: string }) => void sent.push(m) }) }));
+vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ send: async (m: { to: string; text: string }) => (sent.push(m), "sent") }) }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
@@ -61,3 +61,4 @@ describe("sending a thank-you", () => {
     expect(sent).toHaveLength(1);
   });
 });
+

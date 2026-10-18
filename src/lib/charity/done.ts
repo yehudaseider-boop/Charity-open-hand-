@@ -66,7 +66,7 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         next: { label: "Next: post an update about it", href: `${c.base}/updates` },
       };
     case "campaign_ended":
-      return { what: `${quote(d.title)} has ended. Donors can't give to it any more. Gifts already made stay with you.`, next: { label: "Next: thank the people who gave", href: `${c.base}/thank-donors` } };
+      return { what: `${quote(d.title)} has ended. Donors can't give to it any more. Donations already made stay with you.`, next: { label: "Next: thank the people who gave", href: `${c.base}/thank-donors` } };
     case "update_posted":
       return {
         what: c.approved ? "Your update is on your page." : "Your update is saved. It shows on your page once your application is approved.",

@@ -42,6 +42,8 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
   const base = `/charity-admin/${id}/report`;
   const top = Math.max(1, ...r.months.map((m) => m.cents));
   const thisMonth = saDate(now).slice(0, 7);
+  // The two shares always add to 100.
+  const monthlyPct = pct(r.monthlyCents, r.totalCents);
 
   return (
     <div className="space-y-6">
@@ -83,8 +85,8 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
           <section aria-label="The year in figures" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Figure strong label={r.running ? "Raised so far" : "Raised"} value={formatRand(r.totalCents)} note={`${plural(r.donationCount, "donation")}, ${formatRand(r.averageCents)} on average`} />
             <Figure label="Donors" value={String(r.donors)} note={`${r.newDonors} new, ${r.returningDonors} who gave before`} />
-            <Figure label="Monthly donations" value={formatRand(r.monthlyCents)} note={`${pct(r.monthlyCents, r.totalCents)}% of the year`} />
-            <Figure label="Once-off donations" value={formatRand(r.onceOffCents)} note={`${pct(r.onceOffCents, r.totalCents)}% of the year`} />
+            <Figure label="Monthly donations" value={formatRand(r.monthlyCents)} note={`${monthlyPct}% of the year`} />
+            <Figure label="Once-off donations" value={formatRand(r.onceOffCents)} note={`${r.totalCents > 0 ? 100 - monthlyPct : 0}% of the year`} />
           </section>
 
           <section className="space-y-3">
@@ -144,7 +146,7 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
       )}
 
       <p className="text-xs text-muted">
-        From Givezy&apos;s records of donations paid to {charity.name_en} through Givezy, on {formatDate(now)}. Gifts made outside Givezy are not included.
+        From Givezy&apos;s records of donations paid to {charity.name_en} through Givezy, on {formatDate(now)}. Donations made outside Givezy are not included.
       </p>
     </div>
   );

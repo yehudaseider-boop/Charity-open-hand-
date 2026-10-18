@@ -33,7 +33,7 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="What we collect">
-        <p><strong>When you donate:</strong> your name (or your organisation&apos;s name and contact person), email address, and optionally your phone number and a message to the charity. If you ask for an s18A tax receipt, your SA ID number or income tax number (or your organisation&apos;s registration number).</p>
+        <p><strong>When you donate:</strong> your name (or your organisation&apos;s name and contact person), email address, and optionally your phone number and a message to the charity. If you ask for an s18A receipt, your SA ID number or income tax number (or your organisation&apos;s registration number).</p>
         <p><strong>Your giving records:</strong> each donation&apos;s amount, date and charity, any contribution to {name}, and whether you counted it as maaser, chomesh or general tzedaka.</p>
         <p><strong>When you sign in:</strong> your email address. Admins of charities and of {name} also set up an authenticator app.</p>
         <p><strong>When a charity applies:</strong> the organisation&apos;s registration details, contact person, bank account and supporting documents.</p>

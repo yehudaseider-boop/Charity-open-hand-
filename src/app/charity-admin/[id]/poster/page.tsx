@@ -54,7 +54,7 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
         />
         <p className="text-lg font-semibold print:text-2xl">Point your phone camera here to give</p>
         <p className="text-sm text-muted print:text-base">or go to {shortUrl}</p>
-        {canIssue18a(charity) ? <p className="text-sm print:text-base">Donations get an s18A tax receipt.</p> : null}
+        {canIssue18a(charity) ? <p className="text-sm print:text-base">Donations get an s18A receipt.</p> : null}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="Givezy" width={97} height={32} className="mx-auto h-8 w-auto print:h-10" />
       </section>

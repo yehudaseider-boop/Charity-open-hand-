@@ -105,7 +105,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
           )}
           <p className="text-xs text-muted">
             {receipts
-              ? "Donations qualify for one annual s18A tax receipt, issued on this organisation's behalf."
+              ? "Donations qualify for one s18A receipt a year, issued on this organisation's behalf."
               : "This organisation is not s18A-approved, so donations do not get a tax receipt."}{" "}
             Givezy charges no fee on donations.
           </p>

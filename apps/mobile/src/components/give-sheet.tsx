@@ -16,13 +16,13 @@ import { Text } from "./text";
  * payment page, never in this sheet: in the phone's browser, or inside the app when the in-app
  * giving switch is on.
  */
-export function GiveSheet({ charityName, slug, onDone }: { charityName: string; slug: string; onDone?: () => void }) {
-  const [label, setLabel] = useState<string | null>(null);
+export function GiveSheet({ charityName, slug, onDone, initialLabel = null, campaign }: { charityName: string; slug: string; onDone?: () => void; initialLabel?: string | null; campaign?: string }) {
+  const [label, setLabel] = useState<string | null>(initialLabel);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const account = useAccount();
   const suggestions = useLabelSuggestions();
-  const url = donateUrl(SITE_URL, slug, label);
+  const url = donateUrl(SITE_URL, slug, label, campaign);
 
   return (
     <View style={{ gap: 18 }}>

@@ -40,13 +40,16 @@ let gift: unknown = null;
 let stopped = false;
 let claimed = false;
 let failSend = false;
+let skipSend = false;
 let released = 0;
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/email", () => ({
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string; replyTo?: string }) => {
       if (failSend) throw new Error("down");
+      if (skipSend) return "skipped";
       sent.push(m);
+      return "sent";
     },
   }),
 }));
@@ -74,6 +77,7 @@ beforeEach(() => {
   claimed = false;
   stopped = false;
   failSend = false;
+  skipSend = false;
   released = 0;
   gift = details();
   process.env.SITE_URL = "https://g.test";
@@ -107,6 +111,13 @@ describe("sending one donor a thank-you", () => {
     const r = await sendDonorThankYou(args);
     expect(r.ok === false && r.message).toMatch(/Nothing went out/);
     expect(released).toBe(1);
+  });
+  it("a send the email service skipped is reported as not sent, and the week is handed back", async () => {
+    skipSend = true;
+    const r = await sendDonorThankYou(args);
+    expect(r.ok === false && r.message).toMatch(/nothing was sent/);
+    expect(released).toBe(1);
+    expect(sent).toHaveLength(0);
   });
   it("a company is greeted through its contact person", async () => {
     gift = details({ donor_type: "company", first_name: null, organisation_name: "Acme (Pty) Ltd", contact_person: "Thandi Mokoena" });

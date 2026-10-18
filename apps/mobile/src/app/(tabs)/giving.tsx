@@ -337,8 +337,8 @@ export default function Giving() {
                 onCancel={() => setEditing(null)}
                 onRemove={goals.some((g) => g.id === editing) ? () => {
                   const before = goals;
-                  putGoals(goals.filter((g) => g.id !== editing), "Goal removed. Your giving stays as it is.");
-                  setUndo({ text: "Goal removed. Your giving stays as it is.", label: "Undo", run: () => { putGoals(before, "Taken back. Your goal is back."); setUndo(null); } });
+                  putGoals(goals.filter((g) => g.id !== editing), "Saved.");
+                  setUndo({ text: "Goal removed. Your giving stays as it is.", label: "Undo", run: () => { putGoals(before, "Saved."); setUndo({ text: "Taken back. Your goal is back." }); } });
                 } : undefined}
               />
             ) : goals.length === 0 ? (
@@ -569,7 +569,7 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {rand(r.cents)} a month · {r.status === "failed" ? "Stopped: the card was declined" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {rand(r.cents)} a month{r.contributionCents ? ` (+ ${rand(r.contributionCents)} to Givezy)` : ""} · {r.status === "failed" ? "Stopped: the card was declined" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
                       <ChevronIcon />
@@ -624,7 +624,7 @@ export default function Giving() {
             <View style={{ gap: 4 }}>
               <Text variant="label">Monthly donation</Text>
               <Text variant="h2">{open.charityName}</Text>
-              <Text variant="bodyMuted">{rand(open.cents)} a month · {open.status === "failed" ? "stopped" : open.status === "cancelled" ? "cancellation requested" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
+              <Text variant="bodyMuted">{rand(open.cents)} a month{open.contributionCents ? ` (+ ${rand(open.contributionCents)} to Givezy)` : ""} · {open.status === "failed" ? "stopped" : open.status === "cancelled" ? "cancellation requested" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
             </View>
             {!preview ? (
               <>

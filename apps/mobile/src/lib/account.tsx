@@ -6,6 +6,7 @@ import * as WebBrowser from "expo-web-browser";
 import { POLICY_VERSION } from "@shared/policy";
 import type { Gift, Receipt, Recurring } from "@/data/giving";
 import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
+import { forgetDetails } from "./donor-details";
 import { cacheKey, forgetGivingCache, writeGivingCache } from "./giving-cache";
 import { secureStorage } from "./secure-storage";
 import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
@@ -377,8 +378,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       },
       refresh,
       async signOut() {
-        // Nothing of theirs stays on the phone once they sign out.
+        // Their giving and remembered details don't stay on the phone once they sign out (goals and
+        // income are kept, by design: "stay on this phone", under their own user id).
         await forgetGivingCache(session?.user.id);
+        await forgetDetails(session?.user.id ?? null).catch(() => undefined);
         lastCached.current = null;
         await supabase?.auth.signOut();
         setLive(null);

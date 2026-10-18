@@ -38,6 +38,8 @@ vi.mock("@/lib/supabase/admin", () => ({
         eq: (c: string, v: unknown) => ((f[c] = v), q),
         maybeSingle: async () => ({ data: profile, error: null }),
         delete: () => ({
+          // The charities' personal thank-yous to the erased donors: .in("donor_id", ids)
+          in: async () => ({ error: null }),
           eq: (c1: string, v1: unknown) => ({
             // consents: .eq("user_id").eq("kind"); the person's own tables: one .eq("user_id")
             eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }),

@@ -58,6 +58,20 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
 
   const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
   if (error) throw new Error(`Could not erase: ${error.message}`);
+  if (ids.size) {
+    // The charities' personal thank-yous to them, and their name in the dashboard's "what just happened" rows.
+    const { error: thanksError } = await db.from("charity_donor_thanks").delete().in("donor_id", [...ids]);
+    if (thanksError) throw new Error(`Could not erase: ${thanksError.message}`);
+    const { data: actions, error: actionsError } = await db.from("charity_actions").select("id, details").eq("kind", "donor_thanked");
+    if (actionsError) throw new Error(`Could not erase: ${actionsError.message}`);
+    for (const a of actions ?? []) {
+      const details = (a.details ?? {}) as Record<string, unknown>;
+      if (typeof details.donorId === "string" && ids.has(details.donorId)) {
+        const { error: e } = await db.from("charity_actions").update({ details: { ...details, name: "a donor" } }).eq("id", a.id);
+        if (e) throw new Error(`Could not erase: ${e.message}`);
+      }
+    }
+  }
   const c = (counts ?? {}) as Record<string, number>;
 
   const summary: EraseSummary = {

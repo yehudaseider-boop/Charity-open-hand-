@@ -30,7 +30,12 @@ async function readSaved(): Promise<{ savedAt: Date; data: Directory } | null> {
     const savedAt = new Date(v.savedAt ?? "");
     if (!v.data || !Array.isArray(v.data.charities) || !Array.isArray(v.data.causes) || Number.isNaN(savedAt.getTime())) return null;
     lastSaved = JSON.stringify(v.data);
-    return { savedAt, data: { charities: v.data.charities, causes: v.data.causes, raising: Array.isArray(v.data.raising) ? v.data.raising : [] } };
+    // Dates come back from JSON as text: put them back as dates.
+    const raising = (Array.isArray(v.data.raising) ? v.data.raising : []).map((r) => ({
+      ...r,
+      campaign: { ...r.campaign, endsAt: r.campaign.endsAt ? new Date(r.campaign.endsAt as unknown as string) : null },
+    }));
+    return { savedAt, data: { charities: v.data.charities, causes: v.data.causes, raising } };
   } catch {
     return null;
   }
@@ -88,7 +93,14 @@ export function useDirectory() {
     // While the server answers, show the saved copy (if this is the first load since the app opened).
     if (!cached) {
       readSaved().then((saved) => {
-        if (!current || !saved || cached) return;
+        if (!current) return;
+        // Another screen (or the server) got there first: show what it has.
+        if (cached) {
+          setData(cached);
+          setSavedAt(cachedSavedAt);
+          return;
+        }
+        if (!saved) return;
         cached = saved.data;
         cachedSavedAt = saved.savedAt;
         setData(saved.data);

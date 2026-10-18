@@ -3,9 +3,9 @@ import { COMMA_THOUSANDS_MESSAGE, parseRandToCents, usesCommaThousands } from "@
 
 /** A charity's new campaign, as typed. The goal is required: it is what donors watch fill up. */
 export const campaignSchema = z.object({
-  title: z.string().trim().min(3, "Give it a short name, at least 3 letters").max(80, "Keep the name to 80 characters"),
+  title: z.string({ error: (i) => (i.input === undefined ? "Give it a short name" : undefined) }).trim().min(3, "Give it a short name, at least 3 letters").max(80, "Please keep the name to 80 characters or fewer"),
   description: z.string().trim().max(500, "Please keep it to 500 characters or fewer").optional(),
-  target: z.string().trim().min(1, "Enter the goal in Rand, for example 50000"),
+  target: z.string({ error: (i) => (i.input === undefined ? "Enter the goal in Rand, for example 50000" : undefined) }).trim().min(1, "Enter the goal in Rand, for example 50000"),
   ends_on: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date").optional(),
 });
 

@@ -207,9 +207,10 @@ describe("saved copy size", () => {
 });
 
 describe("monthly donations (collected by our own job)", () => {
-  it("shows what is collected each month: the donation plus the contribution", () => {
+  it("keeps the monthly gift and the contribution to Givezy apart, as the charity sees them", () => {
     const [r] = toRecurring([{ id: "r1", amount_cents: 18_000, contribution_cents: "2000", status: "active", next_charge_at: "2026-11-15T06:00:00Z", charities: charity }]);
-    expect(r.cents).toBe(20_000);
+    expect(r.cents).toBe(18_000);
+    expect(r.contributionCents).toBe(2_000);
   });
 
   it("an older row with no contribution still shows its amount", () => {

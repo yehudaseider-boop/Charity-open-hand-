@@ -183,13 +183,13 @@ export async function removeSavedCard(site: string, token: string, send: Send = 
   return { ok: false, message: "We couldn't remove your card just now. Please try again." };
 }
 
-export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
+export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /** Whether a payment went through, asked after the payment page closes. Unknown or unreachable reads as "pending". */
 export async function paymentStatus(site: string, reference: string, token: string, post: Post = fetchPost): Promise<PaymentOutcome> {
   const r = await call<{ ok: boolean; outcome?: string }>(post, api(site, "status"), { reference, token });
   const o = r.ok ? r.outcome : undefined;
-  return o === "paid" || o === "failed" || o === "review" || o === "not_found" ? o : "pending";
+  return o === "paid" || o === "failed" || o === "review" || o === "not_found" || o === "reversed" ? o : "pending";
 }
 
 /**
@@ -201,6 +201,7 @@ export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, sa
   const jhb = checkedAt ? new Date(checkedAt.getTime() + 2 * 3_600_000) : null;
   const last = jhb ? ` Last checked at ${String(jhb.getUTCHours()).padStart(2, "0")}:${String(jhb.getUTCMinutes()).padStart(2, "0")}.` : "";
   if (outcome === "failed") return "Your card was declined and nothing was charged. Your details are still here: tap Give to try again, or use another card.";
+  if (outcome === "reversed") return "This donation was refunded, so nothing is owed on it. Your details are still here if you'd like to give again.";
   if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: tap Give to try again.";
   if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.${last}`;
   if (savedCard) return `Your bank is still confirming this payment. Please don't give again: tap Check again in a minute. We'll also email you when it's through.${last}`;

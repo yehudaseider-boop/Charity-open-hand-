@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
@@ -40,6 +41,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   const [{ data, count, error }, totals] = await Promise.all([query, loadTotals(supabase, id, filters)]);
   // A page past the end (an old link, a typed number) is the database saying "out of range": show page 1's link instead of an error.
   if (error && error.code !== "PGRST103") throw error;
+  if (error?.code === "PGRST103") redirect(`/charity-admin/${id}/donations?${new URLSearchParams({ ...(q ? { q } : {}), ...(status !== "all" ? { status } : {}), ...(filters.period !== "all" ? { period: filters.period } : {}) }).toString()}`.replace(/\?$/, ""));
   const rows = (data ?? []) as unknown as DonationRow[];
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
 

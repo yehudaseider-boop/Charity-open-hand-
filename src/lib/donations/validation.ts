@@ -31,7 +31,7 @@ export const checkoutSchema = z.object({
   message: str(500, "your message"),
   /** Optional: given in honour of, or in memory of, someone (the name is checked in checkDonorDetails). */
   dedication_kind: z.enum(["none", "honour", "memory"]).optional(),
-  dedication_name: str(200, "their name"),
+  dedication_name: str(80, "their name"),
   /** The donor's own label for this gift, optional and private to them ("Work giving", "Maaser"). */
   giving_label: str(80, "your label"),
   /** Older app versions send the fixed choice instead; it becomes the label. */
