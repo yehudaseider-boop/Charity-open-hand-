@@ -482,7 +482,7 @@ export default function Give() {
   }
 
   const err = (k: string) => errors[k];
-  const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card" : "Opening the payment page") : busy === "checking" ? "Checking your payment" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
+  const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card…" : "Opening the payment page…") : busy === "checking" ? "Checking your payment…" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
   // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
   const goalLabel = goal?.counts?.[0] ?? null;
   const counting = goal ? counts(goal, cleanLabel(label)) : false;

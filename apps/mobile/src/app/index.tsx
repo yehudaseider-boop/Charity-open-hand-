@@ -29,7 +29,7 @@ const GOAL_NAMES = ["Giving goal", "Maaser", "Tithe"] as const;
 
 const SAFE = [
   { title: "Your card goes on a secure page", body: "You enter it on our payment partner's own secure page, never in this app." },
-  { title: "Kept there, not with us", body: "For monthly gifts, your card is kept by the payment partner, so next month needs no typing. Givezy never sees or stores it." },
+  { title: "Kept there, not with us", body: "For monthly donations, your card is kept by the payment partner, so next month needs no typing. Givezy never sees or stores it." },
   { title: "Givezy never holds the money", body: "Your gift goes from the payment partner straight to the charity's bank account." },
 ];
 
