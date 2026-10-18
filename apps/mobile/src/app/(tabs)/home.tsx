@@ -7,7 +7,7 @@ import { Blob } from "@/components/blob";
 import { Button } from "@/components/button";
 import { CharityPhotoCard } from "@/components/charity-photo-card";
 import { GoalRing } from "@/components/goal-ring";
-import { ReceiptsIcon } from "@/components/icons";
+import { ChevronIcon, ReceiptsIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { useScreenState } from "@/lib/screen-state";
@@ -94,7 +94,12 @@ export default function Home() {
           ) : goals.status !== "ready" && !preview ? (
             <SkeletonBlock height={120} />
           ) : goal && progress ? (
-            <View style={styles.goalRow}>
+            <Pressable
+              onPress={() => router.push("/giving")}
+              accessibilityRole="button"
+              accessibilityLabel={`${goal.name}: ${rand(progress.givenCents)}${progress.targetCents !== null ? ` of ${rand(progress.targetCents)}` : ""}. Open your goals`}
+              style={({ pressed }) => [styles.goalRow, pressed && { opacity: 0.85 }]}
+            >
               <GoalRing percent={pct} onBlue size={width < 360 ? 96 : 118} />
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={styles.goalKicker}>{goal.name} · {progress.window.label}</Text>
@@ -103,7 +108,8 @@ export default function Home() {
                   {progress.targetCents !== null ? `of ${rand(progress.targetCents)}` : "Log income to see the target"} · {counted} {counted === 1 ? "gift" : "gifts"}
                 </Text>
               </View>
-            </View>
+              <ChevronIcon color={colors.onInk} />
+            </Pressable>
           ) : (
             <View style={{ gap: 12 }}>
               <Text style={styles.goalAmount}>Set a giving goal</Text>
