@@ -8,7 +8,7 @@ import { checkDonorDetails, checkoutSchema, cleanPhone, type CheckoutInput } fro
 import { clientIp } from "@/lib/client-ip";
 import { getViewer } from "@/lib/auth";
 import { formToObject } from "@/lib/form";
-import { formatRand, parseRandToCents } from "@/lib/money";
+import { COMMA_THOUSANDS_MESSAGE, formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { platformConfig } from "@/config/platform";
 
 export type QuoteState = { ok: boolean; message?: string; quote?: Quote };
@@ -20,7 +20,7 @@ export async function getQuote(slug: string, _prev: QuoteState, formData: FormDa
   const cents = parseRandToCents(typed);
   if (cents === null) {
     // SA writes thousands with a space; a comma is the decimal mark, so 1,250 can't be read safely.
-    if (/\d,\d{3}\b/.test(typed)) return { ok: false, message: "Use a space or nothing for thousands, for example 1250 or 1 250." };
+    if (usesCommaThousands(typed)) return { ok: false, message: `${COMMA_THOUSANDS_MESSAGE}.` };
     return { ok: false, message: "Enter an amount in Rand, for example 180 or 180.50." };
   }
   if (cents === 0) return { ok: false, message: `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.` };

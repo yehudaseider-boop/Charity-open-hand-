@@ -50,6 +50,7 @@ export function SignIn() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
 
   const social = (provider: "google" | "apple") => step(setBusy, setError, () => account.signInWith(provider));
 
@@ -85,7 +86,9 @@ export function SignIn() {
   return (
     <View style={styles.card}>
       <Text variant="h2" style={styles.title}>Check your email</Text>
-      <Text variant="bodyMuted">We sent a 6-digit code to {sentTo}. It works once and expires soon.</Text>
+      <Text variant="bodyMuted">
+        {resent ? `We sent a new code to ${sentTo}. Use the newest one: older codes no longer work.` : `We sent a 6-digit code to ${sentTo}. It works once and expires soon.`}
+      </Text>
       <Field label="Code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={7} error={error ?? undefined} />
       <Button
         label={busy ? "Checking…" : "Sign in"}
@@ -101,10 +104,11 @@ export function SignIn() {
         onPress={() => {
           if (busy) return;
           setCode("");
-          void step(setBusy, setError, () => account.sendCode(sentTo), () => setError(null));
+          setResent(false);
+          void step(setBusy, setError, () => account.sendCode(sentTo), () => setResent(true));
         }}
       />
-      <TextLink label="Use a different email" onPress={() => { setSentTo(null); setCode(""); setError(null); }} />
+      <TextLink label="Use a different email" onPress={() => { setSentTo(null); setCode(""); setError(null); setResent(false); }} />
     </View>
   );
 }
@@ -126,7 +130,7 @@ export function Agree() {
         information or send you marketing.
       </Text>
       <Check checked={terms} onPress={() => setTerms((v) => !v)} label="I agree to the Terms and the Privacy Policy." />
-      <View style={{ flexDirection: "row", gap: 16, paddingLeft: 36 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, paddingLeft: 36 }}>
         <TextLink label="Read the Terms" onPress={() => open("/terms")} />
         <TextLink label="Read the Privacy Policy" onPress={() => open("/privacy")} />
       </View>

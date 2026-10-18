@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { bigAmountSize } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Blob } from "@/components/blob";
 import { Button } from "@/components/button";
@@ -35,6 +36,7 @@ const noIncome: IncomeEntry[] = [];
  */
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const account = useAccount();
   const preview = account.status === "preview";
   const signedIn = account.status === "signed-in";
@@ -93,10 +95,10 @@ export default function Home() {
             <SkeletonBlock height={120} />
           ) : goal && progress ? (
             <View style={styles.goalRow}>
-              <GoalRing percent={pct} onBlue size={118} />
+              <GoalRing percent={pct} onBlue size={width < 360 ? 96 : 118} />
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={styles.goalKicker}>{goal.name} · {progress.window.label}</Text>
-                <Text style={styles.goalAmount}>{rand(progress.givenCents)}</Text>
+                <Text style={[styles.goalAmount, bigAmountSize(rand(progress.givenCents), width, 34)]}>{rand(progress.givenCents)}</Text>
                 <Text style={styles.goalSub}>
                   {progress.targetCents !== null ? `of ${rand(progress.targetCents)}` : "Log income to see the target"} · {counted} {counted === 1 ? "gift" : "gifts"}
                 </Text>
@@ -115,7 +117,7 @@ export default function Home() {
       <View style={{ gap: 12 }}>
         <View style={[styles.gutter, styles.sectionHead]}>
           <Text variant="h2" accessibilityRole="header">Your causes</Text>
-          <Pressable onPress={() => router.push("/discover")} accessibilityRole="link" hitSlop={8}>
+          <Pressable onPress={() => router.push("/discover")} accessibilityRole="link" hitSlop={12}>
             <Text style={styles.seeAll}>See all</Text>
           </Pressable>
         </View>
@@ -143,7 +145,7 @@ export default function Home() {
       <View style={styles.gutter}>
         <View style={styles.strip}>
           <ReceiptsIcon color={colors.blue} />
-          <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>Your s18A receipts arrive on their own at tax time.</Text>
+          <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>Ask for an s18A receipt when you give, and it arrives on its own at tax time.</Text>
         </View>
       </View>
     </ScrollView>

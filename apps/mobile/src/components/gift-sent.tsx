@@ -10,7 +10,11 @@ import { ShareButton } from "./share-button";
 import { Text } from "./text";
 
 export type SentGift = {
+  /** The gift to the charity (not the contribution to Givezy). */
   cents: number;
+  /** The optional contribution to Givezy paid with it. */
+  contributionCents: number;
+  monthly: boolean;
   email: string;
   /** Finished on the payment page, but the provider hasn't confirmed it yet. */
   confirming: boolean;
@@ -39,8 +43,11 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
         </View>
         {gift.confirming ? null : <View style={styles.tick}><CheckIcon size={28} color={colors.blue} /></View>}
         <Text style={styles.kicker} accessibilityRole="header">
-          {gift.confirming ? "Confirming your gift" : "Gift sent"} · {rand(gift.cents)}
+          {gift.monthly
+            ? `${gift.confirming ? "Confirming your monthly donation" : "Monthly donation set up"} · ${rand(gift.cents)} a month`
+            : `${gift.confirming ? "Confirming your gift" : "Gift sent"} · ${rand(gift.cents)} to ${charityName}`}
         </Text>
+        {gift.contributionCents > 0 ? <Text style={styles.sub}>And {rand(gift.contributionCents)} to Givezy{gift.monthly ? " a month" : ""}. Thank you.</Text> : null}
         <Text style={styles.big}>
           {gift.confirming ? "Waiting for the payment provider to confirm. This usually takes a minute." : (impact ?? `Thank you for giving to ${charityName}.`)}
         </Text>

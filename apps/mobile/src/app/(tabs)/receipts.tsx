@@ -63,7 +63,7 @@ export default function Receipts() {
           <BackIcon color={colors.onInk} />
         </Pressable>
         <Text style={styles.headTitle} accessibilityRole="header">Your s18A receipts</Text>
-        <Text style={styles.headLine}>One receipt per charity each tax year, ready for your tax return. They arrive on their own.</Text>
+        <Text style={styles.headLine}>Ask for an s18A receipt when you give, and you get one per charity each tax year, ready for your tax return.</Text>
       </BlueHeader>
       <View style={{ paddingHorizontal: space.gutter, gap: space.block }}>
 
@@ -148,7 +148,7 @@ export default function Receipts() {
                   <Button
                     key={y}
                     variant="secondary"
-                    label={y === current ? `${y} so far` : `Tax year ${y}`}
+                    label={y === current ? `Tax year ${y} so far` : `Tax year ${y}`}
                     style={{ paddingHorizontal: 18 }}
                     onPress={() => (preview ? notify("Sample tax pack", "In the live app this opens your tax pack on our website.") : openSite(`/account/tax-pack/${y}`))}
                   />

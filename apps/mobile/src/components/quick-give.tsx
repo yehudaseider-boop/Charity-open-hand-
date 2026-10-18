@@ -12,7 +12,7 @@ import { colors, fonts, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { BackIcon, SearchIcon } from "./icons";
 import { GiveSheet } from "./give-sheet";
-import { ErrorState, SkeletonBlock } from "./states";
+import { EmptyState, ErrorState, SkeletonBlock } from "./states";
 import { Text } from "./text";
 
 /**
@@ -67,7 +67,7 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
         matches.length ? (
           <View>{matches.slice(0, 8).map((c, i) => <Row key={c.slug} charity={c} live={directory.live} last={i === Math.min(matches.length, 8) - 1} onPress={() => pick(c)} />)}</View>
         ) : (
-          <Text variant="bodyMuted">{`No charity matches "${query.trim()}".`}</Text>
+          <EmptyState title="No charities found" body={`Nothing matches "${query.trim()}". Try another name or a different cause.`} action={{ label: "Clear search", onPress: () => setQuery("") }} />
         )
       ) : (
         <>

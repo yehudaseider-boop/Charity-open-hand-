@@ -1,11 +1,12 @@
 import { parseRandToCents } from "@shared/money";
+import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button } from "@/components/button";
+import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
 import { Field } from "@/components/field";
 import { GiftSent, type SentGift } from "@/components/gift-sent";
@@ -133,6 +134,8 @@ export default function Give() {
   // What happened, as a red error or a calm note while we wait; `help` adds how to reach a person.
   const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean } | null>(null);
   const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => setMessageState(text ? { text, tone, help } : null);
+  // A payment we haven't heard back about: the footer offers "Check again" instead of a second gift.
+  const [unsettled, setUnsettled] = useState<{ reference: string; token: string; charged: boolean } | null>(null);
   // Where each part of the form sits, so a failed tap scrolls to the first thing to fix.
   const scrollRef = useRef<ScrollView>(null);
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
@@ -194,7 +197,7 @@ export default function Give() {
         <TopBar title="Give" />
         <View style={{ padding: space.gutter, gap: 12 }}>
           <Text variant="h2">Give on our website</Text>
-          <Text variant="bodyMuted">Giving inside the app isn&apos;t on yet. Our website takes you through it in a minute.</Text>
+          <Text variant="bodyMuted">You give on our secure website. It takes about a minute, and the gift shows here once it&apos;s paid.</Text>
           <Button label="Give on our website" onPress={() => openUrl(websiteUrl)} />
           <Button label="Back" variant="secondary" onPress={() => router.back()} />
         </View>
@@ -244,7 +247,7 @@ export default function Give() {
       <View style={styles.screen}>
         <TopBar title="Give" />
         <View style={{ padding: space.gutter }}>
-          <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now. Please try again later.`} action={{ label: "Back", onPress: () => router.back() }} />
+          <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now, so nothing was charged. Please try again later. ${helpLine()}`} action={{ label: "Back", onPress: () => router.back() }} />
         </View>
       </View>
     );
@@ -285,7 +288,8 @@ export default function Give() {
   const offerSave = cardsOpen && !payWithSaved;
 
   /** What the after-gift screen shows: this gift added to the goal and the streak, and honest badges. */
-  function sentSummary(cents: number, mail: string, confirming: boolean): SentGift {
+  /** `cents` is the gift to the charity only: a contribution to Givezy never counts towards a goal. */
+  function sentSummary(cents: number, contributionCents: number, mail: string, confirming: boolean): SentGift {
     const today = jhbToday();
     const rows = [...history, ...elsewhere, { date: today, cents, label: cleanLabel(label) }];
     const pr = goal && counts(goal, cleanLabel(label)) ? goalProgress(goal, rows, income.value, today) : null;
@@ -297,6 +301,8 @@ export default function Give() {
     ].filter((b): b is string => Boolean(b));
     return {
       cents,
+      contributionCents,
+      monthly: isMonthly,
       email: mail,
       confirming,
       goal: pr && goal && pr.targetCents ? { name: goal.name, percent: Math.floor((pr.givenCents * 100) / pr.targetCents), givenCents: pr.givenCents, targetCents: pr.targetCents } : null,
@@ -306,14 +312,14 @@ export default function Give() {
   }
   if (demo === "sent" && !SITE_URL && !demoShown) {
     setDemoShown(true);
-    setDone(sentSummary(18_000, "sarah@example.co.za", false));
+    setDone(sentSummary(18_000, 0, "sarah@example.co.za", false));
   }
 
   function check() {
     const e: Record<string, string> = {};
-    if (!gift) e.amount = "Enter an amount in Rand, for example 180 or 180.50";
+    if (!gift) e.amount = amountProblem(amount, "180 or 180.50") ?? "Enter an amount in Rand, for example 180 or 180.50";
     else if (gift < minGift) e.amount = `The smallest donation is ${rand(minGift)}`;
-    else if (maxGift !== null && gift > maxGift) e.amount = `The largest donation in the app is ${rand(maxGift)}. For more, please contact us.`;
+    else if (maxGift !== null && gift > maxGift) e.amount = `The largest donation in the app is ${rand(maxGift)}. For a bigger gift, please contact the charity directly.`;
     if (extra && !contribution) e.extra = "Enter your contribution in Rand, or switch it off";
     else if (extra && contribution !== null && contribution < minExtra) e.extra = `The smallest contribution is ${rand(minExtra)}, or switch it off`;
     if (!first.trim()) e.first_name = "Enter your first name";
@@ -424,6 +430,7 @@ export default function Give() {
             ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your details are still here. Tap Give again: we check first, and never charge twice."
             : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and tap Give again.",
           payWithSaved ? "wait" : "error",
+          true,
         );
         return;
       }
@@ -434,7 +441,7 @@ export default function Give() {
         showProblems(r.fieldErrors);
         return;
       }
-      setMessage(r.quote ? `${r.message} The total is now ${rand(r.quote.totalCents)}.` : r.message);
+      setMessage(r.quote ? `${r.message} The total is now ${rand(r.quote.totalCents)}.` : r.message, "error", !r.quote);
       if (r.quote) setAuthorisedTotal(null);
       return;
     }
@@ -449,7 +456,7 @@ export default function Give() {
         shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
       } catch {
         setBusy(false);
-        setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here: tap Give to try again.");
+        setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here: tap Give to try again.", "error", true);
         return;
       }
     }
@@ -473,12 +480,35 @@ export default function Give() {
     if (!finished) {
       haptic.tap();
       const o = outcome === "paid" ? "pending" : outcome;
-      setMessage(afterPaymentMessage(o, Boolean(r.charged)), afterPaymentTone(o), true);
+      setUnsettled(o === "pending" || o === "review" ? { reference: r.reference, token: r.token, charged: Boolean(r.charged) } : null);
+      setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date()), afterPaymentTone(o), true);
       return;
     }
     haptic.success();
     void refreshAfterGiving(account.refresh);
-    setDone(sentSummary(total, details.email, outcome !== "paid"));
+    setDone(sentSummary(gift ?? 0, contribution ?? 0, details.email, outcome !== "paid"));
+  }
+
+  /** "Check again": ask the payment provider about the unsettled payment, without starting a new one. */
+  async function checkAgain() {
+    if (!unsettled || busy) return;
+    setBusy("checking");
+    const outcome = await paymentStatus(SITE_URL, unsettled.reference, unsettled.token);
+    setBusy(false);
+    if (outcome === "paid") {
+      setUnsettled(null);
+      setMessage(null);
+      if (unsettled.charged) attemptRef.current = null;
+      haptic.success();
+      void refreshAfterGiving(account.refresh);
+      setDone(sentSummary(gift ?? 0, contribution ?? 0, email.trim(), false));
+      return;
+    }
+    if (outcome === "failed" || outcome === "not_found") {
+      setUnsettled(null);
+      if (unsettled.charged) attemptRef.current = null;
+    }
+    setMessage(afterPaymentMessage(outcome, unsettled.charged, new Date()), afterPaymentTone(outcome), true);
   }
 
   const err = (k: string) => errors[k];
@@ -509,6 +539,7 @@ export default function Give() {
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
+                maxLength={AMOUNT_MAX_LENGTH}
                 placeholder="0"
                 placeholderTextColor={colors.lilac}
                 accessibilityLabel="Amount in Rand"
@@ -577,7 +608,7 @@ export default function Give() {
                 <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 16 }} numberOfLines={1}>{first} {last}</Text>
                 <Text variant="label" numberOfLines={1}>{email}</Text>
               </View>
-              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" hitSlop={8}>
+              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" hitSlop={14}>
                 <Text style={{ fontFamily: fonts.bodySemibold, color: colors.blue }}>Change</Text>
               </Pressable>
             </View>
@@ -711,10 +742,10 @@ export default function Give() {
               error={err("agreed") ?? err("age_confirmed") ?? err("popia_consent")}
             />
             <View style={styles.links}>
-              <Pressable onPress={() => openSite("/terms")} accessibilityRole="link" hitSlop={8}>
+              <Pressable onPress={() => openSite("/terms")} accessibilityRole="link" style={styles.linkTap}>
                 <Text style={styles.link}>Read the Terms</Text>
               </Pressable>
-              <Pressable onPress={() => openSite("/privacy")} accessibilityRole="link" hitSlop={8}>
+              <Pressable onPress={() => openSite("/privacy")} accessibilityRole="link" style={styles.linkTap}>
                 <Text style={styles.link}>Read the Privacy Policy</Text>
               </Pressable>
             </View>
@@ -729,7 +760,16 @@ export default function Give() {
             </View>
           ) : null}
           <View style={{ gap: 8 }}>
-            <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
+            {unsettled ? (
+              <>
+                <Button variant="cta" label={busy === "checking" ? "Checking your payment…" : "Check again"} disabled={busy !== false} onPress={checkAgain} />
+                {unsettled.charged ? null : (
+                  <TextLink label="I didn't pay: start again" onPress={() => { setUnsettled(null); setMessage(null); }} />
+                )}
+              </>
+            ) : (
+              <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
+            )}
             <Text variant="label" style={{ textAlign: "center" }}>
               {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}. ` : ""}
               {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
@@ -758,6 +798,7 @@ const styles = StyleSheet.create({
   giver: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   note: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   waitNote: { padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
-  links: { flexDirection: "row", gap: 18, marginLeft: 36 },
+  links: { flexDirection: "row", gap: 18, marginLeft: 36, flexWrap: "wrap" },
+  linkTap: { minHeight: 44, justifyContent: "center" },
   link: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue, textDecorationLine: "underline" },
 });

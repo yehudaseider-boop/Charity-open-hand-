@@ -10,6 +10,12 @@ import { SITE_URL } from "./website";
  */
 export const GIVE_IN_APP = (IN_APP_GIVING && Boolean(SITE_URL)) || supabase === null;
 
+/**
+ * Every "Give" button in the app goes through here, so they all behave the same: the give screen when
+ * giving in the app is on, otherwise the charity's page with its give sheet open (which hands over to
+ * the website).
+ */
 export function openGiveScreen(slug: string, extra: { label?: string; campaign?: string } = {}) {
-  router.push({ pathname: "/give/[slug]", params: { slug, ...extra } });
+  if (GIVE_IN_APP) router.push({ pathname: "/give/[slug]", params: { slug, ...extra } });
+  else router.push({ pathname: "/charity/[slug]", params: { slug, sheet: "give" } });
 }

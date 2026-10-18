@@ -102,6 +102,6 @@ const styles = StyleSheet.create({
   fill: { height: 8, borderRadius: 4, backgroundColor: colors.orange },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
   progressText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.muted },
-  give: { minHeight: 40, paddingHorizontal: 18, borderRadius: 14, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", borderBottomWidth: 3, borderBottomColor: colors.navy },
+  give: { minHeight: 44, paddingHorizontal: 18, borderRadius: 14, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", borderBottomWidth: 3, borderBottomColor: colors.navy },
   giveText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.onInk },
 });

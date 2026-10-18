@@ -65,7 +65,9 @@ describe("before and after the payment page", () => {
   it("tells the donor plainly whether anything was charged", () => {
     expect(afterPaymentMessage("failed")).toMatch(/nothing was charged/);
     expect(afterPaymentMessage("review")).toMatch(/don't pay again/);
-    expect(afterPaymentMessage("pending")).toMatch(/wait for your confirmation email before giving again/);
+    expect(afterPaymentMessage("pending")).toMatch(/please don.t pay again: tap Check again/);
+    expect(afterPaymentMessage("pending", false, new Date("2026-10-18T12:05:00Z"))).toMatch(/Last checked at 14:05\./);
+    expect(afterPaymentMessage("not_found")).toMatch(/nothing was charged/);
     for (const o of ["failed", "review", "pending", "not_found"] as const) expect(afterPaymentMessage(o)).not.toMatch(/!|—/);
   });
   it("puts a past amount in the box as the donor would type it", () => {

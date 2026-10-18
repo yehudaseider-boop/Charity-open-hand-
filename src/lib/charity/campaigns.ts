@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseRandToCents } from "@/lib/money";
+import { COMMA_THOUSANDS_MESSAGE, parseRandToCents, usesCommaThousands } from "@/lib/money";
 
 /** A charity's new campaign, as typed. The goal is required: it is what donors watch fill up. */
 export const campaignSchema = z.object({
@@ -23,7 +23,7 @@ export function checkCampaign(raw: Record<string, string | undefined>, today: st
   if (!parsed.success) for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
   const targetCents = parseRandToCents(raw.target ?? "");
   if (!fieldErrors.target) {
-    if (/\d,\d{3}\b/.test(raw.target ?? "")) fieldErrors.target = "Use a space or nothing for thousands, for example 50000 or 50 000";
+    if (usesCommaThousands(raw.target ?? "")) fieldErrors.target = COMMA_THOUSANDS_MESSAGE;
     else if (targetCents === null) fieldErrors.target = "Enter the goal in Rand, for example 50000";
     else if (targetCents < 10_000) fieldErrors.target = "Goals start at R100";
     else if (targetCents > 10_000_000_000) fieldErrors.target = "Goals can be up to R100 000 000";

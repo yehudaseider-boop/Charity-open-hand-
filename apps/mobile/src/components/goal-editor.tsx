@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { parseRandToCents, percentToPpm } from "@shared/money";
+import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { CHOMESH_PRESET, MAASER_PRESET, ppmToPercentText, type Goal, type GoalPeriod, type GoalYear } from "@/lib/goals";
 import { haptic } from "@/lib/haptics";
 import { centsToInput } from "@/lib/pay-api";
@@ -82,7 +83,7 @@ export function GoalEditor({
     const cents = basis === "fixed" ? parseRandToCents(amount) : null;
     if (!name.trim()) e.name = "Give your goal a name";
     if (basis === "income" && !ppm) e.percent = "Enter a percentage, for example 10 or 12.5";
-    if (basis === "fixed" && !(cents && cents > 0)) e.amount = "Enter an amount in Rand, for example 12000";
+    if (basis === "fixed" && !(cents && cents > 0)) e.amount = amountProblem(amount, "12000") ?? "Enter an amount in Rand, for example 12000";
     if (some && chosen.length === 0) e.counts = "Choose at least one label, or count all your giving";
     setErrors(e);
     if (Object.keys(e).length) return;
@@ -130,7 +131,7 @@ export function GoalEditor({
         ]}
       />
       {basis === "fixed" ? (
-        <Field label={period === "month" ? "Amount each month" : "Amount each year"} prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} error={errors.amount} placeholder="0" />
+        <Field label={period === "month" ? "Amount each month" : "Amount each year"} prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} maxLength={AMOUNT_MAX_LENGTH} error={errors.amount} placeholder="0" />
       ) : (
         <Field
           label="Percentage of income"
@@ -138,7 +139,7 @@ export function GoalEditor({
           value={percent}
           onChangeText={setPercent}
           error={errors.percent}
-          helper="Log your income on the Giving tab and we work out the amount. Your income stays on this phone."
+          helper="Log your income on the Progress tab and we work out the amount. Your income stays on this phone."
         />
       )}
 

@@ -47,7 +47,7 @@ export const glossary: Record<GlossaryTerm, { title: string; body: string[] }> =
     ],
   },
   s18a: {
-    title: "s18A tax receipts",
+    title: "s18A receipts",
     body: [
       "Section 18A of the Income Tax Act lets you deduct donations to approved organisations from your taxable income, up to a limit set by SARS.",
       "To claim, you need an s18A receipt. If the charity is approved and you ask for one, you get one receipt per charity for each tax year (1 March to the end of February), after the year ends.",

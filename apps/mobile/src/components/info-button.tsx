@@ -19,7 +19,7 @@ export function InfoButton({ terms, label }: { terms: GlossaryTerm[]; label?: st
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`What is ${name}?`}
+        accessibilityLabel={`More about ${name}`}
         hitSlop={12}
         style={styles.button}
       >

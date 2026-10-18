@@ -196,11 +196,15 @@ export async function paymentStatus(site: string, reference: string, token: stri
  * What to tell the donor when a gift isn't confirmed as paid: what did and didn't happen, and the one
  * thing to do now. `savedCard`: charged to a kept card, so there was no payment page to "finish".
  */
-export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, savedCard = false): string {
+export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, savedCard = false, checkedAt?: Date): string {
+  // Johannesburg time (UTC+2, no daylight saving).
+  const jhb = checkedAt ? new Date(checkedAt.getTime() + 2 * 3_600_000) : null;
+  const last = jhb ? ` Last checked at ${String(jhb.getUTCHours()).padStart(2, "0")}:${String(jhb.getUTCMinutes()).padStart(2, "0")}.` : "";
   if (outcome === "failed") return "Your card was declined and nothing was charged. Your details are still here: tap Give to try again, or use another card.";
-  if (outcome === "review") return "Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.";
-  if (savedCard) return "Your bank is still confirming this payment. Please don't give again. We'll email you when it's through, and it will show in Progress.";
-  return "We haven't heard from the payment provider yet. If you didn't finish paying, nothing was charged and you can tap Give again. If you did pay, please don't give again: wait for your confirmation email before giving again.";
+  if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: tap Give to try again.";
+  if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.${last}`;
+  if (savedCard) return `Your bank is still confirming this payment. Please don't give again: tap Check again in a minute. We'll also email you when it's through.${last}`;
+  return `We're still waiting to hear whether your payment went through. If you finished paying, please don't pay again: tap Check again in a minute, or wait for your confirmation email. If you closed the page without paying, nothing was charged.${last}`;
 }
 
 /** How a message looks: a red error, or a calm note while we wait for an answer. */

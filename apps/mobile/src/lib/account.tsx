@@ -27,7 +27,7 @@ export type AccountStatus = "preview" | "loading" | "signed-out" | "agreeing" | 
 
 /** `fromCache`: what the phone saved last time, shown until fresh data arrives (or while offline). */
 type Live = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: Elsewhere[]; loadedAt: Date; fromCache?: boolean };
-type Result = { ok: true } | { ok: false; message: string };
+type Result = { ok: true; id?: string } | { ok: false; message: string };
 
 type AccountValue = {
   status: AccountStatus;
@@ -387,16 +387,16 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       },
       async addElsewhere(e) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
-        const { error } = await supabase.from("external_giving_entries").insert({
+        const { data, error } = await supabase.from("external_giving_entries").insert({
           user_id: session.user.id,
           amount_cents: e.cents,
           entry_date: e.date,
           recipient_text: e.recipient,
           label: e.label,
-        });
-        if (error) return { ok: false, message: "We couldn't save that. Please try again." };
+        }).select("id").single();
+        if (error) return { ok: false, message: "We couldn't save that. Check your connection and try again." };
         await refresh();
-        return { ok: true };
+        return { ok: true, id: (data as { id?: string } | null)?.id };
       },
       async removeElsewhere(id) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { bigAmountSize } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { BlueHeader } from "@/components/backdrop";
@@ -10,6 +11,7 @@ import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
 import { Sheet } from "@/components/sheet";
 import { EmptyState, ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
+import { UndoToast, type UndoMessage } from "@/components/undo-toast";
 import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
 import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
@@ -40,6 +42,7 @@ import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 /** Progress (was Giving): the main goal as a big ring on blue, month by month, then the donor's records and history. */
 export default function Giving() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const account = useAccount();
   const preview = account.status === "preview";
   const signedIn = account.status === "signed-in";
@@ -113,7 +116,7 @@ export default function Giving() {
   // "Saving…", then "Goal saved." once the phone has kept it (never before).
   const [saved, setSaved] = useState<string | null>(null);
   // What just happened, with a way to take it back, for a few seconds after a removal or a monthly change.
-  const [undo, setUndo] = useState<{ text: string; label?: string; run?: () => void } | null>(null);
+  const [undo, setUndo] = useState<UndoMessage | null>(null);
   useEffect(() => {
     if (!undo) return;
     const t = setTimeout(() => setUndo(null), 10_000);
@@ -155,9 +158,11 @@ export default function Giving() {
   const addIncome = (e: { cents: number; date: string; note: string }) => {
     if (!incomeReady) return;
     const next = [{ id: newEntryId(), ...e }, ...income].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const before = income;
     incomeRecord.setValue(next);
     void persistIncome(next, owner);
     setLogging(null);
+    setUndo({ text: `Logged ${rand(e.cents)} of income.`, label: "Undo", run: () => { incomeRecord.setValue(before); void persistIncome(before, owner); setUndo({ text: "Taken back. That income entry is removed." }); } });
   };
   const removeIncome = (id: string) => {
     if (!incomeReady) return;
@@ -179,7 +184,7 @@ export default function Giving() {
     setRemoving(id);
     account.removeElsewhere(id).then((r) => {
       setRemoving(null);
-      if (!r.ok) return setUndo({ text: `We couldn't remove it, so it's still in your records. ${r.message}` });
+      if (!r.ok) return setUndo({ text: "We couldn't remove it, so it's still in your records. Check your connection and try again." });
       if (!was) return;
       const iso = `${was.date.getFullYear()}-${String(was.date.getMonth() + 1).padStart(2, "0")}-${String(was.date.getDate()).padStart(2, "0")}`;
       setUndo({
@@ -188,7 +193,7 @@ export default function Giving() {
         run: () => {
           setUndo({ text: "Putting it back…" });
           account.addElsewhere({ cents: was.cents, date: iso, recipient: was.recipient, label: was.label }).then((a) =>
-            setUndo({ text: a.ok ? "Taken back. It's back in your records." : `We couldn't put it back. ${a.message}` }),
+            setUndo({ text: a.ok ? "Taken back. It's back in your records." : "We couldn't put it back. Check your connection, then log it again." }),
           );
         },
       });
@@ -206,19 +211,37 @@ export default function Giving() {
     if (!r.ok) return;
     setOpen(null);
     const name = which?.charityName ?? "this charity";
-    if (status === "paused") setUndo({ text: `Paused your monthly donation to ${name}. Nothing more is collected until you resume.`, label: "Resume", run: () => void changeRecurring(id, "active") });
+    if (status === "paused") setUndo({ text: `Paused your monthly donation to ${name}. Nothing more is collected until you resume it.`, label: "Undo", run: () => void changeRecurring(id, "active") });
     else if (status === "active") setUndo({ text: `Resumed your monthly donation to ${name}.` });
+    else if (which?.status === "failed") setUndo({ text: `Removed the stopped monthly donation to ${name} from your list.` });
     else setUndo({ text: `Cancellation of your monthly donation to ${name} is requested. Nothing more is collected once the payment provider confirms.` });
   };
   const saveElsewhere = async (e: { cents: number; date: string; recipient: string; label: string | null }): Promise<string | null> => {
+    const logged = `Logged ${rand(e.cents)} given to ${e.recipient}.`;
     if (preview) {
-      setPreviewElsewhere((rows) => [{ id: `p${Date.now()}`, date: isoToDate(e.date), recipient: e.recipient, cents: e.cents, label: e.label }, ...rows]);
+      const id = `p${Date.now()}`;
+      setPreviewElsewhere((rows) => [{ id, date: isoToDate(e.date), recipient: e.recipient, cents: e.cents, label: e.label }, ...rows]);
       setLogging(null);
+      setUndo({ text: logged, label: "Undo", run: () => { setPreviewElsewhere((rows) => rows.filter((r) => r.id !== id)); setUndo({ text: "Taken back. It's removed from your records." }); } });
       return null;
     }
     const r = await account.addElsewhere(e);
-    if (r.ok) setLogging(null);
-    return r.ok ? null : r.message;
+    if (!r.ok) return r.message;
+    setLogging(null);
+    const newId = r.id;
+    setUndo(
+      newId
+        ? {
+            text: logged,
+            label: "Undo",
+            run: () => {
+              setUndo({ text: "Taking it back…" });
+              account.removeElsewhere(newId).then((x) => setUndo({ text: x.ok ? "Taken back. It's removed from your records." : "We couldn't take it back. Check your connection, then remove it from the list." }));
+            },
+          }
+        : { text: logged },
+    );
+    return null;
   };
 
   return (
@@ -233,10 +256,10 @@ export default function Giving() {
           {main && mainProgress && state === "ready" && goalsLoaded && !goalsProblem ? (
             <View style={{ gap: 18, marginTop: 8 }}>
               <View style={styles.ringRow}>
-                <GoalRing percent={mainPct} size={140} onBlue stroke={14} />
+                <GoalRing percent={mainPct} size={width < 360 ? 112 : 140} onBlue stroke={14} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.headKicker}>{main.name} · {mainProgress.window.label}</Text>
-                  <Text style={styles.headAmount}>{rand(mainProgress.givenCents)}</Text>
+                  <Text style={[styles.headAmount, bigAmountSize(rand(mainProgress.givenCents), width, 34)]}>{rand(mainProgress.givenCents)}</Text>
                   <Text style={styles.headLine}>
                     {mainProgress.targetCents === null ? "Log your income to see the goal" : `of ${rand(mainProgress.targetCents)}`}
                   </Text>
@@ -270,16 +293,6 @@ export default function Giving() {
         ) : (
           <>
             {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
-            {undo ? (
-              <View style={styles.undoBar} accessibilityRole="alert" accessibilityLiveRegion="polite">
-                <Text style={{ flex: 1, fontSize: 16, lineHeight: 22, color: colors.navy }}>{undo.text}</Text>
-                {undo.run && undo.label ? (
-                  <Pressable onPress={undo.run} accessibilityRole="button" hitSlop={8} style={styles.undoBtn}>
-                    <Text style={{ fontFamily: fonts.bodyBold, color: colors.blue }}>{undo.label}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : null}
             {account.status === "signed-out" ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
@@ -466,7 +479,7 @@ export default function Giving() {
             {myGifts.length > 0 ? (
               <View style={{ gap: 12 }}>
                 <Text variant="h2" style={styles.heading}>
-                  {shownYear === "all" ? "All your giving" : shownYear === taxYear ? "This tax year in numbers" : `Tax year ${shownYear} in numbers`}
+                  {shownYear === "all" ? "All your giving" : shownYear === taxYear ? `Tax year ${shownYear} so far` : `Tax year ${shownYear} in numbers`}
                 </Text>
                 {years.length > 1 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space.gutter }} contentContainerStyle={styles.yearChips} accessibilityRole="radiogroup" accessibilityLabel="Which tax year">
@@ -475,7 +488,7 @@ export default function Giving() {
                       return (
                         <Pressable key={y} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setPickedYear(y)} style={[styles.goalChip, selected && styles.yearChipOn]}>
                           <Text style={[styles.goalChipText, selected && { color: colors.onInk }]}>
-                            {y === "all" ? "All time" : y === taxYear ? "This tax year" : `Tax year ${y}`}
+                            {y === "all" ? "All time" : y === taxYear ? `Tax year ${y} so far` : `Tax year ${y}`}
                           </Text>
                         </Pressable>
                       );
@@ -556,10 +569,9 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {r.status === "failed" ? "Stopped: the card was declined" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {rand(r.cents)} a month · {r.status === "failed" ? "Stopped: the card was declined" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 17 }}>{rand(r.cents)}/month</Text>
                       <ChevronIcon />
                     </Pressable>
                   ))}
@@ -604,6 +616,7 @@ export default function Giving() {
         )}
         </View>
       </ScrollView>
+      <UndoToast message={undo} />
 
       <Sheet visible={open !== null} onClose={() => { setOpen(null); setConfirmCancel(false); setRecurringError(null); }}>
         {open ? (
@@ -651,23 +664,44 @@ export default function Giving() {
               </>
             ) : (
             <>
-            <Button
-              label={open.status === "paused" ? "Resume" : "Pause"}
-              onPress={() => {
-                setRecurring((rs) => rs.map((r) => (r.id === open.id ? { ...r, status: r.status === "paused" ? "active" : "paused" } : r)));
-                setOpen(null);
-              }}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                setRecurring((rs) => rs.filter((r) => r.id !== open.id));
-                setOpen(null);
-              }}
-              style={styles.cancel}
-            >
-              <Text style={[type.button, { color: colors.danger }]}>Cancel monthly donation</Text>
-            </Pressable>
+            {confirmCancel ? (
+              <View style={{ gap: 10 }}>
+                <Text style={{ fontSize: 17 }}>Cancel this monthly donation for good? You would need to set up a new one to give monthly again.</Text>
+                <Button
+                  label="Yes, cancel it"
+                  onPress={() => {
+                    const name = open.charityName;
+                    setRecurring((rs) => rs.filter((r) => r.id !== open.id));
+                    setOpen(null);
+                    setConfirmCancel(false);
+                    setUndo({ text: `Cancellation of your monthly donation to ${name} is requested. Nothing more is collected once the payment provider confirms.` });
+                  }}
+                />
+                <Button variant="secondary" label="Keep it" onPress={() => setConfirmCancel(false)} />
+              </View>
+            ) : (
+              <>
+                <Button
+                  label={open.status === "paused" ? "Resume" : "Pause"}
+                  onPress={() => {
+                    const id = open.id;
+                    const name = open.charityName;
+                    const pausing = open.status !== "paused";
+                    const flip = () => setRecurring((rs) => rs.map((r) => (r.id === id ? { ...r, status: r.status === "paused" ? "active" : "paused" } : r)));
+                    flip();
+                    setOpen(null);
+                    setUndo(
+                      pausing
+                        ? { text: `Paused your monthly donation to ${name}. Nothing more is collected until you resume it.`, label: "Undo", run: () => { flip(); setUndo({ text: `Resumed your monthly donation to ${name}.` }); } }
+                        : { text: `Resumed your monthly donation to ${name}.` },
+                    );
+                  }}
+                />
+                <Pressable accessibilityRole="button" onPress={() => setConfirmCancel(true)} style={styles.cancel}>
+                  <Text style={[type.button, { color: colors.danger }]}>Cancel monthly donation</Text>
+                </Pressable>
+              </>
+            )}
             <Text variant="label">Cancelling stops all future payments with the payment provider. Past donations stay in your history.</Text>
             </>
             )}
@@ -773,8 +807,6 @@ const styles = StyleSheet.create({
   cancel: { minHeight: touch, alignItems: "center", justifyContent: "center" },
   tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
   card: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
-  undoBar: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
-  undoBtn: { minHeight: touch, justifyContent: "center", paddingHorizontal: 6 },
 });
 
 /** A failure while drawing shows "Try again" and the error, not a blank page. */

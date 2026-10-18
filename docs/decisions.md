@@ -860,3 +860,17 @@ Yehuda asked for the consistency rule on the charity dashboard. Changes:
 - **Empty lists all say "No … yet. They appear here once …"**, and a search or filter that finds nothing says "No … match your search or filters" with a "Clear the search and filters" link, on donations, donors and monthly donations alike.
 - **One main button**: blue with the solid navy edge underneath (the brand's pressable button), on every form, search, error page and the poster's print button.
 - **Same words for the same moment**: "Please keep it to … characters or fewer" everywhere (website and dashboard), "Back to your overview" and "Back to your public profile", "Download … (CSV)".
+
+## 18/10/2026: The donor app reads as one product, and failures are looked after
+
+Yehuda asked for the quality rules on the donor app (un-glamorous moments, consistency across flows, service recovery, test and break). A tester broke every screen at 390px and 320px wide; every finding was checked and fixed:
+
+- **Undo you can see.** One floating bar just above the tab bar, wherever you've scrolled to, for every action that can be taken back: removing income, giving elsewhere or a goal, pausing a monthly donation, and now also logging income and giving elsewhere ("Logged R50 given to School fun run. Undo"). Pausing offers "Undo" like everything else.
+- **Every "Give" button does the same thing.** With giving in the app off (store builds), Home and Progress now open the charity's give sheet like Discover and the charity page do, instead of a screen saying giving "isn't on yet".
+- **Waiting for the payment provider has its own button.** If we haven't heard back, the button becomes "Check again" (with "Last checked at 14:05") instead of inviting a second gift, plus "I didn't pay: start again". A way to reach a person shows on every problem on the give screen.
+- **The thank-you screen counts only the gift** towards the goal ("Gift sent · R180 to Northcliff Meals Fund", "and R20 to Givezy"); a monthly donation says "Monthly donation set up · R180 a month".
+- **Same words everywhere**: "Tax year 2027 so far" and "Tax year 2026" on every screen; "R500 a month"; the Progress tab named Progress everywhere; "s18A receipts" in the info button; the s18A promise now says to ask for one when you give (it's opt-in). Bad amounts get the same message in every box, including "1,250", and no box takes a 14-digit number.
+- **Edge cases**: a page that doesn't exist shows a calm "We couldn't find that page" with "Go to Home"; goal amounts step down a size on narrow phones instead of breaking; small links are 44px tall; the give sheet's search has "Clear search"; "Send a new code" confirms it was sent.
+- The sample-data version (what Expo Go shows without a live server) behaves like the live one: cancelling asks first, pausing has Undo.
+
+**Left as is:** goal and log amounts have no upper limit beyond the length of the box (11 characters); a cap would be a new platform value, so it waits for Yehuda if he wants one.

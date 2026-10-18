@@ -4,6 +4,7 @@ import { useLabelSuggestions } from "@/lib/use-labels";
 import { ddmmyyyy, jhbToday } from "@/lib/format";
 import { dateToIso, parseDdMmYyyy } from "@/lib/ledger";
 import { parseRandToCents } from "@shared/money";
+import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { colors } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
@@ -23,7 +24,7 @@ export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; 
         <Text variant="h2" style={styles.title}>Log income</Text>
         <Text variant="bodyMuted">For a goal set as a share of your income, like 10%. Log what you earn and we work out the goal. This stays on your phone and is never sent to us.</Text>
       </View>
-      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} error={errors.amount} />
+      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} maxLength={AMOUNT_MAX_LENGTH} error={errors.amount} />
       <Field label="Date received (dd/mm/yyyy)" value={date} onChangeText={setDate} keyboardType="numbers-and-punctuation" error={errors.date} />
       <Field label="Note (optional)" value={note} onChangeText={setNote} maxLength={120} helper="For example: October salary" />
       <Button
@@ -32,7 +33,7 @@ export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; 
           const cents = parseRandToCents(amount);
           const iso = parseDdMmYyyy(date, dateToIso(jhbToday()));
           const e = {
-            amount: cents && cents > 0 ? undefined : "Enter an amount in Rand, for example 25000 or 25000.50.",
+            amount: amountProblem(amount, "25000 or 25000.50") ?? undefined,
             date: iso ? undefined : "Use a real date that is not in the future, like 09/10/2026.",
           };
           setErrors(e);
@@ -60,7 +61,7 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
         <Text variant="h2" style={styles.title}>Log giving elsewhere</Text>
         <Text variant="bodyMuted">Cash, an appeal at work or another charity. It counts towards your giving goal.</Text>
       </View>
-      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} error={errors.amount} />
+      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} maxLength={AMOUNT_MAX_LENGTH} error={errors.amount} />
       <Field label="Given to" value={recipient} onChangeText={setRecipient} maxLength={120} error={errors.recipient} helper="For example: School fun run (cash)" />
       <Field label="Date given (dd/mm/yyyy)" value={date} onChangeText={setDate} keyboardType="numbers-and-punctuation" error={errors.date} />
       <LabelPicker value={label} onChange={setLabel} suggestions={suggestions} />
@@ -73,7 +74,7 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
           const iso = parseDdMmYyyy(date, dateToIso(jhbToday()));
           const who = recipient.trim();
           const e = {
-            amount: cents && cents > 0 ? undefined : "Enter an amount in Rand, for example 180 or 180.50.",
+            amount: amountProblem(amount, "180 or 180.50") ?? undefined,
             date: iso ? undefined : "Use a real date that is not in the future, like 09/10/2026.",
             recipient: who ? undefined : "Say who you gave to.",
           };

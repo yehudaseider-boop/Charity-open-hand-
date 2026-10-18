@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { parseRandToCents } from "@shared/money";
+import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { Backdrop } from "@/components/backdrop";
 import { Blob } from "@/components/blob";
 import { Button, TextLink } from "@/components/button";
@@ -164,17 +165,17 @@ export default function Welcome() {
               </Pressable>
             </View>
             {writingOwn ? <Field label="Your goal's name" value={ownName} onChangeText={setOwnName} maxLength={40} /> : null}
-            <Field label="How much a year?" prefix="R" keyboardType="decimal-pad" value={yearly} onChangeText={setYearly} placeholder="0" error={amountError} />
+            <Field label="How much a year?" prefix="R" keyboardType="decimal-pad" value={yearly} onChangeText={setYearly} maxLength={AMOUNT_MAX_LENGTH} placeholder="0" error={amountError} />
             <View style={styles.previewCard}>
               <Text style={styles.previewKicker}>That&apos;s about</Text>
-              <Text style={styles.previewAmount}>{perMonth ? `${rand(perMonth)} a month` : "R__ a month"}</Text>
+              <Text style={styles.previewAmount}>{perMonth ? `${rand(perMonth)} a month` : "Type a yearly amount to see it monthly"}</Text>
             </View>
             <View style={{ flex: 1 }} />
             <Button
               label="Next"
               onPress={async () => {
                 if (!yearly.trim()) return next(); // no goal for now
-                if (!yearlyCents || yearlyCents <= 0) return setAmountError("Enter an amount in Rand, for example 12000");
+                if (!yearlyCents || yearlyCents <= 0) return setAmountError(amountProblem(yearly, "12000") ?? undefined);
                 setAmountError(undefined);
                 const name = (writingOwn ? ownName.trim() : goalName) || "Giving goal";
                 const saved = await saveGoals(
