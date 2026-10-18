@@ -38,7 +38,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   if (charity.status === "suspended") {
     return (
       <div className="space-y-4">
-        <h1 className="font-display text-2xl text-indigo">{charity.name_en}</h1>
+        <h1 className="font-display text-2xl text-indigo">Overview</h1>
         <Notice tone="danger">
           <p className="font-medium">Your page is paused</p>
           <p className="mt-1">While it is paused, your page is hidden and donors can&apos;t give to you. Monthly donations aren&apos;t collected. Your past donations and receipts are kept.</p>
@@ -48,7 +48,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         <p className="text-sm">
           <Link href={`${base}/donations`} className="text-brand underline">Your donations</Link>
           {" · "}
-          <Link href={`${base}/receipts`} className="text-brand underline">Receipts</Link>
+          <Link href={`${base}/receipts`} className="text-brand underline">s18A receipts</Link>
         </p>
       </div>
     );
@@ -56,10 +56,10 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   if (charity.status !== "approved") {
     return (
       <div className="space-y-4">
-        <h1 className="font-display text-2xl text-indigo">{charity.name_en}</h1>
+        <h1 className="font-display text-2xl text-indigo">Overview</h1>
         <Notice tone="warning">
           Donations start once your application is approved.{" "}
-          <Link href={`${base}/application`} className="underline">Go to your registration details</Link>.
+          <Link href={`${base}/application`} className="underline">Go to your application</Link>.
         </Notice>
       </div>
     );
@@ -185,7 +185,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                   </li>
                   <li>
                     {year.paid_count === 0 ? (
-                      <>No donations yet this tax year.</>
+                      <>No donations yet this tax year. They appear here once a payment goes through.</>
                     ) : (
                       <>
                         The average donation this tax year is <span className="font-semibold">{formatRand(averageCents(year.paid_cents, year.paid_count))}</span>
@@ -295,7 +295,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
           <Card title="Monthly donations">
             {recurring.length === 0 ? (
-              <p className="text-sm text-muted">No monthly donors yet. Donors can choose to give every month when they donate.</p>
+              <p className="text-sm text-muted">No monthly donations yet. One appears here once a donor chooses to give every month.</p>
             ) : (
               <p className="text-sm">
                 {plural(regular.runningCount, "donor")} {regular.runningCount === 1 ? "gives" : "give"} {formatRand(regular.runningCentsPerMonth)} a month in total

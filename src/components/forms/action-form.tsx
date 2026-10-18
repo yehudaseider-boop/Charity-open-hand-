@@ -100,7 +100,7 @@ export function ActionForm({
                   setAsking(null);
                   startTransition(() => dispatch(held));
                 }}
-                className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast"
+                className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast"
               >
                 {confirmLabel ?? `Yes, ${submitLabel.charAt(0).toLowerCase()}${submitLabel.slice(1)}`}
               </button>
@@ -114,7 +114,7 @@ export function ActionForm({
           <button
             disabled={pending}
             hidden={Boolean(asking)}
-            className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60"
+            className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60"
           >
             {pending ? pendingLabel : submitLabel}
           </button>

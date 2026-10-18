@@ -17,9 +17,9 @@ export const RECENT_DAYS = 30;
 export type DonorGroup = "new" | "repeat" | "once" | "lapsed";
 
 export const donorGroups: { key: DonorGroup; label: string; hint: string }[] = [
-  { key: "new", label: "New", hint: `First gift in the last ${NEW_DONOR_DAYS} days` },
+  { key: "new", label: "New", hint: `First donation in the last ${NEW_DONOR_DAYS} days` },
   { key: "repeat", label: "Coming back", hint: "Gave more than once, and in the last 6 months" },
-  { key: "once", label: "Gave once", hint: "One gift, in the last 6 months" },
+  { key: "once", label: "Gave once", hint: "One donation, in the last 6 months" },
   { key: "lapsed", label: "Lapsed", hint: "Nothing in the last 6 months" },
 ];
 

@@ -84,7 +84,7 @@ function CampaignBar({ raised, target, gifts, endsAt }: { raised: number; target
   return (
     <div className="space-y-1 text-sm">
       <p>
-        {formatRand(raised)} raised{target ? ` of ${formatRand(target)}` : ""} <span className="text-muted">({gifts} {gifts === 1 ? "gift" : "gifts"}{endsAt ? `, until ${formatDate(endsAt)}` : ""})</span>
+        {formatRand(raised)} raised{target ? ` of ${formatRand(target)}` : ""} <span className="text-muted">({gifts} {gifts === 1 ? "donation" : "donations"}{endsAt ? `, until ${formatDate(endsAt)}` : ""})</span>
       </p>
       {target ? (
         <div className="h-2 rounded-full bg-honey-soft" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${pct}% of the goal`}>

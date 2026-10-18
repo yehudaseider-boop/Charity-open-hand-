@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
 import { chargeDayLabel, ERASED_DONOR, isErasedEmail, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, shownEmail, type MonthlyState } from "@/lib/charity/dashboard";
@@ -93,14 +94,14 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
           aria-label="Search by donor name or email"
           className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
         />
-        <button className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
+        <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
       </form>
 
       {shown.length === 0 ? (
         <p className="text-sm text-muted">
           {all.length === 0
             ? "No monthly donations yet. One appears here once its first payment has gone through."
-            : "No monthly donations match."}
+            : <NoMatch what="monthly donations" clearHref={base} />}
         </p>
       ) : (
         <ul className="space-y-2">

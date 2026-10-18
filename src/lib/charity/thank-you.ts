@@ -44,7 +44,7 @@ export function checkThankYou(raw: string): { ok: true; body: string } | { ok: f
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
     .trim();
   if (body.length < THANK_YOU_MIN) return { ok: false, message: "Write a few words of thanks." };
-  if (body.length > THANK_YOU_MAX) return { ok: false, message: `Keep it to ${THANK_YOU_MAX} characters.` };
+  if (body.length > THANK_YOU_MAX) return { ok: false, message: `Please keep it to ${THANK_YOU_MAX} characters or fewer.` };
   return { ok: true, body };
 }
 

@@ -52,9 +52,9 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         next: seePage(c, { label: "Next: add photos and an update", href: `${c.base}/updates` }),
       };
     case "logo_changed":
-      return { what: "Your new logo is up.", next: seePage(c, { label: "Back to your profile", href: `${c.base}/profile` }) };
+      return { what: "Your new logo is up.", next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }) };
     case "cover_changed":
-      return { what: "Your new cover image is up.", next: seePage(c, { label: "Back to your profile", href: `${c.base}/profile` }) };
+      return { what: "Your new cover image is up.", next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }) };
     case "donation_emails_on":
       return { what: "Donation emails are on. We'll email you each time a donation comes in.", next: { label: "Back to your overview", href: c.base } };
     case "donation_emails_off":

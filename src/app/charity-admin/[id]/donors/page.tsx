@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
 import { ERASED_DONOR, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
@@ -40,10 +41,10 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <h1 className="font-display text-2xl text-indigo">Donors</h1>
-        <a href={`/charity-admin/${id}/export/donors`} className="text-sm text-brand underline">Download CSV</a>
+        <a href={`/charity-admin/${id}/export/donors`} className="text-sm text-brand underline">Download donors (CSV)</a>
       </div>
       <p className="text-sm text-muted">
-        People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record gifts. Where a donor asked for one, Givezy issues the s18A receipt in your name.
+        People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record donations. Where a donor asked for one, Givezy issues the s18A receipt in your name.
       </p>
 
       <nav aria-label="Donor groups" className="flex flex-wrap gap-2 text-sm">
@@ -69,11 +70,11 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
           aria-label="Search by donor name or email"
           className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
         />
-        <button className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
+        <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
       </form>
 
       {shown.length === 0 ? (
-        <p className="text-sm text-muted">{q || group ? "No donors match." : "No donors yet. People appear here once their first donation is paid."}</p>
+        <p className="text-sm text-muted">{q || group ? <NoMatch what="donors" clearHref={base} /> : "No donors yet. People appear here once their first donation is paid."}</p>
       ) : (
         <ul className="space-y-2">
           {shown.map((d) => (

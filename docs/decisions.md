@@ -851,3 +851,12 @@ Yehuda asked to apply five rules: design the un-glamorous moments (status, undo,
 - Dashboard: "Saving…"-style button words while working, the first wrong field focused, an error page that keeps the tabs, and the done panel only on the page and day it belongs to.
 
 **Left for later:** the app's charity list doesn't yet open offline (the giving history does); the test payment page can be pressed twice with the back button (test-only, the real confirmation already ignores a repeat); the CSP nonce (as before).
+
+## 18/10/2026: The dashboard reads as one product
+
+Yehuda asked for the consistency rule on the charity dashboard. Changes:
+- **Tabs and page headings match.** Every page's heading is its tab's name ("Overview", "Application", not the charity's name, which is already in the blue header). Tabs now read "Monthly donations" and "s18A receipts" like their pages; "Registration" became "Application", the word every message already used. "Registration number" and "registration certificate" stay: they are the company's own documents.
+- **"Donation", never "gift", on the dashboard** (campaign counts, donor groups, the profile hint). The app keeps "gift" for a donor's own giving.
+- **Empty lists all say "No … yet. They appear here once …"**, and a search or filter that finds nothing says "No … match your search or filters" with a "Clear the search and filters" link, on donations, donors and monthly donations alike.
+- **One main button**: blue with the solid navy edge underneath (the brand's pressable button), on every form, search, error page and the poster's print button.
+- **Same words for the same moment**: "Please keep it to … characters or fewer" everywhere (website and dashboard), "Back to your overview" and "Back to your public profile", "Download … (CSV)".

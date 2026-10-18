@@ -12,7 +12,7 @@ import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Receipts" };
+export const metadata: Metadata = { title: "s18A receipts" };
 
 export default async function CharityReceiptsPage({ params }: PageProps<"/charity-admin/[id]/receipts">) {
   const { id } = await params;

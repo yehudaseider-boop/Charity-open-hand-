@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const tooLong = (max: number) => `Keep it to ${max.toLocaleString("en-ZA").replace(/[\s,]/g, " ")} characters`;
+const tooLong = (max: number) => `Please keep it to ${max.toLocaleString("en-ZA").replace(/[\s,]/g, " ")} characters or fewer`;
 const optional = (max = 200) => z.string().max(max, tooLong(max)).optional();
 const required = (label: string, max = 200) =>
   z
@@ -108,6 +108,6 @@ export function normalisePhone(v: string | undefined) {
 }
 
 /** A short update from a charity, and a photo caption. */
-export const updateSchema = z.object({ body_en: z.string({ error: (i) => (i.input === undefined ? "Write your update" : undefined) }).min(1, "Write your update").max(500, "Keep it to 500 characters") });
+export const updateSchema = z.object({ body_en: z.string({ error: (i) => (i.input === undefined ? "Write your update" : undefined) }).min(1, "Write your update").max(500, "Please keep it to 500 characters or fewer") });
 export const photoSchema = z.object({ caption_en: optional(120) });
 export const MAX_PHOTOS = 12;

@@ -20,7 +20,7 @@ export function ProfileForm({ action, charity, categories, selected }: {
       <TextArea name="funds_use_en" label="How donations are used" defaultValue={charity.funds_use_en}
         hint="What a donation pays for, for example food parcels for families or a teacher's salary. Specific is best." />
       <TextField name="impact_en" label="Your impact line" defaultValue={charity.impact_en}
-        hint="One line on what a gift does, in your own numbers, for example: R180 feeds a family for a week. Shown with your photo in the app. Up to 140 characters." />
+        hint="One line on what a donation does, in your own numbers, for example: R180 feeds a family for a week. Shown with your photo in the app. Up to 140 characters." />
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Suggested amounts</legend>
         <p className="text-sm text-muted">

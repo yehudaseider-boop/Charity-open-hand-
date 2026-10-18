@@ -19,7 +19,7 @@ export default function DashboardError({ reset }: { error: Error & { digest?: st
           : "Nothing was changed. It's usually a dropped connection: try again in a moment."}
       </p>
       <div className="flex flex-wrap items-center gap-4">
-        <button onClick={reset} className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Try again</button>
+        <button onClick={reset} className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Try again</button>
         <Link href={`/charity-admin/${id}`} className="text-sm text-brand underline">Back to your overview</Link>
       </div>
       <p className="text-xs text-muted">If it keeps happening, reply to any email we&apos;ve sent you and a person will help.</p>

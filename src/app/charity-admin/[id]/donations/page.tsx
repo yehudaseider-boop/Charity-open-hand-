@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
@@ -88,7 +89,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
           aria-label="Search by donor name or email"
           className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
         />
-        <button className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
+        <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
         </div>
       </form>
 
@@ -119,7 +120,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       </nav>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted">{q || status !== "all" || filters.period !== "all" ? "No donations match." : "No donations yet. They appear here once a payment goes through."}</p>
+        <p className="text-sm text-muted">{q || status !== "all" || filters.period !== "all" ? <NoMatch what="donations" clearHref={base} /> : "No donations yet. They appear here once a payment goes through."}</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((d) => {

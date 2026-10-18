@@ -60,7 +60,7 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
       </section>
 
       <p className="text-sm print:hidden">
-        <Link href={`/charity-admin/${id}`} className="text-brand underline">Back to your dashboard</Link>
+        <Link href={`/charity-admin/${id}`} className="text-brand underline">Back to your overview</Link>
       </p>
     </div>
   );

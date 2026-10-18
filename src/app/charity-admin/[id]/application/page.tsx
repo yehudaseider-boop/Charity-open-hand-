@@ -19,7 +19,7 @@ import {
 } from "./actions";
 import { AddressForm, BankForm, ContactForm, OrganisationForm, SubmitForm, UploadForm } from "./forms";
 
-export const metadata: Metadata = { title: "Registration" };
+export const metadata: Metadata = { title: "Application" };
 
 export default async function ApplicationPage({ params, searchParams }: PageProps<"/charity-admin/[id]/application">) {
   const { id } = await params;
@@ -41,7 +41,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
     <div className="space-y-4">
       <div>
         <Link href="/charity-admin" className="text-sm text-muted">← Your charities</Link>
-        <h1 className="mt-1 font-display text-2xl text-indigo">{charity.name_en}</h1>
+        <h1 className="mt-1 font-display text-2xl text-indigo">Application</h1>
         <div className="mt-2"><Badge tone={status.tone}>{status.label}</Badge></div>
       </div>
 
@@ -151,7 +151,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
           <div className="flex justify-between text-sm">
             {at > 0 ? <Link href={href(steps[at - 1].key)} className="rounded-control border border-border px-4 py-2">Back</Link> : <span />}
             {at < steps.length - 1 ? (
-              <Link href={href(steps[at + 1].key)} className="rounded-control bg-brand px-4 py-2 font-medium text-brand-contrast">
+              <Link href={href(steps[at + 1].key)} className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">
                 {step.done ? "Next" : "Skip for now"}
               </Link>
             ) : null}
