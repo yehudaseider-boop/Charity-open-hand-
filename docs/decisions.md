@@ -883,3 +883,7 @@ Yehuda chose three new dashboard features (weekly email to the charity, annual r
 - It **asks first** ("An email can't be called back once it's sent"), then shows what happened on the page. There is no undo, like the monthly thank-you.
 - **At most once a week per donor** (Monday to Sunday, Johannesburg time), so no donor is flooded; the row says "Last thanked personally on dd/mm/yyyy". Never to erased donors, or to anyone who used "stop thank-you emails" (the row says so). Each email carries that stop link.
 - Kept in `charity_donor_thanks` (migration `20261018000002`, server-only).
+
+## 18/10/2026: Annual report for the board or AGM
+
+New "Annual report" tab on the dashboard: one SARS tax year on one page, filled from Givezy's own records. Raised (paid donations only, with the average), donors (new this year against those who gave before), the monthly and once-off split, month by month with the best month, each campaign's total, s18A receipts (who asked, who has one, what is still to be receipted) and, apart, anything refunded or reversed. A running year says "so far" and shows months still to come as such. "Save as PDF" uses the browser's print, which hides the dashboard's header and tabs; "Download the figures (CSV)" gives the same numbers with no donor details. The footnote says gifts made outside Givezy are not included.

@@ -125,6 +125,23 @@ export async function loadReceiptGifts(charityId: string) {
   return { gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })), onIssued };
 }
 
+/** Everything the annual report needs: every paid, refunded or charged-back donation, the campaign names and issued receipts. */
+export async function loadReportData(charityId: string) {
+  const gifts = await allCharityDonations<{ id: string; donor_id: string; status: string; amount_cents: number; paid_at: string | null; tax_year: number | null; recurring_id: string | null; campaign_id: string | null; wants_18a: boolean }>(
+    charityId,
+    "id, donor_id, status, amount_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a",
+  );
+  const supabase = await createClient();
+  const { data: camps, error } = await supabase.from("campaigns").select("id, title").eq("charity_id", charityId);
+  if (error) throw new Error(error.message);
+  const { onIssued } = await loadReceiptGifts(charityId);
+  return {
+    gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })),
+    campaignTitles: new Map((camps ?? []).map((c) => [c.id as string, c.title as string])),
+    onIssued,
+  };
+}
+
 export const DONATION_FIELDS =
   "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
 

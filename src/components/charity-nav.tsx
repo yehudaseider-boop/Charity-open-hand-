@@ -11,6 +11,7 @@ const tabs = [
   { href: "/thank-donors", label: "Thank donors" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/receipts", label: "s18A receipts" },
+  { href: "/report", label: "Annual report" },
   { href: "/application", label: "Application" },
   { href: "/profile", label: "Public profile" },
   { href: "/updates", label: "Photos and updates" },
