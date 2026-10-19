@@ -35,6 +35,8 @@ describe("priceDonation", () => {
   it("refuses a gift above R1 000 000 (a typo, not a gift), and takes exactly R1 000 000", () => {
     expect(platformConfig.maxDonationCents).toBe(100_000_000);
     expect(code(() => priceDonation(100_000_001, 0, mins))).toBe("above_maximum");
+    // A typo in the contribution (R50 000 instead of R50) is caught the same way.
+    expect(code(() => priceDonation(3_000, 100_000_001, mins))).toBe("above_maximum");
     expect(code(() => priceDonation(100_000_000, 0, mins))).toBeNull();
     // Callers without a ceiling (older tests) keep working.
     expect(code(() => priceDonation(100_000_001, 0, { minDonationCents: 3_000, minContributionCents: 1_000 }))).toBeNull();

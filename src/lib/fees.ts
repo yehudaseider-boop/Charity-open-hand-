@@ -50,6 +50,9 @@ export function priceDonation(amountCents: number, contributionCents: number, m:
   if (m.maxDonationCents !== undefined && amountCents > m.maxDonationCents) {
     throw new FeeError("above_maximum", "That amount is above the most we can take online. Please give a smaller amount or contact us.");
   }
+  if (m.maxDonationCents !== undefined && contributionCents > m.maxDonationCents) {
+    throw new FeeError("above_maximum", "That contribution is above the most we can take online. Please check the amount.");
+  }
   if (contributionCents > 0 && contributionCents < m.minContributionCents) {
     throw new FeeError("contribution_below_minimum", "The contribution is below the minimum.");
   }

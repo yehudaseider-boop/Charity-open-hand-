@@ -214,7 +214,14 @@ export const paystackGateway: PaymentGateway = {
       amountCents: type === "refund_processed" && Number.isSafeInteger(d.amount) ? (d.amount as number) : null,
       currency: type === "refund_processed" && typeof d.currency === "string" ? d.currency : null,
       detail: type === "dispute_resolved" ? (d.resolution ?? d.status ?? null) : null,
-      raw: body,
+      // What we keep of the event. Never the whole body: a charge carries the reusable card code
+      // (authorization) and the customer's details, which are kept encrypted or not at all elsewhere.
+      // `reference` is the donation's own reference, so an erasure finds refund and dispute rows too.
+      raw: {
+        event: body.event,
+        reference: isPayment ? (d.reference ?? null) : original,
+        data: { id: d.id ?? null, amount: d.amount ?? null, currency: d.currency ?? null, status: d.status ?? null, resolution: d.resolution ?? null },
+      },
     };
   },
 

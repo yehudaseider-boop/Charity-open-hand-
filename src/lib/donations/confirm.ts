@@ -59,6 +59,13 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
   // After a gateway change, an old pending payment can't be checked any more: a person decides.
   if (donation.gateway !== getGateway().name) {
     console.warn(`[confirm] donation ${donation.id} is on gateway "${donation.gateway}", not the active one`);
+    await logAudit({
+      actorUserId: null,
+      action: "donation.gateway_mismatch",
+      entityType: "donation",
+      entityId: donation.id,
+      details: { gateway: donation.gateway, active: getGateway().name },
+    });
     return "review";
   }
   const tx = await gatewayByName(donation.gateway).verifyTransaction(reference);

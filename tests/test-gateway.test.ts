@@ -53,3 +53,12 @@ describe("test gateway checkout signature", () => {
     expect(readSignedTestCheckout((k) => sp.get(k), null)).toBeNull();
   });
 });
+
+describe("test gateway webhooks", () => {
+  it("reads a full refund in rand, so it is applied without a person", async () => {
+    const { testGateway, testGatewaySign } = await import("@/lib/gateway/test-gateway");
+    const body = JSON.stringify({ id: "evt_1", outcome: "refunded", reference: "11111111-1111-1111-1111-111111111111", amount: 3240 });
+    const e = await testGateway.parseWebhook(body, new Headers({ "x-test-signature": testGatewaySign(body) }));
+    expect(e).toMatchObject({ type: "refund_processed", amountCents: 3240, currency: "ZAR" });
+  });
+});

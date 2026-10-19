@@ -121,6 +121,8 @@ export const testGateway: PaymentGateway = {
       type,
       reference: body.reference,
       amountCents: type === "refund_processed" && Number.isSafeInteger(body.amount) ? (body.amount as number) : null,
+      // The test gateway only ever works in rand.
+      currency: type === "refund_processed" ? "ZAR" : null,
       detail: type === "dispute_resolved" ? (body.resolution ?? null) : null,
       raw: body,
     };

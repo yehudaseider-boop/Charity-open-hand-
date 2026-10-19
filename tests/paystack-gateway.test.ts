@@ -162,6 +162,17 @@ describe("webhook signature", () => {
     expect(e).toMatchObject({ type: "payment_succeeded", reference: base.reference, eventId: "charge.success:42" });
   });
 
+  it("keeps no card code or customer details from the event", async () => {
+    const full = JSON.stringify({
+      event: "charge.success",
+      data: { id: 43, reference: base.reference, amount: 18000, currency: "ZAR", status: "success", authorization: { authorization_code: "AUTH_secret" }, customer: { email: "donor@example.co.za" } },
+    });
+    const e = await paystackGateway.parseWebhook(full, headers(sign(full)));
+    const kept = JSON.stringify(e?.raw);
+    expect(kept).not.toMatch(/AUTH_secret|authorization|donor@example|customer/);
+    expect(e?.raw).toMatchObject({ event: "charge.success", reference: base.reference, data: { id: 43, amount: 18000, currency: "ZAR" } });
+  });
+
   it("maps failed charges and other events", async () => {
     const failed = JSON.stringify({ event: "charge.failed", data: { id: 1, reference: "r" } });
     expect((await paystackGateway.parseWebhook(failed, headers(sign(failed))))?.type).toBe("payment_failed");
