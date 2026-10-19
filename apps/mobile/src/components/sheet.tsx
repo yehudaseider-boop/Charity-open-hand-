@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
-import { Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Animated, Keyboard, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { reduceMotion } from "@/lib/motion";
 import { colors, radius, space } from "@/theme/tokens";
 
+/** What the swipe handlers need to know, updated outside of render. */
+class Live {
+  scrollY = 0;
+  constructor(public onClose: () => void) {}
+  setScroll(y: number) {
+    this.scrollY = y;
+  }
+  setOnClose(fn: () => void) {
+    this.onClose = fn;
+  }
+}
+
 /**
  * Motion 1: a bottom sheet that rises over the whole screen (tab bar included).
  * Android's back button closes it, and it slides away before it disappears.
+ * Swipe down to close: from the handle area at the top (a big target, not just the
+ * little bar), or from anywhere on the sheet once its list is scrolled to the top.
  */
 export function Sheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -14,6 +28,12 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
   const [v] = useState(() => new Animated.Value(0));
   const [mounted, setMounted] = useState(visible);
   const [keyboard, setKeyboard] = useState(0);
+  const [drag] = useState(() => new Animated.Value(0));
+  // Plain mutable holder read by the gesture handlers (kept out of render).
+  const [live] = useState(() => new Live(onClose));
+  useEffect(() => {
+    live.setOnClose(onClose);
+  }, [onClose, live]);
   // While sliding away, keep showing what was there (the screen may already have cleared it).
   const [shown, setShown] = useState(children);
   if (visible && !mounted) setMounted(true);
@@ -25,6 +45,41 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
       if (!visible) setMounted(false);
     });
   }, [visible, v]);
+
+  useEffect(() => {
+    if (visible) drag.setValue(0);
+  }, [visible, drag]);
+
+  const settle = (dy: number, vy: number) => {
+    if (dy > 90 || vy > 0.7) {
+      live.onClose();
+    } else {
+      Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+    }
+  };
+  const move = (_: unknown, g: { dy: number }) => drag.setValue(Math.max(0, g.dy));
+  const end = (_: unknown, g: { dy: number; vy: number }) => settle(g.dy, g.vy);
+  // The handle area always drags down.
+  const [handlePan] = useState(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => Keyboard.dismiss(),
+      onPanResponderMove: move,
+      onPanResponderRelease: end,
+      onPanResponderTerminate: () => settle(0, 0),
+    }),
+  );
+  // The body drags down only when the list is at the top and the move is mostly vertical.
+  const [bodyPan] = useState(() =>
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, g) => live.scrollY <= 0 && g.dy > 10 && g.dy > Math.abs(g.dx) * 1.5,
+      onPanResponderGrant: () => Keyboard.dismiss(),
+      onPanResponderMove: move,
+      onPanResponderRelease: end,
+      onPanResponderTerminate: () => settle(0, 0),
+    }),
+  );
 
   // The sheet's own scroll area shrinks when the keyboard is up, so the top stays on screen.
   useEffect(() => {
@@ -50,12 +105,15 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
             style={[
               styles.sheet,
               { paddingBottom: keyboard ? space.md : insets.bottom + space.md },
-              { transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [480, 0] }) }] },
+              { transform: [{ translateY: Animated.add(v.interpolate({ inputRange: [0, 1], outputRange: [480, 0] }), drag) }] },
             ]}
+            {...bodyPan.panHandlers}
           >
-            <View style={styles.grabber} />
+            <View {...handlePan.panHandlers} style={styles.handleZone} accessible accessibilityRole="adjustable" accessibilityLabel="Swipe down to close" accessibilityActions={[{ name: "dismiss", label: "Close" }]} onAccessibilityAction={onClose}>
+              <View style={styles.grabber} />
+            </View>
             {/* Tall forms scroll inside the sheet instead of running off a small screen. */}
-            <ScrollView style={{ maxHeight: room }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: room }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} scrollEventThrottle={16} onScroll={(e) => { live.setScroll(e.nativeEvent.contentOffset.y); }}>
               {visible ? children : shown}
             </ScrollView>
           </Animated.View>
@@ -73,7 +131,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.card,
     borderTopRightRadius: radius.card,
     paddingHorizontal: space.gutter,
-    paddingTop: 10,
+    paddingTop: 0,
   },
-  grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: colors.hairline, marginBottom: 18 },
+  // A tall, full-width strip so the swipe is easy to start with a thumb.
+  handleZone: { height: 44, marginHorizontal: -space.gutter, alignItems: "center", justifyContent: "center" },
+  grabber: { width: 48, height: 5, borderRadius: 3, backgroundColor: colors.lilac },
 });
