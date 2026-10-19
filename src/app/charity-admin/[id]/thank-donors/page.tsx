@@ -68,7 +68,7 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
             {sentRows.map((r) => (
               <li key={r.id} className="space-y-1 py-3">
                 <p className="font-medium">
-                  {monthLabel(r.period_month as string)} <span className="font-normal text-muted">· sent {formatDate(r.sent_at as string)} to {r.recipient_count} {r.recipient_count === 1 ? "donor" : "donors"}</span>
+                  {monthLabel(r.period_month as string)} <span className="font-normal text-muted">· {r.recipient_count === null ? `started ${formatDate(r.sent_at as string)}, but the send was interrupted, so some donors may not have received it. Contact us before sending again.` : `sent ${formatDate(r.sent_at as string)} to ${r.recipient_count} ${r.recipient_count === 1 ? "donor" : "donors"}`}</span>
                 </p>
                 <p className="whitespace-pre-line text-muted">{r.body}</p>
               </li>

@@ -2,6 +2,7 @@
  * Thank-you emails from a charity to the people who gave in a month. DRAFT WORDING for Yehuda.
  * Givezy sends them, so the charity never handles donors' addresses. Pure helpers (tested).
  */
+import { cleanDedicationName } from "@/lib/donations/dedication";
 import { createHash } from "node:crypto";
 import type { EmailMessage } from "@/lib/email";
 import { saDate } from "./dashboard";
@@ -62,7 +63,8 @@ export function oneDonorThankYouEmail(
   to: string,
   v: { charityName: string; firstName: string | null; body: string; stopUrl: string; replyTo: string | null },
 ): EmailMessage {
-  const name = v.firstName?.trim();
+  // One line only, even for names saved before checkout cleaned them.
+  const name = cleanDedicationName(v.firstName);
   return {
     to,
     subject: `A thank-you from ${v.charityName}`,
@@ -86,7 +88,8 @@ export function thankYouEmail(
   to: string,
   v: { charityName: string; firstName: string | null; month: string; body: string; stopUrl: string; replyTo?: string | null },
 ): EmailMessage {
-  const name = v.firstName?.trim();
+  // One line only, even for names saved before checkout cleaned them.
+  const name = cleanDedicationName(v.firstName);
   return {
     to,
     subject: `A thank-you from ${v.charityName}`,

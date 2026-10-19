@@ -73,7 +73,9 @@ type Snapshot = { cents: number; contributionCents: number; email: string; month
 
 export default function Give() {
   const insets = useSafeAreaInsets();
-  const { slug, kind: kindParam, label: labelParam, campaign: campaignParam, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
+  const { slug, kind: kindParam, label: labelParam, campaign: rawCampaign, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
+  // A link with a broken campaign id gives to the charity itself, rather than failing every check.
+  const campaignParam = typeof rawCampaign === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawCampaign) ? rawCampaign : undefined;
   const { charity, failed, retry } = useCharity(slug);
   const account = useAccount();
   const preview = account.status === "preview";
@@ -497,13 +499,14 @@ export default function Give() {
     // A saved-card charge has no payment page to come back from, so "pending" is not an answer:
     // ask a few more times before giving up.
     const asks = r.charged ? 4 : shown === "returned" ? 1 : 0;
-    for (let i = 0; i < asks && outcome === "pending"; i++) {
+    for (let i = 0; i < asks && (outcome === "pending" || outcome === "unknown"); i++) {
       await new Promise((ok) => setTimeout(ok, 3_000));
       outcome = await paymentStatus(SITE_URL, r.reference, r.token);
     }
     setBusy(false);
-    // Back from the payment page, the website only sends the donor to the app once the gift is paid,
-    // so "returned" with the provider still catching up counts. A saved-card charge counts only when paid.
+    // Back from the payment page with our server saying the provider is still catching up counts as given.
+    // No answer at all ("unknown") never does: the donor may have come back from a declined payment.
+    // A saved-card charge counts only when paid.
     const finished = outcome === "paid" || (outcome === "pending" && shown === "returned" && !r.charged);
     // Paid or declined settles a saved-card attempt; anything else keeps its id, so "Give" asks again instead of charging again.
     if (r.charged && (outcome === "paid" || outcome === "failed" || outcome === "reversed")) {
@@ -512,7 +515,7 @@ export default function Give() {
     }
     if (!finished) {
       haptic.tap();
-      const o = outcome === "paid" ? "pending" : outcome;
+      const o = outcome === "paid" || outcome === "unknown" ? "pending" : outcome;
       setUnsettled(o === "pending" || o === "review" ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent } : null);
       setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date()), afterPaymentTone(o), true);
       return;
@@ -546,7 +549,8 @@ export default function Give() {
         setDone(sentSummary(unsettled.summary, false));
         return;
       }
-      setMessage(afterPaymentMessage(outcome, unsettled.charged, new Date()), afterPaymentTone(outcome), true);
+      const o = outcome === "unknown" ? "pending" : outcome;
+      setMessage(afterPaymentMessage(o, unsettled.charged, new Date()), afterPaymentTone(o), true);
     } finally {
       busyRef.current = false;
     }
@@ -595,7 +599,7 @@ export default function Give() {
             {quick.map((c) => {
               const on = gift === c;
               return (
-                <Pressable key={c} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Give ${rand(c)}`} accessibilityState={{ selected: on }} style={[styles.chip, on && styles.chipOn]}>
+                <Pressable key={c} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Set the amount to ${rand(c)}`} accessibilityState={{ selected: on }} style={[styles.chip, on && styles.chipOn]}>
                   <Text style={[styles.chipText, on && { color: colors.onInk }]}>{rand(c)}</Text>
                 </Pressable>
               );

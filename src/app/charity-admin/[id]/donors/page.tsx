@@ -24,7 +24,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const { charity } = await loadCharityForManager(id);
   const sp = await searchParams;
   const q = safeSearch(typeof sp.q === "string" ? sp.q : "");
-  const page = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
+  const asked = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
 
   const group = isDonorGroup(sp.group) ? sp.group : null;
 
@@ -36,6 +36,8 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
     (d) => (!group || donorGroup(d, now) === group) && (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
   );
   const pages = Math.max(1, Math.ceil(donors.length / PAGE));
+  // A page past the end (an old link, a typed number) shows the last page, never "No donors yet".
+  const page = Math.min(asked, pages);
   const shown = donors.slice((page - 1) * PAGE, page * PAGE);
   const base = `/charity-admin/${id}/donors`;
   const href = (p: number, g: string | null = group) =>

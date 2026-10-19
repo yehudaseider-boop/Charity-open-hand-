@@ -23,7 +23,7 @@ export async function GET() {
 
   const [profile, donors, kinds, consents, requests, favourites, maaserSettings, income, external, notes] = await Promise.all([
     supabase.from("profiles").select("email, full_name, created_at").eq("id", user.id).maybeSingle(),
-    supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, created_at").eq("user_id", user.id),
+    supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, age_confirmed_18_at, popia_consent_at, created_at").eq("user_id", user.id),
     supabase.from("donation_giving_kinds").select("donation_id, kind, label"),
     supabase.from("consents").select("kind, policy_version, accepted_at").eq("user_id", user.id).order("accepted_at"),
     supabase.from("data_requests").select("kind, details, status, response, created_at, closed_at").eq("user_id", user.id),
@@ -45,7 +45,7 @@ export async function GET() {
   for (let page = 0; donorIds.length; page += 1000) {
     const { data, error } = await supabase
       .from("donations")
-      .select("id, created_at, paid_at, status, amount_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, dedication_kind, dedication_name, tax_year, charities(name_en)")
+      .select("id, created_at, paid_at, status, amount_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, dedication_kind, dedication_name, tax_year, popia_consent_at, age_confirmed_at, charities(name_en)")
       .in("donor_id", donorIds)
       .order("created_at")
       .order("id")
@@ -66,6 +66,20 @@ export async function GET() {
     if (error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
     checkoutDetails.push(...((data ?? []) as Record<string, unknown>[]));
   }
+  // Agreements given with each gift (not tied to the account), and charities' personal thank-you notes.
+  const giftConsents: Record<string, unknown>[] = [];
+  for (let i = 0; i < donationIds.length; i += 200) {
+    const { data, error } = await createAdminClient()
+      .from("consents")
+      .select("kind, policy_version, donation_id, accepted_at")
+      .in("donation_id", donationIds.slice(i, i + 200));
+    if (error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+    giftConsents.push(...((data ?? []) as Record<string, unknown>[]));
+  }
+  const thanks = donorIds.length
+    ? await createAdminClient().from("charity_donor_thanks").select("body, sent_at, charities(name_en)").in("donor_id", donorIds).order("sent_at")
+    : { data: [], error: null };
+  if (thanks.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   const [myReceipts, monthly] = donorIds.length
     ? await Promise.all([
         supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, donor_as_printed:details->donor").in("donor_id", donorIds),
@@ -101,6 +115,8 @@ export async function GET() {
     giving_kinds: kinds.data ?? [],
     s18a_receipts: myReceipts.data ?? [],
     agreements: consents.data ?? [],
+    agreements_with_gifts: giftConsents,
+    thank_you_notes_from_charities: thanks.data ?? [],
     requests: requests.data ?? [],
     saved_charities: favourites.data ?? [],
     maaser_settings: maaserSettings.data ?? [],

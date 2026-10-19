@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useLabelSuggestions } from "@/lib/use-labels";
 import { ddmmyyyy, jhbToday } from "@/lib/format";
@@ -9,14 +9,18 @@ import { colors } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
 import { LabelPicker } from "./label-picker";
+import type { SheetGuard } from "./sheet";
 import { Text } from "./text";
 
 /** Log income (for a goal set as a share of income). It stays on this phone only. */
-export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; date: string; note: string }) => void; onCancel: () => void }) {
+export function IncomeForm({ onSave, onCancel, onGuard }: { onSave: (e: { cents: number; date: string; note: string }) => void; onCancel: () => void; onGuard?: (g: SheetGuard) => void }) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(() => ddmmyyyy(jhbToday()));
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<{ amount?: string; date?: string }>({});
+  // Tell the sheet once something is typed, so a stray swipe asks before throwing it away.
+  const typed = Boolean(amount.trim() || note.trim());
+  useEffect(() => onGuard?.(typed ? "typed" : null), [typed, onGuard]);
 
   return (
     <View style={{ gap: 14 }}>
@@ -46,7 +50,7 @@ export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; 
 }
 
 /** Log giving made outside the app: cash, an appeal, another charity. */
-export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: number; date: string; recipient: string; label: string | null }) => Promise<string | null>; onCancel: () => void }) {
+export function ElsewhereForm({ onSave, onCancel, onGuard }: { onSave: (e: { cents: number; date: string; recipient: string; label: string | null }) => Promise<string | null>; onCancel: () => void; onGuard?: (g: SheetGuard) => void }) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(() => ddmmyyyy(jhbToday()));
   const [recipient, setRecipient] = useState("");
@@ -54,6 +58,10 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
   const suggestions = useLabelSuggestions();
   const [errors, setErrors] = useState<{ amount?: string; date?: string; recipient?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
+  // While saving the sheet stays open (so a failed save is seen); once something is typed, it asks first.
+  const typed = Boolean(amount.trim() || recipient.trim());
+  const guard: SheetGuard = busy ? "busy" : typed ? "typed" : null;
+  useEffect(() => onGuard?.(guard), [guard, onGuard]);
 
   return (
     <View style={{ gap: 14 }}>

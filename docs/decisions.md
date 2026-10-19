@@ -909,3 +909,17 @@ Yehuda asked for a check of all code. Four reviewers (security and database, mon
 - The phone app's build tooling carries three known vulnerable packages (braces, decode-uri-component, node-forge) through Expo 57. Only decode-uri-component ships in the app itself (URL parsing in Expo Router), and the worst case is a hang from a crafted link. Fixing them means an Expo upgrade; on the go-live list.
 - A receipt that needs re-issuing after a refund still counts as "has one" on the Receipts tab until an admin voids it. Cosmetic; noted.
 - Undo's "changed since" check is read-then-write, not atomic: only a same-second edit by another admin could slip past. Acceptable.
+
+## 19/10/2026: Hardening review (five independent reviewers, every finding verified)
+
+No new features. Fixed: payment notifications keep no card code or customer details; the contribution
+has the same R1 000 000 ceiling as the gift; test refunds apply on their own; a payment on a retired
+provider is held in Admin, Payments; the app never shows a thank-you when it got no answer about a
+payment (it offers "Check again"), and the server says "couldn't check" instead of "still confirming";
+sheets ask before throwing away typed details and stay open while saving; a broken campaign link gives to
+the charity; the monthly thank-you can no longer use up a month with nothing sent; out-of-range donor
+pages show the last page; the donations redirect keeps custom dates; South African phone numbers keep
+their 0 in CSV downloads; Undo says "removed since" correctly; a saved-ID problem at checkout is shown
+in words; a spaced ID number fits the box; names and address lines are kept to one line; the data
+download includes agreements given with gifts and charities' personal thank-you notes. Open decisions
+went to the go-live checklist (sign-in lockout, second-step live check, shared emails in the download).

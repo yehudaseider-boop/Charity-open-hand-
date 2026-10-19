@@ -57,3 +57,11 @@ describe("dedication names with hidden characters", () => {
     expect(cleanDedicationName("חיים כהן")).toBe("חיים כהן");
   });
 });
+
+describe("one-line checkout fields", () => {
+  it("turn a typed line break into a space, so a name can't pass off extra text in an email", () => {
+    const parsed = checkoutSchema.parse({ donor_type: "individual", email: "a@b.co.za", first_name: "Bob\n\nVisit evil.example", city: "Johannes\tburg" });
+    expect(parsed.first_name).toBe("Bob Visit evil.example");
+    expect(parsed.city).toBe("Johannes burg");
+  });
+});

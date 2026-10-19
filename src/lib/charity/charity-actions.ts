@@ -68,7 +68,7 @@ export async function loadAction(charityId: string, id: string): Promise<ActionR
   return data as ActionRow;
 }
 
-export type UndoFailure = "gone" | "late" | "changed" | "given" | "full" | "locked" | "ended" | "error";
+export type UndoFailure = "gone" | "removed" | "late" | "changed" | "given" | "full" | "locked" | "ended" | "error";
 export type UndoResult = { ok: true; row: ActionRow } | { ok: false; why: UndoFailure; row: ActionRow | null };
 
 const editable = (status: string) => status === "draft" || status === "rejected";
@@ -116,7 +116,7 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       const cols = Object.keys(undo.after);
       const { data: now, error } = await db.from(undo.table).select(cols.join(", ")).eq(key, charityId).maybeSingle();
       if (error) throw error;
-      if (!now) return "gone";
+      if (!now) return "removed";
       // Changed again since (by this person or another admin): don't overwrite their newer work.
       if (cols.some((c) => !same((now as unknown as Record<string, unknown>)[c], undo.after[c]))) return "changed";
       if (undo.categoriesAfter) {
@@ -150,7 +150,7 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       }
       const { data, error } = await db.from(undo.table).delete().eq("id", undo.id).eq("charity_id", charityId).select("id");
       if (error) throw error;
-      if (!data?.length) return "gone";
+      if (!data?.length) return "removed";
       if (undo.file && ownPath(undo.file.path)) await db.storage.from(undo.file.bucket).remove([undo.file.path]);
       return null;
     }
@@ -159,7 +159,8 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       const { error } = await db.from(undo.table).insert(undo.row);
       if (error) {
         if (/up to \d+/.test(error.message)) return "full";
-        if (/duplicate key/.test(error.message)) return "gone";
+        // Something of the same kind was added since (a newer document of that type): keep it.
+        if (/duplicate key/.test(error.message)) return "changed";
         throw error;
       }
       return null;
@@ -167,7 +168,8 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
     case "reopen_campaign": {
       const { data: c, error } = await db.from("campaigns").select("status, ends_at").eq("id", undo.id).eq("charity_id", charityId).maybeSingle();
       if (error) throw error;
-      if (!c || c.status !== "ended") return "gone";
+      if (!c) return "removed";
+      if (c.status !== "ended") return "changed";
       if (c.ends_at && new Date(c.ends_at as string) <= new Date()) return "ended";
       const { error: upError } = await db.from("campaigns").update({ status: "active" }).eq("id", undo.id).eq("charity_id", charityId);
       if (upError) {
@@ -183,6 +185,7 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
 export function undoFailureText(why: UndoFailure): string {
   switch (why) {
     case "gone": return "It has already been taken back.";
+    case "removed": return "It was removed since, so there is nothing to take back.";
     case "late": return "It's been more than 30 minutes, so it can't be taken back here. You can change it again by hand.";
     case "changed": return "It was changed again since, so it can't be taken back here. Your newer changes are kept.";
     case "given": return "Donors have already given to it, so it can't be removed. You can end it instead.";

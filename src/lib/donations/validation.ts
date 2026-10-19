@@ -1,10 +1,15 @@
 import { z } from "zod";
 import { isValidSaIdNumber } from "@/lib/sa-id";
-import { parseDedication } from "./dedication";
+import { cleanDedicationName, parseDedication } from "./dedication";
 import { cleanLabel } from "./labels";
 
 /** An optional text field, with a plain message when it is too long. */
 const str = (max: number, what: string) => z.string().max(max, `Please keep ${what} to ${max} characters or fewer`).optional();
+/**
+ * A one-line field (a name, an address line): line breaks, control and direction characters become
+ * spaces. These are printed in emails and on receipts, where a typed line break could pass off extra text.
+ */
+const line = (max: number, what: string) => str(max, what).transform((v) => (v === undefined ? v : cleanDedicationName(v)));
 const yes = z.literal("on").optional();
 
 /** The old fixed choice, still accepted from older app versions and links (read as a label). */
@@ -14,19 +19,19 @@ export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "Tze
 export const checkoutSchema = z.object({
   donor_type: z.enum(["individual", "company", "trust"]),
   email: z.email("Enter a valid email address"),
-  first_name: str(80, "your first name"),
-  last_name: str(80, "your surname"),
-  organisation_name: str(200, "the name"),
-  registration_number: str(40, "the registration number"),
-  contact_person: str(120, "the contact person"),
+  first_name: line(80, "your first name"),
+  last_name: line(80, "your surname"),
+  organisation_name: line(200, "the name"),
+  registration_number: line(40, "the registration number"),
+  contact_person: line(120, "the contact person"),
   phone: str(20, "the phone number"),
   wants_18a: yes,
   id_number: str(20, "the ID number"),
   tax_reference: str(20, "the income tax number"),
-  address_line1: str(200, "the street address"),
-  address_line2: str(200, "this line"),
-  suburb: str(80, "the suburb"),
-  city: str(80, "the city or town"),
+  address_line1: line(200, "the street address"),
+  address_line2: line(200, "this line"),
+  suburb: line(80, "the suburb"),
+  city: line(80, "the city or town"),
   postal_code: z.string().max(4, "Postal codes are 4 digits").optional(),
   message: str(500, "your message"),
   /** Optional: given in honour of, or in memory of, someone (the name is checked in checkDonorDetails). */

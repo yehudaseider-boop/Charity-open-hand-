@@ -9,9 +9,16 @@ vi.mock("server-only", () => ({}));
 let charity: Record<string, unknown> | null = null;
 let campaignOpen = false;
 let confirmed = 0;
+let confirmFails = false;
 vi.mock("@/lib/donations/charity", () => ({ loadDonatableCharity: async () => charity }));
 vi.mock("@/lib/donations/checkout", () => ({ loadOpenCampaign: async () => (campaignOpen ? { id: "x" } : null) }));
-vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: async () => (confirmed++, "paid") }));
+vi.mock("@/lib/donations/confirm", () => ({
+  confirmPayment: async () => {
+    confirmed++;
+    if (confirmFails) throw new Error("provider down");
+    return "paid";
+  },
+}));
 vi.mock("@/lib/donations/confirmation-access", () => ({ confirmationTokenMatches: async (_r: string, t: string) => t === "a".repeat(43) }));
 vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => false }));
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => null }));
@@ -27,6 +34,7 @@ beforeEach(() => {
   charity = { id: "c1", acceptingPayments: true, receiptsAvailable: true };
   campaignOpen = false;
   confirmed = 0;
+  confirmFails = false;
 });
 
 describe("app ready check", () => {
@@ -54,6 +62,12 @@ describe("app payment status", () => {
   });
   it("returns the outcome only", async () => {
     expect(await (await status(req({ reference: REF, token: "a".repeat(43) }))).json()).toEqual({ ok: true, outcome: "paid" });
+  });
+  it("says it couldn't check, never 'still confirming', when the check fails", async () => {
+    confirmFails = true;
+    const res = await status(req({ reference: REF, token: "a".repeat(43) }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).ok).toBe(false);
   });
   it("is closed with the server switch off", async () => {
     delete process.env.APP_GIVING;

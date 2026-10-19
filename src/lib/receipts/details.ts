@@ -112,7 +112,7 @@ export function buildReceiptDetails(args: {
     period,
     wording: {
       title: receiptConfig.wording.title,
-      statement: receiptConfig.wording.statement.replaceAll("{charity}", c.legal_name_en).replaceAll("{period}", period),
+      statement: receiptConfig.wording.statement.replaceAll("{charity}", () => c.legal_name_en).replaceAll("{period}", () => period),
     },
     issued_on: formatDate(args.issuedAt),
   };

@@ -185,11 +185,15 @@ export async function removeSavedCard(site: string, token: string, send: Send = 
 
 export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
-/** Whether a payment went through, asked after the payment page closes. Unknown or unreachable reads as "pending". */
-export async function paymentStatus(site: string, reference: string, token: string, post: Post = fetchPost): Promise<PaymentOutcome> {
+/**
+ * Whether a payment went through, asked after the payment page closes. "unknown" means our server gave no
+ * usable answer (offline, an error): it is never read as "still confirming", because the donor may have
+ * come back from a declined payment.
+ */
+export async function paymentStatus(site: string, reference: string, token: string, post: Post = fetchPost): Promise<PaymentOutcome | "unknown"> {
   const r = await call<{ ok: boolean; outcome?: string }>(post, api(site, "status"), { reference, token });
   const o = r.ok ? r.outcome : undefined;
-  return o === "paid" || o === "failed" || o === "review" || o === "not_found" || o === "reversed" ? o : "pending";
+  return o === "paid" || o === "failed" || o === "pending" || o === "review" || o === "not_found" || o === "reversed" ? o : "unknown";
 }
 
 /**

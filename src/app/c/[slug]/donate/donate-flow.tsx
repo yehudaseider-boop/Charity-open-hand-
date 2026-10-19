@@ -317,6 +317,10 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                       <>
                         <input type="hidden" name="use_saved_id" value="on" />
                         <p className="text-xs text-muted">From your last s18A gift. Give with your account&apos;s email ({account.email}) to use it.</p>
+                        {/* There's no ID box to mark in red here, so a problem with the saved number is said in words. */}
+                        {state.fieldErrors?.id_number ? (
+                          <p role="alert" className="text-xs font-medium text-danger">{state.fieldErrors.id_number}</p>
+                        ) : null}
                       </>
                     ) : null}
                   </fieldset>
@@ -324,7 +328,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                 {org || !(account?.savedIdLast4 && useSavedId) ? (
                   <>
                     {org ? null : (
-                      <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." maxLength={13} />
+                      <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." maxLength={17} />
                     )}
                     <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={10} hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
                   </>

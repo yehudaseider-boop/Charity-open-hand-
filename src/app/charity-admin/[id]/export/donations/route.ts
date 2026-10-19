@@ -4,7 +4,7 @@ import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charit
 import { applyDonationFilters, parseDonationFilters, periodText } from "@/lib/charity/donation-filters";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
-import { centsToPlain, toCsv } from "@/lib/csv";
+import { centsToPlain, toCsv, csvPhone } from "@/lib/csv";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       d.donor_type,
       d.registration_number,
       shownEmail(d.email),
-      d.phone,
+      csvPhone(d.phone),
       addressLine(d),
       centsToPlain(d.amount_cents),
       d.wants_18a ? "Yes" : "No",

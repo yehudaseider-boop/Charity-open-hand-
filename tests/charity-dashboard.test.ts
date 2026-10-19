@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { allTime, donorName, safeSearch, saDate, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
-import { centsToPlain, csvCell, toCsv } from "@/lib/csv";
+import { centsToPlain, csvCell, csvPhone, toCsv } from "@/lib/csv";
 
 describe("csv export", () => {
   it("quotes commas, quotes and new lines", () => {
@@ -14,6 +14,14 @@ describe("csv export", () => {
     for (const evil of ["=1+1", "+1+1", "-2+3", "@SUM(A1)", "=HYPERLINK(\"http://evil\")", "\tcmd", "+cmd|' /C calc'!A0"]) {
       expect(csvCell(evil).replace(/^"/, "").startsWith("'")).toBe(true);
     }
+  });
+
+  it("writes South African phone numbers so a spreadsheet keeps the leading 0", () => {
+    expect(csvPhone("0821234567")).toBe("082 123 4567");
+    expect(csvPhone("+27821234567")).toBe("082 123 4567");
+    expect(csvPhone("+442012345678")).toBe("+442012345678");
+    expect(csvCell(csvPhone("+44 20 1234 5678"))).toBe("'+44 20 1234 5678");
+    expect(csvPhone(null)).toBe("");
   });
 
   it("leaves ordinary numbers and phone numbers alone", () => {

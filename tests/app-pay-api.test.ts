@@ -57,12 +57,15 @@ describe("before and after the payment page", () => {
     const r = await checkReady("https://x.test", "a", undefined, async () => { throw new Error("offline"); });
     expect(r.ok === false && !r.closed && r.message).toMatch(/connection/);
   });
-  it("an unknown or unreachable payment status reads as still pending, never as paid", async () => {
+  it("an unknown or unreachable payment status reads as unknown, never as paid or still confirming", async () => {
     expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "paid" } }))).toBe("paid");
-    expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "weird" } }))).toBe("pending");
+    expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "pending" } }))).toBe("pending");
+    // No usable answer is "unknown", never "pending": the donor may have come back from a declined card.
+    expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "weird" } }))).toBe("unknown");
+    expect(await paymentStatus("https://x.test", "r", "t", async () => { throw new Error("offline"); })).toBe("unknown");
+    expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 500, json: { ok: false } }))).toBe("unknown");
     expect(await paymentStatus("https://x.test", "r", "t", async () => ({ status: 200, json: { ok: true, outcome: "reversed" } }))).toBe("reversed");
     expect(afterPaymentMessage("reversed")).toMatch(/refunded, so nothing is owed/);
-    expect(await paymentStatus("https://x.test", "r", "t", async () => { throw new Error("offline"); })).toBe("pending");
   });
   it("tells the donor plainly whether anything was charged", () => {
     expect(afterPaymentMessage("failed")).toMatch(/nothing was charged/);

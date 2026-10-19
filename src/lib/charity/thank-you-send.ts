@@ -56,6 +56,8 @@ export type SendResult = { ok: true; sent: number; failed: number } | { ok: fals
 /** Send the charity's thank-you for one month. Only once per month: the row is claimed first. */
 export async function sendThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string; replyTo?: string | null }): Promise<SendResult> {
   const db = createAdminClient();
+  // Before claiming the month: a sending set-up problem must not use up the month with nothing sent.
+  const transport = getEmailTransport();
   const claim = await db
     .from("charity_thank_yous")
     .insert({ charity_id: args.charityId, period_month: args.month, body: args.body, sent_by: args.userId })
@@ -75,7 +77,6 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
     throw e;
   }
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
-  const transport = getEmailTransport();
   let sent = 0;
   let failed = 0;
   for (const r of recipients) {

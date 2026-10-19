@@ -9,7 +9,7 @@ import { GoalRing } from "@/components/goal-ring";
 import { FadeUp } from "@/components/fade-up";
 import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
-import { Sheet } from "@/components/sheet";
+import { Sheet, type SheetGuard } from "@/components/sheet";
 import { EmptyState, ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { UndoToast, type UndoMessage } from "@/components/undo-toast";
 import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
@@ -109,6 +109,9 @@ export default function Giving() {
   const [showAllElsewhere, setShowAllElsewhere] = useState(false);
   const [previewElsewhere, setPreviewElsewhere] = useState<Elsewhere[]>(newDonor ? [] : sampleElsewhere);
   const [logging, setLogging] = useState<"income" | "elsewhere" | null>(null);
+  // What the open logging form tells its sheet: saving, typed into, or nothing yet.
+  const [logGuard, setLogGuard] = useState<SheetGuard>(null);
+  if (logging === null && logGuard !== null) setLogGuard(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [recurringError, setRecurringError] = useState<string | null>(null);
   // Which goal is open in the editor: its id, "new", or none.
@@ -709,9 +712,9 @@ export default function Giving() {
         ) : null}
       </Sheet>
 
-      <Sheet visible={logging !== null} onClose={() => setLogging(null)}>
-        {logging === "income" ? <IncomeForm onSave={addIncome} onCancel={() => setLogging(null)} /> : null}
-        {logging === "elsewhere" ? <ElsewhereForm onSave={saveElsewhere} onCancel={() => setLogging(null)} /> : null}
+      <Sheet visible={logging !== null} onClose={() => setLogging(null)} guard={logGuard}>
+        {logging === "income" ? <IncomeForm onSave={addIncome} onCancel={() => setLogging(null)} onGuard={setLogGuard} /> : null}
+        {logging === "elsewhere" ? <ElsewhereForm onSave={saveElsewhere} onCancel={() => setLogging(null)} onGuard={setLogGuard} /> : null}
       </Sheet>
 
       <Sheet visible={openGift !== null} onClose={() => setOpenGift(null)}>
