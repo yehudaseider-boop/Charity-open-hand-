@@ -10,6 +10,7 @@ import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
 import { Field } from "@/components/field";
 import { GiftSent, type GoalInvite, type SentGift } from "@/components/gift-sent";
+import { ChevronIcon } from "@/components/icons";
 import { Blob } from "@/components/blob";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
@@ -54,9 +55,9 @@ const FIELD_NAMES: Record<string, string> = {
 };
 /** Which part of the form a problem is in, for scrolling to it. */
 const SECTION_OF: Record<string, string> = {
-  amount: "amount", extra: "extra", first_name: "details", last_name: "details", email: "details", phone: "details",
-  id_number: "s18a", address_line1: "s18a", suburb: "s18a", city: "s18a", postal_code: "s18a", dedication_kind: "dedication",
-  dedication_name: "dedication", monthly_authorised: "monthly", agreed: "agree", age_confirmed: "agree", popia_consent: "agree", message: "note",
+  amount: "amount", extra: "extra", first_name: "details", last_name: "details", email: "details", phone: "more",
+  id_number: "s18a", address_line1: "s18a", suburb: "s18a", city: "s18a", postal_code: "s18a", dedication_kind: "more",
+  dedication_name: "more", monthly_authorised: "monthly", agreed: "agree", age_confirmed: "agree", popia_consent: "agree", message: "more",
 };
 
 /**
@@ -114,6 +115,8 @@ export default function Give() {
   const legacy = kindParam && Object.hasOwn(LEGACY_KIND_LABELS, kindParam) ? LEGACY_KIND_LABELS[kindParam] : null;
   const startLabel = cleanLabel(labelParam) || legacy || (slug ? lastLabel(history, slug) : null);
   const [label, setLabel] = useState<string | null>(startLabel);
+  // The optional extras (monthly, label, phone, anonymous, message, dedication, save card), closed unless something is already chosen.
+  const [more, setMore] = useState(Boolean(startLabel));
   const labelSuggestions = useLabelSuggestions();
   const [monthly, setMonthly] = useState(false);
   const [extra, setExtra] = useState(false);
@@ -389,6 +392,7 @@ export default function Give() {
     const names = [...new Set(keys.map((k) => FIELD_NAMES[k] ?? "a highlighted field"))];
     const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
     setMessage(names.length === 1 ? `One thing to fix: ${list}.` : `${names.length} things to fix: ${list}.`);
+    if (keys.some((k) => SECTION_OF[k] === "more")) setMore(true);
     const ys = keys.map((k) => sectionY[SECTION_OF[k] ?? ""]).filter((y): y is number => typeof y === "number");
     if (ys.length) scrollRef.current?.scrollTo({ y: Math.max(0, Math.min(...ys) - 12), animated: true });
   }
@@ -587,6 +591,16 @@ export default function Give() {
   }
 
   const err = (k: string) => errors[k];
+  const chosenExtras = [
+    isMonthly ? "Monthly" : null,
+    label ? `Label: ${label}` : null,
+    phone.trim() ? "Phone" : null,
+    anonymous ? "Anonymous" : null,
+    note.trim() ? "Message" : null,
+    dedicating ? "Dedication" : null,
+    saveCard ? "Save card" : null,
+  ].filter((x): x is string => Boolean(x));
+  const moreSummary = chosenExtras.length ? `On: ${chosenExtras.join(", ")}` : `${campaignId ? "" : "Give every month, "}label, phone, message, anonymous, dedication`;
   const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card…" : "Opening the payment page…") : busy === "checking" ? "Checking your payment…" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
   // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
   const goalLabel = goal?.counts?.[0] ?? null;
@@ -656,9 +670,6 @@ export default function Give() {
           ) : null}
           {/* "Cover the card fee" stays hidden until the payment provider's rates are in the platform config: the fee is never a made-up figure. */}
 
-          <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
-
-          {campaignId ? null : <SwitchRow label="Give every month" description={heldAttempt ? "Available again once your saved-card payment is confirmed." : "The same amount each month until you cancel."} value={isMonthly} onChange={(v) => { if (!heldAttempt) setMonthly(v); }} />}
           <SwitchRow
             label="Add a contribution to Givezy"
             description={isMonthly ? "Optional. It helps us keep Givezy running, and repeats each month with your gift." : "Optional. It helps us keep Givezy running. Your gift to the charity stays whole."}
@@ -673,8 +684,6 @@ export default function Give() {
               <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
               <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
               <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={err("email")} helper="Your confirmation is sent here." />
-              <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" error={err("phone")} />
-              <SwitchRow label="Remember my details on this phone" description="Your name, email and phone, so next time you don't type them. Never your ID number." value={remember} onChange={setRemember} />
             </View>
           ) : (
             <View style={styles.giver} onLayout={at("details")}>
@@ -722,54 +731,8 @@ export default function Give() {
               ) : null}
             </View>
           ) : null}
-          <SwitchRow
-            label="Give anonymously"
-            description={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
-            value={anonymous}
-            onChange={setAnonymous}
-          />
-
-          <View onLayout={at("note")}>
-          <Field
-            label={`Message to ${charity.nameEn} (optional)`}
-            value={note}
-            onChangeText={setNote}
-            multiline
-            maxLength={500}
-            error={err("message")}
-            helper="The charity sees it with your donation."
-          />
-          </View>
-
-          {/* Optional: in honour of, or in memory of, someone. */}
-          <SwitchRow
-            label="Dedicate this donation"
-            description="In honour of, or in memory of, someone. The charity sees the name; it is not on your s18A receipt."
-            value={dedicating}
-            onChange={(v) => {
-              setDedicating(v);
-              if (!v) setDedicate(null);
-            }}
-          />
-          {dedicating ? (
-            <View style={{ gap: 8 }} onLayout={at("dedication")}>
-              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Dedication">
-                {(["honour", "memory"] as const).map((k) => {
-                  const on = dedicate === k;
-                  return (
-                    <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.chip, on && styles.chipOn]}>
-                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{k === "honour" ? "In honour of" : "In memory of"}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {err("dedication_kind") && !dedicate ? <Text variant="label" style={{ color: colors.danger }}>{err("dedication_kind")}</Text> : null}
-              <Field label="Their name" value={dedicationName} onChangeText={setDedicationName} autoCapitalize="words" maxLength={80} error={err("dedication_name")} />
-            </View>
-          ) : null}
-
           {/* How you pay: the card kept for next time, or a new card on the payment page. */}
-          {cardsOpen ? (
+          {cardsOpen && savedCard ? (
             <View style={{ gap: 10 }}>
               <Text style={styles.question}>How would you like to pay?</Text>
               {savedCard ? (
@@ -784,16 +747,94 @@ export default function Give() {
                   })}
                 </View>
               ) : null}
-              {offerSave ? (
-                <SwitchRow
-                  label="Save my card for next time"
-                  description="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
-                  value={saveCard}
-                  onChange={setSaveCard}
-                />
-              ) : null}
             </View>
           ) : null}
+
+          {/* Everything optional lives here, closed by default, so a first gift is: amount, name, email, Give. */}
+          <View style={styles.more} onLayout={at("more")}>
+            <Pressable
+              onPress={() => { haptic.tap(); setMore((m) => !m); }}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: more }}
+              accessibilityLabel={`More options. ${moreSummary}`}
+              style={styles.moreHead}
+            >
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy }}>More options</Text>
+                <Text variant="label" numberOfLines={2}>{moreSummary}</Text>
+              </View>
+              <View style={{ transform: [{ rotate: more ? "90deg" : "0deg" }] }}><ChevronIcon color={colors.navy} /></View>
+            </Pressable>
+            {more ? (
+              <View style={{ gap: 18, paddingTop: 6 }}>
+            {campaignId ? null : <SwitchRow label="Give every month" description={heldAttempt ? "Available again once your saved-card payment is confirmed." : "The same amount each month until you cancel."} value={isMonthly} onChange={(v) => { if (!heldAttempt) setMonthly(v); }} />}
+            <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
+
+
+                {showDetailFields ? (
+                  <>
+                    <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" error={err("phone")} />
+                    <SwitchRow label="Remember my details on this phone" description="Your name, email and phone, so next time you don't type them. Never your ID number." value={remember} onChange={setRemember} />
+                  </>
+                ) : null}
+            <SwitchRow
+              label="Give anonymously"
+              description={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
+              value={anonymous}
+              onChange={setAnonymous}
+            />
+
+            <View onLayout={at("note")}>
+            <Field
+              label={`Message to ${charity.nameEn} (optional)`}
+              value={note}
+              onChangeText={setNote}
+              multiline
+              maxLength={500}
+              error={err("message")}
+              helper="The charity sees it with your donation."
+            />
+            </View>
+
+            {/* Optional: in honour of, or in memory of, someone. */}
+            <SwitchRow
+              label="Dedicate this donation"
+              description="In honour of, or in memory of, someone. The charity sees the name; it is not on your s18A receipt."
+              value={dedicating}
+              onChange={(v) => {
+                setDedicating(v);
+                if (!v) setDedicate(null);
+              }}
+            />
+            {dedicating ? (
+              <View style={{ gap: 8 }} onLayout={at("dedication")}>
+                <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Dedication">
+                  {(["honour", "memory"] as const).map((k) => {
+                    const on = dedicate === k;
+                    return (
+                      <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.chip, on && styles.chipOn]}>
+                        <Text style={[styles.chipText, on && { color: colors.onInk }]}>{k === "honour" ? "In honour of" : "In memory of"}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {err("dedication_kind") && !dedicate ? <Text variant="label" style={{ color: colors.danger }}>{err("dedication_kind")}</Text> : null}
+                <Field label="Their name" value={dedicationName} onChangeText={setDedicationName} autoCapitalize="words" maxLength={80} error={err("dedication_name")} />
+              </View>
+            ) : null}
+
+
+                {offerSave ? (
+                  <SwitchRow
+                    label="Save my card for next time"
+                    description="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
+                    value={saveCard}
+                    onChange={setSaveCard}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
 
           {isMonthly && total ? (
             <View style={{ gap: 8 }} onLayout={at("monthly")}>
@@ -825,16 +866,13 @@ export default function Give() {
               </Pressable>
             </View>
           </View>
-          {/* The first gift: how a gift is kept safe, at the one moment it matters. */}
+          {/* The first gift: one line on how it is kept safe, at the one moment it matters. */}
           {firstGift ? (
-            <View style={[styles.safeBox, { marginHorizontal: space.gutter }]}>
-              <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy }}>How your gift is kept safe</Text>
-              {SAFE.map((s) => (
-                <View key={s.title} style={{ gap: 2 }}>
-                  <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.navy }}>{s.title}</Text>
-                  <Text variant="bodyMuted" style={{ fontSize: 15 }}>{s.body}</Text>
-                </View>
-              ))}
+            <View style={styles.safeBox}>
+              <Text variant="bodyMuted" style={{ fontSize: 15 }}>
+                <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.navy }}>Kept safe. </Text>
+                You enter your card on our payment partner&apos;s own secure page. Givezy never sees it, and never holds the money: it goes straight to the charity.
+              </Text>
             </View>
           ) : null}
         </ScrollView>
@@ -868,16 +906,9 @@ export default function Give() {
   );
 }
 
-/** Shown on a first gift. Never names the payment provider. */
-const SAFE = [
-  { title: "Your card goes on a secure page", body: "You enter it on our payment partner's own secure page, never in this app." },
-  { title: "Kept there, not with us", body: "For monthly donations, your card is kept by the payment partner, so next month needs no typing. Givezy never sees or stores it." },
-  { title: "Givezy never holds the money", body: "Your gift goes from the payment partner straight to the charity's bank account." },
-];
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
-  safeBox: { gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft, marginTop: space.block },
+  safeBox: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, justifyContent: "center", backgroundColor: colors.surface },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
@@ -890,6 +921,8 @@ const styles = StyleSheet.create({
   amountInput: { flex: 1, fontFamily: fonts.display, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
   amountImpact: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft },
   question: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy },
+  more: { gap: 4, padding: 14, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
+  moreHead: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
   giver: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   note: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   waitNote: { padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft },

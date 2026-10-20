@@ -943,3 +943,15 @@ signed in (never over an answer already there). Database: `20261020000001_giver_
 own-row update grant). New personal data: Privacy Policy line for Yosef (go-live checklist).
 Known limit: the goal invitation only appears on the gift-sent screen of a gift confirmed straight away;
 if the payment provider is still catching up, only the Home card is offered.
+
+## 20/10/2026: A shorter give screen in the app (first gift in as few taps as possible)
+
+Yehuda found a first gift took too long. The main form is now: amount, name, email, then an optional
+Givezy contribution switch (off by default), the s18A receipt switch (only for charities that issue
+them; the ID and address boxes appear only when it is on), the agreement tick, and Give. Everything else
+is in one "More options" block, closed by default: give every month, label, phone, remember my details
+(still off by default), give anonymously, a message to the charity, a dedication, and save my card. It
+opens by itself when a label is already chosen, and when a problem is inside it. A closed block says what
+is switched on. The three "kept safe" points became one line on a first gift (the card is entered on the
+payment partner's page; Givezy never sees it or holds the money). Nothing was removed, and the server's
+checks are unchanged. The strategy for getting donors to stay (the long game) is still to be decided.
