@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+import * as Updates from "expo-updates";
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
@@ -12,6 +14,7 @@ import { SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { sampleDonor } from "@/data/giving";
 import { useAccount } from "@/lib/account";
+import { startAgainAsNewDonor } from "@/lib/first-run";
 import { setJewishMode, useJewishMode } from "@/lib/jewish-mode";
 import { SavedCardRow } from "@/components/saved-card-row";
 import { SwitchRow } from "@/components/switch-row";
@@ -23,6 +26,26 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
  * Screen 9: Account. Live: email-code sign-in, then agreement, then the
  * account. Preview (no live database yet): the sample account, ?demo=signedin.
  */
+/** Only in test builds (Expo Go, or the preview update channel), never in the store app. */
+const TEST_BUILD = __DEV__ || Constants.executionEnvironment === ExecutionEnvironment.StoreClient || Updates.channel === "preview";
+
+/** Asks first, then resets this phone's first-open choices and shows the welcome again. */
+function confirmStartAgain() {
+  Alert.alert(
+    "Start again as a new donor?",
+    "For testing. This phone forgets its first-open answers (kind of giver, causes) and the goal invitation, then shows the welcome again. Your goals, gifts and account are not touched. To get the goal invitation after a gift, be signed out and have no goal.",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Start again",
+        onPress: () => {
+          void startAgainAsNewDonor().then(() => router.replace("/"));
+        },
+      },
+    ],
+  );
+}
+
 export default function Account() {
   const insets = useSafeAreaInsets();
   const p = useLocalSearchParams<{ demo?: string }>();
@@ -60,6 +83,8 @@ export default function Account() {
     { label: "How Givezy works", onPress: () => router.push("/how-it-works") },
     { label: "Privacy Policy", onPress: open("/privacy") },
     { label: "Terms", onPress: open("/terms") },
+    // Test builds only: see the new-donor first open again.
+    ...(TEST_BUILD ? [{ label: "Start again as a new donor (testing)", onPress: confirmStartAgain }] : []),
   ];
 
   return (

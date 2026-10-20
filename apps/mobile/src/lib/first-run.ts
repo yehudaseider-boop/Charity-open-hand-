@@ -49,3 +49,18 @@ export function isFirstGift(s: { signedIn: boolean; freshHistoryEmpty: boolean; 
 export function shouldInviteGoal(s: { goalsReady: boolean; goalCount: number; firstGift: boolean; confirming: boolean }): boolean {
   return s.goalsReady && s.goalCount === 0 && s.firstGift && !s.confirming;
 }
+
+/**
+ * Test builds only (Expo Go): make this phone a new donor again, so the first open, the two questions and
+ * the goal invitation can be tried again. Clears only these first-open choices; goals, gifts and the
+ * account are left alone.
+ */
+export async function startAgainAsNewDonor(): Promise<void> {
+  for (const key of ["nediv-lev.welcomed", "nediv-lev.causes", "nediv-lev.giver-type", NEW_DONOR, INVITED, CARD_DISMISSED]) {
+    try {
+      await secureStorage.removeItem(key);
+    } catch {
+      // Best effort: a key left behind only means that one step is skipped.
+    }
+  }
+}
