@@ -179,7 +179,12 @@ export const paystackGateway: PaymentGateway = {
     const gotBytes = Buffer.from(got, "hex");
     const expectedBytes = Buffer.from(expected, "hex");
     if (!/^[0-9a-f]{128}$/i.test(got) || gotBytes.length !== expectedBytes.length || !timingSafeEqual(gotBytes, expectedBytes)) return null;
-    const body = JSON.parse(rawBody) as { event: string; data?: { id?: number; reference?: string } };
+    const body = JSON.parse(rawBody) as { event: string; data?: { id?: number; reference?: string; authorization?: Record<string, unknown> } };
+    // The body is kept in gateway_events. The card-on-file code in it is a secret (it can charge the card
+    // with our key) and lives encrypted on the monthly donation, so it is dropped before anything is stored.
+    if (body.data?.authorization && typeof body.data.authorization === "object") {
+      delete body.data.authorization.authorization_code;
+    }
     return {
       // Paystack events carry no event id; event type + transaction id is unique. VERIFY.
       eventId: `${body.event}:${body.data?.id ?? body.data?.reference ?? "unknown"}`,

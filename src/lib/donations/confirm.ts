@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyDonationPaid } from "./notify";
 import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyHandledElsewhere, monthlyWaitingFor } from "./recurring";
 
-export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
+export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "refunded" | "charged_back";
 
 /** The donation could not be read or written, so no final answer can be given. Safe to retry. */
 export class PersistenceError extends Error {

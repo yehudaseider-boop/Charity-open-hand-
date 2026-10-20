@@ -19,7 +19,9 @@ import { Text } from "./text";
  */
 export function ThankYou() {
   const account = useAccount();
-  const demo = useGlobalSearchParams<{ demo?: string }>().demo === "thanks";
+  // Preview only: a crafted link with ?demo=thanks must never show a thank-you in a store build.
+  const params = useGlobalSearchParams<{ demo?: string }>();
+  const demo = account.status === "preview" && params.demo === "thanks";
   const [demoOpen, setDemoOpen] = useState(demo);
   const [lastDemo, setLastDemo] = useState(demo);
   if (demo !== lastDemo) {
@@ -73,7 +75,7 @@ export function ThankYou() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(31,42,94,0.45)", justifyContent: "center", padding: space.gutter },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, justifyContent: "center", padding: space.gutter },
   card: { gap: 16, padding: 24, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center", alignItems: "stretch" },
   badge: { alignSelf: "center", width: 72, height: 72, borderRadius: 36, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },
   body: { fontSize: 17, lineHeight: 25, textAlign: "center", color: colors.ink },

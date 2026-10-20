@@ -6,7 +6,7 @@ import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import { formatRand } from "@/lib/money";
-import { hitRateLimit } from "@/lib/rate-limit";
+import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -72,7 +72,11 @@ export async function startDonation(args: {
   const fieldErrors = checkDonorDetails(args.input, charity.receiptsAvailable);
   if (Object.keys(fieldErrors).length) return { ok: false, message: "Please check the highlighted fields.", fieldErrors };
 
-  const limited = await hitRateLimit("checkout", [`ip:${args.ip}`, `email:${args.input.email.toLowerCase()}`], 5, 10);
+  // Card testing (bots trying stolen cards) is slowed per email address and, more loosely, per network
+  // address: a hall full of donors on one WiFi must not be stopped by each other.
+  const limited =
+    (await hitRateLimit("checkout", [`email:${args.input.email.toLowerCase()}`], 5, 10)) ||
+    (await hitRateLimit("checkout", ipKeys(args.ip), 30, 10));
   if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
 
   const quoted = quoteDonation(args.giftCents, args.contributionCents);

@@ -74,6 +74,9 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
   const { data, error } = await createAdminClient().from("charities").update(update).eq("id", id).eq("status", "pending_review").select("id");
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
+  // The vetting tick covers the bank confirmation letter too: record it, so the charity can be connected.
+  const { error: bankError } = await createAdminClient().from("charity_private").update({ bank_verified_at: now }).eq("charity_id", id).is("bank_verified_at", null);
+  if (bankError) return failed(bankError);
   await logAudit({
     actorUserId: admin.userId,
     action: "charity.approved",
@@ -200,7 +203,8 @@ export async function addCharityAdmin(id: string, _prev: FormState, formData: Fo
     .from("charity_admins")
     .upsert({ charity_id: id, user_id: profile.id, role: "admin" }, { onConflict: "charity_id,user_id", ignoreDuplicates: true });
   if (error) return failed(error);
-  await logAudit({ actorUserId: admin.userId, action: "charity.admin_added", entityType: "charity", entityId: id, details: { email } });
+  // The person's id, not their address: the audit log is append-only and outlives an erasure.
+  await logAudit({ actorUserId: admin.userId, action: "charity.admin_added", entityType: "charity", entityId: id, details: { user_id: profile.id } });
   refresh(id);
   return { ok: true, message: `${email} can now sign in and manage this charity.` };
 }
@@ -213,12 +217,14 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
   const db = createAdminClient();
   const { data: priv } = await db
     .from("charity_private")
-    .select("bank_name, bank_account_holder, bank_account_number_encrypted, bank_branch_code")
+    .select("bank_name, bank_account_holder, bank_account_number_encrypted, bank_branch_code, bank_verified_at")
     .eq("charity_id", id)
     .single();
   if (!priv?.bank_account_number_encrypted || !priv.bank_name || !priv.bank_branch_code) {
     return { ok: false, message: "Bank details are incomplete." };
   }
+  // Donations settle straight into this account, so it is never registered unchecked.
+  if (!priv.bank_verified_at) return { ok: false, message: "Check the bank details first: approve the charity, or change the bank details with its confirmation letter." };
 
   const gateway = getGateway();
   try {

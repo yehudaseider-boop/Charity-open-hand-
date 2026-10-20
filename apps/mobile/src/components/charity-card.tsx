@@ -45,7 +45,7 @@ function GiveButton({ charity, onGive }: { charity: Charity; onGive: (c: Charity
  * divided by a hairline, with no box around it.
  */
 export function CharityCard({ charity, featured = false, live = false, last = false, onGive }: { charity: Charity; featured?: boolean; live?: boolean; last?: boolean; onGive?: (c: Charity) => void }) {
-  const open = () => router.push(`/charity/${charity.slug}`);
+  const open = () => router.push({ pathname: "/charity/[slug]", params: { slug: charity.slug } });
   const where = [charity.area, charity.cause].filter(Boolean).join(" · ");
   if (featured) {
     return (
@@ -65,7 +65,7 @@ export function CharityCard({ charity, featured = false, live = false, last = fa
               haptic.press();
               // On Discover the give sheet opens right here; elsewhere, on the charity's page.
               if (onGive) onGive(charity);
-              else router.push(`/charity/${charity.slug}?sheet=give`);
+              else router.push({ pathname: "/charity/[slug]", params: { slug: charity.slug, sheet: "give" } });
             }}
             accessibilityRole="button"
             accessibilityLabel={`Give to ${charity.nameEn}`}
@@ -106,6 +106,6 @@ const styles = StyleSheet.create({
   thumb: { width: 92, aspectRatio: 1 },
   rowText: { flex: 1, gap: 2 },
   name: { fontFamily: fonts.display, fontSize: 19, lineHeight: 24, color: colors.blue },
-  area: { fontFamily: fonts.bodySemibold, fontSize: 14, letterSpacing: 0.2, color: colors.orangeText },
+  area: { fontFamily: fonts.bodySemibold, fontSize: 14, letterSpacing: 0.2, color: colors.muted },
   receipt: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.successText },
 });

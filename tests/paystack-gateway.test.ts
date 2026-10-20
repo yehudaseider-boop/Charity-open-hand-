@@ -162,6 +162,16 @@ describe("webhook signature", () => {
     expect(e).toMatchObject({ type: "payment_succeeded", reference: base.reference, eventId: "charge.success:42" });
   });
 
+  it("drops the card-on-file code before the event is stored", async () => {
+    const withCard = JSON.stringify({
+      event: "charge.success",
+      data: { id: 7, reference: base.reference, authorization: { authorization_code: "AUTH_secret", reusable: true, last4: "4081" } },
+    });
+    const e = await paystackGateway.parseWebhook(withCard, headers(sign(withCard)));
+    expect(JSON.stringify(e?.raw)).not.toContain("AUTH_secret");
+    expect(e?.raw).toMatchObject({ data: { authorization: { reusable: true, last4: "4081" } } });
+  });
+
   it("maps failed charges and other events", async () => {
     const failed = JSON.stringify({ event: "charge.failed", data: { id: 1, reference: "r" } });
     expect((await paystackGateway.parseWebhook(failed, headers(sign(failed))))?.type).toBe("payment_failed");

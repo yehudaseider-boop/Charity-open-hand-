@@ -168,7 +168,7 @@ export default function CharityDetail() {
 
       {/* Sticky give bar */}
       <View style={[styles.giveBar, { paddingBottom: insets.bottom + 12 }]}>
-        <LinearGradient colors={["rgba(254,253,247,0)", colors.cream]} style={styles.fade} pointerEvents="none" />
+        <LinearGradient colors={[colors.creamTransparent, colors.cream]} style={styles.fade} pointerEvents="none" />
         <Button label={`Give to ${charity.nameEn}`} onPress={() => setSheetOpen(true)} />
       </View>
 

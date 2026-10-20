@@ -12,22 +12,32 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { clientIp } from "@/lib/client-ip";
-import { hitRateLimit } from "@/lib/rate-limit";
+import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
+import { HebrewAware } from "@/components/hebrew-aware";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Thank you", referrer: "no-referrer" };
+
+/** The first value of a query parameter, when it is present once or more. */
+function first(value: string | string[] | undefined): string | undefined {
+  const v = Array.isArray(value) ? value[0] : value;
+  return typeof v === "string" ? v : undefined;
+}
 
 /** Where the gateway sends the donor back. We check the payment ourselves. */
 export default async function DonateReturnPage({ searchParams }: PageProps<"/donate/return">) {
   const { reference, from, t } = await searchParams;
   const fromApp = from === "app";
-  const ref = typeof reference === "string" ? reference : "";
+  // The payment provider adds its own `reference` to our return address, so the key can arrive twice: take ours (the first).
+  const ref = first(reference) ?? "";
+  const credential = first(t);
   // If the payment provider can't be reached, or the result can't be saved yet, say we're still
   // confirming rather than showing an error page. Nothing here says "paid" unless it is saved.
-  // Each load can ask the payment provider about the payment, so one visitor gets a generous but
-  // limited number of checks (a donor needs about 13); past that the page just says "still confirming".
-  const limited = await hitRateLimit("return-check", [`ip:${clientIp(await headers())}`], 40, 10).catch(() => false);
+  // Each load can ask the payment provider about the payment, so one donation gets a generous but
+  // limited number of checks (a donor needs about 13) and one address many more (a hall full of donors
+  // shares one); past that the page just says "still confirming".
+  const limited = await hitRateLimit("return-check", [`ref:${ref}`, ...ipKeys(clientIp(await headers()))], 40, 10).catch(() => false);
   const outcome = limited
     ? ("pending" as const)
     : await confirmPayment(ref).catch((e) => {
@@ -41,7 +51,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, donation_giving_kinds(kind), charities(name_en, slug)";
   let d = null;
   if (ref && outcome !== "not_found") {
-    if (await confirmationTokenMatches(ref, typeof t === "string" ? t : undefined)) {
+    if (await confirmationTokenMatches(ref, credential)) {
       d = (await createAdminClient().from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
     } else {
       d = (await (await createClient()).from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
@@ -59,7 +69,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
 
   if (outcome === "paid" && d && charity) {
     return (
-      <Card title="Thank you">
+      <Card headingLevel={1} title="Thank you">
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
@@ -68,7 +78,10 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
           <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>
           {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
-            <div className="flex justify-between gap-3"><dt>Dedication</dt><dd className="text-right" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd></div>
+            <div className="flex justify-between gap-3">
+              <dt>Dedication</dt>
+              <dd className="text-right" dir="auto"><HebrewAware text={dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)} /></dd>
+            </div>
           ) : null}
         </dl>
         <p className="mt-3 text-sm text-muted">
@@ -92,7 +105,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "paid") {
     // Paid, but we can't show whose it is: no amounts, no giving choice.
     return (
-      <Card title="Thank you">
+      <Card headingLevel={1} title="Thank you">
         <p className="text-sm">Your payment went through. A confirmation is on its way to your email.</p>
         <p className="mt-2 text-sm text-muted">To see the details, open the link from your payment or sign in with the email you gave with.</p>
         {fromApp ? (
@@ -106,7 +119,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   }
   if (outcome === "failed") {
     return (
-      <Card title="Payment didn't go through">
+      <Card headingLevel={1} title="Payment didn't go through">
         <p className="text-sm">Nothing was charged. You can try again.</p>
         <Link href={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} className="mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
           Try again
@@ -116,21 +129,29 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   }
   if (outcome === "review") {
     return (
-      <Card title="We're checking this payment">
+      <Card headingLevel={1} title="We're checking this payment">
         <p className="text-sm">Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
+      </Card>
+    );
+  }
+  if (outcome === "refunded" || outcome === "charged_back") {
+    return (
+      <Card headingLevel={1} title="This donation was refunded">
+        <p className="text-sm">The payment was returned to the card it came from. If you have a question about it, reply to your confirmation email.</p>
+        <Link href="/charities" className="mt-4 inline-block text-sm text-brand underline">Find a charity</Link>
       </Card>
     );
   }
   if (outcome === "pending") {
     return (
-      <Card title="We're confirming your payment">
+      <Card headingLevel={1} title="We're confirming your payment">
         <p className="text-sm">This can take a minute. Please don&apos;t pay again.</p>
         <KeepChecking retryHref={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} />
       </Card>
     );
   }
   return (
-    <Card title="Donation not found">
+    <Card headingLevel={1} title="Donation not found">
       <p className="text-sm text-muted">We couldn&apos;t find that donation. If you were charged, your confirmation email has the reference.</p>
       <Link href="/charities" className="mt-4 inline-block text-sm text-brand underline">Find a charity</Link>
     </Card>

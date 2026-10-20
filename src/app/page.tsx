@@ -51,7 +51,7 @@ export default async function Home() {
             </li>
           ))}
         </ol>
-        <Info terms={["tzedaka", "maaser", "chomesh", "s18a"]} label="maaser, chomesh or s18A" />
+        <Info terms={["tzedaka", "maaser", "chomesh", "s18a"]} label="meant by maaser, chomesh and s18A receipts" />
       </section>
 
       {charities && charities.length > 0 ? (

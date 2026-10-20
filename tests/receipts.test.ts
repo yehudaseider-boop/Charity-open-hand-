@@ -276,7 +276,7 @@ describe("emailing receipts", () => {
     expect(first).toMatchObject({ issued: 2, emailed: 2, emailFailed: 0 });
     expect(sent).toHaveLength(2);
     expect(sent[0].attachments?.[0]).toMatchObject({ filename: "LTC-2027-0001.pdf", contentType: "application/pdf" });
-    expect(sent[0].subject).toBe("Your section 18A receipt LTC-2027-0001 from Linksfield Torah Learning Centre NPC");
+    expect(sent[0].subject).toBe("Your s18A receipt LTC-2027-0001 from Linksfield Torah Learning Centre NPC");
     expect(emailed.size).toBe(2);
     // Running it again sends nothing more.
     const again = await runReceiptsJob({ store, render, ...base, mailer });

@@ -7,6 +7,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Payments" };
 
+/** Every row of a query, a page at a time: the database API hands back at most 1 000 rows per call. */
+const PAGE = 1000;
+async function allRows<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if (!data || data.length < PAGE) return out;
+  }
+}
+
 /** The charity name from an embedded row, which the database client types as one row or a list. */
 const nameOf = (v: unknown): string => {
   const row = (Array.isArray(v) ? v[0] : v) as { name_en?: string } | null | undefined;
@@ -20,14 +32,23 @@ export default async function PaymentsPage() {
   const now = new Date();
   const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
 
-  const [pending, events, review, paid, monthly] = await Promise.all([
+  type PaidQuery = { charity_id: string; amount_cents: number; contribution_cents: number; charities: unknown };
+  type MonthlyQuery = { id: string; status: string; next_charge_at: string | null; last_attempt_at: string | null; amount_cents: number; contribution_cents: number; charities: unknown };
+  const [pending, events, review, paidRows, monthlyRows] = await Promise.all([
     db.from("donations").select("id, created_at, total_charged_cents, charities(name_en)").eq("status", "pending").order("created_at").limit(500),
     db.from("gateway_events").select("id, gateway, event_type, received_at, payload").is("processed_at", null).order("received_at").limit(200),
     db.from("audit_log").select("id, action, created_at, entity_id").in("action", ["donation.amount_mismatch", "webhook.unmatched_payment"]).gte("created_at", since).order("created_at", { ascending: false }).limit(50),
-    db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").gte("paid_at", since).limit(5000),
-    db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).limit(5000),
+    // Totals must count every row, so these two are read a page at a time rather than cut off at the API's limit.
+    allRows<PaidQuery>((from, to) =>
+      db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").gte("paid_at", since).order("id").range(from, to) as unknown as PromiseLike<{ data: PaidQuery[] | null; error: { message: string } | null }>,
+    ),
+    allRows<MonthlyQuery>((from, to) =>
+      db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).order("id").range(from, to) as unknown as PromiseLike<{ data: MonthlyQuery[] | null; error: { message: string } | null }>,
+    ),
   ]);
-  for (const r of [pending, events, review, paid, monthly]) if (r.error) throw r.error;
+  for (const r of [pending, events, review]) if (r.error) throw r.error;
+  const paid = { data: paidRows };
+  const monthly = { data: monthlyRows };
 
   const stuckPayments = stalePending(
     (pending.data ?? []).map((r) => ({ id: r.id as string, created_at: r.created_at as string, total_charged_cents: r.total_charged_cents as number, charity: nameOf(r.charities) })),

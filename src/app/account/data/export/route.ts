@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { decrypt } from "@/lib/crypto";
 import { hitRateLimit } from "@/lib/rate-limit";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 /**
  * "Download my information" (POPIA section 23): everything we hold about the
  * signed-in person, read through row-level security so it can only ever be
  * their own. Encrypted values are decrypted for them; card details we never had.
+ * Two things only the server may read are added for their own donations: the
+ * details typed at checkout and the agreements ticked there.
  */
 export async function GET() {
   const supabase = await createClient();
@@ -60,6 +63,27 @@ export async function GET() {
       ])
     : [{ data: [], error: null }, { data: [], error: null }];
   if (myReceipts.error || monthly.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+
+  // Per-donation details and checkout agreements are platform-admin-only tables, so they are read with
+  // the service role, strictly for the donation ids established above as this person's own.
+  const donationIds = donations.map((d) => d.id as string);
+  const checkoutDetails: Record<string, unknown>[] = [];
+  const checkoutAgreements: Record<string, unknown>[] = [];
+  const admin = createAdminClient();
+  for (let i = 0; i < donationIds.length; i += 500) {
+    const ids = donationIds.slice(i, i + 500);
+    const [details, agreements] = await Promise.all([
+      admin
+        .from("donation_checkout_details")
+        .select("donation_id, donor_type, email, first_name, last_name, organisation_name, registration_number, contact_person, phone, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, created_at")
+        .in("donation_id", ids)
+        .is("erased_at", null),
+      admin.from("consents").select("kind, policy_version, accepted_at, donation_id").in("donation_id", ids).order("accepted_at"),
+    ]);
+    if (details.error || agreements.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+    checkoutDetails.push(...((details.data ?? []) as Record<string, unknown>[]));
+    checkoutAgreements.push(...((agreements.data ?? []) as Record<string, unknown>[]));
+  }
   const open = (v: string | null) => {
     if (!v) return null;
     try {
@@ -76,10 +100,12 @@ export async function GET() {
     // ID and tax numbers as their last 4 digits only: a donor record can be shared by everyone who gave with one email.
     donor_details: donors.data ?? [],
     donations,
+    // What was typed with each donation (for its s18A receipt and the donor's own record).
+    donation_details: checkoutDetails,
     monthly_donations: monthly.data ?? [],
     giving_kinds: kinds.data ?? [],
     s18a_receipts: myReceipts.data ?? [],
-    agreements: consents.data ?? [],
+    agreements: [...(consents.data ?? []), ...checkoutAgreements],
     requests: requests.data ?? [],
     saved_charities: favourites.data ?? [],
     maaser_settings: maaserSettings.data ?? [],

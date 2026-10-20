@@ -5,7 +5,7 @@ import { BilingualName } from "@/components/bilingual-name";
 import { requireCharityAdmin } from "@/lib/auth";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 
-export const metadata: Metadata = { title: "Your charities" };
+export const metadata: Metadata = { title: "Your charities", robots: { index: false, follow: false } };
 
 export default async function CharityAdminPage() {
   const viewer = await requireCharityAdmin();

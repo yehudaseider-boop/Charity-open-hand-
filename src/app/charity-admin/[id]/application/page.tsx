@@ -59,16 +59,27 @@ export default async function ApplicationPage({ params }: PageProps<"/charity-ad
               {checklist.map((i) => (
                 <li key={i.key} className="flex items-center gap-2">
                   <span aria-hidden className={i.done ? "text-success" : "text-muted"}>{i.done ? "✓" : "○"}</span>
+                  <span className="sr-only">{i.done ? "Done:" : "To do:"}</span>
                   <span className={i.done ? "" : "text-muted"}>{i.label}</span>
                 </li>
               ))}
             </ul>
           </Card>
           <Card title="Organisation">
-            <OrganisationForm action={saveOrganisation.bind(null, id)} charity={charity} />
+            <OrganisationForm
+              action={saveOrganisation.bind(null, id)}
+              // Only what the form edits reaches the browser: the full row holds gateway and mandate details.
+              charity={{
+                name_en: charity.name_en, name_he: charity.name_he, legal_name_en: charity.legal_name_en, legal_name_he: charity.legal_name_he,
+                npo_number: charity.npo_number, pbo_number: charity.pbo_number, s18a_reference: charity.s18a_reference,
+              }}
+            />
           </Card>
           <Card title="Registered address">
-            <AddressForm action={saveAddress.bind(null, id)} charity={charity} />
+            <AddressForm
+              action={saveAddress.bind(null, id)}
+              charity={{ address_line1: charity.address_line1, address_line2: charity.address_line2, suburb: charity.suburb, city: charity.city, postal_code: charity.postal_code }}
+            />
           </Card>
           <Card title="Contact person">
             <ContactForm action={saveContact.bind(null, id)} priv={priv} />

@@ -27,6 +27,14 @@ const icon = (Icon: (p: { color: string }) => React.ReactElement) =>
     );
   };
 
+/** Made once, here: a new component on every render would remount every label and icon each time the path changes. */
+const tabs = {
+  discover: { label: label("Discover"), icon: icon(DiscoverIcon) },
+  giving: { label: label("Giving"), icon: icon(GivingIcon) },
+  receipts: { label: label("Receipts"), icon: icon(ReceiptsIcon) },
+  account: { label: label("Account"), icon: icon(AccountIcon) },
+};
+
 /** The big round Give button in the middle of the tab bar: giving is the first thing on every screen. */
 function GiveButton({ onPress }: { onPress: () => void }) {
   return (
@@ -83,11 +91,11 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: "transparent" },
       }}
     >
-      <Tabs.Screen name="discover" options={{ title: "Discover", tabBarLabel: label("Discover"), tabBarIcon: icon(DiscoverIcon) }} />
-      <Tabs.Screen name="giving" options={{ title: "Giving", tabBarLabel: label("Giving"), tabBarIcon: icon(GivingIcon) }} />
+      <Tabs.Screen name="discover" options={{ title: "Discover", tabBarLabel: tabs.discover.label, tabBarIcon: tabs.discover.icon }} />
+      <Tabs.Screen name="giving" options={{ title: "Giving", tabBarLabel: tabs.giving.label, tabBarIcon: tabs.giving.icon }} />
       <Tabs.Screen name="give-now" options={{ title: "Give", tabBarButton: () => <GiveButton onPress={() => setGiving(true)} /> }} />
-      <Tabs.Screen name="receipts" options={{ title: "Receipts", tabBarLabel: label("Receipts"), tabBarIcon: icon(ReceiptsIcon) }} />
-      <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: label("Account"), tabBarIcon: icon(AccountIcon) }} />
+      <Tabs.Screen name="receipts" options={{ title: "Receipts", tabBarLabel: tabs.receipts.label, tabBarIcon: tabs.receipts.icon }} />
+      <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: tabs.account.label, tabBarIcon: tabs.account.icon }} />
     </Tabs>
     <Sheet visible={giving} onClose={() => setGiving(false)}>
       <QuickGive onDone={() => setGiving(false)} />

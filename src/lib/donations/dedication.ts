@@ -40,6 +40,16 @@ export function dedicationFrom(kind: string | null | undefined, name: string | n
   return (kind === "honour" || kind === "memory") && clean ? { kind, name: clean } : null;
 }
 
+/** Where the Hebrew starts (the first character in the Hebrew block), or -1 when there is none. */
+export function hebrewStart(text: string): number {
+  return text.search(/[\u0590-\u05ff]/);
+}
+
+/** True when the text has Hebrew in it, so a page can mark it `lang="he" dir="rtl"` and set it in Heebo. */
+export function isHebrew(text: string): boolean {
+  return hebrewStart(text) >= 0;
+}
+
 /** "In honour of Rivka Levin" / "In memory of Chaim Cohen". */
 export function dedicationLine(d: Dedication): string {
   return `${d.kind === "honour" ? "In honour of" : "In memory of"} ${d.name}`;

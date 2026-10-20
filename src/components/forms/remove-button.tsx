@@ -8,7 +8,7 @@ export function RemoveButton({ what, confirmText }: { what: string; confirmText?
       onClick={(e) => {
         if (!window.confirm(confirmText ?? `Remove ${what}? This can't be undone.`)) e.preventDefault();
       }}
-      className="text-xs text-danger underline"
+      className="inline-flex min-h-11 items-center text-xs text-danger underline"
     >
       Remove
     </button>

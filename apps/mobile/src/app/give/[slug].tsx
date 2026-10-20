@@ -18,7 +18,7 @@ import { givingKindLabels } from "@/lib/giving";
 import { haptic } from "@/lib/haptics";
 import { requestQuote, startPayment, type DonorDetails, type Pricing } from "@/lib/pay-api";
 import { SITE_URL } from "@/lib/website";
-import { colors, radius, space } from "@/theme/tokens";
+import { colors, fonts, radius, space } from "@/theme/tokens";
 import type { GivingKind } from "@/data/giving";
 
 /**
@@ -170,7 +170,12 @@ export default function Give() {
       return;
     }
     try {
-      await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
+      const outcome = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
+      if (outcome === "closed") {
+        // The donor closed the sheet before the page finished: stay here, with nothing to wait for.
+        setMessage("The payment page was closed before it finished. If you did pay, the gift will show in Giving once it is confirmed.");
+        return;
+      }
       void refreshAfterGiving(account.refresh);
       // Back to the Giving tab that is already open underneath (replace would stack a second tab bar).
       router.dismissTo("/giving");
@@ -291,8 +296,8 @@ export default function Give() {
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <View style={styles.row}>
-      <Text style={{ flexShrink: 1, fontWeight: strong ? "600" : "400" }}>{label}</Text>
-      <Text style={{ fontWeight: strong ? "600" : "400" }}>{value}</Text>
+      <Text style={[{ flexShrink: 1 }, strong && { fontFamily: fonts.bodySemibold }]}>{label}</Text>
+      <Text style={strong && { fontFamily: fonts.bodySemibold }}>{value}</Text>
     </View>
   );
 }

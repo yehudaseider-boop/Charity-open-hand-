@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isErasedAddress } from "@/lib/email";
 import type { CharityRow, DonorRow, ReceiptDetails } from "./details";
 import type { IssuedReceipt, ReceiptStore } from "./issue";
 import type { PlanCharity, PlanDonation, PlannedReceipt } from "./plan";
@@ -151,7 +152,9 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         donations.sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
         const raw = donations[0]?.donation_checkout_details;
         const email = (Array.isArray(raw) ? raw[0] : raw)?.email;
-        if (!email) continue;
+        // A donor erased since the receipt was issued has no address left to send to; the receipt is
+        // not counted as emailed, so the admin page does not say it was.
+        if (!email || isErasedAddress(email)) continue;
         out.push({
           id: r.id,
           charityId: r.charity_id,

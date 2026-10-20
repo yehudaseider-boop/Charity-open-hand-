@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { requireSecondStep } from "@/lib/mfa";
 import { legalConfig } from "@/config/legal";
@@ -23,8 +24,8 @@ export async function signedInWithPassword(supabase: Awaited<ReturnType<typeof c
   return amr.some((a) => a.method === "password");
 }
 
-/** The signed-in person and their roles, or null for a visitor. */
-export async function getViewer(): Promise<Viewer | null> {
+/** The signed-in person and their roles, or null for a visitor. Looked up once per request. */
+export const getViewer = cache(async function getViewer(): Promise<Viewer | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -60,7 +61,7 @@ export async function getViewer(): Promise<Viewer | null> {
     managedCharityIds: (memberships ?? []).map((m) => m.charity_id as string),
     agreedToCurrentPolicy: Boolean(agreement),
   };
-}
+});
 
 export async function requireViewer(next = "/account"): Promise<Viewer> {
   const viewer = await getViewer();

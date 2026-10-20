@@ -17,7 +17,10 @@ import {
   organisationSchema,
   type DocumentType,
 } from "@/lib/charity/validation";
+import { saDate } from "@/lib/charity/dashboard";
 import { encrypt, last4 } from "@/lib/crypto";
+import { formatDate } from "@/lib/dates";
+import { getEmailTransport } from "@/lib/email";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isRealDocument } from "@/lib/charity/file-check";
@@ -97,8 +100,8 @@ export async function saveAddress(charityId: string, _prev: FormState, formData:
 }
 
 export async function saveContact(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  await requireViewer();
-  await loadCharityForManager(charityId);
+  const viewer = await requireViewer();
+  const { charity, priv } = await loadCharityForManager(charityId);
   const raw = formToObject(formData);
   raw.contact_phone = normalisePhone(raw.contact_phone);
   const parsed = contactSchema.safeParse(raw);
@@ -113,6 +116,28 @@ export async function saveContact(charityId: string, _prev: FormState, formData:
     .select("charity_id");
   const fail = refusal(error, data);
   if (fail) return fail;
+
+  // The contact address is where the bank-change warning goes, so changing it is recorded and the old
+  // address is told: someone who got into an account cannot quietly redirect that warning first.
+  const before = priv?.contact_email?.toLowerCase() ?? null;
+  if (before && before !== v.contact_email.toLowerCase()) {
+    await logAudit({ actorUserId: viewer.userId, action: "charity.contact_changed", entityType: "charity", entityId: charityId, details: { from: before, to: v.contact_email.toLowerCase() } });
+    try {
+      await getEmailTransport().send({
+        to: before,
+        subject: `The contact details for ${charity.name_en} were changed`,
+        text: [
+          `The contact person for ${charity.name_en} on Givezy was changed on ${formatDate(new Date())}. Notices now go to ${v.contact_email}.`,
+          "",
+          "If you did not ask for this, please tell us straight away.",
+          "",
+          "Givezy",
+        ].join("\n"),
+      });
+    } catch (e) {
+      console.error("[charity] contact change notice not sent", e);
+    }
+  }
   revalidatePath(`/charity-admin/${charityId}/application`);
   return saved;
 }
@@ -160,7 +185,7 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
   const file = formData.get("file");
   const signedOn = String(formData.get("signed_on") ?? "").trim() || null;
 
-  if (!(type in documentTypes)) return { ok: false, fieldErrors: { document_type: "Choose a document type" } };
+  if (!Object.hasOwn(documentTypes, type)) return { ok: false, fieldErrors: { document_type: "Choose a document type" } };
   if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose a file" } };
   if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Files must be 5 MB or smaller" } };
   if (!(DOCUMENT_MIME as readonly string[]).includes(file.type)) {
@@ -171,7 +196,7 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
     if (!signedOn || !/^\d{4}-\d{2}-\d{2}$/.test(signedOn)) {
       return { ok: false, fieldErrors: { signed_on: "Enter the date the mandate was signed" } };
     }
-    if (signedOn > new Date().toISOString().slice(0, 10)) {
+    if (signedOn > saDate(new Date())) {
       return { ok: false, fieldErrors: { signed_on: "The signing date can't be in the future" } };
     }
   }

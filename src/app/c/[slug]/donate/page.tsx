@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { Card } from "@/components/card";
 import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
@@ -8,7 +9,13 @@ import { givingKinds } from "@/lib/donations/validation";
 import { formatRand } from "@/lib/money";
 import { DonateFlow } from "./donate-flow";
 
-export const metadata: Metadata = { title: "Donate" };
+// One lookup serves both the title and the page.
+const loadCharity = cache(loadDonatableCharity);
+
+export async function generateMetadata({ params }: PageProps<"/c/[slug]/donate">): Promise<Metadata> {
+  const charity = await loadCharity((await params).slug);
+  return { title: charity ? `Give to ${charity.name_en}` : "Donate" };
+}
 
 export default async function DonatePage({ params, searchParams }: PageProps<"/c/[slug]/donate">) {
   const { slug } = await params;
@@ -17,7 +24,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   const kind = sp.kind;
   const fromApp = sp.from === "app";
   const initialKind = typeof kind === "string" && kind in givingKinds ? (kind as keyof typeof givingKinds) : undefined;
-  const charity = await loadDonatableCharity(slug);
+  const charity = await loadCharity(slug);
   if (!charity) notFound();
 
   return (

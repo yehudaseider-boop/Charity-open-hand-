@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
+import { startTransition, useActionState, useId, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
 import { TermsAndPrivacyLinks } from "@/components/legal";
@@ -46,7 +46,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
       >
         <label htmlFor="amount" className="block text-sm font-medium">How much would you like to give?</label>
         <div className="flex gap-2">
-          <div className="flex min-w-0 flex-1 items-center rounded-control border border-border bg-surface px-3">
+          <div className="flex min-w-0 flex-1 items-center rounded-control border border-border bg-surface px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand">
             <span className="text-muted">R</span>
             <input
               id="amount"
@@ -81,7 +81,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           {giveExtra ? (
             <div>
               <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Givezy</label>
-              <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3">
+              <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand">
                 <span className="text-muted">R</span>
                 <input
                   id="contribution"
@@ -127,15 +127,39 @@ function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; ch
   );
 }
 
-function Check({ name, children, error }: { name: string; children: React.ReactNode; error?: string }) {
+/** A page-unique id, safe in id and aria-describedby attributes (as in forms/fields.tsx). */
+function useFieldId(name: string) {
+  return `${name}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
+}
+
+/**
+ * A consent box. `children` is the label (clicking it ticks the box); `detail` follows it in the same
+ * sentence but outside the label, so links in it can be clicked without toggling the box.
+ */
+function Check({ name, children, detail, error }: { name: string; children: React.ReactNode; detail?: React.ReactNode; error?: string }) {
   const [checked, setChecked] = useState(false);
+  const id = useFieldId(name);
+  const showError = Boolean(error) && !checked;
+  const describedBy = [detail ? `${id}-detail` : null, showError ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   return (
     <div>
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" name={name} className="mt-1" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
-        <span>{children}</span>
-      </label>
-      {error && !checked ? <p className="ml-6 text-xs text-danger">{error}</p> : null}
+      <div className="flex items-start gap-2 text-sm">
+        <input
+          id={id}
+          type="checkbox"
+          name={name}
+          className="mt-1"
+          checked={checked}
+          onChange={(e) => setChecked(e.target.checked)}
+          aria-invalid={showError || undefined}
+          aria-describedby={describedBy}
+        />
+        <span>
+          <label htmlFor={id}>{children}</label>
+          {detail ? <span id={`${id}-detail`}> {detail}</span> : null}
+        </span>
+      </div>
+      {showError ? <p id={`${id}-error`} role="alert" className="ml-6 text-xs text-danger">{error}</p> : null}
     </div>
   );
 }
@@ -163,6 +187,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   const [want18a, setWant18a] = useState(false);
   const [monthly, setMonthly] = useState(false);
   const org = donorType !== "individual";
+  const givingKindErrorId = `${useFieldId("giving_kind")}-error`;
+  const givingKindError = state.fieldErrors?.giving_kind;
 
   return (
     <FormStateProvider state={state}>
@@ -233,14 +259,14 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           <div className="flex flex-wrap gap-2">
             {Object.entries(givingKinds).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
-                <input type="radio" name="giving_kind" value={value} required defaultChecked={value === initialKind} />
+                <input type="radio" name="giving_kind" value={value} required defaultChecked={value === initialKind} aria-describedby={givingKindError ? givingKindErrorId : undefined} />
                 {label}
               </label>
             ))}
           </div>
           <p className="text-xs text-muted">Counts towards your maaser and chomesh in the Givezy app. Only you see this.</p>
           <Info terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
-          {state.fieldErrors?.giving_kind ? <p className="text-xs text-danger">{state.fieldErrors.giving_kind}</p> : null}
+          {givingKindError ? <p id={givingKindErrorId} role="alert" className="text-xs text-danger">{givingKindError}</p> : null}
         </fieldset>
 
         <Dedicate error={state.fieldErrors?.dedication_name} />
@@ -273,9 +299,17 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           <Check name="age_confirmed" error={state.fieldErrors?.age_confirmed}>
             I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
           </Check>
-          <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
-            I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my
-            donation. Givezy keeps my maaser, chomesh or tzedaka choice privately, for my own records.
+          <Check
+            name="popia_consent"
+            error={state.fieldErrors?.popia_consent}
+            detail={
+              <>
+                <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my donation.
+                Givezy keeps my maaser, chomesh or tzedaka choice privately, for my own records.
+              </>
+            }
+          >
+            I agree to
           </Check>
         </div>
 
@@ -299,13 +333,15 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
  */
 function Dedicate({ error }: { error?: string }) {
   const [kind, setKind] = useState<"none" | "honour" | "memory">("none");
+  const errorId = `${useFieldId("dedication_kind")}-error`;
+  const showError = Boolean(error) && kind === "none";
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm font-medium">Dedicate this donation <span className="font-normal text-muted">(optional)</span></legend>
       <div className="flex flex-wrap gap-2">
         {([["none", "No"], ["honour", "In honour of"], ["memory", "In memory of"]] as const).map(([value, label]) => (
           <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
-            <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} />
+            <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} aria-describedby={showError ? errorId : undefined} />
             {label}
           </label>
         ))}
@@ -313,7 +349,7 @@ function Dedicate({ error }: { error?: string }) {
       {kind !== "none" ? (
         <TextField name="dedication_name" label="Their name" required autoDirection hint={`${charityLabel(kind)} The charity sees this name; it is not on your s18A receipt.`} />
       ) : null}
-      {error && kind === "none" ? <p className="text-xs text-danger">{error}</p> : null}
+      {showError ? <p id={errorId} role="alert" className="text-xs text-danger">{error}</p> : null}
     </fieldset>
   );
 }

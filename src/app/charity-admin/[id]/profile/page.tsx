@@ -27,7 +27,13 @@ export default async function ProfilePage({ params }: PageProps<"/charity-admin/
         )}
       </div>
       <Card title="Details">
-        <ProfileForm action={saveProfile.bind(null, id)} charity={charity} categories={categories} selected={categoryIds} />
+        <ProfileForm
+          action={saveProfile.bind(null, id)}
+          // Only what the form edits reaches the browser: the full row holds gateway and mandate details.
+          charity={{ name_en: charity.name_en, description_en: charity.description_en, funds_use_en: charity.funds_use_en, thank_you_en: charity.thank_you_en, website: charity.website }}
+          categories={categories}
+          selected={categoryIds}
+        />
       </Card>
       <Card title="Logo">
         {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { logAudit } from "@/lib/audit";
 import { safeNextPath } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,7 +32,13 @@ export async function verifyCode(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  // Whether this code finishes a new authenticator's set-up, or is a sign-in with an existing one.
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const enrolling = (factors?.all ?? []).some((f) => f.id === factorId && f.status === "unverified");
   const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
   if (error) back("code");
+  if (enrolling) {
+    await logAudit({ actorUserId: user.id, action: "user.mfa_enrolled", entityType: "user", entityId: user.id }).catch((e) => console.error("[mfa] audit not written", e));
+  }
   redirect(next);
 }

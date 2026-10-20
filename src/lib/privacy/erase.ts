@@ -103,7 +103,8 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       const { error: consentError } = await db.from("consents").delete().eq("user_id", userId).eq("kind", "account");
       if (consentError) throw new Error(`Could not remove their agreement records: ${consentError.message}`);
       const { error: delError } = await db.auth.admin.deleteUser(userId);
-      if (delError) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
+      // Running the erasure again after the account is gone is not a failure.
+      if (delError && delError.status !== 404) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
       else summary.accountDeleted = true;
     }
   }
