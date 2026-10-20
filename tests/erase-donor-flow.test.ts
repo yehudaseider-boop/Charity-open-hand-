@@ -129,7 +129,7 @@ describe("erasing a donor by their account", () => {
     for (const t of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"]) {
       expect(calls).toContain(`${t}:deleted:user_id=${USER}`);
     }
-    expect(calls).toContain('profiles:update:{"full_name":null}');
+    expect(calls).toContain('profiles:update:{"full_name":null,"giver_type":null}');
   });
 
   it("reports an account that could not be deleted, after the information was erased", async () => {

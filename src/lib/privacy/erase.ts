@@ -108,8 +108,9 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     const blocked = await accountBlocker(userId);
     if (blocked) {
       summary.note = blocked;
-      // The account stays for their charity or platform work, without the name they gave as a donor.
-      const { error: nameError } = await db.from("profiles").update({ full_name: null }).eq("id", userId);
+      // The account stays for their charity or platform work, without the name they gave as a donor
+      // or how they described their giving.
+      const { error: nameError } = await db.from("profiles").update({ full_name: null, giver_type: null }).eq("id", userId);
       if (nameError) throw new Error(`Could not erase their name: ${nameError.message}`);
     } else {
       // Their own account agreement goes with them. A charity's declarations stay with the charity

@@ -29,7 +29,7 @@ vi.mock("../apps/mobile/src/lib/supabase", () => ({
   },
 }));
 
-const { shouldInviteGoal, goalInvited, markGoalInvited, goalCardDismissed, dismissGoalCard } = await import("../apps/mobile/src/lib/first-run");
+const { isFirstGift, shouldInviteGoal, goalInvited, markGoalInvited, goalCardDismissed, dismissGoalCard } = await import("../apps/mobile/src/lib/first-run");
 const { cleanGiverType, saveGiverType, syncGiverType, GIVER_TYPES } = await import("../apps/mobile/src/lib/giver-type");
 const { causesFirst } = await import("../apps/mobile/src/lib/live-charities");
 
@@ -39,18 +39,25 @@ beforeEach(() => {
 });
 
 describe("the goal invitation after a first gift", () => {
-  const first = { goalsReady: true, goalCount: 0, giftCount: 0, invited: false, confirming: false };
-  it("is offered on a first confirmed gift, to someone with no goal, once", () => {
+  const first = { goalsReady: true, goalCount: 0, firstGift: true, confirming: false };
+  it("is offered on a new donor's first confirmed gift, when they have no goal", () => {
     expect(shouldInviteGoal(first)).toBe(true);
   });
-  it("is never offered to someone with a giving history, a goal, or who has been invited", () => {
-    expect(shouldInviteGoal({ ...first, giftCount: 4 })).toBe(false);
+  it("is never offered to someone with a goal, or before the gift is confirmed and goals are read", () => {
     expect(shouldInviteGoal({ ...first, goalCount: 1 })).toBe(false);
-    expect(shouldInviteGoal({ ...first, invited: true })).toBe(false);
-  });
-  it("waits for the gift to be confirmed and for goals to be read", () => {
     expect(shouldInviteGoal({ ...first, confirming: true })).toBe(false);
     expect(shouldInviteGoal({ ...first, goalsReady: false })).toBe(false);
+    expect(shouldInviteGoal({ ...first, firstGift: false })).toBe(false);
+  });
+  it("counts as a first gift only for a new donor, once, and when signed in only with fresh, empty history", () => {
+    const newDonor = { signedIn: false, freshHistoryEmpty: false, newDonor: true, invited: false };
+    expect(isFirstGift(newDonor)).toBe(true);
+    // A donor from before the new first open, giving signed out (no history to see), never gets it.
+    expect(isFirstGift({ ...newDonor, newDonor: false })).toBe(false);
+    expect(isFirstGift({ ...newDonor, invited: true })).toBe(false);
+    // Signed in: only when the history has loaded fresh and is empty (not while loading, offline or failed).
+    expect(isFirstGift({ ...newDonor, signedIn: true, freshHistoryEmpty: false })).toBe(false);
+    expect(isFirstGift({ ...newDonor, signedIn: true, freshHistoryEmpty: true })).toBe(true);
   });
   it("remembers on the phone that it was shown, and that the Home card was dismissed", async () => {
     expect(await goalInvited()).toBe(false);

@@ -43,7 +43,7 @@ export default function Discover() {
   useEffect(() => {
     loadCausePrefs().then(setPicked);
   }, []);
-  const sortedByCauses = picked.length > 0 && cause === "all" && !query.trim();
+  const searching = query.trim().length > 0;
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -55,7 +55,9 @@ export default function Discover() {
     return !q && cause === "all" ? causesFirst(found, picked) : found;
   }, [query, cause, charities, picked]);
 
-  const featured = !query && cause === "all" ? results.find((c) => c.featured) : undefined;
+  const featured = !searching && cause === "all" ? results.find((c) => c.featured) : undefined;
+  // Only say "the causes you chose, first" when at least one charity is in them.
+  const sortedByCauses = !searching && cause === "all" && results.some((c) => picked.some((p) => inCause(c, p)));
   const noneYet = live && charities.length === 0;
   const rest = results.filter((c) => c !== featured);
 
@@ -126,7 +128,7 @@ export default function Discover() {
               </FadeUp>
             ) : null}
             <View style={{ gap: 16 }}>
-              {rest.length ? <Text style={styles.listHead}>{cause === "all" && !query ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
+              {rest.length ? <Text style={styles.listHead}>{cause === "all" && !searching ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
               {rest.map((c, i) => (
                 <FadeUp key={c.slug} index={i + 1}>
                   <CharityPhotoCard charity={c} live={live} onGive={onGive} />

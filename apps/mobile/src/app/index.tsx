@@ -14,6 +14,7 @@ import { saveCausePrefs } from "@/lib/cause-prefs";
 import { useDirectory } from "@/lib/directory";
 import { GIVER_TYPES, saveGiverType, type GiverType } from "@/lib/giver-type";
 import { haptic } from "@/lib/haptics";
+import { markNewDonor } from "@/lib/first-run";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
@@ -56,6 +57,7 @@ export default function Welcome() {
   // Straight to the charities, the donor's causes first.
   const finish = () => {
     markWelcomed();
+    void markNewDonor();
     router.replace("/discover");
   };
   const next = () => (step >= STEPS ? finish() : setStep((n) => n + 1));

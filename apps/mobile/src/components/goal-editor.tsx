@@ -44,7 +44,8 @@ export function GoalEditor({
   /** Labels the donor has used, for "only gifts labelled". */
   labels: string[];
   jewish: boolean;
-  onSave: (g: Goal) => void;
+  /** May return a promise: the button then says "Saving…" and can't be tapped twice until it settles. */
+  onSave: (g: Goal) => void | Promise<unknown>;
   onCancel?: () => void;
   onRemove?: () => void;
   title?: string;
@@ -60,6 +61,7 @@ export function GoalEditor({
   const [chosen, setChosen] = useState<string[]>(initial?.counts ?? []);
   const [newLabel, setNewLabel] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const offered = [...labels];
   for (const c of chosen) if (!offered.some((o) => o.toLowerCase() === c.toLowerCase())) offered.push(c);
@@ -86,8 +88,8 @@ export function GoalEditor({
     if (basis === "fixed" && !(cents && cents > 0)) e.amount = amountProblem(amount, "12000") ?? "Enter an amount in Rand, for example 12000";
     if (some && chosen.length === 0) e.counts = "Choose at least one label, or count all your giving";
     setErrors(e);
-    if (Object.keys(e).length) return;
-    onSave({
+    if (Object.keys(e).length || saving) return;
+    const result = onSave({
       id: initial?.id ?? newId(),
       name: name.trim().slice(0, 40),
       basis,
@@ -97,6 +99,10 @@ export function GoalEditor({
       year: jewish ? year : initial?.year === "hebrew" ? "hebrew" : "tax",
       counts: some ? chosen : null,
     });
+    if (result instanceof Promise) {
+      setSaving(true);
+      result.finally(() => setSaving(false));
+    }
   };
 
   return (
@@ -203,7 +209,7 @@ export function GoalEditor({
         </View>
       ) : null}
 
-      <Button label="Save goal" onPress={save} />
+      <Button label={saving ? "Saving…" : "Save goal"} disabled={saving} onPress={save} />
       {onCancel ? <TextLink label={cancelLabel} onPress={onCancel} /> : null}
       {onRemove ? <TextLink label="Remove this goal" onPress={onRemove} /> : null}
     </View>

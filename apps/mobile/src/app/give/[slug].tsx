@@ -25,7 +25,7 @@ import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
 import { jhbToday, rand } from "@/lib/format";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals, saveGoals } from "@/lib/goals-store";
-import { goalInvited, markGoalInvited, shouldInviteGoal } from "@/lib/first-run";
+import { goalInvited, isFirstGift, isNewDonor, markGoalInvited, shouldInviteGoal } from "@/lib/first-run";
 import { useJewishMode } from "@/lib/jewish-mode";
 import { loadIncome } from "@/lib/income-store";
 import type { IncomeEntry } from "@/lib/ledger";
@@ -93,11 +93,15 @@ export default function Give() {
   const jewish = useJewishMode();
   // Whether this phone has already been invited to set a goal. Assumed yes until the answer is read, so it can never show twice.
   const [invited, setInvited] = useState(true);
+  const [newDonor, setNewDonor] = useState(false);
   useEffect(() => {
     goalInvited().then(setInvited);
+    isNewDonor().then(setNewDonor);
   }, []);
   // "First gift" only when we know for sure: signed in, fresh giving history from the server, and none in it.
   const firstEver = account.status === "signed-in" && account.live !== null && !account.live.fromCache && account.live.gifts.length === 0;
+  // A new donor's first gift (also when signed out): the safety points and the goal invitation.
+  const firstGift = isFirstGift({ signedIn: account.status === "signed-in", freshHistoryEmpty: firstEver, newDonor, invited });
 
   // Asked of the server once per visit (and on "Try again"). The preview has no server.
   const [ready, setReady] = useState<ReadyReply | undefined>(undefined);
@@ -319,7 +323,7 @@ export default function Give() {
       s18aAvailable && want18a ? "s18A receipt at tax time" : null,
       pr && goal ? `Counts towards ${goal.name}` : null,
     ].filter((b): b is string => Boolean(b));
-    const inviteNow = (demo === "invite" && !SITE_URL) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, giftCount: history.length, invited, confirming });
+    const inviteNow = (demo === "invite" && !SITE_URL) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift, confirming });
     const invite: GoalInvite | null = inviteNow
       ? {
           jewish,
@@ -822,7 +826,7 @@ export default function Give() {
             </View>
           </View>
           {/* The first gift: how a gift is kept safe, at the one moment it matters. */}
-          {history.length === 0 ? (
+          {firstGift ? (
             <View style={[styles.safeBox, { marginHorizontal: space.gutter }]}>
               <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy }}>How your gift is kept safe</Text>
               {SAFE.map((s) => (
