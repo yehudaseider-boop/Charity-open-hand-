@@ -22,7 +22,7 @@ export async function GET() {
   }
 
   const [profile, donors, kinds, consents, requests, favourites, maaserSettings, income, external, notes] = await Promise.all([
-    supabase.from("profiles").select("email, full_name, created_at").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("email, full_name, giver_type, created_at").eq("id", user.id).maybeSingle(),
     supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, age_confirmed_18_at, popia_consent_at, created_at").eq("user_id", user.id),
     supabase.from("donation_giving_kinds").select("donation_id, kind, label"),
     supabase.from("consents").select("kind, policy_version, accepted_at").eq("user_id", user.id).order("accepted_at"),

@@ -8,6 +8,7 @@ import type { Gift, Receipt, Recurring } from "@/data/giving";
 import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
 import { forgetDetails } from "./donor-details";
 import { cacheKey, forgetGivingCache, writeGivingCache } from "./giving-cache";
+import { syncGiverType } from "./giver-type";
 import { secureStorage } from "./secure-storage";
 import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
@@ -299,6 +300,11 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
     return startLoad(uid);
   }, [userId, status, startLoad]);
+
+  // The "kind of giver" answer given on first open, copied to the account the first time they are signed in.
+  useEffect(() => {
+    if (status === "signed-in" && userId) void syncGiverType(userId);
+  }, [status, userId]);
 
   // Show what the phone saved last time straight away; fresh data replaces it.
   useEffect(() => {

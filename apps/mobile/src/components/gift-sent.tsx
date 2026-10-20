@@ -1,13 +1,34 @@
+import { router } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { rand } from "@/lib/format";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 import { Blob } from "./blob";
-import { Button } from "./button";
+import type { Goal } from "@/lib/goals";
+import { Button, TextLink } from "./button";
+import { GoalEditor } from "./goal-editor";
 import { GoalRing } from "./goal-ring";
 import { CheckIcon } from "./icons";
 import { ShareButton } from "./share-button";
 import { Text } from "./text";
+
+/**
+ * "Small yes first": after a first gift, one invitation to set a giving goal, with the gift already
+ * counted. Only given on a first confirmed gift, to someone with no goal, and only once ever.
+ */
+export type GoalInvite = {
+  jewish: boolean;
+  labels: string[];
+  signedIn: boolean;
+  /** Where a goal stands with this gift counted. `targetCents` is null for a share of income not yet logged. */
+  progressFor(goal: Goal): { percent: number | null; givenCents: number; targetCents: number | null };
+  /** Keep the goal on the phone. False if it couldn't be saved. */
+  save(goal: Goal): Promise<boolean>;
+  /** Called once the invitation is on screen, so it never comes back. */
+  shown(): void;
+  goHome(): void;
+};
 
 export type SentGift = {
   /** The gift to the charity (not the contribution to Givezy). */
@@ -23,6 +44,8 @@ export type SentGift = {
   /** Months in a row with a gift, this one included. */
   streak: number;
   badges: string[];
+  /** Present only when the donor should be invited to set a goal now. */
+  invite?: GoalInvite | null;
 };
 
 const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
@@ -34,6 +57,19 @@ const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
  */
 export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gift: SentGift; charityName: string; impact: string | null; shareText: string | null; onDone: () => void }) {
   const insets = useSafeAreaInsets();
+  const invite = gift.confirming ? null : (gift.invite ?? null);
+  const [phase, setPhase] = useState<"invite" | "editing" | "set">("invite");
+  const [made, setMade] = useState<Goal | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const marked = useRef(false);
+  const shown = invite?.shown;
+  useEffect(() => {
+    if (shown && !marked.current) {
+      marked.current = true;
+      shown();
+    }
+  }, [shown]);
+  const progress = made && invite ? invite.progressFor(made) : null;
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.cream }} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
       <View style={[styles.top, { paddingTop: insets.top + 28 }]}>
@@ -93,12 +129,72 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
           </View>
         ) : null}
 
+        {invite && phase === "invite" ? (
+          <View style={styles.invite}>
+            <Text variant="h2" accessibilityRole="header">Make it a habit</Text>
+            <Text variant="bodyMuted">Set a yearly giving goal. Your first gift already counts.</Text>
+            <Button variant="cta" label="Set my goal" onPress={() => setPhase("editing")} />
+            <TextLink label="Maybe later" onPress={invite.goHome} />
+          </View>
+        ) : null}
+
+        {invite && phase === "editing" ? (
+          <View style={{ gap: 10 }}>
+            {saveFailed ? (
+              <Text accessibilityRole="alert" style={{ color: colors.danger }}>
+                We couldn&apos;t save your goal on this phone. Nothing was lost: please try again, or set it later on the Progress tab.
+              </Text>
+            ) : null}
+            <GoalEditor
+              initial={null}
+              labels={invite.labels}
+              jewish={invite.jewish}
+              title="Set your goal"
+              cancelLabel="Back"
+              onCancel={() => setPhase("invite")}
+              onSave={async (g) => {
+                const ok = await invite.save(g);
+                setSaveFailed(!ok);
+                if (ok) {
+                  setMade(g);
+                  setPhase("set");
+                }
+              }}
+            />
+          </View>
+        ) : null}
+
+        {invite && phase === "set" && made && progress ? (
+          <View style={{ gap: 10 }}>
+            <View style={styles.card}>
+              {progress.targetCents && progress.percent !== null ? <GoalRing percent={progress.percent} size={96} stroke={10} /> : null}
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.cardKicker}>{made.name}</Text>
+                <Text style={styles.cardAmount}>{rand(progress.givenCents)}</Text>
+                <Text variant="bodyMuted" style={{ fontSize: 15 }}>
+                  {progress.targetCents
+                    ? `of ${rand(progress.targetCents)}. Your first gift is already counted.`
+                    : "so far, your first gift counted. Log your income on the Progress tab to see your target."}
+                </Text>
+              </View>
+            </View>
+            {invite.signedIn ? null : (
+              <View style={styles.streak}>
+                <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>
+                  Sign in with {gift.email} and your gifts are counted towards your goal.
+                </Text>
+                <TextLink label="Sign in" onPress={() => router.push("/account")} />
+              </View>
+            )}
+          </View>
+        ) : null}
+
         <View style={{ gap: 8, alignItems: "center" }}>
           <ShareButton text={shareText} label={`Share ${charityName} on WhatsApp`} />
           <Text variant="label">Share the cause. Your amount stays private.</Text>
         </View>
 
-        <Button label="Done" onPress={onDone} />
+        <Button label="Done" onPress={invite ? invite.goHome : onDone} />
       </View>
     </ScrollView>
   );
@@ -116,6 +212,7 @@ const styles = StyleSheet.create({
   cardAmount: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, color: colors.navy },
   streak: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   streakDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.orange },
+  invite: { gap: 10, padding: 18, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.lightPurple },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   badge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.lightPurple },
   badgeText: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.navy },

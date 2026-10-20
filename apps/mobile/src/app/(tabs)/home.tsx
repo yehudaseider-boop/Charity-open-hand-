@@ -22,6 +22,7 @@ import { loadGoals } from "@/lib/goals-store";
 import { loadIncome } from "@/lib/income-store";
 import { inCause, savedCharities } from "@/lib/live-charities";
 import { loadCausePrefs } from "@/lib/cause-prefs";
+import { dismissGoalCard, goalCardDismissed } from "@/lib/first-run";
 import type { IncomeEntry } from "@/lib/ledger";
 import { useSaved } from "@/lib/saved";
 import { useStoredRecord } from "@/lib/use-stored-record";
@@ -63,6 +64,13 @@ export default function Home() {
   // "First gift" only when we know: fresh giving from the server with none in it (not while it loads or fails).
   const firstGift = preview ? demoState === "empty" : account.status === "signed-in" && account.live !== null && !account.live.fromCache && gifts.length === 0;
   const goal = goals.value[0] ?? null;
+  // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
+  // While the choice is being read it stays hidden, so it never flashes up and away.
+  const [cardGone, setCardGone] = useState<boolean | null>(null);
+  useEffect(() => {
+    goalCardDismissed().then(setCardGone);
+  }, []);
+  const hideGoalCard = !preview && goals.status === "ready" && !goal && cardGone !== false;
   const progress = goal ? goalProgress(goal, [...gifts, ...elsewhere], income.value, jhbToday()) : null;
   const counted = goal && progress ? [...gifts, ...elsewhere].filter((g) => g.date >= progress.window.start && g.date <= progress.window.end && counts(goal, g.label)).length : 0;
   const pct = progress?.targetCents ? Math.floor((progress.givenCents * 100) / progress.targetCents) : 0;
@@ -81,8 +89,8 @@ export default function Home() {
         <Text variant="h1" accessibilityRole="header">{firstGift ? "Welcome in. Ready for your first gift?" : "Ready to do some good?"}</Text>
       </View>
 
-      {/* The main goal, as a ring on blue. */}
-      <View style={styles.gutter}>
+      {/* The main goal, as a ring on blue. Without a goal it is a soft invitation that can be dismissed. */}
+      {hideGoalCard ? null : <View style={styles.gutter}>
         <View style={styles.goalCard}>
           <Blob size={100} color={colors.orange} rotate={20} style={{ right: -55, top: -60 }} />
           <Blob size={90} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -50, bottom: -60 }} />
@@ -115,10 +123,24 @@ export default function Home() {
               <Text style={styles.goalAmount}>Set a giving goal</Text>
               <Text style={styles.goalSub}>A set amount or a share of your income. Only you see it.</Text>
               <Button variant="white" label="Set a goal" onPress={() => router.push("/giving")} />
+              {preview ? null : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Not now: hide the goal card"
+                  hitSlop={8}
+                  onPress={() => {
+                    setCardGone(true);
+                    void dismissGoalCard();
+                  }}
+                  style={styles.notNow}
+                >
+                  <Text style={styles.notNowText}>Not now</Text>
+                </Pressable>
+              )}
             </View>
           )}
         </View>
-      </View>
+      </View>}
 
       <View style={{ gap: 12 }}>
         <View style={[styles.gutter, styles.sectionHead]}>
@@ -168,6 +190,8 @@ const styles = StyleSheet.create({
   goalRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   goalKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilacSoft },
   goalAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
+  notNow: { minHeight: 44, alignItems: "center", justifyContent: "center" },
+  notNowText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lilacSoft, textDecorationLine: "underline" },
   goalSub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   seeAll: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue },

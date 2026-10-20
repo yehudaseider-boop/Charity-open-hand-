@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
 import { Field } from "@/components/field";
-import { GiftSent, type SentGift } from "@/components/gift-sent";
+import { GiftSent, type GoalInvite, type SentGift } from "@/components/gift-sent";
 import { Blob } from "@/components/blob";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
@@ -18,13 +18,15 @@ import { TopBar } from "@/components/top-bar";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleGoals } from "@/data/giving";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
-import { cleanLabel, LEGACY_KIND_LABELS } from "@shared/donations/labels";
+import { cleanLabel, JEWISH_LABELS, LEGACY_KIND_LABELS } from "@shared/donations/labels";
 import { useAccount } from "@/lib/account";
 import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
 import { jhbToday, rand } from "@/lib/format";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
-import { loadGoals } from "@/lib/goals-store";
+import { loadGoals, saveGoals } from "@/lib/goals-store";
+import { goalInvited, markGoalInvited, shouldInviteGoal } from "@/lib/first-run";
+import { useJewishMode } from "@/lib/jewish-mode";
 import { loadIncome } from "@/lib/income-store";
 import type { IncomeEntry } from "@/lib/ledger";
 import { monthsInARow } from "@/lib/streak";
@@ -88,6 +90,12 @@ export default function Give() {
   const goal = goals.value[0] ?? null;
   // Income logged on the Progress tab, so a goal set as a share of income has its real target.
   const income = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
+  const jewish = useJewishMode();
+  // Whether this phone has already been invited to set a goal. Assumed yes until the answer is read, so it can never show twice.
+  const [invited, setInvited] = useState(true);
+  useEffect(() => {
+    goalInvited().then(setInvited);
+  }, []);
   // "First gift" only when we know for sure: signed in, fresh giving history from the server, and none in it.
   const firstEver = account.status === "signed-in" && account.live !== null && !account.live.fromCache && account.live.gifts.length === 0;
 
@@ -311,18 +319,36 @@ export default function Give() {
       s18aAvailable && want18a ? "s18A receipt at tax time" : null,
       pr && goal ? `Counts towards ${goal.name}` : null,
     ].filter((b): b is string => Boolean(b));
+    const inviteNow = (demo === "invite" && !SITE_URL) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, giftCount: history.length, invited, confirming });
+    const invite: GoalInvite | null = inviteNow
+      ? {
+          jewish,
+          labels: jewish ? [...JEWISH_LABELS] : [],
+          signedIn: account.status === "signed-in",
+          // With this first gift counted, so "your first gift already counts" is true on screen.
+          progressFor: (g) => {
+            const p = goalProgress(g, rows, income.value, today);
+            const t = p.targetCents;
+            return { percent: t ? Math.min(100, Math.floor((p.givenCents * 100) / t)) : null, givenCents: p.givenCents, targetCents: t ?? null };
+          },
+          save: async (g) => (await saveGoals([g], owner)).ok,
+          shown: () => void markGoalInvited(),
+          goHome: () => router.replace("/home"),
+        }
+      : null;
     return {
       cents,
       contributionCents,
       monthly: wasMonthly,
       email: mail,
+      invite,
       confirming,
       goal: pr && goal && pr.targetCents ? { name: goal.name, percent: Math.floor((pr.givenCents * 100) / pr.targetCents), givenCents: pr.givenCents, targetCents: pr.targetCents } : null,
       streak: monthsInARow(rows.map((r) => r.date), today),
       badges,
     };
   }
-  if (demo === "sent" && !SITE_URL && !demoShown) {
+  if ((demo === "sent" || demo === "invite") && !SITE_URL && !demoShown) {
     setDemoShown(true);
     setDone(sentSummary({ cents: 18_000, contributionCents: 0, email: "sarah@example.co.za", monthly: false, label }, false));
   }
@@ -795,6 +821,18 @@ export default function Give() {
               </Pressable>
             </View>
           </View>
+          {/* The first gift: how a gift is kept safe, at the one moment it matters. */}
+          {history.length === 0 ? (
+            <View style={[styles.safeBox, { marginHorizontal: space.gutter }]}>
+              <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy }}>How your gift is kept safe</Text>
+              {SAFE.map((s) => (
+                <View key={s.title} style={{ gap: 2 }}>
+                  <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.navy }}>{s.title}</Text>
+                  <Text variant="bodyMuted" style={{ fontSize: 15 }}>{s.body}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </ScrollView>
         {/* Pinned: what happened (if anything), the exact total and the Give button. */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
@@ -826,8 +864,16 @@ export default function Give() {
   );
 }
 
+/** Shown on a first gift. Never names the payment provider. */
+const SAFE = [
+  { title: "Your card goes on a secure page", body: "You enter it on our payment partner's own secure page, never in this app." },
+  { title: "Kept there, not with us", body: "For monthly donations, your card is kept by the payment partner, so next month needs no typing. Givezy never sees or stores it." },
+  { title: "Givezy never holds the money", body: "Your gift goes from the payment partner straight to the charity's bank account." },
+];
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
+  safeBox: { gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft, marginTop: space.block },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, justifyContent: "center", backgroundColor: colors.surface },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },

@@ -2,56 +2,39 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { parseRandToCents } from "@shared/money";
-import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { Backdrop } from "@/components/backdrop";
 import { Blob } from "@/components/blob";
 import { Button, TextLink } from "@/components/button";
 import { FadeUp } from "@/components/fade-up";
-import { Field } from "@/components/field";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
+import { SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
-import { useAccount } from "@/lib/account";
 import { saveCausePrefs } from "@/lib/cause-prefs";
-import { causeList } from "@/lib/directory";
-import { rand } from "@/lib/format";
-import { saveGoals } from "@/lib/goals-store";
+import { useDirectory } from "@/lib/directory";
+import { GIVER_TYPES, saveGiverType, type GiverType } from "@/lib/giver-type";
 import { haptic } from "@/lib/haptics";
-import { notify } from "@/lib/open-site";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
-/** The onboarding steps after the welcome screen. */
-const STEPS = 3;
-
-/** Goal names to start from; the donor names their own goal, so maaser is one option, never the default. */
-const GOAL_NAMES = ["Giving goal", "Maaser", "Tithe"] as const;
-
-const SAFE = [
-  { title: "Your card goes on a secure page", body: "You enter it on our payment partner's own secure page, never in this app." },
-  { title: "Kept there, not with us", body: "For monthly donations, your card is kept by the payment partner, so next month needs no typing. Givezy never sees or stores it." },
-  { title: "Givezy never holds the money", body: "Your gift goes from the payment partner straight to the charity's bank account." },
-];
+/** The questions after the welcome screen: what kind of giver, then which causes. */
+const STEPS = 2;
 
 /**
- * First open: the blue welcome, then three steps: the causes you care about, your giving goal, and
- * how giving is kept safe. Skippable, and shown once per phone.
+ * First open, "small yes first": the blue welcome, then two quick questions (what kind of giver you are,
+ * and which causes matter to you), each skippable, then straight to the charities, those you chose first.
+ * A giving goal is asked about once, after the first gift (see GiftSent). Shown once per phone.
  * `?welcome=1&step=2` shows it again for design review (step 0 is the welcome).
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
-  const account = useAccount();
+  const directory = useDirectory();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
   const forced = p.welcome === "1";
   const [seen, setSeen] = useState<boolean | null>(forced ? false : null);
   const [step, setStep] = useState(() => Math.min(STEPS, Math.max(0, Number(p.step) || 0)));
+  const [giver, setGiver] = useState<GiverType | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  const [goalName, setGoalName] = useState<string>("Giving goal");
-  const [ownName, setOwnName] = useState("");
-  const [writingOwn, setWritingOwn] = useState(false);
-  const [yearly, setYearly] = useState("");
-  const [amountError, setAmountError] = useState<string | undefined>();
 
   useEffect(() => {
     if (!forced) hasBeenWelcomed().then(setSeen);
@@ -70,14 +53,13 @@ export default function Welcome() {
   if (seen === null) return <View style={styles.blueScreen} />;
   if (seen) return <Redirect href="/home" />;
 
+  // Straight to the charities, the donor's causes first.
   const finish = () => {
     markWelcomed();
-    router.replace("/home");
+    router.replace("/discover");
   };
-  const next = () => setStep((s) => Math.min(STEPS, s + 1));
-  const yearlyCents = parseRandToCents(yearly);
-  const perMonth = yearlyCents && yearlyCents > 0 ? Math.ceil(yearlyCents / 12 / 100) * 100 : null;
-  const causes = causeList().filter((c) => c.id !== "all");
+  const next = () => (step >= STEPS ? finish() : setStep((n) => n + 1));
+  const causes = (directory.data?.causes ?? []).filter((c) => c.id !== "all");
 
   if (step === 0) {
     return (
@@ -111,103 +93,98 @@ export default function Welcome() {
               <View key={i} style={[styles.segment, i < step && styles.segmentOn]} />
             ))}
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Skip the setup" hitSlop={8} onPress={finish} style={styles.skip}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Skip this question" hitSlop={8} onPress={next} style={styles.skip}>
             <Text style={styles.skipText}>Skip</Text>
           </Pressable>
         </View>
 
         {step === 1 ? (
-          <FadeUp key="causes" style={{ flex: 1, gap: space.block }}>
+          <FadeUp key="giver" style={{ flex: 1, gap: space.block }}>
             <View style={{ gap: 8 }}>
-              <Text variant="h1" accessibilityRole="header">What do you care about?</Text>
-              <Text variant="bodyMuted">Pick as many as you like. We show you these first.</Text>
+              <Text variant="h1" accessibilityRole="header">What kind of giver are you?</Text>
+              <Text variant="bodyMuted">There&apos;s no right answer. It just helps us get to know you.</Text>
             </View>
-            <View style={styles.chips}>
-              {causes.map((c) => {
-                const on = picked.includes(c.id);
+            <View style={{ gap: 12 }} accessibilityRole="radiogroup">
+              {GIVER_TYPES.map((g) => {
+                const on = giver === g.id;
                 return (
                   <Pressable
-                    key={c.id}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: on }}
+                    key={g.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
                     onPress={() => {
                       haptic.tap();
-                      setPicked((ps) => (on ? ps.filter((x) => x !== c.id) : [...ps, c.id]));
+                      setGiver(g.id);
                     }}
-                    style={[styles.chip, on && styles.chipOn]}
+                    style={[styles.choice, on && styles.choiceOn]}
                   >
-                    {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
-                    <Text style={[styles.chipText, on && { color: colors.onInk }]}>{c.label}</Text>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 18, color: colors.navy }}>{g.label}</Text>
+                      <Text variant="bodyMuted">{g.line}</Text>
+                    </View>
+                    {on ? <CheckIcon size={20} color={colors.blue} /> : null}
                   </Pressable>
                 );
               })}
-            </View>
-            <View style={{ flex: 1 }} />
-            <Button label="Next" onPress={() => { void saveCausePrefs(picked); next(); }} />
-          </FadeUp>
-        ) : step === 2 ? (
-          <FadeUp key="goal" style={{ flex: 1, gap: space.block }}>
-            <View style={{ gap: 8 }}>
-              <Text variant="h1" accessibilityRole="header">Name your goal.</Text>
-              <Text variant="bodyMuted">Optional. Only you see it, and you can change it any time.</Text>
-            </View>
-            <View style={styles.chips} accessibilityRole="radiogroup">
-              {GOAL_NAMES.map((n) => {
-                const on = !writingOwn && goalName === n;
-                return (
-                  <Pressable key={n} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setWritingOwn(false); setGoalName(n); }} style={[styles.chip, on && styles.chipOn]}>
-                    <Text style={[styles.chipText, on && { color: colors.onInk }]}>{n}</Text>
-                  </Pressable>
-                );
-              })}
-              <Pressable accessibilityRole="radio" accessibilityState={{ selected: writingOwn }} onPress={() => { haptic.tap(); setWritingOwn(true); }} style={[styles.chip, writingOwn && styles.chipOn]}>
-                <Text style={[styles.chipText, writingOwn && { color: colors.onInk }]}>Write your own</Text>
-              </Pressable>
-            </View>
-            {writingOwn ? <Field label="Your goal's name" value={ownName} onChangeText={setOwnName} maxLength={40} /> : null}
-            <Field label="How much a year?" prefix="R" keyboardType="decimal-pad" value={yearly} onChangeText={setYearly} maxLength={AMOUNT_MAX_LENGTH} placeholder="0" error={amountError} />
-            <View style={styles.previewCard}>
-              <Text style={styles.previewKicker}>That&apos;s about</Text>
-              <Text style={styles.previewAmount}>{perMonth ? `${rand(perMonth)} a month` : "Type a yearly amount to see it monthly"}</Text>
             </View>
             <View style={{ flex: 1 }} />
             <Button
               label="Next"
-              onPress={async () => {
-                if (!yearly.trim()) return next(); // no goal for now
-                if (!yearlyCents || yearlyCents <= 0) return setAmountError(amountProblem(yearly, "12000") ?? undefined);
-                setAmountError(undefined);
-                const name = (writingOwn ? ownName.trim() : goalName) || "Giving goal";
-                const saved = await saveGoals(
-                  [{ id: `${Date.now()}`, name: name.slice(0, 40), basis: "fixed", percentPpm: null, fixedCents: yearlyCents, period: "year", year: "tax", counts: null }],
-                  account.status === "signed-in" ? account.userId : null,
-                );
-                if (!saved.ok) return notify("Your goal was not saved", "It could not be saved on this phone. Please try again, or skip and set it later on the Progress tab.");
-                haptic.success();
+              disabled={!giver}
+              onPress={() => {
+                void saveGiverType(giver);
                 next();
               }}
             />
-            <TextLink label="Not now" onPress={next} />
           </FadeUp>
         ) : (
-          <FadeUp key="safe" style={{ flex: 1, gap: space.block }}>
+          <FadeUp key="causes" style={{ flex: 1, gap: space.block }}>
             <View style={{ gap: 8 }}>
-              <Text variant="h1" accessibilityRole="header">Giving in a few taps, kept safe.</Text>
-              <Text variant="bodyMuted">How giving works, so you know where your card and your money go.</Text>
+              <Text variant="h1" accessibilityRole="header">Which causes matter to you?</Text>
+              <Text variant="bodyMuted">Pick as many as you like. We show these charities first.</Text>
             </View>
-            <View style={{ gap: 12 }}>
-              {SAFE.map((s, i) => (
-                <View key={s.title} style={styles.safeCard}>
-                  <View style={styles.safeNumber}><Text style={styles.safeNumberText}>{i + 1}</Text></View>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy }}>{s.title}</Text>
-                    <Text variant="bodyMuted">{s.body}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
+            {!directory.data && !directory.failed ? (
+              <View style={{ gap: 10 }}>
+                <SkeletonBlock height={46} width="70%" />
+                <SkeletonBlock height={46} width="55%" />
+                <SkeletonBlock height={46} width="80%" />
+              </View>
+            ) : directory.failed && !directory.data ? (
+              <View style={{ gap: 8 }} accessibilityRole="alert">
+                <Text variant="bodyMuted">We couldn&apos;t load the causes. Check your connection and try again, or skip this and see all charities.</Text>
+                <TextLink label="Try again" onPress={directory.retry} />
+              </View>
+            ) : (
+              <View style={styles.chips}>
+                {causes.map((c) => {
+                  const on = picked.includes(c.id);
+                  return (
+                    <Pressable
+                      key={c.id}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: on }}
+                      onPress={() => {
+                        haptic.tap();
+                        setPicked((ps) => (on ? ps.filter((x) => x !== c.id) : [...ps, c.id]));
+                      }}
+                      style={[styles.chip, on && styles.chipOn]}
+                    >
+                      {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
+                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{c.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
             <View style={{ flex: 1 }} />
-            <Button variant="cta" label="Start giving" onPress={finish} />
+            <Button
+              variant="cta"
+              label="Show me charities"
+              onPress={() => {
+                void saveCausePrefs(picked);
+                finish();
+              }}
+            />
           </FadeUp>
         )}
       </ScrollView>
@@ -232,11 +209,7 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 46, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  choice: { flexDirection: "row", alignItems: "center", gap: 12, padding: 18, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
+  choiceOn: { borderColor: colors.blue, backgroundColor: colors.lilacSoft },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
-  previewCard: { padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft, gap: 2 },
-  previewKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.muted },
-  previewAmount: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, color: colors.navy },
-  safeCard: { flexDirection: "row", gap: 14, padding: 16, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.lightPurple },
-  safeNumber: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.orange, alignItems: "center", justifyContent: "center" },
-  safeNumberText: { fontFamily: fonts.display, fontSize: 18, color: colors.navy },
 });

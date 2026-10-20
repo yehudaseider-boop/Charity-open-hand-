@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RaisingNowRow } from "@/components/raising-now";
@@ -16,7 +16,8 @@ import { EmptyState, ErrorState, LoadingList, OfflineNote, SkeletonBlock } from 
 import { Text } from "@/components/text";
 import { useDirectory } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
-import { inCause } from "@/lib/live-charities";
+import { loadCausePrefs } from "@/lib/cause-prefs";
+import { causesFirst, inCause } from "@/lib/live-charities";
 import { useScreenState } from "@/lib/screen-state";
 import { SeasonalCard } from "@/components/day-greeting";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
@@ -37,14 +38,22 @@ export default function Discover() {
   const [giveTo, setGiveTo] = useState<Charity | null>(null);
   const onGive = (c: Charity) => (GIVE_IN_APP ? openGiveScreen(c.slug) : setGiveTo(c));
 
+  // The causes picked on first open: those charities come first (nothing is hidden).
+  const [picked, setPicked] = useState<string[]>([]);
+  useEffect(() => {
+    loadCausePrefs().then(setPicked);
+  }, []);
+  const sortedByCauses = picked.length > 0 && cause === "all" && !query.trim();
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return charities.filter(
+    const found = charities.filter(
       (c) =>
         inCause(c, cause) &&
         (!q || c.nameEn.toLowerCase().includes(q) || c.cause.toLowerCase().includes(q) || c.area.toLowerCase().includes(q)),
     );
-  }, [query, cause, charities]);
+    return !q && cause === "all" ? causesFirst(found, picked) : found;
+  }, [query, cause, charities, picked]);
 
   const featured = !query && cause === "all" ? results.find((c) => c.featured) : undefined;
   const noneYet = live && charities.length === 0;
@@ -117,7 +126,7 @@ export default function Discover() {
               </FadeUp>
             ) : null}
             <View style={{ gap: 16 }}>
-              {rest.length ? <Text style={styles.listHead}>{cause === "all" && !query ? "More charities" : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
+              {rest.length ? <Text style={styles.listHead}>{cause === "all" && !query ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
               {rest.map((c, i) => (
                 <FadeUp key={c.slug} index={i + 1}>
                   <CharityPhotoCard charity={c} live={live} onGive={onGive} />

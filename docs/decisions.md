@@ -923,3 +923,23 @@ their 0 in CSV downloads; Undo says "removed since" correctly; a saved-ID proble
 in words; a spaced ID number fits the box; names and address lines are kept to one line; the data
 download includes agreements given with gifts and charities' personal thank-you notes. Open decisions
 went to the go-live checklist (sign-in lockout, second-step live check, shared emails in the download).
+
+## 20/10/2026: First open is "small yes first": give first, set a goal afterwards
+
+Decided by Yehuda. New first-open flow in the app: welcome, then two skippable questions ("What kind of
+giver are you?", "Which causes matter to you?"), then straight to Discover with the chosen causes' charities
+first (nothing hidden). The goal question left first open. After a first confirmed gift the gift-sent
+screen shows the charity's own impact line (or a plain thank-you; never invented) and, once ever, "Make it a
+habit" with "Set my goal" and "Maybe later". Set my goal opens the normal goal editor (neutral name, maaser
+only as an optional preset when the Jewish switch is on), and the progress shows the first gift already
+counted. Maybe later goes to Home, where a gentle goal card can be dismissed (a flag on the phone; no
+repeat pop-ups). Goals count the tax year, 1 March to the end of February, to match s18A receipts.
+Existing donors who finished first open see none of the new questions; with no goal they get only the Home
+card. Sign-up is not forced before the questions: giving still works without an account, and a donor who
+hasn't signed in is shown "Sign in with the email you gave with" so their gifts count towards the goal.
+The three "kept safe" points moved from first open to the give screen, shown on a first gift.
+"Kind of giver" is stored on the phone first and copied to the account's profile the first time they are
+signed in (never over an answer already there). Database: `20261020000001_giver_type.sql` (column plus its
+own-row update grant). New personal data: Privacy Policy line for Yosef (go-live checklist).
+Known limit: the goal invitation only appears on the gift-sent screen of a gift confirmed straight away;
+if the payment provider is still catching up, only the Home card is offered.

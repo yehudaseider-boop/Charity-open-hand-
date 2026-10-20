@@ -80,6 +80,16 @@ export function inCause(c: Charity, cause: string): boolean {
 }
 
 /**
+ * The donor's chosen causes first, everything else after, each group keeping its own order. Nothing is
+ * hidden, and nothing changes when no cause was chosen.
+ */
+export function causesFirst<T extends Charity>(list: T[], picked: string[]): T[] {
+  if (!picked.length) return list;
+  const mine = (c: Charity) => picked.some((p) => inCause(c, p));
+  return [...list.filter(mine), ...list.filter((c) => !mine(c))];
+}
+
+/**
  * Saved charities, newest first, without repeats. Used when someone who saved
  * charities on this phone signs in: those join the ones already on their account.
  */
