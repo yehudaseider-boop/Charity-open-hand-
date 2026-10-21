@@ -599,3 +599,9 @@ Four independent read-only reviews (money, security and privacy, receipts and ta
 - Read through `charity_monthly_list` (migration `20261016000001`), never the raw rows: no card details, gateway references, the donor's contribution to Givezy, their maaser/chomesh/tzedaka choice or the stored end reason. Like donations, a monthly donation shows only once a payment from it has gone through.
 - Database tests now run in the sandbox against a local Postgres with a stand-in for Supabase's auth and storage schemas: all 132 pass, including migrations `20261015000002` to `20261016000001`. Five older tests were updated to the stricter rules from the code review (a charity can't change its own status from the browser; resuming needs a card).
 - Not checked in a browser: the page needs a live Supabase.
+
+## Charity dashboard polish (21/10/2026)
+
+- Tabs wrap onto a second line on wider screens instead of being cut off (they still scroll sideways on a phone).
+- Overview opens on a lilac welcome card: the charity's name, "Verified" and "s18A receipts" badges where they apply, and the latest paid donation. The four summary tiles sit in one row from tablet width up.
+- The site stays a centred column (about 768px wide) on desktop on purpose, to match the rest of Givezy. A wider layout for charity pages is an option if wanted.

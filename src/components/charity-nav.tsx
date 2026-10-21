@@ -19,7 +19,7 @@ export function CharityNav({ id }: { id: string }) {
   const pathname = usePathname();
   const base = `/charity-admin/${id}`;
   return (
-    <nav aria-label="Charity" className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
+    <nav aria-label="Charity" className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
       {tabs.map((t) => {
         const href = `${base}${t.href}`;
         const active = t.exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);

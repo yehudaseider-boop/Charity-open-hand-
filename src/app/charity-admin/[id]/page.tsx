@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { allTime, monthlySummary, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
-import { loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
+import { loadLatestDonation, loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 
@@ -43,12 +44,13 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
   const now = new Date();
   const taxYear = thisTaxYear(now);
-  const [month, year, all, monthly, recurring] = await Promise.all([
+  const [month, year, all, monthly, recurring, latest] = await Promise.all([
     loadOverview(id, thisMonth(now)),
     loadOverview(id, taxYear),
     loadOverview(id, allTime),
     loadMonthlyTotals(id, 12),
     loadMonthlyDonations(id),
+    loadLatestDonation(id),
   ]);
   const regular = monthlySummary(recurring);
   const receipts = canIssue18a(charity);
@@ -59,9 +61,20 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{charity.name_en}</h1>
+      <section className="rounded-card border border-honey bg-honey-soft p-5">
+        <h1 className="text-xl font-semibold">{charity.name_en}</h1>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {charity.is_verified ? <Badge tone="success">Verified</Badge> : null}
+          {receipts ? <Badge tone="brand">s18A receipts</Badge> : null}
+        </div>
+        <p className="mt-3 text-sm">
+          {latest
+            ? `Your latest donation was ${formatRand(latest.amountCents)}, on ${formatDate(latest.paidAt)}.`
+            : "Your first donation will show here once a payment goes through."}
+        </p>
+      </section>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="This month" value={formatRand(month.paid_cents)} note={plural(month.paid_count, "donation")} />
         <Stat label={`Tax year ${taxYear.taxYear}`} value={formatRand(year.paid_cents)} note={plural(year.paid_count, "donation")} />
         <Stat label="All time" value={formatRand(all.paid_cents)} note={plural(all.paid_count, "donation")} />

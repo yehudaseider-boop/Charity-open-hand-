@@ -87,6 +87,21 @@ export async function loadMonthlyDonations(charityId: string): Promise<MonthlyRo
   return rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents), paid_count: n(r.paid_count), paid_cents: n(r.paid_cents) }));
 }
 
+/** The most recent paid donation, for the welcome card on the overview. */
+export async function loadLatestDonation(charityId: string): Promise<{ amountCents: number; paidAt: string } | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("charity_donations")
+    .select("amount_cents, paid_at")
+    .eq("charity_id", charityId)
+    .eq("status", "paid")
+    .order("paid_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.paid_at ? { amountCents: n(data.amount_cents), paidAt: data.paid_at as string } : null;
+}
+
 export const DONATION_FIELDS =
   "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
 
