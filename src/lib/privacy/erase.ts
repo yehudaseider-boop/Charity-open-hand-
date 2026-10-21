@@ -59,6 +59,11 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
   const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
   if (error) throw new Error(`Could not erase: ${error.message}`);
   if (ids.size) {
+    // What charities wrote or set about this person (notes, follow-ups, tags) goes with them.
+    for (const table of ["charity_donor_notes", "charity_donor_reminders", "charity_donor_tags"] as const) {
+      const { error: careError } = await db.from(table).delete().in("donor_id", [...ids]);
+      if (careError) throw careError;
+    }
     // The charities' personal thank-yous to them, and their name in the dashboard's "what just happened" rows.
     const { error: thanksError } = await db.from("charity_donor_thanks").delete().in("donor_id", [...ids]);
     if (thanksError) throw new Error(`Could not erase: ${thanksError.message}`);

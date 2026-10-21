@@ -12,7 +12,12 @@ import { loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charit
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
-import { donorGroup, donorGroups, isDonorGroup, monthlyByDonor } from "@/lib/charity/insights";
+import { donorGroup, donorGroupsFor, isDonorGroup, monthlyByDonor } from "@/lib/charity/insights";
+import { Card } from "@/components/card";
+import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "@/lib/charity/donor-care";
+import { deleteCharityTag, deleteDonorList, saveDonorList, saveLapsedPeriod } from "./care-actions";
+import { ButtonForm, LapsedForm, SaveListForm } from "./care-forms";
+import { CARE_DONE } from "@/lib/charity/donor-care-rules";
 
 export const metadata: Metadata = { title: "Donors" };
 
@@ -28,20 +33,30 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
 
   const group = isDonorGroup(sp.group) ? sp.group : null;
 
-  const [all, monthlyGifts, monthly] = await Promise.all([loadDonors(id), loadMonthlyGifts(id), loadMonthlyDonations(id)]);
+  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays] = await Promise.all([
+    loadDonors(id), loadMonthlyGifts(id), loadMonthlyDonations(id), listTags(id), tagsByDonor(id), listSegments(id), lapsedDaysFor(id),
+  ]);
+  const donorGroups = donorGroupsFor(lapsedDays);
+  const tagName = new Map(tags.map((t) => [t.id, t.name]));
+  const tag = typeof sp.tag === "string" && tagName.has(sp.tag) ? sp.tag : null;
   const givesMonthly = monthlyByDonor(monthlyGifts, monthly);
   const now = new Date();
   const needle = q.toLowerCase();
   const donors = all.filter(
-    (d) => (!group || donorGroup(d, now) === group) && (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
+    (d) =>
+      (!group || donorGroup(d, now, lapsedDays) === group) &&
+      (!tag || (byDonor.get(d.donor_id) ?? []).includes(tag)) &&
+      (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
   );
   const pages = Math.max(1, Math.ceil(donors.length / PAGE));
   // A page past the end (an old link, a typed number) shows the last page, never "No donors yet".
   const page = Math.min(asked, pages);
   const shown = donors.slice((page - 1) * PAGE, page * PAGE);
   const base = `/charity-admin/${id}/donors`;
-  const href = (p: number, g: string | null = group) =>
-    `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
+  const href = (p: number, g: string | null = group, t: string | null = tag) =>
+    `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(t ? { tag: t } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
+  const segmentHref = (f: { group?: string; tag?: string; q?: string }) =>
+    `${base}?${new URLSearchParams({ ...(f.q ? { q: f.q } : {}), ...(f.group ? { group: f.group } : {}), ...(f.tag ? { tag: f.tag } : {}) }).toString()}`.replace(/\?$/, "");
   // "Say thank you": only once the page is live, never to erased donors or anyone who asked not to get them.
   const canThank = charity.status === "approved";
   const [thanked, stopped] = canThank
@@ -57,6 +72,9 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         <a href={`/charity-admin/${id}/export/donors`} className="text-sm text-brand underline">Download donors (CSV)</a>
       </div>
       <DonePanel charity={charity} sp={sp} here={base} />
+      {typeof sp.did === "string" && CARE_DONE[sp.did] ? (
+        <p role="status" className="rounded-card bg-success-soft p-3 text-sm text-success">{CARE_DONE[sp.did]}</p>
+      ) : null}
       <p className="text-sm text-muted">
         People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record donations. Where a donor asked for one, Givezy issues the s18A receipt in your name.
       </p>
@@ -75,8 +93,34 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
       </nav>
       {group ? <p className="text-xs text-muted">{donorGroups.find((g) => g.key === group)?.hint}.</p> : null}
 
+      {tags.length ? (
+        <nav aria-label="Tags" className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs text-muted">Tags:</span>
+          {tags.map((t) => (
+            <Link
+              key={t.id}
+              href={href(1, group, tag === t.id ? null : t.id)}
+              aria-current={tag === t.id ? "page" : undefined}
+              className={`rounded-full border px-3 py-1 ${tag === t.id ? "border-brand bg-brand text-brand-contrast" : "border-border bg-surface text-navy"}`}
+            >
+              {t.name}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
+      {segments.length ? (
+        <nav aria-label="Saved lists" className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs text-muted">Saved lists:</span>
+          {segments.map((s) => (
+            <Link key={s.id} href={segmentHref(s.filters)} className="rounded-full border border-lilac bg-brand-soft px-3 py-1 text-indigo">{s.name}</Link>
+          ))}
+        </nav>
+      ) : null}
+
       <form action={base} className="flex gap-2">
         {group ? <input type="hidden" name="group" value={group} /> : null}
+        {tag ? <input type="hidden" name="tag" value={tag} /> : null}
         <input
           name="q"
           defaultValue={q}
@@ -88,14 +132,14 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
       </form>
 
       {shown.length === 0 ? (
-        <p className="text-sm text-muted">{q || group ? <NoMatch what="donors" clearHref={base} /> : "No donors yet. People appear here once their first donation is paid."}</p>
+        <p className="text-sm text-muted">{q || group || tag ? <NoMatch what="donors" clearHref={base} /> : "No donors yet. People appear here once their first donation is paid."}</p>
       ) : (
         <ul className="space-y-2">
           {shown.map((d) => (
             <li key={d.donor_id} className="rounded-card border border-border bg-surface p-4 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</p>
+                  <Link href={`${base}/${d.donor_id}`} className="block truncate font-medium text-brand underline">{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</Link>
                   {shownEmail(d.email) ? <p className="break-all text-muted">{d.email}</p> : null}
                   {d.phone ? <p className="text-muted">{d.phone}</p> : null}
                   <p className="mt-1 text-muted">
@@ -107,6 +151,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                     {d.donor_type !== "individual" ? <Badge>{d.donor_type === "company" ? "Company" : "Trust"}</Badge> : null}
                     {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                     {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
+                    {(byDonor.get(d.donor_id) ?? []).map((t) => (tagName.has(t) ? <Badge key={t}>{tagName.get(t)}</Badge> : null))}
                   </div>
                 </div>
                 <p className="shrink-0 font-semibold">{formatRand(d.total_cents)}</p>
@@ -125,6 +170,45 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
           ))}
         </ul>
       )}
+
+      {group || tag || q ? (
+        <Card title="Keep this list">
+          <SaveListForm action={saveDonorList.bind(null, id, { ...(group ? { group } : {}), ...(tag ? { tag } : {}), ...(q ? { q } : {}) })} />
+        </Card>
+      ) : null}
+
+      <details className="rounded-card border border-border bg-surface p-4 text-sm">
+        <summary className="cursor-pointer font-medium text-navy">Settings: lapsed donors, tags and saved lists</summary>
+        <div className="mt-3 space-y-4">
+          <LapsedForm action={saveLapsedPeriod.bind(null, id)} days={lapsedDays} />
+          {tags.length ? (
+            <div className="space-y-2">
+              <p className="font-medium">Your tags</p>
+              <ul className="space-y-2">
+                {tags.map((t) => (
+                  <li key={t.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{t.name}</span>
+                    <ButtonForm action={deleteCharityTag.bind(null, id, t.id)} label="Delete tag" pending="Deleting…" confirm={`Delete the tag "${t.name}"? It comes off every donor. The donors themselves are not changed.`} confirmLabel="Yes, delete it" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {segments.length ? (
+            <div className="space-y-2">
+              <p className="font-medium">Your saved lists</p>
+              <ul className="space-y-2">
+                {segments.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{s.name}</span>
+                    <ButtonForm action={deleteDonorList.bind(null, id, s.id)} label="Remove list" pending="Removing…" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      </details>
 
       {pages > 1 ? (
         <div className="flex items-center justify-between text-sm">

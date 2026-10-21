@@ -16,12 +16,25 @@ export const RECENT_DAYS = 30;
 
 export type DonorGroup = "new" | "repeat" | "once" | "lapsed";
 
-export const donorGroups: { key: DonorGroup; label: string; hint: string }[] = [
-  { key: "new", label: "New", hint: `First donation in the last ${NEW_DONOR_DAYS} days` },
-  { key: "repeat", label: "Coming back", hint: "Gave more than once, and in the last 6 months" },
-  { key: "once", label: "Gave once", hint: "One donation, in the last 6 months" },
-  { key: "lapsed", label: "Lapsed", hint: "Nothing in the last 6 months" },
-];
+/** "6 months", "90 days", "1 year": how a charity's lapsed period reads. */
+export function lapsedPeriodText(days: number): string {
+  if (days % 365 === 0) return days === 365 ? "year" : `${days / 365} years`;
+  if (days % 30 === 0 && days >= 60) return `${days / 30} months`;
+  return `${days} days`;
+}
+
+/** The groups, with hints in this charity's own lapsed period (default 180 days, "6 months"). */
+export function donorGroupsFor(lapsedDays: number = LAPSED_DAYS): { key: DonorGroup; label: string; hint: string }[] {
+  const period = lapsedPeriodText(lapsedDays);
+  return [
+    { key: "new", label: "New", hint: `First donation in the last ${NEW_DONOR_DAYS} days` },
+    { key: "repeat", label: "Coming back", hint: `Gave more than once, and in the last ${period}` },
+    { key: "once", label: "Gave once", hint: `One donation, in the last ${period}` },
+    { key: "lapsed", label: "Lapsed", hint: `Nothing in the last ${period}` },
+  ];
+}
+
+export const donorGroups = donorGroupsFor(LAPSED_DAYS);
 
 export function isDonorGroup(s: unknown): s is DonorGroup {
   return typeof s === "string" && donorGroups.some((g) => g.key === s);
@@ -30,16 +43,16 @@ export function isDonorGroup(s: unknown): s is DonorGroup {
 type DonorFacts = { donation_count: number; first_paid_at: string; last_paid_at: string };
 
 /** Each donor is in exactly one group. */
-export function donorGroup(d: DonorFacts, now: Date): DonorGroup {
+export function donorGroup(d: DonorFacts, now: Date, lapsedDays: number = LAPSED_DAYS): DonorGroup {
   const t = now.getTime();
-  if (t - new Date(d.last_paid_at).getTime() > LAPSED_DAYS * DAY) return "lapsed";
+  if (t - new Date(d.last_paid_at).getTime() > lapsedDays * DAY) return "lapsed";
   if (t - new Date(d.first_paid_at).getTime() <= NEW_DONOR_DAYS * DAY) return "new";
   return d.donation_count >= 2 ? "repeat" : "once";
 }
 
-export function countDonorGroups(donors: DonorFacts[], now: Date): Record<DonorGroup, number> {
+export function countDonorGroups(donors: DonorFacts[], now: Date, lapsedDays: number = LAPSED_DAYS): Record<DonorGroup, number> {
   const out: Record<DonorGroup, number> = { new: 0, repeat: 0, once: 0, lapsed: 0 };
-  for (const d of donors) out[donorGroup(d, now)] += 1;
+  for (const d of donors) out[donorGroup(d, now, lapsedDays)] += 1;
   return out;
 }
 

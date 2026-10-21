@@ -8,11 +8,12 @@ import { gettingStarted } from "@/lib/charity/checklist";
 import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
 import { CopyLink } from "./copy-link";
 import { allTime, averageCents, ERASED_DONOR, isErasedEmail, lastMonth, monthlySummary, repeatPercent, saDate, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
-import { countDonorGroups, donorGroups, endsWithinAWeek, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
+import { countDonorGroups, donorGroupsFor, endsWithinAWeek, lapsedPeriodText, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
+import { dueReminders, lapsedDaysFor } from "@/lib/charity/donor-care";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { isRunning, progressPercent } from "@/lib/charity/campaigns";
 import { loadDonors, loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
-import { formatDate, taxYearLabel } from "@/lib/dates";
+import { formatDate, isoDateInJhb, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Overview" };
@@ -79,6 +80,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     loadStories(id, 1),
     loadDonors(id),
   ]);
+  const [lapsedDays, due] = await Promise.all([lapsedDaysFor(id), dueReminders(id, isoDateInJhb(now))]);
+  const donorGroups = donorGroupsFor(lapsedDays);
   const activeCampaigns = campaigns.filter((c) => isRunning(c, now));
   const start = gettingStarted(charity, { updates: stories.updates.length, campaigns: campaigns.length }, base);
   const startDone = start.filter((i) => i.done).length;
@@ -87,7 +90,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const receipts = canIssue18a(charity);
   const today = saDate(now);
   const chart = lastMonths(monthly, today, 12);
-  const groups = countDonorGroups(donors, now);
+  const groups = countDonorGroups(donors, now, lapsedDays);
   const top = topDonors(donors, 5);
   const needs = monthlyAttention(recurring, now);
   const endingSoon = activeCampaigns.filter((c) => endsWithinAWeek(c.endsAt, now));
@@ -97,7 +100,10 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   if (needs.retrying > 0) todo.push({ key: "retry", text: `${plural(needs.retrying, "monthly donation")} declined this month and being tried again`, href: `${base}/monthly?show=running`, link: "See who" });
   if (needs.endedRecently > 0) todo.push({ key: "ended", text: `${plural(needs.endedRecently, "monthly donation")} stopped or cancelled in the last 30 days (${formatRand(needs.endedRecentlyCents)} a month)`, href: `${base}/monthly?show=ended`, link: "See who" });
   if (needs.pausedRecently > 0) todo.push({ key: "paused", text: `${plural(needs.pausedRecently, "monthly donor")} paused in the last 30 days`, href: `${base}/monthly?show=paused`, link: "See who" });
-  if (groups.lapsed > 0) todo.push({ key: "lapsed", text: `${plural(groups.lapsed, "donor")} haven't given in 6 months`, href: `${base}/donors?group=lapsed`, link: "See who" });
+  if (groups.lapsed > 0) todo.push({ key: "lapsed", text: `${plural(groups.lapsed, "donor")} haven't given in the last ${lapsedPeriodText(lapsedDays)}`, href: `${base}/donors?group=lapsed`, link: "See who" });
+  // Follow-ups the charity set itself, due today or earlier: the first few by name, then the count.
+  for (const r of due.slice(0, 5)) todo.push({ key: `f-${r.id}`, text: `Follow up with ${r.donor_name}: ${r.what}${r.due_on < isoDateInJhb(now) ? ` (was due ${formatDate(`${r.due_on}T12:00:00+02:00`)})` : ""}`, href: `${base}/donors/${r.donor_id}`, link: "Open" });
+  if (due.length > 5) todo.push({ key: "f-more", text: `${plural(due.length - 5, "more follow-up")} due`, href: `${base}/donors`, link: "See donors" });
   for (const c of endingSoon) todo.push({ key: `c-${c.id}`, text: `"${c.title}" ends on ${formatDate(c.endsAt as string)}${c.targetCents ? `, at ${progressPercent(c.raisedCents, c.targetCents)}% of its goal` : ""}`, href: `${base}/campaigns`, link: "Share it again" });
   if (all.refunded_count > 0) todo.push({ key: "refund", text: `${plural(all.refunded_count, "donation")} refunded (${formatRand(all.refunded_cents)})`, href: `${base}/donations?status=refunded`, link: "See them" });
   if (all.charged_back_count > 0) todo.push({ key: "cb", text: `${plural(all.charged_back_count, "donation")} charged back`, href: `${base}/donations?status=charged_back`, link: "See them" });

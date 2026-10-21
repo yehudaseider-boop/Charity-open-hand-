@@ -51,6 +51,14 @@
   given; our own gift amount is used for the Gift column (the s18A receipt is always for the full gift).
   A line or deposit that doesn't add up is shown as such, never smoothed over.
 
+- **Donor care (21/10/2026, Yehuda, chunk 3):** each donor has a page on the charity dashboard (Donors, their
+  name) with their giving, gifts, the charity's own tags, follow-up reminders and notes. Donors can be filtered
+  by tag and a filtered list (group, tag, search) saved under a name. Each charity chooses after how many days
+  without a gift a donor counts as lapsed (30 to 730, default 180). Follow-ups due today or earlier show on the
+  overview's to-do list. All of it is the charity's own (server-only tables, about donors who gave to it), is
+  never shown to donors, and is removed with an erased donor. Notes say on the form that donors can ask what
+  is held about them.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).
