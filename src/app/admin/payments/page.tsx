@@ -51,7 +51,7 @@ export default async function PaymentsPage() {
     db.from("donations").select("id, created_at, total_charged_cents, charities(name_en)").eq("status", "pending").order("created_at").limit(500),
     db.from("gateway_events").select("id, gateway, event_type, received_at, payload").is("processed_at", null).order("received_at").limit(200),
     db.from("audit_log").select("id, action, created_at, entity_type, entity_id, details").in("action", HELD).gte("created_at", since).order("created_at", { ascending: false }).limit(50),
-    allRows((a, b) => db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").gte("paid_at", since).order("id").range(a, b)),
+    allRows((a, b) => db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").neq("gateway", "recorded").gte("paid_at", since).order("id").range(a, b)),
     allRows((a, b) => db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).order("id").range(a, b)),
   ]);
   for (const r of [pending, events, review, paid, monthly]) if (r.error) throw r.error;

@@ -171,7 +171,7 @@ export function ImportGiftsForm({
               <summary className="cursor-pointer text-brand">Rows to fix ({preview.bad})</summary>
               <ul className="mt-2 space-y-1">
                 {preview.problems.map((p) => (
-                  <li key={p.line}><span className="font-medium">Row {p.line}:</span> {p.messages.join(". ")}.</li>
+                  <li key={p.line}><span className="font-medium">Row {p.line}:</span> {p.messages.map((m) => m.replace(/\.$/, "")).join(". ")}.</li>
                 ))}
               </ul>
               {preview.bad > preview.problems.length ? <p className="mt-1 text-muted">And {preview.bad - preview.problems.length} more.</p> : null}
@@ -202,4 +202,17 @@ export function ImportGiftsForm({
 function ConfirmError() {
   const error = useFieldError("confirm");
   return error ? <p role="alert" className="text-xs text-danger">{error}</p> : null;
+}
+
+/** Remove one recorded gift, or a whole import. Asked first on the page: it can't be undone. */
+export function RemoveImportForm({ action, gifts }: { action: (s: FormState, f: FormData) => Promise<FormState>; gifts: number }) {
+  return (
+    <ActionForm
+      action={action}
+      submitLabel={gifts === 1 ? "Remove this gift" : `Remove these ${gifts} gifts`}
+      pendingLabel="Removing…"
+      confirm={`Remove ${gifts === 1 ? "this gift" : `all ${gifts} gifts from this file`}? ${gifts === 1 ? "It" : "They"} will no longer count in your totals or on any s18A receipt. This can't be undone, but you can record or import ${gifts === 1 ? "it" : "them"} again.`}
+      confirmLabel="Yes, remove"
+    />
+  );
 }

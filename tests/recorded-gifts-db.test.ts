@@ -1,0 +1,100 @@
+/** Recorded gifts in the database: their shape, when they can be removed, and what the charity sees. Needs the local Supabase, seeded. */
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
+
+const client = new pg.Client({ connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres" });
+const run = (sql: string, args: unknown[] = []) => client.query(sql, args);
+let charity: string, admin: string;
+beforeAll(async () => {
+  await client.connect();
+  charity = (await run("select id from public.charities where slug = $1", ["northcliff-meals-fund"])).rows[0].id;
+  admin = (await run("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"])).rows[0].id;
+});
+afterAll(() => client.end());
+async function tx(fn: () => Promise<void>) {
+  await run("begin");
+  try {
+    await fn();
+  } finally {
+    await run("rollback");
+  }
+}
+async function refused(sql: string, args: unknown[], pattern: RegExp) {
+  await run("savepoint s");
+  await expect(run(sql, args)).rejects.toThrow(pattern);
+  await run("rollback to savepoint s");
+}
+const donor = async () => (await run("insert into public.donors (email, donor_type) values ($1, 'individual') returning id", [`rec-${Math.random()}@x.test`])).rows[0].id as string;
+const recorded = (d: string, o: { amount?: number; fee?: number; method?: string | null; gateway?: string; came?: string | null; ref?: string | null; wants?: boolean } = {}) =>
+  run(
+    `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway, status, paid_at, tax_year, recorded_method, came_from, external_ref, wants_18a)
+     values ($1, $2, $3, 0, $4, $5, $6, 'paid', '2026-03-05T12:00:00+02:00', 2027, $7, $8, $9, $10) returning id`,
+    [d, charity, o.amount ?? 50_000, o.fee ?? 0, (o.amount ?? 50_000) + (o.fee ?? 0), o.gateway ?? "recorded", o.method === undefined ? "eft" : o.method, o.came === undefined ? "recorded" : o.came, o.ref ?? null, o.wants ?? false],
+  );
+
+describe("recorded gifts", () => {
+  it("have no fee, no provider, and say how they came in", async () => {
+    await tx(async () => {
+      const d = await donor();
+      await expect(recorded(d)).resolves.toBeTruthy();
+      await run("savepoint s");
+      await expect(recorded(d, { fee: 100 })).rejects.toThrow(/recorded_gift_shape/);
+      await run("rollback to savepoint s");
+      await expect(recorded(d, { method: null })).rejects.toThrow(/recorded_gift_shape/);
+      await run("rollback to savepoint s");
+      await expect(recorded(d, { came: "website" })).rejects.toThrow(/recorded_gift_shape/);
+      await run("rollback to savepoint s");
+      // A gift through the payment provider can't claim to be recorded by the charity.
+      await expect(recorded(d, { gateway: "test", method: null, came: "recorded" })).rejects.toThrow(/recorded_gift_shape/);
+      await run("rollback to savepoint s");
+      await expect(recorded(d, { method: "bitcoin" })).rejects.toThrow(/donation_recorded_method/);
+    });
+  });
+
+  it("one reference once per charity", async () => {
+    await tx(async () => {
+      const d = await donor();
+      await recorded(d, { ref: "BANK-1" });
+      await run("savepoint s");
+      await expect(recorded(d, { ref: "BANK-1" })).rejects.toThrow(/donations_recorded_ref/);
+    });
+  });
+
+  it("can be removed until it is on a receipt; a paid online gift never can", async () => {
+    await tx(async () => {
+      const d = await donor();
+      const a = (await recorded(d)).rows[0].id;
+      await expect(run("delete from public.donations where id = $1", [a])).resolves.toMatchObject({ rowCount: 1 });
+      const b = (await recorded(d, { wants: true })).rows[0].id;
+      await run("update public.charities set is_s18a = true, mandate_signed_at = '2025-01-01' where id = $1", [charity]);
+      
+      await run("select * from public.issue_s18a_receipt($1, $2, 2027, $3::uuid[], 'MEALS', '{}'::jsonb)", [charity, d, [b]]);
+      await refused("delete from public.donations where id = $1", [b], /cannot be deleted/);
+      const online = (await recorded(d, { gateway: "test", method: null, came: "website" })).rows[0].id;
+      await refused("delete from public.donations where id = $1", [online], /cannot be deleted/);
+    });
+  });
+
+  it("how a gift came in can't be changed afterwards", async () => {
+    await tx(async () => {
+      const d = await donor();
+      const a = (await recorded(d)).rows[0].id;
+      await refused("update public.donations set recorded_method = 'cash' where id = $1", [a], /cannot change/);
+      await refused("update public.donations set gateway = 'test', recorded_method = null where id = $1", [a], /cannot change|recorded_gift_shape/);
+    });
+  });
+
+  it("the charity sees how each gift came in; a browser can't read or write imports", async () => {
+    await tx(async () => {
+      const d = await donor();
+      await recorded(d, { ref: "BANK-9" });
+      await run("insert into public.donation_checkout_details (donation_id, donor_type, email) select id, 'individual', 'v@x.test' from public.donations where external_ref = 'BANK-9'");
+      await run("set local role authenticated");
+      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: admin, role: "authenticated", aal: "aal2" })]);
+      const seen = await run("select recorded_method, external_ref, came_from from public.charity_donations where external_ref = 'BANK-9'");
+      expect(seen.rows).toEqual([{ recorded_method: "eft", external_ref: "BANK-9", came_from: "recorded" }]);
+      await refused("select * from public.gift_imports", [], /permission denied/);
+      await refused("insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway) values ($1, $2, 1, 0, 0, 1, 'recorded')", [d, charity], /permission denied|row-level security/);
+    });
+  });
+});

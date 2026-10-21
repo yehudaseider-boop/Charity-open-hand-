@@ -8,11 +8,14 @@ import { requireViewer } from "@/lib/auth";
 import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charity/dashboard";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { formatDateTime } from "@/lib/dates";
+import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { donationReference } from "@/lib/donations/reference";
 import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
+import { cameInBy } from "@/lib/charity/recorded-gifts";
+import { removeRecordedGifts } from "../record-actions";
+import { RemoveImportForm } from "../record-forms";
 
 export const metadata: Metadata = { title: "Donation" };
 
@@ -51,8 +54,10 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
 
       <Card title="Donation" headingLevel={1}>
         <dl>
-          <Row label="Started">{formatDateTime(d.created_at)}</Row>
-          {d.paid_at ? <Row label="Paid">{formatDateTime(d.paid_at)}</Row> : null}
+          {d.recorded_method ? null : <Row label="Started">{formatDateTime(d.created_at)}</Row>}
+          {d.paid_at ? <Row label={d.recorded_method ? "Came in" : "Paid"}>{d.recorded_method ? formatDate(d.paid_at) : formatDateTime(d.paid_at)}</Row> : null}
+          <Row label="How it came in">{cameInBy(d.recorded_method)}</Row>
+          {d.external_ref ? <Row label="Your reference">{d.external_ref}</Row> : null}
           {d.refunded_at ? <Row label="Refunded">{formatDateTime(d.refunded_at)}</Row> : null}
           {d.charged_back_at ? <Row label="Charged back">{formatDateTime(d.charged_back_at)}</Row> : null}
           {d.tax_year ? <Row label="Tax year">{d.tax_year}</Row> : null}
@@ -101,6 +106,13 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           </ul>
         )}
       </Card>
+
+      {d.recorded_method && receipts.length === 0 ? (
+        <Card title="A mistake?">
+          <p className="mb-3 text-sm text-muted">You recorded this gift, so you can remove it until it is on an s18A receipt. Then record it again with the right details.</p>
+          <RemoveImportForm action={removeRecordedGifts.bind(null, id, { donationId: d.id })} gifts={1} />
+        </Card>
+      ) : null}
     </div>
   );
 }

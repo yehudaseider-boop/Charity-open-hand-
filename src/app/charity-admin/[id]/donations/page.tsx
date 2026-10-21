@@ -9,6 +9,8 @@ import { donationStatus, donorName } from "@/lib/charity/dashboard";
 import { applyDonationFilters, filtersToQuery, parseDonationFilters, periodOptions, periodText, type PeriodKey } from "@/lib/charity/donation-filters";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { formatDate } from "@/lib/dates";
+import { DonePanel } from "@/components/done-panel";
+import { RECORDED_METHODS, type RecordedMethod } from "@/lib/charity/recorded-gifts";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,7 +23,7 @@ const statusTabs = ["all", "paid", "refunded", "charged_back"] as const;
 export default async function DonationsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/donations">) {
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/donations`);
-  await loadCharityForManager(id);
+  const { charity } = await loadCharityForManager(id);
   const sp = await searchParams;
   const filters = parseDonationFilters(sp);
   const { status, q } = filters;
@@ -60,6 +62,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
 
   return (
     <div className="space-y-4">
+      <DonePanel charity={charity} sp={sp} here={base} />
       <div className="flex items-start justify-between gap-3">
         <h1 className="font-display text-2xl text-indigo">Donations</h1>
         {/* Paid only by default, so the bookkeeper's total is income received. */}
@@ -71,6 +74,12 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
             <a href={csvAllHref} className="mt-1 block text-xs text-muted underline">Every status</a>
           ) : null}
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 text-sm">
+        <Link href={`${base}/record`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Record a gift</Link>
+        <Link href={`${base}/import`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Import from a file</Link>
+        <span className="self-center text-xs text-muted">For EFT, cash and other gifts that didn&apos;t come through Givezy.</span>
       </div>
 
       <form action={base} className="space-y-2">
@@ -139,6 +148,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
                         <Badge tone={s.tone}>{s.label}</Badge>
                         {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                         {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
+                        {d.recorded_method ? <Badge>Recorded: {RECORDED_METHODS[d.recorded_method as RecordedMethod] ?? "by you"}</Badge> : null}
                       </div>
                     </div>
                     <p className="shrink-0 font-semibold">{formatRand(d.amount_cents)}</p>

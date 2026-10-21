@@ -33,6 +33,17 @@
   go on the same yearly receipt so donors get one receipt; messages to donors are email only for now
   (WhatsApp sending waits for a provider and its price); IT3(d) waits for the SARS layout.
 
+- **Gifts a charity records itself (21/10/2026, Yehuda):** EFT, cash, a debit order or another
+  programme (Heroes with Halos), typed in on Donations, Record a gift, or imported from a CSV file
+  (Donations, Import from a file: checked first, nothing saved until Import, with the charity's
+  confirmation that it may share the donors' details and won't issue its own receipt). Stored as donations
+  with gateway `recorded`: no fee, no contribution, never counted in Givezy's comparison with the payment
+  provider. They count in the charity's totals and donor history and go on the donor's one yearly s18A
+  receipt. An amount or date that could be read two ways ("1,250", a file where every date could be
+  month/day) is refused or flagged, never guessed. The same gift twice is caught by the bank reference, or
+  by email, amount and date. A recorded gift can be removed (Undo for 30 minutes, then Remove) until it is
+  on an s18A receipt, issued or withdrawn; the database enforces this.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

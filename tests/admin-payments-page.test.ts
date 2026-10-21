@@ -9,6 +9,7 @@ vi.mock("server-only", () => ({}));
 const NOW = Date.now();
 const ago = (min: number) => new Date(NOW - min * 60_000).toISOString();
 let tables: Record<string, unknown[]>;
+let excluded: string[];
 
 vi.mock("@/lib/auth", () => ({ requirePlatformAdmin: async () => ({ userId: "admin1" }) }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -16,6 +17,7 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (table: string) => {
       const q: Record<string, unknown> = {};
       for (const m of ["select", "eq", "in", "is", "gte", "order", "limit", "range"]) q[m] = () => q;
+      q.neq = (col: string, val: string) => (excluded.push(`${table}.${col}<>${val}`), q);
       q.then = (resolve: (v: { data: unknown[]; error: null }) => void) => resolve({ data: tables[table] ?? [], error: null });
       return q;
     },
@@ -29,9 +31,15 @@ async function page() {
 
 beforeEach(() => {
   tables = {};
+  excluded = [];
 });
 
 describe("the Payments page", () => {
+  it("leaves gifts a charity recorded itself out of the totals compared with the payment provider", async () => {
+    await page();
+    expect(excluded).toContain("donations.gateway<>recorded");
+  });
+
   it("says nothing is stuck when nothing is", async () => {
     const html = await page();
     expect(html).toContain("Nothing is stuck");

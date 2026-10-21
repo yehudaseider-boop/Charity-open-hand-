@@ -143,7 +143,7 @@ export async function loadReportData(charityId: string) {
 }
 
 export const DONATION_FIELDS =
-  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code";
+  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code, recorded_method, external_ref, came_from";
 
 export type DonationRow = {
   id: string;
@@ -174,6 +174,12 @@ export type DonationRow = {
   suburb: string | null;
   city: string | null;
   postal_code: string | null;
+  /** Set when the charity recorded the gift itself (EFT, cash, ...); null for a gift made on Givezy. */
+  recorded_method: string | null;
+  /** The charity's own reference for a recorded gift (a bank reference). */
+  external_ref: string | null;
+  /** Where the gift came from: website, app, whatsapp, share_link, qr or recorded (null for older gifts). */
+  came_from: string | null;
 };
 
 export type Insights = { newDonors: number; returningDonors: number; repeatDonors: number; allDonors: number; monthlyActive: number; monthlyActiveCents: number };

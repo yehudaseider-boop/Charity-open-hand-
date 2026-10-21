@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { cameInBy } from "@/lib/charity/recorded-gifts";
 import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charity/dashboard";
 import { applyDonationFilters, parseDonationFilters, periodText } from "@/lib/charity/donation-filters";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
@@ -10,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { donationReference } from "@/lib/donations/reference";
 
-const HEADER = ["Date", "Reference", "Status", "Tax year", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "s18A receipt requested", "Anonymous publicly", "Dedication", "Message"];
+const HEADER = ["Date", "Reference", "Status", "Tax year", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "s18A receipt requested", "Anonymous publicly", "Dedication", "Message", "How it came in", "Your reference"];
 
 /**
  * A charity's donations as a CSV, for their bookkeeper. Paid donations only unless asked
@@ -59,6 +60,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
         return ded ? dedicationLine(ded) : "";
       })(),
       d.message,
+      cameInBy(d.recorded_method),
+      d.external_ref,
     ]),
   );
   return csvResponse(csv, `donations-${status ?? "all"}${filters.fromDate ? `-${filters.fromDate}-to-${filters.toDate}` : ""}.csv`);
