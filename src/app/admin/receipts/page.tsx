@@ -6,8 +6,10 @@ import { containsPattern, safeSearch } from "@/lib/charity/dashboard";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
-import { voidReceipt } from "./actions";
-import { VoidForm } from "./forms";
+import { receiptsEnabled } from "@/config/receipts";
+import { getRun, listUnfinishedRuns, listWaitingRuns, pendingAtYearEnd, runNeedsFinishing } from "@/lib/receipts/runs";
+import { finishReceipts, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
+import { FinishForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
 
 export const metadata: Metadata = { title: "Receipts" };
 
@@ -15,7 +17,8 @@ const tabs = ["issued", "void"] as const;
 
 export default async function AdminReceiptsPage({ searchParams }: PageProps<"/admin/receipts">) {
   await requirePlatformAdmin();
-  const { status: raw, q: rawQ } = await searchParams;
+  const { status: raw, q: rawQ, run: rawRun } = await searchParams;
+  const justRan = typeof rawRun === "string" ? await getRun(rawRun) : null;
   const status = tabs.includes(raw as (typeof tabs)[number]) ? (raw as (typeof tabs)[number]) : "issued";
   // Search by receipt number, donor or charity name: letters, digits, spaces and dashes only (it goes into a filter).
   const q = typeof rawQ === "string" ? safeSearch(rawQ) : "";
@@ -36,11 +39,62 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
   }
   const { data: receipts, error } = await query;
   if (error) throw error;
+  const [waiting, unfinished] = await Promise.all([listWaitingRuns(), listUnfinishedRuns()]);
+  const pending = await Promise.all(waiting.map((w) => pendingAtYearEnd(w.charity_id, w.tax_year)));
+  const enabled = receiptsEnabled();
 
   return (
     <div className="space-y-4">
       <Link href="/admin" className="text-sm text-muted">← Platform admin</Link>
       <h1 className="text-xl font-semibold">s18A receipts</h1>
+
+      {justRan?.summary ? <RunDone run={justRan} /> : null}
+      {justRan?.status === "cancelled" ? (
+        <section role="status" aria-label="What just happened" className="space-y-1 rounded-card border border-border bg-warning-soft p-4 text-sm">
+          <p className="font-medium text-navy">{justRan.charity_name}, {taxYearLabel(justRan.tax_year)}: nothing was issued.</p>
+          <p>It went back to the charity&apos;s receipts page with the new list and this note: &ldquo;{justRan.cancelled_reason}&rdquo;</p>
+        </section>
+      ) : null}
+
+      <section className="space-y-3" aria-labelledby="waiting-runs">
+        <h2 id="waiting-runs" className="font-semibold">Waiting for your sign-off</h2>
+        {!enabled ? (
+          <p className="rounded-card bg-warning-soft p-3 text-sm text-warning">
+            Receipts are switched off until the attorney confirms the wording (RECEIPTS_ENABLED and RECEIPT_WORDING_CONFIRMED). Charities can approve their lists; signing off is refused until then.
+          </p>
+        ) : null}
+        {waiting.length === 0 ? <p className="text-sm text-muted">No charity has a list waiting. A charity approves its list after the tax year closes.</p> : null}
+        {waiting.map((w, i) => (
+          <div key={w.id} className="space-y-2 rounded-card border border-border bg-surface p-4 text-sm">
+            <p className="font-medium">{w.charity_name}</p>
+            <p>
+              {taxYearLabel(w.tax_year)}: {w.receipts_planned} {w.receipts_planned === 1 ? "receipt" : "receipts"}, {formatRand(w.total_cents)}. Approved by the charity on {formatDate(w.charity_approved_at)}.
+            </p>
+            {pending[i] ? <p className="text-warning">{pending[i]} s18A {pending[i] === 1 ? "payment" : "payments"} from the last days of the year still pending. Check Payments first.</p> : null}
+            {w.status === "issuing" ? (
+              <p className="text-muted">Being issued since {w.signed_off_at ? formatDate(w.signed_off_at) : "just now"}. If this stays here, the run stopped part way: tell the developer.</p>
+            ) : (
+              <>
+                <SignOffForm action={signOffReceipts.bind(null, w.id)} count={w.receipts_planned} total={formatRand(w.total_cents)} />
+                <details>
+                  <summary className="cursor-pointer text-brand">Send it back to the charity</summary>
+                  <div className="mt-2"><SendBackForm action={sendBackReceipts.bind(null, w.id, w.total_cents)} /></div>
+                </details>
+              </>
+            )}
+          </div>
+        ))}
+        {unfinished.map((u) => (
+          <div key={u.id} className="space-y-2 rounded-card border border-border bg-warning-soft p-4 text-sm">
+            <p className="font-medium">{u.charity_name}, {taxYearLabel(u.tax_year)}: not finished</p>
+            <p>
+              {u.summary?.issued ?? 0} issued, {u.summary?.pdfsMade ?? 0} PDFs made, {u.summary?.emailed ?? 0} emailed.
+              {u.summary?.failed[0] ? ` Some steps failed (${u.summary.failed[0].message}).` : " Not every receipt has been emailed yet."} Finish makes what is missing and sends what wasn&apos;t sent. It never issues a new receipt.
+            </p>
+            <FinishForm action={finishReceipts.bind(null, u.id)} />
+          </div>
+        ))}
+      </section>
       <nav className="flex gap-2 text-sm">
         {tabs.map((t) => (
           <Link
@@ -61,7 +115,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
           aria-label="Search receipts"
           className="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm"
         />
-        <button type="submit" className="rounded-control bg-brand px-4 py-2 text-sm font-semibold text-brand-contrast">Search</button>
+        <button type="submit" className="shrink-0 whitespace-nowrap rounded-control bg-brand px-4 py-2 text-sm font-semibold text-brand-contrast">Search</button>
       </form>
       <p className="text-xs text-muted">{q ? `Matches for \u201c${q}\u201d (up to 100).` : "The latest 100. Search to find an older receipt."}</p>
       {receipts && receipts.length > 0 ? (
@@ -101,5 +155,26 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
         <p className="text-sm text-muted">{status === "issued" ? "No receipts have been issued yet." : "No receipts have been withdrawn."}</p>
       )}
     </div>
+  );
+}
+
+/** What a sign-off or a finish just did, from the run's own record. */
+function RunDone({ run }: { run: NonNullable<Awaited<ReturnType<typeof getRun>>> }) {
+  const s = run.summary!;
+  const unfinished = runNeedsFinishing(s);
+  return (
+    <section role="status" aria-label="What just happened" className={`space-y-1 rounded-card border border-border p-4 text-sm ${unfinished ? "bg-warning-soft" : "bg-brand-soft"}`}>
+      <p className="font-medium text-navy">
+        {run.charity_name}, {taxYearLabel(run.tax_year)}: {s.issued} of {s.planned} {s.planned === 1 ? "receipt" : "receipts"} issued, {s.pdfsMade} PDFs made, {s.emailed} emailed.
+      </p>
+      {unfinished ? (
+        <p>
+          Not everything is done yet{s.emailed < s.issued && s.failed.length === 0 && s.emailFailed === 0 ? ": receipts are not emailed while email is not switched on (EMAIL_TRANSPORT) or SITE_URL is missing" : ""}.
+          It is listed below under &ldquo;not finished&rdquo;. Finish makes what is missing and sends what wasn&apos;t sent; it never issues a new receipt.
+        </p>
+      ) : (
+        <p>All done. Each donor has their receipt by email, and the charity sees them on its receipts page.</p>
+      )}
+    </section>
   );
 }

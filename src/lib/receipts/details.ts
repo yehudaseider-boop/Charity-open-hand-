@@ -35,6 +35,11 @@ export type DonorRow = {
   tax_reference_last4: string | null;
 };
 
+/** The donor's name as printed on a receipt: a person's first and last name, or the organisation's. */
+export function receiptDonorName(d: Pick<DonorRow, "donor_type" | "first_name" | "last_name" | "organisation_name">): string {
+  return d.donor_type === "individual" ? lines(d.first_name, d.last_name).join(" ") : (d.organisation_name ?? "").trim();
+}
+
 export type ReceiptDetails = {
   charity: {
     legal_name_en: string;
@@ -85,10 +90,7 @@ export function buildReceiptDetails(args: {
   const { charity: c, donor: d } = args;
   const fmt = (iso: string) => iso.split("-").reverse().join("/");
   const period = `${fmt(args.periodStart)} to ${fmt(args.periodEnd)}`;
-  const name =
-    d.donor_type === "individual"
-      ? lines(d.first_name, d.last_name).join(" ")
-      : (d.organisation_name ?? "").trim();
+  const name = receiptDonorName(d);
   const sorted = [...args.donations].sort((a, b) => new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime());
   return {
     charity: {

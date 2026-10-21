@@ -16,16 +16,17 @@ import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, typ
 export type IssuedReceipt = { id: string; reference: string; charityId: string; details: ReceiptDetails; pdfPath: string | null };
 
 export interface ReceiptStore {
-  listDonations(taxYear: number): Promise<PlanDonation[]>;
+  /** Paid s18A donations of the tax year; one charity's only, when given. */
+  listDonations(taxYear: number, charityId?: string): Promise<PlanDonation[]>;
   listCharities(ids: string[]): Promise<(PlanCharity & CharityRow)[]>;
   receiptedDonationIds(taxYear: number): Promise<Set<string>>;
   /** The donor details typed with a donation, plus when it was paid. */
   donorDetailsFor(donationIds: string[]): Promise<{ paidAt: string; amountCents: number; donor: DonorRow }[]>;
   issue(receipt: PlannedReceipt, charity: CharityRow, details: ReceiptDetails): Promise<IssuedReceipt>;
-  listIssuedWithoutPdf(taxYear: number): Promise<IssuedReceipt[]>;
+  listIssuedWithoutPdf(taxYear: number, charityId?: string): Promise<IssuedReceipt[]>;
   savePdf(receipt: IssuedReceipt, pdf: Buffer): Promise<void>;
   /** Issued receipts with a PDF that have not been emailed yet, with the donor's email address. */
-  listToEmail(taxYear: number): Promise<(IssuedReceipt & { email: string })[]>;
+  listToEmail(taxYear: number, charityId?: string): Promise<(IssuedReceipt & { email: string })[]>;
   readPdf(receipt: IssuedReceipt): Promise<Buffer>;
   markEmailed(receipt: IssuedReceipt): Promise<void>;
 }
@@ -35,7 +36,8 @@ export type Mailer = { transport: EmailTransport; siteUrl: string; platformName:
 
 export type Renderer = (receipt: { details: ReceiptDetails; reference: string }) => Promise<Buffer>;
 
-export type JobMode = "dry-run" | "issue";
+/** "finish" only makes missing PDFs and sends unsent emails: it never issues a receipt nobody approved. */
+export type JobMode = "dry-run" | "issue" | "finish";
 
 export type JobSummary = {
   taxYear: number;
@@ -64,14 +66,16 @@ export async function runReceiptsJob(args: {
   mode: JobMode;
   /** If given, each receipt is emailed to the donor once its PDF exists. */
   mailer?: Mailer;
+  /** One charity's receipts only (the run it approved). Left out, every charity's. */
+  charityId?: string;
 }): Promise<JobSummary> {
-  const { store, taxYear } = args;
+  const { store, taxYear, charityId } = args;
   const { start, end } = taxYearRange(taxYear);
   if (!taxYearIsClosed(end, args.today)) {
     throw new Error(`Tax year ${taxYear} ends on ${end.split("-").reverse().join("/")}. Receipts are issued after it closes.`);
   }
 
-  const donations = await store.listDonations(taxYear);
+  const donations = await store.listDonations(taxYear, charityId);
   const charities = await store.listCharities([...new Set(donations.map((d) => d.charityId))]);
   const already = await store.receiptedDonationIds(taxYear);
   const { receipts, skipped, severalIdentities } = planReceipts({ taxYear, donations, charities, alreadyReceipted: already });
@@ -95,7 +99,7 @@ export async function runReceiptsJob(args: {
 
   const charityById = new Map(charities.map((c) => [c.id, c]));
   // One bad receipt never stops the others: its failure is recorded and the run carries on.
-  for (const r of receipts) {
+  for (const r of args.mode === "issue" ? receipts : []) {
     const what = `receipt for donor ${r.donorId} (donations ${r.donationIds.join(", ")})`;
     try {
       const charity = charityById.get(r.charityId)!;
@@ -124,7 +128,7 @@ export async function runReceiptsJob(args: {
   }
 
   // Receipts issued earlier whose PDF failed or was never made.
-  for (const missing of await store.listIssuedWithoutPdf(taxYear)) {
+  for (const missing of await store.listIssuedWithoutPdf(taxYear, charityId)) {
     try {
       await store.savePdf(missing, await args.render({ details: missing.details, reference: missing.reference }));
       summary.pdfsMade += 1;
@@ -136,7 +140,7 @@ export async function runReceiptsJob(args: {
   // Email every receipt that has a PDF and has not been emailed. One failed
   // email never stops the others; it is tried again on the next run.
   if (args.mailer) {
-    for (const r of await store.listToEmail(taxYear)) {
+    for (const r of await store.listToEmail(taxYear, charityId)) {
       try {
         const pdf = await store.readPdf(r);
         const mail = buildReceiptEmail({ details: r.details, reference: r.reference, siteUrl: args.mailer.siteUrl, platformName: args.mailer.platformName });
@@ -164,10 +168,10 @@ export async function runReceiptsJob(args: {
  * Receipts as they would be issued, without writing anything: for checking
  * the layout and the totals. Works for any tax year, open or closed.
  */
-export async function previewReceipts(args: { store: ReceiptStore; taxYear: number; now: Date }) {
+export async function previewReceipts(args: { store: ReceiptStore; taxYear: number; now: Date; charityId?: string }) {
   const { store, taxYear } = args;
   const { start, end } = taxYearRange(taxYear);
-  const donations = await store.listDonations(taxYear);
+  const donations = await store.listDonations(taxYear, args.charityId);
   const charities = await store.listCharities([...new Set(donations.map((d) => d.charityId))]);
   const { receipts } = planReceipts({ taxYear, donations, charities, alreadyReceipted: await store.receiptedDonationIds(taxYear) });
   const charityById = new Map(charities.map((c) => [c.id, c]));
