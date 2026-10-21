@@ -20,7 +20,9 @@ export type Undo =
   /** Start a campaign again that this action ended. */
   | { type: "reopen_campaign"; id: string }
   /** Withdraw a receipt approval, while Givezy hasn't signed it off yet. */
-  | { type: "cancel_receipt_run"; id: string };
+  | { type: "cancel_receipt_run"; id: string }
+  /** Remove gifts the charity recorded (one, or a whole import), while none is on a receipt. */
+  | { type: "remove_recorded"; donationIds?: string[]; importId?: string };
 
 export type ActionRow = { id: string; charity_id: string; kind: ActionKind; details: Details; undo: Undo | null; undone_at: string | null; created_at: string };
 
@@ -192,6 +194,25 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       // Already signed off and issued (or already withdrawn): receipts can't be taken back here.
       return data?.length ? null : "issued";
     }
+    case "remove_recorded": {
+      const ids = undo.importId ? null : (undo.donationIds ?? []);
+      let q = db.from("donations").select("id").eq("charity_id", charityId).eq("gateway", "recorded");
+      q = undo.importId ? q.eq("import_id", undo.importId) : q.in("id", ids ?? []);
+      const { data: rows, error } = await q;
+      if (error) throw error;
+      const found = (rows ?? []).map((r) => r.id as string);
+      if (!found.length) return "removed";
+      const { count, error: linkError } = await db.from("s18a_receipt_donations").select("donation_id", { count: "exact", head: true }).in("donation_id", found);
+      if (linkError) throw linkError;
+      if ((count ?? 0) > 0) return "issued";
+      const { error: delError } = await db.from("donations").delete().in("id", found).eq("gateway", "recorded");
+      if (delError) {
+        if (/cannot be deleted/.test(delError.message)) return "issued";
+        throw delError;
+      }
+      if (undo.importId) await db.from("gift_imports").delete().eq("id", undo.importId).eq("charity_id", charityId);
+      return null;
+    }
   }
 }
 
@@ -206,7 +227,7 @@ export function undoFailureText(why: UndoFailure): string {
     case "full": return "There's no room for it: you're at the limit. Remove or end one first, then try again.";
     case "locked": return "Your application has been submitted, so your details are locked while we review them.";
     case "ended": return "Its last day has passed, so it can't run again. Start a new campaign instead.";
-    case "issued": return "Givezy has already signed it off, so the receipts are issued. If one is wrong, tell us: only we can withdraw and re-issue a receipt.";
+    case "issued": return "It's already on an s18A receipt Givezy has issued, so it can't be taken back here. If something is wrong, tell us: only we can withdraw and re-issue a receipt.";
     case "error": return "Something went wrong and nothing was changed. Please try again.";
   }
 }
