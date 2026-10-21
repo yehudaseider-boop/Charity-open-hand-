@@ -25,19 +25,18 @@ function identityOf(embed: unknown): string {
 
 export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
   return {
-    async listDonations(taxYear) {
-      const rows = await all<Record<string, unknown>>((from, to) =>
-        db
+    async listDonations(taxYear, charityId) {
+      const rows = await all<Record<string, unknown>>((from, to) => {
+        const q = db
           .from("donations")
           // A donor whose information was erased can no longer be given a receipt (their details are gone), so they are left out.
           .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at, donation_checkout_details!inner(receipt_identity, erased_at)")
           .is("donation_checkout_details.erased_at", null)
           .eq("tax_year", taxYear)
           .eq("status", "paid")
-          .eq("wants_18a", true)
-          .order("id")
-          .range(from, to),
-      );
+          .eq("wants_18a", true);
+        return (charityId ? q.eq("charity_id", charityId) : q).order("id").range(from, to);
+      });
       return rows.map(
         (r): PlanDonation => ({
           id: r.id as string,
@@ -113,10 +112,11 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       return { id: row.receipt_id, reference: row.receipt_reference, charityId: r.charityId, details, pdfPath: null };
     },
 
-    async listIssuedWithoutPdf(taxYear) {
-      const rows = await all<{ id: string; charity_id: string; details: ReceiptDetails }>((from, to) =>
-        db.from("s18a_receipts").select("id, charity_id, details").eq("tax_year", taxYear).eq("status", "issued").is("pdf_path", null).order("id").range(from, to),
-      );
+    async listIssuedWithoutPdf(taxYear, charityId) {
+      const rows = await all<{ id: string; charity_id: string; details: ReceiptDetails }>((from, to) => {
+        const q = db.from("s18a_receipts").select("id, charity_id, details").eq("tax_year", taxYear).eq("status", "issued").is("pdf_path", null);
+        return (charityId ? q.eq("charity_id", charityId) : q).order("id").range(from, to);
+      });
       return rows.map((r) => ({
         id: r.id,
         charityId: r.charity_id,
@@ -126,7 +126,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       }));
     },
 
-    async listToEmail(taxYear) {
+    async listToEmail(taxYear, charityId) {
       type Row = {
         id: string;
         charity_id: string;
@@ -134,17 +134,16 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         pdf_path: string;
         s18a_receipt_donations: { donations: { status: string; paid_at: string; donation_checkout_details: { email: string } | { email: string }[] | null } | null }[];
       };
-      const rows = await all<Row>((from, to) =>
-        db
+      const rows = await all<Row>((from, to) => {
+        const q = db
           .from("s18a_receipts")
           .select("id, charity_id, details, pdf_path, s18a_receipt_donations(donations(status, paid_at, donation_checkout_details(email)))")
           .eq("tax_year", taxYear)
           .eq("status", "issued")
           .not("pdf_path", "is", null)
-          .is("emailed_at", null)
-          .order("id")
-          .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
-      );
+          .is("emailed_at", null);
+        return (charityId ? q.eq("charity_id", charityId) : q).order("id").range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+      });
       const out: (IssuedReceipt & { email: string })[] = [];
       for (const r of rows) {
         const donations = r.s18a_receipt_donations.map((l) => l.donations).filter((d): d is NonNullable<typeof d> => d !== null);

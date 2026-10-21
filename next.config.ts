@@ -41,6 +41,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Receipt PDFs are printed with Chrome through playwright-core: loaded from node_modules at run time, not bundled.
+  serverExternalPackages: ["playwright-core"],
   experimental: {
     // Server actions accept 1 MB by default, but charity photos and documents may be up to 5 MB
     // (MAX_UPLOAD_BYTES in src/lib/charity/validation.ts). Leave room for the rest of the form.

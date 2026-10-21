@@ -18,7 +18,9 @@ export type Undo =
   /** Put back a row this action removed (its file was kept for this). */
   | { type: "reinsert"; table: "charity_updates" | "charity_photos" | "charity_documents"; row: Record<string, unknown> }
   /** Start a campaign again that this action ended. */
-  | { type: "reopen_campaign"; id: string };
+  | { type: "reopen_campaign"; id: string }
+  /** Withdraw a receipt approval, while Givezy hasn't signed it off yet. */
+  | { type: "cancel_receipt_run"; id: string };
 
 export type ActionRow = { id: string; charity_id: string; kind: ActionKind; details: Details; undo: Undo | null; undone_at: string | null; created_at: string };
 
@@ -68,7 +70,7 @@ export async function loadAction(charityId: string, id: string): Promise<ActionR
   return data as ActionRow;
 }
 
-export type UndoFailure = "gone" | "removed" | "late" | "changed" | "given" | "full" | "locked" | "ended" | "error";
+export type UndoFailure = "gone" | "removed" | "late" | "changed" | "given" | "full" | "locked" | "ended" | "issued" | "error";
 export type UndoResult = { ok: true; row: ActionRow } | { ok: false; why: UndoFailure; row: ActionRow | null };
 
 const editable = (status: string) => status === "draft" || status === "rejected";
@@ -178,6 +180,18 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       }
       return null;
     }
+    case "cancel_receipt_run": {
+      const { data, error } = await db
+        .from("receipt_runs")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString(), cancelled_reason: "The charity took back its approval." })
+        .eq("id", undo.id)
+        .eq("charity_id", charityId)
+        .eq("status", "charity_approved")
+        .select("id");
+      if (error) throw error;
+      // Already signed off and issued (or already withdrawn): receipts can't be taken back here.
+      return data?.length ? null : "issued";
+    }
   }
 }
 
@@ -192,6 +206,7 @@ export function undoFailureText(why: UndoFailure): string {
     case "full": return "There's no room for it: you're at the limit. Remove or end one first, then try again.";
     case "locked": return "Your application has been submitted, so your details are locked while we review them.";
     case "ended": return "Its last day has passed, so it can't run again. Start a new campaign instead.";
+    case "issued": return "Givezy has already signed it off, so the receipts are issued. If one is wrong, tell us: only we can withdraw and re-issue a receipt.";
     case "error": return "Something went wrong and nothing was changed. Please try again.";
   }
 }

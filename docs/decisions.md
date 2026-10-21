@@ -16,6 +16,23 @@
   row and needs a reason, never deleted, one issued receipt per donor per charity
   per tax year.
 
+- **Yearly s18A receipts run from the website with two approvals (21/10/2026, Yehuda):** still one
+  receipt per donor, per charity, per tax year, after the year closes. The charity sees its list on
+  its receipts page (donor, number of gifts, amount, total) and approves it; Givezy signs it off in
+  Admin, s18A receipts; then the receipts are issued, their PDFs made and emailed. What the charity
+  approved is fingerprinted (`receipt_runs.plan_fingerprint`): if the list changes before sign-off
+  (a refund, a late payment), nothing is issued and it goes back to the charity. The charity can take
+  its approval back until Givezy signs off (Undo for 30 minutes, then "Take back my approval"); Givezy
+  can send a list back with a reason the charity sees. "Finish" only makes missing PDFs and sends
+  unsent emails, never a new receipt. The command-line script no longer issues receipts (dry run,
+  preview and `--finish` only). Still behind `RECEIPTS_ENABLED` and `RECEIPT_WORDING_CONFIRMED`.
+- **Angel Network needs (21/10/2026, Yehuda):** gifts are tracked per appeal (campaign) including
+  WhatsApp links, and each gift will also record its source (WhatsApp, QR poster, website, app);
+  each donor's running total for the year shows to the charity (donor page, to build) and the donor
+  (tax pack, built); gifts from Heroes with Halos, their existing monthly programme, are imported and
+  go on the same yearly receipt so donors get one receipt; messages to donors are email only for now
+  (WhatsApp sending waits for a provider and its price); IT3(d) waits for the SARS layout.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).
@@ -116,7 +133,7 @@
 - **PDF:** the receipt is a web page printed by headless Chrome (handles Hebrew), with
   fonts embedded. Stored privately in the `receipts` bucket, PDF only, 2 MB limit.
 - **How it runs:** by a person from the command line, never from the website:
-  `npm run receipts -- 2027` (dry run), `-- 2027 --preview=./out` (DRAFT PDFs), `-- 2027 --issue`.
+  `npm run receipts -- 2027` (dry run), `-- 2027 --preview=./out` (DRAFT PDFs), `-- 2027 --finish` (since 21/10/2026 receipts are issued from the website, see above).
   Safe to run again: no double receipts, and a receipt whose PDF failed gets it next run.
 - **Late payments:** a donation paid in the tax year but confirmed after its receipt was
   issued is not on that receipt. The job lists paid donations it could not receipt so a

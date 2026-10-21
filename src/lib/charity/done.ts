@@ -27,7 +27,8 @@ export type ActionKind =
   | "document_removed"
   | "application_submitted"
   | "thank_you_sent"
-  | "donor_thanked";
+  | "donor_thanked"
+  | "receipts_approved";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
 export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked"];
@@ -112,6 +113,11 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         what: `Your thank-you went to ${String(d.name ?? "your donor")}.${d.replyTo ? ` If they reply, it goes to ${String(d.replyTo)}.` : ""}`,
         next: { label: "Back to your donors", href: `${c.base}/donors` },
       };
+    case "receipts_approved":
+      return {
+        what: `You approved ${plural(Number(d.receipts ?? 0), "s18A receipt")} for tax year ${String(d.taxYear ?? "")}, ${String(d.total ?? "")} in all. Nothing is issued yet: Givezy checks the list and signs it off, then each donor gets their receipt by email.`,
+        next: { label: "See your donors", href: `${c.base}/donors` },
+      };
   }
 }
 
@@ -135,6 +141,7 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "bank_saved": return "Taken back. Your previous bank details are back. We still check them before you go live.";
     case "document_uploaded": return `Taken back. ${quote(d.fileName)} is removed.`;
     case "document_removed": return `Taken back. ${quote(d.fileName)} is back.`;
+    case "receipts_approved": return `Taken back. Your approval for tax year ${String(d.taxYear ?? "")} is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
     case "application_submitted":
     case "thank_you_sent":
     case "donor_thanked":
@@ -149,6 +156,7 @@ export function pageOf(kind: ActionKind): string {
   if (kind.startsWith("update_") || kind.startsWith("photo_")) return "updates";
   if (kind === "thank_you_sent") return "thank-donors";
   if (kind === "donor_thanked") return "donors";
+  if (kind === "receipts_approved") return "receipts";
   return "application";
 }
 
@@ -162,6 +170,7 @@ const KINDS = new Set<ActionKind>([
   "profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off", "campaign_started", "campaign_ended",
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
   "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
+  "receipts_approved",
 ]);
 
 /** Undo is offered while it is recent, not yet taken back, and the action stored what it needs. */
