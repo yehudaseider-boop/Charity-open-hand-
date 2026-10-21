@@ -1,4 +1,5 @@
--- Nadiv Lev / Givezy: all database setup steps in order, for a NEW EMPTY test project only. Generated from supabase/migrations.
+-- Givezy: all database setup steps in order, for a NEW EMPTY test project only. Generated from supabase/migrations (20/10/2026).
+-- An existing project runs only the sections it does not have yet, in order.
 
 -- ===== 20261006000001_core_schema.sql =====
 -- Open Hand: core schema (milestone 1)
@@ -2292,3 +2293,729 @@ end $$;
 revoke execute on function public.set_my_recurring_status(uuid, text) from public, anon;
 grant execute on function public.set_my_recurring_status(uuid, text) to authenticated;
 revoke execute on function public.monthly_charge_time(timestamp, int) from public, anon, authenticated;
+
+-- ===== 20261014000003_review_fixes.sql =====
+-- Review fixes, 14/10/2026.
+--
+-- 1. Erasing a donor always marks their monthly donations as ended by the erasure. Before, a
+--    monthly donation already closed as "the first payment failed" kept that reason, and a late
+--    successful first payment could then start it again for an erased donor.
+create or replace function public.erase_donor_data(p_donor_ids uuid[]) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  emails text[];
+  refs text[];
+  n_donors int; n_details int; n_monthly int; n_events int; n_kinds int; n_messages int;
+begin
+  if p_donor_ids is null or cardinality(p_donor_ids) = 0 then
+    return jsonb_build_object('donors', 0);
+  end if;
+
+  select coalesce(array_agg(distinct lower(email::text)), '{}') into emails
+    from (select email from public.donors where id = any (p_donor_ids)
+          union select c.email from public.donation_checkout_details c
+                join public.donations d on d.id = c.donation_id where d.donor_id = any (p_donor_ids)) e;
+  select coalesce(array_agg(gateway_ref), '{}') into refs
+    from public.donations where donor_id = any (p_donor_ids) and gateway_ref is not null;
+
+  -- Monthly donations stop, and the stored card is destroyed.
+  update public.recurring_donations
+     set status = 'cancelled', cancelled_at = coalesce(cancelled_at, now()), authorization_encrypted = null,
+         ended_reason = 'the donor''s information was erased', message = null,
+         card_last4 = null, card_brand = null, card_exp = null, needs_gateway_sync = false
+   where donor_id = any (p_donor_ids);
+  get diagnostics n_monthly = row_count;
+
+  -- Free text the donor wrote.
+  update public.donations set message = null where donor_id = any (p_donor_ids) and message is not null;
+  get diagnostics n_messages = row_count;
+
+  -- The private maaser / chomesh / tzedaka choice and the confirmation links.
+  delete from public.donation_giving_kinds where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_kinds = row_count;
+  delete from public.donation_confirmations where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+
+  -- Who they are, as typed at each checkout. Amounts and dates stay on the donations.
+  update public.donation_checkout_details c
+     set email = 'erased+' || c.donation_id::text || '@erased.invalid',
+         first_name = null, last_name = null, organisation_name = null, registration_number = null,
+         contact_person = null, phone = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, receipt_identity = null, erased_at = now()
+   where c.donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_details = row_count;
+
+  -- The donor record itself.
+  update public.donors
+     set email = 'erased+' || id::text || '@erased.invalid', email_verified_at = null,
+         first_name = null, last_name = null, phone = null, registration_number = null,
+         organisation_name = case when donor_type = 'individual' then null else 'Erased' end,
+         contact_person = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, date_of_birth = null, user_id = null, erased_at = now()
+   where id = any (p_donor_ids);
+  get diagnostics n_donors = row_count;
+
+  -- The gateway's raw records of their payments keep the reference and event, not the customer.
+  update public.gateway_events
+     set payload = jsonb_build_object(
+           'event', payload->>'event',
+           'reference', coalesce(payload->'data'->>'reference', payload->>'reference'),
+           'redacted', true)
+   where coalesce(payload->'data'->>'reference', payload->>'reference') = any (refs)
+     and coalesce(payload->>'redacted', 'false') <> 'true';
+  get diagnostics n_events = row_count;
+
+  -- Their address in the rate limiter's short-lived records.
+  delete from public.rate_limit_events where key = any (select 'email:' || e from unnest(emails) e);
+
+  return jsonb_build_object('donors', n_donors, 'checkout_details', n_details, 'monthly_stopped', n_monthly,
+                            'giving_choices', n_kinds, 'messages', n_messages, 'gateway_records', n_events);
+end $$;
+revoke execute on function public.erase_donor_data(uuid[]) from public, anon, authenticated;
+grant execute on function public.erase_donor_data(uuid[]) to service_role;
+
+-- 2. A charity's signed declarations stay with the charity when the person who signed them
+--    deletes their account: the record keeps the charity and loses the person.
+alter table public.consents drop constraint consent_has_subject;
+alter table public.consents add constraint consent_has_subject check (
+  (kind = 'account' and user_id is not null)
+  or (kind in ('donation', 'monthly_authorisation') and donation_id is not null)
+  or (kind = 'charity_declarations' and charity_id is not null)
+);
+
+-- 3. Removing a monthly donation that already stopped (card declined) keeps the real reason.
+create or replace function public.set_my_recurring_status(p_id uuid, p_status text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  uid uuid := (select auth.uid());
+  cur public.recurring_status;
+  r_day int;
+  r_paid text;
+  this_month timestamp := date_trunc('month', now() at time zone 'Africa/Johannesburg');
+  this_charge timestamptz;
+  new_next timestamptz;
+begin
+  if uid is null then raise exception 'Not signed in'; end if;
+  if p_status not in ('active', 'paused', 'cancelled') then raise exception 'Unknown status'; end if;
+
+  select r.status, r.charge_day, r.last_paid_period into cur, r_day, r_paid
+  from public.recurring_donations r
+  join public.donors d on d.id = r.donor_id
+  where r.id = p_id and d.user_id = uid
+  for update of r;
+  if not found then raise exception 'Monthly donation not found'; end if;
+
+  if cur::text = p_status then return; end if;
+  if not (
+       (cur in ('active', 'failed') and p_status in ('paused', 'cancelled'))
+    or (cur = 'paused' and p_status in ('active', 'cancelled'))
+    or (cur = 'pending' and p_status = 'cancelled')
+  ) then
+    raise exception 'A % monthly donation cannot be set to %', cur, p_status;
+  end if;
+
+  if p_status = 'active' then
+    this_charge := public.monthly_charge_time(this_month, r_day);
+    new_next := case
+      when r_paid is distinct from to_char(this_month, 'YYYY-MM') and this_charge > now() then this_charge
+      else public.monthly_charge_time(this_month + interval '1 month', r_day)
+    end;
+  end if;
+
+  update public.recurring_donations
+     set status = p_status::public.recurring_status,
+         paused_at = case p_status when 'paused' then now() when 'active' then null else paused_at end,
+         cancelled_at = case p_status when 'cancelled' then now() else cancelled_at end,
+         authorization_encrypted = case p_status when 'cancelled' then null else authorization_encrypted end,
+         -- Removing a stopped one keeps the real reason ("the card was declined ...") for the record.
+         ended_reason = case when p_status = 'cancelled' and cur <> 'failed' then 'cancelled by the donor' else ended_reason end,
+         next_charge_at = case when p_status = 'active' then new_next else next_charge_at end,
+         needs_gateway_sync = false
+   where id = p_id;
+end $$;
+revoke execute on function public.set_my_recurring_status(uuid, text) from public, anon;
+grant execute on function public.set_my_recurring_status(uuid, text) to authenticated;
+
+-- ===== 20261015000001_dedications.sql =====
+-- Givezy: dedications (15/10/2026, approved by Yehuda).
+-- A donor may give "in honour of" or "in memory of" someone. Only the kind and the name are stored
+-- (the optional note to the charity is the donation's existing message). The donor and the charity
+-- see it; it is never on an s18A receipt; erasing the donor's information wipes it.
+
+-- 1. The dedication on a donation, and on a monthly donation (copied to each month's donation).
+alter table public.donations
+  add column dedication_kind text,
+  add column dedication_name text,
+  add constraint dedication_kind_known check (dedication_kind in ('honour', 'memory')),
+  add constraint dedication_name_length check (dedication_name is null or char_length(dedication_name) between 1 and 80),
+  add constraint dedication_complete check ((dedication_kind is null) = (dedication_name is null));
+
+alter table public.recurring_donations
+  add column dedication_kind text,
+  add column dedication_name text,
+  add constraint dedication_kind_known check (dedication_kind in ('honour', 'memory')),
+  add constraint dedication_name_length check (dedication_name is null or char_length(dedication_name) between 1 and 80),
+  add constraint dedication_complete check ((dedication_kind is null) = (dedication_name is null));
+
+-- Donors read their own monthly donations through a column-by-column grant, so the new columns need one too.
+grant select (dedication_kind, dedication_name) on public.recurring_donations to authenticated;
+
+-- 2. Charities see the dedication on their donations (new columns go at the end of the view).
+create or replace view public.charity_donations with (security_barrier = true) as
+  select
+    d.id, d.charity_id, d.donor_id, d.status, d.amount_cents,
+    d.paid_at, d.created_at, d.refunded_at, d.charged_back_at, d.tax_year,
+    d.wants_18a, d.is_anonymous, d.message, d.campaign_id, d.recurring_id,
+    c.donor_type, c.first_name, c.last_name, c.organisation_name, c.registration_number,
+    c.contact_person, c.email, c.phone,
+    c.address_line1, c.address_line2, c.suburb, c.city, c.postal_code,
+    d.dedication_kind, d.dedication_name
+  from public.donations d
+  left join public.donation_checkout_details c on c.donation_id = d.id
+  where d.status in ('paid', 'refunded', 'charged_back')
+    and (public.is_charity_admin(d.charity_id) or public.is_platform_admin());
+revoke all on public.charity_donations from anon, authenticated;
+grant select on public.charity_donations to authenticated;
+
+-- 3. Erasing a donor's information also wipes their dedications (same function, two more columns).
+create or replace function public.erase_donor_data(p_donor_ids uuid[]) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  emails text[];
+  refs text[];
+  n_donors int; n_details int; n_monthly int; n_events int; n_kinds int; n_messages int;
+begin
+  if p_donor_ids is null or cardinality(p_donor_ids) = 0 then
+    return jsonb_build_object('donors', 0);
+  end if;
+
+  -- Every email they used, on the donor record and at each checkout (repeats are harmless below).
+  emails := array(select lower(email::text) from public.donors where id = any (p_donor_ids))
+         || array(select lower(c.email::text) from public.donation_checkout_details c
+                    join public.donations d on d.id = c.donation_id where d.donor_id = any (p_donor_ids));
+  select coalesce(array_agg(gateway_ref), '{}') into refs
+    from public.donations where donor_id = any (p_donor_ids) and gateway_ref is not null;
+
+  -- Monthly donations stop, and the stored card is destroyed.
+  update public.recurring_donations
+     set status = 'cancelled', cancelled_at = coalesce(cancelled_at, now()), authorization_encrypted = null,
+         ended_reason = 'the donor''s information was erased', message = null, dedication_kind = null, dedication_name = null,
+         card_last4 = null, card_brand = null, card_exp = null, needs_gateway_sync = false
+   where donor_id = any (p_donor_ids);
+  get diagnostics n_monthly = row_count;
+
+  -- Free text the donor wrote, and any dedication (the name of someone they honoured or remembered).
+  update public.donations set message = null, dedication_kind = null, dedication_name = null
+   where donor_id = any (p_donor_ids) and (message is not null or dedication_name is not null);
+  get diagnostics n_messages = row_count;
+
+  -- The private maaser / chomesh / tzedaka choice and the confirmation links.
+  delete from public.donation_giving_kinds where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_kinds = row_count;
+  delete from public.donation_confirmations where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+
+  -- Who they are, as typed at each checkout. Amounts and dates stay on the donations.
+  update public.donation_checkout_details c
+     set email = 'erased+' || c.donation_id::text || '@erased.invalid',
+         first_name = null, last_name = null, organisation_name = null, registration_number = null,
+         contact_person = null, phone = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, receipt_identity = null, erased_at = now()
+   where c.donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_details = row_count;
+
+  -- The donor record itself.
+  update public.donors
+     set email = 'erased+' || id::text || '@erased.invalid', email_verified_at = null,
+         first_name = null, last_name = null, phone = null, registration_number = null,
+         organisation_name = case when donor_type = 'individual' then null else 'Erased' end,
+         contact_person = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, date_of_birth = null, user_id = null, erased_at = now()
+   where id = any (p_donor_ids);
+  get diagnostics n_donors = row_count;
+
+  -- The gateway's raw records of their payments keep the reference and event, not the customer.
+  update public.gateway_events
+     set payload = jsonb_build_object(
+           'event', payload->>'event',
+           'reference', coalesce(payload->'data'->>'reference', payload->>'reference'),
+           'redacted', true)
+   where coalesce(payload->'data'->>'reference', payload->>'reference') = any (refs)
+     and coalesce(payload->>'redacted', 'false') <> 'true';
+  get diagnostics n_events = row_count;
+
+  -- Their address in the rate limiter's short-lived records.
+  delete from public.rate_limit_events where key = any (select 'email:' || e from unnest(emails) e);
+
+  return jsonb_build_object('donors', n_donors, 'checkout_details', n_details, 'monthly_stopped', n_monthly,
+                            'giving_choices', n_kinds, 'messages', n_messages, 'gateway_records', n_events);
+end $$;
+revoke execute on function public.erase_donor_data(uuid[]) from public, anon, authenticated;
+grant execute on function public.erase_donor_data(uuid[]) to service_role;
+
+-- ===== 20261015000002_monthly_resume_needs_card.sql =====
+-- Givezy: code review fixes, monthly giving (15/10/2026).
+-- A stopped monthly donation (status 'failed': the card was declined every time) has no card left, so it
+-- can only be removed, never paused and resumed into an "active" donation that can never be collected.
+-- Resuming a paused one needs a stored card, and starts the month's attempts afresh.
+
+create or replace function public.set_my_recurring_status(p_id uuid, p_status text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  uid uuid := (select auth.uid());
+  cur public.recurring_status;
+  r_day int;
+  r_paid text;
+  has_card boolean;
+  this_month timestamp := date_trunc('month', now() at time zone 'Africa/Johannesburg');
+  this_charge timestamptz;
+  new_next timestamptz;
+begin
+  if uid is null then raise exception 'Not signed in'; end if;
+  if p_status not in ('active', 'paused', 'cancelled') then raise exception 'Unknown status'; end if;
+
+  select r.status, r.charge_day, r.last_paid_period, r.authorization_encrypted is not null into cur, r_day, r_paid, has_card
+  from public.recurring_donations r
+  join public.donors d on d.id = r.donor_id
+  where r.id = p_id and d.user_id = uid
+  for update of r;
+  if not found then raise exception 'Monthly donation not found'; end if;
+
+  if cur::text = p_status then return; end if;
+  if not (
+       (cur = 'active' and p_status in ('paused', 'cancelled'))
+    or (cur = 'failed' and p_status = 'cancelled')
+    or (cur = 'paused' and p_status in ('active', 'cancelled'))
+    or (cur = 'pending' and p_status = 'cancelled')
+  ) then
+    raise exception 'A % monthly donation cannot be set to %', cur, p_status;
+  end if;
+  if p_status = 'active' and not has_card then
+    raise exception 'This monthly donation has no card to charge. Start a new monthly donation instead.';
+  end if;
+
+  if p_status = 'active' then
+    this_charge := public.monthly_charge_time(this_month, r_day);
+    new_next := case
+      when r_paid is distinct from to_char(this_month, 'YYYY-MM') and this_charge > now() then this_charge
+      else public.monthly_charge_time(this_month + interval '1 month', r_day)
+    end;
+  end if;
+
+  update public.recurring_donations
+     set status = p_status::public.recurring_status,
+         paused_at = case p_status when 'paused' then now() when 'active' then null else paused_at end,
+         cancelled_at = case p_status when 'cancelled' then now() else cancelled_at end,
+         authorization_encrypted = case p_status when 'cancelled' then null else authorization_encrypted end,
+         -- Removing a stopped one keeps the real reason ("the card was declined ...") for the record.
+         ended_reason = case when p_status = 'cancelled' and cur <> 'failed' then 'cancelled by the donor' else ended_reason end,
+         next_charge_at = case when p_status = 'active' then new_next else next_charge_at end,
+         -- A resumed donation gets the full number of tries again.
+         attempt_period = case when p_status = 'active' then null else attempt_period end,
+         failed_attempts = case when p_status = 'active' then 0 else failed_attempts end,
+         needs_gateway_sync = false
+   where id = p_id;
+end $$;
+revoke execute on function public.set_my_recurring_status(uuid, text) from public, anon;
+grant execute on function public.set_my_recurring_status(uuid, text) to authenticated;
+
+-- ===== 20261015000003_charity_receipts_without_id.sql =====
+-- Givezy: code review fixes, privacy (15/10/2026, decided by Yehuda).
+-- Charities no longer see any part of a donor's ID or income tax number. Until now a charity admin
+-- could read a receipt's full stored details (including the last 4 digits of ID and tax numbers, and
+-- the identity fingerprint) and download the PDF, which prints them. Yosef is to confirm what a
+-- charity must hold; until then charities see their receipts through two narrow views only.
+
+-- 1. Receipts: the donor (their own), platform admins. Not charity admins.
+drop policy receipts_read on public.s18a_receipts;
+create policy receipts_read on public.s18a_receipts for select to authenticated
+  using (donor_id in (select public.my_donor_ids()) or public.is_platform_admin());
+-- (receipt_links_read follows: a link is readable only when its receipt is.)
+
+-- 2. A charity's receipts: reference, donor name, amount and status. No ID or tax digits, no fingerprint.
+create view public.charity_receipts with (security_barrier = true) as
+  select
+    r.id, r.charity_id, r.tax_year, r.amount_cents, r.issued_at, r.status, r.emailed_at,
+    r.details->>'receipt_reference' as reference,
+    r.details->'donor'->>'name' as donor_name
+  from public.s18a_receipts r
+  where public.is_charity_admin(r.charity_id) or public.is_platform_admin();
+revoke all on public.charity_receipts from anon, authenticated;
+grant select on public.charity_receipts to authenticated;
+
+-- 3. Which receipt a charity's donation is on.
+create view public.charity_receipt_donations with (security_barrier = true) as
+  select rd.donation_id, r.id as receipt_id, r.charity_id, r.status, r.details->>'receipt_reference' as reference
+  from public.s18a_receipt_donations rd
+  join public.s18a_receipts r on r.id = rd.receipt_id
+  where public.is_charity_admin(r.charity_id) or public.is_platform_admin();
+revoke all on public.charity_receipt_donations from anon, authenticated;
+grant select on public.charity_receipt_donations to authenticated;
+
+-- ===== 20261015000004_privacy_security_review.sql =====
+-- Givezy: code review fixes, privacy and security (15/10/2026).
+
+-- 1. A donor record can be shared by everyone who gives with one email address, so it no longer holds full
+--    ID or income tax numbers (each donation's checkout details keep them, for its receipt). Clear the old copies.
+update public.donors set id_number_encrypted = null, tax_reference_encrypted = null
+ where id_number_encrypted is not null or tax_reference_encrypted is not null;
+
+-- 2. The income log lives on the phone; this table is not written by the website or app. Closing it to
+--    signed-in users means nothing in it can be a value someone pasted in to have it decrypted.
+revoke insert, update, delete on public.maaser_income_entries from authenticated;
+
+-- 3. A charity's status and approval fields change only on the server (submitting an application with its
+--    four declarations, or a platform admin's decision), never directly from a browser.
+revoke update on public.charities from authenticated;
+grant update (name_en, name_he, legal_name_en, legal_name_he, description_en, description_he, funds_use_en, thank_you_en,
+  website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, address_line1, address_line2, suburb, city,
+  postal_code, is_s18a, s18a_confirmed_at, mandate_signed_at, mandate_document_path, updated_at) on public.charities to authenticated;
+
+-- 4. New functions are not callable by everyone unless granted. (The earlier per-schema statement could not
+--    remove Postgres's global default; this one does, for functions created by this role from now on.)
+alter default privileges revoke execute on functions from public;
+
+-- 5. Erasure also clears the gateway's customer and subscription references on monthly donations.
+create or replace function public.erase_donor_data(p_donor_ids uuid[]) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  emails text[];
+  refs text[];
+  n_donors int; n_details int; n_monthly int; n_events int; n_kinds int; n_messages int;
+begin
+  if p_donor_ids is null or cardinality(p_donor_ids) = 0 then
+    return jsonb_build_object('donors', 0);
+  end if;
+
+  -- Every email they used, on the donor record and at each checkout (repeats are harmless below).
+  emails := array(select lower(email::text) from public.donors where id = any (p_donor_ids))
+         || array(select lower(c.email::text) from public.donation_checkout_details c
+                    join public.donations d on d.id = c.donation_id where d.donor_id = any (p_donor_ids));
+  select coalesce(array_agg(gateway_ref), '{}') into refs
+    from public.donations where donor_id = any (p_donor_ids) and gateway_ref is not null;
+
+  -- Monthly donations stop, and the stored card is destroyed.
+  update public.recurring_donations
+     set status = 'cancelled', cancelled_at = coalesce(cancelled_at, now()), authorization_encrypted = null,
+         ended_reason = 'the donor''s information was erased', message = null, dedication_kind = null, dedication_name = null,
+         card_last4 = null, card_brand = null, card_exp = null, needs_gateway_sync = false,
+         gateway_customer_ref = null, gateway_subscription_ref = null
+   where donor_id = any (p_donor_ids);
+  get diagnostics n_monthly = row_count;
+
+  -- Free text the donor wrote, and any dedication (the name of someone they honoured or remembered).
+  update public.donations set message = null, dedication_kind = null, dedication_name = null
+   where donor_id = any (p_donor_ids) and (message is not null or dedication_name is not null);
+  get diagnostics n_messages = row_count;
+
+  -- The private maaser / chomesh / tzedaka choice and the confirmation links.
+  delete from public.donation_giving_kinds where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_kinds = row_count;
+  delete from public.donation_confirmations where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+
+  -- Who they are, as typed at each checkout. Amounts and dates stay on the donations.
+  update public.donation_checkout_details c
+     set email = 'erased+' || c.donation_id::text || '@erased.invalid',
+         first_name = null, last_name = null, organisation_name = null, registration_number = null,
+         contact_person = null, phone = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, receipt_identity = null, erased_at = now()
+   where c.donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_details = row_count;
+
+  -- The donor record itself.
+  update public.donors
+     set email = 'erased+' || id::text || '@erased.invalid', email_verified_at = null,
+         first_name = null, last_name = null, phone = null, registration_number = null,
+         organisation_name = case when donor_type = 'individual' then null else 'Erased' end,
+         contact_person = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, date_of_birth = null, user_id = null, erased_at = now()
+   where id = any (p_donor_ids);
+  get diagnostics n_donors = row_count;
+
+  -- The gateway's raw records of their payments keep the reference and event, not the customer.
+  update public.gateway_events
+     set payload = jsonb_build_object(
+           'event', payload->>'event',
+           'reference', coalesce(payload->'data'->>'reference', payload->>'reference'),
+           'redacted', true)
+   where coalesce(payload->'data'->>'reference', payload->>'reference') = any (refs)
+     and coalesce(payload->>'redacted', 'false') <> 'true';
+  get diagnostics n_events = row_count;
+
+  -- Their address in the rate limiter's short-lived records.
+  delete from public.rate_limit_events where key = any (select 'email:' || e from unnest(emails) e);
+
+  return jsonb_build_object('donors', n_donors, 'checkout_details', n_details, 'monthly_stopped', n_monthly,
+                            'giving_choices', n_kinds, 'messages', n_messages, 'gateway_records', n_events);
+end $$;
+revoke execute on function public.erase_donor_data(uuid[]) from public, anon, authenticated;
+grant execute on function public.erase_donor_data(uuid[]) to service_role;
+
+-- 6. Givezy signs people in with an emailed code only. A session started with a password (for example
+--    someone who registered another person's email with a password before that person ever signed in)
+--    sees no donor records. The website refuses such sessions too (src/lib/auth.ts).
+create or replace function public.signed_in_without_password() returns boolean
+language sql stable set search_path = '' as $$
+  select not coalesce((select auth.jwt()) -> 'amr' @> '[{"method": "password"}]'::jsonb, false)
+$$;
+grant execute on function public.signed_in_without_password() to authenticated;
+
+create or replace function public.my_donor_ids() returns setof uuid
+language sql stable security definer set search_path = '' as $$
+  select d.id from public.donors d where d.user_id = (select auth.uid()) and public.signed_in_without_password()
+$$;
+revoke execute on function public.my_donor_ids() from public, anon;
+grant execute on function public.my_donor_ids() to authenticated;
+
+-- ===== 20261015000005_receipt_numbers_past_9999.sql =====
+-- Givezy: code review fixes, receipts (15/10/2026).
+-- Receipt references printed only 4 digits: Postgres's lpad cuts longer text, so a charity's 10 000th
+-- receipt printed as "-1000", the same as its 1 000th. The number itself was always unique (charity,
+-- receipt_number); only the printed reference repeated. Numbers now print in full: 0001 ... 9999, 10000.
+-- Same function as 20261009000008_receipt_identity.sql with that one line changed.
+
+create or replace function public.issue_s18a_receipt(
+  p_charity_id uuid,
+  p_donor_id uuid,
+  p_tax_year int,
+  p_donation_ids uuid[],
+  p_number_prefix text,
+  p_details jsonb,
+  p_donor_identity text default ''
+) returns table (receipt_id uuid, receipt_number int, receipt_reference text, amount_cents bigint)
+language plpgsql security definer set search_path = '' as $$
+declare
+  c public.charities;
+  found_count int;
+  good_count int;
+  total bigint;
+  n int;
+  new_id uuid := gen_random_uuid();
+  ref text;
+begin
+  if p_donation_ids is null or array_length(p_donation_ids, 1) is null then
+    raise exception 'A receipt needs at least one donation';
+  end if;
+  if array_length(p_donation_ids, 1) <> (select count(distinct x) from unnest(p_donation_ids) x) then
+    raise exception 'The same donation was listed twice';
+  end if;
+
+  select * into c from public.charities where id = p_charity_id for update;
+  if not found then raise exception 'Charity not found'; end if;
+  if not public.charity_can_issue_18a(c) then
+    raise exception 'This charity cannot issue s18A receipts (approval or mandate missing)';
+  end if;
+
+  select count(*) into found_count from public.donations where id = any (p_donation_ids);
+  if found_count <> array_length(p_donation_ids, 1) then
+    raise exception 'A listed donation does not exist';
+  end if;
+
+  select count(*), coalesce(sum(d.amount_cents), 0) into good_count, total
+  from public.donations d
+  where d.id = any (p_donation_ids)
+    and d.status = 'paid'
+    and d.charity_id = p_charity_id
+    and d.donor_id = p_donor_id
+    and d.tax_year = p_tax_year
+    and d.wants_18a
+    and c.mandate_signed_at <= d.paid_at
+    -- every donation was given under the same s18A identity (ID, tax or registration number)
+    and coalesce((select x.receipt_identity from public.donation_checkout_details x where x.donation_id = d.id), '') = coalesce(p_donor_identity, '')
+    and not exists (
+      select 1 from public.s18a_receipt_donations l
+      join public.s18a_receipts r on r.id = l.receipt_id
+      where l.donation_id = d.id and r.status = 'issued'
+    );
+  if good_count <> array_length(p_donation_ids, 1) then
+    raise exception 'A listed donation is not eligible for this receipt';
+  end if;
+
+  n := public.next_receipt_number(p_charity_id);
+  ref := p_number_prefix || '-' || p_tax_year::text || '-' || lpad(n::text, greatest(4, length(n::text)), '0');
+
+  insert into public.s18a_receipts (id, charity_id, receipt_number, donor_id, donor_identity, tax_year, amount_cents, details)
+  values (new_id, p_charity_id, n, p_donor_id, coalesce(p_donor_identity, ''), p_tax_year, total,
+          p_details || jsonb_build_object('receipt_reference', ref, 'amount_cents', total));
+  insert into public.s18a_receipt_donations (receipt_id, donation_id)
+  select new_id, x from unnest(p_donation_ids) x;
+
+  return query select new_id, n, ref, total;
+end $$;
+
+revoke execute on function public.issue_s18a_receipt(uuid, uuid, int, uuid[], text, jsonb, text) from public, anon, authenticated;
+grant execute on function public.issue_s18a_receipt(uuid, uuid, int, uuid[], text, jsonb, text) to service_role;
+
+-- ===== 20261016000001_charity_monthly_donations.sql =====
+-- Givezy: monthly donations for charities (16/10/2026).
+-- A charity sees its monthly donors: who, how much, which day, how many months collected, and
+-- whether it is running, paused, stopped (the card was declined every time) or cancelled.
+-- Read through this function only: the raw rows hold the gateway references and the card details,
+-- and the donor's contribution to Givezy and their maaser/chomesh/tzedaka choice stay private.
+-- Like donations, a monthly donation appears only once a payment from it has gone through, and
+-- the donor's details are those typed at their latest such payment.
+
+create or replace function public.charity_monthly_list(p_charity_id uuid)
+returns table (
+  recurring_id uuid, status text, retrying boolean, amount_cents bigint, charge_day int,
+  next_charge_at timestamptz, started_at timestamptz, last_paid_at timestamptz,
+  paid_count bigint, paid_cents bigint, wants_18a boolean, is_anonymous boolean,
+  dedication_kind text, dedication_name text,
+  donor_type text, display_name text, email text, phone text,
+  paused_at timestamptz, ended_at timestamptz
+)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not (public.is_charity_admin(p_charity_id) or public.is_platform_admin()) then
+    raise exception 'Not allowed';
+  end if;
+  return query
+    with seen as (
+      select d.recurring_id as rid, d.id as did, d.status as dst, d.amount_cents as amt, d.paid_at
+      from public.donations d
+      where d.charity_id = p_charity_id and d.recurring_id is not null
+        and d.status in ('paid', 'refunded', 'charged_back')
+    ), totals as (
+      select s.rid, min(s.paid_at) as first_at, max(s.paid_at) filter (where s.dst = 'paid') as last_at,
+             count(*) filter (where s.dst = 'paid') as n, coalesce(sum(s.amt) filter (where s.dst = 'paid'), 0)::bigint as total
+      from seen s group by s.rid
+    ), latest as (
+      select distinct on (s.rid) s.rid, c.donor_type::text as dt, c.first_name, c.last_name, c.organisation_name, c.email::text as em, c.phone as ph
+      from seen s left join public.donation_checkout_details c on c.donation_id = s.did
+      order by s.rid, s.paid_at desc nulls last
+    )
+    select r.id, r.status::text, (r.status = 'active' and r.failed_attempts > 0), r.amount_cents, r.charge_day,
+           case when r.status = 'active' then r.next_charge_at end,
+           t.first_at, t.last_at, t.n, t.total, r.wants_18a, r.is_anonymous,
+           r.dedication_kind, r.dedication_name,
+           l.dt,
+           case when coalesce(l.dt, 'individual') = 'individual'
+                then nullif(trim(coalesce(l.first_name, '') || ' ' || coalesce(l.last_name, '')), '')
+                else nullif(trim(coalesce(l.organisation_name, '')), '') end,
+           l.em, l.ph,
+           case when r.status = 'paused' then r.paused_at end,
+           case when r.status in ('cancelled', 'failed') then coalesce(r.cancelled_at, r.updated_at) end
+    from public.recurring_donations r
+    join totals t on t.rid = r.id
+    left join latest l on l.rid = r.id
+    where r.charity_id = p_charity_id
+      and r.status in ('active', 'paused', 'failed', 'cancelled')
+    order by case r.status when 'active' then 0 when 'paused' then 1 when 'failed' then 2 else 3 end,
+             r.amount_cents desc, t.first_at;
+end $$;
+revoke execute on function public.charity_monthly_list(uuid) from public, anon;
+grant execute on function public.charity_monthly_list(uuid) to authenticated;
+
+-- ===== 20261020000001_review_fixes.sql =====
+-- Givezy: code review fixes, database (20/10/2026).
+
+-- 1. Donor records no longer hold ID or income tax numbers (20261015000004), so signed-in users may not write
+--    those columns either: nothing pasted in can ever be a value the server decrypts.
+revoke update (id_number_encrypted, id_number_last4, tax_reference_encrypted, tax_reference_last4) on public.donors from authenticated;
+
+-- 2. Approval fields change only on the server. The guard trigger already refuses a charity admin changing
+--    them; the column grant now says the same, so there is one less thing to rely on.
+revoke update (is_s18a, s18a_confirmed_at, mandate_signed_at, mandate_document_path) on public.charities from authenticated;
+
+-- 3. A charity's logo and cover picture come from its own folder in the public bucket, like its photos.
+alter table public.charities
+  add constraint charities_logo_own_folder check (logo_path is null or (logo_path like id::text || '/%' and logo_path not like '%..%')),
+  add constraint charities_cover_own_folder check (cover_path is null or (cover_path like id::text || '/%' and cover_path not like '%..%'));
+
+-- 4. An active monthly donation always has a charge day (resuming one without would schedule nothing).
+alter table public.recurring_donations
+  add constraint recurring_active_has_charge_day check (status <> 'active' or charge_day is not null);
+
+-- 5. Money is bigint everywhere, this legacy column included.
+alter table public.fee_settings alter column gateway_fixed_cents type bigint;
+
+-- 6. Indexes for the lookups the website and jobs make.
+create index if not exists donations_recurring_idx on public.donations (recurring_id) where recurring_id is not null;
+create index if not exists donations_campaign_idx on public.donations (campaign_id) where campaign_id is not null;
+create index if not exists recurring_charity_idx on public.recurring_donations (charity_id);
+create index if not exists charity_admins_user_idx on public.charity_admins (user_id);
+create index if not exists s18a_receipts_year_status_idx on public.s18a_receipts (tax_year, status);
+create index if not exists consents_charity_idx on public.consents (charity_id) where charity_id is not null;
+
+-- 7. Erasure also clears a campaign answer (free text the donor typed), should campaigns ever be switched on.
+create or replace function public.erase_donor_data(p_donor_ids uuid[]) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  emails text[];
+  refs text[];
+  n_donors int; n_details int; n_monthly int; n_events int; n_kinds int; n_messages int;
+begin
+  if p_donor_ids is null or cardinality(p_donor_ids) = 0 then
+    return jsonb_build_object('donors', 0);
+  end if;
+
+  -- Every email they used, on the donor record and at each checkout (repeats are harmless below).
+  emails := array(select lower(email::text) from public.donors where id = any (p_donor_ids))
+         || array(select lower(c.email::text) from public.donation_checkout_details c
+                    join public.donations d on d.id = c.donation_id where d.donor_id = any (p_donor_ids));
+  select coalesce(array_agg(gateway_ref), '{}') into refs
+    from public.donations where donor_id = any (p_donor_ids) and gateway_ref is not null;
+
+  -- Monthly donations stop, and the stored card is destroyed.
+  update public.recurring_donations
+     set status = 'cancelled', cancelled_at = coalesce(cancelled_at, now()), authorization_encrypted = null,
+         ended_reason = 'the donor''s information was erased', message = null, dedication_kind = null, dedication_name = null,
+         card_last4 = null, card_brand = null, card_exp = null, needs_gateway_sync = false,
+         gateway_customer_ref = null, gateway_subscription_ref = null
+   where donor_id = any (p_donor_ids);
+  get diagnostics n_monthly = row_count;
+
+  -- Free text the donor wrote (a message, a campaign answer), and any dedication (the name of someone they honoured or remembered).
+  update public.donations set message = null, dedication_kind = null, dedication_name = null, campaign_answer = null
+   where donor_id = any (p_donor_ids) and (message is not null or dedication_name is not null or campaign_answer is not null);
+  get diagnostics n_messages = row_count;
+
+  -- The private maaser / chomesh / tzedaka choice and the confirmation links.
+  delete from public.donation_giving_kinds where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_kinds = row_count;
+  delete from public.donation_confirmations where donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+
+  -- Who they are, as typed at each checkout. Amounts and dates stay on the donations.
+  update public.donation_checkout_details c
+     set email = 'erased+' || c.donation_id::text || '@erased.invalid',
+         first_name = null, last_name = null, organisation_name = null, registration_number = null,
+         contact_person = null, phone = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, receipt_identity = null, erased_at = now()
+   where c.donation_id in (select id from public.donations where donor_id = any (p_donor_ids));
+  get diagnostics n_details = row_count;
+
+  -- The donor record itself.
+  update public.donors
+     set email = 'erased+' || id::text || '@erased.invalid', email_verified_at = null,
+         first_name = null, last_name = null, phone = null, registration_number = null,
+         organisation_name = case when donor_type = 'individual' then null else 'Erased' end,
+         contact_person = null, id_number_encrypted = null, id_number_last4 = null,
+         tax_reference_encrypted = null, tax_reference_last4 = null, address_line1 = null, address_line2 = null,
+         suburb = null, city = null, postal_code = null, date_of_birth = null, user_id = null, erased_at = now()
+   where id = any (p_donor_ids);
+  get diagnostics n_donors = row_count;
+
+  -- The gateway's raw records of their payments keep the reference and event, not the customer.
+  update public.gateway_events
+     set payload = jsonb_build_object(
+           'event', payload->>'event',
+           'reference', coalesce(payload->'data'->>'reference', payload->>'reference'),
+           'redacted', true)
+   where coalesce(payload->'data'->>'reference', payload->>'reference') = any (refs)
+     and coalesce(payload->>'redacted', 'false') <> 'true';
+  get diagnostics n_events = row_count;
+
+  -- Their address in the rate limiter's short-lived records.
+  delete from public.rate_limit_events where key = any (select 'email:' || e from unnest(emails) e);
+
+  return jsonb_build_object('donors', n_donors, 'checkout_details', n_details, 'monthly_stopped', n_monthly,
+                            'giving_choices', n_kinds, 'messages', n_messages, 'gateway_records', n_events);
+end $$;
+revoke execute on function public.erase_donor_data(uuid[]) from public, anon, authenticated;
+grant execute on function public.erase_donor_data(uuid[]) to service_role;
+

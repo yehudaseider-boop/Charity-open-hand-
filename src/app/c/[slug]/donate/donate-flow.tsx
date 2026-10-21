@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useId, useRef, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
 import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
@@ -106,7 +106,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           </div>
         ) : null}
         <div className="flex gap-2">
-          <div className="flex min-w-0 flex-1 items-center rounded-control border-[1.5px] border-border bg-surface px-4 focus-within:border-brand">
+          <div className="flex min-w-0 flex-1 items-center rounded-control border-[1.5px] border-border bg-surface px-4 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand">
             <span className="font-display text-2xl text-indigo">R</span>
             <input
               id="amount"
@@ -147,7 +147,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           {giveExtra ? (
             <div>
               <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Givezy</label>
-              <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3">
+              <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand">
                 <span className="text-muted">R</span>
                 <input
                   id="contribution"
@@ -195,15 +195,39 @@ function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; ch
   );
 }
 
-function Check({ name, children, error }: { name: string; children: React.ReactNode; error?: string }) {
+/** A page-unique id, safe in id and aria-describedby attributes (as in forms/fields.tsx). */
+function useFieldId(name: string) {
+  return `${name}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
+}
+
+/**
+ * A consent box. `children` is the label (clicking it ticks the box); `detail` follows it in the same
+ * sentence but outside the label, so links in it can be clicked without toggling the box.
+ */
+function Check({ name, children, detail, error }: { name: string; children: React.ReactNode; detail?: React.ReactNode; error?: string }) {
   const [checked, setChecked] = useState(false);
+  const id = useFieldId(name);
+  const showError = Boolean(error) && !checked;
+  const describedBy = [detail ? `${id}-detail` : null, showError ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   return (
     <div>
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" name={name} className="mt-1" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
-        <span>{children}</span>
-      </label>
-      {error && !checked ? <p className="ml-6 text-xs text-danger">{error}</p> : null}
+      <div className="flex items-start gap-2 text-sm">
+        <input
+          id={id}
+          type="checkbox"
+          name={name}
+          className="mt-1"
+          checked={checked}
+          onChange={(e) => setChecked(e.target.checked)}
+          aria-invalid={showError || undefined}
+          aria-describedby={describedBy}
+        />
+        <span>
+          <label htmlFor={id}>{children}</label>
+          {detail ? <span id={`${id}-detail`}> {detail}</span> : null}
+        </span>
+      </div>
+      {showError ? <p id={`${id}-error`} role="alert" className="ml-6 text-xs text-danger">{error}</p> : null}
     </div>
   );
 }
@@ -424,13 +448,15 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
  */
 function Dedicate({ error }: { error?: string }) {
   const [kind, setKind] = useState<"none" | "honour" | "memory">("none");
+  const errorId = `${useFieldId("dedication_kind")}-error`;
+  const showError = Boolean(error) && kind === "none";
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm font-medium">Dedicate this donation <span className="font-normal text-muted">(optional)</span></legend>
       <div className="flex flex-wrap gap-2">
         {([["none", "No"], ["honour", "In honour of"], ["memory", "In memory of"]] as const).map(([value, label]) => (
           <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
-            <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} />
+            <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} aria-describedby={showError ? errorId : undefined} />
             {label}
           </label>
         ))}
@@ -438,7 +464,7 @@ function Dedicate({ error }: { error?: string }) {
       <fieldset hidden={kind === "none"} disabled={kind === "none"}>
         <TextField name="dedication_name" label="Their name" required autoDirection maxLength={80} hint={`${charityLabel(kind === "memory" ? "memory" : "honour")} The charity sees this name; it is not on your s18A receipt.`} />
       </fieldset>
-      {error && kind === "none" ? <p className="text-xs text-danger">{error}</p> : null}
+      {showError ? <p id={errorId} role="alert" className="text-xs text-danger">{error}</p> : null}
     </fieldset>
   );
 }

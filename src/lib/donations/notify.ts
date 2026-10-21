@@ -2,6 +2,7 @@ import "server-only";
 import { donationReceivedEmail, notifyCharity } from "@/lib/charity/emails";
 import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAudit } from "@/lib/audit";
 import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
 
@@ -54,6 +55,14 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
     await getEmailTransport().send({ to: email, ...m });
   } catch (e) {
     console.error(`[notify] confirmation email for donation ${donationId} failed`, e);
+    // The audit log is where the team finds confirmations to resend. Never let that write undo a payment.
+    await logAudit({
+      actorUserId: null,
+      action: "donation.confirmation_email_failed",
+      entityType: "donation",
+      entityId: donationId,
+      details: { message: e instanceof Error ? e.message : String(e) },
+    }).catch((err) => console.error("[notify] could not record the failed email", err));
   }
   await notifyCharityOfDonation(donationId);
 }

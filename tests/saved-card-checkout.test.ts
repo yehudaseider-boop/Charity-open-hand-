@@ -31,7 +31,7 @@ function builder(table: string) {
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: builder }) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) }));
-vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => false }));
+vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => false, ipKeys: (ip: string) => [`ip:${ip}`] }));
 vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));

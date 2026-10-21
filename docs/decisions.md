@@ -939,7 +939,7 @@ card. Sign-up is not forced before the questions: giving still works without an 
 hasn't signed in is shown "Sign in with the email you gave with" so their gifts count towards the goal.
 The three "kept safe" points moved from first open to the give screen, shown on a first gift.
 "Kind of giver" is stored on the phone first and copied to the account's profile the first time they are
-signed in (never over an answer already there). Database: `20261020000001_giver_type.sql` (column plus its
+signed in (never over an answer already there). Database: `20261020000002_giver_type.sql` (column plus its
 own-row update grant). New personal data: Privacy Policy line for Yosef (go-live checklist).
 Known limit: the goal invitation only appears on the gift-sent screen of a gift confirmed straight away;
 if the payment provider is still catching up, only the Home card is offered.
@@ -966,3 +966,46 @@ Signifiers: "Once-off" and "Every month" are two always-visible options with the
 a switch inside More options); an unavailable one (campaign gifts, or while a saved-card payment is
 unresolved) is struck through with the reason underneath; the chosen amount button shows a tick, and amount
 buttons are dimmed and inert while a payment is being started or held.
+## Full code review, second pass (20/10/2026)
+
+Six independent read-only reviews (payments and monthly giving; receipts, tax pack and privacy; the database and row-level security; sign-in, admin and charity actions; the phone app; the website's look, copy and accessibility), every finding checked against the code before anything was changed. Nothing critical; the money core, receipt rules and row-level security held. The database tests run in the sandbox again (plain Postgres with the Supabase stand-in): all 524 tests pass, plus typecheck, lint and a production build. Fixed:
+
+- **Return page after a card payment:** the payment provider adds its own `reference` to our return address, so the key arrived twice and the page showed "Donation not found" even though the payment was recorded and emailed. Taken care of; a refunded donation now says so instead of "not found".
+- **Monthly giving:** a charge the provider refuses outright now marks that month's attempt failed (it stayed pending for ever); a payment the provider took for the wrong amount or currency is held for a person once, with the next collection next month, instead of being re-checked and re-logged every hour.
+- **Webhook records** no longer keep the card-on-file code (it lives encrypted on the monthly donation only). A confirmation email that could not be sent leaves an audit row to resend from.
+- **Rate limits:** checkout is 5 attempts per email and 30 per network address in 10 minutes (one hall on one WiFi is not one donor); the return page is limited per donation; sign-in links per email and per address; a missing address header no longer lumps everyone together.
+- **Privacy:** "Download my information" now includes the details typed with each donation and the agreements ticked at checkout (both were server-only tables, so they were missing). Receipts for a donor erased since issue are not counted as emailed. Erasure also clears a campaign answer, and re-running it after the account is gone is not reported as a failure. The audit log records a new charity admin's id, not their email.
+- **Receipts:** a "$" in a charity's legal name prints as typed on the receipt statement. The SA ID check now requires the citizenship digit to be 0 or 1. The receipt email says "s18A receipt".
+- **Charity admin and platform admin:** charity pages hand their client-side forms only the fields they edit (the whole service-role row, with gateway account and mandate path, was being serialised to the browser). Uploaded pictures are capped at 30 million pixels and 2 400 px a side. The donor CSV export and document links refuse password-started sessions like every page does. Changing a charity's contact email is audited and the old address is told. The mandate signing date is checked against Johannesburg's today. Approving a charity records its bank details as checked, and connecting to the payment provider needs that check. Agreeing to the policy twice records once; setting up an authenticator is audited; the viewer lookup runs once per request.
+- **Admin, Payments** reads every paid and monthly row a page at a time (the API answers 1 000 at a time, so totals would have silently stopped there).
+- **Database** (`20261020000001_review_fixes.sql`): signed-in users can no longer write ID or tax columns on donor records or the approval columns on charities (the triggers already refused; the grants now agree); a charity's logo and cover must sit in its own folder; an active monthly donation always has a charge day; the legacy fee column is bigint; indexes on the lookups the jobs and dashboards make. `docs/test-site/setup-database.sql` regenerated (it had stopped seven migrations short) and the stale `apply-erase-fix.sql` removed.
+- **Website:** private pages (admin, charity dashboard, account, MFA, agree, test gateway, thank-you) are marked not to be indexed, with a `robots.txt`; a root error page in the Givezy voice; the donate page's tab title names the charity; keyboard focus shows on the amount fields; the thank-you and donation pages have a real page heading; checklist states, error messages and new-tab links are announced to screen readers; Hebrew dedication names render right to left in Heebo; "section 18A receipt" became "s18A receipt" in the receipt email.
+- **Phone app:** a crafted `nedivlev://…?demo=thanks` link can no longer show a fake thank-you in a store build (preview only); switching accounts without signing out sweeps the previous person's cached giving; closing the payment sheet without paying says so instead of landing on Giving and polling; routes are built from typed params; the "You pay" total is really semibold on Android; tab labels are not remounted on every tab change; the unused Fraunces font dependency is gone; orange is no longer used as text (the area line on charity cards is muted navy) and the scrim colours live in `tokens.ts`.
+- **Dependencies:** `sharp` patched (0.35.5). The app's remaining audit items are Expo transitive packages with no non-breaking fix.
+
+Not changed, for Yehuda or Yosef (all on the go-live checklist): the `NL-` reference prefix; a notice to the donor when a receipt is withdrawn, and the tax pack after a refund (both wait on the refunds decision); the Terms sentence about payments never happening in the app; what the iOS Keychain keeps after the app is deleted; the look items (lilac bars on the charity dashboard, the unused orange accent on the website, button radius, more than one orange graphic on the app's Giving tab and Welcome screen).
+
+## 21/10/2026: main (the 20/10 second-pass review) merged into milestone-1-foundation
+
+`main` had two commits this branch lacked: the second-pass review (20/10) and a Vercel build fix (21/10). Both
+lines of work had reviewed the same ground, so 35 files clashed. Calls made, so they can be revisited:
+- **Phone app:** this branch's design and screens kept throughout (main's app was still the 15/10 look); main's
+  typed route params, scrim and tab-icon "made once" ideas were brought in where they still applied.
+- **Webhook records:** this branch's version kept (stores only the event, reference, amount, currency and status);
+  main only dropped the card code. Main's test expecting card brand and last four digits in the record was dropped.
+- **Refunded donation on the return page and status:** this branch's single "reversed" outcome kept; main's
+  separate "refunded" and "charged back" labels showed the same card.
+- **Return page and checkout rate limits:** this branch's rules (the provider is only asked for a donor holding the
+  payment link's credential; only attempts that reach the payment page count) plus main's per-address key that
+  ignores an unknown address.
+- **Contact-email change notice:** this branch's (a proper notice and an audit row with no email addresses in it);
+  main's logged both addresses.
+- **Data download:** main's loop for details typed at checkout and agreements ticked kept; this branch's extras
+  (giver type, consent times, charities' personal thank-you notes) kept; the duplicate loops removed.
+- **Admin, Payments:** this branch's version (held items with their current state, and the 50 000-row cap notice).
+- **Receipts:** one fix for a "$" in a charity name (both had it). **Pages:** main's accessibility and noindex
+  changes kept; main's noindex list unioned with this branch's.
+- **Database:** main's migration is `20261020000001_review_fixes.sql`; this branch's giver-type change was renamed
+  `20261020000002_giver_type.sql` so the two version numbers don't clash.
+- **Not carried over:** `docs/test-site/setup-database.sql` (main regenerated it before this branch's migrations
+  existed); it needs regenerating from the full migration list.

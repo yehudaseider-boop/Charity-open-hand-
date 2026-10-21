@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { logAudit } from "@/lib/audit";
 import { signedInWithPassword } from "@/lib/auth";
 import { safeNextPath } from "@/lib/mfa";
 import { hitRateLimit } from "@/lib/rate-limit";
@@ -37,7 +38,13 @@ export async function verifyCode(formData: FormData) {
   if (!user || (await signedInWithPassword(supabase))) redirect(`/login?next=${encodeURIComponent(next)}`);
   // A code is six digits: a slow guess is still a guess. Ten tries, then a quarter of an hour.
   if (await hitRateLimit("mfa-code", [`user:${user.id}`], 10, 15)) back("busy");
+  // Whether this code finishes a new authenticator's set-up, or is a sign-in with an existing one.
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const enrolling = (factors?.all ?? []).some((f) => f.id === factorId && f.status === "unverified");
   const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
   if (error) back("code");
+  if (enrolling) {
+    await logAudit({ actorUserId: user.id, action: "user.mfa_enrolled", entityType: "user", entityId: user.id }).catch((e) => console.error("[mfa] audit not written", e));
+  }
   redirect(next);
 }

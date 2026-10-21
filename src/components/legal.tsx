@@ -16,8 +16,8 @@ export function TermsAndPrivacyLinks() {
   return (
     <>
       the{" "}
-      <Link href="/terms" target="_blank" className="text-brand underline">Terms</Link> and the{" "}
-      <Link href="/privacy" target="_blank" className="text-brand underline">Privacy Policy</Link>
+      <Link href="/terms" target="_blank" className="text-brand underline">Terms<span className="sr-only"> (opens in a new tab)</span></Link> and the{" "}
+      <Link href="/privacy" target="_blank" className="text-brand underline">Privacy Policy<span className="sr-only"> (opens in a new tab)</span></Link>
     </>
   );
 }

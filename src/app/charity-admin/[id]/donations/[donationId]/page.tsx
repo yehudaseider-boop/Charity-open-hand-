@@ -1,3 +1,4 @@
+import { HebrewAware } from "@/components/hebrew-aware";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -48,7 +49,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
         <div className="mt-1"><Badge tone={s.tone}>{s.label}</Badge></div>
       </div>
 
-      <Card title="Donation">
+      <Card title="Donation" headingLevel={1}>
         <dl>
           <Row label="Started">{formatDateTime(d.created_at)}</Row>
           {d.paid_at ? <Row label="Paid">{formatDateTime(d.paid_at)}</Row> : null}
@@ -74,7 +75,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
 
       {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
         <Card title="Dedication">
-          <p className="text-sm" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</p>
+          <p className="text-sm" dir="auto"><HebrewAware text={dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)} /></p>
         </Card>
       ) : null}
 

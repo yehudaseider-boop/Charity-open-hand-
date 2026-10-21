@@ -123,3 +123,53 @@ describe("review fixes in the database", () => {
     });
   });
 });
+
+describe("review fixes, 20/10/2026", () => {
+  it("a signed-in person can't write ID or tax numbers onto a donor record", async () => {
+    await tx(async () => {
+      await as(ids.donorUser);
+      await refused("update public.donors set id_number_last4 = '1234' where id = $1", [ids.donor], /permission denied/);
+      await refused("update public.donors set tax_reference_encrypted = 'v1:x' where id = $1", [ids.donor], /permission denied/);
+      await run("update public.donors set city = 'Sandton' where id = $1", [ids.donor]);
+    });
+  });
+
+  it("a charity admin can't touch the approval fields, even by column grant", async () => {
+    await tx(async () => {
+      await as(ids.mealsAdmin);
+      await refused("update public.charities set mandate_document_path = 'x' where id = $1", [ids.meals], /permission denied/);
+      await refused("update public.charities set is_s18a = false where id = $1", [ids.meals], /permission denied/);
+    });
+  });
+
+  it("a charity's logo and cover must come from its own folder", async () => {
+    await tx(async () => {
+      await as(ids.mealsAdmin);
+      await refused("update public.charities set logo_path = 'other-charity/logo.png' where id = $1", [ids.meals], /own_folder/);
+      await refused("update public.charities set cover_path = $2 where id = $1", [ids.meals, `${ids.meals}/../x.png`], /own_folder/);
+      await run("update public.charities set logo_path = $2 where id = $1", [ids.meals, `${ids.meals}/logo-1.png`]);
+    });
+  });
+
+  it("an active monthly donation always has a charge day", async () => {
+    await tx(async () => {
+      await run("reset role");
+      await refused(
+        "insert into public.recurring_donations (donor_id, charity_id, amount_cents, status) values ($1, $2, 5000, 'active')",
+        [ids.donor, ids.meals],
+        /charge_day/,
+      );
+      await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents, status) values ($1, $2, 5000, 'pending')", [ids.donor, ids.meals]);
+    });
+  });
+
+  it("erasing a donor clears a campaign answer too", async () => {
+    await tx(async () => {
+      const id = await paidDonation();
+      await run("update public.donations set campaign_answer = 'In memory of my father' where id = $1", [id]);
+      await run("select public.erase_donor_data(array[$1::uuid])", [ids.donor]);
+      const { rows } = await run("select campaign_answer from public.donations where id = $1", [id]);
+      expect(rows[0].campaign_answer).toBeNull();
+    });
+  });
+});

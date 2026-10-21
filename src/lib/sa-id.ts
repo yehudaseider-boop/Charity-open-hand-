@@ -1,7 +1,7 @@
 /**
  * South African ID number check: 13 digits, a real date of birth in the
- * first six, and a valid Luhn check digit. It catches typing mistakes; it
- * does not prove the number belongs to the person.
+ * first six, a citizenship digit of 0 or 1, and a valid Luhn check digit. It
+ * catches typing mistakes; it does not prove the number belongs to the person.
  */
 export function isValidSaIdNumber(raw: string): boolean {
   const id = raw.replace(/\s/g, "");
@@ -17,6 +17,8 @@ export function isValidSaIdNumber(raw: string): boolean {
     return d.getUTCMonth() === mm - 1 && d.getUTCDate() === dd;
   });
   if (!exists) return false;
+  // Digit 11: 0 for a citizen, 1 for a permanent resident. Nothing else is issued.
+  if (id[10] !== "0" && id[10] !== "1") return false;
 
   let sum = 0;
   for (let i = 0; i < 13; i++) {

@@ -32,7 +32,7 @@ vi.mock("@/lib/donations/confirm", () => ({
   savedOutcome: async () => outcome,
 }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }) }));
-vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit }));
+vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit, ipKeys: (ip: string) => [`ip:${ip}`] }));
 vi.mock("@/lib/donations/confirmation-access", () => ({
   confirmationTokenMatches: async (_id: string, t?: string) => t === "good-credential",
 }));
@@ -111,6 +111,19 @@ describe("confirmation page privacy", () => {
   it("the return-to-app button still shows without the credential", async () => {
     const html = await page({ from: "app" });
     expect(html).toContain("nedivlev://giving");
+  });
+
+  it("the payment provider adding its own reference to the address still finds the donation", async () => {
+    // Paystack sends the donor to callback_url?trxref=<ref>&reference=<ref>, so our own key arrives twice.
+    const html = await page({ reference: [ID, ID], trxref: ID, t: "good-credential" });
+    expect(html).toContain("Thank you");
+    expect(html).toContain("R23.45");
+    expect(html).not.toContain("Donation not found");
+  });
+
+  it("a refunded donation says so instead of 'not found'", async () => {
+    outcome = "reversed";
+    expect(await page({})).toContain("This donation was refunded");
   });
 
   it("a failed or unknown payment shows no donation details either", async () => {

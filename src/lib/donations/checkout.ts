@@ -9,7 +9,7 @@ import { formatRand } from "@/lib/money";
 import { savedAddress, savedIdNumber } from "./saved-id";
 import { savedCardsOpen } from "./app-api";
 import { loadSavedCardToken, requestCardSave } from "./saved-card";
-import { hitRateLimit } from "@/lib/rate-limit";
+import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -154,7 +154,7 @@ export async function startDonation(args: {
   // one address gets more, because a shul's Wi-Fi or a mobile network puts many donors behind it.
   const limited =
     (await hitRateLimit("checkout", [`email:${input.email.toLowerCase()}`], 5, 10)) ||
-    (await hitRateLimit("checkout-ip", [`ip:${args.ip}`], 30, 10));
+    (await hitRateLimit("checkout-ip", ipKeys(args.ip), 30, 10));
   if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
 
   const v = input;

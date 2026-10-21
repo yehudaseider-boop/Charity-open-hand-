@@ -99,8 +99,22 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
           {/* A fresh form after each action: an upload or bank number isn't left filled in. */}
           <Card key={formKey(sp, step.key)} title={`Step ${at + 1} of ${steps.length}: ${step.label}`}>
             <p className="mb-3 text-sm text-muted">{step.hint}</p>
-            {step.key === "organisation" ? <OrganisationForm action={saveOrganisation.bind(null, id)} charity={charity} /> : null}
-            {step.key === "address" ? <AddressForm action={saveAddress.bind(null, id)} charity={charity} /> : null}
+            {/* Only what each form edits reaches the browser: the full row holds gateway and mandate details. */}
+            {step.key === "organisation" ? (
+              <OrganisationForm
+                action={saveOrganisation.bind(null, id)}
+                charity={{
+                  name_en: charity.name_en, name_he: charity.name_he, legal_name_en: charity.legal_name_en, legal_name_he: charity.legal_name_he,
+                  npo_number: charity.npo_number, pbo_number: charity.pbo_number, s18a_reference: charity.s18a_reference,
+                }}
+              />
+            ) : null}
+            {step.key === "address" ? (
+              <AddressForm
+                action={saveAddress.bind(null, id)}
+                charity={{ address_line1: charity.address_line1, address_line2: charity.address_line2, suburb: charity.suburb, city: charity.city, postal_code: charity.postal_code }}
+              />
+            ) : null}
             {step.key === "contact" ? <ContactForm action={saveContact.bind(null, id)} priv={priv} /> : null}
             {step.key === "bank" ? (
               <>

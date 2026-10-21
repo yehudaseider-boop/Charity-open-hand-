@@ -32,7 +32,17 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       </div>
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/profile`} />
       <Card title="Details">
-        <ProfileForm key={k} action={saveProfile.bind(null, id)} charity={charity} categories={categories} selected={categoryIds} />
+        <ProfileForm
+          key={k}
+          action={saveProfile.bind(null, id)}
+          // Only what the form edits reaches the browser: the full row holds gateway and mandate details.
+          charity={{
+            name_en: charity.name_en, description_en: charity.description_en, funds_use_en: charity.funds_use_en, thank_you_en: charity.thank_you_en,
+            impact_en: charity.impact_en, suggested_amounts_cents: charity.suggested_amounts_cents, website: charity.website,
+          }}
+          categories={categories}
+          selected={categoryIds}
+        />
       </Card>
       <Card title="Emails">
         <DonationEmailsForm key={k} action={saveDonationEmails.bind(null, id)} on={priv?.notify_donations !== false} email={priv?.contact_email ?? null} />

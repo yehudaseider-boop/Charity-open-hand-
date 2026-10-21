@@ -112,6 +112,7 @@ export function buildReceiptDetails(args: {
     period,
     wording: {
       title: receiptConfig.wording.title,
+      // Function replacers: a "$" in a charity's legal name is printed as typed, never read as a pattern.
       statement: receiptConfig.wording.statement.replaceAll("{charity}", () => c.legal_name_en).replaceAll("{period}", () => period),
     },
     issued_on: formatDate(args.issuedAt),

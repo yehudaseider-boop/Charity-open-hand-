@@ -27,6 +27,14 @@ const icon = (Icon: (p: { color: string }) => React.ReactElement) =>
     );
   };
 
+/** Made once, here: a new component on every render would remount every label and icon each time the path changes. */
+const tabs = {
+  home: { label: label("Home"), icon: icon(HomeIcon) },
+  discover: { label: label("Discover"), icon: icon(DiscoverIcon) },
+  progress: { label: label("Progress"), icon: icon(ProgressIcon) },
+  account: { label: label("Account"), icon: icon(AccountIcon) },
+};
+
 /** The big round Give button in the middle of the tab bar: giving is the first thing on every screen. */
 function GiveButton({ onPress }: { onPress: () => void }) {
   return (
@@ -83,11 +91,11 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: "transparent" },
       }}
     >
-      <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: label("Home"), tabBarIcon: icon(HomeIcon) }} />
-      <Tabs.Screen name="discover" options={{ title: "Discover", tabBarLabel: label("Discover"), tabBarIcon: icon(DiscoverIcon) }} />
+      <Tabs.Screen name="home" options={{ title: "Home", tabBarLabel: tabs.home.label, tabBarIcon: tabs.home.icon }} />
+      <Tabs.Screen name="discover" options={{ title: "Discover", tabBarLabel: tabs.discover.label, tabBarIcon: tabs.discover.icon }} />
       <Tabs.Screen name="give-now" options={{ title: "Give", tabBarButton: () => <GiveButton onPress={() => setGiving(true)} /> }} />
-      <Tabs.Screen name="giving" options={{ title: "Progress", tabBarLabel: label("Progress"), tabBarIcon: icon(ProgressIcon) }} />
-      <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: label("Account"), tabBarIcon: icon(AccountIcon) }} />
+      <Tabs.Screen name="giving" options={{ title: "Progress", tabBarLabel: tabs.progress.label, tabBarIcon: tabs.progress.icon }} />
+      <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: tabs.account.label, tabBarIcon: tabs.account.icon }} />
       {/* Receipts are opened from Account (and Home); the page keeps its address. */}
       <Tabs.Screen name="receipts" options={{ title: "Receipts", href: null }} />
     </Tabs>

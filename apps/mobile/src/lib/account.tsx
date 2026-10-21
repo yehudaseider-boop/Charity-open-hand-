@@ -190,6 +190,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
     // Someone else signed in: nothing of the last person's stays on screen.
     if (lastUser.current && lastUser.current !== s.user.id) {
+      // Their offline copy goes too: without a SIGNED_OUT event nothing else would sweep it.
+      void forgetGivingCache(lastUser.current);
+      lastCached.current = null;
       setLive(null);
       setLoadError(false);
       setArrived([]);

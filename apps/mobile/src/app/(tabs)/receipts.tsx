@@ -128,7 +128,7 @@ export default function Receipts() {
                         onDownload={() => {
                           // The PDF is handed out by the website, after it checks who is asking.
                           if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF on our website.");
-                          openSite(`/receipts/${r.id}`);
+                          openSite(`/receipts/${encodeURIComponent(r.id)}`);
                         }}
                       />
                     ))}

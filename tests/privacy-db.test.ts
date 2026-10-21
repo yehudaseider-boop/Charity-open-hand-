@@ -66,8 +66,8 @@ async function paidDonation() {
   );
   await run("insert into public.donation_giving_kinds (donation_id, kind) values ($1, 'maaser')", [id]);
   await run(
-    `insert into public.recurring_donations (donor_id, charity_id, amount_cents, gateway, gateway_subscription_ref, gateway_customer_ref)
-     values ($1, $2, 18000, 'test', 'SUB_secret', 'CUS_secret')`,
+    `insert into public.recurring_donations (donor_id, charity_id, amount_cents, charge_day, gateway, gateway_subscription_ref, gateway_customer_ref)
+     values ($1, $2, 18000, 15, 'test', 'SUB_secret', 'CUS_secret')`,
     [ids.donor, ids.meals],
   );
   return id;
@@ -368,7 +368,7 @@ describe("giving made elsewhere", () => {
 describe("pausing and cancelling a monthly donation", () => {
   async function monthly(card = true) {
     await run("reset role");
-    const { rows } = await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents, authorization_encrypted) values ($1, $2, 50000, $3) returning id", [ids.donor, ids.meals, card ? "enc" : null]);
+    const { rows } = await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents, charge_day, authorization_encrypted) values ($1, $2, 50000, 15, $3) returning id", [ids.donor, ids.meals, card ? "enc" : null]);
     return rows[0].id as string;
   }
   const state = async (id: string) => {

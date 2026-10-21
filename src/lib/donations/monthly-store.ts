@@ -176,6 +176,15 @@ export function supabaseMonthlyStore(): MonthlyStore {
       if (error) throw new Error(`Could not record a collected month: ${error.message}`);
     },
 
+    async failAttempt(donationId) {
+      const { error } = await db
+        .from("donations")
+        .update({ status: "failed", failed_at: new Date().toISOString() })
+        .eq("id", donationId)
+        .eq("status", "pending");
+      if (error) throw new Error(`Could not record a refused attempt: ${error.message}`);
+    },
+
     async recordFailure(id, period, failedAttempts, retryAt) {
       const patch = retryAt
         ? { attempt_period: period, failed_attempts: failedAttempts, next_charge_at: retryAt.toISOString() }

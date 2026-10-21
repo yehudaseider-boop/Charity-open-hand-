@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { RequestForm } from "./request-form";
 
-export const metadata: Metadata = { title: "Your information" };
+export const metadata: Metadata = { title: "Your information", robots: { index: false, follow: false } };
 
 const kindLabel = { correct: "Correct", delete: "Delete", object: "Stop using" } as const;
 const statusLabel = { open: "Open", done: "Done", declined: "Declined" } as const;

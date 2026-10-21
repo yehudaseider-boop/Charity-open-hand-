@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { CharityNav } from "@/components/charity-nav";
 import { loadCharityForManager } from "@/lib/charity/queries";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * Every charity page sits under a blue colour-block header with the charity's name and the tabs.

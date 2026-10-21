@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CodeField, Enrol } from "./enrol";
 import { verifyCode } from "./actions";
 
-export const metadata: Metadata = { title: "Second step" };
+export const metadata: Metadata = { title: "Second step", robots: { index: false, follow: false } };
 
 export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
   const sp = await searchParams;
@@ -30,7 +30,7 @@ export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
     <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">
       <h1 className="text-xl font-semibold">{verified ? "Enter your code" : "Set up a second step"}</h1>
       <div className="mt-4">
-        {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="mb-3 text-sm text-danger">{error}</p> : null}
         {verified ? (
           <form action={verifyCode} className="space-y-3">
             <p className="text-sm text-muted">Open your authenticator app and enter the 6-digit code for Givezy.</p>

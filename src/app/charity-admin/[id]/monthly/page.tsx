@@ -1,3 +1,4 @@
+import { HebrewAware } from "@/components/hebrew-aware";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NoMatch } from "@/components/no-match";
@@ -7,7 +8,7 @@ import { chargeDayLabel, ERASED_DONOR, isErasedEmail, monthlyState, monthlyState
 import { loadMonthlyDonations } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
-import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
+import { dedicationFrom, dedicationLine, isHebrew } from "@/lib/donations/dedication";
 import { formatRand } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Monthly donations" };
@@ -114,7 +115,11 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
               <li key={r.recurring_id} className="rounded-card border border-border bg-surface p-4 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium" dir="auto">{isErasedEmail(r.email) || !r.display_name ? ERASED_DONOR : r.display_name}</p>
+                    {!isErasedEmail(r.email) && r.display_name && isHebrew(r.display_name) ? (
+                      <p className="truncate font-hebrew font-medium" lang="he" dir="rtl">{r.display_name}</p>
+                    ) : (
+                      <p className="truncate font-medium" dir="auto">{isErasedEmail(r.email) || !r.display_name ? ERASED_DONOR : r.display_name}</p>
+                    )}
                     {shownEmail(r.email) ? <p className="break-all text-muted">{r.email}</p> : null}
                     {r.phone ? <p className="text-muted">{r.phone}</p> : null}
                   </div>
@@ -128,7 +133,7 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
                   {r.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                   {r.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
                 </div>
-                {dedication ? <p className="mt-2" dir="auto">{dedicationLine(dedication)}</p> : null}
+                {dedication ? <p className="mt-2" dir="auto"><HebrewAware text={dedicationLine(dedication)} /></p> : null}
                 <ul className="mt-2 space-y-0.5 text-muted">
                   <li>Since {formatDate(r.started_at)}: {plural(r.paid_count, "payment")}, {formatRand(r.paid_cents)} in total</li>
                   {state === "running" || state === "retrying" ? (
