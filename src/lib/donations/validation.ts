@@ -42,6 +42,8 @@ export const checkoutSchema = z.object({
   /** Older app versions send the fixed choice instead; it becomes the label. */
   giving_kind: z.enum(["maaser", "chomesh", "tzedaka"]).optional(),
   is_anonymous: yes,
+  /** "Don't send me news or appeals from this charity" (POPIA: the donor can say no when giving). */
+  no_news: yes,
   /** Give this amount every month until the donor cancels. */
   monthly: yes,
   monthly_authorised: yes,

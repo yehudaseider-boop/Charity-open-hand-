@@ -9,12 +9,14 @@ const tabs = [
   { href: "/donors", label: "Donors" },
   { href: "/monthly", label: "Monthly donations" },
   { href: "/thank-donors", label: "Thank donors" },
+  { href: "/email-donors", label: "Email donors" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/receipts", label: "s18A receipts" },
   { href: "/report", label: "Annual report" },
   { href: "/application", label: "Application" },
   { href: "/profile", label: "Public profile" },
   { href: "/updates", label: "Photos and updates" },
+  { href: "/team", label: "Team" },
 ];
 
 /** Tabs across the top of every page for one charity, on the blue header. */

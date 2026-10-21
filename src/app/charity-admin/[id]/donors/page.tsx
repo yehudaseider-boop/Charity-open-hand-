@@ -69,7 +69,10 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <h1 className="font-display text-2xl text-indigo">Donors</h1>
-        <a href={`/charity-admin/${id}/export/donors`} className="text-sm text-brand underline">Download donors (CSV)</a>
+        <span className="space-x-3 text-sm">
+          <a href={`/charity-admin/${id}/export/donors`} className="text-brand underline">Download donors (CSV)</a>
+          <a href={`/charity-admin/${id}/export/donors?format=xlsx`} className="text-brand underline">Excel</a>
+        </span>
       </div>
       <DonePanel charity={charity} sp={sp} here={base} />
       {typeof sp.did === "string" && CARE_DONE[sp.did] ? (
@@ -174,6 +177,10 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
       {group || tag || q ? (
         <Card title="Keep this list">
           <SaveListForm action={saveDonorList.bind(null, id, { ...(group ? { group } : {}), ...(tag ? { tag } : {}), ...(q ? { q } : {}) })} />
+          {/* One group or one tag can be emailed straight away; other mixes are saved as a list first. */}
+          {(group && !tag && !q) || (tag && !group && !q) ? (
+            <Link href={`/charity-admin/${id}/email-donors?to=${group ? `group:${group}` : `tag:${tag}`}`} className="mt-3 inline-block text-sm text-brand underline">Email these donors</Link>
+          ) : null}
         </Card>
       ) : null}
 

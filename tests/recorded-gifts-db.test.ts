@@ -121,6 +121,17 @@ describe("recorded gifts", () => {
     });
   });
 
+  it("a recorded gift to a campaign counts in the campaign's public total (Yehuda, 21/10/2026)", async () => {
+    await tx(async () => {
+      const camp = (await run("insert into public.campaigns (charity_id, slug, title, target_cents, status) values ($1, 'rec-camp', 'Roof', 1000000, 'active') returning id", [charity])).rows[0].id;
+      const gift = { donor_type: "individual", email: "eft@x.test", first_name: "A", last_name: "B", amount_cents: 125_050, paid_at: "2026-03-05T12:00:00+02:00", tax_year: 2027, method: "eft", wants_18a: false, campaign_id: camp, reference: "EFT-ROOF" };
+      await run("select public.record_gifts($1, $2, null, $3)", [charity, admin, JSON.stringify([gift])]);
+      await run("set local role anon");
+      const p = (await run("select raised_cents, gift_count from public.campaign_progress($1::uuid[])", [[camp]])).rows[0];
+      expect([Number(p.raised_cents), Number(p.gift_count)]).toEqual([125_050, 1]);
+    });
+  });
+
   it("only the server may call record_gifts", async () => {
     await tx(async () => {
       await run("set local role authenticated");

@@ -71,6 +71,29 @@
   from columns, each campaign has "See who gave", and each donor page shows the largest gift and their giving
   by campaign and by source. No database change was needed (the column came with chunk 2).
 
+- **Recorded gifts count in a campaign's public total (21/10/2026, Yehuda):** an EFT or cash gift the charity
+  records against a campaign counts in the "raised" figure donors see, like a gift made on Givezy. (It already did;
+  now there is a test for it.)
+
+- **Owner and admin (21/10/2026, Yehuda, chunk 5):** only a charity's owner adds or removes people (Team), sets the
+  bank account, and emails donors. Admins do everything else. A Givezy platform admin counts as an owner. An owner
+  can't remove another owner, and the only owner can't remove themselves (ask Givezy). Adding someone gives them a
+  Givezy sign-in if they have none and emails them; Undo takes the access back within 30 minutes.
+
+- **Emailing donors (21/10/2026, Yehuda, chunk 5):** the owner writes news or an appeal on Email donors and Givezy
+  sends it from its own address, replies going to the charity. It goes to all donors, a donor group, a tag, a saved
+  list, or the people who gave to a campaign. POPIA direct marketing to a charity's own donors: every email has a
+  stop link for that charity, and the checkout (website and app) has "Don't send me news or appeals from this
+  charity". Someone who stopped thank-yous from charities is left out too. At most 4 emails in 30 days from one
+  charity to one donor, and 5 sends a day per charity. Donors whose only gifts were recorded by the charity (EFT,
+  cash, an import) are left out until Yosef confirms the import confirmation covers it. Sending is resumable and
+  never emails anyone twice; "Send the rest" carries on after a long send. Wording is a draft.
+
+- **Excel and Xero (21/10/2026, Yehuda, chunk 5):** donations, donors and deposits download as Excel as well as CSV
+  (amounts are real numbers; phone and ID numbers stay text; nothing typed can run as a formula), written without a
+  library. "For Xero" on Deposits is Xero's bank statement import layout for a clearing account: per deposit, the
+  donations in, card fees out and the deposit out to the bank, adding up to zero.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

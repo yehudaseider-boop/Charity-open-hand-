@@ -17,6 +17,7 @@ import { loadDonatableCharity } from "./charity";
 import { issueConfirmationToken, reissueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
 import { cameFromOf } from "./source";
+import { optOutAtCheckout } from "@/lib/charity/appeals";
 import { checkDonorDetails, givingLabelOf, type CheckoutInput } from "./validation";
 import { isUuid } from "@/lib/ids";
 import { parseDedication } from "./dedication";
@@ -227,6 +228,9 @@ export async function startDonation(args: {
     });
     if (r.error) throw r.error;
   }
+
+  // Said no to news and appeals: kept before anything else, so it holds even if the payment never happens.
+  if (v.no_news === "on") await optOutAtCheckout(charity.id, v.email);
 
   const { error } = await db.from("donations").insert({
     id: donationId,

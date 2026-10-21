@@ -36,6 +36,8 @@ export type DonorDetails = {
   /** The donor's own label for the gift, if any (private to them). */
   giving_label?: string;
   is_anonymous?: boolean;
+  /** "No news or appeals from this charity". */
+  no_news?: boolean;
   monthly?: boolean;
   monthly_authorised?: boolean;
   age_confirmed: boolean;

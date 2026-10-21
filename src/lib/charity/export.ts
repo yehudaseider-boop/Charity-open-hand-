@@ -38,4 +38,15 @@ export function csvResponse(text: string, filename: string) {
   });
 }
 
+/** An Excel download (see src/lib/xlsx.ts). */
+export function xlsxResponse(file: Buffer, filename: string) {
+  return new NextResponse(new Uint8Array(file), {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export const audit = logAudit;

@@ -7,6 +7,7 @@ import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/
 import { requireViewer } from "@/lib/auth";
 import { applicationChecklist, applicationSteps, currentStep, isComplete } from "@/lib/charity/checklist";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { isOwner } from "@/lib/charity/team";
 import { statusLabels } from "@/lib/charity/status";
 import {
   removeDocument,
@@ -27,6 +28,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
   const { step: asked } = sp as { step?: string };
   await requireViewer(`/charity-admin/${id}/application`);
   const { charity, priv, documents } = await loadCharityForManager(id);
+  const owner = await isOwner(id);
   const editable = charity.status === "draft" || charity.status === "rejected";
   const checklist = applicationChecklist({ charity, priv, documentTypes: documents.map((d) => d.document_type) });
   const status = statusLabels[charity.status as keyof typeof statusLabels];
@@ -121,7 +123,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
                 <p className="mb-3 text-sm text-muted">
                   Donations settle straight into this account. It&apos;s stored encrypted, and we check it before you go live.
                 </p>
-                <BankForm action={saveBank.bind(null, id)} priv={priv} />
+                {owner ? <BankForm action={saveBank.bind(null, id)} priv={priv} /> : <Notice>Only your charity&apos;s owner can set the bank account. Ask them to fill in this step.</Notice>}
               </>
             ) : null}
             {step.key === "documents" ? (

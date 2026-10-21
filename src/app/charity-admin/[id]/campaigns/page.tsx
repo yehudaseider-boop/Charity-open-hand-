@@ -84,7 +84,12 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
                 <p className="font-medium">{c.title}</p>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={null} />
                 {c.status === "active" && c.endsAt ? <p className="text-xs text-muted">Ended on {formatDate(c.endsAt)}</p> : null}
-                {c.giftCount ? <Link href={whoGave(c.id)} className="inline-block text-sm text-brand underline">See who gave</Link> : null}
+                {c.giftCount ? (
+                  <div className="flex flex-wrap gap-x-4">
+                    <Link href={whoGave(c.id)} className="text-sm text-brand underline">See who gave</Link>
+                    <Link href={`/charity-admin/${id}/email-donors?to=campaign:${c.id}`} className="text-sm text-brand underline">Tell them how it went</Link>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -226,3 +226,19 @@ export async function notifyCharity(message: EmailMessage | null): Promise<void>
     console.error("[charity email] not sent", e);
   }
 }
+
+export function memberAddedEmail(to: string, charityName: string, charityId: string, base = site()): EmailMessage {
+  return {
+    to,
+    subject: `You can now help manage ${charityName} on Givezy`,
+    text: [
+      `You've been given access to ${charityName}'s dashboard on Givezy, where you can see donations and donors and keep the charity's page up to date.`,
+      "",
+      `Sign in with your email address (we'll send you a code): ${base}/charity-admin/${charityId}`,
+      "The first time, you'll also set up a second step on your phone, to keep donors' details safe.",
+      "",
+      "If you weren't expecting this, reply to this email.",
+      ...sign,
+    ].join("\n"),
+  };
+}

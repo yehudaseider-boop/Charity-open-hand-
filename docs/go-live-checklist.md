@@ -47,6 +47,11 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Lost authenticator resets:** agree who may reset a charity admin's second step and how they check it is really them (a call to a number already on file). Each reset is logged with that note and the person is emailed.
 - [ ] **Charity invitations and POPIA:** the invitations table keeps the invited contact's email. Decide how long to keep unused, expired invitations (suggest: delete 90 days after they expire) and add it to the Privacy Policy.
 
+- [ ] **Database change for chunk 5 (needs Yehuda's yes):** `20261021000006_donor_emails.sql` on the Givezy test project, then on the live database in order. Until it runs there, Email donors and the checkout's "no news" box fail on the test site (the box stops the payment starting).
+- [ ] **Yosef: emails to donors (POPIA direct marketing).** (1) The checkout line "Don't send me news or appeals from {charity}" and the stop link wording in each email; (2) a Privacy Policy line: charities you give to may send you news and appeals through Givezy, at most 4 a month, and you can stop them; (3) whether donors a charity imported or recorded by hand (EFT, cash) may be emailed: the import confirmation says the details are for recording gifts and receipts only, so they are left out until he says yes.
+- [ ] **App update for the "no news" switch** on the give screen (needs Yehuda's approval to publish). In-app giving is off anyway until the app stores confirm.
+- [ ] **First real send to donors:** needs email switched on (Resend, below). Send one test from Email donors to yourself first.
+
 ## A2. Ask when you reach them (added 21/10/2026, from the Angel Network and Feed a Child meetings)
 
 Questions only the charities or their advisers can answer. Bring these up whenever Yehuda says he has spoken to them.

@@ -146,6 +146,7 @@ export default function Give() {
   const [saveCard, setSaveCard] = useState(false);
   const [note, setNote] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const [noNews, setNoNews] = useState(false);
   // Switched on, the donor still chooses "in honour of" or "in memory of": never chosen for them.
   const [dedicating, setDedicating] = useState(false);
   const [dedicate, setDedicate] = useState<"honour" | "memory" | null>(null);
@@ -437,6 +438,7 @@ export default function Give() {
       message: note.trim() || undefined,
       giving_label: cleanLabel(label) ?? undefined,
       is_anonymous: anonymous,
+      no_news: noNews,
       dedication_kind: dedicating && dedicate ? dedicate : undefined,
       dedication_name: dedicating ? dedicationName.trim() : undefined,
       monthly: isMonthly,
@@ -597,6 +599,7 @@ export default function Give() {
     label ? `Label: ${label}` : null,
     phone.trim() ? "Phone" : null,
     anonymous ? "Anonymous" : null,
+    noNews ? "No news" : null,
     note.trim() ? "Message" : null,
     dedicating ? "Dedication" : null,
     saveCard ? "Save card" : null,
@@ -806,6 +809,12 @@ export default function Give() {
               description={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
               value={anonymous}
               onChange={setAnonymous}
+            />
+            <SwitchRow
+              label={`No news or appeals from ${charity.nameEn}`}
+              description={`${charity.nameEn} can email you news and appeals through Givezy, at most 4 a month. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
+              value={noNews}
+              onChange={setNoNews}
             />
 
             <View onLayout={at("note")}>

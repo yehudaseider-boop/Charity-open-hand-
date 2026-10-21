@@ -26,6 +26,7 @@ import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isRealDocument } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
+import { isOwner } from "@/lib/charity/team";
 
 /** The values of these columns as they are now, for "Undo". */
 function pick(row: unknown, cols: string[]): Record<string, unknown> {
@@ -137,6 +138,8 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
   const viewer = await requireViewer();
   const { locked } = await loadEditable(charityId);
   if (locked) return locked;
+  // Donations are paid into this account: only the owner may set it (Yehuda, 21/10/2026).
+  if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can change the bank account. Nothing was changed." };
   const parsed = bankSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   const v = parsed.data;

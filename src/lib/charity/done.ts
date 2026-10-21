@@ -31,10 +31,13 @@ export type ActionKind =
   | "receipts_approved"
   | "gift_recorded"
   | "gifts_imported"
-  | "gifts_removed";
+  | "gifts_removed"
+  | "member_added"
+  | "member_removed"
+  | "appeal_sent";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
-export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed"];
+export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent"];
 
 export type Details = Record<string, string | number | boolean | null | undefined>;
 export type Context = { base: string; publicUrl: string | null; approved: boolean };
@@ -133,6 +136,30 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       };
     case "gifts_removed":
       return { what: `${plural(Number(d.removed ?? 0), "recorded gift")} removed. ${Number(d.removed ?? 0) === 1 ? "It no longer counts" : "They no longer count"} in your totals or on any s18A receipt.`, next: { label: "See your donations", href: `${c.base}/donations` } };
+    case "member_added":
+      return {
+        what: d.already
+          ? `${String(d.email ?? "That person")} already had access, so nothing changed.`
+          : `${String(d.email ?? "They")} can now sign in and help manage your charity. We've emailed them how.`,
+        next: { label: "Back to your team", href: `${c.base}/team` },
+      };
+    case "member_removed":
+      return { what: `${String(d.email ?? "That person")} no longer has access to your dashboard. We've let them know.`, next: { label: "Back to your team", href: `${c.base}/team` } };
+    case "appeal_sent": {
+      const sent = Number(d.sent ?? 0);
+      const waiting = Number(d.waiting ?? 0);
+      const skipped = Number(d.skipped ?? 0);
+      if (!sent && !waiting) {
+        return {
+          what: `${quote(d.subject)} is saved, but nobody was emailed${skipped ? `: ${plural(skipped, "donor")} left out (they asked not to get emails, already had 4 from you this month, or email isn't switched on here)` : ""}.${Number(d.failed ?? 0) ? ` ${plural(Number(d.failed), "email")} could not be sent: tell us.` : ""}`,
+          next: { label: "See your donors", href: `${c.base}/donors` },
+        };
+      }
+      return {
+        what: `${quote(d.subject)} went to ${plural(sent, "donor")}.${waiting ? ` ${plural(waiting, "email")} still to send: press "Send the rest" below.` : ""}${Number(d.failed ?? 0) ? ` ${plural(Number(d.failed), "email")} could not be sent.` : ""}`,
+        next: { label: "See your donors", href: `${c.base}/donors` },
+      };
+    }
   }
 }
 
@@ -157,12 +184,15 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "document_uploaded": return `Taken back. ${quote(d.fileName)} is removed.`;
     case "document_removed": return `Taken back. ${quote(d.fileName)} is back.`;
     case "gift_recorded": return "Taken back. The gift is removed and no longer counts anywhere.";
+    case "member_added": return `Taken back. ${String(d.email ?? "They")} no longer ${d.email ? "has" : "have"} access to your dashboard.`;
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;
     case "receipts_approved": return `Taken back. Your approval for tax year ${String(d.taxYear ?? "")} is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
     case "application_submitted":
     case "thank_you_sent":
     case "donor_thanked":
     case "gifts_removed":
+    case "member_removed":
+    case "appeal_sent":
       return "This can't be taken back.";
   }
 }
@@ -176,6 +206,8 @@ export function pageOf(kind: ActionKind): string {
   if (kind === "donor_thanked") return "donors";
   if (kind === "receipts_approved") return "receipts";
   if (kind === "gift_recorded" || kind === "gifts_imported" || kind === "gifts_removed") return "donations";
+  if (kind === "member_added" || kind === "member_removed") return "team";
+  if (kind === "appeal_sent") return "email-donors";
   return "application";
 }
 
@@ -189,7 +221,7 @@ const KINDS = new Set<ActionKind>([
   "profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off", "campaign_started", "campaign_ended",
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
   "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
-  "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed",
+  "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
 ]);
 
 /** Undo is offered while it is recent, not yet taken back, and the action stored what it needs. */

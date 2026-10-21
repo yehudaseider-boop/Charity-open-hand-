@@ -33,7 +33,11 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
             {d.status === "pending" ? <Badge>On its way to your bank</Badge> : d.status === "failed" ? <Badge tone="danger">Payout failed</Badge> : <Badge tone="success">Paid to your bank</Badge>}
           </div>
         </div>
-        <a href={`${base}/deposits/${d.id}/csv`} className="shrink-0 text-sm text-brand underline">Download (CSV)</a>
+        <p className="shrink-0 space-x-3 text-sm">
+          <a href={`${base}/deposits/${d.id}/csv`} className="text-brand underline">CSV</a>
+          <a href={`${base}/deposits/${d.id}/csv?format=xlsx`} className="text-brand underline">Excel</a>
+          {d.status === "paid" ? <a href={`${base}/deposits/${d.id}/csv?format=xero`} className="text-brand underline">For Xero</a> : null}
+        </p>
       </div>
       {dep.balances ? (
         <Notice tone="success">Every line adds up, and the lines add up to the deposit of {formatRand(d.amountCents)}.</Notice>

@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin", "/charity-admin", "/account", "/api/", "/auth/", "/login", "/mfa", "/agree", "/donate/return", "/thanks/", "/test-gateway", "/documents/", "/receipts/"],
+      disallow: ["/admin", "/charity-admin", "/account", "/api/", "/auth/", "/login", "/mfa", "/agree", "/donate/return", "/thanks/", "/news/", "/test-gateway", "/documents/", "/receipts/"],
     },
   };
 }

@@ -73,6 +73,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
           <a href={csvHref} className="text-brand underline">
             {status === "all" || status === "paid" ? "Download paid donations (CSV)" : "Download CSV"}
           </a>
+          <a href={`${csvHref}&format=xlsx`} className="mt-1 block text-brand underline">Same in Excel</a>
           {status === "all" ? (
             <a href={csvAllHref} className="mt-1 block text-xs text-muted underline">Every status</a>
           ) : null}

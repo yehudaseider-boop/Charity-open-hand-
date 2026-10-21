@@ -420,6 +420,9 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
             Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
             <span className="text-muted">{charityName} still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
           </Check>
+          <Check name="no_news">
+            Don&apos;t send me news or appeals from {charityName}. <span className="text-muted">You&apos;ll still get your confirmation{receiptsAvailable ? " and s18A receipt" : ""}.</span>
+          </Check>
           <Check name="age_confirmed" error={state.fieldErrors?.age_confirmed}>
             I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
           </Check>

@@ -5,7 +5,8 @@ import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charit
 import { applyDonationFilters, parseDonationFilters, periodText } from "@/lib/charity/donation-filters";
 import { DONATION_FIELDS, loadCampaignTitles, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { giftSourceLabel } from "@/lib/donations/source";
-import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
+import { audit, authoriseExport, csvResponse, xlsxResponse } from "@/lib/charity/export";
+import { toXlsx } from "@/lib/xlsx";
 import { centsToPlain, toCsv, csvPhone } from "@/lib/csv";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
@@ -41,10 +42,9 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
 
   const campaigns = await loadCampaignTitles(id).catch(() => null);
   if (!campaigns) return new NextResponse("Could not read the campaigns.", { status: 500 });
-  await audit({ actorUserId: who.userId, action: "charity.donations_exported", entityType: "charity", entityId: id, details: { rows: rows.length, status, period: periodText(filters), search: Boolean(filters.q), campaign: filters.campaign || null, source: filters.source || null } });
-  const csv = toCsv(
-    HEADER,
-    rows.map((d) => [
+  const xlsx = params.format === "xlsx";
+  await audit({ actorUserId: who.userId, action: "charity.donations_exported", entityType: "charity", entityId: id, details: { rows: rows.length, format: xlsx ? "xlsx" : "csv", status, period: periodText(filters), search: Boolean(filters.q), campaign: filters.campaign || null, source: filters.source || null } });
+  const table = rows.map((d) => [
       formatDate(d.paid_at ?? d.created_at),
       donationReference(d.id),
       donationStatus[d.status].label,
@@ -67,7 +67,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       d.external_ref,
       d.campaign_id ? campaigns.get(d.campaign_id) ?? "" : "",
       giftSourceLabel(d.came_from),
-    ]),
-  );
-  return csvResponse(csv, `donations-${status ?? "all"}${filters.fromDate ? `-${filters.fromDate}-to-${filters.toDate}` : ""}.csv`);
+    ]);
+  const name = `donations-${status ?? "all"}${filters.fromDate ? `-${filters.fromDate}-to-${filters.toDate}` : ""}`;
+  if (xlsx) return xlsxResponse(toXlsx("Donations", HEADER, table, [HEADER.indexOf("Amount (R)")]), `${name}.xlsx`);
+  return csvResponse(toCsv(HEADER, table), `${name}.csv`);
 }

@@ -52,6 +52,7 @@ export const appCheckoutSchema = appQuoteSchema.extend({
     giving_label: z.string().max(80).optional(),
     giving_kind: z.string().optional(),
     is_anonymous: flag,
+    no_news: flag,
     monthly: flag,
     monthly_authorised: flag,
     age_confirmed: flag,
@@ -60,7 +61,7 @@ export const appCheckoutSchema = appQuoteSchema.extend({
 });
 export type AppCheckoutBody = z.infer<typeof appCheckoutSchema>;
 
-const FLAGS = ["wants_18a", "is_anonymous", "monthly", "monthly_authorised", "age_confirmed", "popia_consent"] as const;
+const FLAGS = ["wants_18a", "is_anonymous", "no_news", "monthly", "monthly_authorised", "age_confirmed", "popia_consent"] as const;
 
 /** Run the app's answers through the same rules as the website's checkout form. */
 export function toCheckoutInput(details: AppCheckoutBody["details"]):

@@ -32,8 +32,27 @@ export default async function DepositsPage({ params }: PageProps<"/charity-admin
             each fee, and what reached your bank, so it matches your bank statement line for line. s18A receipts are always for the full gift.
           </p>
         </div>
-        {deposits.length ? <a href={`${base}/csv`} className="shrink-0 text-sm text-brand underline">Download all (CSV)</a> : null}
+        {deposits.length ? (
+          <div className="shrink-0 space-y-1 text-right text-sm">
+            <p className="text-muted">Download all</p>
+            <p className="space-x-3">
+              <a href={`${base}/csv`} className="text-brand underline">CSV</a>
+              <a href={`${base}/csv?format=xlsx`} className="text-brand underline">Excel</a>
+              <a href={`${base}/csv?format=xero`} className="text-brand underline">For Xero</a>
+            </p>
+          </div>
+        ) : null}
       </div>
+      {deposits.length ? (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-brand">Using Xero?</summary>
+          <p className="mt-2 text-muted">
+            &quot;For Xero&quot; is a bank statement file for a clearing account in Xero (for example &quot;Givezy donations&quot;). Each deposit becomes the donations in,
+            the card fees out and the deposit out to your bank, so the clearing account comes back to zero and the deposit matches the line on your real bank feed.
+            In Xero: Accounting, Bank accounts, your clearing account, Import a statement. Ask your bookkeeper to set up the clearing account once.
+          </p>
+        </details>
+      ) : null}
       <Notice>Not in deposits: gifts you recorded yourself (EFT, cash), which never pass through the payment provider, and donors&apos; contributions to Givezy, which go to Givezy.</Notice>
       {deposits.length === 0 ? (
         <Card>
