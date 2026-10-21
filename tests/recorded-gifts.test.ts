@@ -16,7 +16,7 @@ describe("amounts", () => {
     expect(parseGiftAmount("0.5")).toEqual({ cents: 50 });
   });
   it("refuses an amount that could be read two ways, and says how to write it", () => {
-    for (const s of ["1,250", "1.250", "50,000", "1.250.000"]) expect(parseGiftAmount(s)).toEqual({ error: expect.stringMatching(/two ways.*1250/) });
+    for (const s of ["1,250", "1.250", "50,000", "1.250.000", "1,25.00", "12,34.50", "1.2.3,00", "1,250.5.0"]) expect(parseGiftAmount(s)).toEqual({ error: expect.stringMatching(/two ways.*1250/) });
   });
   it("refuses empty, zero, nonsense, three decimals and anything over R1 000 000", () => {
     expect(parseGiftAmount("")).toEqual({ error: "Amount missing" });

@@ -6,7 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
-import { cancelRun, finishRun, signOffRun, type SignOffResult } from "@/lib/receipts/runs";
+import { cancelRun, finishRun, markRunStopped, signOffRun, type SignOffResult } from "@/lib/receipts/runs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -101,4 +101,14 @@ export async function sendBackReceipts(runId: string, totalCents: number, _prev:
   revalidatePath("/admin/receipts");
   if (!ok) return { ok: false, message: "This run is no longer waiting for sign-off. Nothing was changed." };
   return { ok: true, message: `Sent back. The charity sees your reason and the list (${formatRand(totalCents)}) to approve again.` };
+}
+
+/** A sign-off that stopped part way: mark it done so Finish can make the rest. Never issues anything. */
+export async function markReceiptsStopped(runId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isId(runId)) return { ok: false, message: "Run not found." };
+  const ok = await markRunStopped({ runId, userId: admin.userId });
+  revalidatePath("/admin/receipts");
+  if (!ok) return { ok: false, message: "This run isn't stuck (it finished, or it's still within its first 15 minutes). Nothing was changed." };
+  redirect(`/admin/receipts?run=${runId}`);
 }

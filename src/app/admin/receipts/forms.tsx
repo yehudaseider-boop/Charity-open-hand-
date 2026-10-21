@@ -39,3 +39,15 @@ export function SendBackForm({ action }: { action: (s: FormState, f: FormData) =
 export function FinishForm({ action }: { action: (s: FormState, f: FormData) => Promise<FormState> }) {
   return <ActionForm action={action} submitLabel="Finish" pendingLabel="Finishing…" />;
 }
+
+export function MarkStoppedForm({ action }: { action: (s: FormState, f: FormData) => Promise<FormState> }) {
+  return (
+    <ActionForm
+      action={action}
+      submitLabel="Mark as stopped"
+      pendingLabel="Marking…"
+      confirm="Mark this sign-off as stopped? Receipts it already issued stay issued. Then use Finish to make the missing PDFs and send the emails. Nothing is issued twice."
+      confirmLabel="Yes, mark it stopped"
+    />
+  );
+}

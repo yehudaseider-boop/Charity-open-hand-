@@ -28,7 +28,12 @@ export interface ReceiptStore {
   /** Issued receipts with a PDF that have not been emailed yet, with the donor's email address. */
   listToEmail(taxYear: number, charityId?: string): Promise<(IssuedReceipt & { email: string })[]>;
   readPdf(receipt: IssuedReceipt): Promise<Buffer>;
-  markEmailed(receipt: IssuedReceipt): Promise<void>;
+  /**
+   * Mark a receipt emailed before its email goes, so two runs at once never both send it. False when another
+   * run got there first (it is sending it). A send that doesn't happen hands it back with releaseEmail.
+   */
+  claimEmail(receipt: IssuedReceipt): Promise<boolean>;
+  releaseEmail(receipt: IssuedReceipt): Promise<void>;
 }
 
 /** Sends receipts by email. Left out of a run unless asked for. */
@@ -68,6 +73,11 @@ export async function runReceiptsJob(args: {
   mailer?: Mailer;
   /** One charity's receipts only (the run it approved). Left out, every charity's. */
   charityId?: string;
+  /**
+   * Called with exactly what is about to be issued, before anything is written. Throwing stops the run with
+   * nothing issued (the approved list no longer matches what would be issued).
+   */
+  checkPlan?: (receipts: PlannedReceipt[]) => void;
 }): Promise<JobSummary> {
   const { store, taxYear, charityId } = args;
   const { start, end } = taxYearRange(taxYear);
@@ -96,6 +106,7 @@ export async function runReceiptsJob(args: {
   const fail = (what: string, e: unknown) => summary.failed.push({ what, message: e instanceof Error ? e.message : String(e) });
   for (const s of skipped) summary.skippedByReason[s.reason] = (summary.skippedByReason[s.reason] ?? 0) + 1;
   if (args.mode === "dry-run") return summary;
+  if (args.mode === "issue") args.checkPlan?.(receipts);
 
   const charityById = new Map(charities.map((c) => [c.id, c]));
   // One bad receipt never stops the others: its failure is recorded and the run carries on.
@@ -141,6 +152,7 @@ export async function runReceiptsJob(args: {
   // email never stops the others; it is tried again on the next run.
   if (args.mailer) {
     for (const r of await store.listToEmail(taxYear, charityId)) {
+      if (!(await store.claimEmail(r))) continue;
       try {
         const pdf = await store.readPdf(r);
         const mail = buildReceiptEmail({ details: r.details, reference: r.reference, siteUrl: args.mailer.siteUrl, platformName: args.mailer.platformName });
@@ -151,11 +163,10 @@ export async function runReceiptsJob(args: {
         });
         // Only a real send marks the receipt emailed: the console transport (local runs) and skipped
         // addresses leave it for a later run with a real transport.
-        if (sent === "sent") {
-          await store.markEmailed(r);
-          summary.emailed += 1;
-        }
+        if (sent === "sent") summary.emailed += 1;
+        else await store.releaseEmail(r);
       } catch (e) {
+        await store.releaseEmail(r).catch(() => undefined);
         summary.emailFailed += 1;
         console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);
       }

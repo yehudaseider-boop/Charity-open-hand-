@@ -168,7 +168,7 @@ export async function importGifts(charityId: string, _prev: FormState, formData:
   const gifts = file.rows.flatMap((r) => (r.check.ok && !r.duplicateOf ? [{ ...r.check.gift, campaignId: r.check.gift.campaign ? campaigns.get(r.check.gift.campaign.toLowerCase()) ?? null : null }] : []));
   if (!gifts.length) return { ok: false, message: "No gift in this file can be recorded: fix the rows listed above and check it again. Nothing was imported." };
   const fileName = String(formData.get("file_name") ?? "file.csv").replace(/[\u0000-\u001f]/g, "").slice(0, 200) || "file.csv";
-  const r = await recordGifts({ charityId, userId: viewer.userId, gifts, importOf: { fileName, confirmedAt: new Date().toISOString() } });
+  const r = await recordGifts({ charityId, userId: viewer.userId, gifts, importOf: { fileName, fingerprint: fileFingerprint(text), confirmedAt: new Date().toISOString() } });
   if (!r.ok) return { ok: false, message: r.message };
   revalidatePath(`/charity-admin/${charityId}/donations`);
   const done = await recordAction(
@@ -176,7 +176,7 @@ export async function importGifts(charityId: string, _prev: FormState, formData:
     viewer.userId,
     "gifts_imported",
     { gifts: gifts.length, file: fileName, total: formatRand(gifts.reduce((t, g) => t + g.amountCents, 0)), leftOut: file.bad },
-    { type: "remove_recorded", importId: r.ids[0] },
+    { type: "remove_recorded", importId: r.importId ?? undefined },
   );
   redirect(`/charity-admin/${charityId}/donations?done=${done}`);
 }

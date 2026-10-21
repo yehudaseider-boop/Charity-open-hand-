@@ -40,152 +40,70 @@ export async function campaignsByTitle(charityId: string): Promise<Map<string, s
   return new Map((data ?? []).map((c) => [String(c.title).trim().toLowerCase(), c.id as string]));
 }
 
-/** The donor record for this email and type (shared with online gifts), made if there is none. */
-async function donorFor(g: CleanGift): Promise<string> {
-  const db = createAdminClient();
-  const reg = g.donorType === "individual" ? null : g.registrationNumber;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let q = db.from("donors").select("id, registration_number").eq("email", g.email).eq("donor_type", g.donorType);
-    if (reg) q = q.eq("registration_number", reg);
-    else if (g.donorType === "individual") q = q.is("registration_number", null);
-    const { data: matches, error } = await q.limit(2);
-    if (error) throw error;
-    const existing = matches?.length === 1 ? matches[0] : (matches ?? []).find((m) => m.registration_number === reg);
-    if (existing) return existing.id as string;
-    // Not the donor's own confirmation of age or consent: the charity recorded the gift (see gift_imports).
-    const { data, error: insError } = await db
-      .from("donors")
-      .insert({
-        email: g.email,
-        donor_type: g.donorType,
-        registration_number: reg,
-        first_name: g.firstName,
-        last_name: g.lastName,
-        organisation_name: g.organisationName,
-        phone: g.phone,
-        id_number_last4: g.idNumber ? last4(g.idNumber) : null,
-        tax_reference_last4: g.taxReference ? last4(g.taxReference) : null,
-        address_line1: g.addressLine1,
-        address_line2: g.addressLine2,
-        suburb: g.suburb,
-        city: g.city,
-        postal_code: g.postalCode,
-      })
-      .select("id")
-      .single();
-    if (data) return data.id as string;
-    if (insError?.code !== "23505") throw insError; // someone else made it a moment ago: look again
-  }
-  throw new Error("Could not create the donor");
-}
-
-export type RecordResult = { ok: true; ids: string[] } | { ok: false; message: string };
+export type RecordResult = { ok: true; importId: string | null; ids: string[] } | { ok: false; message: string };
 
 /**
- * Record gifts: one typed in, or a whole file (with `importOf`). All or nothing: if one fails, the ones
- * already saved are removed again and nothing is kept.
+ * Record gifts: one typed in, or a whole file (with `importOf`). One database call, one transaction: all or
+ * nothing, even if the website stops part way. ID and tax numbers are encrypted here; the key never leaves
+ * the server.
  */
 export async function recordGifts(args: {
   charityId: string;
   userId: string;
   gifts: (CleanGift & { campaignId: string | null })[];
-  importOf?: { fileName: string; confirmedAt: string };
+  importOf?: { fileName: string; fingerprint: string; confirmedAt: string };
 }): Promise<RecordResult> {
-  const db = createAdminClient();
-  let importId: string | null = null;
-  if (args.importOf) {
-    const { data, error } = await db
-      .from("gift_imports")
-      .insert({
-        charity_id: args.charityId,
-        file_name: args.importOf.fileName.slice(0, 200) || "file.csv",
-        gifts: args.gifts.length,
-        total_cents: args.gifts.reduce((t, g) => t + g.amountCents, 0),
-        created_by: args.userId,
-        confirmed_at: args.importOf.confirmedAt,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    importId = data.id as string;
+  const gifts = args.gifts.map((g) => ({
+    donor_type: g.donorType,
+    email: g.email,
+    first_name: g.firstName,
+    last_name: g.lastName,
+    organisation_name: g.organisationName,
+    registration_number: g.registrationNumber,
+    phone: g.phone,
+    amount_cents: g.amountCents,
+    paid_at: paidAtOf(g.date),
+    tax_year: taxYearOfGift(g.date),
+    method: g.method,
+    wants_18a: g.wants18a,
+    campaign_id: g.campaignId,
+    reference: g.reference,
+    ...(g.wants18a
+      ? {
+          receipt_identity: receiptIdentity({ donorType: g.donorType, idNumber: g.idNumber ?? undefined, taxReference: g.taxReference ?? undefined, registrationNumber: g.registrationNumber ?? undefined }),
+          id_number_encrypted: g.idNumber ? encrypt(g.idNumber) : null,
+          id_number_last4: g.idNumber ? last4(g.idNumber) : null,
+          tax_reference_encrypted: g.taxReference ? encrypt(g.taxReference) : null,
+          tax_reference_last4: g.taxReference ? last4(g.taxReference) : null,
+          address_line1: g.addressLine1,
+          address_line2: g.addressLine2,
+          suburb: g.suburb,
+          city: g.city,
+          postal_code: g.postalCode,
+        }
+      : {}),
+  }));
+  const { data, error } = await createAdminClient().rpc("record_gifts", {
+    p_charity_id: args.charityId,
+    p_user_id: args.userId,
+    p_import: args.importOf ? { file_name: args.importOf.fileName.slice(0, 200) || "file.csv", file_fingerprint: args.importOf.fingerprint, confirmed_at: args.importOf.confirmedAt } : null,
+    p_gifts: gifts,
+  });
+  if (error) {
+    if (/gift_imports_once/.test(error.message)) return { ok: false, message: "You've already imported this exact file, so nothing was recorded again. It's under Earlier imports below." };
+    if (/donations_recorded_ref/.test(error.message)) return { ok: false, message: "One of these references is already on a gift you recorded, so nothing was recorded. Check the references and try again." };
+    console.error("[recorded-gifts]", error.message);
+    return { ok: false, message: "Something went wrong while saving, so nothing was recorded. Please try again." };
   }
-  const saved: string[] = [];
-  try {
-    for (const g of args.gifts) {
-      const donorId = await donorFor(g);
-      const { data, error } = await db
-        .from("donations")
-        .insert({
-          donor_id: donorId,
-          charity_id: args.charityId,
-          campaign_id: g.campaignId,
-          amount_cents: g.amountCents,
-          contribution_cents: 0,
-          platform_fee_cents: 0,
-          fee_vat_cents: 0,
-          processing_charge_cents: 0,
-          total_charged_cents: g.amountCents,
-          status: "paid",
-          paid_at: paidAtOf(g.date),
-          tax_year: taxYearOfGift(g.date),
-          gateway: "recorded",
-          gateway_ref: null,
-          wants_18a: g.wants18a,
-          recorded_method: g.method,
-          recorded_by: args.userId,
-          import_id: importId,
-          external_ref: g.reference,
-          came_from: "recorded",
-        })
-        .select("id")
-        .single();
-      if (error) {
-        if (error.code === "23505") throw new Error(`The reference "${g.reference}" is already on another gift you recorded.`);
-        throw error;
-      }
-      saved.push(data.id as string);
-      const details = await db.from("donation_checkout_details").insert({
-        donation_id: data.id,
-        donor_type: g.donorType,
-        email: g.email,
-        first_name: g.firstName,
-        last_name: g.lastName,
-        organisation_name: g.organisationName,
-        registration_number: g.registrationNumber,
-        phone: g.phone,
-        ...(g.wants18a
-          ? {
-              receipt_identity: receiptIdentity({ donorType: g.donorType, idNumber: g.idNumber ?? undefined, taxReference: g.taxReference ?? undefined, registrationNumber: g.registrationNumber ?? undefined }),
-              id_number_encrypted: g.idNumber ? encrypt(g.idNumber) : null,
-              id_number_last4: g.idNumber ? last4(g.idNumber) : null,
-              tax_reference_encrypted: g.taxReference ? encrypt(g.taxReference) : null,
-              tax_reference_last4: g.taxReference ? last4(g.taxReference) : null,
-              address_line1: g.addressLine1,
-              address_line2: g.addressLine2,
-              suburb: g.suburb,
-              city: g.city,
-              postal_code: g.postalCode,
-            }
-          : {}),
-      });
-      if (details.error) throw details.error;
-    }
-  } catch (e) {
-    // Nothing half-done: take back what this call saved (none of it can be on a receipt yet).
-    if (saved.length) await db.from("donations").delete().in("id", saved);
-    if (importId) await db.from("gift_imports").delete().eq("id", importId);
-    const message = e instanceof Error && /already on another gift/.test(e.message) ? e.message : "Something went wrong while saving, so nothing was recorded. Please try again.";
-    if (!(e instanceof Error && /already on another gift/.test(e.message))) console.error("[recorded-gifts]", e);
-    return { ok: false, message };
-  }
+  const out = data as { import_id: string | null; donation_ids: string[] };
   await logAudit({
     actorUserId: args.userId,
-    action: importId ? "gifts.imported" : "gift.recorded",
+    action: out.import_id ? "gifts.imported" : "gift.recorded",
     entityType: "charity",
     entityId: args.charityId,
-    details: { gifts: saved.length, importId, cents: args.gifts.reduce((t, g) => t + g.amountCents, 0) },
+    details: { gifts: out.donation_ids.length, importId: out.import_id, cents: args.gifts.reduce((t, g) => t + g.amountCents, 0) },
   });
-  return { ok: true, ids: importId ? [importId, ...saved] : saved };
+  return { ok: true, importId: out.import_id, ids: out.donation_ids };
 }
 
 export type RemoveResult = { ok: true; removed: number } | { ok: false; why: "gone" | "receipted" };
@@ -193,7 +111,7 @@ export type RemoveResult = { ok: true; removed: number } | { ok: false; why: "go
 /** Remove recorded gifts (one, or a whole import), only while none of them is on a receipt. */
 export async function removeRecorded(args: { charityId: string; userId: string; donationId?: string; importId?: string }): Promise<RemoveResult> {
   const db = createAdminClient();
-  let q = db.from("donations").select("id").eq("charity_id", args.charityId).eq("gateway", "recorded");
+  let q = db.from("donations").select("id, import_id").eq("charity_id", args.charityId).eq("gateway", "recorded");
   q = args.importId ? q.eq("import_id", args.importId) : q.eq("id", args.donationId ?? "");
   const { data: rows, error } = await q;
   if (error) throw error;
@@ -208,7 +126,7 @@ export async function removeRecorded(args: { charityId: string; userId: string; 
     if (/cannot be deleted/.test(delError.message)) return { ok: false, why: "receipted" };
     throw delError;
   }
-  if (args.importId) await db.from("gift_imports").delete().eq("id", args.importId).eq("charity_id", args.charityId);
+  await dropEmptyImports(args.charityId, [...new Set((rows ?? []).map((r) => r.import_id as string | null).filter((x): x is string => Boolean(x)))]);
   await logAudit({ actorUserId: args.userId, action: "gifts.removed", entityType: "charity", entityId: args.charityId, details: { removed: ids.length, importId: args.importId ?? null } });
   return { ok: true, removed: ids.length };
 }
@@ -218,14 +136,40 @@ export function fileFingerprint(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 32);
 }
 
-/** The charity's recent imports, newest first. */
+/** The charity's recent imports, newest first, with the gifts still recorded from each (some may have been removed one by one). */
 export async function listImports(charityId: string) {
-  const { data, error } = await createAdminClient()
-    .from("gift_imports")
-    .select("id, file_name, gifts, total_cents, created_at")
-    .eq("charity_id", charityId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const db = createAdminClient();
+  const { data, error } = await db.from("gift_imports").select("id, file_name, created_at").eq("charity_id", charityId).order("created_at", { ascending: false }).limit(20);
   if (error) throw error;
-  return (data ?? []) as { id: string; file_name: string; gifts: number; total_cents: number; created_at: string }[];
+  const imports = (data ?? []) as { id: string; file_name: string; created_at: string }[];
+  const live = new Map<string, { gifts: number; cents: number }>();
+  if (imports.length) {
+    const { data: rows, error: rowError } = await db.from("donations").select("import_id, amount_cents").eq("charity_id", charityId).in("import_id", imports.map((i) => i.id));
+    if (rowError) throw rowError;
+    for (const r of rows ?? []) {
+      const t = live.get(r.import_id as string) ?? { gifts: 0, cents: 0 };
+      t.gifts += 1;
+      t.cents += Number(r.amount_cents);
+      live.set(r.import_id as string, t);
+    }
+  }
+  return imports
+    .map((i) => ({ ...i, gifts: live.get(i.id)?.gifts ?? 0, total_cents: live.get(i.id)?.cents ?? 0 }))
+    .filter((i) => i.gifts > 0);
+}
+
+/**
+ * Imports with no gifts left (removed as a whole, or one by one) are cleared away, so the corrected file can be
+ * imported again. An import that still has gifts is kept.
+ */
+export async function dropEmptyImports(charityId: string, importIds: string[]) {
+  const db = createAdminClient();
+  for (const id of importIds) {
+    const { count, error } = await db.from("donations").select("id", { count: "exact", head: true }).eq("import_id", id);
+    if (error) throw error;
+    if (!count) {
+      const del = await db.from("gift_imports").delete().eq("id", id).eq("charity_id", charityId);
+      if (del.error) throw del.error;
+    }
+  }
 }

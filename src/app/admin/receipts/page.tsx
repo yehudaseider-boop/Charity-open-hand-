@@ -3,13 +3,13 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { containsPattern, safeSearch } from "@/lib/charity/dashboard";
-import { formatDate, taxYearLabel } from "@/lib/dates";
+import { formatDate, formatDateTime, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { receiptsEnabled } from "@/config/receipts";
-import { getRun, listUnfinishedRuns, listWaitingRuns, pendingAtYearEnd, runNeedsFinishing } from "@/lib/receipts/runs";
-import { finishReceipts, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
-import { FinishForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
+import { getRun, listUnfinishedRuns, listWaitingRuns, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
+import { finishReceipts, markReceiptsStopped, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
+import { FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
 
 export const metadata: Metadata = { title: "Receipts" };
 
@@ -72,7 +72,15 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
             </p>
             {pending[i] ? <p className="text-warning">{pending[i]} s18A {pending[i] === 1 ? "payment" : "payments"} from the last days of the year still pending. Check Payments first.</p> : null}
             {w.status === "issuing" ? (
-              <p className="text-muted">Being issued since {w.signed_off_at ? formatDate(w.signed_off_at) : "just now"}. If this stays here, the run stopped part way: tell the developer.</p>
+              <div className="space-y-2">
+                <p className="text-muted">Being issued since {w.signed_off_at ? formatDateTime(w.signed_off_at) : "just now"}.</p>
+                {w.stuck ? (
+                  <>
+                    <p className="text-warning">This has taken more than {STUCK_MINUTES} minutes, so it most likely stopped part way.</p>
+                    <MarkStoppedForm action={markReceiptsStopped.bind(null, w.id)} />
+                  </>
+                ) : null}
+              </div>
             ) : (
               <>
                 <SignOffForm action={signOffReceipts.bind(null, w.id)} count={w.receipts_planned} total={formatRand(w.total_cents)} />

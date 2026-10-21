@@ -158,7 +158,8 @@ describe("the yearly job", () => {
       savePdf: async (r, pdf) => void pdfs.set(r.id, pdf),
       listToEmail: async () => issued.filter((r) => pdfs.has(r.id) && !emailed.has(r.id)).map((r) => ({ ...r, email: "sarah@example.co.za" })),
       readPdf: async (r) => pdfs.get(r.id)!,
-      markEmailed: async (r) => void emailed.add(r.id),
+      claimEmail: async (r) => (emailed.has(r.id) ? false : (emailed.add(r.id), true)),
+      releaseEmail: async (r) => void emailed.delete(r.id),
     };
     return { store, issued, pdfs, emailed };
   }
@@ -275,7 +276,8 @@ describe("emailing receipts", () => {
       savePdf: async (r, pdf) => void pdfs.set(r.id, pdf),
       listToEmail: async () => issued.filter((r) => pdfs.has(r.id) && !emailed.has(r.id)).map((r) => ({ ...r, email: `donor-${r.id}@example.co.za` })),
       readPdf: async (r) => pdfs.get(r.id)!,
-      markEmailed: async (r) => void emailed.add(r.id),
+      claimEmail: async (r) => (emailed.has(r.id) ? false : (emailed.add(r.id), true)),
+      releaseEmail: async (r) => void emailed.delete(r.id),
     };
     return { store, emailed };
   }
@@ -292,6 +294,15 @@ describe("emailing receipts", () => {
     // Running it again sends nothing more.
     const again = await runReceiptsJob({ store, render, ...base, mailer });
     expect(again.emailed).toBe(0);
+    expect(sent).toHaveLength(2);
+  });
+
+  it("two runs at once (two Finish presses) still email each donor once", async () => {
+    const { store } = setup([don({ id: "a" }), don({ id: "b", donorId: "u2" })]);
+    const { sent, mailer } = sentTo();
+    await runReceiptsJob({ store, render, ...base, mode: "issue" });
+    const [x, y] = await Promise.all([runReceiptsJob({ store, render, ...base, mode: "finish", mailer }), runReceiptsJob({ store, render, ...base, mode: "finish", mailer })]);
+    expect(x.emailed + y.emailed).toBe(2);
     expect(sent).toHaveLength(2);
   });
 

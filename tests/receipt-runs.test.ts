@@ -78,7 +78,8 @@ describe("finishing never issues a receipt nobody approved", () => {
       savePdf: async (x) => void pdfs.add(x.id),
       listToEmail: async (_y, c) => (asked.push(c), pdfs.has("r1") ? [{ ...already, pdfPath: "c1/r1.pdf", email: "sarah@example.co.za" }] : []),
       readPdf: async () => Buffer.from("%PDF"),
-      markEmailed: async () => {},
+      claimEmail: async () => true,
+      releaseEmail: async () => {},
     };
     const send = vi.fn(async () => "sent" as const);
     const s = await runReceiptsJob({
@@ -102,3 +103,22 @@ describe("the dashboard's words for an approval", () => {
     expect(d.what).not.toMatch(/[—!]/);
   });
 });
+
+describe("a sign-off never issues more than was approved", () => {
+  it("stops before writing anything when the list changed at the last moment", async () => {
+    const issue = vi.fn();
+    const charity = { id: "c1", isS18a: true, mandateSignedAt: "2025-03-09T00:00:00+02:00", quickgive_code: "LTC", legal_name_en: "T NPC", legal_name_he: null, npo_number: "1", pbo_number: "1", s18a_reference: "1", address_line1: "1 Rd", address_line2: null, suburb: null, city: "Jhb", postal_code: "2000" };
+    const gift = { id: "d1", charityId: "c1", donorId: "u1", donorIdentity: "", taxYear: 2026, amountCents: 50_000, status: "paid", wants18a: true, paidAt: "2025-10-01T10:00:00Z" };
+    const store = {
+      listDonations: async () => [gift], listCharities: async () => [charity], receiptedDonationIds: async () => new Set<string>(),
+      donorDetailsFor: async () => [], issue, listIssuedWithoutPdf: async () => [], savePdf: async () => {}, listToEmail: async () => [],
+      readPdf: async () => Buffer.from(""), claimEmail: async () => true, releaseEmail: async () => {},
+    } as unknown as ReceiptStore;
+    const approved = fingerprintPlan([{ donorId: "u1", donorIdentity: "", donationIds: ["other"], totalCents: 1 }]);
+    await expect(
+      runReceiptsJob({ store, taxYear: 2026, today: "2026-10-21", now: new Date(), mode: "issue", render: async () => Buffer.from(""), checkPlan: (r) => { if (fingerprintPlan(r) !== approved) throw new Error("changed"); } }),
+    ).rejects.toThrow("changed");
+    expect(issue).not.toHaveBeenCalled();
+  });
+});
+

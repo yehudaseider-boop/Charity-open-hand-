@@ -1,6 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { dropEmptyImports } from "./recorded-gifts-store";
 import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 
 /**
@@ -196,7 +197,7 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
     }
     case "remove_recorded": {
       const ids = undo.importId ? null : (undo.donationIds ?? []);
-      let q = db.from("donations").select("id").eq("charity_id", charityId).eq("gateway", "recorded");
+      let q = db.from("donations").select("id, import_id").eq("charity_id", charityId).eq("gateway", "recorded");
       q = undo.importId ? q.eq("import_id", undo.importId) : q.in("id", ids ?? []);
       const { data: rows, error } = await q;
       if (error) throw error;
@@ -210,7 +211,7 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
         if (/cannot be deleted/.test(delError.message)) return "issued";
         throw delError;
       }
-      if (undo.importId) await db.from("gift_imports").delete().eq("id", undo.importId).eq("charity_id", charityId);
+      await dropEmptyImports(charityId, [...new Set((rows ?? []).map((r) => r.import_id as string | null).filter((x): x is string => Boolean(x)))]);
       return null;
     }
   }

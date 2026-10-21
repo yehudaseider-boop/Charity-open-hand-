@@ -80,8 +80,14 @@ export function parseGiftAmount(raw: string | undefined): { cents: number } | { 
   const lastComma = s.lastIndexOf(","), lastDot = s.lastIndexOf(".");
   let normal = s;
   if (lastComma >= 0 && lastDot >= 0) {
-    // Both marks: the last one is the decimal mark and the other separates thousands.
-    normal = lastDot > lastComma ? s.replace(/,/g, "") : s.replace(/\./g, "").replace(",", ".");
+    // Both marks: the last one is the decimal mark and the other separates thousands, in proper groups of
+    // three ("1,250.00", "1.250,00"). Anything else ("1,25.00") is refused rather than read one way.
+    const dec = lastDot > lastComma ? "." : ",";
+    const sep = dec === "." ? "," : ".";
+    const [whole, cents] = [s.slice(0, s.lastIndexOf(dec)), s.slice(s.lastIndexOf(dec) + 1)];
+    const groups = new RegExp(`^\\d{1,3}(\\${sep}\\d{3})+$`);
+    if (!groups.test(whole) || !/^\d{1,2}$/.test(cents)) return { error: `"${raw?.trim()}" could be read two ways. Write it as 1250 or 1250.00` };
+    normal = `${whole.split(sep).join("")}.${cents}`;
   } else if (usesCommaThousands(s) || /\d\.\d{3}$/.test(s) || /\d\.\d{3}\./.test(s)) {
     return { error: `"${raw?.trim()}" could be read two ways. Write it as 1250 or 1250.00` };
   }

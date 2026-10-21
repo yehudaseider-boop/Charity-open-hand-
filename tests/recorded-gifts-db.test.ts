@@ -97,4 +97,34 @@ describe("recorded gifts", () => {
       await refused("insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway) values ($1, $2, 1, 0, 0, 1, 'recorded')", [d, charity], /permission denied|row-level security/);
     });
   });
+
+  it("record_gifts saves a whole file in one go: one bad row means nothing at all is saved", async () => {
+    await tx(async () => {
+      const gift = (email: string, ref: string | null) => ({ donor_type: "individual", email, first_name: "A", last_name: "B", amount_cents: 1000, paid_at: "2026-03-05T12:00:00+02:00", tax_year: 2027, method: "eft", wants_18a: false, campaign_id: null, reference: ref });
+      const imp = { file_name: "gifts.csv", file_fingerprint: "a".repeat(32), confirmed_at: new Date().toISOString() };
+      const before = Number((await run("select count(*) from public.donations")).rows[0].count);
+      await run("savepoint s");
+      // Two rows with the same reference: the second is refused, and the first is not kept either.
+      await expect(run("select public.record_gifts($1, $2, $3, $4)", [charity, admin, imp, JSON.stringify([gift("one@x.test", "R-1"), gift("two@x.test", "R-1")])])).rejects.toThrow(/donations_recorded_ref/);
+      await run("rollback to savepoint s");
+      expect(Number((await run("select count(*) from public.donations")).rows[0].count)).toBe(before);
+      expect(Number((await run("select count(*) from public.gift_imports where file_name = 'gifts.csv'")).rows[0].count)).toBe(0);
+      // A good file is saved, with its donors, gifts and details, and the same file again is refused.
+      const ok = (await run("select public.record_gifts($1, $2, $3, $4) as r", [charity, admin, imp, JSON.stringify([gift("one@x.test", "R-1"), gift("two@x.test", "R-2")])])).rows[0].r;
+      expect(ok.donation_ids).toHaveLength(2);
+      expect(Number((await run("select count(*) from public.donation_checkout_details where donation_id = any($1::uuid[])", [ok.donation_ids])).rows[0].count)).toBe(2);
+      await run("savepoint s2");
+      await expect(run("select public.record_gifts($1, $2, $3, $4)", [charity, admin, imp, JSON.stringify([gift("three@x.test", "R-3")])])).rejects.toThrow(/gift_imports_once/);
+      await run("rollback to savepoint s2");
+      // An import can't be removed while it still has gifts.
+      await expect(run("delete from public.gift_imports where id = $1", [ok.import_id])).rejects.toThrow(/donations_import_id_fkey/);
+    });
+  });
+
+  it("only the server may call record_gifts", async () => {
+    await tx(async () => {
+      await run("set local role authenticated");
+      await expect(run("select public.record_gifts($1, $2, null, '[]'::jsonb)", [charity, admin])).rejects.toThrow(/permission denied/);
+    });
+  });
 });

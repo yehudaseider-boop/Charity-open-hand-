@@ -175,8 +175,14 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       return Buffer.from(await data.arrayBuffer());
     },
 
-    async markEmailed(receipt) {
-      const { error } = await db.from("s18a_receipts").update({ emailed_at: new Date().toISOString() }).eq("id", receipt.id).is("emailed_at", null);
+    async claimEmail(receipt) {
+      const { data, error } = await db.from("s18a_receipts").update({ emailed_at: new Date().toISOString() }).eq("id", receipt.id).is("emailed_at", null).select("id");
+      if (error) throw new Error(error.message);
+      return Boolean(data?.length);
+    },
+
+    async releaseEmail(receipt) {
+      const { error } = await db.from("s18a_receipts").update({ emailed_at: null }).eq("id", receipt.id);
       if (error) throw new Error(error.message);
     },
 

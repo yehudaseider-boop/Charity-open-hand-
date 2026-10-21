@@ -113,7 +113,7 @@ export async function getRun(runId: string): Promise<(ReceiptRun & { charity_nam
 }
 
 /** Runs the charity approved that wait for Givezy's sign-off, oldest first, with the charity's name. */
-export async function listWaitingRuns(): Promise<(ReceiptRun & { charity_name: string })[]> {
+export async function listWaitingRuns(now = new Date()): Promise<(ReceiptRun & { charity_name: string; stuck: boolean })[]> {
   const { data, error } = await createAdminClient()
     .from("receipt_runs")
     .select(`${RUN_COLUMNS}, charities(name_en)`)
@@ -122,7 +122,10 @@ export async function listWaitingRuns(): Promise<(ReceiptRun & { charity_name: s
   if (error) throw error;
   return (data ?? []).map((r) => {
     const c = (Array.isArray(r.charities) ? r.charities[0] : r.charities) as { name_en: string } | null;
-    return { ...(r as unknown as ReceiptRun), charity_name: c?.name_en ?? "A charity" };
+    const run = r as unknown as ReceiptRun & { signed_off_at: string | null };
+    // A sign-off running longer than STUCK_MINUTES most likely stopped part way (see markRunStopped).
+    const stuck = run.status === "issuing" && Boolean(run.signed_off_at) && now.getTime() - Date.parse(run.signed_off_at!) > STUCK_MINUTES * 60_000;
+    return { ...run, charity_name: c?.name_en ?? "A charity", stuck };
   });
 }
 
@@ -135,12 +138,23 @@ export async function listUnfinishedRuns(): Promise<(ReceiptRun & { charity_name
     .order("finished_at", { ascending: false })
     .limit(50);
   if (error) throw error;
-  return (data ?? [])
-    .map((r) => {
-      const c = (Array.isArray(r.charities) ? r.charities[0] : r.charities) as { name_en: string } | null;
-      return { ...(r as unknown as ReceiptRun), charity_name: c?.name_en ?? "A charity" };
-    })
-    .filter((r) => runNeedsFinishing(r.summary));
+  const runs = (data ?? []).map((r) => {
+    const c = (Array.isArray(r.charities) ? r.charities[0] : r.charities) as { name_en: string } | null;
+    return { ...(r as unknown as ReceiptRun), charity_name: c?.name_en ?? "A charity" };
+  });
+  // What Finish would actually do now, from the receipts themselves (not the count saved with the run, which
+  // goes stale when a receipt is withdrawn or emailed some other way). Each charity and year is read once.
+  const s = store();
+  const seen = new Set<string>();
+  const out: typeof runs = [];
+  for (const r of runs) {
+    const key = `${r.charity_id}|${r.tax_year}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const [noPdf, toEmail] = await Promise.all([s.listIssuedWithoutPdf(r.tax_year, r.charity_id), s.listToEmail(r.tax_year, r.charity_id)]);
+    if (noPdf.length || toEmail.length) out.push(r);
+  }
+  return out;
 }
 
 /** Whether a finished run still has PDFs or emails to do (a receipt not yet emailed counts). Pure. */
@@ -241,7 +255,7 @@ export async function signOffRun(args: { runId: string; userId: string; now?: Da
   if (!run || run.status !== "charity_approved") return { ok: false, why: "gone" };
   const plan = await loadPlan(run.charity_id, run.tax_year);
   if (plan.fingerprint !== run.plan_fingerprint) {
-    await cancelRun({ runId: run.id, userId: args.userId, reason: "The list changed after it was approved (a gift was refunded or paid late), so nothing was issued. Please check the new list and approve it again." });
+    await cancelRun({ runId: run.id, userId: args.userId, reason: CHANGED_REASON });
     return { ok: false, why: "changed" };
   }
   // Claim it, so two people signing off at once can't run it twice.
@@ -258,14 +272,80 @@ export async function signOffRun(args: { runId: string; userId: string; now?: Da
   const j = job(run.id);
   let summary: JobSummary;
   try {
-    summary = await runReceiptsJob({ store: store(), taxYear: run.tax_year, today: today(now), now, mode: "issue", charityId: run.charity_id, mailer: j.mailer, render: j.render });
+    summary = await runReceiptsJob({
+      store: store(),
+      taxYear: run.tax_year,
+      today: today(now),
+      now,
+      mode: "issue",
+      charityId: run.charity_id,
+      mailer: j.mailer,
+      render: j.render,
+      // The list is checked again at the last moment, so a gift paid or refunded since the check above is
+      // never issued without the charity's approval.
+      checkPlan: (receipts) => {
+        if (fingerprintPlan(receipts) !== run.plan_fingerprint) throw new PlanChanged();
+      },
+    });
   } catch (e) {
+    if (e instanceof PlanChanged) {
+      const { error: backError } = await db
+        .from("receipt_runs")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString(), cancelled_reason: CHANGED_REASON })
+        .eq("id", run.id)
+        .eq("status", "issuing");
+      if (backError) throw backError;
+      return { ok: false, why: "changed" };
+    }
     // The job stopped before or between receipts. Receipts it issued stay issued (they are safe to
     // finish), so the run is marked done with the error, and "Finish" makes the rest.
     summary = { taxYear: run.tax_year, mode: "issue", planned: run.receipts_planned, issued: 0, pdfsMade: 0, emailed: 0, emailFailed: 0, skippedByReason: {}, needsAttention: [], checkIdentities: [], failed: [{ what: "the run", message: e instanceof Error ? e.message : String(e) }] };
   }
-  await db.from("receipt_runs").update({ status: "done", finished_at: new Date().toISOString(), summary }).eq("id", run.id);
+  const { error: doneError } = await db.from("receipt_runs").update({ status: "done", finished_at: new Date().toISOString(), summary }).eq("id", run.id);
+  // Left as "issuing", the run shows as stuck on the admin page, where it can be marked stopped (see below).
+  if (doneError) console.error("[receipts] could not mark the run done", run.id, doneError.message);
   return { ok: true, summary, emailed: Boolean(j.mailer) };
+}
+
+class PlanChanged extends Error {}
+const CHANGED_REASON = "The list changed after it was approved (a gift was refunded or paid late), so nothing was issued. Please check the new list and approve it again.";
+
+/** How long a sign-off may take before the admin page offers to mark it stopped. */
+export const STUCK_MINUTES = 15;
+
+/**
+ * A sign-off that never finished (the server stopped part way). Its receipts issued so far stay issued; the
+ * run is marked done with a note, so "Finish" makes the missing PDFs and emails and nothing is issued twice.
+ */
+export async function markRunStopped(args: { runId: string; userId: string; now?: Date }): Promise<boolean> {
+  const now = args.now ?? new Date();
+  const cutoff = new Date(now.getTime() - STUCK_MINUTES * 60_000).toISOString();
+  const db = createAdminClient();
+  const { data: run, error } = await db.from("receipt_runs").select(RUN_COLUMNS).eq("id", args.runId).eq("status", "issuing").lt("signed_off_at", cutoff).maybeSingle();
+  if (error) throw error;
+  if (!run) return false;
+  const { count, error: countError } = await db
+    .from("s18a_receipts")
+    .select("id", { count: "exact", head: true })
+    .eq("charity_id", run.charity_id)
+    .eq("tax_year", run.tax_year)
+    .eq("status", "issued")
+    .gte("issued_at", run.signed_off_at as string);
+  if (countError) throw countError;
+  const summary: JobSummary = {
+    taxYear: run.tax_year, mode: "issue", planned: run.receipts_planned, issued: count ?? 0, pdfsMade: 0, emailed: 0, emailFailed: 0,
+    skippedByReason: {}, needsAttention: [], checkIdentities: [], failed: [{ what: "the run", message: "It stopped part way. Finish makes the missing PDFs and emails." }],
+  };
+  const { data: done, error: doneError } = await db
+    .from("receipt_runs")
+    .update({ status: "done", finished_at: now.toISOString(), summary })
+    .eq("id", run.id)
+    .eq("status", "issuing")
+    .select("id");
+  if (doneError) throw doneError;
+  if (!done?.length) return false;
+  await logAudit({ actorUserId: args.userId, action: "receipts.run_marked_stopped", entityType: "charity", entityId: run.charity_id, details: { runId: run.id, issued: count ?? 0 } });
+  return true;
 }
 
 /** Make any missing PDFs and send any unsent emails for a finished run. Never issues a new receipt. */
