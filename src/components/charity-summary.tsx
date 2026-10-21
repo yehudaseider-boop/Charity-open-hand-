@@ -83,7 +83,7 @@ export function DocumentList({ docs, hrefFor, removeAction }: {
             </div>
             {removeAction ? (
               <form action={removeAction(d.id)}>
-                <RemoveButton what={d.file_name} />
+                <RemoveButton what={d.file_name} ask={false} />
               </form>
             ) : null}
           </li>

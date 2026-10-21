@@ -15,6 +15,11 @@ describe("SA ID number check", () => {
     expect(isValidSaIdNumber(`${valid.slice(0, 6)} ${valid.slice(6)}`)).toBe(true);
   });
 
+  it("rejects a citizenship digit other than 0 or 1", () => {
+    expect(isValidSaIdNumber(makeId("800101500918"))).toBe(true);
+    expect(() => makeId("800101500958")).toThrow();
+  });
+
   it("rejects a wrong check digit", () => {
     const wrong = valid.slice(0, 12) + ((Number(valid[12]) + 1) % 10);
     expect(isValidSaIdNumber(wrong)).toBe(false);

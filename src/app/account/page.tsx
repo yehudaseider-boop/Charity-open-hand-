@@ -8,7 +8,7 @@ import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyButton } from "./monthly-button";
 
-export const metadata: Metadata = { title: "Account" };
+export const metadata: Metadata = { title: "Account", robots: { index: false, follow: false } };
 
 export default async function AccountPage({ searchParams }: PageProps<"/account">) {
   const viewer = await requireViewer();

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Animated, type ViewStyle } from "react-native";
+import { Animated, type StyleProp, type ViewStyle } from "react-native";
 import { reduceMotion } from "@/lib/motion";
 
 /** Motion 2: soft fade-up as list items appear. */
-export function FadeUp({ index = 0, children, style }: { index?: number; children: React.ReactNode; style?: ViewStyle }) {
+export function FadeUp({ index = 0, children, style }: { index?: number; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   const [v] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (reduceMotion()) return v.setValue(1);

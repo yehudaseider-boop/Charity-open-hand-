@@ -19,6 +19,12 @@ export function zonedParts(date: Date): { year: number; month: number; day: numb
   return { year: get("year"), month: get("month"), day: get("day") };
 }
 
+/** Today's date in Johannesburg as yyyy-mm-dd (between 00:00 and 02:00 the UTC date is still yesterday). */
+export function isoDateInJhb(date: Date = new Date()): string {
+  const { year, month, day } = zonedParts(date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /** 2026-10-06T14:00:00Z -> "06/10/2026" (in Johannesburg time). */
 export function formatDate(date: Date | string): string {
   const { year, month, day } = zonedParts(new Date(date));

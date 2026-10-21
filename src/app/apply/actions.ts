@@ -7,6 +7,7 @@ import { requireViewer } from "@/lib/auth";
 import { randomCode, slugify } from "@/lib/charity/slug";
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { hitRateLimit } from "@/lib/rate-limit";
+import { claimInvite } from "@/lib/charity/invites";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const startSchema = z.object({
@@ -51,11 +52,16 @@ export async function startApplication(_prev: FormState, formData: FormData): Pr
   ]);
   for (const { error } of links) if (error) throw error;
 
+  // Started from an invitation: mark it used, so the link can't start a second application.
+  const invite = formData.get("invite");
+  const fromInvite = typeof invite === "string" && invite ? await claimInvite(invite, viewer.userId, charityId) : false;
+
   await logAudit({
     actorUserId: viewer.userId,
     action: "charity.application_started",
     entityType: "charity",
     entityId: charityId,
+    details: fromInvite ? { from_invite: true } : undefined,
   });
   redirect(`/charity-admin/${charityId}/application`);
 }

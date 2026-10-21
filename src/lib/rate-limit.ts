@@ -2,10 +2,20 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
+ * The rate-limit key for a visitor's address. No address (the hosting header is missing) gives no key,
+ * so everyone is not counted together under one "unknown" address; the other keys still apply.
+ * Many donors share one address (a shul hall, an office), so an address gets a wider allowance.
+ */
+export function ipKeys(ip: string): string[] {
+  return ip && ip !== "unknown" ? [`ip:${ip}`] : [];
+}
+
+/**
  * Counts recent attempts per key and refuses once the limit is reached.
  * Used on checkout to slow down card testing (bots trying stolen cards).
  */
 export async function hitRateLimit(bucket: string, keys: string[], limit: number, windowMinutes: number) {
+  if (keys.length === 0) return false;
   const db = createAdminClient();
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
   // Record this attempt first, then count: parallel requests can't all slip under the limit.

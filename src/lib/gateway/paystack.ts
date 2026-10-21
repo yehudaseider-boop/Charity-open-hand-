@@ -57,8 +57,10 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok || !body?.status) {
     // Only a 404, or Paystack saying in words that it has no such transaction, counts as "never received".
     const notFound = res.status === 404 || /transaction reference not found|transaction not found/i.test(body?.message ?? "");
-    // Paystack answered and said no (a 4xx other than "not found" or "too many requests", or a 2xx with status false).
-    const refused = !notFound && ((res.status >= 400 && res.status < 500 && res.status !== 429) || (res.ok && body?.status === false));
+    // Paystack answered and said no to this request: 400, 402 or 422, or a 2xx with status false. A 401 or 403
+    // means our key is wrong or was changed, and a 5xx or 429 that Paystack is struggling: those are outages,
+    // never a declined card, so monthly donors are not stopped and saved cards not dropped because of them.
+    const refused = !notFound && ([400, 402, 422].includes(res.status) || (res.ok && body?.status === false));
     throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused });
   }
   return body.data as T;
@@ -165,7 +167,7 @@ export const paystackGateway: PaymentGateway = {
         currency: "ZAR",
         reference: req.reference,
         ...splitOrNone(req, paystackGateway.splitsPayments),
-        metadata: { description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: true },
+        metadata: { description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: req.monthly ?? true },
       }),
     });
     return { status: data.status === "success" ? ("success" as const) : ["failed", "reversed"].includes(data.status) ? ("failed" as const) : ("pending" as const) };
@@ -179,13 +181,47 @@ export const paystackGateway: PaymentGateway = {
     const gotBytes = Buffer.from(got, "hex");
     const expectedBytes = Buffer.from(expected, "hex");
     if (!/^[0-9a-f]{128}$/i.test(got) || gotBytes.length !== expectedBytes.length || !timingSafeEqual(gotBytes, expectedBytes)) return null;
-    const body = JSON.parse(rawBody) as { event: string; data?: { id?: number; reference?: string } };
+    type Data = {
+      id?: number;
+      reference?: string;
+      amount?: number;
+      currency?: string;
+      resolution?: string;
+      status?: string;
+      transaction_reference?: string;
+      transaction?: { reference?: string };
+    };
+    const body = JSON.parse(rawBody) as { event: string; data?: Data };
+    const d = body.data ?? {};
+    // Refunds and disputes name the original payment. The field names are not confirmed against a live
+    // payload yet: VERIFY in Paystack's test mode (docs/paystack-test-script.md). Unknown shapes leave the
+    // reference empty, so the event is held for a person instead of changing anything.
+    const original = d.transaction_reference ?? d.transaction?.reference ?? null;
+    const type: WebhookEvent["type"] =
+      body.event === "charge.success" ? "payment_succeeded"
+      : body.event === "charge.failed" ? "payment_failed"
+      : body.event === "refund.processed" ? "refund_processed"
+      : body.event === "charge.dispute.create" ? "dispute_opened"
+      : body.event === "charge.dispute.resolve" ? "dispute_resolved"
+      : "other";
+    const isPayment = type === "payment_succeeded" || type === "payment_failed";
     return {
       // Paystack events carry no event id; event type + transaction id is unique. VERIFY.
-      eventId: `${body.event}:${body.data?.id ?? body.data?.reference ?? "unknown"}`,
-      type: body.event === "charge.success" ? "payment_succeeded" : body.event === "charge.failed" ? "payment_failed" : "other",
-      reference: body.data?.reference ?? null,
-      raw: body,
+      eventId: `${body.event}:${d.id ?? d.reference ?? original ?? "unknown"}`,
+      type,
+      reference: isPayment ? (d.reference ?? null) : original,
+      // Paystack amounts are in the smallest unit (cents for rand). VERIFY for refunds.
+      amountCents: type === "refund_processed" && Number.isSafeInteger(d.amount) ? (d.amount as number) : null,
+      currency: type === "refund_processed" && typeof d.currency === "string" ? d.currency : null,
+      detail: type === "dispute_resolved" ? (d.resolution ?? d.status ?? null) : null,
+      // What we keep of the event. Never the whole body: a charge carries the reusable card code
+      // (authorization) and the customer's details, which are kept encrypted or not at all elsewhere.
+      // `reference` is the donation's own reference, so an erasure finds refund and dispute rows too.
+      raw: {
+        event: body.event,
+        reference: isPayment ? (d.reference ?? null) : original,
+        data: { id: d.id ?? null, amount: d.amount ?? null, currency: d.currency ?? null, status: d.status ?? null, resolution: d.resolution ?? null },
+      },
     };
   },
 

@@ -1,41 +1,51 @@
-import { useState } from "react";
-import { Animated, Pressable, StyleSheet, type PressableProps } from "react-native";
+import { Pressable, StyleSheet, View, type PressableProps } from "react-native";
 import { haptic } from "@/lib/haptics";
-import { reduceMotion } from "@/lib/motion";
-import { colors, lift, radius, touch, type } from "@/theme/tokens";
+import { colors, radius, touch, type } from "@/theme/tokens";
 import { Text } from "./text";
 
-/** Primary button: a blue pill with a springy press, 17 px semibold, full width. `secondary`: outlined, for actions that should not shout. */
-export function Button({ label, style, variant = "primary", ...rest }: Omit<PressableProps, "style"> & { label: string; style?: object; variant?: "primary" | "secondary" }) {
-  const secondary = variant === "secondary";
-  const [scale] = useState(() => new Animated.Value(1));
-  const to = (v: number) => {
-    if (reduceMotion()) return;
-    Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 9 }).start();
-  };
+type Variant = "primary" | "cta" | "secondary" | "white" | "dark";
+
+/** Face colour, text colour and the solid edge under each kind of button. */
+const look: Record<Variant, { bg: string; text: string; edge: string; border?: string }> = {
+  /** Blue, white text, navy edge: the usual button. */
+  primary: { bg: colors.blue, text: colors.onInk, edge: colors.navy },
+  /** Orange, navy text, navy edge: the one call to action on a screen. */
+  cta: { bg: colors.orange, text: colors.navy, edge: colors.navy },
+  /** White, blue text, lavender edge: for actions that should not shout, and on blue grounds. */
+  secondary: { bg: colors.surface, text: colors.blue, edge: colors.lilac, border: colors.lightPurple },
+  white: { bg: colors.surface, text: colors.blue, edge: colors.lilac },
+  /** Navy, white text (Continue with Apple). */
+  dark: { bg: colors.navy, text: colors.onInk, edge: colors.navyEdge },
+};
+
+/**
+ * A pressable button: big rounded corners, bold DM Sans 18, and a solid bottom edge so it looks
+ * tappable. It nudges down 2px when pressed, as the edge squashes.
+ */
+export function Button({ label, style, variant = "primary", icon, ...rest }: Omit<PressableProps, "style"> & { label: string; style?: object; variant?: Variant; icon?: React.ReactNode }) {
+  const l = look[variant];
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: Boolean(rest.disabled) }}
-        {...rest}
-        onPressIn={(e) => {
-          to(0.96);
-          rest.onPressIn?.(e);
-        }}
-        onPressOut={(e) => {
-          to(1);
-          rest.onPressOut?.(e);
-        }}
-        onPress={(e) => {
-          haptic.press();
-          rest.onPress?.(e);
-        }}
-        style={[styles.primary, !rest.disabled && !secondary && lift, secondary && styles.secondary, rest.disabled && { opacity: 0.45 }, style]}
-      >
-        <Text style={[type.button, { color: secondary ? colors.blue : colors.onInk }]}>{label}</Text>
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(rest.disabled) }}
+      {...rest}
+      onPress={(e) => {
+        haptic.press();
+        rest.onPress?.(e);
+      }}
+      style={({ pressed }) => [
+        styles.base,
+        { backgroundColor: l.bg, borderBottomColor: l.edge, borderBottomWidth: pressed ? 2 : 5, marginTop: pressed ? 3 : 0 },
+        l.border ? { borderColor: l.border, borderWidth: 1.5, borderBottomWidth: pressed ? 2 : 5, borderBottomColor: l.edge } : null,
+        rest.disabled && { opacity: 0.45 },
+        style,
+      ]}
+    >
+      <View style={styles.inner}>
+        {icon}
+        <Text style={[type.button, { color: l.text }]}>{label}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -49,15 +59,8 @@ export function TextLink({ label, ...rest }: PressableProps & { label: string })
 }
 
 const styles = StyleSheet.create({
-  primary: {
-    minHeight: 58,
-    borderRadius: radius.pill,
-    backgroundColor: colors.blue,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  secondary: { minHeight: 50, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.blue, paddingHorizontal: 8 },
+  base: { minHeight: 58, borderRadius: radius.control, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
+  inner: { flexDirection: "row", alignItems: "center", gap: 10 },
   link: { minHeight: touch, alignItems: "center", justifyContent: "center" },
-  linkText: { color: colors.blue, textDecorationLine: "underline", textDecorationColor: colors.blue },
+  linkText: { color: colors.blue, textDecorationLine: "underline", textDecorationColor: colors.blue, fontSize: 17 },
 });

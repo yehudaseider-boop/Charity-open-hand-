@@ -27,7 +27,7 @@ describe("app tax year (SARS)", () => {
   });
 });
 
-import { groupByMonth, maaserTargetCents, totalInTaxYear } from "../apps/mobile/src/lib/giving";
+import { groupByMonth, maaserTargetCents, taxYearsGiven, totalInTaxYear } from "../apps/mobile/src/lib/giving";
 
 describe("app giving helpers", () => {
   const rows = [
@@ -49,15 +49,32 @@ describe("app giving helpers", () => {
 });
 
 describe("app hand-off to the website", () => {
-  it("opens the charity's donation page with the giving kind chosen in the app", () => {
-    expect(donateUrl("https://example.co.za", "northcliff-meals-fund", "chomesh")).toBe(
-      "https://example.co.za/c/northcliff-meals-fund/donate?kind=chomesh&from=app",
+  it("opens the charity's donation page with the donor's label carried over", () => {
+    expect(donateUrl("https://example.co.za", "northcliff-meals-fund", "Work giving")).toBe(
+      "https://example.co.za/c/northcliff-meals-fund/donate?label=Work%20giving&from=app",
     );
-    expect(donateUrl("https://example.co.za/", "a b", "maaser")).toBe("https://example.co.za/c/a%20b/donate?kind=maaser&from=app");
+    expect(donateUrl("https://example.co.za/", "a b", "Maaser")).toBe("https://example.co.za/c/a%20b/donate?label=Maaser&from=app");
+  });
+  it("carries a campaign over, and no label when none was chosen", () => {
+    expect(donateUrl("https://example.co.za", "a", null, "c0ffee00-0000-4000-8000-000000000001")).toBe(
+      "https://example.co.za/c/a/donate?campaign=c0ffee00-0000-4000-8000-000000000001&from=app",
+    );
   });
   it("refuses a website address that isn't https", () => {
     expect(donateUrl("http://example.co.za", "x", "tzedaka")).toBeNull();
     expect(donateUrl("", "x", "tzedaka")).toBeNull();
     expect(donateUrl(undefined, "x", "tzedaka")).toBeNull();
+  });
+});
+
+describe("app giving: tax years given", () => {
+  it("lists the tax years with gifts, newest first, always with the current one", () => {
+    const rows = [
+      { date: new Date(2025, 1, 28) }, // 28/02/2025: tax year 2025
+      { date: new Date(2025, 2, 1) }, // 01/03/2025: tax year 2026
+      { date: new Date(2025, 5, 10) },
+    ];
+    expect(taxYearsGiven(rows, 2027)).toEqual([2027, 2026, 2025]);
+    expect(taxYearsGiven([], 2027)).toEqual([2027]);
   });
 });

@@ -37,7 +37,7 @@ export function confirmationEmail(d: {
       : "You did not ask for an s18A receipt for this donation.",
     "",
     ...monthlyLines(d),
-    "You can see all your donations, and your maaser and chomesh, in the Givezy app. Sign in with this email address.",
+    "You can see all your donations, and your giving goal, in the Givezy app. Sign in with this email address.",
     "",
     "Givezy",
   ];

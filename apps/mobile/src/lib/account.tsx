@@ -1,10 +1,14 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import { POLICY_VERSION } from "@shared/policy";
-import type { Gift, GivingKind, Receipt, Recurring } from "@/data/giving";
+import type { Gift, Receipt, Recurring } from "@/data/giving";
 import { toElsewhere, type Elsewhere, type ElsewhereRow } from "./ledger";
+import { forgetDetails } from "./donor-details";
 import { cacheKey, forgetGivingCache, writeGivingCache } from "./giving-cache";
+import { syncGiverType } from "./giver-type";
 import { secureStorage } from "./secure-storage";
 import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
@@ -25,7 +29,7 @@ export type AccountStatus = "preview" | "loading" | "signed-out" | "agreeing" | 
 
 /** `fromCache`: what the phone saved last time, shown until fresh data arrives (or while offline). */
 type Live = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: Elsewhere[]; loadedAt: Date; fromCache?: boolean };
-type Result = { ok: true } | { ok: false; message: string };
+type Result = { ok: true; id?: string } | { ok: false; message: string };
 
 type AccountValue = {
   status: AccountStatus;
@@ -37,17 +41,28 @@ type AccountValue = {
   /** Donations that arrived since the donor last looked: the app thanks them. */
   arrived: Gift[];
   dismissArrived(): void;
+  /** The signed-in donor's current access token, so our own server knows who is giving (null when signed out). */
+  accessToken(): Promise<string | null>;
   sendCode(email: string): Promise<{ ok: true } | { ok: false; message: string }>;
   verifyCode(email: string, code: string): Promise<{ ok: true } | { ok: false; message: string }>;
+  /** Google or Apple, on the provider's own page. Only offered once SOCIAL_SIGN_IN is on. */
+  signInWith(provider: "google" | "apple"): Promise<{ ok: true } | { ok: false; message: string }>;
   agree(): Promise<{ ok: true } | { ok: false; message: string }>;
   refresh(): Promise<void>;
   signOut(): Promise<void>;
-  addElsewhere(e: { cents: number; date: string; recipient: string; kind: GivingKind }): Promise<Result>;
+  addElsewhere(e: { cents: number; date: string; recipient: string; label: string | null }): Promise<Result>;
   removeElsewhere(id: string): Promise<Result>;
   setRecurringStatus(id: string, status: "active" | "paused" | "cancelled"): Promise<Result>;
 };
 
 const AccountContext = createContext<AccountValue | null>(null);
+
+const NO_CONNECTION = "We couldn't reach Givezy. Check your connection and try again.";
+
+/** No connection or no answer, as opposed to a real "no" from the sign-in service. */
+function isNetworkError(error: { name?: string; status?: number }): boolean {
+  return error.name === "AuthRetryableFetchError" || error.status === 0 || error.status === undefined;
+}
 
 export function useAccount(): AccountValue {
   const v = useContext(AccountContext);
@@ -76,17 +91,17 @@ async function loadLive(userId: string): Promise<Live> {
   const donorIds = (donors ?? []).map((d) => d.id as string);
   // Giving logged by hand belongs to the account itself, not to a donor record.
   const elsewhere = await allPages<ElsewhereRow>((a, b) =>
-    db.from("external_giving_entries").select("id, entry_date, recipient_text, amount_cents, kind").eq("user_id", userId).order("entry_date", { ascending: false }).order("id").range(a, b),
+    db.from("external_giving_entries").select("id, entry_date, recipient_text, amount_cents, kind, label").eq("user_id", userId).order("entry_date", { ascending: false }).order("id").range(a, b),
   );
   const loggedElsewhere = toElsewhere(elsewhere);
   if (donorIds.length === 0) return { gifts: [], recurring: [], receipts: [], elsewhere: loggedElsewhere, loadedAt: new Date() };
 
   const [donations, recurring, receipts] = await Promise.all([
-    // Each donation carries its own maaser/chomesh/tzedaka choice.
-    allPages<DonationRow & { donation_giving_kinds: { kind: string } | { kind: string }[] | null }>((a, b) =>
+    // Each donation carries the donor's own label, if they gave one.
+    allPages<DonationRow & { donation_giving_kinds: { kind: string | null; label: string | null } | { kind: string | null; label: string | null }[] | null }>((a, b) =>
       db
         .from("donations")
-        .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en), donation_giving_kinds(kind)")
+        .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en), donation_giving_kinds(kind, label)")
         .in("donor_id", donorIds)
         .eq("status", "paid")
         .order("paid_at", { ascending: false })
@@ -103,7 +118,7 @@ async function loadLive(userId: string): Promise<Live> {
   for (const r of [recurring, receipts]) if (r.error) throw r.error;
   const kinds: KindRow[] = donations.flatMap((d) => {
     const k = Array.isArray(d.donation_giving_kinds) ? d.donation_giving_kinds[0] : d.donation_giving_kinds;
-    return k ? [{ donation_id: d.id, kind: k.kind }] : [];
+    return k ? [{ donation_id: d.id, kind: k.kind, label: k.label }] : [];
   });
   return {
     gifts: toGifts(donations, kinds),
@@ -175,6 +190,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
     // Someone else signed in: nothing of the last person's stays on screen.
     if (lastUser.current && lastUser.current !== s.user.id) {
+      // Their offline copy goes too: without a SIGNED_OUT event nothing else would sweep it.
+      void forgetGivingCache(lastUser.current);
+      lastCached.current = null;
       setLive(null);
       setLoadError(false);
       setArrived([]);
@@ -193,7 +211,11 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => settle(data.session));
+    supabase.auth
+      .getSession()
+      .then(({ data }) => settle(data.session))
+      // A session that cannot be read counts as signed out, never an endless loading screen.
+      .catch(() => settle(null));
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       // A routine token refresh is the same person: no need to re-check anything.
       if (event === "TOKEN_REFRESHED") return setSession(s);
@@ -282,6 +304,11 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     return startLoad(uid);
   }, [userId, status, startLoad]);
 
+  // The "kind of giver" answer given on first open, copied to the account the first time they are signed in.
+  useEffect(() => {
+    if (status === "signed-in" && userId) void syncGiverType(userId);
+  }, [status, userId]);
+
   // Show what the phone saved last time straight away; fresh data replaces it.
   useEffect(() => {
     if (status !== "signed-in" || !userId) return;
@@ -305,6 +332,13 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [status, refresh]);
 
+  // Stable while the sign-in state is the same, so screens can ask the server once.
+  const accessToken = useCallback(async () => {
+    if (!supabase || status !== "signed-in") return null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  }, [status]);
+
   const value = useMemo<AccountValue>(
     () => ({
       status,
@@ -315,15 +349,33 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       refreshing,
       arrived,
       dismissArrived: () => setArrived([]),
+      accessToken,
       async sendCode(email) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
-        return error ? { ok: false, message: "We couldn't send the code. Please check the address and try again in a minute." } : { ok: true };
+        if (!error) return { ok: true };
+        if (isNetworkError(error)) return { ok: false, message: NO_CONNECTION };
+        if (error.status === 429) return { ok: false, message: "We've just sent you a code. Please wait a minute before asking for another." };
+        return { ok: false, message: "We couldn't send the code. Please check the address and try again in a minute." };
       },
       async verifyCode(email, code) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
-        return error ? { ok: false, message: "That code didn't work or has expired. Check it, or ask for a new one." } : { ok: true };
+        if (!error) return { ok: true };
+        if (isNetworkError(error)) return { ok: false, message: `${NO_CONNECTION} Your code still works for a few minutes.` };
+        return { ok: false, message: "That code didn't work or has expired. Check it, or tap Send a new code." };
+      },
+      async signInWith(provider) {
+        if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
+        const returnTo = Linking.createURL("auth");
+        const { data, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: returnTo, skipBrowserRedirect: true } });
+        if (error || !data.url) return { ok: false, message: "That sign-in isn't available right now. Please use your email." };
+        const r = await WebBrowser.openAuthSessionAsync(data.url, returnTo);
+        if (r.type !== "success") return { ok: false, message: "Sign-in was cancelled." };
+        const code = new URL(r.url).searchParams.get("code");
+        if (!code) return { ok: false, message: "That sign-in didn't finish. Please try again, or use your email." };
+        const { error: e2 } = await supabase.auth.exchangeCodeForSession(code);
+        return e2 ? { ok: false, message: "That sign-in didn't finish. Please try again, or use your email." } : { ok: true };
       },
       async agree() {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
@@ -335,8 +387,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       },
       refresh,
       async signOut() {
-        // Nothing of theirs stays on the phone once they sign out.
+        // Their giving and remembered details don't stay on the phone once they sign out (goals and
+        // income are kept, by design: "stay on this phone", under their own user id).
         await forgetGivingCache(session?.user.id);
+        await forgetDetails(session?.user.id ?? null).catch(() => undefined);
         lastCached.current = null;
         await supabase?.auth.signOut();
         setLive(null);
@@ -345,16 +399,16 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       },
       async addElsewhere(e) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
-        const { error } = await supabase.from("external_giving_entries").insert({
+        const { data, error } = await supabase.from("external_giving_entries").insert({
           user_id: session.user.id,
           amount_cents: e.cents,
           entry_date: e.date,
           recipient_text: e.recipient,
-          kind: e.kind,
-        });
-        if (error) return { ok: false, message: "We couldn't save that. Please try again." };
+          label: e.label,
+        }).select("id").single();
+        if (error) return { ok: false, message: "We couldn't save that. Check your connection and try again." };
         await refresh();
-        return { ok: true };
+        return { ok: true, id: (data as { id?: string } | null)?.id };
       },
       async removeElsewhere(id) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
@@ -371,7 +425,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
       },
     }),
-    [status, session, live, loadError, refreshing, refresh, arrived],
+    [status, session, live, loadError, refreshing, refresh, arrived, accessToken],
   );
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;

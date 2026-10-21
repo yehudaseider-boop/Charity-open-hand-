@@ -1,38 +1,43 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import type { GivingKind } from "@/data/giving";
-import { givingKindLabels } from "@/lib/giving";
-import { dateToIso, parseDdMmYyyy, todayDdMmYyyy } from "@/lib/ledger";
+import { useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { useLabelSuggestions } from "@/lib/use-labels";
+import { ddmmyyyy, jhbToday } from "@/lib/format";
+import { dateToIso, parseDdMmYyyy } from "@/lib/ledger";
 import { parseRandToCents } from "@shared/money";
-import { colors, radius, type } from "@/theme/tokens";
+import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
+import { colors } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
-import { InfoButton } from "./info-button";
+import { LabelPicker } from "./label-picker";
+import type { SheetGuard } from "./sheet";
 import { Text } from "./text";
 
-/** Log income (for maaser). It stays on this phone only. */
-export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; date: string; note: string }) => void; onCancel: () => void }) {
+/** Log income (for a goal set as a share of income). It stays on this phone only. */
+export function IncomeForm({ onSave, onCancel, onGuard }: { onSave: (e: { cents: number; date: string; note: string }) => void; onCancel: () => void; onGuard?: (g: SheetGuard) => void }) {
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(todayDdMmYyyy());
+  const [date, setDate] = useState(() => ddmmyyyy(jhbToday()));
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<{ amount?: string; date?: string }>({});
+  // Tell the sheet once something is typed, so a stray swipe asks before throwing it away.
+  const typed = Boolean(amount.trim() || note.trim());
+  useEffect(() => onGuard?.(typed ? "typed" : null), [typed, onGuard]);
 
   return (
     <View style={{ gap: 14 }}>
       <View style={{ gap: 6 }}>
         <Text variant="h2" style={styles.title}>Log income</Text>
-        <Text variant="bodyMuted">Maaser is a tenth of your income. Log what you earn and we keep count of what is owed. This stays on your phone and is never sent to us.</Text>
+        <Text variant="bodyMuted">For a goal set as a share of your income, like 10%. Log what you earn and we work out the goal. This stays on your phone and is never sent to us.</Text>
       </View>
-      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} error={errors.amount} />
+      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} maxLength={AMOUNT_MAX_LENGTH} error={errors.amount} />
       <Field label="Date received (dd/mm/yyyy)" value={date} onChangeText={setDate} keyboardType="numbers-and-punctuation" error={errors.date} />
       <Field label="Note (optional)" value={note} onChangeText={setNote} maxLength={120} helper="For example: October salary" />
       <Button
         label="Save"
         onPress={() => {
           const cents = parseRandToCents(amount);
-          const iso = parseDdMmYyyy(date, dateToIso(new Date()));
+          const iso = parseDdMmYyyy(date, dateToIso(jhbToday()));
           const e = {
-            amount: cents && cents > 0 ? undefined : "Enter an amount in Rand, for example 25000 or 25000.50.",
+            amount: amountProblem(amount, "25000 or 25000.50") ?? undefined,
             date: iso ? undefined : "Use a real date that is not in the future, like 09/10/2026.",
           };
           setErrors(e);
@@ -44,59 +49,47 @@ export function IncomeForm({ onSave, onCancel }: { onSave: (e: { cents: number; 
   );
 }
 
-/** Log giving made outside the app: cash, a shul appeal, another charity. */
-export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: number; date: string; recipient: string; kind: GivingKind }) => Promise<string | null>; onCancel: () => void }) {
+/** Log giving made outside the app: cash, an appeal, another charity. */
+export function ElsewhereForm({ onSave, onCancel, onGuard }: { onSave: (e: { cents: number; date: string; recipient: string; label: string | null }) => Promise<string | null>; onCancel: () => void; onGuard?: (g: SheetGuard) => void }) {
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(todayDdMmYyyy());
+  const [date, setDate] = useState(() => ddmmyyyy(jhbToday()));
   const [recipient, setRecipient] = useState("");
-  const [kind, setKind] = useState<GivingKind | null>(null);
-  const [errors, setErrors] = useState<{ amount?: string; date?: string; recipient?: string; kind?: string; form?: string }>({});
+  const [label, setLabel] = useState<string | null>(null);
+  const suggestions = useLabelSuggestions();
+  const [errors, setErrors] = useState<{ amount?: string; date?: string; recipient?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
+  // While saving the sheet stays open (so a failed save is seen); once something is typed, it asks first.
+  const typed = Boolean(amount.trim() || recipient.trim());
+  const guard: SheetGuard = busy ? "busy" : typed ? "typed" : null;
+  useEffect(() => onGuard?.(guard), [guard, onGuard]);
 
   return (
     <View style={{ gap: 14 }}>
       <View style={{ gap: 6 }}>
         <Text variant="h2" style={styles.title}>Log giving elsewhere</Text>
-        <Text variant="bodyMuted">Cash, a shul appeal or another charity. It counts towards your maaser and chomesh.</Text>
+        <Text variant="bodyMuted">Cash, an appeal at work or another charity. It counts towards your giving goal.</Text>
       </View>
-      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} error={errors.amount} />
-      <Field label="Given to" value={recipient} onChangeText={setRecipient} maxLength={120} error={errors.recipient} helper="For example: Shul appeal (cash)" />
+      <Field label="Amount" prefix="R" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} maxLength={AMOUNT_MAX_LENGTH} error={errors.amount} />
+      <Field label="Given to" value={recipient} onChangeText={setRecipient} maxLength={120} error={errors.recipient} helper="For example: School fun run (cash)" />
       <Field label="Date given (dd/mm/yyyy)" value={date} onChangeText={setDate} keyboardType="numbers-and-punctuation" error={errors.date} />
-      <View style={{ gap: 6 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-          <Text variant="label" style={{ color: colors.ink }}>This counts as</Text>
-          <InfoButton terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
-        </View>
-        <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="This counts as">
-          {(Object.keys(givingKindLabels) as GivingKind[]).map((k) => {
-            const selected = kind === k;
-            return (
-              <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setKind(k)} style={[styles.choice, selected && styles.choiceOn]}>
-                <Text style={[type.button, { fontSize: 16, textAlign: "center", color: selected ? colors.blue : colors.ink }]}>{givingKindLabels[k]}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        {errors.kind ? <Text variant="label" style={{ color: colors.danger }}>{errors.kind}</Text> : null}
-      </View>
+      <LabelPicker value={label} onChange={setLabel} suggestions={suggestions} />
       {errors.form ? <Text style={{ color: colors.danger }}>{errors.form}</Text> : null}
       <Button
         label={busy ? "Saving…" : "Save"}
         disabled={busy}
         onPress={async () => {
           const cents = parseRandToCents(amount);
-          const iso = parseDdMmYyyy(date, dateToIso(new Date()));
+          const iso = parseDdMmYyyy(date, dateToIso(jhbToday()));
           const who = recipient.trim();
           const e = {
-            amount: cents && cents > 0 ? undefined : "Enter an amount in Rand, for example 180 or 180.50.",
+            amount: amountProblem(amount, "180 or 180.50") ?? undefined,
             date: iso ? undefined : "Use a real date that is not in the future, like 09/10/2026.",
             recipient: who ? undefined : "Say who you gave to.",
-            kind: kind ? undefined : "Choose maaser, chomesh or general tzedaka.",
           };
           setErrors(e);
-          if (e.amount || e.date || e.recipient || e.kind || !cents || !iso || !kind) return;
+          if (e.amount || e.date || e.recipient || !cents || !iso) return;
           setBusy(true);
-          const problem = await onSave({ cents, date: iso, recipient: who, kind });
+          const problem = await onSave({ cents, date: iso, recipient: who, label });
           setBusy(false);
           if (problem) setErrors({ form: problem });
         }}
@@ -108,6 +101,4 @@ export function ElsewhereForm({ onSave, onCancel }: { onSave: (e: { cents: numbe
 
 const styles = StyleSheet.create({
   title: { fontSize: 22, lineHeight: 28 },
-  choice: { flex: 1, minHeight: 56, paddingHorizontal: 8, borderRadius: radius.control, borderWidth: 1, borderColor: colors.hairline, justifyContent: "center", backgroundColor: colors.surface },
-  choiceOn: { borderColor: colors.blue, borderWidth: 1.5 },
 });

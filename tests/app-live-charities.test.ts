@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { givenBefore, imageUrl, inCause, mergeSaved, savedCharities, oneLiner, toCauses, toCharity, toPhotos, toUpdates, type CharityRow } from "../apps/mobile/src/lib/live-charities";
+import { campaignPercent, givenBefore, imageUrl, toCampaigns, inCause, mergeSaved, savedCharities, oneLiner, toCauses, toCharity, toPhotos, toUpdates, type CharityRow } from "../apps/mobile/src/lib/live-charities";
 
 const base = "https://example.supabase.co";
 const row = (o: Partial<CharityRow> = {}): CharityRow => ({
@@ -74,5 +74,19 @@ describe("givenBefore", () => {
   });
   it("stops at the limit", () => {
     expect(givenBefore([g("a", 1), g("b", 2), g("c", 3)], list, 2)).toHaveLength(2);
+  });
+});
+
+describe("campaigns in the app", () => {
+  const row = (id: string, ends: string | null) => ({ id, title: "Pesach", description: null, target_cents: "5000000", ends_at: ends });
+  it("adds each campaign's paid total and leaves out any past its last day", () => {
+    const now = new Date("2026-10-16T10:00:00Z");
+    const out = toCampaigns([row("a", null), row("b", "2026-10-15T21:59:59Z")], [{ campaign_id: "a", raised_cents: "1250000", gift_count: 7 }], now);
+    expect(out).toEqual([{ id: "a", title: "Pesach", description: null, targetCents: 5_000_000, raisedCents: 1_250_000, giftCount: 7, endsAt: null }]);
+  });
+  it("starts at zero with no gifts, and the bar never passes 100", () => {
+    expect(toCampaigns([row("a", null)], [])[0].raisedCents).toBe(0);
+    expect(campaignPercent({ raisedCents: 9, targetCents: 5 })).toBe(100);
+    expect(campaignPercent({ raisedCents: 9, targetCents: null })).toBe(0);
   });
 });

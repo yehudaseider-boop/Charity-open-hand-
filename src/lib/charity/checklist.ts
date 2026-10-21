@@ -58,3 +58,48 @@ export function applicationChecklist({ charity, priv, documentTypes }: Checklist
 export function isComplete(items: ChecklistItem[]) {
   return items.every((i) => i.done);
 }
+
+/** The application as five steps plus submit, each done when its checklist items are. */
+export type ApplicationStep = { key: "organisation" | "address" | "contact" | "bank" | "documents" | "submit"; label: string; hint: string; done: boolean };
+
+const STEP_ITEMS: Record<Exclude<ApplicationStep["key"], "submit">, string[]> = {
+  organisation: ["organisation"],
+  address: ["address"],
+  contact: ["contact"],
+  bank: ["bank"],
+  documents: ["bank_confirmation", "pbo_approval", "s18a_approval", "receipting_mandate"],
+};
+
+export function applicationSteps(items: ChecklistItem[]): ApplicationStep[] {
+  const done = (keys: string[]) => items.filter((i) => keys.includes(i.key)).every((i) => i.done);
+  const steps: ApplicationStep[] = [
+    { key: "organisation", label: "Your organisation", hint: "Its registered name and NPO or PBO number.", done: done(STEP_ITEMS.organisation) },
+    { key: "address", label: "Registered address", hint: "Where the organisation is registered.", done: done(STEP_ITEMS.address) },
+    { key: "contact", label: "Contact person", hint: "Who we speak to about the account.", done: done(STEP_ITEMS.contact) },
+    { key: "bank", label: "Bank account", hint: "Where donations are paid. Stored encrypted.", done: done(STEP_ITEMS.bank) },
+    { key: "documents", label: "Documents", hint: "Your bank confirmation letter, and approvals if you have them.", done: done(STEP_ITEMS.documents) },
+  ];
+  return [...steps, { key: "submit", label: "Submit", hint: "Check the declarations and send it to us.", done: false }];
+}
+
+/** Where to land: the step asked for if it exists, otherwise the first one not yet done. */
+export function currentStep(steps: ApplicationStep[], asked: string | undefined): ApplicationStep {
+  return steps.find((s) => s.key === asked) ?? steps.find((s) => !s.done) ?? steps[steps.length - 1];
+}
+
+/** After approval: the few things that help donors find a charity and give. Each ticks itself off. */
+export type StartItem = { key: string; label: string; done: boolean; href: string | null };
+
+export function gettingStarted(
+  c: { cover_path: string | null; description_en: string | null; funds_use_en: string | null; gateway_subaccount_ref: string | null },
+  counts: { updates: number; campaigns: number },
+  base: string,
+): StartItem[] {
+  return [
+    { key: "payments", label: "Connected to receive online donations (we do this for you)", done: Boolean(c.gateway_subaccount_ref), href: null },
+    { key: "cover", label: "Add a cover photo", done: Boolean(c.cover_path), href: `${base}/profile` },
+    { key: "story", label: "Tell donors what you do and where gifts go", done: Boolean(c.description_en?.trim() && c.funds_use_en?.trim()), href: `${base}/profile` },
+    { key: "update", label: "Post your first update", done: counts.updates > 0, href: `${base}/updates` },
+    { key: "campaign", label: "Start a campaign, if you're raising for something specific", done: counts.campaigns > 0, href: `${base}/campaigns` },
+  ];
+}

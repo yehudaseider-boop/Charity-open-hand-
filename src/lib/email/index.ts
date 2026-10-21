@@ -9,12 +9,17 @@ export type EmailMessage = {
   subject: string;
   text: string;
   html?: string;
+  /** Where a reply goes (for example the charity, on a thank-you sent in its name). */
+  replyTo?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
 };
 
+/** "sent" means a real email left; "skipped" means nothing was sent (console transport, erased or disallowed address). */
+export type SendOutcome = "sent" | "skipped";
+
 export interface EmailTransport {
   readonly name: string;
-  send(message: EmailMessage): Promise<void>;
+  send(message: EmailMessage): Promise<SendOutcome>;
 }
 
 export class EmailError extends Error {}
@@ -29,6 +34,7 @@ export const consoleTransport: EmailTransport = {
   name: "console",
   async send(m) {
     console.info(`[email] would send "${m.subject}" to ${maskEmail(m.to)}${m.attachments?.length ? ` with ${m.attachments.length} attachment(s)` : ""}`);
+    return "skipped";
   },
 };
 
@@ -50,15 +56,18 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
         body: JSON.stringify({
           from,
           to: [m.to],
-          subject: m.subject,
+          // A subject is one line, whatever a charity typed into its name.
+          subject: m.subject.replace(/[\r\n]+/g, " "),
           text: m.text,
           ...(m.html ? { html: m.html } : {}),
+          ...(m.replyTo ? { reply_to: m.replyTo } : {}),
           ...(m.attachments?.length
             ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
             : {}),
         }),
       });
       if (!res.ok) throw new EmailError(`Resend refused the email (${res.status}).`);
+      return "sent";
     },
   };
 }
@@ -72,15 +81,41 @@ function skippingErased(inner: EmailTransport): EmailTransport {
   return {
     name: inner.name,
     async send(m) {
-      if (isErasedAddress(m.to)) return;
-      await inner.send(m);
+      if (isErasedAddress(m.to)) return "skipped";
+      return inner.send(m);
+    },
+  };
+}
+
+/**
+ * EMAIL_ALLOWLIST (comma-separated addresses or domains, e.g. "givezy.co.za, yehuda@example.com"):
+ * when set, email goes only to those; anything else is logged and skipped. For the test site, so a
+ * test checkout can never email a real donor. Leave unset on the live site.
+ */
+export function allowedAddress(address: string, allowlist: string | undefined): boolean {
+  const rules = (allowlist ?? "").split(",").map((r) => r.trim().toLowerCase()).filter(Boolean);
+  if (rules.length === 0) return true;
+  const to = address.trim().toLowerCase();
+  const domain = to.split("@")[1] ?? "";
+  return rules.some((r) => (r.includes("@") ? r === to : r === domain));
+}
+
+function onlyAllowed(inner: EmailTransport, allowlist: string | undefined): EmailTransport {
+  return {
+    name: inner.name,
+    async send(m) {
+      if (!allowedAddress(m.to, allowlist)) {
+        console.info(`[email] not on EMAIL_ALLOWLIST, skipped "${m.subject}" to ${maskEmail(m.to)}`);
+        return "skipped";
+      }
+      return inner.send(m);
     },
   };
 }
 
 export function getEmailTransport(env: Record<string, string | undefined> = process.env): EmailTransport {
   const name = env.EMAIL_TRANSPORT ?? "console";
-  if (name === "console") return skippingErased(consoleTransport);
-  if (name === "resend") return skippingErased(resendTransport(env));
-  throw new EmailError(`Unknown EMAIL_TRANSPORT "${name}".`);
+  const inner = name === "console" ? consoleTransport : name === "resend" ? resendTransport(env) : null;
+  if (!inner) throw new EmailError(`Unknown EMAIL_TRANSPORT "${name}".`);
+  return skippingErased(onlyAllowed(inner, env.EMAIL_ALLOWLIST));
 }

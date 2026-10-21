@@ -1,16 +1,9 @@
 /**
- * The donor's own records: income (for maaser) and giving made elsewhere.
+ * The donor's own records: income (for a goal set as a share of income) and giving made elsewhere.
  * Pure functions plus on-phone storage for income, so the website's tests can
  * check them. Amounts are integer cents.
  */
-import { percentToPpm } from "@shared/money";
-import type { GivingKind } from "../data/giving";
-import { maaserTargetCents } from "./giving";
-
-/** Maaser is a tenth of income; chomesh a further tenth. */
-export const TENTH_PPM = percentToPpm("10");
-
-export const isKind = (k: unknown): k is GivingKind => k === "maaser" || k === "chomesh" || k === "tzedaka";
+import { labelOf } from "@shared/donations/labels";
 
 /** Today's date as dd/mm/yyyy for a form's starting value (the phone's own date). */
 export function todayDdMmYyyy(now = new Date()): string {
@@ -38,13 +31,12 @@ export function isoToDate(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export type Elsewhere = { id: string; date: Date; recipient: string; cents: number; kind: GivingKind };
-export type ElsewhereRow = { id: string; entry_date: string; recipient_text: string; amount_cents: number | string; kind: string };
+export type Elsewhere = { id: string; date: Date; recipient: string; cents: number; label: string | null };
+export type ElsewhereRow = { id: string; entry_date: string; recipient_text: string; amount_cents: number | string; kind?: string | null; label?: string | null };
 
 export function toElsewhere(rows: ElsewhereRow[]): Elsewhere[] {
   return rows
-    .filter((r) => isKind(r.kind))
-    .map((r) => ({ id: r.id, date: isoToDate(r.entry_date), recipient: r.recipient_text, cents: Number(r.amount_cents), kind: r.kind as GivingKind }))
+    .map((r) => ({ id: r.id, date: isoToDate(r.entry_date), recipient: r.recipient_text, cents: Number(r.amount_cents), label: labelOf(r) }))
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
@@ -71,12 +63,6 @@ export function cleanIncome(raw: unknown): IncomeEntry[] {
 /** Income dated from `from` up to and including `to` (both "yyyy-mm-dd"). */
 export function incomeBetween(entries: IncomeEntry[], from: string, to: string): number {
   return entries.filter((e) => e.date >= from && e.date <= to).reduce((s, e) => s + e.cents, 0);
-}
-
-/** What income in a period means for maaser (a tenth) and, if kept, chomesh (a further tenth). */
-export function owedFromIncome(incomeCents: number, keepsChomesh: boolean): { maaserCents: number; chomeshCents: number } {
-  const tenth = maaserTargetCents(incomeCents, TENTH_PPM);
-  return { maaserCents: tenth, chomeshCents: keepsChomesh ? tenth : 0 };
 }
 
 export const dateToIso = (d: Date) =>

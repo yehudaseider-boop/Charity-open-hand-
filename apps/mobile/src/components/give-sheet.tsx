@@ -1,67 +1,40 @@
 import { useState } from "react";
 import * as WebBrowser from "expo-web-browser";
-import { router } from "expo-router";
-import { Linking, Pressable, StyleSheet, View } from "react-native";
-import type { GivingKind } from "@/data/giving";
+import { Linking, View } from "react-native";
 import { useAccount } from "@/lib/account";
-import { givingKindLabels } from "@/lib/giving";
 import { IN_APP_GIVING, openGivingPage, refreshAfterGiving } from "@/lib/give-flow";
-import { haptic } from "@/lib/haptics";
+import { useLabelSuggestions } from "@/lib/use-labels";
 import { donateUrl, SITE_URL } from "@/lib/website";
-import { colors, radius, type } from "@/theme/tokens";
+import { colors } from "@/theme/tokens";
 import { Button } from "./button";
-import { InfoButton } from "./info-button";
+import { LabelPicker } from "./label-picker";
 import { Text } from "./text";
 
 /**
- * Before leaving for the website the donor says what this donation counts as,
- * so it lands in the right place in their maaser and chomesh. No default.
- * The amount and payment are entered on our website's payment page, never in this sheet:
- * in the phone's browser, or inside the app when the in-app giving switch is on.
+ * Before leaving for the website the donor can give the gift their own label (optional), so it
+ * lands in the right place in their records. The amount and payment are entered on our website's
+ * payment page, never in this sheet: in the phone's browser, or inside the app when the in-app
+ * giving switch is on.
  */
-export function GiveSheet({ charityName, slug, onDone }: { charityName: string; slug: string; onDone?: () => void }) {
-  const [kind, setKind] = useState<GivingKind | null>(null);
+export function GiveSheet({ charityName, slug, onDone, initialLabel = null, campaign }: { charityName: string; slug: string; onDone?: () => void; initialLabel?: string | null; campaign?: string }) {
+  const [label, setLabel] = useState<string | null>(initialLabel);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const account = useAccount();
-  const url = kind ? donateUrl(SITE_URL, slug, kind) : null;
+  const suggestions = useLabelSuggestions();
+  const url = donateUrl(SITE_URL, slug, label, campaign);
 
   return (
     <View style={{ gap: 18 }}>
-      <View style={{ gap: 6 }}>
-        <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Give to {charityName}</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Text variant="bodyMuted" style={{ flexShrink: 1 }}>What does this donation count as? Only you see this.</Text>
-          <InfoButton terms={["maaser", "chomesh", "generalTzedaka"]} label="maaser and chomesh" />
-        </View>
-      </View>
-
-      <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="This donation counts as">
-        {(Object.keys(givingKindLabels) as GivingKind[]).map((k) => {
-          const selected = kind === k;
-          return (
-            <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => {
-              haptic.tap();
-              setKind(k);
-            }} style={[styles.choice, selected && styles.choiceOn]}>
-              <View style={[styles.dot, selected && styles.dotOn]}>{selected ? <View style={styles.dotFill} /> : null}</View>
-              <Text style={[type.button, { fontSize: 17, color: selected ? colors.blue : colors.ink }]}>{givingKindLabels[k]}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Give to {charityName}</Text>
+      <LabelPicker value={label} onChange={setLabel} suggestions={suggestions} />
 
       <View style={{ gap: 8 }}>
         <Button
-          label={kind ? `${IN_APP_GIVING ? "Continue" : "Give"} as ${givingKindLabels[kind].toLowerCase()}` : IN_APP_GIVING ? "Continue to payment" : "Give on our website"}
-          disabled={(!url && !(IN_APP_GIVING && kind && SITE_URL)) || opening}
-          style={!url && !(IN_APP_GIVING && kind && SITE_URL) ? { opacity: 0.4 } : undefined}
+          label={IN_APP_GIVING ? "Continue to payment" : "Give on our website"}
+          disabled={!url || opening}
+          style={!url ? { opacity: 0.4 } : undefined}
           onPress={async () => {
-            if (IN_APP_GIVING && kind && SITE_URL) {
-              router.push({ pathname: "/give/[slug]", params: { slug, kind } });
-              onDone?.();
-              return;
-            }
             if (!url || opening) return;
             setOpening(true);
             setError(null);
@@ -82,18 +55,10 @@ export function GiveSheet({ charityName, slug, onDone }: { charityName: string; 
           }}
         />
         <Text variant="label" style={{ textAlign: "center" }}>
-          {kind && !SITE_URL ? "The website isn't live yet, so this button is off in the preview." : IN_APP_GIVING ? "You choose the amount here, then pay on a secure payment page. The app never sees your card." : "Opens in your browser. You choose the amount and pay there."}
+          {!SITE_URL ? "The website isn't live yet, so this button is off in the preview." : IN_APP_GIVING ? "Opens a secure payment page inside the app. You choose the amount and pay there." : "Opens in your browser. You choose the amount and pay there."}
         </Text>
         {error ? <Text accessibilityRole="alert" style={{ color: colors.danger, textAlign: "center" }}>{error}</Text> : null}
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  choice: { minHeight: 58, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.hairline, flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: colors.surface },
-  choiceOn: { borderColor: colors.blue, backgroundColor: colors.blueSoft },
-  dot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.hairline, alignItems: "center", justifyContent: "center" },
-  dotOn: { borderColor: colors.blue },
-  dotFill: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.blue },
-});

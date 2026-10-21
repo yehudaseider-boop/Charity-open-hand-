@@ -45,6 +45,8 @@ export interface MonthlyStore {
   recordPaid(id: string, period: Period, nextChargeAt: Date): Promise<void>;
   /** A failed attempt. `retryAt` null means the attempts are used up: the monthly donation is marked failed. */
   recordFailure(id: string, period: Period, failedAttempts: number, retryAt: Date | null): Promise<void>;
+  /** The gateway refused the charge outright: the attempt's donation is marked failed (it was never sent for confirmation). */
+  failAttempt(donationId: string): Promise<void>;
 }
 
 export type MonthlyDeps = {
@@ -70,6 +72,8 @@ export type MonthlySummary = {
   /** Not settled yet, or skipped: checked again next run. */
   waiting: { id: string; reason: string }[];
   alreadyPaid: number;
+  /** The gateway took a payment that does not match what was asked: held for a person to look at, not charged again. */
+  review: { id: string; donationId: string }[];
   errors: { id: string; message: string }[];
 };
 
@@ -91,7 +95,7 @@ export function collectingPeriod(r: Pick<DueMonthly, "attemptPeriod" | "lastPaid
 
 export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySummary> {
   const { store, now } = deps;
-  const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, errors: [] };
+  const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [] };
 
   const { rows, unreadable } = await store.due(now, deps.limit ?? 50);
   summary.errors.push(...unreadable);
@@ -129,6 +133,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         } catch (e) {
           if (!deps.isRefused(e)) throw e;
           refused = true;
+          await store.failAttempt(donationId);
         }
         return true;
       };
@@ -147,9 +152,20 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         }
       }
 
+      // After a refusal, ask the gateway what it recorded (this also marks the attempt failed); a refusal
+      // it has no transaction for is still a failed attempt.
+      const settle = async (): Promise<ConfirmOutcome> => {
+        if (!refused) return deps.confirm(donationId);
+        try {
+          return await deps.confirm(donationId);
+        } catch (e) {
+          if (deps.isNotFound(e)) return "failed";
+          throw e;
+        }
+      };
       let outcome: ConfirmOutcome;
       try {
-        outcome = refused ? "failed" : await deps.confirm(donationId);
+        outcome = await settle();
       } catch (e) {
         // A pending attempt the gateway says it has never heard of: the run that made it died (or the
         // charge was refused) before the charge reached the gateway. Only then is it sent again, under the
@@ -161,7 +177,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
           summary.waiting.push({ id: r.id, reason: "no longer active" });
           continue;
         }
-        outcome = refused ? "failed" : await deps.confirm(donationId);
+        outcome = await settle();
       }
       if (outcome === "paid") {
         await store.recordPaid(r.id, period, next);
@@ -173,6 +189,12 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         await deps.notifyFailed(r, { totalCents, final: retryAt === null }).catch((e) => console.error("[monthly] failure email not sent", e));
         summary.failed += 1;
         if (retryAt === null) summary.stopped += 1;
+      } else if (outcome === "review") {
+        // The gateway says it took a payment, but not the amount or currency asked for. Never charge this
+        // month again and do not come back every hour: the attempt stays pending for a person to settle
+        // (Admin, Payments), and the next collection is next month's.
+        await store.reschedule(r.id, next);
+        summary.review.push({ id: r.id, donationId });
       } else {
         summary.waiting.push({ id: r.id, reason: `payment ${outcome}` });
       }

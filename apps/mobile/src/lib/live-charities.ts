@@ -3,7 +3,7 @@
  * photos and updates. Pure functions (no React Native), so the website's
  * test suite can check them.
  */
-import type { Cause, Charity, CharityPhoto, CharityUpdate } from "../data/sample";
+import type { Campaign, Cause, Charity, CharityPhoto, CharityUpdate } from "../data/sample";
 
 export type CharityRow = {
   id: string;
@@ -11,6 +11,7 @@ export type CharityRow = {
   name_en: string;
   description_en: string | null;
   funds_use_en: string | null;
+  impact_en?: string | null;
   cover_path: string | null;
   suburb: string | null;
   city: string | null;
@@ -23,7 +24,7 @@ export type PhotoRow = { id: string; storage_path: string; caption_en: string | 
 export type UpdateRow = { id: string; body_en: string; photo_path: string | null; created_at: string };
 
 export const CHARITY_COLUMNS =
-  "id, slug, name_en, description_en, funds_use_en, cover_path, suburb, city, is_s18a, mandate_signed_at, charity_categories(category_id)";
+  "id, slug, name_en, description_en, funds_use_en, impact_en, cover_path, suburb, city, is_s18a, mandate_signed_at, charity_categories(category_id)";
 
 /** Public images live in the charity-public bucket. */
 export function imageUrl(base: string, path: string | null): string | null {
@@ -54,6 +55,7 @@ export function toCharity(row: CharityRow, base: string): Charity {
     issues18a: row.is_s18a && row.mandate_signed_at !== null,
     about: [row.description_en ?? "", row.funds_use_en ?? ""],
     coverUrl: imageUrl(base, row.cover_path),
+    impact: row.impact_en?.trim() || null,
   };
 }
 
@@ -75,6 +77,16 @@ export function toUpdates(rows: UpdateRow[], base: string): CharityUpdate[] {
 
 export function inCause(c: Charity, cause: string): boolean {
   return cause === "all" || c.causeId === cause || (c.causeIds ?? []).includes(cause);
+}
+
+/**
+ * The donor's chosen causes first, everything else after, each group keeping its own order. Nothing is
+ * hidden, and nothing changes when no cause was chosen.
+ */
+export function causesFirst<T extends Charity>(list: T[], picked: string[]): T[] {
+  if (!picked.length) return list;
+  const mine = (c: Charity) => picked.some((p) => inCause(c, p));
+  return [...list.filter(mine), ...list.filter((c) => !mine(c))];
 }
 
 /**
@@ -103,4 +115,52 @@ export function givenBefore(gifts: { charitySlug: string; date: Date }[], charit
     if (out.length === limit) break;
   }
   return out;
+}
+
+export type CampaignRow = { id: string; title: string; description: string | null; target_cents: number | string | null; ends_at: string | null };
+export type ProgressRow = { campaign_id: string; raised_cents: number | string; gift_count: number | string };
+
+/** Active campaigns with their totals; any past its last day is left out (the server refuses those gifts too). */
+export function toCampaigns(rows: CampaignRow[], progress: ProgressRow[], now: Date = new Date()): Campaign[] {
+  return rows.flatMap((r) => {
+    const endsAt = r.ends_at ? new Date(r.ends_at) : null;
+    if (endsAt && endsAt.getTime() < now.getTime()) return [];
+    const p = progress.find((x) => x.campaign_id === r.id);
+    return [{
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      targetCents: r.target_cents === null ? null : Number(r.target_cents),
+      raisedCents: p ? Number(p.raised_cents) : 0,
+      giftCount: p ? Number(p.gift_count) : 0,
+      endsAt,
+    }];
+  });
+}
+
+/** How far along, as a whole percentage for the bar (0 to 100). */
+export function campaignPercent(c: Pick<Campaign, "raisedCents" | "targetCents">): number {
+  if (!c.targetCents || c.targetCents <= 0) return 0;
+  return Math.min(100, Math.floor((c.raisedCents * 100) / c.targetCents));
+}
+
+export type RaisingNow = { campaign: Campaign; charity: Charity };
+
+/**
+ * "Raising now" on Discover: running campaigns of charities in the directory, the closest to their
+ * goal first (a nearly-full bar is the strongest nudge), then the newest. At most `max`.
+ */
+export function raisingNow(rows: (CampaignRow & { charity_id: string })[], progress: ProgressRow[], charities: Charity[], max = 6, now: Date = new Date()): RaisingNow[] {
+  const byId = new Map(charities.filter((c) => c.id).map((c) => [c.id!, c]));
+  const out: RaisingNow[] = [];
+  for (const r of rows) {
+    const charity = byId.get(r.charity_id);
+    const [campaign] = toCampaigns([r], progress, now);
+    if (charity && campaign) out.push({ campaign, charity });
+  }
+  return out
+    .map((x, i) => ({ x, i, pct: campaignPercent(x.campaign) }))
+    .sort((a, b) => b.pct - a.pct || a.i - b.i)
+    .slice(0, max)
+    .map(({ x }) => x);
 }

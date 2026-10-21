@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { platformConfig } from "@/config/platform";
 import { checkoutSchema, cleanPhone, type CheckoutInput } from "./validation";
 
 /**
@@ -7,7 +8,7 @@ import { checkoutSchema, cleanPhone, type CheckoutInput } from "./validation";
  * booleans here and become the checkout form's "on" before the shared rules run.
  */
 const flag = z.boolean().optional();
-const cents = z.number().int().min(0).max(100_000_000);
+const cents = z.number().int().min(0).max(platformConfig.maxDonationCents);
 
 export const appQuoteSchema = z.object({
   slug: z.string().min(1).max(120),
@@ -16,7 +17,18 @@ export const appQuoteSchema = z.object({
 });
 
 export const appCheckoutSchema = appQuoteSchema.extend({
-  shownTotalCents: cents,
+  /** Gift plus contribution, so it can be up to twice the single-gift ceiling. */
+  shownTotalCents: z.number().int().min(0).max(2 * platformConfig.maxDonationCents),
+  /** One of the charity's campaigns, when the gift is for it. */
+  campaignId: z.uuid().optional(),
+  /** "Use my ID ending 1234": the server fills in the number for the signed-in donor. */
+  useSavedId: z.boolean().optional(),
+  /** Keep the card used for this once-off gift, for next time (signed in; only when saved cards are switched on). */
+  saveCard: z.boolean().optional(),
+  /** Pay with the saved card instead of the payment page (signed in; only when saved cards are switched on). */
+  useSavedCard: z.boolean().optional(),
+  /** One id per give attempt, so asking twice never charges a saved card twice. */
+  attemptId: z.string().uuid().optional(),
   details: z.object({
     donor_type: z.enum(["individual", "company", "trust"]),
     email: z.string().max(200),
@@ -37,7 +49,8 @@ export const appCheckoutSchema = appQuoteSchema.extend({
     message: z.string().max(500).optional(),
     dedication_kind: z.string().max(10).optional(),
     dedication_name: z.string().max(200).optional(),
-    giving_kind: z.string(),
+    giving_label: z.string().max(80).optional(),
+    giving_kind: z.string().optional(),
     is_anonymous: flag,
     monthly: flag,
     monthly_authorised: flag,
@@ -68,3 +81,15 @@ export function toCheckoutInput(details: AppCheckoutBody["details"]):
 
 /** Off unless APP_GIVING=yes on the server: the in-app payment API stays closed in production until we choose. */
 export const appGivingOpen = (env: Record<string, string | undefined> = process.env) => env.APP_GIVING === "yes";
+
+/**
+ * Off unless SAVED_CARDS=yes on the server: saving a card for once-off gifts stays closed until the consent
+ * wording and the app stores' answers are in (see docs/go-live-checklist.md). Needs APP_GIVING too.
+ */
+export const savedCardsOpen = (env: Record<string, string | undefined> = process.env) => appGivingOpen(env) && env.SAVED_CARDS === "yes";
+
+/** The give screen asks, as it opens, whether it can take this gift (and the campaign, if one was chosen). */
+export const appReadySchema = z.object({ slug: z.string().min(1).max(120), campaignId: z.uuid().optional() });
+
+/** After the payment page closes: did this payment go through? Only the donor holds the token. */
+export const appStatusSchema = z.object({ reference: z.uuid(), token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) });

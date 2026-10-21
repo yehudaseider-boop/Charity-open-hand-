@@ -142,14 +142,23 @@ export function supabaseMonthlyStore(): MonthlyStore {
         age_confirmed_at: first.age_confirmed_at,
       });
       if (ins.error) throw new Error(`Could not create a collection attempt: ${ins.error.message}`);
-      // The donor's details for the s18A receipt and their own record travel with each monthly gift.
-      const details = must(await db.from("donation_checkout_details").select("*").eq("donation_id", rec.first_donation_id).maybeSingle(), "read the donor's details");
-      const copy = await db.from("donation_checkout_details").insert({ ...details, donation_id: donationId });
-      if (copy.error) throw new Error(`Could not copy the donor's details: ${copy.error.message}`);
-      const kind = await db.from("donation_giving_kinds").select("kind").eq("donation_id", rec.first_donation_id).maybeSingle();
-      if (kind.data) {
-        const k = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: kind.data.kind });
-        if (k.error) throw new Error(`Could not copy the giving choice: ${k.error.message}`);
+      // The donor's details for the s18A receipt and their own record travel with each monthly gift. If
+      // copying them fails, the attempt (not yet sent to the gateway) is removed again, so the next run
+      // makes it afresh instead of charging a gift with no donor details.
+      try {
+        const details = must(await db.from("donation_checkout_details").select("*").eq("donation_id", rec.first_donation_id).maybeSingle(), "read the donor's details");
+        const copy = await db.from("donation_checkout_details").insert({ ...details, donation_id: donationId });
+        if (copy.error) throw new Error(`Could not copy the donor's details: ${copy.error.message}`);
+        const kind = await db.from("donation_giving_kinds").select("kind, label").eq("donation_id", rec.first_donation_id).maybeSingle();
+        if (kind.data) {
+          const k = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: kind.data.kind, label: kind.data.label });
+          if (k.error) throw new Error(`Could not copy the donor's label: ${k.error.message}`);
+        }
+      } catch (e) {
+        await db.from("donation_giving_kinds").delete().eq("donation_id", donationId);
+        await db.from("donation_checkout_details").delete().eq("donation_id", donationId);
+        await db.from("donations").delete().eq("id", donationId).eq("status", "pending");
+        throw e;
       }
     },
 
@@ -165,6 +174,15 @@ export function supabaseMonthlyStore(): MonthlyStore {
         .eq("id", id)
         .eq("status", "active");
       if (error) throw new Error(`Could not record a collected month: ${error.message}`);
+    },
+
+    async failAttempt(donationId) {
+      const { error } = await db
+        .from("donations")
+        .update({ status: "failed", failed_at: new Date().toISOString() })
+        .eq("id", donationId)
+        .eq("status", "pending");
+      if (error) throw new Error(`Could not record a refused attempt: ${error.message}`);
     },
 
     async recordFailure(id, period, failedAttempts, retryAt) {

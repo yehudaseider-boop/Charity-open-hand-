@@ -1,12 +1,13 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { taxYearFor } from "@/lib/dates";
-import { gatewayByName } from "@/lib/gateway";
+import { gatewayByName, getGateway } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyDonationPaid } from "./notify";
+import { cardSaveWaitingFor, finishCardSave } from "./saved-card";
 import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyHandledElsewhere, monthlyWaitingFor } from "./recurring";
 
-export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found";
+export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /** The donation could not be read or written, so no final answer can be given. Safe to retry. */
 export class PersistenceError extends Error {
@@ -26,6 +27,17 @@ export class PersistenceError extends Error {
  * "failed" unless that state is saved, so callers can retry safely (the
  * webhook answers with an error so the gateway sends the event again).
  */
+/** What we already know about a payment, without asking the payment provider. */
+export async function savedOutcome(reference: string): Promise<ConfirmOutcome> {
+  if (!/^[0-9a-f-]{36}$/i.test(reference)) return "not_found";
+  const { data, error } = await createAdminClient().from("donations").select("status").eq("gateway_ref", reference).maybeSingle();
+  if (error) throw new PersistenceError("read the donation", error);
+  if (!data) return "not_found";
+  if (data.status === "paid" || data.status === "failed" || data.status === "review") return data.status;
+  if (data.status === "refunded" || data.status === "charged_back") return "reversed";
+  return "pending";
+}
+
 export async function confirmPayment(reference: string): Promise<ConfirmOutcome> {
   if (!/^[0-9a-f-]{36}$/i.test(reference)) return "not_found";
   const db = createAdminClient();
@@ -38,10 +50,24 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
   if (!donation) return "not_found";
   if (donation.status === "paid") {
     await finishMonthlySetup(donation, reference);
+    await finishCardKeeping(donation, reference);
     return "paid";
   }
+  if (donation.status === "refunded" || donation.status === "charged_back") return "reversed";
   if (donation.status !== "pending" && donation.status !== "failed") return donation.status as ConfirmOutcome;
 
+  // After a gateway change, an old pending payment can't be checked any more: a person decides.
+  if (donation.gateway !== getGateway().name) {
+    console.warn(`[confirm] donation ${donation.id} is on gateway "${donation.gateway}", not the active one`);
+    await logAudit({
+      actorUserId: null,
+      action: "donation.gateway_mismatch",
+      entityType: "donation",
+      entityId: donation.id,
+      details: { gateway: donation.gateway, active: getGateway().name },
+    });
+    return "review";
+  }
   const tx = await gatewayByName(donation.gateway).verifyTransaction(reference);
 
   if (tx.status === "success") {
@@ -55,7 +81,11 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
       });
       return "review";
     }
-    const paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
+    let paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
+    if (Number.isNaN(paidAt.getTime())) {
+      console.warn(`[confirm] unreadable paid_at from the gateway for ${donation.id}: ${String(tx.paidAt)}`);
+      paidAt = new Date();
+    }
     const { data: updated, error } = await db
       .from("donations")
       .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt) })
@@ -66,6 +96,9 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (updated?.length) {
       // Set up the monthly donation first (a failure here is retried: see the paid branch above).
       const monthly = donation.recurring_id ? await activateMonthlyDonation(donation.id, tx) : "none";
+      // The donor asked us to keep this card for next time. A failure must not hold back their confirmation
+      // email: the request stays, and the next look at this paid gift (see the paid branch above) tries again.
+      await finishCardSave(donation.id, tx, donation.gateway).catch((e) => console.error("[saved-card] card not kept yet", e));
       // A concurrent call that finished the monthly set-up first has already sent the email.
       if (!(donation.recurring_id && monthly === "none" && (await monthlyHandledElsewhere(donation.id)))) {
         await notifyDonationPaid(donation.id, { monthly });
@@ -77,6 +110,7 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (now === "paid") {
       // The other call may have died before the monthly set-up finished: finish it here too.
       await finishMonthlySetup(donation, reference);
+      await finishCardKeeping(donation, reference);
       return "paid";
     }
     if (now === "pending" || now === "failed") throw new PersistenceError("save the paid donation");
@@ -113,6 +147,13 @@ async function finishMonthlySetup(donation: { id: string; gateway: string; recur
   if (again.status !== "success") return;
   const monthly = await activateMonthlyDonation(donation.id, again);
   if (monthly !== "none") await notifyDonationPaid(donation.id, { monthly });
+}
+
+/** A paid gift whose card was meant to be kept but was not (the first confirmation died part-way): do it now. */
+async function finishCardKeeping(donation: { id: string; gateway: string }, reference: string): Promise<void> {
+  if (!(await cardSaveWaitingFor(donation.id))) return;
+  const again = await gatewayByName(donation.gateway).verifyTransaction(reference);
+  if (again.status === "success") await finishCardSave(donation.id, again, donation.gateway);
 }
 
 async function currentStatus(donationId: string): Promise<string> {

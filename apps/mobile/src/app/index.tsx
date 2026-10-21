@@ -1,46 +1,41 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop } from "@/components/backdrop";
-import { Button } from "@/components/button";
-import { Drop } from "@/components/splash";
+import { Blob } from "@/components/blob";
+import { Button, TextLink } from "@/components/button";
 import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
 import { SkeletonBlock } from "@/components/states";
-import { TargetEditor } from "@/components/target-editor";
 import { Text } from "@/components/text";
-import { ddmmyyyy } from "@/lib/format";
+import { saveCausePrefs } from "@/lib/cause-prefs";
+import { useDirectory } from "@/lib/directory";
+import { GIVER_TYPES, saveGiverType, type GiverType } from "@/lib/giver-type";
 import { haptic } from "@/lib/haptics";
-import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "@/lib/hebrew-year";
-import { useAccount } from "@/lib/account";
-import { saveTarget } from "@/lib/targets";
-import { notify } from "@/lib/open-site";
+import { markNewDonor } from "@/lib/first-run";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
-import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
+import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
-const STEPS = 3;
-
-const how = [
-  { title: "Find a charity here", body: "See what each charity does and whether it issues s18A receipts." },
-  { title: "Give on our website", body: "Tap Give and our website opens. You choose the amount and pay there securely." },
-  { title: "It all comes back to the app", body: "Sign in with the email you gave with. Your donations, receipts, maaser and chomesh show up here." },
-];
+/** The questions after the welcome screen: what kind of giver, then which causes. */
+const STEPS = 2;
 
 /**
- * First open: three short screens (what Givezy is, how giving works, an
- * optional maaser target). Skippable, and shown once per phone.
- * `?welcome=1&step=2` shows it again for design review.
+ * First open, "small yes first": the blue welcome, then two quick questions (what kind of giver you are,
+ * and which causes matter to you), each skippable, then straight to the charities, those you chose first.
+ * A giving goal is asked about once, after the first gift (see GiftSent). Shown once per phone.
+ * `?welcome=1&step=2` shows it again for design review (step 0 is the welcome).
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
-  const account = useAccount();
+  const directory = useDirectory();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
   const forced = p.welcome === "1";
   const [seen, setSeen] = useState<boolean | null>(forced ? false : null);
-  const [step, setStep] = useState(() => Math.min(STEPS, Math.max(1, Number(p.step) || 1)));
+  const [step, setStep] = useState(() => Math.min(STEPS, Math.max(0, Number(p.step) || 0)));
+  const [giver, setGiver] = useState<GiverType | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
 
   useEffect(() => {
     if (!forced) hasBeenWelcomed().then(setSeen);
@@ -49,68 +44,41 @@ export default function Welcome() {
   // Android's back button steps back through the welcome rather than closing the app.
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (step <= 1) return false;
+      if (step <= 0) return false;
       setStep(step - 1);
       return true;
     });
     return () => sub.remove();
   }, [step]);
 
-  if (seen === null) return <View style={styles.screen} />;
-  if (seen) return <Redirect href="/discover" />;
+  if (seen === null) return <View style={styles.blueScreen} />;
+  if (seen) return <Redirect href="/home" />;
 
+  // Straight to the charities, the donor's causes first.
   const finish = () => {
     markWelcomed();
+    void markNewDonor();
     router.replace("/discover");
   };
-  const next = () => {
-    setStep((s) => Math.min(STEPS, s + 1));
-  };
+  const next = () => (step >= STEPS ? finish() : setStep((n) => n + 1));
+  const causes = (directory.data?.causes ?? []).filter((c) => c.id !== "all");
 
-  const now = new Date();
-  const hYear = hebrewYearFor(now);
-
-  const skip =
-    step < STEPS ? (
-      <Pressable accessibilityRole="button" accessibilityLabel="Skip the introduction" hitSlop={8} onPress={finish} style={[styles.skip, { top: insets.top + 8 }]}>
-        <Text style={[type.button, { fontSize: 16, color: colors.blue }]}>Skip</Text>
-      </Pressable>
-    ) : null;
-
-  const dots = (
-    <View style={styles.dots} accessible accessibilityLabel={`Step ${step} of ${STEPS}`}>
-      {Array.from({ length: STEPS }, (_, i) => (
-        <View key={i} style={[styles.dot, i + 1 === step && styles.dotOn]} />
-      ))}
-    </View>
-  );
-
-  if (step === 1) {
+  if (step === 0) {
     return (
-      <View style={styles.screen}>
-        <View style={styles.hero}>
-          <LinearGradient colors={[colors.lilacSoft, colors.cream]} locations={[0, 1]} style={StyleSheet.absoluteFill} />
-          <View style={{ position: "absolute", right: -50, top: insets.top + 40 }}><Drop size={130} color={colors.lilac} rotate={16} opacity={0.55} /></View>
-          <View style={{ position: "absolute", left: -40, bottom: 10 }}><Drop size={150} color={colors.orange} rotate={-22} opacity={0.3} /></View>
-          <FadeUp style={styles.heroLogo}>
-            <Logo width={260} tagline />
-          </FadeUp>
-          {skip}
-        </View>
-
-        <View style={[styles.content, { paddingBottom: insets.bottom + space.md }]}>
-          <FadeUp>
-            <Text variant="hero" accessibilityRole="header">
-              Give to the causes that carry our community.
-            </Text>
-            <Text variant="bodyMuted" style={styles.support}>
-              Find charities, give on our website, and keep your maaser and chomesh in one place.
-            </Text>
-          </FadeUp>
-          <View style={styles.actions}>
-            {dots}
-            <Button label="Next" onPress={next} />
-          </View>
+      <View style={[styles.blueScreen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+        <Blob size={260} color={colors.orange} rotate={25} style={{ right: -110, top: insets.top + 90 }} />
+        <Blob size={200} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -110, top: insets.top + 150 }} />
+        <View style={styles.gutter}><Logo width={150} white /></View>
+        <View style={{ flex: 1 }} />
+        <FadeUp style={[styles.gutter, { gap: 14 }]}>
+          <Text style={styles.welcomeTitle} accessibilityRole="header">Give in a few taps.</Text>
+          <Text style={styles.welcomeLine}>All your giving, finally in one place. Every charity checked by us.</Text>
+        </FadeUp>
+        <View style={[styles.gutter, { gap: 6, marginTop: 28 }]}>
+          <Button variant="white" label="Get started" onPress={next} />
+          <Pressable onPress={() => { markWelcomed(); router.replace("/account"); }} accessibilityRole="link" style={styles.alreadyLink}>
+            <Text style={styles.alreadyText}>I already have an account</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -119,70 +87,106 @@ export default function Welcome() {
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <Backdrop variant="page" />
-      {skip}
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter, paddingTop: insets.top + 56, paddingBottom: insets.bottom + space.md, gap: space.block }}
-      >
-        {step === 2 ? (
-          <FadeUp key="how" style={{ flex: 1, gap: space.block }}>
-            <Text variant="h1" accessibilityRole="header">
-              Giving happens on our website.
-            </Text>
-            <View style={{ gap: 20 }}>
-              {how.map((s, i) => (
-                <View key={s.title} style={styles.step}>
-                  <View style={styles.number}>
-                    <Text style={styles.numberText}>{i + 1}</Text>
-                  </View>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 18 }}>{s.title}</Text>
-                    <Text variant="bodyMuted">{s.body}</Text>
-                  </View>
-                </View>
-              ))}
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter, paddingTop: insets.top + 16, paddingBottom: insets.bottom + space.md, gap: space.block }}>
+        <View style={styles.topRow}>
+          {/* Three segments: where you are in the setup. */}
+          <View style={styles.bar} accessible accessibilityLabel={`Step ${step} of ${STEPS}`}>
+            {Array.from({ length: STEPS }, (_, i) => (
+              <View key={i} style={[styles.segment, i < step && styles.segmentOn]} />
+            ))}
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Skip this question" hitSlop={8} onPress={next} style={styles.skip}>
+            <Text style={styles.skipText}>Skip</Text>
+          </Pressable>
+        </View>
+
+        {step === 1 ? (
+          <FadeUp key="giver" style={{ flex: 1, gap: space.block }}>
+            <View style={{ gap: 8 }}>
+              <Text variant="h1" accessibilityRole="header">What kind of giver are you?</Text>
+              <Text variant="bodyMuted">There&apos;s no right answer. It just helps us get to know you.</Text>
             </View>
-            <View style={styles.promise}>
-              <View style={{ marginTop: 3 }}>
-                <CheckIcon />
-              </View>
-              <Text style={{ flex: 1, fontSize: 17 }}>Givezy charges no fee on donations.</Text>
+            <View style={{ gap: 12 }} accessibilityRole="radiogroup">
+              {GIVER_TYPES.map((g) => {
+                const on = giver === g.id;
+                return (
+                  <Pressable
+                    key={g.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => {
+                      haptic.tap();
+                      setGiver(g.id);
+                    }}
+                    style={[styles.choice, on && styles.choiceOn]}
+                  >
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 18, color: colors.navy }}>{g.label}</Text>
+                      <Text variant="bodyMuted">{g.line}</Text>
+                    </View>
+                    {on ? <CheckIcon size={20} color={colors.blue} /> : null}
+                  </Pressable>
+                );
+              })}
             </View>
             <View style={{ flex: 1 }} />
-            <View style={styles.actions}>
-              {dots}
-              <Button label="Next" onPress={next} />
-            </View>
+            <Button
+              label="Next"
+              disabled={!giver}
+              onPress={() => {
+                void saveGiverType(giver);
+                next();
+              }}
+            />
           </FadeUp>
         ) : (
-          <FadeUp key="target" style={{ gap: space.md }}>
-            <Text variant="h1" accessibilityRole="header">
-              Keep track of your maaser.
-            </Text>
-            <Text variant="bodyMuted">Optional. Set a target and the app shows how much you have given towards it. You can change it any time on the Giving tab.</Text>
-            {/* Targets are saved per person, so wait until we know who is using the phone. */}
-            {account.status === "loading" || account.status === "agreeing" ? (
-              <SkeletonBlock height={320} />
+          <FadeUp key="causes" style={{ flex: 1, gap: space.block }}>
+            <View style={{ gap: 8 }}>
+              <Text variant="h1" accessibilityRole="header">Which causes matter to you?</Text>
+              <Text variant="bodyMuted">Pick as many as you like. We show these charities first.</Text>
+            </View>
+            {!directory.data && !directory.failed ? (
+              <View style={{ gap: 10 }}>
+                <SkeletonBlock height={46} width="70%" />
+                <SkeletonBlock height={46} width="55%" />
+                <SkeletonBlock height={46} width="80%" />
+              </View>
+            ) : directory.failed && !directory.data ? (
+              <View style={{ gap: 8 }} accessibilityRole="alert">
+                <Text variant="bodyMuted">We couldn&apos;t load the causes. Check your connection and try again, or skip this and see all charities.</Text>
+                <TextLink label="Try again" onPress={directory.retry} />
+              </View>
             ) : (
-            <TargetEditor
-              initial={null}
-              title="Your target"
-              yearEnd={ddmmyyyy(givingYearRange(hYear).end)}
-              monthsLeft={monthsLeftInGivingYear(now, hYear)}
-              onSave={async (t) => {
-                haptic.success();
-                const saved = await saveTarget(t, account.status === "signed-in" ? account.userId : null);
-                if (!saved.ok) {
-                  notify("Your target was not saved", "It could not be saved on this phone. Please try again, or skip for now and set it later on the Giving tab.");
-                  return;
-                }
+              <View style={styles.chips}>
+                {causes.map((c) => {
+                  const on = picked.includes(c.id);
+                  return (
+                    <Pressable
+                      key={c.id}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: on }}
+                      onPress={() => {
+                        haptic.tap();
+                        setPicked((ps) => (on ? ps.filter((x) => x !== c.id) : [...ps, c.id]));
+                      }}
+                      style={[styles.chip, on && styles.chipOn]}
+                    >
+                      {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
+                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{c.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+            <View style={{ flex: 1 }} />
+            <Button
+              variant="cta"
+              label="Show me charities"
+              onPress={() => {
+                void saveCausePrefs(picked);
                 finish();
               }}
-              onCancel={finish}
-              cancelLabel="Skip for now"
             />
-            )}
-            {dots}
           </FadeUp>
         )}
       </ScrollView>
@@ -191,19 +195,23 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
-  hero: { flex: 1, minHeight: 300, overflow: "hidden", borderBottomLeftRadius: 48, borderBottomRightRadius: 48 },
-  heroLogo: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 40 },
-  logo: { position: "absolute", left: space.gutter, zIndex: 2 },
-  skip: { position: "absolute", right: space.gutter, zIndex: 3, minHeight: touch, minWidth: touch, alignItems: "flex-end", justifyContent: "center" },
-  content: { paddingHorizontal: space.gutter, marginTop: 24 },
-  support: { marginTop: 12, fontSize: 17, lineHeight: 25 },
-  actions: { marginTop: space.block, gap: 16 },
-  dots: { flexDirection: "row", justifyContent: "center", gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.lilac },
-  dotOn: { width: 28, backgroundColor: colors.orange },
-  step: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
-  number: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
-  numberText: { fontFamily: fonts.display, fontSize: 19, color: colors.onInk },
-  promise: { flexDirection: "row", gap: 10, padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  screen: { flex: 1, backgroundColor: colors.cream },
+  blueScreen: { flex: 1, backgroundColor: colors.blue, overflow: "hidden" },
+  gutter: { paddingHorizontal: space.gutter },
+  welcomeTitle: { fontFamily: fonts.display, fontSize: 52, lineHeight: 56, color: colors.onInk },
+  welcomeLine: { fontFamily: fonts.bodyMedium, fontSize: 19, lineHeight: 27, color: colors.lilacSoft },
+  alreadyLink: { minHeight: touch, alignItems: "center", justifyContent: "center" },
+  alreadyText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.onInk, textDecorationLine: "underline" },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+  bar: { flex: 1, flexDirection: "row", gap: 6 },
+  segment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.lightPurple },
+  segmentOn: { backgroundColor: colors.blue },
+  skip: { minHeight: touch, minWidth: touch, alignItems: "flex-end", justifyContent: "center" },
+  skipText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 46, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
+  chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  choice: { flexDirection: "row", alignItems: "center", gap: 12, padding: 18, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
+  choiceOn: { borderColor: colors.blue, backgroundColor: colors.lilacSoft },
+  chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
 });

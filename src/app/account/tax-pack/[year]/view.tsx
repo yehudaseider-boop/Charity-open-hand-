@@ -1,3 +1,4 @@
+import { HebrewAware } from "@/components/hebrew-aware";
 import Link from "next/link";
 import { platformConfig } from "@/config/platform";
 import { formatDate, taxYearLabel } from "@/lib/dates";
@@ -5,7 +6,6 @@ import { formatRand } from "@/lib/money";
 import type { TaxPack } from "@/lib/tax-pack/build";
 import { PrintButton } from "./print-button";
 
-const kindLabel = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "General tzedaka" } as const;
 
 /** What the tax pack page shows, from a built pack. Separate from the loading so it can be previewed with sample data. */
 export function TaxPackView({ year, email, pack, current }: { year: number; email: string; pack: TaxPack | null; current: number }) {
@@ -90,7 +90,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
               </tbody>
             </table>
             <p className="mt-3 text-sm text-muted">
-              Maaser {formatRand(pack.byKind.maaser)} · Chomesh {formatRand(pack.byKind.chomesh)} · General tzedaka {formatRand(pack.byKind.tzedaka)}. Only you see these.
+              {pack.byLabel.map((t) => `${t.label} ${formatRand(t.cents)}`).join(" · ")}. Your own labels: only you see these.
             </p>
           </section>
 
@@ -118,8 +118,8 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
                   <div>
                     <p>{l.charityName}</p>
                     <p className="text-xs text-muted">
-                      <span className="tabular-nums">{formatDate(l.paidAt)}</span> · {kindLabel[l.kind]}{l.monthly ? " · monthly" : ""} · {l.receipted ? "on an s18A receipt" : l.s18a ? (yearOpen || pack.receipts.length === 0 ? "s18A receipt asked for" : "asked for, not on a receipt") : "no s18A receipt"}
-                      {l.dedication ? <span className="block" dir="auto">{l.dedication}</span> : null}
+                      <span className="tabular-nums">{formatDate(l.paidAt)}</span> · {l.label ?? "No label"}{l.monthly ? " · monthly" : ""} · {l.receipted ? "on an s18A receipt" : l.s18a ? (yearOpen || pack.receipts.length === 0 ? "s18A receipt asked for" : "asked for, not on a receipt") : "no s18A receipt"}
+                      {l.dedication ? <span className="block" dir="auto"><HebrewAware text={l.dedication} /></span> : null}
                     </p>
                   </div>
                   <p className="whitespace-nowrap font-medium tabular-nums">{formatRand(l.cents)}</p>

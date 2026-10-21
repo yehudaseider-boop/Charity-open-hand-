@@ -15,8 +15,11 @@ const notify = vi.fn(async (_id: string) => {});
 const audit = vi.fn(async (_e: unknown) => {});
 
 vi.mock("@/lib/audit", () => ({ logAudit: (e: unknown) => audit(e) }));
+const cardWaiting = vi.fn(async (_id: string) => false);
+const cardSave = vi.fn(async (_id: string, _tx: unknown, _gateway: string): Promise<string> => "none");
+vi.mock("@/lib/donations/saved-card", () => ({ cardSaveWaitingFor: (id: string) => cardWaiting(id), finishCardSave: (id: string, tx: unknown, g: string) => cardSave(id, tx, g) }));
 vi.mock("@/lib/donations/notify", () => ({ notifyDonationPaid: (id: string) => notify(id) }));
-vi.mock("@/lib/gateway", () => ({ gatewayByName: () => ({ verifyTransaction: verify }) }));
+vi.mock("@/lib/gateway", () => ({ gatewayByName: () => ({ verifyTransaction: verify }), getGateway: () => ({ name: "test" }) }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: () => ({
@@ -63,6 +66,10 @@ beforeEach(() => {
   verify.mockResolvedValue(paidTx);
   notify.mockClear();
   audit.mockClear();
+  cardWaiting.mockReset();
+  cardWaiting.mockResolvedValue(false);
+  cardSave.mockReset();
+  cardSave.mockResolvedValue("none");
 });
 
 describe("confirmPayment and database failures", () => {
@@ -127,6 +134,35 @@ describe("confirmPayment and database failures", () => {
     await confirmPayment(REF);
     await confirmPayment(REF);
     expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the card the donor asked us to keep, when the payment is confirmed paid", async () => {
+    verify.mockResolvedValue({ ...paidTx, authorization: { code: "AUTH", reusable: true, last4: "4242", brand: "visa", expires: "12/2030" } });
+    expect(await confirmPayment(REF)).toBe("paid");
+    expect(cardSave).toHaveBeenCalledTimes(1);
+    expect(cardSave.mock.calls[0][0]).toBe(REF);
+    expect(cardSave.mock.calls[0][2]).toBe("test");
+  });
+
+  it("a card that could not be saved yet never holds back the confirmation email, and is tried again on the next look", async () => {
+    verify.mockResolvedValue(paidTx);
+    cardSave.mockRejectedValueOnce(new Error("database down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await confirmPayment(REF)).toBe("paid");
+    expect(notify).toHaveBeenCalledTimes(1);
+    // The next look at this paid gift finishes it, and does not email again.
+    cardWaiting.mockResolvedValueOnce(true);
+    expect(await confirmPayment(REF)).toBe("paid");
+    expect(cardSave).toHaveBeenCalledTimes(2);
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("looks at a gift that is already paid only to finish keeping a card that was asked for", async () => {
+    verify.mockResolvedValue(paidTx);
+    await confirmPayment(REF);
+    cardSave.mockClear();
+    await confirmPayment(REF);
+    expect(cardSave).not.toHaveBeenCalled();
   });
 
   it("a failed read is an error, not 'not found'", async () => {

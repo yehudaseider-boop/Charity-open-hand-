@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requirePlatformAdmin } from "@/lib/auth";
+import { containsPattern, safeSearch } from "@/lib/charity/dashboard";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +18,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
   const { status: raw, q: rawQ } = await searchParams;
   const status = tabs.includes(raw as (typeof tabs)[number]) ? (raw as (typeof tabs)[number]) : "issued";
   // Search by receipt number, donor or charity name: letters, digits, spaces and dashes only (it goes into a filter).
-  const q = typeof rawQ === "string" ? rawQ.replace(/[^\p{L}\p{N} -]/gu, "").trim().slice(0, 60) : "";
+  const q = typeof rawQ === "string" ? safeSearch(rawQ) : "";
 
   const supabase = await createClient();
   let query = supabase
@@ -30,7 +31,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
     .limit(100);
   if (q) {
     query = query.or(
-      `details->>receipt_reference.ilike.*${q}*,details->donor->>name.ilike.*${q}*,details->charity->>legal_name_en.ilike.*${q}*`,
+      `details->>receipt_reference.ilike.${containsPattern(q)},details->donor->>name.ilike.${containsPattern(q)},details->charity->>legal_name_en.ilike.${containsPattern(q)}`,
     );
   }
   const { data: receipts, error } = await query;

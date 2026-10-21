@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
-import { closeRequest, eraseByEmail, eraseForRequest } from "./actions";
+import { closeRequest, eraseByEmailForm, eraseForRequest } from "./actions";
+import { EraseByEmailForm } from "./erase-form";
 
 export const metadata: Metadata = { title: "Privacy requests" };
 
@@ -77,15 +78,7 @@ export default async function PrivacyRequestsPage({ searchParams }: PageProps<"/
       <section className="space-y-2 rounded-card border border-border bg-surface p-4 text-sm">
         <h2 className="font-semibold">Erase a donor with no account</h2>
         <p className="text-muted">For someone who gave as a guest and asked by email. Check who they are first. Type their email address twice.</p>
-        <form action={eraseByEmail} className="space-y-2">
-          <input name="email" type="email" required aria-label="Email address" placeholder="Email address" className="w-full rounded-control border border-border bg-surface px-3 py-2" />
-          <input name="again" type="email" required aria-label="Email address again" placeholder="Email address again" className="w-full rounded-control border border-border bg-surface px-3 py-2" />
-          <label className="flex items-start gap-2">
-            <input type="checkbox" name="checked" className="mt-1" />
-            <span>I have checked this is really the person.</span>
-          </label>
-          <button className="min-h-11 rounded-control border border-danger px-3 py-2 text-danger">Erase their information</button>
-        </form>
+        <EraseByEmailForm action={eraseByEmailForm} />
       </section>
     </div>
   );

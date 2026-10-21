@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { platformConfig } from "@/config/platform";
 import { FeeError, priceDonation } from "@/lib/fees";
 
-const mins = { minDonationCents: platformConfig.minDonationCents, minContributionCents: platformConfig.minContributionCents };
+const mins = { minDonationCents: platformConfig.minDonationCents, minContributionCents: platformConfig.minContributionCents, maxDonationCents: platformConfig.maxDonationCents };
 
 function code(fn: () => unknown) {
   try {
@@ -32,9 +32,21 @@ describe("priceDonation", () => {
     expect(code(() => priceDonation(3_000, 1_000, mins))).toBeNull();
   });
 
+  it("refuses a gift above R1 000 000 (a typo, not a gift), and takes exactly R1 000 000", () => {
+    expect(platformConfig.maxDonationCents).toBe(100_000_000);
+    expect(code(() => priceDonation(100_000_001, 0, mins))).toBe("above_maximum");
+    // A typo in the contribution (R50 000 instead of R50) is caught the same way.
+    expect(code(() => priceDonation(3_000, 100_000_001, mins))).toBe("above_maximum");
+    expect(code(() => priceDonation(100_000_000, 0, mins))).toBeNull();
+    // Callers without a ceiling (older tests) keep working.
+    expect(code(() => priceDonation(100_000_001, 0, { minDonationCents: 3_000, minContributionCents: 1_000 }))).toBeNull();
+  });
+
   it("refuses broken amounts", () => {
-    for (const [a, c] of [[0, 0], [-100, 0], [30.5, 0], [Number.NaN, 0], [3_000, -1], [3_000, 0.5], [Number.MAX_SAFE_INTEGER, 1_000]]) {
+    for (const [a, c] of [[0, 0], [-100, 0], [30.5, 0], [Number.NaN, 0], [3_000, -1], [3_000, 0.5]]) {
       expect(code(() => priceDonation(a, c, mins))).toBe("invalid_amount");
     }
+    // Past the safe-integer range the sum itself is unsafe (no ceiling given here).
+    expect(code(() => priceDonation(Number.MAX_SAFE_INTEGER, 1_000, { minDonationCents: 3_000, minContributionCents: 1_000 }))).toBe("invalid_amount");
   });
 });

@@ -20,7 +20,7 @@ export function SavedRow({ charities, live }: { charities: Charity[]; live: bool
           key={c.slug}
           onPress={() => {
             haptic.tap();
-            router.push(`/charity/${c.slug}`);
+            router.push({ pathname: "/charity/[slug]", params: { slug: c.slug } });
           }}
           accessibilityRole="button"
           accessibilityLabel={`${c.nameEn}, saved`}

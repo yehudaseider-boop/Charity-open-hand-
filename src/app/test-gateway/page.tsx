@@ -5,7 +5,7 @@ import { readSignedTestCheckout } from "@/lib/gateway/test-gateway";
 import { formatRand } from "@/lib/money";
 import { completeTestPayment } from "./actions";
 
-export const metadata: Metadata = { title: "Test payment" };
+export const metadata: Metadata = { title: "Test payment", robots: { index: false, follow: false } };
 
 /** The stand-in gateway's hosted payment page. Local development only. */
 export default async function TestGatewayPage({ searchParams }: PageProps<"/test-gateway">) {

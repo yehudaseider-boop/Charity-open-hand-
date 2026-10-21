@@ -1,96 +1,80 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState } from "react";
-import { Animated, Easing, StyleSheet, View, useWindowDimensions, type ViewStyle } from "react-native";
-import { reduceMotion } from "@/lib/motion";
+import { StyleSheet, View, type ViewStyle } from "react-native";
 import { colors } from "@/theme/tokens";
-import { Drop } from "./splash";
+import { Blob } from "./blob";
 
-type Shape = { color: typeof colors.lilac | typeof colors.orange | typeof colors.blue; size: number; rotate: number; opacity: number; at: ViewStyle };
+type Spot = { color: string; size: number; rotate: number; stretch?: number; at: ViewStyle };
 
 /**
- * The four tabs sit on plain cream: their colour comes from the lilac header curve (`HeaderCurve`),
- * which scrolls with the page. Other pages keep the logo's shapes, very faint and drifting off the
- * edges, over a lilac wash that fades into cream.
+ * White screens get three soft splashes behind all content, in pale lilac and peach, placed
+ * differently on each screen so they don't feel stamped on. The tab bar stays solid white over them.
  */
-const LAYOUTS: Record<string, Shape[]> = {
-  discover: [],
-  giving: [],
-  receipts: [],
-  account: [],
+const LAYOUTS: Record<string, Spot[]> = {
+  home: [
+    { color: colors.lilacSoft, size: 260, rotate: 20, at: { right: -110, top: 380 } },
+    { color: colors.peach, size: 220, rotate: -15, stretch: 1.2, at: { left: -120, top: 640 } },
+    { color: colors.lilacSoft, size: 180, rotate: 40, at: { right: -60, bottom: 60 } },
+  ],
+  discover: [
+    { color: colors.peach, size: 240, rotate: 30, at: { left: -120, top: 300 } },
+    { color: colors.lilacSoft, size: 280, rotate: -10, stretch: 1.1, at: { right: -140, top: 620 } },
+    { color: colors.peach, size: 170, rotate: 10, at: { left: -50, bottom: 40 } },
+  ],
+  giving: [
+    { color: colors.lilacSoft, size: 230, rotate: -25, at: { left: -110, top: 420 } },
+    { color: colors.peach, size: 200, rotate: 15, at: { right: -90, top: 700 } },
+    { color: colors.lilacSoft, size: 260, rotate: 5, stretch: 1.2, at: { left: -80, bottom: -40 } },
+  ],
+  receipts: [
+    { color: colors.peach, size: 220, rotate: 20, at: { right: -100, top: 260 } },
+    { color: colors.lilacSoft, size: 260, rotate: -30, at: { left: -130, top: 560 } },
+    { color: colors.peach, size: 160, rotate: 0, at: { right: -40, bottom: 80 } },
+  ],
+  account: [
+    { color: colors.lilacSoft, size: 250, rotate: 35, at: { left: -120, top: 320 } },
+    { color: colors.peach, size: 210, rotate: -20, at: { right: -100, top: 600 } },
+    { color: colors.lilacSoft, size: 170, rotate: 10, at: { left: -40, bottom: 30 } },
+  ],
   page: [
-    { color: colors.lilac, size: 170, rotate: 18, opacity: 0.14, at: { right: -90, top: 420 } },
-    { color: colors.orange, size: 170, rotate: -22, opacity: 0.09, at: { left: -100, bottom: 160 } },
+    { color: colors.lilacSoft, size: 240, rotate: 18, at: { right: -110, top: 340 } },
+    { color: colors.peach, size: 200, rotate: -22, at: { left: -100, top: 640 } },
+    { color: colors.lilacSoft, size: 180, rotate: 30, at: { right: -60, bottom: 40 } },
   ],
 };
 
 export type BackdropVariant = keyof typeof LAYOUTS;
 
-/** A slow, gentle float. Still when the phone asks for less motion. */
-function Floating({ index, children, style }: { index: number; children: React.ReactNode; style: ViewStyle }) {
-  const [v] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    if (reduceMotion()) return;
-    const half = 4200 + index * 900;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(v, { toValue: 1, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(v, { toValue: 0, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [v, index]);
-  const drift = index % 2 === 0 ? 10 : -10;
-  return (
-    <Animated.View style={[{ position: "absolute" }, style, { transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, drift] }) }] }]}>
-      {children}
-    </Animated.View>
-  );
-}
-
 /** The background behind a screen's content. Purely decorative: never touchable, never read aloud. */
 export function Backdrop({ variant }: { variant: BackdropVariant }) {
-  const shapes = LAYOUTS[variant] ?? LAYOUTS.page;
+  const spots = LAYOUTS[variant] ?? LAYOUTS.page;
   return (
     <View style={[StyleSheet.absoluteFill, styles.base, { pointerEvents: "none" }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {shapes.length ? <LinearGradient colors={[colors.lilacSoft, colors.cream]} locations={[0, 1]} style={styles.wash} /> : null}
-      {shapes.map((s, i) => (
-        <Floating key={`${variant}-${i}`} index={i} style={s.at}>
-          <Drop size={s.size} color={s.color} rotate={s.rotate} opacity={s.opacity} />
-        </Floating>
+      {spots.map((s, i) => (
+        <Blob key={`${variant}-${i}`} size={s.size} color={s.color} rotate={s.rotate} stretch={s.stretch} style={s.at} />
       ))}
     </View>
   );
 }
 
-/** Radius of the circle the curve is cut from: big, so the edge is a gentle arc across the phone. */
-const CURVE_R = 560;
-
 /**
- * The lilac header at the top of each tab, ending in a gentle curve with a lilac and an orange rim.
- * Put it first inside the screen's scroll content; it scrolls away with the header. `depth` is how
- * far down the middle of the curve reaches from the top of the content.
+ * A blue colour-block header with full-strength orange and lavender splashes bleeding off its
+ * edges, and rounded bottom corners. Put white text in it. It scrolls with the page; a blue block
+ * above it fills the gap when pulling down to refresh.
  */
-export function HeaderCurve({ depth }: { depth: number }) {
-  const { width } = useWindowDimensions();
-  const d = CURVE_R * 2;
-  const sag = CURVE_R - Math.sqrt(CURVE_R * CURVE_R - (width / 2) ** 2);
-  const circle = (color: string, drop: number) => (
-    <View style={{ position: "absolute", width: d, height: d, borderRadius: CURVE_R, left: (width - d) / 2, top: depth + drop - d, backgroundColor: color }} />
-  );
+export function BlueHeader({ children, paddingTop, style }: { children: React.ReactNode; paddingTop: number; style?: ViewStyle }) {
   return (
-    <View style={[styles.curve, { height: depth, pointerEvents: "none" }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {/* Reaches above the top, so pulling down to refresh shows lilac, not a gap. */}
-      <View style={{ position: "absolute", left: 0, right: 0, top: -800, height: 800 + depth - sag - 20, backgroundColor: colors.lilacSoft }} />
-      {circle(colors.orange, 8)}
-      {circle(colors.lilac, 4)}
-      {circle(colors.lilacSoft, 0)}
+    <View style={[styles.header, { paddingTop }, style]}>
+      <View style={styles.above} />
+      <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Blob size={130} color={colors.orange} rotate={25} style={{ right: -60, top: -50 }} />
+        <Blob size={110} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -70, bottom: -80 }} />
+      </View>
+      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  curve: { position: "absolute", top: 0, left: 0, right: 0 },
   base: { backgroundColor: colors.cream, overflow: "hidden" },
-  wash: { position: "absolute", top: 0, left: 0, right: 0, height: 340 },
+  header: { backgroundColor: colors.blue, borderBottomLeftRadius: 36, borderBottomRightRadius: 36, overflow: "hidden", paddingHorizontal: 24, paddingBottom: 28, gap: 8 },
+  above: { position: "absolute", left: 0, right: 0, top: -800, height: 800, backgroundColor: colors.blue },
 });

@@ -6,7 +6,7 @@ import { parseTaxYear } from "@/lib/tax-pack/build";
 import { loadTaxPack } from "@/lib/tax-pack/load";
 import { TaxPackView } from "./view";
 
-export const metadata: Metadata = { title: "Tax pack" };
+export const metadata: Metadata = { title: "Tax pack", robots: { index: false, follow: false } };
 
 /**
  * The donor's annual tax pack, laid out for A4: every paid donation in the tax year, what goes on

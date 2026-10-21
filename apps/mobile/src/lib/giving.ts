@@ -23,13 +23,6 @@ export function groupByMonth<T extends { date: Date }>(rows: T[]): { label: stri
   return groups;
 }
 
-export const givingKindLabels = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "General tzedaka" } as const;
-
-/** Total of the rows marked with one kind of giving (maaser, chomesh or general tzedaka). */
-export function sumOfKind<T extends { cents: number; kind: string }>(rows: T[], kind: keyof typeof givingKindLabels): number {
-  return rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.cents, 0);
-}
-
 /** Maaser target from income and a percentage in ppm (10% = 100000), rounded to the nearest cent. */
 export function maaserTargetCents(incomeCents: number, percentPpm: number): number {
   return Math.round((incomeCents * percentPpm) / 1_000_000);
@@ -51,6 +44,13 @@ export function inGivingYear<T extends { date: Date }>(rows: T[], hebrewYear: nu
 /** Whole-number percent of a part in a total, rounded; 0 when the total is 0. */
 export function percentOf(partCents: number, totalCents: number): number {
   return totalCents > 0 ? Math.round((partCents * 100) / totalCents) : 0;
+}
+
+/** The SARS tax years the donor gave in, newest first, always with the current one at the top. */
+export function taxYearsGiven(rows: { date: Date }[], current: number): number[] {
+  const years = new Set(rows.map((r) => taxYearFor(r.date)).filter((y) => y <= current));
+  years.add(current);
+  return [...years].sort((a, b) => b - a);
 }
 
 /** Totals per charity, largest first. */

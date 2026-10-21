@@ -32,6 +32,14 @@ export function parseRandToCents(input: string): number | null {
   return Number(cents);
 }
 
+/** The message for "1,250": SA writes thousands with a space, and the comma is the decimal mark, so it can't be read safely. */
+export const COMMA_THOUSANDS_MESSAGE = "Use a space or nothing for thousands, for example 1250 or 1 250";
+
+/** Did the person write thousands with a comma ("1,250", "50,000")? */
+export function usesCommaThousands(input: string): boolean {
+  return /\d,\d{3}\b/.test(input);
+}
+
 /**
  * Convert a percentage written as a decimal string to integer
  * parts-per-million: "3" -> 30000, "2.9" -> 29000, "15" -> 150000.

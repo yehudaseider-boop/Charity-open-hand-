@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function loadDonatableCharity(slug: string) {
   const { data } = await createAdminClient()
     .from("charities")
-    .select("id, slug, name_en, name_he, status, is_verified, is_s18a, mandate_signed_at, gateway, gateway_subaccount_ref")
+    .select("id, slug, name_en, name_he, status, is_verified, is_s18a, mandate_signed_at, gateway, gateway_subaccount_ref, suggested_amounts_cents")
     .eq("slug", slug)
     .eq("status", "approved")
     .maybeSingle();
@@ -24,6 +24,8 @@ export async function loadDonatableCharity(slug: string) {
   return {
     ...data,
     receiptsAvailable: canIssue18a(data),
+    /** The charity's own suggested amounts (cents, smallest first); empty when it chose none. */
+    suggestedCents: ((data.suggested_amounts_cents ?? []) as (number | string)[]).map(Number).filter((c) => Number.isSafeInteger(c) && c > 0),
     /**
      * Can take payments now. The test gateway always can (and, if it is set to split, needs the
      * charity's test account). A real gateway is closed until it is decided who pays the gateway's

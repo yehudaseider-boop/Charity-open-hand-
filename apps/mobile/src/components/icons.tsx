@@ -9,6 +9,25 @@ type IconProps = { size?: number; color?: string };
 const base = (size: number) => ({ width: size, height: size, viewBox: "0 0 24 24", fill: "none" });
 const stroke = (color: string) => ({ stroke: color, strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const });
 
+export function HomeIcon({ size = 24, color = colors.ink }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M4 11l8-6.5 8 6.5" {...stroke(color)} />
+      <Path d="M6 9.5V19.5h12V9.5" {...stroke(color)} />
+      <Path d="M10 19.5v-5h4v5" {...stroke(color)} />
+    </Svg>
+  );
+}
+
+export function ProgressIcon({ size = 24, color = colors.ink }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Circle cx="12" cy="12" r="8.5" {...stroke(color)} />
+      <Path d="M12 3.5a8.5 8.5 0 018.5 8.5" {...stroke(color)} strokeWidth={3} />
+    </Svg>
+  );
+}
+
 export function DiscoverIcon({ size = 24, color = colors.ink }: IconProps) {
   return (
     <Svg {...base(size)}>

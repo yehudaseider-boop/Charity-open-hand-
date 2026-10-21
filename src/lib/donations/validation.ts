@@ -1,36 +1,46 @@
 import { z } from "zod";
 import { isValidSaIdNumber } from "@/lib/sa-id";
-import { parseDedication } from "./dedication";
+import { cleanDedicationName, parseDedication } from "./dedication";
+import { cleanLabel } from "./labels";
 
-const str = (max = 200) => z.string().max(max).optional();
+/** An optional text field, with a plain message when it is too long. */
+const str = (max: number, what: string) => z.string().max(max, `Please keep ${what} to ${max} characters or fewer`).optional();
+/**
+ * A one-line field (a name, an address line): line breaks, control and direction characters become
+ * spaces. These are printed in emails and on receipts, where a typed line break could pass off extra text.
+ */
+const line = (max: number, what: string) => str(max, what).transform((v) => (v === undefined ? v : cleanDedicationName(v)));
 const yes = z.literal("on").optional();
 
-/** What a gift is counted as in the donor's own records. The donor must choose; there is no default. */
-export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "General tzedaka" } as const;
+/** The old fixed choice, still accepted from older app versions and links (read as a label). */
+export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "Tzedaka" } as const;
 
 /** Checkout form, as sent. Cross-field rules are applied in checkDonorDetails. */
 export const checkoutSchema = z.object({
   donor_type: z.enum(["individual", "company", "trust"]),
   email: z.email("Enter a valid email address"),
-  first_name: str(80),
-  last_name: str(80),
-  organisation_name: str(),
-  registration_number: str(40),
-  contact_person: str(120),
-  phone: str(20),
+  first_name: line(80, "your first name"),
+  last_name: line(80, "your surname"),
+  organisation_name: line(200, "the name"),
+  registration_number: line(40, "the registration number"),
+  contact_person: line(120, "the contact person"),
+  phone: str(20, "the phone number"),
   wants_18a: yes,
-  id_number: str(20),
-  tax_reference: str(20),
-  address_line1: str(),
-  address_line2: str(),
-  suburb: str(80),
-  city: str(80),
-  postal_code: str(4),
-  message: str(500),
+  id_number: str(20, "the ID number"),
+  tax_reference: str(20, "the income tax number"),
+  address_line1: line(200, "the street address"),
+  address_line2: line(200, "this line"),
+  suburb: line(80, "the suburb"),
+  city: line(80, "the city or town"),
+  postal_code: z.string().max(4, "Postal codes are 4 digits").optional(),
+  message: str(500, "your message"),
   /** Optional: given in honour of, or in memory of, someone (the name is checked in checkDonorDetails). */
   dedication_kind: z.enum(["none", "honour", "memory"]).optional(),
-  dedication_name: str(200),
-  giving_kind: z.enum(["maaser", "chomesh", "tzedaka"], { error: "Choose maaser, chomesh or general tzedaka" }),
+  dedication_name: str(80, "their name"),
+  /** The donor's own label for this gift, optional and private to them ("Work giving", "Maaser"). */
+  giving_label: str(80, "your label"),
+  /** Older app versions send the fixed choice instead; it becomes the label. */
+  giving_kind: z.enum(["maaser", "chomesh", "tzedaka"]).optional(),
   is_anonymous: yes,
   /** Give this amount every month until the donor cancels. */
   monthly: yes,
@@ -56,9 +66,13 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
 
   if (v.phone && !/^(\+27|0)\d{9}$/.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
 
-  // s18A details: an ID or income tax number only, for now. Address and phone
-  // are left out until Yehuda confirms what an s18A receipt must show.
+  // s18A details: an ID or income tax number, and the donor's address (section 18A(2) asks for the
+  // donor's name and address on the receipt; the receipt job refuses one without it).
   if (want18a) {
+    if (!v.address_line1) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
+    if (!v.city) e.city = "Enter your city or town";
+    if (!v.postal_code) e.postal_code = "Enter your postal code";
+    else if (!/^\d{4}$/.test(v.postal_code)) e.postal_code = "Postal codes are 4 digits";
     if (v.donor_type === "individual") {
       if (!v.id_number && !v.tax_reference) e.id_number = "Enter your SA ID number or income tax number";
       if (v.id_number && !isValidSaIdNumber(v.id_number)) e.id_number = "That doesn't look like a valid SA ID number";
@@ -77,4 +91,9 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
 
 export function cleanPhone(v: string | undefined) {
   return v?.replace(/[\s()-]/g, "") || undefined;
+}
+
+/** The label to keep with a gift: what the donor typed, else an older app's fixed choice. */
+export function givingLabelOf(v: Pick<CheckoutInput, "giving_label" | "giving_kind">): string | null {
+  return cleanLabel(v.giving_label) ?? (v.giving_kind ? givingKinds[v.giving_kind] : null);
 }

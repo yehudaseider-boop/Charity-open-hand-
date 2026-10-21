@@ -13,7 +13,7 @@ export const receiptConfig = {
     title: "Section 18A receipt",
     /** {charity} and {period} are filled in. */
     statement:
-      "This receipt is issued by {charity} for the purposes of section 18A of the Income Tax Act, 1962, for the donations listed above, received during {period}.",
+      "This receipt is issued by {charity} for the purposes of section 18A of the Income Tax Act, 1962, for the donations listed above, received during {period}. {charity} confirms that these donations have been or will be used exclusively for the objects of the organisation in carrying on its public benefit activities.",
   },
   // Donor ID and tax numbers are printed as the last 4 digits only ("•••• 1234")
   // until the attorney says SARS requires the full number. Printing the full

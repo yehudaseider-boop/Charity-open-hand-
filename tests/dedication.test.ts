@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { confirmationEmail } from "@/lib/donations/confirmation-email";
-import { cleanDedicationName, dedicationFrom, dedicationLine, parseDedication } from "@/lib/donations/dedication";
+import { cleanDedicationName, dedicationFrom, dedicationLine, hebrewStart, isHebrew, parseDedication } from "@/lib/donations/dedication";
 import { checkDonorDetails, checkoutSchema } from "@/lib/donations/validation";
 
 describe("dedications", () => {
@@ -55,5 +55,22 @@ describe("dedication names with hidden characters", () => {
     expect(cleanDedicationName("‮Chaim‬ Cohen‏")).toBe("Chaim Cohen");
     expect(cleanDedicationName("\u0085Rivka⁦ Levin")).toBe("Rivka Levin");
     expect(cleanDedicationName("חיים כהן")).toBe("חיים כהן");
+  });
+
+  it("spots Hebrew so the page can set it right to left in Heebo", () => {
+    expect(isHebrew("חיים כהן")).toBe(true);
+    expect(isHebrew("In memory of חיים כהן")).toBe(true);
+    expect(isHebrew("Chaim Cohen")).toBe(false);
+    expect(isHebrew("")).toBe(false);
+    expect(hebrewStart("In memory of חיים כהן")).toBe(13);
+    expect(hebrewStart("Chaim Cohen")).toBe(-1);
+  });
+});
+
+describe("one-line checkout fields", () => {
+  it("turn a typed line break into a space, so a name can't pass off extra text in an email", () => {
+    const parsed = checkoutSchema.parse({ donor_type: "individual", email: "a@b.co.za", first_name: "Bob\n\nVisit evil.example", city: "Johannes\tburg" });
+    expect(parsed.first_name).toBe("Bob Visit evil.example");
+    expect(parsed.city).toBe("Johannes burg");
   });
 });

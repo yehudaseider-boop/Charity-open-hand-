@@ -2,7 +2,8 @@
  * Turning the donor's own rows from the database into what the screens show.
  * Pure functions (no React Native), so the website's test suite can check them.
  */
-import type { Gift, GivingKind, Receipt, Recurring } from "../data/giving";
+import type { Gift, Receipt, Recurring } from "../data/giving";
+import { cleanLabel, labelOf } from "@shared/donations/labels";
 import { jhbDay } from "./format";
 
 export type DonationRow = {
@@ -14,7 +15,7 @@ export type DonationRow = {
   recurring_id: string | null;
   charities: { slug: string; name_en: string; thank_you_en?: string | null } | { slug: string; name_en: string; thank_you_en?: string | null }[] | null;
 };
-export type KindRow = { donation_id: string; kind: string };
+export type KindRow = { donation_id: string; kind?: string | null; label?: string | null };
 export type RecurringRow = {
   id: string;
   amount_cents: number | string;
@@ -36,20 +37,18 @@ export type ReceiptRow = {
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
-const isKind = (k: string | undefined): k is GivingKind => k === "maaser" || k === "chomesh" || k === "tzedaka";
 
 /**
- * Paid donations only: they are what counts towards maaser and chomesh.
+ * Paid donations only: they are what counts towards the donor's goals.
  * (Refunded or charged-back donations drop out; pending ones aren't money yet.)
- * A donation from before giving kinds were recorded counts as general tzedaka.
+ * Each carries the donor's own label, if they gave one (old maaser/chomesh/tzedaka choices read as labels).
  */
 export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
-  const kindOf = new Map(kinds.map((k) => [k.donation_id, k.kind]));
+  const labelFor = new Map(kinds.map((k) => [k.donation_id, labelOf(k)]));
   return donations
     .filter((d) => d.status === "paid" && d.paid_at)
     .map((d) => {
       const c = one(d.charities);
-      const k = kindOf.get(d.id);
       return {
         id: d.id,
         date: jhbDay(new Date(d.paid_at!)),
@@ -59,7 +58,7 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
         cents: Number(d.amount_cents),
         monthly: d.recurring_id !== null,
         with18a: d.wants_18a,
-        kind: isKind(k) ? k : "tzedaka",
+        label: labelFor.get(d.id) ?? null,
         ...(c?.thank_you_en ? { thankYou: c.thank_you_en } : {}),
       };
     })
@@ -79,7 +78,8 @@ export function toRecurring(rows: RecurringRow[]): Recurring[] {
         id: r.id,
         charitySlug: c?.slug ?? "",
         charityName: c?.name_en ?? "Charity",
-        cents: Number(r.amount_cents) + Number(r.contribution_cents ?? 0),
+        cents: Number(r.amount_cents),
+        contributionCents: Number(r.contribution_cents ?? 0),
         nextDate: r.next_charge_at ? jhbDay(new Date(r.next_charge_at)) : null,
         status: r.status as "active" | "paused" | "cancelled" | "failed",
         syncing: r.needs_gateway_sync === true,
@@ -136,7 +136,7 @@ export function seenFrom(gifts: Gift[]): Seen {
  * away and still shows history without signal. Dates go in as ISO strings and
  * every field is checked on the way back in; anything odd means no cache.
  */
-export type Cached = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: { id: string; date: Date; recipient: string; cents: number; kind: GivingKind }[]; loadedAt: Date };
+export type Cached = { gifts: Gift[]; recurring: Recurring[]; receipts: Receipt[]; elsewhere: { id: string; date: Date; recipient: string; cents: number; label: string | null }[]; loadedAt: Date };
 
 export function toCache(live: Cached): string {
   // Kept small: the newest 500 donations, without the charities' thank-you notes.
@@ -166,10 +166,9 @@ export function fromCache(raw: string | null): Cached | null {
       if (typeof v !== "string") throw new Error("bad text");
       return v;
     };
-    const kind = (v: unknown): GivingKind => {
-      if (v !== "maaser" && v !== "chomesh" && v !== "tzedaka") throw new Error("bad kind");
-      return v;
-    };
+    // A label, or (saved by an earlier version) the old fixed choice.
+    const label = (row: Record<string, unknown>): string | null =>
+      row.label !== undefined ? cleanLabel(row.label) : labelOf({ kind: typeof row.kind === "string" ? row.kind : null });
     const list = (v: unknown): Record<string, unknown>[] => {
       if (!Array.isArray(v)) throw new Error("bad list");
       return v as Record<string, unknown>[];
@@ -184,7 +183,7 @@ export function fromCache(raw: string | null): Cached | null {
         cents: cents(g.cents),
         monthly: g.monthly === true,
         with18a: g.with18a === true,
-        kind: kind(g.kind),
+        label: label(g),
         ...(typeof g.thankYou === "string" ? { thankYou: g.thankYou } : {}),
       })),
       recurring: list(o.recurring).map((r) => {
@@ -208,7 +207,7 @@ export function fromCache(raw: string | null): Cached | null {
         cents: cents(r.cents),
         issued: date(r.issued),
       })),
-      elsewhere: list(o.elsewhere).map((e) => ({ id: str(e.id), date: date(e.date), recipient: str(e.recipient), cents: cents(e.cents), kind: kind(e.kind) })),
+      elsewhere: list(o.elsewhere).map((e) => ({ id: str(e.id), date: date(e.date), recipient: str(e.recipient), cents: cents(e.cents), label: label(e) })),
       loadedAt: date(o.loadedAt),
     };
   } catch {

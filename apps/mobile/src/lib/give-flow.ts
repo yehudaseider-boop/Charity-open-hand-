@@ -17,6 +17,13 @@ export const APP_RETURN_LINK = "nedivlev://giving";
 export const inAppGivingEnabled = (value: string | undefined): boolean => value === "yes";
 export const IN_APP_GIVING = inAppGivingEnabled(process.env.EXPO_PUBLIC_IN_APP_GIVING);
 
+/**
+ * Saving a card for once-off gifts is a second switch, off unless EXPO_PUBLIC_SAVED_CARDS is "yes" (and the
+ * server's SAVED_CARDS too). Keep it off in builds sent to the app stores until the consent wording and the
+ * stores' answers are in (see docs/go-live-checklist.md).
+ */
+export const SAVED_CARDS = inAppGivingEnabled(process.env.EXPO_PUBLIC_SAVED_CARDS);
+
 export type BrowserOutcome = { type: string };
 export type OpenInAppBrowser = (url: string, returnTo: string) => Promise<BrowserOutcome>;
 

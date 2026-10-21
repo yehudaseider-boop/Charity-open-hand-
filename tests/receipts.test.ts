@@ -3,7 +3,7 @@
  * them. No database or Chrome needed (the store and renderer are stand-ins).
  */
 import { describe, expect, it, vi } from "vitest";
-import { buildReceiptDetails, type CharityRow, type DonorRow } from "@/lib/receipts/details";
+import { buildReceiptDetails, missingForSars, type CharityRow, type DonorRow } from "@/lib/receipts/details";
 import { buildReceiptEmail } from "@/lib/receipts/email";
 import { getEmailTransport, maskEmail, type EmailMessage } from "@/lib/email";
 import { buildReceiptHtml, esc } from "@/lib/receipts/html";
@@ -104,6 +104,17 @@ describe("receipt contents", () => {
     expect(details.donations).toEqual([{ date: "15/09/2026", amount_cents: 18_000 }, { date: "01/10/2026", amount_cents: 50_000 }]);
     expect(details.period).toBe("01/03/2026 to 28/02/2027");
     expect(details.issued_on).toBe("02/03/2027");
+  });
+
+  it("names the charity in both places in the statement, including that gifts are used for its objects", () => {
+    expect(details.wording.statement).not.toContain("{charity}");
+    expect(details.wording.statement).toMatch(/used exclusively for the objects/);
+  });
+
+  it("says what SARS needs that a receipt lacks: names and addresses", () => {
+    expect(missingForSars(details)).toEqual([]);
+    expect(missingForSars({ ...details, donor: { ...details.donor, address: [] } })).toEqual(["the donor's address"]);
+    expect(missingForSars({ ...details, charity: { ...details.charity, address: [] } })).toEqual(["the charity's address"]);
   });
 
   it("keeps only the last 4 digits of the donor's ID number", () => {
@@ -239,7 +250,7 @@ describe("emailing receipts", () => {
   const render = async () => Buffer.from("%PDF-test");
   const sentTo = () => {
     const sent: EmailMessage[] = [];
-    const transport = { name: "test", send: async (m: EmailMessage) => void sent.push(m) };
+    const transport = { name: "test", send: async (m: EmailMessage) => { sent.push(m); return "sent" as const; } };
     return { sent, mailer: { transport, siteUrl: "https://example.co.za", platformName: "Givezy" } };
   };
 
@@ -276,7 +287,7 @@ describe("emailing receipts", () => {
     expect(first).toMatchObject({ issued: 2, emailed: 2, emailFailed: 0 });
     expect(sent).toHaveLength(2);
     expect(sent[0].attachments?.[0]).toMatchObject({ filename: "LTC-2027-0001.pdf", contentType: "application/pdf" });
-    expect(sent[0].subject).toBe("Your section 18A receipt LTC-2027-0001 from Linksfield Torah Learning Centre NPC");
+    expect(sent[0].subject).toBe("Your s18A receipt LTC-2027-0001 from Linksfield Torah Learning Centre NPC");
     expect(emailed.size).toBe(2);
     // Running it again sends nothing more.
     const again = await runReceiptsJob({ store, render, ...base, mailer });
@@ -294,7 +305,7 @@ describe("emailing receipts", () => {
     const { store, emailed } = setup([don({ id: "a" }), don({ id: "b", donorId: "u2" })]);
     const sent: string[] = [];
     let fail = true;
-    const transport = { name: "test", send: async (m: EmailMessage) => { if (fail && m.to.includes("r1")) throw new Error("provider down"); sent.push(m.to); } };
+    const transport = { name: "test", send: async (m: EmailMessage) => { if (fail && m.to.includes("r1")) throw new Error("provider down"); sent.push(m.to); return "sent" as const; } };
     const mailer = { transport, siteUrl: "https://example.co.za", platformName: "Givezy" };
     const first = await runReceiptsJob({ store, render, ...base, mailer });
     expect(first).toMatchObject({ emailed: 1, emailFailed: 1 });

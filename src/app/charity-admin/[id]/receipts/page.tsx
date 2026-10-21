@@ -3,13 +3,16 @@ import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
+import { SupportContact } from "@/components/legal";
 import { thisTaxYear } from "@/lib/charity/dashboard";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { loadReceiptGifts } from "@/lib/charity/dashboard-queries";
+import { receiptProgress } from "@/lib/charity/insights";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Receipts" };
+export const metadata: Metadata = { title: "s18A receipts" };
 
 export default async function CharityReceiptsPage({ params }: PageProps<"/charity-admin/[id]/receipts">) {
   const { id } = await params;
@@ -32,13 +35,15 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
     if (!data || data.length < 1000) break;
   }
   const taxYear = thisTaxYear(new Date());
+  const { gifts, onIssued } = await loadReceiptGifts(id);
+  const progress = receiptProgress(gifts, onIssued, taxYear.taxYear);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">s18A receipts</h1>
+      <h1 className="font-display text-2xl text-indigo">s18A receipts</h1>
       {canIssue18a(charity) ? (
         <Notice>
-          One receipt is issued for each donor, once a year, after the tax year ends. The current tax year ({taxYearLabel(taxYear.taxYear)}) ends on {formatDate(taxYear.end)}.
+          One receipt is issued for each donor, once a year, after the tax year ends. The current tax year runs from {formatDate(taxYear.from)} to {formatDate(taxYear.end)} (SARS calls it tax year {taxYear.taxYear}).
           Each receipt lists that donor&apos;s paid donations to you and shows the donations only, not any contribution to Givezy.
         </Notice>
       ) : (
@@ -46,6 +51,37 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
           Your charity can&apos;t issue s18A receipts yet: it needs confirmed s18A approval and a signed receipting mandate.
         </Notice>
       )}
+
+      {progress.length > 0 ? (
+        <Card>
+          <h2 className="font-display text-lg text-indigo">Who has a receipt</h2>
+          <ul className="mt-2 divide-y divide-border text-sm">
+            {progress.map((y) => (
+              <li key={y.taxYear} className="flex items-start justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="font-medium">{y.current ? `Tax year ${y.taxYear} so far` : taxYearLabel(y.taxYear)}</p>
+                  <p className="text-muted">
+                    {y.donors} {y.donors === 1 ? "donor" : "donors"} asked for an s18A receipt
+                    {y.current
+                      ? `. Receipts are issued after ${formatDate(taxYear.end)}.`
+                      : y.receipted === y.donors
+                        ? ", and every one has it."
+                        : `: ${y.receipted} receipted, ${y.donors - y.receipted} still to come.`}
+                  </p>
+                </div>
+                {y.waitingCents > 0 ? (
+                  <div className="shrink-0 text-right">
+                    <p className="font-semibold">{formatRand(y.waitingCents)}</p>
+                    <p className="text-xs text-muted">{y.current ? "to be receipted" : "not receipted yet"}</p>
+                  </div>
+                ) : (
+                  <Badge tone="success">All receipted</Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {receipts && receipts.length > 0 ? (
         <ul className="space-y-2">
@@ -74,7 +110,7 @@ export default async function CharityReceiptsPage({ params }: PageProps<"/charit
       )}
       <p className="text-xs text-muted">
         The receipt itself goes to the donor (it shows their ID or tax number, which charities don&apos;t see). If a receipt needs correcting,
-        contact the platform team: only they can withdraw and re-issue one.
+        tell us (<SupportContact />): only we can withdraw and re-issue one.
       </p>
     </div>
   );

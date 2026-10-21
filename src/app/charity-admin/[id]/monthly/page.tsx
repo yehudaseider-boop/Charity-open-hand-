@@ -1,12 +1,14 @@
+import { HebrewAware } from "@/components/hebrew-aware";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
-import { chargeDayLabel, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, type MonthlyState } from "@/lib/charity/dashboard";
+import { chargeDayLabel, ERASED_DONOR, isErasedEmail, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, shownEmail, type MonthlyState } from "@/lib/charity/dashboard";
 import { loadMonthlyDonations } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
-import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
+import { dedicationFrom, dedicationLine, isHebrew } from "@/lib/donations/dedication";
 import { formatRand } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Monthly donations" };
@@ -52,7 +54,7 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Monthly donations</h1>
+      <h1 className="font-display text-2xl text-indigo">Monthly donations</h1>
       <p className="text-sm text-muted">
         Donors who give the same amount every month. Givezy collects it on the day they chose. Donors pause, restart or cancel it themselves; you can&apos;t change it from here.
       </p>
@@ -93,14 +95,14 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
           aria-label="Search by donor name or email"
           className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
         />
-        <button className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
+        <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
       </form>
 
       {shown.length === 0 ? (
         <p className="text-sm text-muted">
           {all.length === 0
             ? "No monthly donations yet. One appears here once its first payment has gone through."
-            : "No monthly donations match."}
+            : <NoMatch what="monthly donations" clearHref={base} />}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -113,8 +115,12 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
               <li key={r.recurring_id} className="rounded-card border border-border bg-surface p-4 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium" dir="auto">{r.display_name ?? "Donor's details erased"}</p>
-                    {r.email ? <p className="break-all text-muted">{r.email}</p> : null}
+                    {!isErasedEmail(r.email) && r.display_name && isHebrew(r.display_name) ? (
+                      <p className="truncate font-hebrew font-medium" lang="he" dir="rtl">{r.display_name}</p>
+                    ) : (
+                      <p className="truncate font-medium" dir="auto">{isErasedEmail(r.email) || !r.display_name ? ERASED_DONOR : r.display_name}</p>
+                    )}
+                    {shownEmail(r.email) ? <p className="break-all text-muted">{r.email}</p> : null}
                     {r.phone ? <p className="text-muted">{r.phone}</p> : null}
                   </div>
                   <p className="shrink-0 text-right font-semibold">
@@ -127,7 +133,7 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
                   {r.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                   {r.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
                 </div>
-                {dedication ? <p className="mt-2" dir="auto">{dedicationLine(dedication)}</p> : null}
+                {dedication ? <p className="mt-2" dir="auto"><HebrewAware text={dedicationLine(dedication)} /></p> : null}
                 <ul className="mt-2 space-y-0.5 text-muted">
                   <li>Since {formatDate(r.started_at)}: {plural(r.paid_count, "payment")}, {formatRand(r.paid_cents)} in total</li>
                   {state === "running" || state === "retrying" ? (

@@ -16,7 +16,8 @@ const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 export const supabase: SupabaseClient | null =
   url && key && url.startsWith("https://")
     ? createClient(url, key, {
-        auth: { storage: secureStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
+        // pkce: Google and Apple sign-in come back with a one-time code, swapped for a session here.
+        auth: { storage: secureStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false, flowType: "pkce" },
       })
     : null;
 

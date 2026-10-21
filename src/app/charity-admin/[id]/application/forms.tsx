@@ -75,7 +75,7 @@ export function BankForm({ action, priv }: {
 
 export function UploadForm({ action, showMandateDate }: { action: Action; showMandateDate: boolean }) {
   return (
-    <ActionForm action={action} submitLabel="Upload" resetOnSuccess>
+    <ActionForm action={action} submitLabel="Upload" pendingLabel="Uploading…" resetOnSuccess>
       <SelectField name="document_type" label="Document" required
         options={Object.entries(documentTypes).map(([value, label]) => ({ value, label }))} />
       <FileField name="file" label="File" required accept="application/pdf,image/jpeg,image/png" hint="PDF, JPG or PNG, up to 5 MB." />
@@ -97,8 +97,8 @@ export const charityDeclarations = [
 
 export function SubmitForm({ action }: { action: (state: FormState, formData: FormData) => Promise<FormState> }) {
   return (
-    <ActionForm action={action} submitLabel="Submit for review"
-      confirm="Submit now? You won't be able to change your details or bank account while we review them.">
+    <ActionForm action={action} submitLabel="Submit for review" pendingLabel="Submitting…" confirmLabel="Yes, submit"
+      confirm="Submit now? Once submitted it can't be taken back, and you won't be able to change your details or bank account while we review them.">
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Declarations</legend>
         {charityDeclarations.map(([name, text]) => (

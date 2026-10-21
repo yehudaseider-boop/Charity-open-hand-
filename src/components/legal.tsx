@@ -16,8 +16,8 @@ export function TermsAndPrivacyLinks() {
   return (
     <>
       the{" "}
-      <Link href="/terms" target="_blank" className="text-brand underline">Terms</Link> and the{" "}
-      <Link href="/privacy" target="_blank" className="text-brand underline">Privacy Policy</Link>
+      <Link href="/terms" target="_blank" className="text-brand underline">Terms<span className="sr-only"> (opens in a new tab)</span></Link> and the{" "}
+      <Link href="/privacy" target="_blank" className="text-brand underline">Privacy Policy<span className="sr-only"> (opens in a new tab)</span></Link>
     </>
   );
 }
@@ -26,6 +26,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border bg-surface print:hidden">
       <div className="mx-auto flex max-w-3xl flex-wrap gap-x-4 gap-y-1 px-4 py-4 text-xs text-muted">
+        <Link href="/for-charities" className="hover:text-brand">For charities</Link>
         <Link href="/privacy" className="hover:text-brand">Privacy Policy</Link>
         <Link href="/terms" className="hover:text-brand">Terms</Link>
         <Link href="/account/data" className="hover:text-brand">Your information</Link>
@@ -41,5 +42,15 @@ export function Section({ title, children }: { title: string; children: React.Re
       <h2 className="text-lg font-semibold">{title}</h2>
       <div className="space-y-2 text-sm leading-relaxed">{children}</div>
     </section>
+  );
+}
+
+/** How a charity reaches us: the support address once there is one, until then a reply to our emails. */
+export function SupportContact() {
+  const email = legalConfig.supportEmail;
+  return email ? (
+    <a href={`mailto:${email}`} className="text-brand underline">{email}</a>
+  ) : (
+    <>reply to any email we&apos;ve sent you</>
   );
 }

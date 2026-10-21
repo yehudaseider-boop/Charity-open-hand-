@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { logAudit } from "@/lib/audit";
+import { signedInWithPassword } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -11,6 +12,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/documents/[
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || !/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not found", { status: 404 });
+  // Sessions started with a password are refused everywhere (see getViewer).
+  if (await signedInWithPassword(supabase)) return new NextResponse("Not found", { status: 404 });
 
   const { data: doc } = await supabase
     .from("charity_documents")

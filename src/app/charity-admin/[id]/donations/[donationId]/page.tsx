@@ -1,10 +1,11 @@
+import { HebrewAware } from "@/components/hebrew-aware";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/badge";
 import { Card } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
-import { addressLine, donationStatus, donorName } from "@/lib/charity/dashboard";
+import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charity/dashboard";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDateTime } from "@/lib/dates";
@@ -48,7 +49,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
         <div className="mt-1"><Badge tone={s.tone}>{s.label}</Badge></div>
       </div>
 
-      <Card title="Donation">
+      <Card title="Donation" headingLevel={1}>
         <dl>
           <Row label="Started">{formatDateTime(d.created_at)}</Row>
           {d.paid_at ? <Row label="Paid">{formatDateTime(d.paid_at)}</Row> : null}
@@ -66,7 +67,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {d.is_anonymous ? <Row label="Anonymous">Not shown on public pages. You see the details because you need them to record the donation.</Row> : null}
           {d.contact_person ? <Row label="Contact person">{d.contact_person}</Row> : null}
           {d.registration_number ? <Row label="Registration number">{d.registration_number}</Row> : null}
-          {d.email ? <Row label="Email"><a href={`mailto:${d.email}`} className="text-brand underline">{d.email}</a></Row> : null}
+          {shownEmail(d.email) ? <Row label="Email"><a href={`mailto:${d.email}`} className="text-brand underline">{d.email}</a></Row> : null}
           {d.phone ? <Row label="Phone">{d.phone}</Row> : null}
           {addressLine(d) ? <Row label="Address">{addressLine(d)}</Row> : null}
         </dl>
@@ -74,7 +75,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
 
       {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
         <Card title="Dedication">
-          <p className="text-sm" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</p>
+          <p className="text-sm" dir="auto"><HebrewAware text={dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)} /></p>
         </Card>
       ) : null}
 

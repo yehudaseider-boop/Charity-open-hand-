@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useFieldError } from "./action-form";
 
 /** A page-unique id, so two forms with the same field name never share a label. */
@@ -40,6 +40,7 @@ export function TextField({
   autoDirection,
   inputMode,
   autoComplete,
+  maxLength,
   ...base
 }: Base & {
   defaultValue?: string | null;
@@ -50,6 +51,8 @@ export function TextField({
   autoDirection?: boolean;
   inputMode?: "numeric" | "tel" | "email" | "url";
   autoComplete?: string;
+  /** Stops typing past what the server accepts. */
+  maxLength?: number;
 }) {
   const error = useFieldError(base.name);
   const id = useFieldId(base.name);
@@ -65,6 +68,7 @@ export function TextField({
         aria-describedby={error ? `${id}-error` : base.hint ? `${id}-hint` : undefined}
         inputMode={inputMode}
         autoComplete={autoComplete}
+        maxLength={maxLength}
         {...(hebrew ? { lang: "he", dir: "rtl" } : autoDirection ? { dir: "auto" } : {})}
         className={inputClass}
       />
@@ -76,8 +80,9 @@ export function TextArea({
   defaultValue,
   hebrew,
   rows = 5,
+  maxLength,
   ...base
-}: Base & { defaultValue?: string | null; hebrew?: boolean; rows?: number }) {
+}: Base & { defaultValue?: string | null; hebrew?: boolean; rows?: number; maxLength?: number }) {
   const error = useFieldError(base.name);
   const id = useFieldId(base.name);
   return (
@@ -86,6 +91,7 @@ export function TextArea({
         id={id}
         name={base.name}
         rows={rows}
+        maxLength={maxLength}
         defaultValue={defaultValue ?? ""}
         required={base.required}
         aria-invalid={error ? true : undefined}
@@ -128,9 +134,15 @@ export function SelectField({
   );
 }
 
+/** Files over this are refused on the phone or laptop, before uploading (the server says the same). */
+export const MAX_FILE_MB = 5;
+
 export function FileField({ accept, ...base }: Base & { accept: string }) {
-  const error = useFieldError(base.name);
+  const serverError = useFieldError(base.name);
   const id = useFieldId(base.name);
+  // Checked as soon as a file is chosen: a too-big file never leaves the device, and nothing typed is lost.
+  const [tooBig, setTooBig] = useState<string | null>(null);
+  const error = tooBig ?? serverError;
   return (
     <Wrapper {...base} id={id}>
       <input
@@ -139,10 +151,18 @@ export function FileField({ accept, ...base }: Base & { accept: string }) {
         type="file"
         accept={accept}
         required={base.required}
+        onChange={(e) => {
+          const f = e.currentTarget.files?.[0];
+          if (f && f.size > MAX_FILE_MB * 1024 * 1024) {
+            setTooBig(`This file is ${(f.size / 1024 / 1024).toFixed(1)} MB. Files must be ${MAX_FILE_MB} MB or smaller. Choose a smaller one.`);
+            e.currentTarget.value = "";
+          } else setTooBig(null);
+        }}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : base.hint ? `${id}-hint` : undefined}
         className="block w-full text-sm file:mr-3 file:rounded-control file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:text-indigo"
       />
+      {tooBig ? <p id={`${id}-error`} role="alert" className="text-sm text-danger">{tooBig}</p> : null}
     </Wrapper>
   );
 }

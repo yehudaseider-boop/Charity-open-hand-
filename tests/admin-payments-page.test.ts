@@ -15,7 +15,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "in", "is", "gte", "order", "limit"]) q[m] = () => q;
+      for (const m of ["select", "eq", "in", "is", "gte", "order", "limit", "range"]) q[m] = () => q;
       q.then = (resolve: (v: { data: unknown[]; error: null }) => void) => resolve({ data: tables[table] ?? [], error: null });
       return q;
     },

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
+import { ERASED_DONOR, isErasedEmail, shownEmail } from "@/lib/charity/dashboard";
 import { loadDonors } from "@/lib/charity/dashboard-queries";
-import { centsToPlain, toCsv } from "@/lib/csv";
+import { centsToPlain, toCsv, csvPhone } from "@/lib/csv";
 import { formatDate } from "@/lib/dates";
 
 const HEADER = ["Donor", "Donor type", "Email", "Phone", "Donations", "Total (R)", "First donation", "Last donation", "s18A receipt requested", "Anonymous publicly"];
@@ -22,10 +23,10 @@ export async function GET(_request: Request, ctx: RouteContext<"/charity-admin/[
   const csv = toCsv(
     HEADER,
     donors.map((d) => [
-      d.display_name,
+      isErasedEmail(d.email) ? ERASED_DONOR : d.display_name,
       d.donor_type,
-      d.email,
-      d.phone,
+      shownEmail(d.email),
+      csvPhone(d.phone),
       d.donation_count,
       centsToPlain(d.total_cents),
       formatDate(d.first_paid_at),

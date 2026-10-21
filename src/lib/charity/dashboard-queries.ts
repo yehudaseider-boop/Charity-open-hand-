@@ -40,10 +40,12 @@ export async function loadMonthlyTotals(charityId: string, months = 12) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("charity_monthly_totals", { p_charity_id: charityId, p_months: months });
   if (error) throw new Error(error.message);
-  return ((data ?? []) as { month: string; donation_count: number; amount_cents: number }[]).map((r) => ({
+  return ((data ?? []) as { month: string; donation_count: number; amount_cents: number; monthly_cents: number }[]).map((r) => ({
     month: r.month,
     donationCount: n(r.donation_count),
     amountCents: n(r.amount_cents),
+    /** The part that came from monthly donations; the rest was once-off. */
+    monthlyCents: n(r.monthly_cents),
   }));
 }
 
@@ -87,19 +89,57 @@ export async function loadMonthlyDonations(charityId: string): Promise<MonthlyRo
   return rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents), paid_count: n(r.paid_count), paid_cents: n(r.paid_cents) }));
 }
 
-/** The most recent paid donation, for the welcome card on the overview. */
-export async function loadLatestDonation(charityId: string): Promise<{ amountCents: number; paidAt: string } | null> {
+/** Rows of `charity_donations` (paid, refunded or charged back), read page by page. */
+async function allCharityDonations<T>(charityId: string, fields: string, narrow: (q: any) => any = (q) => q): Promise<T[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("charity_donations")
-    .select("amount_cents, paid_at")
-    .eq("charity_id", charityId)
-    .eq("status", "paid")
-    .order("paid_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const rows: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await narrow(supabase.from("charity_donations").select(fields).eq("charity_id", charityId)).order("id").range(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as T[]));
+    if (!data || data.length < 1000) break;
+  }
+  return rows;
+}
+
+/** Each donor's monthly payments, to mark who gives monthly on the donor list. */
+export function loadMonthlyGifts(charityId: string) {
+  return allCharityDonations<{ donor_id: string; recurring_id: string | null }>(charityId, "donor_id, recurring_id", (q) => q.not("recurring_id", "is", null));
+}
+
+/** Paid gifts that asked for an s18A receipt, and which of them are on an issued receipt. */
+export async function loadReceiptGifts(charityId: string) {
+  const gifts = await allCharityDonations<{ id: string; donor_id: string; tax_year: number | null; amount_cents: number; wants_18a: boolean; status: string }>(
+    charityId,
+    "id, donor_id, tax_year, amount_cents, wants_18a, status",
+    (q) => q.eq("status", "paid").eq("wants_18a", true),
+  );
+  const supabase = await createClient();
+  const onIssued = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("charity_receipt_donations").select("donation_id").eq("charity_id", charityId).eq("status", "issued").order("donation_id").range(from, from + 999);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) onIssued.add(r.donation_id as string);
+    if (!data || data.length < 1000) break;
+  }
+  return { gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })), onIssued };
+}
+
+/** Everything the annual report needs: every paid, refunded or charged-back donation, the campaign names and issued receipts. */
+export async function loadReportData(charityId: string) {
+  const gifts = await allCharityDonations<{ id: string; donor_id: string; status: string; amount_cents: number; paid_at: string | null; tax_year: number | null; recurring_id: string | null; campaign_id: string | null; wants_18a: boolean }>(
+    charityId,
+    "id, donor_id, status, amount_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a",
+  );
+  const supabase = await createClient();
+  const { data: camps, error } = await supabase.from("campaigns").select("id, title").eq("charity_id", charityId);
   if (error) throw new Error(error.message);
-  return data?.paid_at ? { amountCents: n(data.amount_cents), paidAt: data.paid_at as string } : null;
+  const { onIssued } = await loadReceiptGifts(charityId);
+  return {
+    gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })),
+    campaignTitles: new Map((camps ?? []).map((c) => [c.id as string, c.title as string])),
+    onIssued,
+  };
 }
 
 export const DONATION_FIELDS =
@@ -135,3 +175,21 @@ export type DonationRow = {
   city: string | null;
   postal_code: string | null;
 };
+
+export type Insights = { newDonors: number; returningDonors: number; repeatDonors: number; allDonors: number; monthlyActive: number; monthlyActiveCents: number };
+
+/** New and returning donors in the period, repeat donors and active monthly donors (all time). */
+export async function loadInsights(charityId: string, period: Period): Promise<Insights> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("charity_insights", { p_charity_id: charityId, p_from: period.from, p_to: period.to });
+  if (error) throw new Error(error.message);
+  const r = (Array.isArray(data) ? data[0] : data) ?? {};
+  return {
+    newDonors: n(r.new_donors),
+    returningDonors: n(r.returning_donors),
+    repeatDonors: n(r.repeat_donors),
+    allDonors: n(r.all_donors),
+    monthlyActive: n(r.monthly_active),
+    monthlyActiveCents: n(r.monthly_active_cents),
+  };
+}

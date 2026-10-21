@@ -174,6 +174,19 @@
 
 ## Phone app (apps/mobile)
 
+### Givezy v2 design (16/10/2026, Yehuda)
+
+- New colours and fonts across the app, website, emails and receipt PDFs: blue #1749B5 (headlines, buttons, tabs, colour-block sections, white text on it), deep navy #092577 (headlines on light grounds, body on lilac, the pressed edge of buttons), orange #FF914D (one call to action per screen, splashes, goal rings, streaks; navy text on it, never white), lavender #C9B4FA, light purple #E5D9FF, pale lilac #F2ECFF and peach #FFEBDD (splashes only), slate #34466A for secondary text, white pages. Fredoka 600 headlines, DM Sans body (Inter and Fraunces removed from the app), Heebo for Hebrew. The receipt PDF still uses Inter until it is redone.
+- Tabs are now Home, Discover, Give, Progress (the old Giving tab) and Account. Receipts moved inside Account.
+- Welcome and onboarding: blue welcome, then causes, a named goal (Giving goal by default; Maaser, Tithe or the donor's own name are options) and how giving is kept safe. The headline is "Give in a few taps" (changed 16/10/2026: a returning donor needs about four taps, so "two taps" overpromised). The card wording says the payment partner keeps the card for monthly gifts only, because that is the only case where it does.
+- Google and Apple sign-in are built but hidden (`EXPO_PUBLIC_SOCIAL_SIGN_IN=yes` shows them) until they are set up in Supabase and Apple's and Google's consoles. Email code sign-in works meanwhile.
+- Charities can write a one-line impact line ("Your impact line", `charities.impact_en`, migration `20261016000009_charity_impact_line.sql`). The app shows it on the charity page, the give screen and after a gift. Sample data uses bracketed placeholders; live, the line is left out until the charity writes one. We never write impact figures for a charity.
+- Give screen: "Count this gift towards my goal?" shows only when the main goal counts certain labels; Yes puts that goal's label on the gift. A goal that counts all giving just says every gift counts. Starting amounts when the donor hasn't given to that charity before are R100, R250 and R500 (suggestions only; any amount works).
+- "Cover the card fee" is not shown until the payment provider's rates are in `src/config/platform.ts`.
+- The trust line "Every charity checked by us" stays only while that check really happens before listing.
+- Saved card for once-off gifts (16/10/2026, built, off): a donor can keep one card (the payment partner's reusable token, encrypted; we also keep its brand, last four digits and expiry) and then pay any charity from the give screen without typing the card. Only for a signed-in donor giving with their account's own email; never with a monthly gift (those are set up on the payment page). "Save my card for next time" is a tick on a once-off gift; the card is kept once that payment is confirmed. The donor removes it in Account at once, and erasing their information or deleting their account removes it too. Two switches, both off: `SAVED_CARDS=yes` (server) and `EXPO_PUBLIC_SAVED_CARDS=yes` (app). A saved-card charge is only a first indication; it counts as paid when the provider confirms it. If the provider refuses it, the gift ends as failed and the donor is offered the payment page. After a timeout or outage the gift stays pending (the charge may have gone through), so a second charge never follows. Go-live items are on the checklist.
+- Charity dashboard in the v2 look (16/10/2026): blue colour-block header with the charity name and the tabs, wider layout on desktop, stat tiles, orange campaign bars and a monthly bar chart. No change to what charities can see or do.
+
 - Expo app for donors (iOS, Android, plus a web preview for review). Charity
   and admin screens stay on the website.
 - Design bible: parchment, ink, one pomegranate accent, Frank Ruhl Libre and
@@ -600,8 +613,399 @@ Four independent read-only reviews (money, security and privacy, receipts and ta
 - Database tests now run in the sandbox against a local Postgres with a stand-in for Supabase's auth and storage schemas: all 132 pass, including migrations `20261015000002` to `20261016000001`. Five older tests were updated to the stricter rules from the code review (a charity can't change its own status from the browser; resuming needs a card).
 - Not checked in a browser: the page needs a live Supabase.
 
-## Charity dashboard polish (21/10/2026)
+## Fewer taps to give (15/10/2026)
 
-- Tabs wrap onto a second line on wider screens instead of being cut off (they still scroll sideways on a phone).
-- Overview opens on a lilac welcome card: the charity's name, "Verified" and "s18A receipts" badges where they apply, and the latest paid donation. The four summary tiles sit in one row from tablet width up.
-- The site stays a centred column (about 768px wide) on desktop on purpose, to match the rest of Givezy. A wider layout for charity pages is an option if wanted.
+Inspired by Givelify's "three taps". Yehuda: as few taps as possible, so the gift goes through.
+
+- **One screen, no review step.** The button shows the exact total ("Give R500", "Give R500 every month") and goes straight to the payment page. The server still re-checks the total and the minimums and refuses if anything changed.
+- **One-tap amounts from the donor's own history only:** the last amount given to this charity, then other recent amounts, at most three. We never suggest a figure of our own. New donors type the amount.
+- **What it counts as** starts from the donor's last gift to that charity.
+- **Remember my details on this phone** (off unless the donor turns it on): name, email and phone in the phone's secure storage, per signed-in person. Never ID or tax numbers. Next time the screen shows "Giving as ..." with Change.
+- **One tick instead of two:** "I am 18 or older, I agree to the Terms and Privacy Policy, and that Givezy records this donation." It sets both confirmations the server requires. **For Yosef to approve** (the website still shows two ticks).
+- The Give button and the tick are pinned to the bottom of the screen.
+- In the design preview (no live data) the give screen is always used, so the flow can be tried; it stops before payment with a note. Live builds still follow the in-app giving switches.
+
+## Campaigns with a goal (16/10/2026)
+
+From Givelify's "virtual envelopes". Built on the `campaigns` table that was in the schema from the start (no screens until now).
+
+- **Charity side (website):** a Campaigns tab. Start one with a name, what it's for, a goal in Rand (required) and an optional last day; end it with one button. Up to 3 running at once (the database enforces it). Started and ended campaigns are in the audit log.
+- **Donor side (app):** the charity page shows each running campaign under the story: raised so far, the goal, a bar, number of gifts and the last day, with "Give to this campaign". The give screen shows the campaign at the top.
+- **Money:** a campaign gift is an ordinary donation to the charity, labelled with the campaign. The total counts paid gifts only (never the contribution to Givezy); refunded and charged-back gifts drop out. The database refuses a gift for another charity's campaign. The server refuses an ended campaign (status or past its last day) before recording anything.
+- **Once-off only:** campaign gifts can't be monthly (a monthly gift would outlive the campaign). Give monthly to the charity itself.
+- Drafts stay private; the public sees active and ended campaigns of approved charities only.
+- Website (16/10/2026): running campaigns show on the charity's public page with their goal bar, and "Give to this campaign" opens the website's giving page for that campaign (once-off; the monthly option is hidden). An ended or unknown campaign falls back to a normal gift with a note. This matters because in-app giving stays off in store builds, so the website is where campaign gifts happen at launch.
+- Not yet: campaigns on the app's Discover screen.
+
+## Insights for charities (16/10/2026)
+
+From Givelify's analytics, kept to plain counts a small charity can act on. On the charity's dashboard:
+
+- **Your donors:** new donors this month and donors who gave before and came back this month; the share of all their donors who have given more than once; the average gift this tax year (whole cents, rounded half up, no floats).
+- **Campaigns:** each running campaign with raised, goal and bar, and a link to start or manage them.
+- Paid donations only; the contribution to Givezy is never included. Only the charity's own admins (and platform admins) can read these figures (database function `charity_insights`). Monthly donors are on the existing Monthly donations card, so they aren't repeated.
+
+## Charity sign-up (16/10/2026)
+
+Yehuda chose this over the Paystack test run as the next step: without charities there is nothing to give to. Built:
+
+- **Emails at each step** (draft wording, `src/lib/charity/emails.ts`): "we have your application" to the charity on submit, "new application" to `ADMIN_NOTIFY_EMAIL`, "approved" with four next steps (and an honest line about s18A when the charity can't issue receipts yet), and "needs a change" with the admin's reason and a link back. A failed email never blocks or undoes the action.
+- **Guided application:** one step at a time (organisation, address, contact, bank, documents, submit) with a progress bar, steps as links with ticks, Back and Next ("Skip for now" on an unfinished step), and a list of what's missing on the submit step. Same forms and rules as before.
+- **Getting started** on the charity dashboard after approval, until all done: connected for online donations (we do this), cover photo, story, first update, first campaign, plus their public link with a Copy button.
+- **For charities page** (`/for-charities`, draft copy): free to list, straight to your bank (the provider's card fee comes off each donation, no figure until the rates are confirmed), s18A receipts done for you, monthly donors, campaigns, dashboard; how to join; what you'll need. Linked from the home page, the header (larger screens) and the footer.
+- **Invitations:** a platform admin enters a charity's name and contact email under Admin, Charities; the charity gets a link that works once for 30 days and starts the application with the name filled in. Only a hash of the link is stored; the table is readable by platform admins only and written by the server only. The list shows Sent, Started (linked) or Expired.
+
+## QR poster for charities (16/10/2026)
+
+Each approved charity has a printable A4 poster under its dashboard (QR poster): its name, a large QR code to its Givezy page, "Point your phone camera here to give", the short web address, the s18A line when it applies, and the Givezy logo. Print, or "Save as PDF" in the print window for a print shop; the QR code alone downloads as an SVG. The code is navy on white with medium error correction. Library: `qrcode` 1.5.4 (MIT). In the same change, `sharp` (which cleans uploaded photos) went from 0.35.4 to 0.35.5 for a security advisory in its SVG library.
+
+## Donation emails to charities (16/10/2026)
+
+Until now only the donor got an email when a gift was paid. Now the charity's contact email also gets one: "Meals Fund received R180 on Givezy", saying whether it was monthly and which campaign it was for, with links to the Donations page and to switch these emails off. It shows the gift only: never the donor's name, email or the contribution to Givezy, so a forwarded email or a shared inbox leaks nothing about who gave. The charity sees donor details on its dashboard as before. On by default; the switch is on the charity's Profile page ("Emails"), saved in `charity_private.notify_donations`. It is sent only after the payment provider confirms the gift, after the donor's email, and a failed email never affects the donation.
+
+## Platform admin controls after approval (16/10/2026)
+
+From the charity-side review. On Admin, Charities, each charity:
+
+- **Remove access** for a charity admin (a volunteer who left). Their sign-in stays, as a donor; the charity's donors, donations and exports close to them at once. Logged, and they are emailed.
+- **Reset second step** when someone loses the phone with their authenticator app. The admin first checks it is really them (a call to a number we already have), writes how in a note that is logged, and the person is emailed. An admin can't reset their own.
+- **Set up s18A receipts later**, for a charity approved without them: add the SARS letter and signed mandate it sent us under Documents (the charity can't add documents once it has applied), enter the reference, and confirm, with the same checks as at approval. The charity is emailed when receipts are set up.
+- **Paused charities are told:** suspending emails the contact the reason; their dashboard says the page is paused, what that means (hidden, no donations, monthly gifts not collected, history kept) and how to reach us. Reinstating emails them too.
+- **Approval marks the bank details verified** (the admin checks the bank letter as part of vetting), and **connecting to the payment provider emails the charity** that it can take donations, as the approval email promises.
+- The charity's mandate signing date is checked against today in Johannesburg, not UTC.
+
+No support email address exists yet: `supportEmail` in `src/config/legal.ts` is empty until Yehuda chooses one (go-live checklist).
+
+## Charity dashboard details (16/10/2026)
+
+From the charity-side review:
+
+- **Campaigns past their last day count as ended** everywhere: they leave "Running now", free one of the 3 places (database rule too), and show "Ended on dd/mm/yyyy". The button that ends a campaign says "End", not a red "Remove".
+- **Donations CSV is paid donations only by default**, so the bookkeeper's total is income received; "Every status" is a separate link. The Reference column is the `NL-` reference donors see, and there is a Tax year column.
+- **The contact person can be changed after applying** (it was locked with the rest). When the email changes, the old address is told.
+- **Renaming, or a new logo or cover, after approval** is allowed but logged, and emails `ADMIN_NOTIFY_EMAIL` to check it still matches the organisation that was vetted. Yehuda can tighten this to "needs review" later.
+- **What goes public on approval** (name, pictures, story, updates, campaigns) is shown on the review page, so it is checked with the application.
+- **Search** on Donations, Donors and Monthly keeps emails and names as typed (dots, apostrophes), quoted safely in the database filter.
+- **Erased donors** show as "Erased at the donor's request", with no placeholder address on screen, in exports or as an email link.
+- Wording: Givezy (not the charity) issues s18A receipts; the tax year line reads properly; the dashboard says the provider's card fee comes off before the money reaches the bank; "contact us" points to the support contact.
+
+## Thank-you emails (16/10/2026)
+
+Yehuda chose this as the next build: a thank-you is the biggest reason donors give again. On the charity's new "Thank donors" tab (also linked from "Your donors" on the dashboard), the charity writes up to 1 000 characters for one of the last three months, and Givezy emails it to everyone who gave that month (paid gifts only), once per address, opening "Dear <first name>,". Draft wording.
+
+- The charity never sees or downloads addresses for this; nothing about amounts or other donors is in the email.
+- One thank-you per charity per month of donations (database rule), so donors aren't flooded.
+- Each email has a link to stop thank-you emails from all charities. The link asks first (so an email scanner opening it changes nothing). Opt-outs and links are kept as hashes of the address, readable only by the server. Erased donors are never emailed.
+- Sent one by one from the server: fine for small charities; a charity with thousands of donors in a month would need a queue (not built).
+- Privacy Policy draft updated; Yosef to confirm (go-live checklist).
+
+## Bookkeeper filters on Donations (16/10/2026)
+
+The Donations page takes a period: any time, this month, last month, this tax year, last tax year, or the charity's own dates (Johannesburg calendar days, both ends included, by the day the payment went through). A totals line shows what was received for everything the filters match (not just the page on screen), with refunds and chargebacks shown separately and not counted. The CSV download uses exactly the same filters (period, status, search), so the file matches the screen; with "All" it is paid donations only, "Every status" gives the rest. The file name carries the dates.
+
+## Faster repeat giving (16/10/2026)
+
+- **"Use my SA ID number ending 1234"** for signed-in donors, on the website's giving page and the app's give screen, when the charity can issue s18A receipts. The number comes from the encrypted copy kept with the donor's last s18A gift and is filled in on the server: only the last four digits ever reach the browser or the phone. It works only with the account's own email address (the receipt goes there), and "A different number" is one tap away. The app proves who is signed in by sending its sign-in token to our server only; password sign-ins are refused, as on the website.
+- **Message to the charity** in the app (optional, up to 500 characters), as on the website.
+- Signed-in donors on the website get their email filled in.
+
+## Share on WhatsApp, and Raising now on Discover (16/10/2026)
+
+- **Share on WhatsApp:** a share button by the heart on every charity page, and "Share on WhatsApp" on each campaign card. It opens WhatsApp with a short message ready ("Northcliff Meals Fund is raising for Pesach parcels. R31 400 of R50 000 raised so far. Give here: <link>"), falling back to the phone's share sheet. Links go to the charity's page, or the campaign's giving page, on our website. The website now gives those pages link previews (name, a line about the work, the cover photo, else the Givezy logo), which WhatsApp shows in the chat. Sharing waits until the website address is set in the app.
+- **Raising now:** a row of running campaigns at the top of Discover (when not searching or filtering), each with its charity, goal and bar, the closest to its goal first. Tapping opens the charity. If campaigns fail to load, Discover still works without the row.
+
+## Givezy is for everyone; Jewish touches are a switch (16/10/2026)
+
+Yehuda decided the app should not be geared towards Jews only. Step 1 of 4:
+
+- **Neutral by default.** The app greets with "Good morning / afternoon / evening" and today's date. The Hebrew date, Shabbos and Yom Tov greetings, the week-ahead lines, seasonal prompts and Hebrew charity names show only with **Account, Preferences, "Jewish calendar and maaser"** switched on. That setting is kept on the phone only and never sent to our server, because it reveals religion (special personal information under POPIA).
+- General wording on the welcome screens, sign-in, How Givezy works, the website (tagline "Give to the causes you care about, simply."), the For charities page, emails and the charity dashboard's examples.
+- Sample charities and causes for the preview are general (food, education, health, animals, faith communities). New cause icons for animals and the environment; churches, mosques and temples get the place-of-worship icon.
+- The test database now has general causes (food and welfare, children and youth, education, health, animals, faith communities, elderly care, disability, housing, environment, disaster relief, arts and culture). The live database needs the same list (go-live checklist).
+
+Next: own labels instead of maaser/chomesh/tzedaka (step 2), a giving goal as a % of income or a fixed amount (step 3), big photo cards on Discover (step 4).
+
+## Own labels and giving goals (16/10/2026)
+
+Steps 2 and 3 of making Givezy for everyone:
+
+- **Labels instead of maaser / chomesh / tzedaka.** Each gift can carry the donor's own label ("Work giving", "Family"), optional and private to them, on the website's giving page, the app's give screen, the website hand-off sheet and "given elsewhere". One tap on a label used before; with the Jewish switch on, Maaser, Chomesh and Tzedaka are offered too. Old choices became labels ("Maaser", "Chomesh", "Tzedaka"); older app versions that still send the fixed choice keep working. Database: `label` columns on `donation_giving_kinds` and `external_giving_entries` (migration `20261016000008_giving_labels.sql`, applied to the test project). The tax pack totals by label.
+- **Giving goals replace the maaser target.** Up to three goals, each a set amount ("R12 000 a year") or a share of income ("10%", which is maaser), per month or per year (the SARS tax year; Rosh Hashana to Rosh Hashana with the Jewish switch on), counting all giving or only gifts with chosen labels. A share of income uses the income log, still kept on the phone only. Maaser and Chomesh are ready-made goals with the Jewish switch on, never the default. Goals stay on the phone; anyone's old maaser/chomesh targets carry over as goals.
+- The Giving tab shows each goal's progress and about how much a month is left; "This tax year in numbers" totals by label.
+
+## Full review and charity insights (16/10/2026)
+
+Yehuda asked for a check of the whole product and a charity dashboard with proper insight. Six reviews ran side by side (payments, sign-in and database, charity side, app, receipts and privacy, and research on what Givelify, Tithe.ly, Pushpay, Donorbox and Givebutter show charities). Fixed in this round:
+
+- **A wrong or changed payment key is an outage, not a declined card.** Before, any 4xx answer from the provider counted as "declined": a rotated key would have stopped every monthly donor due that week, wiped their cards and sent them three decline emails. Now only 400, 402 and 422 count as a refusal, and after a refusal the monthly job asks the provider what it recorded before counting a failed attempt.
+- **A password session sees and changes nothing.** Someone could register a donor's email with a password before the donor signs up; once the donor signed in with a code, the password opened their profile, notes, favourites, goal records and consents. One restrictive policy per table now refuses password sessions, pausing or cancelling a monthly donation refuses them too, and so does "Download my information". New database functions are no longer callable by signed-in users by default, and the s18A approval columns can only be set by the server.
+- **A saved card is never charged twice for one gift.** The app sends one id per give attempt; asking again (a lost answer, a second tap) returns the first answer. The id must match the same charity, email and total. A second tap in the same moment is also stopped on the phone.
+
+**Insights on the charity overview** (from the research; no benchmarks or invented figures, only the charity's own data):
+
+- This month next to last month, the tax year, what monthly donors bring in every month, and all donors with the all-time total.
+- **Needs you this week:** new donors to thank, monthly donations declined and being retried, stopped or cancelled in the last 30 days (with the Rand a month lost), paused in the last 30 days, donors who haven't given in 6 months, campaigns ending within a week, refunds and chargebacks. Each line links to where the charity can act.
+- **Your donors** in four groups, each a link to the filtered Donors list: New (first gift in the last 30 days, like Givelify's four weeks), Coming back (more than once, in the last 6 months), Gave once (in the last 6 months), Lapsed (nothing in 6 months). Yehuda confirmed 6 months (16/10/2026); Pushpay uses 120 days and Givelify 12 months.
+- **Your biggest supporters:** the top five by all-time total.
+- **Donations by month:** the last 12 calendar months (empty months shown as empty, not skipped), each bar split into monthly and once-off, this month outlined.
+
+Second round of fixes from the same review (16/10/2026):
+
+- **Thank-you emails:** a send that fails before anything goes out hands the month back, so the charity can try again. Thanking the current month warns that people who give later that month won't get it.
+- **Admin Payments page** reads every row page by page (it stopped at 1 000 before, so totals were too low).
+- **Charity side:** the Donations empty state is right when a period filter is on; the QR poster uses the v2 navy from the brand colours; the admin receipt search keeps apostrophes and dots; an erased donor reads the same on Monthly as everywhere else.
+- **Download my information** now includes the details typed at each checkout and the donor details as printed on their s18A receipts.
+- **Monthly collections:** if copying the donor's details onto a month's attempt fails, the attempt is removed and made afresh next run, never charged without them.
+- **s18A receipts:** the job refuses a receipt missing the donor's or charity's address (it is listed as failed, to fix and re-run). Receipt emails say "s18A receipt". Receipts use DM Sans like the website (Inter removed).
+- **App:** goals set as a share of income show their real target on Home and after a gift, and only count gifts the goal applies to; the small Give button on charity cards is reachable with a screen reader; "First gift on Givezy" shows only when we know it is true; sign-in buttons never stay greyed out after an error; the give screen and the app start never load forever; Home explains when goals can't be opened; income and "given elsewhere" dates use Johannesburg's date; the last hard-coded colours moved into the theme tokens.
+- Not changed: the admin "erase a donor with no account" form still clears what was typed on a mistake (platform team only, minor).
+
+**Website in the v2 look** (16/10/2026, same review): the home page, a charity's public page and the giving page now match the app and the dashboard. Home opens on a blue block with orange and lavender splashes, a white Fredoka headline and one orange "Find a charity" button with the pressable navy edge. The charity page has a blue splash block when there is no cover photo, the charity's impact line as "Your rand at work", and an orange "Give to {charity}" button. The giving page has the amount on a pale lilac card with a large amount box, and the final Pay button is the screen's one orange button. A `.pressable` style (solid navy edge that sinks when pressed) is in `globals.css`. Checked at 375px and desktop width.
+
+## Each charity chooses its suggested amounts (16/10/2026)
+
+Yehuda: "let the charity choose" (instead of the R100, R250 and R500 starter amounts the app had, which were never confirmed). On its Profile page a charity can set up to three amounts (each at least the minimum donation, no repeats, shown smallest first), saved in `charities.suggested_amounts_cents` (migration `20261016000014`). The give screens show one-tap amounts in this order: the donor's own recent amounts first, then the charity's, three at most (`src/lib/charity/suggested-amounts.ts`, shared with the app). Givezy never suggests a figure of its own: a new donor at a charity that set none types the amount. The website's giving page shows the charity's amounts as buttons that fill in the amount box.
+
+**Vercel production branch** (16/10/2026): Yehuda wasn't sure, so the recommendation stands: keep the test site deploying from `milestone-1-foundation` until launch, so `main` is untouched; switch it to `main` as a launch step (go-live checklist).
+
+## Group challenges built, then removed (16/10/2026)
+
+Yehuda's "giving with friends" idea was built as group challenges (a supporter starts one for a charity, friends give, one ring shows how full it is) and then removed the same day: "keep it simple for now and see if people adopt this app." Nothing was ever given to one. The code is in the history (commit `d3cc3fd`) and the mock-up is at https://claude.ai/artifact/95hrbcacj9nfNJoqf3Y8uR, so it can come back once there are real donors to test it with. The database part was added (`20261016000015`) and taken out again (`20261016000016`).
+
+## Refunds and chargebacks (16/10/2026, built over Shabbos)
+
+Before, a refund or dispute at the payment provider left the donation "paid", so it kept counting in the charity's totals, campaign progress and the donor's s18A receipt. Now:
+
+- **A full refund** (the gateway's refund event for the whole amount the donor paid) marks the donation refunded by itself. It then drops out of everything that counts paid donations.
+- **Everything else is held for a person** on Admin, Payments ("Held for a person"): a partial refund, a refund without an amount, a refund we can't match to a donation, and every dispute (opened or resolved). Each donation item has "Mark refunded" and "Mark charged back" buttons (with a confirmation, logged), to use after checking the gateway's dashboard. Disputes never change a donation by themselves, because who won is not yet confirmed from Paystack's messages.
+- **s18A receipts:** if a refunded or charged-back donation is on an issued receipt, the receipt is listed there to void and re-issue.
+- Paystack's exact field names for refund and dispute events are not published in a form we could verify; the adapter reads the likely ones and anything unrecognised is held, never acted on. Checked in the Paystack test run (step 9).
+
+## s18A receipts ask for the donor's address (16/10/2026, built over Shabbos)
+
+Section 18A(2) asks for the donor's name and address on the receipt, and the receipt job already refuses a receipt without it. So ticking "I want an s18A receipt" now also asks for the address (street, optional unit or suburb, city or town, 4-digit postal code), on the website and in the app. A signed-in donor using "my ID ending 1234" can leave it empty: the server uses the address from that same earlier s18A gift, never sent to the phone. No address is asked for when no receipt is wanted.
+
+## 17/10/2026: Donor "giving so far" and impact on the website thank-you
+- The app's Progress tab already had the giving goal ring and this tax year's totals by charity. It now lets the donor switch to an earlier tax year or "All time" (totals by charity, s18A split and labels follow the choice).
+- The website's thank-you page now shows the charity's impact line ("What your gift does") once the payment is confirmed and the donor's details are shown, like the app's thank-you screen. Left out when the charity hasn't written one.
+
+## 17/10/2026: Full security and bug review (six independent reviewers, every finding verified)
+
+Yehuda: "check all code and fix any bugs and make sure we are 100% safe and secure". Six read-only reviewers covered the database, money and payments, sign-in and admin, receipts and email, the phone app, and the public website and API. No critical findings. Everything confirmed against the code was fixed the same day; the rest is on the go-live list with a reason.
+
+**Fixed**
+- **A session started with a password could still reach a charity's donors through the dashboard functions and the CSV exports** if it had added its own authenticator (two reviewers found this independently). The 16/10 rule lived on tables only; the dashboard reads through functions that check `is_charity_admin`, which checked the second step alone. `has_second_step()` now also requires the emailed-code sign-in, so every function, view and policy built on it inherits the rule (migration `20261017000001`). The exports and the second-step pages start from the viewer too, and a password session can no longer record "agreed" or enrol an authenticator. Ten wrong second-step codes in 15 minutes now wait.
+- **A charged-back first payment did not stop the monthly donation.** It now cancels it and drops the card (each further collection would be another chargeback); an opened dispute pauses it until a person has looked. A refund leaves it running (a goodwill refund is not a dispute). A refund in another currency is never matched by its number alone.
+- **Sign-in link sending** was limited per address only: a script could send thousands of Givezy emails to different addresses. Now also limited per visitor.
+- **A missing `SITE_URL` in production** fell back to the browser's own address for sign-in links; it now fails instead.
+- **The test gateway** is refused outright wherever `VERCEL_ENV=production`, so no switch can open it on the live site.
+- **The thank-you page** asked the payment provider about a payment for anyone who knew the donation id (ids are not secret). Only the donor's own visit (with the credential from their payment link) does now; everyone else sees the saved state, which the webhook keeps right. Outcome checks are limited per donation instead of per shared address (a shul's Wi-Fi no longer blocks other donors).
+- **Receipts were marked "emailed" even when nothing went out** (the console transport on a local run, or an erased address). The transport now says whether it sent, and only a real send marks the receipt. A receipt with a refunded or charged-back gift on it is never emailed as it stands.
+- **`EMAIL_ALLOWLIST`** for test sites: email goes only to listed addresses or domains, so a test checkout can never email a real donor.
+- **Phone app, saved-card path (switched off):** after a lost reply, a changed amount could have become a second charge; the app now keeps the attempt id until the screen closes. A saved-card charge still pending is no longer shown as sent with the goal ring and streak advanced; the app asks a few more times and otherwise keeps the form. A crafted link could make the live app show a sample "gift arrived"; preview only now. The app refuses a non-https site address for its own API.
+- **One largest gift, R1 000 000**, in `src/config/platform.ts` and enforced where the website and app both price a gift (the website had no ceiling; the app had its own).
+- **Database:** donors can no longer write the encrypted ID columns from the browser (the server never reads them from there); `authenticated` loses insert and delete on charities, charity admins and categories (policies already refused, privileges now do too); the suggested-amounts check refuses a null element and has a ceiling; a processed donation can never be deleted and no link can be added to an issued receipt, by anyone, server included.
+- **Smaller:** a donation left on a gateway that is no longer active is held for a person instead of failing the webhook forever; an unreadable payment date from the gateway no longer breaks confirmation; a charity's thank-you body loses control and direction-override characters; email subjects are one line; `form-action 'self'` in the CSP; a `robots.txt` keeping sign-in, admin and confirmation pages out of search engines.
+
+**Not changed, with the reason**
+- The CSP still allows inline scripts. Moving to nonces touches every page and Next's own scripts; there is no script injection point today (every piece of user text renders as text). Later list.
+- Browser uploads to the charity's own storage folder skip the server's image cleaning. The bucket limits size and type; the server actions already clean what they upload. Later list.
+- Charity documents open inline from their signed link rather than downloading. Different origin from Givezy; later list.
+- Audit rows and used invitations keep an admin's email after an erasure (platform admins only). On the privacy list for Yosef.
+- The phone app's third sign-in or pause tap in the same instant: harmless (the second call fails or repeats), left as is.
+
+**Checked and clean:** webhook signatures (constant-time, raw body), idempotency, no floats anywhere in money, no XSS sinks, no secrets in either bundle, no service-role use from client code, every table under row-level security, tax-year boundaries at Johannesburg midnight, receipt numbering under concurrent runs, per-user storage in the app after switching accounts.
+
+## 17/10/2026: The charity dashboard fills itself, no CRM
+
+Yehuda (after a chat about charity CRMs): add only what Givezy can fill with its own data; small SA charities won't leave their spreadsheets, but they will use a dashboard that fills itself. Skip volunteers, case management, events and full email marketing.
+
+Most of the "at launch" list was already built: the donor list (name, contact, total, number of gifts, last gift, s18A and "anonymous publicly"), the donor journey (new, coming back, gave once, lapsed after 6 months), income this month against last month with monthly and once-off split, and CSV exports of donors and donations. Added now:
+- **"Gives monthly" / "Monthly paused"** on each donor in the list.
+- **"Who has a receipt"** on the s18A receipts page: per tax year, how many donors asked for an s18A receipt, how many have one, and the amount still to be receipted. The running tax year says when its receipts come.
+
+Settled the same day (Yehuda):
+- **No fee line on the income summary.** "We haven't decided on a fee." The 3% in the suggestion was not a decision. Nothing shows a fee until Givezy's fee (if any) and the payment provider's rates are decided and in `src/config/platform.ts`.
+- **No paid tier.** Campaigns and impact updates stay free for every charity.
+
+## 18/10/2026: The dashboard's core flow: what just happened, take it back, what next
+
+Yehuda: "We need to make our core flow: what just happened, they can take it back, what to do next." Charity dashboard first (his choice); the app follows once he has felt it.
+
+- After every dashboard action a panel at the top of that page says **what just happened** in plain words ("'Winter food parcels' is live. Donors can give to it now."), offers **Undo** for 30 minutes, and gives **one next step** as the page's orange button ("Next: post an update about it"). All the words live in `src/lib/charity/done.ts`.
+- Undo covers all 17 undoable actions: profile, logo and cover, donation emails, starting and ending a campaign, posting and removing updates and photos, every registration step including bank details, and uploading and removing documents. Undo never overwrites newer work (if it was changed again since, it says so and keeps the newer version), never removes a campaign someone has given to (end it instead), runs once even if tapped twice, and never touches registration details once the application is submitted.
+- **The two that can't be taken back ask first, on the page** (Yehuda's choice: ask first, then no undo): sending the monthly thank-you email and submitting the registration. The check says plainly that it can't be taken back. The phone's own "Are you sure?" pop-ups are gone from the dashboard: removals use Undo instead.
+- Each action is kept in `charity_actions` (migration `20261018000001`, server-only, 30 days) so the panel and Undo work across page loads.
+- Removed or replaced files are kept so Undo can put them back; cleaning them up later is on the go-live list.
+
+## 18/10/2026: Evidence of quality: designing the moments when things go wrong
+
+Yehuda asked to apply five rules: design the un-glamorous moments (status, undo, recovery), keep flows consistent, recover well from failures (a way to reach a person), test by breaking things (Wi-Fi off, empty data), and design empty and error states. Three testers broke the app, the website's donate path and the charity dashboard on purpose; every finding was checked and fixed:
+
+- **A lost connection or a server error never throws a form away.** The donate page, the dashboard forms and the app's give screen keep everything typed, say plainly whether anything was charged ("Nothing was charged"), and offer the way on. A declined card says why it usually happens, keeps the amount for the retry, and from the app goes back to the app.
+- **All the problems at once, and the page takes you to the first.** The donate form shows every field to fix in one go, in plain words ("Postal codes are 4 digits", not the library's own wording), and scrolls to the first one. Same on the dashboard and in the app.
+- **The R1 000 000 typo guard now applies on the website too** (the app already had it). Zero reads as below the minimum. "1,250" is refused with a plain message, on purpose: SA uses the comma as the decimal mark, so 1,250 could mean R1.25.
+- **Unticking the s18A box keeps the ID and address** (and the dedication name) in case the donor ticks it again; hidden fields are never sent.
+- **A person to reach** on every failure screen (see the support email on the go-live list).
+- App: a server-down screen with "Try again" and "Give on our website", undo for removals and pauses on the Progress tab, "Get help" on Account, honest "Waiting for the payment provider" while a gift confirms, no ticks or streaks until it is paid.
+- Dashboard: "Saving…"-style button words while working, the first wrong field focused, an error page that keeps the tabs, and the done panel only on the page and day it belongs to.
+
+**Left for later:** the app's charity list doesn't yet open offline (the giving history does); the test payment page can be pressed twice with the back button (test-only, the real confirmation already ignores a repeat); the CSP nonce (as before).
+
+## 18/10/2026: The dashboard reads as one product
+
+Yehuda asked for the consistency rule on the charity dashboard. Changes:
+- **Tabs and page headings match.** Every page's heading is its tab's name ("Overview", "Application", not the charity's name, which is already in the blue header). Tabs now read "Monthly donations" and "s18A receipts" like their pages; "Registration" became "Application", the word every message already used. "Registration number" and "registration certificate" stay: they are the company's own documents.
+- **"Donation", never "gift", on the dashboard** (campaign counts, donor groups, the profile hint). The app keeps "gift" for a donor's own giving.
+- **Empty lists all say "No … yet. They appear here once …"**, and a search or filter that finds nothing says "No … match your search or filters" with a "Clear the search and filters" link, on donations, donors and monthly donations alike.
+- **One main button**: blue with the solid navy edge underneath (the brand's pressable button), on every form, search, error page and the poster's print button.
+- **Same words for the same moment**: "Please keep it to … characters or fewer" everywhere (website and dashboard), "Back to your overview" and "Back to your public profile", "Download … (CSV)".
+
+## 18/10/2026: The donor app reads as one product, and failures are looked after
+
+Yehuda asked for the quality rules on the donor app (un-glamorous moments, consistency across flows, service recovery, test and break). A tester broke every screen at 390px and 320px wide; every finding was checked and fixed:
+
+- **Undo you can see.** One floating bar just above the tab bar, wherever you've scrolled to, for every action that can be taken back: removing income, giving elsewhere or a goal, pausing a monthly donation, and now also logging income and giving elsewhere ("Logged R50 given to School fun run. Undo"). Pausing offers "Undo" like everything else.
+- **Every "Give" button does the same thing.** With giving in the app off (store builds), Home and Progress now open the charity's give sheet like Discover and the charity page do, instead of a screen saying giving "isn't on yet".
+- **Waiting for the payment provider has its own button.** If we haven't heard back, the button becomes "Check again" (with "Last checked at 14:05") instead of inviting a second gift, plus "I didn't pay: start again". A way to reach a person shows on every problem on the give screen.
+- **The thank-you screen counts only the gift** towards the goal ("Gift sent · R180 to Northcliff Meals Fund", "and R20 to Givezy"); a monthly donation says "Monthly donation set up · R180 a month".
+- **Same words everywhere**: "Tax year 2027 so far" and "Tax year 2026" on every screen; "R500 a month"; the Progress tab named Progress everywhere; "s18A receipts" in the info button; the s18A promise now says to ask for one when you give (it's opt-in). Bad amounts get the same message in every box, including "1,250", and no box takes a 14-digit number.
+- **Edge cases**: a page that doesn't exist shows a calm "We couldn't find that page" with "Go to Home"; goal amounts step down a size on narrow phones instead of breaking; small links are 44px tall; the give sheet's search has "Clear search"; "Send a new code" confirms it was sent.
+- The sample-data version (what Expo Go shows without a live server) behaves like the live one: cancelling asks first, pausing has Undo.
+
+**Left as is:** goal and log amounts have no upper limit beyond the length of the box (11 characters); a cap would be a new platform value, so it waits for Yehuda if he wants one.
+
+## 18/10/2026: Charities can thank one donor personally
+
+Yehuda chose three new dashboard features (weekly email to the charity, annual report, thank one donor), built in that order starting with this one; emails to lapsed or campaign donors stay off until consent wording has had a legal look.
+
+- **"Say thank you"** on each donor's row (Donors page, live charities only): a short message, up to 1 000 characters. Givezy sends it in the charity's name: the donor's first name (or a company's contact person) above it, "From [charity]" below, and **replies go to the charity's contact email**. The monthly thank-you to everyone now also replies to the charity's contact email.
+- It **asks first** ("An email can't be called back once it's sent"), then shows what happened on the page. There is no undo, like the monthly thank-you.
+- **At most once a week per donor** (Monday to Sunday, Johannesburg time), so no donor is flooded; the row says "Last thanked personally on dd/mm/yyyy". Never to erased donors, or to anyone who used "stop thank-you emails" (the row says so). Each email carries that stop link.
+- Kept in `charity_donor_thanks` (migration `20261018000002`, server-only).
+
+## 18/10/2026: Annual report for the board or AGM
+
+New "Annual report" tab on the dashboard: one SARS tax year on one page, filled from Givezy's own records. Raised (paid donations only, with the average), donors (new this year against those who gave before), the monthly and once-off split, month by month with the best month, each campaign's total, s18A receipts (who asked, who has one, what is still to be receipted) and, apart, anything refunded or reversed. A running year says "so far" and shows months still to come as such. "Save as PDF" uses the browser's print, which hides the dashboard's header and tabs; "Download the figures (CSV)" gives the same numbers with no donor details. The footnote says gifts made outside Givezy are not included.
+
+## 18/10/2026: Full review of everything built since 17/10 (four independent reviewers, every finding verified)
+
+Yehuda asked for a check of all code. Four reviewers (security and database, money and receipts, the phone app, the dashboard and website) worked independently; each finding was read in the code before anything changed. Nothing critical was found; the website's packages have no known vulnerabilities; all automated checks pass.
+
+**Fixed**
+- **Saved-card double charge (app, high; the feature is still switched off).** When a saved-card charge got no reply, the donor could switch to "A different card", or to monthly, or change the email, and start a second donation around the unresolved one. Now the gift is held exactly as it was sent until the server says paid or declined: the card choice and the monthly switch are locked, and if the amount or email was changed the form is put back with "We're still checking your earlier gift of R… from your saved card". The "close this screen and try again" advice (which dropped the only guard) is gone.
+- **"Check again" thanks the donor for what was paid**, not for whatever is in the form by then (the summary is snapshotted when the payment goes unsettled).
+- **A refunded donation no longer says "We're confirming your payment, don't pay again" forever.** Website and app now show "This donation was refunded, so nothing is owed on it."
+- **Raw technical text on four dashboard forms** ("Invalid input: expected string, received undefined") when the postal code, bank account number, branch code, campaign name or campaign goal was left empty. Each now says what is missing, and a test covers every dashboard form.
+- **Personal thank-yous capped at 20 an hour per charity**, so a charity account can't be used to mass-mail donors in Givezy's name. A send that was skipped (email not switched on, or an address off the test allow-list) is now reported as not sent instead of "went to Sarah", for the monthly thank-you too.
+- **Erasing a donor** now also removes the charity's personal thank-yous to them and their name from the dashboard's "what just happened" rows.
+- **Annual report:** the two shares always add to 100%; "new donor" follows the same rule as the Overview (first paid gift); the average uses the shared integer helper.
+- **Monthly donation amounts** in the app and on the website account page showed gift plus contribution as one figure ("R190 a month") while the charity saw R180. Now "R180 a month (+ R10 to Givezy)".
+- **Undo of a new campaign** was refused when a donor had merely opened and closed the payment page; only real donations block it now. Undo of a profile save now notices newer category changes. Files kept for Undo are removed when the 30-day rows are purged. The confirm step sends what is in the form at the moment of "Yes".
+- **Donate page:** with "use my ID ending 1234", a typo elsewhere no longer demands the address the page said could be left empty. Dedication names are 80 characters everywhere. The app accepts a R1 000 000 gift with a contribution.
+- Smaller: the Donations page sends an out-of-range page number back to page 1; the app's charity list offline copy reaches every screen (and revives its dates); remembered donor details are forgotten on sign-out; the account's email fills in when the give screen opened before the account loaded; "A different card" and the monthly switch can't be flipped mid-attempt; redirect parameters go through the same path check as everywhere else; "s18A receipt" everywhere; "Donations" not "Gifts" on the dashboard.
+
+**Known and left, with the reason**
+- The phone app's build tooling carries three known vulnerable packages (braces, decode-uri-component, node-forge) through Expo 57. Only decode-uri-component ships in the app itself (URL parsing in Expo Router), and the worst case is a hang from a crafted link. Fixing them means an Expo upgrade; on the go-live list.
+- A receipt that needs re-issuing after a refund still counts as "has one" on the Receipts tab until an admin voids it. Cosmetic; noted.
+- Undo's "changed since" check is read-then-write, not atomic: only a same-second edit by another admin could slip past. Acceptable.
+
+## 19/10/2026: Hardening review (five independent reviewers, every finding verified)
+
+No new features. Fixed: payment notifications keep no card code or customer details; the contribution
+has the same R1 000 000 ceiling as the gift; test refunds apply on their own; a payment on a retired
+provider is held in Admin, Payments; the app never shows a thank-you when it got no answer about a
+payment (it offers "Check again"), and the server says "couldn't check" instead of "still confirming";
+sheets ask before throwing away typed details and stay open while saving; a broken campaign link gives to
+the charity; the monthly thank-you can no longer use up a month with nothing sent; out-of-range donor
+pages show the last page; the donations redirect keeps custom dates; South African phone numbers keep
+their 0 in CSV downloads; Undo says "removed since" correctly; a saved-ID problem at checkout is shown
+in words; a spaced ID number fits the box; names and address lines are kept to one line; the data
+download includes agreements given with gifts and charities' personal thank-you notes. Open decisions
+went to the go-live checklist (sign-in lockout, second-step live check, shared emails in the download).
+
+## 20/10/2026: First open is "small yes first": give first, set a goal afterwards
+
+Decided by Yehuda. New first-open flow in the app: welcome, then two skippable questions ("What kind of
+giver are you?", "Which causes matter to you?"), then straight to Discover with the chosen causes' charities
+first (nothing hidden). The goal question left first open. After a first confirmed gift the gift-sent
+screen shows the charity's own impact line (or a plain thank-you; never invented) and, once ever, "Make it a
+habit" with "Set my goal" and "Maybe later". Set my goal opens the normal goal editor (neutral name, maaser
+only as an optional preset when the Jewish switch is on), and the progress shows the first gift already
+counted. Maybe later goes to Home, where a gentle goal card can be dismissed (a flag on the phone; no
+repeat pop-ups). Goals count the tax year, 1 March to the end of February, to match s18A receipts.
+Existing donors who finished first open see none of the new questions; with no goal they get only the Home
+card. Sign-up is not forced before the questions: giving still works without an account, and a donor who
+hasn't signed in is shown "Sign in with the email you gave with" so their gifts count towards the goal.
+The three "kept safe" points moved from first open to the give screen, shown on a first gift.
+"Kind of giver" is stored on the phone first and copied to the account's profile the first time they are
+signed in (never over an answer already there). Database: `20261020000002_giver_type.sql` (column plus its
+own-row update grant). New personal data: Privacy Policy line for Yosef (go-live checklist).
+Known limit: the goal invitation only appears on the gift-sent screen of a gift confirmed straight away;
+if the payment provider is still catching up, only the Home card is offered.
+
+## 20/10/2026: A shorter give screen in the app (first gift in as few taps as possible)
+
+Yehuda found a first gift took too long. The main form is now: amount, name, email, then an optional
+Givezy contribution switch (off by default), the s18A receipt switch (only for charities that issue
+them; the ID and address boxes appear only when it is on), the agreement tick, and Give. Everything else
+is in one "More options" block, closed by default: give every month, label, phone, remember my details
+(still off by default), give anonymously, a message to the charity, a dedication, and save my card. It
+opens by itself when a label is already chosen, and when a problem is inside it. A closed block says what
+is switched on. The three "kept safe" points became one line on a first gift (the card is entered on the
+payment partner's page; Givezy never sees it or holds the money). Nothing was removed, and the server's
+checks are unchanged. The strategy for getting donors to stay (the long game) is still to be decided.
+
+## 21/10/2026: Hierarchy, feedback and signifiers in the donor app
+
+Added from Yehuda's design notes. Hierarchy: Home keeps the goal card first and adds a quieter "at a
+glance" row under it (given this tax year, the next monthly donation, s18A receipts), each shown only when
+there is something to show and each opening the right tab. Feedback: after a gift the first line says exactly
+what happened ("R180 to Northcliff Meals Fund, done"; a monthly one reads "R180 a month to ..., set up").
+Signifiers: "Once-off" and "Every month" are two always-visible options with the chosen one filled (replacing
+a switch inside More options); an unavailable one (campaign gifts, or while a saved-card payment is
+unresolved) is struck through with the reason underneath; the chosen amount button shows a tick, and amount
+buttons are dimmed and inert while a payment is being started or held.
+## Full code review, second pass (20/10/2026)
+
+Six independent read-only reviews (payments and monthly giving; receipts, tax pack and privacy; the database and row-level security; sign-in, admin and charity actions; the phone app; the website's look, copy and accessibility), every finding checked against the code before anything was changed. Nothing critical; the money core, receipt rules and row-level security held. The database tests run in the sandbox again (plain Postgres with the Supabase stand-in): all 524 tests pass, plus typecheck, lint and a production build. Fixed:
+
+- **Return page after a card payment:** the payment provider adds its own `reference` to our return address, so the key arrived twice and the page showed "Donation not found" even though the payment was recorded and emailed. Taken care of; a refunded donation now says so instead of "not found".
+- **Monthly giving:** a charge the provider refuses outright now marks that month's attempt failed (it stayed pending for ever); a payment the provider took for the wrong amount or currency is held for a person once, with the next collection next month, instead of being re-checked and re-logged every hour.
+- **Webhook records** no longer keep the card-on-file code (it lives encrypted on the monthly donation only). A confirmation email that could not be sent leaves an audit row to resend from.
+- **Rate limits:** checkout is 5 attempts per email and 30 per network address in 10 minutes (one hall on one WiFi is not one donor); the return page is limited per donation; sign-in links per email and per address; a missing address header no longer lumps everyone together.
+- **Privacy:** "Download my information" now includes the details typed with each donation and the agreements ticked at checkout (both were server-only tables, so they were missing). Receipts for a donor erased since issue are not counted as emailed. Erasure also clears a campaign answer, and re-running it after the account is gone is not reported as a failure. The audit log records a new charity admin's id, not their email.
+- **Receipts:** a "$" in a charity's legal name prints as typed on the receipt statement. The SA ID check now requires the citizenship digit to be 0 or 1. The receipt email says "s18A receipt".
+- **Charity admin and platform admin:** charity pages hand their client-side forms only the fields they edit (the whole service-role row, with gateway account and mandate path, was being serialised to the browser). Uploaded pictures are capped at 30 million pixels and 2 400 px a side. The donor CSV export and document links refuse password-started sessions like every page does. Changing a charity's contact email is audited and the old address is told. The mandate signing date is checked against Johannesburg's today. Approving a charity records its bank details as checked, and connecting to the payment provider needs that check. Agreeing to the policy twice records once; setting up an authenticator is audited; the viewer lookup runs once per request.
+- **Admin, Payments** reads every paid and monthly row a page at a time (the API answers 1 000 at a time, so totals would have silently stopped there).
+- **Database** (`20261020000001_review_fixes.sql`): signed-in users can no longer write ID or tax columns on donor records or the approval columns on charities (the triggers already refused; the grants now agree); a charity's logo and cover must sit in its own folder; an active monthly donation always has a charge day; the legacy fee column is bigint; indexes on the lookups the jobs and dashboards make. `docs/test-site/setup-database.sql` regenerated (it had stopped seven migrations short) and the stale `apply-erase-fix.sql` removed.
+- **Website:** private pages (admin, charity dashboard, account, MFA, agree, test gateway, thank-you) are marked not to be indexed, with a `robots.txt`; a root error page in the Givezy voice; the donate page's tab title names the charity; keyboard focus shows on the amount fields; the thank-you and donation pages have a real page heading; checklist states, error messages and new-tab links are announced to screen readers; Hebrew dedication names render right to left in Heebo; "section 18A receipt" became "s18A receipt" in the receipt email.
+- **Phone app:** a crafted `nedivlev://…?demo=thanks` link can no longer show a fake thank-you in a store build (preview only); switching accounts without signing out sweeps the previous person's cached giving; closing the payment sheet without paying says so instead of landing on Giving and polling; routes are built from typed params; the "You pay" total is really semibold on Android; tab labels are not remounted on every tab change; the unused Fraunces font dependency is gone; orange is no longer used as text (the area line on charity cards is muted navy) and the scrim colours live in `tokens.ts`.
+- **Dependencies:** `sharp` patched (0.35.5). The app's remaining audit items are Expo transitive packages with no non-breaking fix.
+
+Not changed, for Yehuda or Yosef (all on the go-live checklist): the `NL-` reference prefix; a notice to the donor when a receipt is withdrawn, and the tax pack after a refund (both wait on the refunds decision); the Terms sentence about payments never happening in the app; what the iOS Keychain keeps after the app is deleted; the look items (lilac bars on the charity dashboard, the unused orange accent on the website, button radius, more than one orange graphic on the app's Giving tab and Welcome screen).
+
+## 21/10/2026: main (the 20/10 second-pass review) merged into milestone-1-foundation
+
+`main` had two commits this branch lacked: the second-pass review (20/10) and a Vercel build fix (21/10). Both
+lines of work had reviewed the same ground, so 35 files clashed. Calls made, so they can be revisited:
+- **Phone app:** this branch's design and screens kept throughout (main's app was still the 15/10 look); main's
+  typed route params, scrim and tab-icon "made once" ideas were brought in where they still applied.
+- **Webhook records:** this branch's version kept (stores only the event, reference, amount, currency and status);
+  main only dropped the card code. Main's test expecting card brand and last four digits in the record was dropped.
+- **Refunded donation on the return page and status:** this branch's single "reversed" outcome kept; main's
+  separate "refunded" and "charged back" labels showed the same card.
+- **Return page and checkout rate limits:** this branch's rules (the provider is only asked for a donor holding the
+  payment link's credential; only attempts that reach the payment page count) plus main's per-address key that
+  ignores an unknown address.
+- **Contact-email change notice:** this branch's (a proper notice and an audit row with no email addresses in it);
+  main's logged both addresses.
+- **Data download:** main's loop for details typed at checkout and agreements ticked kept; this branch's extras
+  (giver type, consent times, charities' personal thank-you notes) kept; the duplicate loops removed.
+- **Admin, Payments:** this branch's version (held items with their current state, and the 50 000-row cap notice).
+- **Receipts:** one fix for a "$" in a charity name (both had it). **Pages:** main's accessibility and noindex
+  changes kept; main's noindex list unioned with this branch's.
+- **Database:** main's migration is `20261020000001_review_fixes.sql`; this branch's giver-type change was renamed
+  `20261020000002_giver_type.sql` so the two version numbers don't clash.
+- **Not carried over:** `docs/test-site/setup-database.sql` (main regenerated it before this branch's migrations
+  existed); it needs regenerating from the full migration list.

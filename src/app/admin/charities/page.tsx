@@ -6,8 +6,13 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
+import { Card } from "@/components/card";
+import { InviteForm } from "./invite/form";
 
 export const metadata: Metadata = { title: "Charities" };
+
+/** Past its last day (read at request time). */
+const hasExpired = (expiresAt: string) => new Date(expiresAt).getTime() < Date.now();
 
 const tabs: CharityStatus[] = ["pending_review", "approved", "rejected", "suspended", "draft"];
 
@@ -23,11 +28,33 @@ export default async function AdminCharitiesPage({ searchParams }: PageProps<"/a
     .eq("status", status)
     .order("updated_at", { ascending: status !== "pending_review" ? false : true });
   if (error) throw error;
+  const { data: invites } = await supabase
+    .from("charity_invites")
+    .select("id, charity_name, contact_email, created_at, expires_at, used_at, charity_id")
+    .order("created_at", { ascending: false })
+    .limit(10);
 
   return (
     <div className="space-y-4">
       <Link href="/admin" className="text-sm text-muted">← Platform admin</Link>
       <h1 className="text-xl font-semibold">Charities</h1>
+      <Card title="Invite a charity">
+        <InviteForm />
+        {invites?.length ? (
+          <ul className="mt-4 divide-y divide-border border-t border-border text-sm">
+            {invites.map((i) => (
+              <li key={i.id} className="flex flex-wrap justify-between gap-2 py-2">
+                <span>
+                  {i.charity_name} <span className="text-muted">({i.contact_email}, {formatDate(i.created_at)})</span>
+                </span>
+                <span className="text-muted">
+                  {i.used_at ? (i.charity_id ? <Link href={`/admin/charities/${i.charity_id}`} className="text-brand underline">Started</Link> : "Started") : hasExpired(i.expires_at) ? "Expired" : "Sent"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </Card>
       <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
         {tabs.map((t) => (
           <Link

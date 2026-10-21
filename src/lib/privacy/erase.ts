@@ -58,6 +58,20 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
 
   const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
   if (error) throw new Error(`Could not erase: ${error.message}`);
+  if (ids.size) {
+    // The charities' personal thank-yous to them, and their name in the dashboard's "what just happened" rows.
+    const { error: thanksError } = await db.from("charity_donor_thanks").delete().in("donor_id", [...ids]);
+    if (thanksError) throw new Error(`Could not erase: ${thanksError.message}`);
+    const { data: actions, error: actionsError } = await db.from("charity_actions").select("id, details").eq("kind", "donor_thanked");
+    if (actionsError) throw new Error(`Could not erase: ${actionsError.message}`);
+    for (const a of actions ?? []) {
+      const details = (a.details ?? {}) as Record<string, unknown>;
+      if (typeof details.donorId === "string" && ids.has(details.donorId)) {
+        const { error: e } = await db.from("charity_actions").update({ details: { ...details, name: "a donor" } }).eq("id", a.id);
+        if (e) throw new Error(`Could not erase: ${e.message}`);
+      }
+    }
+  }
   const c = (counts ?? {}) as Record<string, number>;
 
   const summary: EraseSummary = {
@@ -86,16 +100,17 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
 
   if (userId) {
     // Their own records kept against the account go in every case, also when the account itself has to stay
-    // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, maaser settings.
-    for (const table of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"]) {
+    // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, maaser settings, the saved card.
+    for (const table of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"]) {
       const { error: ownError } = await db.from(table).delete().eq("user_id", userId);
       if (ownError) throw new Error(`Could not erase their ${table.replace(/_/g, " ")}: ${ownError.message}`);
     }
     const blocked = await accountBlocker(userId);
     if (blocked) {
       summary.note = blocked;
-      // The account stays for their charity or platform work, without the name they gave as a donor.
-      const { error: nameError } = await db.from("profiles").update({ full_name: null }).eq("id", userId);
+      // The account stays for their charity or platform work, without the name they gave as a donor
+      // or how they described their giving.
+      const { error: nameError } = await db.from("profiles").update({ full_name: null, giver_type: null }).eq("id", userId);
       if (nameError) throw new Error(`Could not erase their name: ${nameError.message}`);
     } else {
       // Their own account agreement goes with them. A charity's declarations stay with the charity
@@ -103,7 +118,8 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       const { error: consentError } = await db.from("consents").delete().eq("user_id", userId).eq("kind", "account");
       if (consentError) throw new Error(`Could not remove their agreement records: ${consentError.message}`);
       const { error: delError } = await db.auth.admin.deleteUser(userId);
-      if (delError) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
+      // Running the erasure again after the account is gone is not a failure.
+      if (delError && delError.status !== 404) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
       else summary.accountDeleted = true;
     }
   }

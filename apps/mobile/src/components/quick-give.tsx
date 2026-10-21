@@ -4,6 +4,7 @@ import { gifts as sampleGifts } from "@/data/giving";
 import type { Charity } from "@/data/sample";
 import { useAccount } from "@/lib/account";
 import { useDirectory } from "@/lib/directory";
+import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { givenBefore, savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
@@ -11,6 +12,7 @@ import { colors, fonts, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { BackIcon, SearchIcon } from "./icons";
 import { GiveSheet } from "./give-sheet";
+import { EmptyState, ErrorState, SkeletonBlock } from "./states";
 import { Text } from "./text";
 
 /**
@@ -44,7 +46,11 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
   const matches = q ? all.filter((c) => c.nameEn.toLowerCase().includes(q) || c.cause.toLowerCase().includes(q) || c.area.toLowerCase().includes(q)) : [];
   const pick = (c: Charity) => {
     haptic.tap();
-    setChosen(c);
+    if (GIVE_IN_APP) {
+      // Straight to the one-screen give step: amount, what it counts as, done.
+      onDone();
+      openGiveScreen(c.slug);
+    } else setChosen(c);
   };
   // Saved ones not already under "Give again".
   const savedOnly = saved.filter((c) => !again.includes(c));
@@ -61,7 +67,7 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
         matches.length ? (
           <View>{matches.slice(0, 8).map((c, i) => <Row key={c.slug} charity={c} live={directory.live} last={i === Math.min(matches.length, 8) - 1} onPress={() => pick(c)} />)}</View>
         ) : (
-          <Text variant="bodyMuted">{`No charity matches "${query.trim()}".`}</Text>
+          <EmptyState title="No charities found" body={`Nothing matches "${query.trim()}". Try another name or a different cause.`} action={{ label: "Clear search", onPress: () => setQuery("") }} />
         )
       ) : (
         <>
@@ -70,6 +76,11 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
           <View style={{ gap: 4 }}>
             <Text style={styles.head}>All charities</Text>
             {all.map((c, i) => <Row key={c.slug} charity={c} live={directory.live} last={i === all.length - 1} onPress={() => pick(c)} />)}
+            {!all.length && directory.failed ? (
+              <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={directory.retry} />
+            ) : !all.length ? (
+              <SkeletonBlock height={120} />
+            ) : null}
           </View>
         </>
       )}

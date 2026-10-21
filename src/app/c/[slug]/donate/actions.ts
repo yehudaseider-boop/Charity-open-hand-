@@ -4,18 +4,26 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { quoteDonation, startDonation, type Quote } from "@/lib/donations/checkout";
 import { loadDonatableCharity } from "@/lib/donations/charity";
-import { checkoutSchema, cleanPhone } from "@/lib/donations/validation";
+import { checkDonorDetails, checkoutSchema, cleanPhone, type CheckoutInput } from "@/lib/donations/validation";
 import { clientIp } from "@/lib/client-ip";
+import { getViewer } from "@/lib/auth";
 import { formToObject } from "@/lib/form";
-import { parseRandToCents } from "@/lib/money";
+import { COMMA_THOUSANDS_MESSAGE, formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
+import { platformConfig } from "@/config/platform";
 
 export type QuoteState = { ok: boolean; message?: string; quote?: Quote };
 
 export async function getQuote(slug: string, _prev: QuoteState, formData: FormData): Promise<QuoteState> {
   const charity = await loadDonatableCharity(slug);
   if (!charity?.acceptingPayments) return { ok: false, message: "This charity can't take online donations right now." };
-  const cents = parseRandToCents(String(formData.get("amount") ?? ""));
-  if (cents === null) return { ok: false, message: "Enter an amount in Rand, for example 180 or 180.50." };
+  const typed = String(formData.get("amount") ?? "");
+  const cents = parseRandToCents(typed);
+  if (cents === null) {
+    // SA writes thousands with a space; a comma is the decimal mark, so 1,250 can't be read safely.
+    if (usesCommaThousands(typed)) return { ok: false, message: `${COMMA_THOUSANDS_MESSAGE}.` };
+    return { ok: false, message: "Enter an amount in Rand, for example 180 or 180.50." };
+  }
+  if (cents === 0) return { ok: false, message: `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.` };
   let contribution = 0;
   if (formData.get("give_extra") === "on") {
     const c = parseRandToCents(String(formData.get("contribution") ?? ""));
@@ -31,6 +39,8 @@ export type CheckoutState = {
   message?: string;
   fieldErrors?: Record<string, string>;
   quote?: Quote;
+  /** The payment never started (offline, or the server failed): the page offers a person to ask. */
+  failedToStart?: boolean;
 };
 
 export async function submitDonation(
@@ -39,6 +49,7 @@ export async function submitDonation(
   contributionCents: number,
   shownTotalCents: number,
   fromApp: boolean,
+  campaignId: string | undefined,
   _prev: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
@@ -51,12 +62,29 @@ export async function submitDonation(
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
-    return { ok: false, message: "Please check the highlighted fields.", fieldErrors };
+    // Everything to fix in one go, not a round at a time: the other checks run on what was typed too.
+    const charity = await loadDonatableCharity(slug);
+    // With "use my ID ending 1234" the server fills in the ID and address from their earlier gift, so the
+    // s18A checks don't apply yet (startDonation runs them on the merged details).
+    const usingSavedId = formData.get("use_saved_id") === "on";
+    for (const [k, v] of Object.entries(checkDonorDetails(raw as CheckoutInput, Boolean(charity?.receiptsAvailable) && !usingSavedId))) fieldErrors[k] ??= v;
+    return { ok: false, message: fixMessage(fieldErrors), fieldErrors };
   }
 
   const h = await headers();
   const ip = clientIp(h);
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, input: parsed.data, ip });
-  if (!result.ok) return result;
+  // "Use my ID ending 1234": only for the signed-in person, checked here on the server.
+  const viewer = formData.get("use_saved_id") === "on" ? await getViewer() : null;
+  const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, input: parsed.data, ip, useSavedIdOf });
+  if (!result.ok) return result.message === "Please check the highlighted fields." && result.fieldErrors ? { ...result, message: fixMessage(result.fieldErrors) } : result;
+  // The website never charges a saved card (only the app does), so there is always a payment page.
+  if (!result.redirectUrl) return { ok: false, message: "We couldn't start the payment. Please try again." };
   redirect(result.redirectUrl);
+}
+
+/** The line by the Pay button when fields need fixing. */
+function fixMessage(fieldErrors: Record<string, string>): string {
+  const n = Object.keys(fieldErrors).length;
+  return n === 1 ? "Please fix the field marked in red above." : `Please fix the ${n} fields marked in red above.`;
 }

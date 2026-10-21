@@ -1,10 +1,9 @@
 import { router } from "expo-router";
-import { ScrollView, Share, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Splash } from "@/components/splash";
-import { HeaderCurve } from "@/components/backdrop";
+import { BlueHeader } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
-import { InfoIcon } from "@/components/icons";
+import { BackIcon, InfoIcon } from "@/components/icons";
 import { ReceiptSlip } from "@/components/receipt-slip";
 import { ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
@@ -57,14 +56,16 @@ export default function Receipts() {
       : [...new Set(myGifts.filter((g) => directory.data?.charities.find((c) => c.slug === g.charitySlug)?.issues18a === false).map((g) => g.charityName))];
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, paddingHorizontal: space.gutter, gap: space.block }}>
-        <HeaderCurve depth={insets.top + 112} />
-      <View>
-        <Text variant="h1" accessibilityRole="header">Receipts</Text>
-        <View style={styles.arc}><Splash size={84} /></View>
-      </View>
-      {/* Room for the header curve. */}
-      <View style={{ height: 20 }} />
+    <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
+      <BlueHeader paddingTop={insets.top + 12}>
+        {/* Receipts open from Account, so the way back is Account. */}
+        <Pressable onPress={() => router.navigate("/account")} accessibilityRole="button" accessibilityLabel="Back to Account" style={styles.back}>
+          <BackIcon color={colors.onInk} />
+        </Pressable>
+        <Text style={styles.headTitle} accessibilityRole="header">Your s18A receipts</Text>
+        <Text style={styles.headLine}>Ask for an s18A receipt when you give, and you get one per charity each tax year, ready for your tax return.</Text>
+      </BlueHeader>
+      <View style={{ paddingHorizontal: space.gutter, gap: space.block }}>
 
       {state === "loading" ? (
         <View style={{ gap: 16 }}>
@@ -127,7 +128,7 @@ export default function Receipts() {
                         onDownload={() => {
                           // The PDF is handed out by the website, after it checks who is asking.
                           if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF on our website.");
-                          openSite(`/receipts/${r.id}`);
+                          openSite(`/receipts/${encodeURIComponent(r.id)}`);
                         }}
                       />
                     ))}
@@ -147,7 +148,7 @@ export default function Receipts() {
                   <Button
                     key={y}
                     variant="secondary"
-                    label={y === current ? `${y} so far` : `Tax year ${y}`}
+                    label={y === current ? `Tax year ${y} so far` : `Tax year ${y}`}
                     style={{ paddingHorizontal: 18 }}
                     onPress={() => (preview ? notify("Sample tax pack", "In the live app this opens your tax pack on our website.") : openSite(`/account/tax-pack/${y}`))}
                   />
@@ -167,13 +168,16 @@ export default function Receipts() {
           {preview && years.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample receipts for design review</Text> : null}
         </>
       )}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
-  arc: { position: "absolute", right: space.gutter - 2, top: -10, zIndex: 2 },
+  back: { width: 44, height: 44, marginLeft: -10, alignItems: "center", justifyContent: "center" },
+  headTitle: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
+  headLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft },
   summary: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   summaryKicker: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
   pack: { gap: 4, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },

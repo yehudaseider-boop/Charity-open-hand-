@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isErasedAddress } from "@/lib/email";
 import type { CharityRow, DonorRow, ReceiptDetails } from "./details";
 import type { IssuedReceipt, ReceiptStore } from "./issue";
 import type { PlanCharity, PlanDonation, PlannedReceipt } from "./plan";
@@ -131,12 +132,12 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         charity_id: string;
         details: ReceiptDetails;
         pdf_path: string;
-        s18a_receipt_donations: { donations: { paid_at: string; donation_checkout_details: { email: string } | { email: string }[] | null } | null }[];
+        s18a_receipt_donations: { donations: { status: string; paid_at: string; donation_checkout_details: { email: string } | { email: string }[] | null } | null }[];
       };
       const rows = await all<Row>((from, to) =>
         db
           .from("s18a_receipts")
-          .select("id, charity_id, details, pdf_path, s18a_receipt_donations(donations(paid_at, donation_checkout_details(email)))")
+          .select("id, charity_id, details, pdf_path, s18a_receipt_donations(donations(status, paid_at, donation_checkout_details(email)))")
           .eq("tax_year", taxYear)
           .eq("status", "issued")
           .not("pdf_path", "is", null)
@@ -146,12 +147,17 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       );
       const out: (IssuedReceipt & { email: string })[] = [];
       for (const r of rows) {
-        // The donor's email as typed with their most recent donation on the receipt.
         const donations = r.s18a_receipt_donations.map((l) => l.donations).filter((d): d is NonNullable<typeof d> => d !== null);
+        // A gift refunded or charged back since issue makes the receipt wrong: a person voids and
+        // re-issues it (receipt.needs_reissue in the audit log). It is never emailed as it stands.
+        if (donations.some((d) => d.status !== "paid")) continue;
+        // The donor's email as typed with their most recent donation on the receipt.
         donations.sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
         const raw = donations[0]?.donation_checkout_details;
         const email = (Array.isArray(raw) ? raw[0] : raw)?.email;
-        if (!email) continue;
+        // A donor erased since the receipt was issued has no address left to send to; the receipt is
+        // not counted as emailed, so the admin page does not say it was.
+        if (!email || isErasedAddress(email)) continue;
         out.push({
           id: r.id,
           charityId: r.charity_id,

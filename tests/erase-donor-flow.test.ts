@@ -38,6 +38,8 @@ vi.mock("@/lib/supabase/admin", () => ({
         eq: (c: string, v: unknown) => ((f[c] = v), q),
         maybeSingle: async () => ({ data: profile, error: null }),
         delete: () => ({
+          // The charities' personal thank-yous to the erased donors: .in("donor_id", ids)
+          in: async () => ({ error: null }),
           eq: (c1: string, v1: unknown) => ({
             // consents: .eq("user_id").eq("kind"); the person's own tables: one .eq("user_id")
             eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }),
@@ -92,7 +94,7 @@ describe("erasing a donor by their account", () => {
     expect(calls).toEqual([
       "rpc",
       "email",
-      ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"].map((t) => `${t}:deleted:user_id=${USER}`),
+      ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"].map((t) => `${t}:deleted:user_id=${USER}`),
       "consents:kind=account",
       "deleteUser",
       "audit",
@@ -127,7 +129,7 @@ describe("erasing a donor by their account", () => {
     for (const t of ["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings"]) {
       expect(calls).toContain(`${t}:deleted:user_id=${USER}`);
     }
-    expect(calls).toContain('profiles:update:{"full_name":null}');
+    expect(calls).toContain('profiles:update:{"full_name":null,"giver_type":null}');
   });
 
   it("reports an account that could not be deleted, after the information was erased", async () => {

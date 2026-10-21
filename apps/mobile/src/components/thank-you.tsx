@@ -4,7 +4,6 @@ import { Animated, Modal, StyleSheet, View } from "react-native";
 import { gifts as sampleGifts, type Gift } from "@/data/giving";
 import { useAccount } from "@/lib/account";
 import { ddmmyyyy, rand } from "@/lib/format";
-import { givingKindLabels } from "@/lib/giving";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { colors, radius, space } from "@/theme/tokens";
@@ -19,7 +18,9 @@ import { Text } from "./text";
  */
 export function ThankYou() {
   const account = useAccount();
-  const demo = useGlobalSearchParams<{ demo?: string }>().demo === "thanks";
+  // Preview only: a link must never make the live app show a gift as arrived.
+  const params = useGlobalSearchParams<{ demo?: string }>();
+  const demo = account.status === "preview" && params.demo === "thanks";
   const [demoOpen, setDemoOpen] = useState(demo);
   const [lastDemo, setLastDemo] = useState(demo);
   if (demo !== lastDemo) {
@@ -54,7 +55,7 @@ export function ThankYou() {
           <Text variant="h1" style={{ fontSize: 30, lineHeight: 36, textAlign: "center" }}>Thank you</Text>
           {one ? (
             <Text style={styles.body}>
-              Your {rand(one.cents)} to {one.charityName} arrived on {ddmmyyyy(one.date)}. It counts as {givingKindLabels[one.kind].toLowerCase()}.
+              Your {rand(one.cents)} to {one.charityName} arrived on {ddmmyyyy(one.date)}.{one.label ? ` Labelled "${one.label}".` : ""}
             </Text>
           ) : (
             <Text style={styles.body}>{list.length} donations arrived, {rand(total)} in all. They are in your giving history.</Text>
@@ -73,7 +74,7 @@ export function ThankYou() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(31,42,94,0.45)", justifyContent: "center", padding: space.gutter },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, justifyContent: "center", padding: space.gutter },
   card: { gap: 16, padding: 24, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center", alignItems: "stretch" },
   badge: { alignSelf: "center", width: 72, height: 72, borderRadius: 36, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },
   body: { fontSize: 17, lineHeight: 25, textAlign: "center", color: colors.ink },

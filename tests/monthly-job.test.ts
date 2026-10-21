@@ -42,6 +42,7 @@ function deps(now: Date = NOW): MonthlyDeps {
     reschedule: async (id, next) => void world.rescheduled.push({ id, next: next.toISOString() }),
     recordPaid: async (id, period, next) => void world.paid.push({ id, period, next: next.toISOString() }),
     recordFailure: async (id, period, n, retryAt) => void world.failures.push({ id, period, n, retryAt: retryAt?.toISOString() ?? null }),
+    failAttempt: async (id) => void world.attempts.set(id, "failed"),
   };
   return {
     store,
@@ -306,17 +307,43 @@ describe("the end of the month", () => {
   });
 });
 
+describe("a payment the gateway took for a different amount", () => {
+  it("is held for a person: not charged again this month, next collection is next month, no hourly retry", async () => {
+    confirmWith = () => "review";
+    const s = await runMonthlyCharges(deps());
+    const ref = attemptDonationId("rec1", "2026-11", 0);
+    expect(charges).toHaveLength(1);
+    expect(s.review).toEqual([{ id: "rec1", donationId: ref }]);
+    expect(s).toMatchObject({ paid: 0, failed: 0, waiting: [], errors: [] });
+    expect(world.failures).toEqual([]);
+    expect(world.rescheduled).toEqual([{ id: "rec1", next: "2026-12-15T06:00:00.000Z" }]);
+    expect(world.attempts.get(ref)).toBe("pending");
+  });
+});
+
 describe("a charge the gateway refuses outright", () => {
   it("counts as a failed attempt: retry later, email the donor, no re-sending", async () => {
     chargeRefused = true;
+    confirmWith = () => { throw new Error("Transaction reference not found"); };
     const s = await runMonthlyCharges(deps());
     expect(s).toMatchObject({ failed: 1, errors: [] });
     expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: new Date(NOW.getTime() + 24 * 3_600_000).toISOString() }]);
     expect(failedEmails).toEqual([{ final: false }]);
+    // The attempt's own donation does not stay pending for ever.
+    expect(world.attempts.get(attemptDonationId("rec1", "2026-11", 0))).toBe("failed");
+  });
+
+  it("asks the gateway after a refusal, and goes by what it recorded", async () => {
+    chargeRefused = true;
+    confirmWith = () => "paid";
+    const s = await runMonthlyCharges(deps());
+    expect(s).toMatchObject({ paid: 1, failed: 0 });
+    expect(world.failures).toEqual([]);
   });
 
   it("the third refusal stops the monthly donation", async () => {
     chargeRefused = true;
+    confirmWith = () => "failed";
     world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 2 })];
     const s = await runMonthlyCharges(deps());
     expect(s).toMatchObject({ failed: 1, stopped: 1 });

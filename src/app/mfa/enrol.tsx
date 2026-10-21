@@ -11,7 +11,7 @@ export function Enrol({ next }: { next: string }) {
         <p className="text-sm text-muted">
           Charity accounts need a second step when signing in. Use an authenticator app on your phone, such as Google Authenticator, Microsoft Authenticator or Authy.
         </p>
-        {state.error ? <p className="text-sm text-danger">{state.error}</p> : null}
+        {state.error ? <p role="alert" className="text-sm text-danger">{state.error}</p> : null}
         <button disabled={pending} className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-50">
           Set up authenticator app
         </button>
@@ -22,7 +22,7 @@ export function Enrol({ next }: { next: string }) {
     <form action={verifyCode} className="space-y-3">
       <p className="text-sm">1. Scan this code with your authenticator app.</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={state.qr} alt="QR code for your authenticator app" width={192} height={192} className="mx-auto rounded-control border border-border bg-white p-2" />
+      <img src={state.qr} alt="QR code for your authenticator app" width={192} height={192} className="mx-auto rounded-control border border-border bg-surface p-2" />
       <p className="text-xs text-muted">Can&apos;t scan? Enter this key instead: <span className="break-all font-mono">{state.secret}</span></p>
       <p className="text-sm">2. Enter the 6-digit code it shows.</p>
       <input type="hidden" name="factorId" value={state.factorId} />

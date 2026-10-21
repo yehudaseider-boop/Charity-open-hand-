@@ -25,6 +25,13 @@ export function thisMonth(now: Date): Period {
   return { from: sa(first), to: sa(next) };
 }
 
+/** Last calendar month, Johannesburg time. */
+export function lastMonth(now: Date): Period {
+  const [y, m] = saDate(now).split("-").map(Number);
+  const first = m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, "0")}-01`;
+  return { from: sa(first), to: thisMonth(now).from };
+}
+
 /** The current SARS tax year (1 March to the end of February), and its number. */
 export function thisTaxYear(now: Date): Period & { taxYear: number; end: string } {
   const taxYear = taxYearFor(now);
@@ -34,15 +41,29 @@ export function thisTaxYear(now: Date): Period & { taxYear: number; end: string 
 
 export const allTime: Period = { from: sa("2000-01-01"), to: sa("2100-01-01") };
 
+/** A donor who asked to be erased keeps a placeholder address so the record still adds up; never shown or emailed. */
+export const isErasedEmail = (email: string | null | undefined): boolean => Boolean(email && /@erased\.invalid$/i.test(email));
+export const shownEmail = (email: string | null | undefined): string | null => (email && !isErasedEmail(email) ? email : null);
+export const ERASED_DONOR = "Erased at the donor's request";
+
 /** The name to show for a donor: person, or organisation. */
-export function donorName(d: { donor_type: string | null; first_name: string | null; last_name: string | null; organisation_name: string | null }): string {
+export function donorName(d: { donor_type: string | null; first_name: string | null; last_name: string | null; organisation_name: string | null; email?: string | null }): string {
+  if (isErasedEmail(d.email)) return ERASED_DONOR;
   if (d.donor_type && d.donor_type !== "individual") return (d.organisation_name ?? "").trim() || "Organisation";
   return [d.first_name, d.last_name].map((x) => x?.trim()).filter(Boolean).join(" ") || "Donor";
 }
 
-/** Characters that would change the meaning of a PostgREST filter, removed from search text. */
+/**
+ * Search text as typed, so "sarah.cohen@gmail.com" and "O'Brien" still match. Only the characters
+ * that could break out of a quoted PostgREST value, or act as wildcards, are removed.
+ */
 export function safeSearch(q: string): string {
-  return q.replace(/[,()*%_\\"'.:]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  return q.replace(/[\\"*%\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+
+/** A "contains" pattern for a PostgREST or() filter: quoted, so commas, dots and brackets are plain text. */
+export function containsPattern(q: string): string {
+  return `"%${safeSearch(q)}%"`;
 }
 
 export const donationStatus = {
@@ -122,4 +143,16 @@ export function monthlySummary(rows: Pick<MonthlyRow, "status" | "amount_cents">
     pausedCount: rows.filter((r) => r.status === "paused").length,
     endedCount: rows.filter((r) => r.status === "failed" || r.status === "cancelled").length,
   };
+}
+
+/** The average gift in whole cents, rounded half up, using whole numbers only. 0 when there are none. */
+export function averageCents(totalCents: number, count: number): number {
+  if (count <= 0) return 0;
+  const t = BigInt(totalCents), c = BigInt(count);
+  return Number((t * 2n + c) / (c * 2n));
+}
+
+/** Share of donors who gave more than once, as a whole percentage. */
+export function repeatPercent(repeat: number, all: number): number {
+  return all > 0 ? Math.floor((repeat * 100) / all) : 0;
 }

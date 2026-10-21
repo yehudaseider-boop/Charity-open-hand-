@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { TermsAndPrivacyLinks } from "@/components/legal";
 import { getViewer } from "@/lib/auth";
-import { sendLoginLink } from "./actions";
+import { sendLoginLink, verifyLoginCode } from "./actions";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 const errors: Record<string, string> = {
   email: "Please enter a valid email address.",
   send: "We couldn't send the link. Please try again in a minute.",
-  link: "That sign-in link has expired or was already used. Please ask for a new one.",
+  link: "That sign-in link didn't work. It only opens in the browser you asked for it from. Ask for a new one and type the code from the email instead.",
+  code: "That code didn't work. Check it, or ask for a new email and use the newest code.",
   busy: "We've sent several links to this address in the last hour. Please use the latest one, or try again later.",
 };
 
@@ -29,7 +30,29 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           You&apos;re signed in{viewer.email ? ` as ${viewer.email}` : ""}. <Link href="/account" className="text-brand underline">Go to your account</Link>.
         </p>
       ) : sent ? (
-        <p className="mt-3 text-sm">Check your email. We&apos;ve sent you a link to sign in.</p>
+        <div className="mt-3 space-y-4">
+          <p className="text-sm">Check your email{email ? ` (${email})` : ""}. Tap the link in it, or type the code from it here.</p>
+          {email ? (
+            <form action={verifyLoginCode} className="space-y-3">
+              <input type="hidden" name="email" value={email} />
+              <input type="hidden" name="next" value={next} />
+              <label className="block text-sm font-medium" htmlFor="code">Code from the email</label>
+              <input
+                id="code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                className="w-full rounded-control border border-border bg-surface px-3 py-2.5 text-lg tracking-widest"
+              />
+              {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+              <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Sign in</button>
+            </form>
+          ) : null}
+          <p className="text-xs text-muted">
+            Nothing arrived? Check spam, or <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-brand underline">ask for a new email</Link>.
+          </p>
+        </div>
       ) : (
         <form action={sendLoginLink} className="mt-4 space-y-3">
           <p className="text-sm text-muted">

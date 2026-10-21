@@ -66,8 +66,8 @@ async function paidDonation() {
   );
   await run("insert into public.donation_giving_kinds (donation_id, kind) values ($1, 'maaser')", [id]);
   await run(
-    `insert into public.recurring_donations (donor_id, charity_id, amount_cents, gateway, gateway_subscription_ref, gateway_customer_ref)
-     values ($1, $2, 18000, 'test', 'SUB_secret', 'CUS_secret')`,
+    `insert into public.recurring_donations (donor_id, charity_id, amount_cents, charge_day, gateway, gateway_subscription_ref, gateway_customer_ref)
+     values ($1, $2, 18000, 15, 'test', 'SUB_secret', 'CUS_secret')`,
     [ids.donor, ids.meals],
   );
   return id;
@@ -253,6 +253,58 @@ describe("signing in from the app", () => {
     });
   });
 
+  it("a password session on the same account sees and changes nothing", async () => {
+    await tx(async () => {
+      await guestDonor("taken@example.co.za");
+      const u = await newUser("taken@example.co.za", true);
+      await as(u);
+      expect((await run("select public.link_my_donations() as n")).rows[0].n).toBe(1);
+      await run("insert into public.favourites (user_id, charity_id) values ($1, $2)", [u, ids.meals]);
+      expect((await run("select id from public.donors where user_id = $1", [u])).rows).toHaveLength(1);
+      // Someone who registered this address with a password earlier signs in with it.
+      await as(u, "password");
+      expect((await run("select id from public.donors where user_id = $1", [u])).rows).toHaveLength(0);
+      expect((await run("select charity_id from public.favourites where user_id = $1", [u])).rows).toHaveLength(0);
+      expect((await run("update public.donors set phone = '0820000000' where user_id = $1 returning id", [u])).rows).toHaveLength(0);
+      await run("savepoint p");
+      await expect(run("insert into public.favourites (user_id, charity_id) values ($1, $2)", [u, ids.meals])).rejects.toThrow(/row-level security/);
+      await run("rollback to savepoint p");
+      await run("savepoint q");
+      await expect(run("select public.set_my_recurring_status(gen_random_uuid(), 'paused')")).rejects.toThrow(/emailed code/);
+      await run("rollback to savepoint q");
+    });
+  });
+
+  it("the dashboard's action history is closed to browsers, even to the charity's own admins", async () => {
+    await tx(async () => {
+      await as(ids.mealsAdmin);
+      await run("savepoint a");
+      await expect(run("select * from public.charity_actions")).rejects.toThrow(/permission denied/);
+      await run("rollback to savepoint a");
+      await expect(run("insert into public.charity_actions (charity_id, kind) values ($1, 'profile_saved')", [ids.meals])).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it("a charity admin's session started with a password manages nothing, even with a second step", async () => {
+    await tx(async () => {
+      await as(ids.mealsAdmin);
+      expect((await run("select public.is_charity_admin($1) as ok", [ids.meals])).rows[0].ok).toBe(true);
+      await run("select * from public.charity_donor_list($1)", [ids.meals]); // allowed: no error
+      // Someone who registered the admin's email with a password before they ever signed in, and
+      // added their own authenticator: aal2, but not the emailed code.
+      await as(ids.mealsAdmin, "password");
+      expect((await run("select public.is_charity_admin($1) as ok", [ids.meals])).rows[0].ok).toBe(false);
+      expect((await run("select public.has_second_step() as ok")).rows[0].ok).toBe(false);
+      await run("savepoint d");
+      await expect(run("select * from public.charity_donor_list($1)", [ids.meals])).rejects.toThrow(/Not allowed/);
+      await run("rollback to savepoint d");
+      expect((await run("select count(*)::int as n from public.charity_donations where charity_id = $1", [ids.meals])).rows[0].n).toBe(0);
+      await run("savepoint e");
+      await expect(run("select public.agree_to_policy('2026-10')")).rejects.toThrow(/emailed code/);
+      await run("rollback to savepoint e");
+    });
+  });
+
   it("does nothing for an unconfirmed email, and never takes a donor record an account already has", async () => {
     await tx(async () => {
       await guestDonor("pending@example.co.za");
@@ -316,7 +368,7 @@ describe("giving made elsewhere", () => {
 describe("pausing and cancelling a monthly donation", () => {
   async function monthly(card = true) {
     await run("reset role");
-    const { rows } = await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents, authorization_encrypted) values ($1, $2, 50000, $3) returning id", [ids.donor, ids.meals, card ? "enc" : null]);
+    const { rows } = await run("insert into public.recurring_donations (donor_id, charity_id, amount_cents, charge_day, authorization_encrypted) values ($1, $2, 50000, 15, $3) returning id", [ids.donor, ids.meals, card ? "enc" : null]);
     return rows[0].id as string;
   }
   const state = async (id: string) => {
