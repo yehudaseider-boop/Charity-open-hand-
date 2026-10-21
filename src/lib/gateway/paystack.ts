@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { GatewayError, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
+import { GatewayError, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /**
  * Paystack adapter.
@@ -246,5 +246,48 @@ export const paystackGateway: PaymentGateway = {
       }),
     });
     return { accountRef: data.subaccount_code };
+  },
+
+  /**
+   * Payouts ("settlements") to one charity's subaccount, each with its transactions. Amounts are in the
+   * smallest unit (cents for rand). VERIFY in test mode, before any charity sees the report: that
+   * /settlement filters by subaccount; the names of the date, amount, fee and status fields; whether a
+   * transaction's amount is the whole charge or the subaccount's share; and how refunds and chargebacks
+   * taken out of a settlement are listed. Until then the report's own check (each gift minus its fee
+   * equals what reached the bank, and the lines add up to the deposit) shows any mismatch.
+   */
+  async listPayouts({ charityAccountRef, since }) {
+    const out: Payout[] = [];
+    for (let page = 1; page <= 20; page++) {
+      const settlements = await call<
+        { id: number; status: string; settlement_date?: string; createdAt?: string; effective_amount?: number; total_amount?: number }[]
+      >(`/settlement?subaccount=${encodeURIComponent(charityAccountRef)}&from=${encodeURIComponent(since)}&perPage=100&page=${page}`);
+      for (const st of settlements) {
+        const lines: PayoutLine[] = [];
+        for (let tp = 1; tp <= 50; tp++) {
+          const txs = await call<{ reference?: string | null; amount?: number; fees?: number; type?: string; status?: string }[]>(
+            `/settlement/${st.id}/transactions?perPage=100&page=${tp}`,
+          );
+          for (const t of txs) {
+            const gross = Number(t.amount ?? 0);
+            const fee = Number(t.fees ?? 0);
+            const kind = t.type === "refund" ? "refund" : t.type === "dispute" || t.type === "chargeback" ? "chargeback" : t.type === undefined || t.type === "transaction" ? "payment" : "other";
+            const sign = kind === "refund" || kind === "chargeback" ? -1 : 1;
+            lines.push({ reference: t.reference ?? null, kind, grossCents: sign * Math.abs(gross), feeCents: fee, netCents: sign * Math.abs(gross) - fee });
+          }
+          if (txs.length < 100) break;
+        }
+        const day = String(st.settlement_date ?? st.createdAt ?? "").slice(0, 10);
+        out.push({
+          ref: String(st.id),
+          paidOutOn: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : since,
+          amountCents: Number(st.effective_amount ?? st.total_amount ?? 0),
+          status: st.status === "success" || st.status === "processed" ? "paid" : st.status === "failed" ? "failed" : "pending",
+          lines,
+        });
+      }
+      if (settlements.length < 100) break;
+    }
+    return out;
   },
 };

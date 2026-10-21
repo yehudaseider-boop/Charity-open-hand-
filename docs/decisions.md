@@ -44,6 +44,13 @@
   by email, amount and date. A recorded gift can be removed (Undo for 30 minutes, then Remove) until it is
   on an s18A receipt, issued or withdrawn; the database enforces this.
 
+- **Deposits (21/10/2026, Juan of the Angel Network, Yehuda):** the payment provider pays each charity in
+  one deposit a day with its fees taken off. A daily job keeps each payout and its lines as the provider
+  reports them (`payouts`, `payout_lines`, server-only), and the charity's Deposits page shows each gift, its
+  fee and what reached the bank, totalling to the bank deposit. The provider's fee figures are used as
+  given; our own gift amount is used for the Gift column (the s18A receipt is always for the full gift).
+  A line or deposit that doesn't add up is shown as such, never smoothed over.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

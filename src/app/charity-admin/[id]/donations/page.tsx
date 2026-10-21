@@ -79,6 +79,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       <div className="flex flex-wrap gap-2 text-sm">
         <Link href={`${base}/record`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Record a gift</Link>
         <Link href={`${base}/import`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Import from a file</Link>
+        <Link href={`${base}/deposits`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Deposits</Link>
         <span className="self-center text-xs text-muted">For EFT, cash and other gifts that didn&apos;t come through Givezy.</span>
       </div>
 

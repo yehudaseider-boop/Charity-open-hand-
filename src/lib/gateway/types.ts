@@ -100,6 +100,31 @@ export type CharityAccountRequest = {
   accountHolder: string;
 };
 
+/** One line of a payout: a payment paid out to the charity, or money taken back out of the payout. */
+export type PayoutLine = {
+  /** Our reference for the payment (the donation id), when the gateway gives it. */
+  reference: string | null;
+  kind: "payment" | "refund" | "chargeback" | "other";
+  /** What the gateway counts for this line before its fee, in cents. Negative for money taken back. */
+  grossCents: number;
+  /** The gateway's own fee on this line, in cents, as it reports it. Never worked out by us. */
+  feeCents: number;
+  /** What this line adds to the deposit, in cents. Negative for money taken back. */
+  netCents: number;
+};
+
+/** A payout: one deposit the gateway made, or will make, into a charity's bank account. */
+export type Payout = {
+  /** The gateway's own id for the payout. */
+  ref: string;
+  /** The day the money was (or will be) paid out, yyyy-mm-dd, as the gateway says. */
+  paidOutOn: string;
+  /** The deposit amount, in cents, as the gateway says. */
+  amountCents: number;
+  status: "paid" | "pending" | "failed";
+  lines: PayoutLine[];
+};
+
 export interface PaymentGateway {
   /** Short name stored on donations and charities, e.g. "test". */
   readonly name: string;
@@ -122,6 +147,11 @@ export interface PaymentGateway {
   parseWebhook(rawBody: string, headers: Headers): Promise<WebhookEvent | null>;
   /** Register a charity's settlement bank account. Returns the gateway's reference. */
   createCharityAccount(req: CharityAccountRequest): Promise<{ accountRef: string }>;
+  /**
+   * The payouts the gateway made into one charity's account since a day (yyyy-mm-dd), each with its lines:
+   * the payments in it, each payment's fee, and anything taken back out (refunds, chargebacks).
+   */
+  listPayouts(args: { charityId: string; charityAccountRef: string; since: string }): Promise<Payout[]>;
 }
 
 export class GatewayError extends Error {

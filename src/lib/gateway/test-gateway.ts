@@ -1,7 +1,8 @@
 import "server-only";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GatewayError, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
+import { isoDateInJhb } from "@/lib/dates";
+import { GatewayError, type PaymentGateway, type PayoutLine, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /**
  * A stand-in gateway for local development and automated tests. It shows a
@@ -130,5 +131,46 @@ export const testGateway: PaymentGateway = {
 
   async createCharityAccount(req) {
     return { accountRef: `test_acct_${req.charityId.slice(0, 8)}` };
+  },
+
+  /**
+   * Pretend payouts: each day's paid test gifts to the charity paid out the next day, and a refund or
+   * chargeback taken out of the payout on the day after it. The test gateway charges no fee unless
+   * TEST_GATEWAY_FEE_PPM is set (parts per million, local testing only): it never stands for a real rate.
+   */
+  async listPayouts({ charityId, since }) {
+    const ppm = BigInt(/^\d{1,6}$/.test(process.env.TEST_GATEWAY_FEE_PPM ?? "") ? process.env.TEST_GATEWAY_FEE_PPM! : "0");
+    const feeOf = (cents: number) => Number((BigInt(cents) * ppm + 500_000n) / 1_000_000n);
+    const nextDay = (iso: string) => {
+      const d = new Date(Date.parse(`${isoDateInJhb(new Date(iso))}T12:00:00+02:00`) + 86_400_000);
+      return isoDateInJhb(d);
+    };
+    const { data, error } = await createAdminClient()
+      .from("donations")
+      .select("id, amount_cents, status, paid_at, refunded_at, charged_back_at")
+      .eq("charity_id", charityId)
+      .eq("gateway", "test")
+      .in("status", ["paid", "refunded", "charged_back"])
+      .gte("paid_at", `${since}T00:00:00+02:00`)
+      .order("paid_at")
+      .limit(5000);
+    if (error) throw new GatewayError(`Test gateway could not read its payments: ${error.message}`);
+    const byDay = new Map<string, PayoutLine[]>();
+    const add = (day: string, line: PayoutLine) => byDay.set(day, [...(byDay.get(day) ?? []), line]);
+    for (const d of data ?? []) {
+      const cents = Number(d.amount_cents);
+      const fee = feeOf(cents);
+      add(nextDay(d.paid_at as string), { reference: d.id as string, kind: "payment", grossCents: cents, feeCents: fee, netCents: cents - fee });
+      const back = (d.refunded_at ?? d.charged_back_at) as string | null;
+      if (back) add(nextDay(back), { reference: d.id as string, kind: d.refunded_at ? "refund" : "chargeback", grossCents: -cents, feeCents: 0, netCents: -cents });
+    }
+    const today = isoDateInJhb(new Date());
+    return [...byDay.entries()].map(([day, lines]) => ({
+      ref: `test_payout_${charityId.slice(0, 8)}_${day}`,
+      paidOutOn: day,
+      amountCents: lines.reduce((t, l) => t + l.netCents, 0),
+      status: day <= today ? ("paid" as const) : ("pending" as const),
+      lines,
+    }));
   },
 };
