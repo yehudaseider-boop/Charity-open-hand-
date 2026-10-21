@@ -20,7 +20,9 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["./src/lib/*"]
+      "@shared/*": ["./src/lib/*"],
+      "expo-secure-store": ["./tests/stubs/expo-secure-store.ts"],
+      "react-native": ["./tests/stubs/react-native.ts"]
     }
   },
   "include": [
