@@ -4,7 +4,7 @@ import { Notice } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { charityPageUrl, qrSvg } from "@/lib/charity/qr";
+import { charityPageUrl, qrSvg, qrTarget } from "@/lib/charity/qr";
 import { PrintButton } from "./print-button";
 
 export const metadata: Metadata = { title: "QR poster" };
@@ -21,7 +21,8 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
     return <Notice tone="warning">Your QR poster is ready once your charity is approved and listed.</Notice>;
   }
   const url = charityPageUrl(charity.slug);
-  const svg = await qrSvg(url);
+  // The code opens the page tagged as the poster; the printed address stays short.
+  const svg = await qrSvg(qrTarget(charity.slug));
   const shortUrl = url.replace(/^https?:\/\//, "");
   const download = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 

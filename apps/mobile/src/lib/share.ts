@@ -1,7 +1,9 @@
 /**
  * Sharing a charity or a campaign on WhatsApp: a short message with a link to its page on our
  * website (WhatsApp shows the page's photo and name as a preview). No imports on purpose: the
- * website's tests run this file too. Amounts arrive already formatted ("R31 400").
+ * website's tests run this file too. Amounts arrive already formatted ("R31 400"). Each link carries
+ * `src=whatsapp`, so the charity sees which gifts came from a WhatsApp share (the website's
+ * `src/lib/donations/source.ts` reads it).
  */
 
 function page(site: string, path: string): string | null {
@@ -10,7 +12,7 @@ function page(site: string, path: string): string | null {
 }
 
 export function charityShareText(site: string | undefined, c: { slug: string; nameEn: string }): string | null {
-  const url = page(site ?? "", `/c/${encodeURIComponent(c.slug)}`);
+  const url = page(site ?? "", `/c/${encodeURIComponent(c.slug)}?src=whatsapp`);
   return url ? `I give to ${c.nameEn} on Givezy. Have a look: ${url}` : null;
 }
 
@@ -19,7 +21,7 @@ export function campaignShareText(
   c: { slug: string; nameEn: string },
   campaign: { id: string; title: string; raised: string; target: string | null },
 ): string | null {
-  const url = page(site ?? "", `/c/${encodeURIComponent(c.slug)}/donate?campaign=${encodeURIComponent(campaign.id)}`);
+  const url = page(site ?? "", `/c/${encodeURIComponent(c.slug)}/donate?campaign=${encodeURIComponent(campaign.id)}&src=whatsapp`);
   if (!url) return null;
   const progress = campaign.target ? `${campaign.raised} of ${campaign.target} raised so far.` : `${campaign.raised} raised so far.`;
   return `${c.nameEn} is raising for ${campaign.title}. ${progress} Give here: ${url}`;

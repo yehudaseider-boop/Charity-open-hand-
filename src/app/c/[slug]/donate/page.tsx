@@ -12,6 +12,7 @@ import { cleanLabel } from "@/lib/donations/labels";
 import { formatRand } from "@/lib/money";
 import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
+import { sourceTag } from "@/lib/donations/source";
 import { DonateFlow } from "./donate-flow";
 
 // One lookup serves both the title and the page.
@@ -68,6 +69,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           fromApp={fromApp}
           campaign={campaign ? { id: campaign.id, title: campaign.title } : undefined}
           account={account}
+          source={sourceTag(sp.src)}
         />
       ) : (
         <Card><p className="text-sm">{charity.name_en} isn&apos;t taking online donations yet.</p></Card>

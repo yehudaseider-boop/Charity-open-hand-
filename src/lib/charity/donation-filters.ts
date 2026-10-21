@@ -3,6 +3,7 @@
  * matches the screen. Pure (tested). Periods are Johannesburg calendar days, inclusive.
  */
 import { taxYearFor, taxYearRange } from "@/lib/dates";
+import { isGiftSource, type GiftSource } from "@/lib/donations/source";
 import { containsPattern, isDonationStatus, safeSearch, saDate, type DonationStatus } from "./dashboard";
 
 export const periodOptions = {
@@ -22,6 +23,10 @@ export type DonationFilters = {
   /** Inclusive yyyy-mm-dd, set for every period except "all". */
   fromDate: string | null;
   toDate: string | null;
+  /** One campaign (its id), "none" for gifts to no campaign, or "" for all. */
+  campaign: string;
+  /** Where the gifts came from, "unknown" for older gifts with none, or "" for all. */
+  source: GiftSource | "unknown" | "";
 };
 
 const isoDay = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,7 +40,17 @@ const lastDayOfMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).get
 type Params = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function parseDonationFilters(params: Params, now: Date = new Date()): DonationFilters {
+  const rawCampaign = one(params.campaign);
+  const campaign = rawCampaign === "none" || uuid.test(rawCampaign) ? rawCampaign.toLowerCase() : "";
+  const rawSource = one(params.source);
+  const source = rawSource === "unknown" || isGiftSource(rawSource) ? rawSource : "";
+  return { ...dates(params, now), campaign, source };
+}
+
+function dates(params: Params, now: Date): Omit<DonationFilters, "campaign" | "source"> {
   const rawStatus = one(params.status);
   const status = rawStatus !== "all" && isDonationStatus(rawStatus) ? rawStatus : "all";
   const q = safeSearch(one(params.q));
@@ -76,6 +91,8 @@ export function filtersToQuery(f: DonationFilters, extra: Record<string, string>
   const p = new URLSearchParams();
   if (f.status !== "all") p.set("status", f.status);
   if (f.q) p.set("q", f.q);
+  if (f.campaign) p.set("campaign", f.campaign);
+  if (f.source) p.set("source", f.source);
   if (f.period !== "all") p.set("period", f.period);
   if (f.period === "custom" && f.fromDate && f.toDate) {
     p.set("from", f.fromDate);
@@ -97,6 +114,7 @@ type Filterable<T> = {
   gte(column: string, value: string): T;
   lt(column: string, value: string): T;
   or(filters: string): T;
+  is(column: string, value: null): T;
 };
 
 /** Apply the filters to a charity_donations query. Dates go by when the payment went through. */
@@ -104,6 +122,10 @@ export function applyDonationFilters<T extends Filterable<T>>(query: T, f: Donat
   let q = query;
   if (f.status !== "all") q = q.eq("status", f.status);
   if (f.fromDate && f.toDate) q = q.gte("paid_at", `${f.fromDate}T00:00:00+02:00`).lt("paid_at", `${dayAfter(f.toDate)}T00:00:00+02:00`);
+  if (f.campaign === "none") q = q.is("campaign_id", null);
+  else if (f.campaign) q = q.eq("campaign_id", f.campaign);
+  if (f.source === "unknown") q = q.is("came_from", null);
+  else if (f.source) q = q.eq("came_from", f.source);
   if (f.q) {
     const like = containsPattern(f.q);
     q = q.or(`first_name.ilike.${like},last_name.ilike.${like},organisation_name.ilike.${like},email.ilike.${like}`);

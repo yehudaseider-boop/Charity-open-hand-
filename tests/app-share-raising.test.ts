@@ -5,11 +5,11 @@ import { raisingNow } from "../apps/mobile/src/lib/live-charities";
 describe("sharing on WhatsApp", () => {
   const c = { slug: "northcliff-meals-fund", nameEn: "Northcliff Meals Fund" };
   it("links to the charity's page on our website", () => {
-    expect(charityShareText("https://givezy.co.za/", c)).toBe("I give to Northcliff Meals Fund on Givezy. Have a look: https://givezy.co.za/c/northcliff-meals-fund");
+    expect(charityShareText("https://givezy.co.za/", c)).toBe("I give to Northcliff Meals Fund on Givezy. Have a look: https://givezy.co.za/c/northcliff-meals-fund?src=whatsapp");
   });
   it("a campaign says how far along it is and links to give to it", () => {
     const t = campaignShareText("https://givezy.co.za", c, { id: "c-1", title: "Pesach parcels", raised: "R31 400", target: "R50 000" });
-    expect(t).toBe("Northcliff Meals Fund is raising for Pesach parcels. R31 400 of R50 000 raised so far. Give here: https://givezy.co.za/c/northcliff-meals-fund/donate?campaign=c-1");
+    expect(t).toBe("Northcliff Meals Fund is raising for Pesach parcels. R31 400 of R50 000 raised so far. Give here: https://givezy.co.za/c/northcliff-meals-fund/donate?campaign=c-1&src=whatsapp");
     expect(t).not.toMatch(/!|—/);
   });
   it("nothing to share until the website is live on https", () => {

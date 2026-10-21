@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
 import { issueConfirmationToken, reissueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
+import { cameFromOf } from "./source";
 import { checkDonorDetails, givingLabelOf, type CheckoutInput } from "./validation";
 import { isUuid } from "@/lib/ids";
 import { parseDedication } from "./dedication";
@@ -78,6 +79,8 @@ export async function startDonation(args: {
   fromApp?: boolean;
   /** Given to one of this charity's active campaigns (once-off gifts only). */
   campaignId?: string;
+  /** The `?src=` tag of the link the donor followed (whatsapp, link, qr); anything else counts as the website. */
+  sourceTag?: string | null;
   input: CheckoutInput;
   ip: string;
   /**
@@ -240,6 +243,7 @@ export async function startDonation(args: {
     gateway_ref: donationId,
     recurring_id: recurringId,
     ...(campaign ? { campaign_id: campaign.id } : {}),
+    came_from: cameFromOf({ fromApp: args.fromApp, tag: args.sourceTag }),
     wants_18a: want18a,
     is_anonymous: v.is_anonymous === "on",
     message: v.message ?? null,

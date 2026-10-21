@@ -14,6 +14,7 @@ import { donationReference } from "@/lib/donations/reference";
 import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { cameInBy } from "@/lib/charity/recorded-gifts";
+import { giftSourceLabel } from "@/lib/donations/source";
 import { removeRecordedGifts } from "../record-actions";
 import { RemoveImportForm } from "../record-forms";
 
@@ -42,6 +43,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
 
   // The receipt this donation is on, if one has been issued (a narrow view: no donor ID or tax digits).
   const { data: links } = await supabase.from("charity_receipt_donations").select("receipt_id, status, reference").eq("donation_id", donationId);
+  const campaign = d.campaign_id ? (await supabase.from("campaigns").select("title").eq("id", d.campaign_id).eq("charity_id", id).maybeSingle()).data : null;
   const receipts = (links ?? []).map((l) => ({ id: l.receipt_id as string, status: l.status as string, reference: l.reference as string }));
 
   return (
@@ -57,6 +59,12 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {d.recorded_method ? null : <Row label="Started">{formatDateTime(d.created_at)}</Row>}
           {d.paid_at ? <Row label={d.recorded_method ? "Came in" : "Paid"}>{d.recorded_method ? formatDate(d.paid_at) : formatDateTime(d.paid_at)}</Row> : null}
           <Row label="How it came in">{cameInBy(d.recorded_method)}</Row>
+          {d.recorded_method ? null : <Row label="Came from">{giftSourceLabel(d.came_from)}</Row>}
+          {d.campaign_id ? (
+            <Row label="Campaign">
+              <Link href={`/charity-admin/${id}/donations?campaign=${d.campaign_id}`} className="text-brand underline">{(campaign?.title as string | undefined) ?? "A campaign"}</Link>
+            </Row>
+          ) : null}
           {d.external_ref ? <Row label="Your reference">{d.external_ref}</Row> : null}
           {d.refunded_at ? <Row label="Refunded">{formatDateTime(d.refunded_at)}</Row> : null}
           {d.charged_back_at ? <Row label="Charged back">{formatDateTime(d.charged_back_at)}</Row> : null}

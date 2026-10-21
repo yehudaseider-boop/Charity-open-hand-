@@ -59,6 +59,18 @@
   never shown to donors, and is removed with an erased donor. Notes say on the form that donors can ask what
   is held about them.
 
+- **Who gave to each appeal, and where gifts came from (21/10/2026, Yehuda, chunk 4):** every gift started on
+  Givezy now keeps where it came from: the website, the app, a WhatsApp share, a copied link or the QR poster.
+  Shared links carry `?src=` (whatsapp, link or qr); the charity page and the donate page pass it on, the
+  server keeps only those three values (anything else counts as the website), and a gift from the app always
+  counts as the app. "Try again" after a declined card keeps it, and each month of a monthly donation counts
+  where it was set up. Gifts before 21/10/2026 show "Not known". The QR poster's code and the dashboard's own
+  share links (overview, and "Share this campaign" on Campaigns) are tagged; the app's WhatsApp shares too.
+  Posters printed before this carry no tag, so their gifts show as the website: reprint to count them.
+  Donations can be filtered by campaign and by source (with a donor count), the CSV has Campaign and Came
+  from columns, each campaign has "See who gave", and each donor page shows the largest gift and their giving
+  by campaign and by source. No database change was needed (the column came with chunk 2).
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { cameInBy } from "@/lib/charity/recorded-gifts";
 import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charity/dashboard";
 import { applyDonationFilters, parseDonationFilters, periodText } from "@/lib/charity/donation-filters";
-import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
+import { DONATION_FIELDS, loadCampaignTitles, type DonationRow } from "@/lib/charity/dashboard-queries";
+import { giftSourceLabel } from "@/lib/donations/source";
 import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
 import { centsToPlain, toCsv, csvPhone } from "@/lib/csv";
 import { formatDate } from "@/lib/dates";
@@ -11,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { donationReference } from "@/lib/donations/reference";
 
-const HEADER = ["Date", "Reference", "Status", "Tax year", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "s18A receipt requested", "Anonymous publicly", "Dedication", "Message", "How it came in", "Your reference"];
+const HEADER = ["Date", "Reference", "Status", "Tax year", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "s18A receipt requested", "Anonymous publicly", "Dedication", "Message", "How it came in", "Your reference", "Campaign", "Came from"];
 
 /**
  * A charity's donations as a CSV, for their bookkeeper. Paid donations only unless asked
@@ -38,7 +39,9 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
     if (!data || data.length < 1000) break;
   }
 
-  await audit({ actorUserId: who.userId, action: "charity.donations_exported", entityType: "charity", entityId: id, details: { rows: rows.length, status, period: periodText(filters), search: Boolean(filters.q) } });
+  const campaigns = await loadCampaignTitles(id).catch(() => null);
+  if (!campaigns) return new NextResponse("Could not read the campaigns.", { status: 500 });
+  await audit({ actorUserId: who.userId, action: "charity.donations_exported", entityType: "charity", entityId: id, details: { rows: rows.length, status, period: periodText(filters), search: Boolean(filters.q), campaign: filters.campaign || null, source: filters.source || null } });
   const csv = toCsv(
     HEADER,
     rows.map((d) => [
@@ -62,6 +65,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       d.message,
       cameInBy(d.recorded_method),
       d.external_ref,
+      d.campaign_id ? campaigns.get(d.campaign_id) ?? "" : "",
+      giftSourceLabel(d.came_from),
     ]),
   );
   return csvResponse(csv, `donations-${status ?? "all"}${filters.fromDate ? `-${filters.fromDate}-to-${filters.toDate}` : ""}.csv`);

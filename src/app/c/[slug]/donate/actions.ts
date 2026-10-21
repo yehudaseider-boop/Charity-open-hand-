@@ -10,6 +10,7 @@ import { getViewer } from "@/lib/auth";
 import { formToObject } from "@/lib/form";
 import { COMMA_THOUSANDS_MESSAGE, formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { platformConfig } from "@/config/platform";
+import { SOURCE_PARAM } from "@/lib/donations/source";
 
 export type QuoteState = { ok: boolean; message?: string; quote?: Quote };
 
@@ -57,6 +58,9 @@ export async function submitDonation(
   if (formData.get("website")) return { ok: false, message: "Something went wrong. Please try again." };
 
   const raw = formToObject(formData);
+  // Where the link came from (WhatsApp, a copied link, the QR poster): checked in startDonation, not a donor detail.
+  const sourceTagged = typeof raw[SOURCE_PARAM] === "string" ? raw[SOURCE_PARAM] : null;
+  delete raw[SOURCE_PARAM];
   raw.phone = cleanPhone(raw.phone);
   const parsed = checkoutSchema.safeParse(raw);
   if (!parsed.success) {
@@ -76,7 +80,7 @@ export async function submitDonation(
   // "Use my ID ending 1234": only for the signed-in person, checked here on the server.
   const viewer = formData.get("use_saved_id") === "on" ? await getViewer() : null;
   const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, input: parsed.data, ip, useSavedIdOf });
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, sourceTag: sourceTagged, input: parsed.data, ip, useSavedIdOf });
   if (!result.ok) return result.message === "Please check the highlighted fields." && result.fieldErrors ? { ...result, message: fixMessage(result.fieldErrors) } : result;
   // The website never charges a saved card (only the app does), so there is always a payment page.
   if (!result.redirectUrl) return { ok: false, message: "We couldn't start the payment. Please try again." };

@@ -9,6 +9,7 @@ import { CharityBadges } from "@/components/charity-badges";
 import { Info } from "@/components/info";
 import { canIssue18a } from "@/lib/charities";
 import { loadDonatableCharity } from "@/lib/donations/charity";
+import { sourceTag, withSource } from "@/lib/donations/source";
 import { initials } from "@/lib/charity/initials";
 import { loadStories, publicImageUrl } from "@/lib/charity/queries";
 import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
@@ -41,7 +42,9 @@ export async function generateMetadata({ params }: PageProps<"/c/[slug]">): Prom
   };
 }
 
-export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
+export default async function CharityPage({ params, searchParams }: PageProps<"/c/[slug]">) {
+  // A shared link or the QR poster tags the page (?src=); the Give links pass it on to the gift.
+  const src = sourceTag((await searchParams).src);
   const charity = await loadCharity((await params).slug);
   if (!charity) notFound();
   const logo = publicImageUrl(charity.logo_path);
@@ -95,7 +98,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
           ) : null}
           {accepting ? (
             <Link
-              href={`/c/${charity.slug}/donate`}
+              href={withSource(`/c/${charity.slug}/donate`, src)}
               className="pressable block w-full rounded-control bg-coral px-4 py-3.5 text-center text-lg font-bold text-navy"
             >
               Give to {charity.name_en}
@@ -115,7 +118,7 @@ export default async function CharityPage({ params }: PageProps<"/c/[slug]">) {
 
       {/* What they're raising for right now comes before the story. */}
       {campaigns.map((c) => (
-        <CampaignProgress key={c.id} campaign={c} giveHref={accepting ? `/c/${charity.slug}/donate?campaign=${c.id}` : undefined} />
+        <CampaignProgress key={c.id} campaign={c} giveHref={accepting ? withSource(`/c/${charity.slug}/donate?campaign=${c.id}`, src) : undefined} />
       ))}
 
       {charity.description_en ? (

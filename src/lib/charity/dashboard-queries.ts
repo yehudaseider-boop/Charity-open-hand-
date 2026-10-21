@@ -131,19 +131,16 @@ export async function loadReportData(charityId: string) {
     charityId,
     "id, donor_id, status, amount_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a",
   );
-  const supabase = await createClient();
-  const { data: camps, error } = await supabase.from("campaigns").select("id, title").eq("charity_id", charityId);
-  if (error) throw new Error(error.message);
-  const { onIssued } = await loadReceiptGifts(charityId);
+  const [campaignTitles, { onIssued }] = await Promise.all([loadCampaignTitles(charityId), loadReceiptGifts(charityId)]);
   return {
     gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })),
-    campaignTitles: new Map((camps ?? []).map((c) => [c.id as string, c.title as string])),
+    campaignTitles,
     onIssued,
   };
 }
 
 export const DONATION_FIELDS =
-  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code, recorded_method, external_ref, came_from";
+  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code, recorded_method, external_ref, came_from, campaign_id";
 
 export type DonationRow = {
   id: string;
@@ -180,7 +177,26 @@ export type DonationRow = {
   external_ref: string | null;
   /** Where the gift came from: website, app, whatsapp, share_link, qr or recorded (null for older gifts). */
   came_from: string | null;
+  /** The campaign the gift was for, if any. */
+  campaign_id: string | null;
 };
+
+/** One donor's paid gifts to the charity, oldest first, for their largest gift and giving by campaign. */
+export function loadDonorPaidGifts(charityId: string, donorId: string) {
+  return allCharityDonations<{ id: string; amount_cents: number; paid_at: string | null; campaign_id: string | null; came_from: string | null }>(
+    charityId,
+    "id, amount_cents, paid_at, campaign_id, came_from",
+    (q) => q.eq("donor_id", donorId).eq("status", "paid"),
+  ).then((rows) => rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents) })).sort((a, b) => String(a.paid_at).localeCompare(String(b.paid_at))));
+}
+
+/** The charity's campaigns by id, for naming them on gifts and in downloads. */
+export async function loadCampaignTitles(charityId: string): Promise<Map<string, string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("campaigns").select("id, title").eq("charity_id", charityId);
+  if (error) throw new Error(error.message);
+  return new Map((data ?? []).map((c) => [c.id as string, c.title as string]));
+}
 
 export type Insights = { newDonors: number; returningDonors: number; repeatDonors: number; allDonors: number; monthlyActive: number; monthlyActiveCents: number };
 

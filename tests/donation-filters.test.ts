@@ -26,7 +26,7 @@ describe("donation filters", () => {
   });
   it("filters by when the payment went through, the last day included", () => {
     const calls: string[] = [];
-    const q = { eq: (c: string, v: string) => (calls.push(`eq ${c} ${v}`), q), gte: (c: string, v: string) => (calls.push(`gte ${c} ${v}`), q), lt: (c: string, v: string) => (calls.push(`lt ${c} ${v}`), q), or: (v: string) => (calls.push(`or ${v}`), q) };
+    const q = { eq: (c: string, v: string) => (calls.push(`eq ${c} ${v}`), q), gte: (c: string, v: string) => (calls.push(`gte ${c} ${v}`), q), lt: (c: string, v: string) => (calls.push(`lt ${c} ${v}`), q), or: (v: string) => (calls.push(`or ${v}`), q), is: (c: string, v: null) => (calls.push(`is ${c} ${v}`), q) };
     applyDonationFilters(q, parseDonationFilters({ status: "paid", period: "custom", from: "2026-12-01", to: "2026-12-31" }, now));
     expect(calls).toEqual(["eq status paid", "gte paid_at 2026-12-01T00:00:00+02:00", "lt paid_at 2027-01-01T00:00:00+02:00"]);
   });

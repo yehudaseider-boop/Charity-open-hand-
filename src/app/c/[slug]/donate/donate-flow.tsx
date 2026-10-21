@@ -1,5 +1,6 @@
 "use client";
 
+import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
 import { startTransition, useActionState, useEffect, useId, useRef, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
@@ -26,6 +27,8 @@ type Props = {
   campaign?: { id: string; title: string };
   /** Signed in: their email, and the last four digits of the ID number from their last s18A gift. */
   account?: { email: string; savedIdLast4: string | null };
+  /** The shared link's tag (WhatsApp, a copied link, the QR poster), kept on the gift for the charity. */
+  source?: SourceTag | null;
 };
 
 /** As the donor would type it: 180, 180.50. */
@@ -51,7 +54,7 @@ function offlineOrDown(e: unknown, step: "quote" | "pay"): { ok: false; message:
   };
 }
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account, source }: Props) {
   const [quoteState, requestQuote, quoting] = useActionState(async (prev: QuoteState, fd: FormData): Promise<QuoteState> => {
     try {
       return await getQuote(slug, prev, fd);
@@ -177,6 +180,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           fromApp={fromApp}
           campaign={campaign}
           account={account}
+          source={source}
         />
       ) : null}
     </div>
@@ -232,10 +236,11 @@ function Check({ name, children, detail, error }: { name: string; children: Reac
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialLabel, fromApp, campaign, account }: {
+function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialLabel, fromApp, campaign, account, source }: {
   slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
   initialLabel?: string; fromApp: boolean; campaign?: { id: string; title: string };
   account?: { email: string; savedIdLast4: string | null };
+  source?: SourceTag | null;
 }) {
   // A signed-in donor can reuse the ID number from their last s18A gift. Only its last four digits
   // reach the browser; the server fills in the number.
@@ -284,6 +289,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           startTransition(() => dispatch(fd));
         }}
       >
+        {source ? <input type="hidden" name={SOURCE_PARAM} value={source} /> : null}
         <Breakdown q={shownQuote} charityName={charityName} />
         {campaign ? <p className="text-sm text-muted">For the campaign: <span className="font-medium text-text">{campaign.title}</span></p> : null}
 

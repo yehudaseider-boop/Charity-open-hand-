@@ -6,7 +6,7 @@ import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { gettingStarted } from "@/lib/charity/checklist";
 import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
-import { CopyLink } from "./copy-link";
+import { ShareLinks } from "./share-links";
 import { allTime, averageCents, ERASED_DONOR, isErasedEmail, lastMonth, monthlySummary, repeatPercent, saDate, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
 import { countDonorGroups, donorGroupsFor, endsWithinAWeek, lapsedPeriodText, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
 import { dueReminders, lapsedDaysFor } from "@/lib/charity/donor-care";
@@ -132,7 +132,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
           </ul>
           <div className="mt-4 border-t border-border pt-3 text-sm">
             <p className="mb-2">Share your Givezy page with your supporters:</p>
-            <CopyLink url={publicLink} />
+            <ShareLinks url={publicLink} message={`Give to ${charity.name_en} on Givezy:`} />
             <Link href={`${base}/poster`} className="mt-2 inline-block text-brand underline">Print a QR poster for your notice board</Link>
           </div>
         </Card>

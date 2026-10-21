@@ -16,6 +16,7 @@ import { clientIp } from "@/lib/client-ip";
 import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { HebrewAware } from "@/components/hebrew-aware";
+import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Thank you", referrer: "no-referrer" };
@@ -56,7 +57,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (holdsToken) {
@@ -76,6 +77,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (givingLabel) retryParams.set("label", givingLabel);
   // A campaign gift tries again for the same campaign (the donate page says if it has ended since).
   if (d?.campaign_id) retryParams.set("campaign", d.campaign_id);
+  // A gift from a shared link or the QR poster still counts as one when tried again.
+  const tag = tagOf(d?.came_from);
+  if (tag) retryParams.set(SOURCE_PARAM, tag);
   // A declined card tries again with the same amount filled in (the donor's own figure, not a secret).
   if (outcome === "failed" && d?.amount_cents) retryParams.set("amount", String(d.amount_cents));
   const retryQuery = retryParams.size ? `?${retryParams}` : "";

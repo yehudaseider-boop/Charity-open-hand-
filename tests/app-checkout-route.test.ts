@@ -161,7 +161,7 @@ describe("app checkout endpoint", () => {
     campaignRow = { id: CAMPAIGN, ends_at: null };
     const res = await call({ ...gift, campaignId: CAMPAIGN, details });
     expect(res.status).toBe(200);
-    expect(ops.find((o) => o.table === "donations" && o.op === "insert")?.row).toMatchObject({ campaign_id: CAMPAIGN });
+    expect(ops.find((o) => o.table === "donations" && o.op === "insert")?.row).toMatchObject({ campaign_id: CAMPAIGN, came_from: "app" });
   });
 
   it("refuses an ended or unknown campaign, and a monthly campaign gift, before recording anything", async () => {

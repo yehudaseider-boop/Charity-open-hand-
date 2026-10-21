@@ -5,7 +5,8 @@ import { Badge } from "@/components/badge";
 import { Card } from "@/components/card";
 import { requireViewer } from "@/lib/auth";
 import { ERASED_DONOR, donationStatus, isErasedEmail, shownEmail } from "@/lib/charity/dashboard";
-import { loadDonors } from "@/lib/charity/dashboard-queries";
+import { loadCampaignTitles, loadDonorPaidGifts, loadDonors } from "@/lib/charity/dashboard-queries";
+import { donorGiving, type GivingLine } from "@/lib/charity/donor-giving";
 import { lapsedDaysFor, listNotes, listReminders, listTags, tagsByDonor } from "@/lib/charity/donor-care";
 import { CARE_DONE, sortReminders } from "@/lib/charity/donor-care-rules";
 import { donorGroup, donorGroupsFor } from "@/lib/charity/insights";
@@ -30,10 +31,10 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
   if (!donor) notFound();
 
   const supabase = await createClient();
-  const [{ data: gifts, error }, notes, reminders, tags, byDonor, lapsedDays] = await Promise.all([
+  const [{ data: gifts, error }, notes, reminders, tags, byDonor, lapsedDays, paidGifts, campaignTitles] = await Promise.all([
     supabase
       .from("charity_donations")
-      .select("id, status, amount_cents, paid_at, created_at, recorded_method, wants_18a")
+      .select("id, status, amount_cents, paid_at, created_at, recorded_method, wants_18a, campaign_id")
       .eq("charity_id", id)
       .eq("donor_id", donorId)
       .order("paid_at", { ascending: false, nullsFirst: false })
@@ -43,7 +44,10 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
     listTags(id),
     tagsByDonor(id),
     lapsedDaysFor(id),
+    loadDonorPaidGifts(id, donorId),
+    loadCampaignTitles(id),
   ]);
+  const giving = donorGiving(paidGifts, campaignTitles);
   if (error) throw error;
   const mine = new Set(byDonor.get(donorId) ?? []);
   const myTags = tags.filter((t) => mine.has(t.id));
@@ -76,7 +80,18 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
           <div><dt className="text-muted">Gifts</dt><dd className="font-semibold">{donor.donation_count}</dd></div>
           <div><dt className="text-muted">First gift</dt><dd>{formatDate(donor.first_paid_at)}</dd></div>
           <div><dt className="text-muted">Latest gift</dt><dd>{formatDate(donor.last_paid_at)}</dd></div>
+          {giving.largest ? (
+            <div className="col-span-2">
+              <dt className="text-muted">Largest gift</dt>
+              <dd>
+                <span className="font-semibold">{formatRand(giving.largest.amount_cents)}</span>
+                {giving.largest.paid_at ? <span className="text-muted"> on {formatDate(giving.largest.paid_at)}</span> : null}
+              </dd>
+            </div>
+          ) : null}
         </dl>
+        {giving.byCampaign.some((l) => l.key !== "none") ? <GivingLines title="By campaign" lines={giving.byCampaign} /> : null}
+        {giving.bySource.length ? <GivingLines title="How they gave" lines={giving.bySource} /> : null}
       </Card>
 
       <Card title={`Follow-ups${open.length ? ` (${open.length})` : ""}`}>
@@ -163,6 +178,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
                 <Link href={`${base}/donations/${g.id}`} className="flex items-center justify-between gap-3 py-2">
                   <span className="min-w-0">
                     {formatDate((g.paid_at ?? g.created_at) as string)}
+                    {g.campaign_id ? <span className="text-muted"> · {campaignTitles.get(g.campaign_id as string) ?? "A campaign"}</span> : null}
                     {g.recorded_method ? <span className="text-muted"> · {RECORDED_METHODS[g.recorded_method as RecordedMethod] ?? "Recorded"}</span> : null}
                     {g.status !== "paid" ? <span className="text-muted"> · {donationStatus[g.status as keyof typeof donationStatus]?.label}</span> : null}
                   </span>
@@ -172,7 +188,29 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
             ))}
           </ul>
         )}
+        {(gifts ?? []).length === 100 && shownEmail(donor.email) ? (
+          <p className="mt-2 text-xs text-muted">
+            The latest 100 gifts. <Link href={`${base}/donations?q=${encodeURIComponent(donor.email)}`} className="text-brand underline">See them all on Donations</Link>
+          </p>
+        ) : null}
       </Card>
+    </div>
+  );
+}
+
+/** Paid gifts summed one way (by campaign, or by how they came in), largest first. */
+function GivingLines({ title, lines }: { title: string; lines: GivingLine[] }) {
+  return (
+    <div className="mt-4 border-t border-border pt-3 text-sm">
+      <h3 className="mb-1 font-semibold text-navy">{title}</h3>
+      <ul className="space-y-1">
+        {lines.map((l) => (
+          <li key={l.key} className="flex justify-between gap-3">
+            <span className="min-w-0 break-words">{l.label} <span className="text-muted">({l.count} {l.count === 1 ? "gift" : "gifts"})</span></span>
+            <span className="shrink-0 font-medium">{formatRand(l.cents)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

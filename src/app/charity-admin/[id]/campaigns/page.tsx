@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Card, Notice } from "@/components/card";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
@@ -10,6 +11,7 @@ import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { endCampaign, startCampaign } from "./actions";
 import { CampaignForm } from "./forms";
+import { ShareLinks } from "../share-links";
 
 export const metadata: Metadata = { title: "Campaigns" };
 
@@ -23,6 +25,9 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
   const active = campaigns.filter((c) => isRunning(c, now));
   // Ended by hand, or past its last day.
   const past = campaigns.filter((c) => !isRunning(c, now) && c.status !== "draft");
+  const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
+  const giveUrl = (campaignId: string) => `${site}/c/${charity.slug}/donate?campaign=${campaignId}`;
+  const whoGave = (campaignId: string) => `/charity-admin/${id}/donations?campaign=${campaignId}`;
 
   return (
     <div className="space-y-4">
@@ -56,6 +61,15 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
                   </form>
                 </div>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={c.endsAt} />
+                {c.giftCount ? <Link href={whoGave(c.id)} className="inline-block text-sm text-brand underline">See who gave</Link> : null}
+                {charity.status === "approved" ? (
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-brand">Share this campaign</summary>
+                    <div className="mt-2">
+                      <ShareLinks url={giveUrl(c.id)} message={`${charity.name_en} is raising for ${c.title}. Give here:`} />
+                    </div>
+                  </details>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -70,6 +84,7 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
                 <p className="font-medium">{c.title}</p>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={null} />
                 {c.status === "active" && c.endsAt ? <p className="text-xs text-muted">Ended on {formatDate(c.endsAt)}</p> : null}
+                {c.giftCount ? <Link href={whoGave(c.id)} className="inline-block text-sm text-brand underline">See who gave</Link> : null}
               </li>
             ))}
           </ul>

@@ -116,7 +116,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
 
     async createAttempt(r, donationId, totalCents) {
       const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id").eq("id", r.id).maybeSingle(), "read the monthly donation");
-      const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
+      const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at, came_from").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
       const ins = await db.from("donations").insert({
         id: donationId,
         donor_id: rec.donor_id,
@@ -138,6 +138,8 @@ export function supabaseMonthlyStore(): MonthlyStore {
         // Each month carries the dedication the donor chose when they set it up.
         dedication_kind: rec.dedication_kind,
         dedication_name: rec.dedication_name,
+        // Each month counts where the monthly donation was first set up (website, app, a shared link).
+        came_from: first.came_from ?? null,
         popia_consent_at: first.popia_consent_at,
         age_confirmed_at: first.age_confirmed_at,
       });

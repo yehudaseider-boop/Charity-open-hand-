@@ -7,7 +7,8 @@ import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { donationStatus, donorName } from "@/lib/charity/dashboard";
 import { applyDonationFilters, filtersToQuery, parseDonationFilters, periodOptions, periodText, type PeriodKey } from "@/lib/charity/donation-filters";
-import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
+import { DONATION_FIELDS, loadCampaignTitles, type DonationRow } from "@/lib/charity/dashboard-queries";
+import { GIFT_SOURCES, giftSourceLabel } from "@/lib/donations/source";
 import { formatDate } from "@/lib/dates";
 import { DonePanel } from "@/components/done-panel";
 import { RECORDED_METHODS, type RecordedMethod } from "@/lib/charity/recorded-gifts";
@@ -40,7 +41,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       .range((page - 1) * PAGE, page * PAGE - 1),
     filters,
   );
-  const [{ data, count, error }, totals] = await Promise.all([query, loadTotals(supabase, id, filters)]);
+  const [{ data, count, error }, totals, campaigns] = await Promise.all([query, loadTotals(supabase, id, filters), loadCampaignTitles(id)]);
   // A page past the end (an old link, a typed number) is the database saying "out of range": show page 1's link instead of an error.
   if (error && error.code !== "PGRST103") throw error;
   // Every filter is kept (custom dates too), so the totals don't quietly change.
@@ -59,6 +60,8 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   const csvHref = `${csvBase}?${filtersToQuery({ ...filters, status: status === "all" ? "paid" : status })}`;
   const csvAllHref = `${csvBase}?${filtersToQuery(filters, { status: "all" })}`;
   const range = periodText(filters);
+  const campaignName = filters.campaign === "none" ? "no campaign" : filters.campaign ? campaigns.get(filters.campaign) ?? "a campaign" : null;
+  const narrowed = Boolean(q || status !== "all" || filters.period !== "all" || filters.campaign || filters.source);
 
   return (
     <div className="space-y-4">
@@ -94,6 +97,24 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
           <label className="flex items-center gap-1 text-sm">To <input type="date" name="to" defaultValue={filters.period === "custom" ? filters.toDate ?? "" : ""} className="rounded-control border border-border bg-surface px-2 py-2" /></label>
         </div>
         <p className="text-xs text-muted">For your own dates, choose &quot;Choose dates&quot; and fill in both.</p>
+        <div className="flex flex-wrap gap-2">
+          {campaigns.size ? (
+            <>
+              <label className="sr-only" htmlFor="campaign">Campaign</label>
+              <select id="campaign" name="campaign" defaultValue={filters.campaign} className="min-w-0 max-w-full rounded-control border border-border bg-surface px-3 py-2.5">
+                <option value="">Every campaign</option>
+                <option value="none">No campaign</option>
+                {[...campaigns].sort((a, b) => a[1].localeCompare(b[1])).map(([cid, title]) => <option key={cid} value={cid}>{title}</option>)}
+              </select>
+            </>
+          ) : null}
+          <label className="sr-only" htmlFor="source">Came from</label>
+          <select id="source" name="source" defaultValue={filters.source} className="min-w-0 max-w-full rounded-control border border-border bg-surface px-3 py-2.5">
+            <option value="">From anywhere</option>
+            {Object.entries(GIFT_SOURCES).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            <option value="unknown">Not known (before 21/10/2026)</option>
+          </select>
+        </div>
         <div className="flex gap-2">
         <input
           name="q"
@@ -111,8 +132,13 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
         <p>
           <span className="font-semibold">{formatRand(totals.paidCents)}</span> received from {totals.paidCount} {totals.paidCount === 1 ? "donation" : "donations"}
           {range ? <span className="text-muted">, {range}</span> : null}
-          {q ? <span className="text-muted">, matching &quot;{q}&quot;</span> : null}.
+          {q ? <span className="text-muted">, matching &quot;{q}&quot;</span> : null}
+          {campaignName ? <span className="text-muted">, for {filters.campaign === "none" ? campaignName : <>&quot;{campaignName}&quot;</>}</span> : null}
+          {filters.source ? <span className="text-muted">, from {filters.source === "unknown" ? "an unknown source" : GIFT_SOURCES[filters.source]}</span> : null}.
         </p>
+        {narrowed && totals.paidCount ? (
+          <p className="mt-1 text-muted">From {totals.donorCount} {totals.donorCount === 1 ? "donor" : "donors"}.</p>
+        ) : null}
         {totals.reversedCount ? (
           <p className="mt-1 text-muted">
             Not counted: {formatRand(totals.reversedCents)} refunded or charged back ({totals.reversedCount}).
@@ -133,7 +159,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       </nav>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted">{q || status !== "all" || filters.period !== "all" ? <NoMatch what="donations" clearHref={base} /> : "No donations yet. They appear here once a payment goes through."}</p>
+        <p className="text-sm text-muted">{narrowed ? <NoMatch what="donations" clearHref={base} /> : "No donations yet. They appear here once a payment goes through."}</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((d) => {
@@ -150,6 +176,8 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
                         {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                         {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
                         {d.recorded_method ? <Badge>Recorded: {RECORDED_METHODS[d.recorded_method as RecordedMethod] ?? "by you"}</Badge> : null}
+                        {d.campaign_id ? <Badge>{campaigns.get(d.campaign_id) ?? "A campaign"}</Badge> : null}
+                        {d.came_from && d.came_from !== "recorded" ? <Badge>{giftSourceLabel(d.came_from)}</Badge> : null}
                       </div>
                     </div>
                     <p className="shrink-0 font-semibold">{formatRand(d.amount_cents)}</p>
@@ -172,14 +200,15 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   );
 }
 
-type Totals = { paidCents: number; paidCount: number; reversedCents: number; reversedCount: number };
+type Totals = { paidCents: number; paidCount: number; reversedCents: number; reversedCount: number; donorCount: number };
 
 /** Totals of every donation the filters match, read in pages (whole cents, no floats). */
 async function loadTotals(supabase: Awaited<ReturnType<typeof createClient>>, charityId: string, filters: ReturnType<typeof parseDonationFilters>): Promise<Totals> {
-  const t: Totals = { paidCents: 0, paidCount: 0, reversedCents: 0, reversedCount: 0 };
+  const t: Totals = { paidCents: 0, paidCount: 0, reversedCents: 0, reversedCount: 0, donorCount: 0 };
+  const donors = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data, error } = await applyDonationFilters(
-      supabase.from("charity_donations").select("id, status, amount_cents").eq("charity_id", charityId).order("id").range(from, from + 999),
+      supabase.from("charity_donations").select("id, donor_id, status, amount_cents").eq("charity_id", charityId).order("id").range(from, from + 999),
       filters,
     );
     if (error) throw error;
@@ -188,6 +217,7 @@ async function loadTotals(supabase: Awaited<ReturnType<typeof createClient>>, ch
       if (r.status === "paid") {
         t.paidCents += cents;
         t.paidCount++;
+        donors.add(r.donor_id as string);
       } else if (r.status === "refunded" || r.status === "charged_back") {
         t.reversedCents += cents;
         t.reversedCount++;
@@ -195,5 +225,6 @@ async function loadTotals(supabase: Awaited<ReturnType<typeof createClient>>, ch
     }
     if (!data || data.length < 1000) break;
   }
+  t.donorCount = donors.size;
   return t;
 }
