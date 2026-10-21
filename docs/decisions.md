@@ -955,3 +955,14 @@ opens by itself when a label is already chosen, and when a problem is inside it.
 is switched on. The three "kept safe" points became one line on a first gift (the card is entered on the
 payment partner's page; Givezy never sees it or holds the money). Nothing was removed, and the server's
 checks are unchanged. The strategy for getting donors to stay (the long game) is still to be decided.
+
+## 21/10/2026: Hierarchy, feedback and signifiers in the donor app
+
+Added from Yehuda's design notes. Hierarchy: Home keeps the goal card first and adds a quieter "at a
+glance" row under it (given this tax year, the next monthly donation, s18A receipts), each shown only when
+there is something to show and each opening the right tab. Feedback: after a gift the first line says exactly
+what happened ("R180 to Northcliff Meals Fund, done"; a monthly one reads "R180 a month to ..., set up").
+Signifiers: "Once-off" and "Every month" are two always-visible options with the chosen one filled (replacing
+a switch inside More options); an unavailable one (campaign gifts, or while a saved-card payment is
+unresolved) is struck through with the reason underneath; the chosen amount button shows a tick, and amount
+buttons are dimmed and inert while a payment is being started or held.

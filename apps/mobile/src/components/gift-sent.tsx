@@ -80,8 +80,12 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
         {gift.confirming ? null : <View style={styles.tick}><CheckIcon size={28} color={colors.blue} /></View>}
         <Text style={styles.kicker} accessibilityRole="header">
           {gift.monthly
-            ? `${gift.confirming ? "Confirming your monthly donation" : "Monthly donation set up"} · ${rand(gift.cents)} a month`
-            : `${gift.confirming ? "Confirming your gift" : "Gift sent"} · ${rand(gift.cents)} to ${charityName}`}
+            ? gift.confirming
+              ? `Confirming your monthly donation · ${rand(gift.cents)} a month`
+              : `${rand(gift.cents)} a month to ${charityName}, set up`
+            : gift.confirming
+              ? `Confirming your gift · ${rand(gift.cents)} to ${charityName}`
+              : `${rand(gift.cents)} to ${charityName}, done`}
         </Text>
         {gift.contributionCents > 0 ? <Text style={styles.sub}>And {rand(gift.contributionCents)} to Givezy{gift.monthly ? " a month" : ""}. Thank you.</Text> : null}
         <Text style={styles.big}>

@@ -12,10 +12,11 @@ import { Logo } from "@/components/logo";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { useScreenState } from "@/lib/screen-state";
 import { Text } from "@/components/text";
-import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleGoals } from "@/data/giving";
+import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, receipts as sampleReceipts, recurring as sampleRecurring, sampleGoals } from "@/data/giving";
 import { useAccount } from "@/lib/account";
 import { useDirectory } from "@/lib/directory";
-import { rand, jhbToday } from "@/lib/format";
+import { ddmmyyyy, rand, jhbToday } from "@/lib/format";
+import { taxYearFor } from "@/lib/tax-year";
 import { openGiveScreen } from "@/lib/give-entry";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
@@ -64,6 +65,18 @@ export default function Home() {
   // "First gift" only when we know: fresh giving from the server with none in it (not while it loads or fails).
   const firstGift = preview ? demoState === "empty" : account.status === "signed-in" && account.live !== null && !account.live.fromCache && gifts.length === 0;
   const goal = goals.value[0] ?? null;
+  // At a glance, quieter than the goal card: given this tax year, the next monthly gift, and receipts.
+  const monthlyList = preview ? sampleRecurring : (account.live?.recurring ?? []);
+  const receiptList = preview ? sampleReceipts : (account.live?.receipts ?? []);
+  const thisYear = taxYearFor(jhbToday());
+  const yearGifts = gifts.filter((g) => taxYearFor(g.date) === thisYear);
+  const yearCents = yearGifts.reduce((n, g) => n + g.cents, 0);
+  const nextMonthly = monthlyList.filter((r) => r.status === "active" && r.nextDate).sort((a, b) => (a.nextDate as Date).getTime() - (b.nextDate as Date).getTime())[0] ?? null;
+  const glance = [
+    yearGifts.length ? { key: "year", kicker: `Given, tax year ${thisYear}`, value: rand(yearCents), sub: `${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving" as const } : null,
+    nextMonthly ? { key: "next", kicker: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)}, ${nextMonthly.charityName}`, to: "/giving" as const } : null,
+    receiptList.length ? { key: "receipts", kicker: "s18A receipts", value: `${receiptList.length}`, sub: receiptList.length === 1 ? "receipt to download" : "receipts to download", to: "/receipts" as const } : null,
+  ].filter((x): x is NonNullable<typeof x> => x !== null);
   // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
   // While the choice is being read it stays hidden, so it never flashes up and away.
   const [cardGone, setCardGone] = useState<boolean | null>(null);
@@ -142,6 +155,18 @@ export default function Home() {
         </View>
       </View>}
 
+      {glance.length ? (
+        <View style={[styles.gutter, styles.glanceRow]}>
+          {glance.map((t) => (
+            <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.kicker}: ${t.value}. ${t.sub}`} style={({ pressed }) => [styles.glance, pressed && { opacity: 0.85 }]}>
+              <Text style={styles.glanceKicker} numberOfLines={1}>{t.kicker}</Text>
+              <Text style={styles.glanceValue} numberOfLines={1}>{t.value}</Text>
+              <Text style={styles.glanceSub} numberOfLines={2}>{t.sub}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       <View style={{ gap: 12 }}>
         <View style={[styles.gutter, styles.sectionHead]}>
           <Text variant="h2" accessibilityRole="header">Your causes</Text>
@@ -190,6 +215,11 @@ const styles = StyleSheet.create({
   goalRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   goalKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilacSoft },
   goalAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
+  glanceRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  glance: { flexGrow: 1, flexBasis: "30%", minWidth: 92, padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft, gap: 2 },
+  glanceKicker: { fontFamily: fonts.bodySemibold, fontSize: 12, color: colors.muted },
+  glanceValue: { fontFamily: fonts.bodyBold, fontSize: 18, color: colors.navy },
+  glanceSub: { fontFamily: fonts.bodyMedium, fontSize: 13, lineHeight: 18, color: colors.muted },
   notNow: { minHeight: 44, alignItems: "center", justifyContent: "center" },
   notNowText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lilacSoft, textDecorationLine: "underline" },
   goalSub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },

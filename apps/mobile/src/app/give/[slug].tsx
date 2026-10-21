@@ -10,7 +10,8 @@ import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
 import { Field } from "@/components/field";
 import { GiftSent, type GoalInvite, type SentGift } from "@/components/gift-sent";
-import { ChevronIcon } from "@/components/icons";
+import { CheckIcon, ChevronIcon } from "@/components/icons";
+import { Segmented } from "@/components/segmented";
 import { Blob } from "@/components/blob";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
@@ -591,8 +592,8 @@ export default function Give() {
   }
 
   const err = (k: string) => errors[k];
+  const locked = busy !== false || heldAttempt !== null;
   const chosenExtras = [
-    isMonthly ? "Monthly" : null,
     label ? `Label: ${label}` : null,
     phone.trim() ? "Phone" : null,
     anonymous ? "Anonymous" : null,
@@ -600,7 +601,7 @@ export default function Give() {
     dedicating ? "Dedication" : null,
     saveCard ? "Save card" : null,
   ].filter((x): x is string => Boolean(x));
-  const moreSummary = chosenExtras.length ? `On: ${chosenExtras.join(", ")}` : `${campaignId ? "" : "Give every month, "}label, phone, message, anonymous, dedication`;
+  const moreSummary = chosenExtras.length ? `On: ${chosenExtras.join(", ")}` : `label, phone, message, anonymous, dedication`;
   const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card…" : "Opening the payment page…") : busy === "checking" ? "Checking your payment…" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
   // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
   const goalLabel = goal?.counts?.[0] ?? null;
@@ -643,13 +644,36 @@ export default function Give() {
             {quick.map((c) => {
               const on = gift === c;
               return (
-                <Pressable key={c} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Set the amount to ${rand(c)}`} accessibilityState={{ selected: on }} style={[styles.chip, on && styles.chipOn]}>
+                <Pressable key={c} disabled={locked} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Set the amount to ${rand(c)}`} accessibilityState={{ selected: on, disabled: locked }} style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}>
+                  {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                   <Text style={[styles.chipText, on && { color: colors.onInk }]}>{rand(c)}</Text>
                 </Pressable>
               );
             })}
           </View>
           ) : null}
+
+          {/* Once-off or monthly: both options always visible, the chosen one filled, an unavailable one struck through with the reason. */}
+          <View style={{ gap: 6 }}>
+            <Segmented
+              label="How often"
+              value={isMonthly ? "monthly" : "once"}
+              onChange={(v) => setMonthly(v === "monthly")}
+              options={[
+                { value: "once", label: "Once-off" },
+                { value: "monthly", label: "Every month", disabled: Boolean(campaignId) || heldAttempt !== null },
+              ]}
+            />
+            <Text variant="label">
+              {campaignId
+                ? "Campaign gifts are once-off."
+                : heldAttempt
+                  ? "Monthly is available again once your saved-card payment is confirmed."
+                  : isMonthly
+                    ? "The same amount each month until you cancel."
+                    : "A single gift, today."}
+            </Text>
+          </View>
 
           {goal && goalLabel ? (
             <View style={{ gap: 10 }}>
@@ -767,7 +791,7 @@ export default function Give() {
             </Pressable>
             {more ? (
               <View style={{ gap: 18, paddingTop: 6 }}>
-            {campaignId ? null : <SwitchRow label="Give every month" description={heldAttempt ? "Available again once your saved-card payment is confirmed." : "The same amount each month until you cancel."} value={isMonthly} onChange={(v) => { if (!heldAttempt) setMonthly(v); }} />}
+            
             <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
 
 
@@ -912,6 +936,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, justifyContent: "center", backgroundColor: colors.surface },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  chipOff: { opacity: 0.4 },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   footer: { paddingHorizontal: space.gutter, paddingTop: 12, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1.5, borderTopColor: colors.lightPurple },
   amountCard: { padding: 20, gap: 4, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
