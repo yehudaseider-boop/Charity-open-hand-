@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Card } from "@/components/card";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager, loadStories, publicImageUrl } from "@/lib/charity/queries";
+import { viewerRole } from "@/lib/charity/team";
 import { MAX_PHOTOS } from "@/lib/charity/validation";
 import { formatDate } from "@/lib/dates";
 import { addPhoto, postUpdate, removePhoto, removeUpdate } from "./actions";
@@ -17,7 +19,9 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
   const k = formKey(sp);
   await requireViewer(`/charity-admin/${id}/updates`);
   const { charity } = await loadCharityForManager(id);
-  const { photos, updates } = await loadStories(id);
+  const [{ photos, updates }, role] = await Promise.all([loadStories(id), viewerRole(id)]);
+  // Donors only see updates when they visit the page: the owner can email one to them too.
+  const canEmail = role === "owner" && charity.status === "approved";
 
   return (
     <div className="space-y-4">
@@ -47,9 +51,12 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
                   <p className="whitespace-pre-line text-[0.95rem]">{u.body_en}</p>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border border-border object-cover" /> : null}
-                  <form action={removeUpdate.bind(null, id, u.id)}>
-                    <RemoveButton what={`the update from ${formatDate(u.created_at)}`} ask={false} />
-                  </form>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    {canEmail ? <Link href={`/charity-admin/${id}/email-donors?update=${u.id}`} className="text-sm text-brand underline">Email this to your donors</Link> : null}
+                    <form action={removeUpdate.bind(null, id, u.id)}>
+                      <RemoveButton what={`the update from ${formatDate(u.created_at)}`} ask={false} />
+                    </form>
+                  </div>
                 </li>
               );
             })}

@@ -18,15 +18,19 @@ export function AppealForm({
   send,
   audiences,
   initialAudience,
+  initialSubject = "",
+  initialBody = "",
 }: {
   check: (s: AppealCheck, f: FormData) => Promise<AppealCheck>;
   test: (s: FormState, f: FormData) => Promise<FormState>;
   send: (s: FormState, f: FormData) => Promise<FormState>;
   audiences: { group: string; options: Option[] }[];
   initialAudience: string;
+  initialSubject?: string;
+  initialBody?: string;
 }) {
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(initialSubject);
+  const [body, setBody] = useState(initialBody);
   const [audience, setAudience] = useState(initialAudience);
   const [checkedFor, setCheckedFor] = useState<string | null>(null);
   const now = `${audience}\n${subject}\n${body}`;

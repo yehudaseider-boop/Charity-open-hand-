@@ -3,6 +3,7 @@ import { Info } from "@/components/info";
 import { platformConfig } from "@/config/platform";
 import { initials } from "@/lib/charity/initials";
 import { publicImageUrl } from "@/lib/charity/queries";
+import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,6 +22,14 @@ export default async function Home() {
     .eq("status", "approved")
     .order("approved_at", { ascending: false })
     .limit(3);
+  // Cause of the week, chosen by Givezy (Admin, Cause of the week). None chosen, or it can't load: no card.
+  const { data: pick } = await supabase
+    .from("featured_charities")
+    .select("charities(slug, name_en, description_en, cover_path)")
+    .eq("week_start", weekStart(new Date()))
+    .maybeSingle();
+  const featured = (pick?.charities ?? null) as unknown as { slug: string; name_en: string; description_en: string | null; cover_path: string | null } | null;
+  const cover = featured ? publicImageUrl(featured.cover_path) : null;
 
   return (
     <div className="space-y-10">
@@ -45,6 +54,20 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {featured ? (
+        <Link href={`/c/${featured.slug}`} aria-label={`Cause of the week: ${featured.name_en}`} className="relative block overflow-hidden rounded-card bg-navy p-6 text-white sm:p-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {cover ? <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+          <span aria-hidden className="absolute inset-0 bg-navy/60" />
+          <span className="relative block max-w-xl space-y-1">
+            <span className="block text-sm font-bold text-honey">Cause of the week</span>
+            <span className="block font-display text-3xl leading-tight text-white">{featured.name_en}</span>
+            {featured.description_en ? <span className="line-clamp-2 block text-honey-soft">{featured.description_en}</span> : null}
+            <span className="mt-3 inline-block rounded-control bg-coral px-5 py-2.5 font-bold text-navy">See their work</span>
+          </span>
+        </Link>
+      ) : null}
 
       <section className="space-y-4">
         <h2 className="font-display text-2xl">How it works</h2>

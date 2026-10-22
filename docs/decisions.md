@@ -106,6 +106,12 @@
   Excel. It is a list to check before the IT3(d) submission, not the SARS file: that waits on the SARS layout, and
   will need the full numbers decrypted on the server.
 
+- **Updates by email, cause of the week on the website, the Givezy banner (22/10/2026, Yehuda):** each update on
+  Photos and updates has "Email this to your donors" for the owner, which opens Email donors with the update's
+  words and a link to the charity's page (same rules: stop link, 4 a month, the owner sends). The website's home
+  page shows this week's cause of the week under the top block, when one is chosen. When Givezy opens a charity's
+  dashboard it isn't part of, every page says so, since what it saves there is real.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

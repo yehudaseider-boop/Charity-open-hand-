@@ -9,6 +9,7 @@ import { lapsedDaysFor, listSegments, listTags } from "@/lib/charity/donor-care"
 import { donorGroupsFor } from "@/lib/charity/insights";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { viewerRole } from "@/lib/charity/team";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate } from "@/lib/dates";
 import { checkAppealAudience, continueAppeal, sendAppealNow, sendTestAppeal } from "./actions";
 import { AppealForm, ContinueForm } from "./forms";
@@ -40,6 +41,13 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
   ];
   const known = new Set(audiences.flatMap((g) => g.options.map((o) => o.value)));
   const initialAudience = asked && known.has(audienceValue(asked)) ? audienceValue(asked) : "all";
+  // "Email this to your donors" from Photos and updates: start from that update's words, with a link to the page.
+  const update = typeof sp.update === "string" && /^[0-9a-f-]{36}$/i.test(sp.update)
+    ? (await createAdminClient().from("charity_updates").select("body_en").eq("id", sp.update).eq("charity_id", id).maybeSingle()).data
+    : null;
+  const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
+  const initialBody = update ? `${update.body_en as string}\n\nSee more on our page: ${site}/c/${charity.slug}`.slice(0, 5000) : "";
+  const initialSubject = update ? `News from ${charity.name_en}`.slice(0, 120) : "";
 
   return (
     <div className="space-y-4">
@@ -65,6 +73,8 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
             send={sendAppealNow.bind(null, id)}
             audiences={audiences}
             initialAudience={initialAudience}
+            initialSubject={initialSubject}
+            initialBody={initialBody}
           />
         </Card>
       )}
