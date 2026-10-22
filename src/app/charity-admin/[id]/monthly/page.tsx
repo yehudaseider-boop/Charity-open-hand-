@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/dates";
 import { dedicationFrom, dedicationLine, isHebrew } from "@/lib/donations/dedication";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import { MonthlyTrend } from "../monthly-trend";
 
 export const metadata: Metadata = { title: "Monthly donations" };
 
@@ -72,6 +73,7 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
         </div>
       </div>
       <p className="text-xs text-muted">Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included.</p>
+      <MonthlyTrend rows={all} now={new Date()} />
 
       <nav aria-label="Show" className="flex flex-wrap gap-2 text-sm">
         {filters.map((f) => (

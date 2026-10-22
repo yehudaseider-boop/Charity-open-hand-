@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countDonorGroups, donorGroup, endsWithinAWeek, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
+import { countDonorGroups, donorGroup, endsWithinAWeek, giftsPerDonor, lastMonths, monthlyAttention, monthlyTrend, topDonors } from "@/lib/charity/insights";
 import { lastMonth } from "@/lib/charity/dashboard";
 
 const now = new Date("2026-10-16T10:00:00+02:00");
@@ -65,5 +65,60 @@ describe("last 12 months", () => {
   });
   it("last month in Johannesburg time", () => {
     expect(lastMonth(new Date("2026-01-01T00:30:00+02:00"))).toEqual({ from: "2025-12-01T00:00:00+02:00", to: "2026-01-01T00:00:00+02:00" });
+  });
+});
+
+describe("monthly giving trend", () => {
+  const row = (status: "active" | "paused" | "failed" | "cancelled", started: string, extra: { paused?: string; ended?: string; cents?: number } = {}) => ({
+    status, amount_cents: extra.cents ?? 10_000, started_at: started, paused_at: extra.paused ?? null, ended_at: extra.ended ?? null,
+  });
+  const trend = (rows: ReturnType<typeof row>[]) => monthlyTrend(rows, "2026-10-16", now, 3);
+
+  it("covers the last months, oldest first, with empty months as zero", () => {
+    expect(trend([]).map((p) => [p.month, p.running, p.runningCents])).toEqual([["2026-08-01", 0, 0], ["2026-09-01", 0, 0], ["2026-10-01", 0, 0]]);
+  });
+  it("counts who was giving at the end of each month and who joined", () => {
+    const t = trend([row("active", "2026-08-10T10:00:00+02:00"), row("active", "2026-09-20T10:00:00+02:00", { cents: 25_000 })]);
+    expect(t.map((p) => [p.running, p.runningCents, p.started])).toEqual([[1, 10_000, 1], [2, 35_000, 1], [2, 35_000, 0]]);
+  });
+  it("counts a stopped or cancelled donor as stopped in that month and gone after it", () => {
+    const t = trend([row("cancelled", "2026-07-01T10:00:00+02:00", { ended: "2026-09-05T10:00:00+02:00" })]);
+    expect(t.map((p) => [p.running, p.stopped])).toEqual([[1, 0], [0, 1], [0, 0]]);
+  });
+  it("counts a paused donor as paused from the day they paused", () => {
+    const t = trend([row("paused", "2026-07-01T10:00:00+02:00", { paused: "2026-10-02T10:00:00+02:00" })]);
+    expect(t.map((p) => p.running)).toEqual([1, 1, 0]);
+  });
+  it("counts this month up to today, so a donor starting later this month isn't counted yet", () => {
+    expect(trend([row("active", "2026-10-20T10:00:00+02:00")]).map((p) => p.running)).toEqual([0, 0, 0]);
+  });
+  it("uses Johannesburg months at the edge", () => {
+    // 23:30 UTC on 30/09 is 01:30 on 01/10 in Johannesburg.
+    expect(trend([row("active", "2026-09-30T23:30:00Z")]).map((p) => p.started)).toEqual([0, 0, 1]);
+  });
+});
+
+describe("gifts per donor", () => {
+  it("rounds half up to one decimal with whole numbers", () => {
+    expect(giftsPerDonor(7, 3)).toBe("2.3");
+    expect(giftsPerDonor(5, 2)).toBe("2.5");
+    expect(giftsPerDonor(1, 3)).toBe("0.3");
+    expect(giftsPerDonor(2, 3)).toBe("0.7");
+    expect(giftsPerDonor(10, 1)).toBe("10.0");
+  });
+  it("is null with no donors", () => {
+    expect(giftsPerDonor(0, 0)).toBeNull();
+  });
+});
+
+describe("monthly giving trend without dates", () => {
+  it("doesn't count a paused or stopped donor as giving today, even with no date recorded", () => {
+    const rows = [
+      { status: "paused" as const, amount_cents: 10_000, started_at: "2026-07-01T10:00:00+02:00", paused_at: null, ended_at: null },
+      { status: "cancelled" as const, amount_cents: 10_000, started_at: "2026-07-01T10:00:00+02:00", paused_at: null, ended_at: null },
+    ];
+    const t = monthlyTrend(rows, "2026-10-16", now, 3);
+    expect(t.map((p) => p.running)).toEqual([2, 2, 0]);
+    expect(t.map((p) => p.stopped)).toEqual([0, 0, 0]);
   });
 });

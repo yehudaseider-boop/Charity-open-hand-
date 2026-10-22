@@ -72,6 +72,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         <span className="space-x-3 text-sm">
           <a href={`/charity-admin/${id}/export/donors`} className="text-brand underline">Download donors (CSV)</a>
           <a href={`/charity-admin/${id}/export/donors?format=xlsx`} className="text-brand underline">Excel</a>
+          <a href={`/charity-admin/${id}/export/donors?format=salesforce`} className="text-brand underline">For Salesforce</a>
         </span>
       </div>
       <DonePanel charity={charity} sp={sp} here={base} />

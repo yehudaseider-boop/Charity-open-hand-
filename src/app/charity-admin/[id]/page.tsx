@@ -7,8 +7,9 @@ import { canIssue18a } from "@/lib/charities";
 import { gettingStarted } from "@/lib/charity/checklist";
 import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
 import { ShareLinks } from "./share-links";
+import { MonthlyTrend } from "./monthly-trend";
 import { allTime, averageCents, ERASED_DONOR, isErasedEmail, lastMonth, monthlySummary, repeatPercent, saDate, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
-import { countDonorGroups, donorGroupsFor, endsWithinAWeek, lapsedPeriodText, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
+import { countDonorGroups, donorGroupsFor, endsWithinAWeek, giftsPerDonor, lapsedPeriodText, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
 import { dueReminders, lapsedDaysFor } from "@/lib/charity/donor-care";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { isRunning, progressPercent } from "@/lib/charity/campaigns";
@@ -92,6 +93,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const chart = lastMonths(monthly, today, 12);
   const groups = countDonorGroups(donors, now, lapsedDays);
   const top = topDonors(donors, 5);
+  const giftsTotal = donors.reduce((t, d) => t + d.donation_count, 0);
+  const perDonor = giftsPerDonor(giftsTotal, donors.length);
   const needs = monthlyAttention(recurring, now);
   const endingSoon = activeCampaigns.filter((c) => endsWithinAWeek(c.endsAt, now));
   // Each line links to the page where the charity can act on it. Unpaid attempts are not shown to charities.
@@ -189,6 +192,12 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                     <span className="font-semibold">{repeatPercent(insights.repeatDonors, insights.allDonors)}%</span> of your donors have given more than once
                     <span className="text-muted"> ({insights.repeatDonors} of {insights.allDonors})</span>.
                   </li>
+                  {perDonor ? (
+                    <li>
+                      On average, a donor has given <span className="font-semibold">{perDonor}</span> times
+                      <span className="text-muted"> ({plural(giftsTotal, "donation")} from {plural(donors.length, "donor")}, all time)</span>.
+                    </li>
+                  ) : null}
                   <li>
                     {year.paid_count === 0 ? (
                       <>No donations yet this tax year. They appear here once a payment goes through.</>
@@ -299,17 +308,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
             )}
           </Card>
 
-          <Card title="Monthly donations">
-            {recurring.length === 0 ? (
-              <p className="text-sm text-muted">No monthly donations yet. One appears here once a donor chooses to give every month.</p>
-            ) : (
-              <p className="text-sm">
-                {plural(regular.runningCount, "donor")} {regular.runningCount === 1 ? "gives" : "give"} {formatRand(regular.runningCentsPerMonth)} a month in total
-                {regular.pausedCount > 0 ? `, ${regular.pausedCount} paused` : ""}.{" "}
-                <Link href={`${base}/monthly`} className="text-brand underline">See monthly donations</Link>
-              </p>
-            )}
-          </Card>
+          <MonthlyTrend rows={recurring} now={now} seeAllHref={`${base}/monthly`} />
 
           <Card title="s18A receipts">
             {receipts ? (

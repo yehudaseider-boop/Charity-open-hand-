@@ -5,10 +5,11 @@ import { ERASED_DONOR, isErasedEmail, shownEmail } from "@/lib/charity/dashboard
 import { loadDonors } from "@/lib/charity/dashboard-queries";
 import { centsToPlain, toCsv, csvPhone } from "@/lib/csv";
 import { formatDate } from "@/lib/dates";
+import { SALESFORCE_HEADER, salesforceRows } from "@/lib/charity/salesforce-export";
 
 const HEADER = ["Donor", "Donor type", "Email", "Phone", "Donations", "Total (R)", "First donation", "Last donation", "s18A receipt requested", "Anonymous publicly"];
 
-/** A charity's donors (people who have given) as a CSV, or Excel with ?format=xlsx. */
+/** A charity's donors (people who have given) as a CSV, Excel with ?format=xlsx, or laid out for Salesforce with ?format=salesforce. */
 export async function GET(request: Request, ctx: RouteContext<"/charity-admin/[id]/export/donors">) {
   const { id } = await ctx.params;
   const who = await authoriseExport(id);
@@ -21,6 +22,7 @@ export async function GET(request: Request, ctx: RouteContext<"/charity-admin/[i
     return new NextResponse("Could not read the donors.", { status: 500 });
   }
   await audit({ actorUserId: who.userId, action: "charity.donors_exported", entityType: "charity", entityId: id, details: { rows: donors.length } });
+  if (new URL(request.url).searchParams.get("format") === "salesforce") return csvResponse(toCsv(SALESFORCE_HEADER, salesforceRows(donors)), "donors-for-salesforce.csv");
   const table = donors.map((d) => [
       isErasedEmail(d.email) ? ERASED_DONOR : d.display_name,
       d.donor_type,

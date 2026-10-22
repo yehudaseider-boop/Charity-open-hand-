@@ -1195,3 +1195,10 @@ branch still merge); fix the clear findings; bring money rules, legal wording an
   sideways scrolling); one real problem (the whole column too wide on phones) was found and fixed.
 - **Not changed:** what any page does. Native date boxes on Donations show the phone's own date format; making them
   always dd/mm/yyyy needs typed date fields (noted for later).
+
+## PSFA asks: monthly trend, gifts per donor, Salesforce export (22/10/2026)
+From the PSFA intro call (22/10/2026): they want donor frequency, lapsed donors, monthly giving trends, and something that sits alongside their Salesforce rather than replacing it. Lapsed donors, thank-you letters and email to a segment were already in. Three additions, no database change:
+- **Monthly giving over time** (Overview and Monthly donations): per month, the monthly donors still giving at its end (today, for this month), their combined monthly amount, and how many began and stopped. Built from each monthly donation's own dates; a donor who is paused now counts as paused from the day they paused (when they resumed isn't recorded). A paused or stopped donor with no recorded date is not counted as giving today, so the latest month matches the summary.
+- **Gifts per donor** (Overview, Your donors): all-time donations divided by donors, one decimal.
+- **Donors for Salesforce** (Donors page, "For Salesforce"): a CSV with Salesforce's standard Contact field names (First Name, Last Name, Email, Phone, Account Name, Lead Source, Description) so the Data Import Wizard maps every column with no set-up. Last Name is always filled; an organisation's name goes in both Last Name and Account Name. The giving summary goes in Description. Erased donors are left out.
+- Open: a "meals funded" line needs PSFA's own cost per meal. Nothing is invented; ask Chantal.

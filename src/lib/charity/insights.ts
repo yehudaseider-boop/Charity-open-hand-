@@ -104,6 +104,54 @@ export function lastMonths(rows: MonthTotal[], todaySa: string, n = 12): MonthTo
   return out.reverse();
 }
 
+export type MonthlyTrendPoint = { month: string; running: number; runningCents: number; started: number; stopped: number };
+
+/**
+ * How monthly giving moved over the last `n` Johannesburg months, oldest first: the monthly donors still
+ * giving at the end of each month (today, for this month), their combined monthly amount, how many began
+ * that month and how many stopped or were cancelled. Built from each monthly donation's own dates, so a
+ * donor who is paused now counts as paused from the day they paused (when they resumed isn't recorded).
+ */
+export function monthlyTrend(
+  rows: Pick<MonthlyRow, "status" | "amount_cents" | "started_at" | "paused_at" | "ended_at">[],
+  todaySa: string,
+  now: Date,
+  n = 12,
+): MonthlyTrendPoint[] {
+  const months = lastMonths([], todaySa, n).map((m) => m.month.slice(0, 7));
+  const startOf = (key: string) => Date.parse(`${key}-01T00:00:00+02:00`);
+  const nextKey = (key: string) => {
+    const [y, m] = key.split("-").map(Number);
+    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  };
+  const at = (iso: string | null) => (iso ? Date.parse(iso) : null);
+  return months.map((key) => {
+    const from = startOf(key);
+    const to = startOf(nextKey(key));
+    const cutoff = Math.min(to, now.getTime());
+    let running = 0, runningCents = 0, started = 0, stopped = 0;
+    for (const r of rows) {
+      const began = at(r.started_at);
+      // Without a recorded date, a paused or stopped donor still isn't giving today, so the latest month agrees with the summary.
+      const unknown = now.getTime() - 1;
+      const ended = r.status === "failed" || r.status === "cancelled" ? (at(r.ended_at) ?? unknown) : null;
+      const paused = r.status === "paused" ? (at(r.paused_at) ?? unknown) : null;
+      if (began !== null && began >= from && began < to) started += 1;
+      if (ended !== null && ended >= from && ended < to && ended !== unknown) stopped += 1;
+      const live = began !== null && began < cutoff && (ended === null || ended >= cutoff) && (paused === null || paused >= cutoff);
+      if (live) { running += 1; runningCents += Number(r.amount_cents); }
+    }
+    return { month: `${key}-01`, running, runningCents, started, stopped };
+  });
+}
+
+/** Gifts per donor as a one-decimal figure ("2.3"), rounded half up with whole numbers only. null when there are no donors. */
+export function giftsPerDonor(gifts: number, donors: number): string | null {
+  if (donors <= 0) return null;
+  const tenths = Math.floor((gifts * 20 + donors) / (donors * 2));
+  return `${Math.floor(tenths / 10)}.${tenths % 10}`;
+}
+
 /**
  * Which donors give monthly right now: a donor with a running monthly donation is "active"; one whose
  * only monthly donation is paused is "paused". Built from the donor's own gifts (each monthly payment
