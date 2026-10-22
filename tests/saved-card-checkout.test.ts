@@ -134,8 +134,14 @@ describe("saving a card on a once-off gift", () => {
 });
 
 describe("paying with the saved card", () => {
+  it("without the app's attempt id nothing is charged (a double tap could otherwise charge twice)", async () => {
+    const res = await call({ ...gift, useSavedCard: true, details });
+    expect(await res.json()).toMatchObject({ ok: false });
+    expect(charges).toHaveLength(0);
+  });
+
   it("charges the card for exactly the total shown, with no payment page", async () => {
-    const res = await call({ ...gift, contributionCents: 1_000, shownTotalCents: 11_000, useSavedCard: true, details });
+    const res = await call({ ...gift, contributionCents: 1_000, shownTotalCents: 11_000, useSavedCard: true, attemptId: crypto.randomUUID(), details });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ ok: true, charged: true, token: "tok" });
@@ -147,7 +153,7 @@ describe("paying with the saved card", () => {
   });
 
   it("never reveals the stored token to the app", async () => {
-    const res = await call({ ...gift, useSavedCard: true, details });
+    const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
     expect(JSON.stringify(await res.json())).not.toContain("AUTH_SECRET");
   });
 
@@ -162,7 +168,7 @@ describe("paying with the saved card", () => {
 
   it("a card the provider declines ends the gift as failed, and says to use another card", async () => {
     chargeResult = async () => ({ status: "failed" });
-    const res = await call({ ...gift, useSavedCard: true, details });
+    const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
     expect(res.status).toBe(409);
     expect((await res.json()).message).toMatch(/declined/);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
@@ -173,7 +179,7 @@ describe("paying with the saved card", () => {
     chargeResult = async () => {
       throw new Error("refused");
     };
-    const res = await call({ ...gift, useSavedCard: true, details });
+    const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
     expect(res.status).toBe(409);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
   });
@@ -183,7 +189,7 @@ describe("paying with the saved card", () => {
       throw new Error("timeout");
     };
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const res = await call({ ...gift, useSavedCard: true, details });
+    const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, charged: true });
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);

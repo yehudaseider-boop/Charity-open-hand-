@@ -93,6 +93,28 @@ export function collectingPeriod(r: Pick<DueMonthly, "attemptPeriod" | "lastPaid
   return candidate >= addMonths(current, -1) && candidate <= current ? candidate : current;
 }
 
+/** What this month's earlier attempts came to, asked fresh: any paid, any still unsettled, or all turned down. */
+async function earlierAttemptsOutcome(id: string, period: string, attempt: number, deps: MonthlyDeps): Promise<"paid" | "unsettled" | "failed"> {
+  let unsettled = false;
+  for (let n = 0; n < attempt; n++) {
+    const earlierId = attemptDonationId(id, period, n);
+    const saved = await deps.store.attemptStatus(earlierId);
+    if (saved === null) continue;
+    if (saved.status === "paid") return "paid";
+    let outcome: ConfirmOutcome;
+    try {
+      outcome = await deps.confirm(earlierId);
+    } catch (e) {
+      // The provider never heard of it: nothing was charged by that attempt.
+      if (deps.isNotFound(e)) continue;
+      throw e;
+    }
+    if (outcome === "paid") return "paid";
+    if (outcome !== "failed" && outcome !== "not_found") unsettled = true;
+  }
+  return unsettled ? "unsettled" : "failed";
+}
+
 export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySummary> {
   const { store, now } = deps;
   const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [] };
@@ -123,6 +145,21 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       const donationId = attemptDonationId(r.id, period, attempt);
       const totalCents = r.amountCents + r.contributionCents;
       const existing = await store.attemptStatus(donationId);
+      // Before a retry, ask about this month's earlier attempts: one that was turned down may have gone
+      // through after all (a late webhook, the provider finishing it). Then this month is paid, and a new
+      // attempt would charge the donor twice. One still unsettled holds the retry until it is.
+      if (existing === null && attempt > 0) {
+        const earlier = await earlierAttemptsOutcome(r.id, period, attempt, deps);
+        if (earlier === "paid") {
+          await store.recordPaid(r.id, period, next);
+          summary.paid += 1;
+          continue;
+        }
+        if (earlier === "unsettled") {
+          summary.waiting.push({ id: r.id, reason: "an earlier attempt this month is not settled yet" });
+          continue;
+        }
+      }
       // The gateway turning the charge down outright counts as a failed attempt (not something to resend).
       let refused = false;
       const send = async () => {

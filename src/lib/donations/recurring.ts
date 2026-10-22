@@ -54,7 +54,10 @@ export async function activateMonthlyDonation(donationId: string, tx: VerifiedTr
     if (error) throw new MonthlySetupError("close the monthly donation", error);
     return data?.length ? "not_reusable" : "none";
   }
-  const paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
+  // An unreadable date from the provider falls back to now (as confirmPayment does), so it can never stop the
+  // monthly donation from starting.
+  const given = tx.paidAt ? new Date(tx.paidAt) : null;
+  const paidAt = given && !Number.isNaN(given.getTime()) ? given : new Date();
   const period = periodOf(paidAt);
   const { data, error } = await db
     .from("recurring_donations")

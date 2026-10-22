@@ -167,6 +167,11 @@ export async function startDonation(args: {
   const parsedDedication = parseDedication(v.dedication_kind, v.dedication_name);
   const dedication = parsedDedication && !("error" in parsedDedication) ? parsedDedication : null;
   const db = createAdminClient();
+  // A saved-card charge has no payment page to stop a double tap, so it must carry the app's attempt id:
+  // the same id is the same charge, never a second one. Without one, nothing is charged.
+  if (savedToken && !(args.attemptId && isUuid(args.attemptId))) {
+    return { ok: false, message: "Something went wrong, so nothing was charged. Please close this screen and try again." };
+  }
   const attemptId = savedToken && args.attemptId && isUuid(args.attemptId) ? args.attemptId : null;
   if (attemptId) {
     const { data: prior, error: priorError } = await db

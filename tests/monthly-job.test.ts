@@ -162,6 +162,26 @@ describe("when the card is declined", () => {
     expect(world.failures[0]).toMatchObject({ n: 2, retryAt: "2026-11-18T06:30:00.000Z" });
   });
 
+  it("a retry never charges when an earlier attempt this month went through after all", async () => {
+    world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 1 })];
+    world.attempts.set(attemptDonationId("rec1", "2026-11", 0), "failed");
+    // The provider has since finished the first attempt.
+    confirmWith = (ref) => (ref === attemptDonationId("rec1", "2026-11", 0) ? "paid" : "failed");
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(s).toMatchObject({ paid: 1, failed: 0 });
+    expect(world.paid).toEqual([{ id: "rec1", period: "2026-11", next: "2026-12-15T06:00:00.000Z" }]);
+  });
+
+  it("a retry waits while an earlier attempt this month is still unsettled", async () => {
+    world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 1 })];
+    world.attempts.set(attemptDonationId("rec1", "2026-11", 0), "failed");
+    confirmWith = () => "pending";
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(s.waiting).toEqual([{ id: "rec1", reason: "an earlier attempt this month is not settled yet" }]);
+  });
+
   it("stops after three failed attempts in a month", async () => {
     confirmWith = () => "failed";
     world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 2 })];

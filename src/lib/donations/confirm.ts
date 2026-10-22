@@ -134,6 +134,9 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (now === "pending") throw new PersistenceError("save the failed donation");
     return now as ConfirmOutcome; // paid (or later) by a concurrent confirmation
   }
+  // A monthly charge we marked as turned down that the provider is still working on is not settled: saying
+  // "failed" would let the monthly job charge the donor again for the same month.
+  if (donation.status === "failed" && donation.recurring_id && tx.status === "pending") return "pending";
   return donation.status === "failed" ? "failed" : "pending";
 }
 
