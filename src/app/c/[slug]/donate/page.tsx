@@ -47,10 +47,11 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   const account = viewer?.email ? { email: viewer.email, savedIdLast4: charity.receiptsAvailable ? await savedIdLast4(viewer.userId) : null } : undefined;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Link href={`/c/${charity.slug}`} className="text-sm font-medium text-brand">← {charity.name_en}</Link>
-        <h1 className="mt-1 text-3xl leading-tight">Give to {charity.name_en}</h1>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <div className="space-y-2">
+        <Link href={`/c/${charity.slug}`} className="text-sm font-semibold text-brand underline underline-offset-4">← {charity.name_en}</Link>
+        <h1 className="text-[clamp(2rem,5vw,2.75rem)] leading-[1.05] text-balance">Give to {charity.name_en}</h1>
+        <p className="text-muted">Choose an amount, add your details, then pay on the payment provider&apos;s secure page.</p>
       </div>
       {campaign && charity.acceptingPayments ? <CampaignProgress campaign={campaign} compact /> : null}
       {typeof sp.campaign === "string" && !campaign ? (

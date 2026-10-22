@@ -1126,3 +1126,22 @@ lines of work had reviewed the same ground, so 35 files clashed. Calls made, so 
 - **No charities, no causes, no cause of the week:** each part hides itself; with no charities at all the band says
   the first charities are joining now and links to how charities join.
 
+
+## 22/10/2026: Donor pages in design direction A (phase 3)
+
+- **Charities page:** a pale lilac band with a big "Find a charity" heading, one search box and cause chips (the
+  chosen one solid blue), then a count ("3 charities") and two columns of charity cards. No match says what was
+  searched and offers "See all charities"; no charities at all says the first ones are joining now.
+- **A charity's page:** wide cover (the charity's photo, or a blue block with two logo drops), logo or initials
+  overlapping it, name, badges. On a laptop the give card stays beside the story; on a phone it comes first. The
+  give card holds the one orange button and three plain facts (s18A receipt if asked for, or none; no Givezy fee;
+  card details stay with the payment provider).
+- **Giving page:** same steps and logic as before, only restyled: amount card (suggested amounts as tiles that show
+  which one was tapped), "Your gift" total, then "Your details", "A few extras (optional)" and "Before you pay"
+  headings, one orange Pay button. Errors stay next to each field with a count above the button.
+- **Thank-you and outcome page:** one card for every outcome: the logo's three drops on a paid gift, a red heading
+  and "Nothing was charged" with Try again on a declined one, a clock while confirming.
+- **Shared parts changed on every page:** form fields (thicker soft border, blue border and ring when focused),
+  ticks and radio buttons in Givezy blue, an orange keyboard-focus ring, and the campaign card (orange progress).
+- **Not in this phase:** the donor account pages (giving history, monthly gifts, tax pack) and sign-in; they follow
+  with the dashboard work or on request.

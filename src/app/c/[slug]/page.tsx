@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Badge } from "@/components/badge";
 import { CampaignProgress } from "@/components/campaign-progress";
-import { Card } from "@/components/card";
 import { CharityBadges } from "@/components/charity-badges";
 import { Info } from "@/components/info";
 import { canIssue18a } from "@/lib/charities";
@@ -59,130 +58,183 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
   const area = [charity.suburb, charity.city].filter(Boolean).join(", ");
   const monogram = initials(charity.name_en);
 
+  const give = accepting ? withSource(`/c/${charity.slug}/donate`, src) : null;
+
   return (
-    <article className="space-y-4">
-      <div className="overflow-hidden rounded-card border-[1.5px] border-border bg-surface">
+    // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
+    <article className="full-bleed overflow-x-clip">
+      <div className="mx-auto max-w-[75rem] px-4 pt-4 sm:px-6 sm:pt-6">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" className="aspect-[3/1] w-full object-cover" />
+          <img src={cover} alt="" className="aspect-[16/9] w-full rounded-[2rem] object-cover sm:aspect-[3/1]" />
         ) : (
-          <div aria-hidden className="relative aspect-[3/1] w-full overflow-hidden bg-brand">
-            <span className="blob absolute -right-10 -top-12 h-32 w-32 bg-coral sm:h-48 sm:w-48" />
-            <span className="blob absolute -bottom-12 left-1/3 h-24 w-32 rotate-12 bg-honey" />
+          <div aria-hidden className="relative aspect-[5/2] w-full overflow-hidden rounded-[2rem] bg-brand sm:aspect-[4/1]">
+            <Drop colour="lilac" className="-top-10 right-28 h-32 w-auto -rotate-12 sm:right-48 sm:h-44" />
+            <Drop colour="orange" className="-top-6 right-6 h-28 w-auto rotate-12 sm:right-16 sm:h-40" />
           </div>
         )}
-        <div className="space-y-4 p-5 sm:p-6">
-          <div className="flex items-end gap-3">
-            {logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt="" className="-mt-14 h-20 w-20 shrink-0 rounded-card border-4 border-surface bg-surface object-cover" />
-            ) : (
-              <div aria-hidden className="-mt-14 flex h-20 w-20 shrink-0 items-center justify-center rounded-card border-4 border-surface bg-brand font-display text-2xl text-white">
-                {monogram}
-              </div>
-            )}
-            <div className="min-w-0 pb-1">
-              <h1 className="text-3xl leading-tight">{charity.name_en}</h1>
-              {area ? <p className="text-sm text-muted">{area}</p> : null}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <CharityBadges charity={charity} />
-            {categories.map((c) => <Badge key={c.name_en}>{c.name_en}</Badge>)}
-          </div>
-          {charity.impact_en ? (
-            <div className="rounded-card bg-honey-soft p-4">
-              <p className="text-sm font-semibold text-brand">Your rand at work</p>
-              <p className="mt-1 font-display text-xl leading-snug text-navy">{charity.impact_en}</p>
-            </div>
-          ) : null}
-          {accepting ? (
-            <Link
-              href={withSource(`/c/${charity.slug}/donate`, src)}
-              className="pressable block w-full rounded-control bg-coral px-4 py-3.5 text-center text-lg font-bold text-navy"
-            >
-              Give to {charity.name_en}
-            </Link>
+        <header className="flex flex-wrap items-end gap-x-5 gap-y-3 px-1 sm:px-4">
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo} alt="" className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-card border-4 border-surface bg-surface object-cover sm:-mt-16 sm:h-32 sm:w-32" />
           ) : (
-            <p className="rounded-control bg-honey-soft p-3 text-center text-sm text-muted">Online giving opens soon.</p>
+            <div aria-hidden className="relative z-10 -mt-12 flex h-24 w-24 shrink-0 items-center justify-center rounded-card border-4 border-surface bg-peach font-display text-3xl font-semibold text-brand sm:-mt-16 sm:h-32 sm:w-32 sm:text-4xl">
+              {monogram}
+            </div>
           )}
-          <p className="text-xs text-muted">
-            {receipts
-              ? "Donations qualify for one s18A receipt a year, issued on this organisation's behalf."
-              : "This organisation is not s18A-approved, so donations do not get a tax receipt."}{" "}
-            Givezy charges no fee on donations.
-          </p>
-          <Info terms={["s18a"]} label="an s18A receipt" />
+          <div className="min-w-0 flex-[1_1_16rem] pt-2">
+            <h1 className="text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.05] text-balance">{charity.name_en}</h1>
+            {area ? <p className="mt-1 text-muted">{area}</p> : null}
+          </div>
+        </header>
+        <div className="mt-4 flex flex-wrap gap-2 px-1 sm:px-4">
+          <CharityBadges charity={charity} />
+          {categories.map((c) => <Badge key={c.name_en}>{c.name_en}</Badge>)}
         </div>
       </div>
 
-      {/* What they're raising for right now comes before the story. */}
-      {campaigns.map((c) => (
-        <CampaignProgress key={c.id} campaign={c} giveHref={accepting ? withSource(`/c/${charity.slug}/donate?campaign=${c.id}`, src) : undefined} />
-      ))}
-
-      {charity.description_en ? (
-        <Card title="What they do">
-          <p className="whitespace-pre-line text-[0.95rem] leading-relaxed">{charity.description_en}</p>
-        </Card>
-      ) : null}
-
-      {charity.funds_use_en ? (
-        <Card title="How your donation is used">
-          <p className="whitespace-pre-line text-[0.95rem] leading-relaxed">{charity.funds_use_en}</p>
-        </Card>
-      ) : null}
-
-      {updates.length ? (
-        <Card title="Latest from them">
-          <ul className="space-y-4">
-            {updates.map((u) => {
-              const photo = publicImageUrl(u.photo_path);
-              return (
-                <li key={u.id} className="space-y-2">
-                  <p className="text-xs text-muted">{formatDate(u.created_at)}</p>
-                  <p className="whitespace-pre-line text-[0.95rem] leading-relaxed">{u.body_en}</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {photo ? <img src={photo} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-card border border-border object-cover" /> : null}
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      ) : null}
-
-      {photos.length ? (
-        <Card title="Photos">
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {photos.map((p) => (
-              <li key={p.id}>
-                <figure className="space-y-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} loading="lazy" className="aspect-square w-full rounded-card border border-border object-cover" />
-                  {p.caption_en ? <figcaption className="text-xs text-muted">{p.caption_en}</figcaption> : null}
-                </figure>
+      <div className="mx-auto grid max-w-[75rem] gap-8 px-4 pb-20 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12">
+        {/* Giving comes first on a phone, and stays beside the story on a laptop. */}
+        <aside className="lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1 lg:self-start">
+          <div className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6">
+            {charity.impact_en ? (
+              <div className="rounded-control bg-honey-soft p-4">
+                <p className="text-sm font-bold text-brand">Your rand at work</p>
+                <p className="mt-1 font-display text-xl font-semibold leading-snug text-navy">{charity.impact_en}</p>
+              </div>
+            ) : null}
+            {give ? (
+              <Link href={give} className="pressable block w-full rounded-control bg-coral px-4 py-4 text-center text-lg font-bold text-navy">
+                Give to {charity.name_en}
+              </Link>
+            ) : (
+              <p className="rounded-control bg-honey-soft p-4 text-center text-muted">
+                Online giving to {charity.name_en} opens soon.
+              </p>
+            )}
+            <ul className="space-y-2 text-sm">
+              <li className="flex gap-2">
+                <Tick yes={receipts} />
+                <span>
+                  {receipts
+                    ? "One s18A receipt a year for your gifts, if you ask for it, issued on this organisation's behalf."
+                    : "This organisation is not s18A-approved, so gifts don't get a tax receipt."}
+                </span>
               </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
+              <li className="flex gap-2"><Tick yes />No Givezy fee on your gift.</li>
+              <li className="flex gap-2"><Tick yes />You pay on the payment provider&apos;s page. We never see your card.</li>
+            </ul>
+            <Info terms={["s18a"]} label="an s18A receipt" />
+          </div>
+        </aside>
 
-      <Card title="Registration">
-        <dl className="space-y-1 text-sm">
-          <div><dt className="inline text-muted">Registered name: </dt><dd className="inline">{charity.legal_name_en}</dd></div>
-          {charity.npo_number ? <div><dt className="inline text-muted">NPO: </dt><dd className="inline">{charity.npo_number}</dd></div> : null}
-          {charity.pbo_number ? <div><dt className="inline text-muted">PBO: </dt><dd className="inline">{charity.pbo_number}</dd></div> : null}
-          {charity.website ? (
-            <div>
-              <dt className="inline text-muted">Website: </dt>
-              <dd className="inline break-all"><a href={charity.website} rel="noopener noreferrer nofollow" target="_blank" className="text-brand underline">{charity.website.replace(/^https?:\/\//, "")}</a></dd>
+        <div className="min-w-0 space-y-10 lg:col-start-1 lg:row-start-1">
+          {/* What they're raising for right now comes before the story. */}
+          {campaigns.length ? (
+            <div className="space-y-4">
+              {campaigns.map((c) => (
+                <CampaignProgress key={c.id} campaign={c} giveHref={accepting ? withSource(`/c/${charity.slug}/donate?campaign=${c.id}`, src) : undefined} />
+              ))}
             </div>
           ) : null}
-        </dl>
-        {charity.is_verified ? (
-          <p className="mt-3 text-xs text-muted">Verified: we have checked this organisation&apos;s registration and bank details.</p>
-        ) : null}
-      </Card>
+
+          {charity.description_en ? (
+            <Section title="What they do">
+              <p className="whitespace-pre-line text-[17px] leading-relaxed">{charity.description_en}</p>
+            </Section>
+          ) : null}
+
+          {charity.funds_use_en ? (
+            <Section title="How your gift is used">
+              <p className="whitespace-pre-line text-[17px] leading-relaxed">{charity.funds_use_en}</p>
+            </Section>
+          ) : null}
+
+          {updates.length ? (
+            <Section title="Latest from them">
+              <ul className="space-y-4">
+                {updates.map((u) => {
+                  const photo = publicImageUrl(u.photo_path);
+                  return (
+                    <li key={u.id} className="space-y-3 rounded-card bg-honey-soft p-5">
+                      <p className="text-sm font-semibold text-muted">{formatDate(u.created_at)}</p>
+                      <p className="whitespace-pre-line leading-relaxed">{u.body_en}</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {photo ? <img src={photo} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-control object-cover" /> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Section>
+          ) : null}
+
+          {photos.length ? (
+            <Section title="Photos">
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {photos.map((p) => (
+                  <li key={p.id}>
+                    <figure className="space-y-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} loading="lazy" className="aspect-square w-full rounded-control object-cover" />
+                      {p.caption_en ? <figcaption className="text-sm text-muted">{p.caption_en}</figcaption> : null}
+                    </figure>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+
+          <Section title="Registration">
+            <dl className="divide-y divide-border rounded-card border-2 border-border px-5 text-[15px]">
+              <Row label="Registered name" value={charity.legal_name_en} />
+              {charity.npo_number ? <Row label="NPO number" value={charity.npo_number} /> : null}
+              {charity.pbo_number ? <Row label="PBO number" value={charity.pbo_number} /> : null}
+              {charity.website ? (
+                <Row
+                  label="Website"
+                  value={<a href={charity.website} rel="noopener noreferrer nofollow" target="_blank" className="break-all font-semibold text-brand underline">{charity.website.replace(/^https?:\/\//, "")}</a>}
+                />
+              ) : null}
+            </dl>
+            {charity.is_verified ? (
+              <p className="mt-3 text-sm text-muted">Verified: we have checked this organisation&apos;s registration and bank details.</p>
+            ) : null}
+          </Section>
+        </div>
+      </div>
     </article>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <h2 className="font-display text-[1.75rem] font-semibold leading-tight">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap justify-between gap-x-4 gap-y-0.5 py-3">
+      <dt className="text-muted">{label}</dt>
+      <dd className="min-w-0 font-semibold">{value}</dd>
+    </div>
+  );
+}
+
+/** A decorative drop from the logo. */
+function Drop({ colour, className }: { colour: "blue" | "lilac" | "orange"; className: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`/brand/drop-${colour}.png`} alt="" className={`pointer-events-none absolute select-none ${className}`} />;
+}
+
+/** A sage tick for yes, a slate dash for no (the same pair as the s18A badge). */
+function Tick({ yes }: { yes: boolean }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className={`mt-0.5 shrink-0 ${yes ? "stroke-sage" : "stroke-muted"}`}>
+      {yes ? <path d="M5 12.5l4.2 4.2L19 7" /> : <path d="M6 12h12" />}
+    </svg>
   );
 }

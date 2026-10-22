@@ -20,7 +20,7 @@ export function KeepChecking({ retryHref }: { retryHref: string }) {
     return () => clearTimeout(t);
   }, [tries, router]);
   if (tries < 12) {
-    return <p className="mt-2 text-xs text-muted" aria-live="polite">Checking again automatically…</p>;
+    return <p className="mt-2 flex items-center gap-2 text-sm text-muted" aria-live="polite"><span aria-hidden className="h-2.5 w-2.5 animate-pulse rounded-full bg-coral" />Checking again automatically…</p>;
   }
   return (
     <div className="mt-3 space-y-2" aria-live="polite">
@@ -28,7 +28,7 @@ export function KeepChecking({ retryHref }: { retryHref: string }) {
         Your payment hasn&apos;t come through yet. If you paid, it can take a few minutes: refresh this page later, and your confirmation email will follow.
         If you closed the payment page without paying, nothing was charged.
       </p>
-      <Link href={retryHref} className="inline-block rounded-control border border-brand px-4 py-2 text-sm font-medium text-brand">
+      <Link href={retryHref} className="inline-block rounded-control border-2 border-border px-5 py-2.5 font-bold text-brand hover:border-brand">
         I didn&apos;t pay: try again
       </Link>
     </div>

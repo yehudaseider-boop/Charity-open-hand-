@@ -113,3 +113,18 @@ main:has(> .full-bleed) {
   max-width: none;
   padding: 0;
 }
+
+/* Ticks and radio buttons in Givezy blue, big enough to hit. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--brand);
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+/* Keyboard focus: an orange ring, the same on every page (style guide). */
+:focus-visible {
+  outline: 3px solid var(--coral);
+  outline-offset: 3px;
+}

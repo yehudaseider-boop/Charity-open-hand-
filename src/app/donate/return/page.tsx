@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card } from "@/components/card";
 import { SupportContact } from "@/components/legal";
 import { KeepChecking } from "./keep-checking";
 import { confirmPayment, savedOutcome } from "@/lib/donations/confirm";
@@ -86,15 +85,15 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
 
   if (outcome === "paid" && d && charity) {
     return (
-      <Card headingLevel={1} title="Thank you">
+      <Result tone="paid" title="Thank you">
         {/* What the gift does, in the charity's own words (left out when it hasn't written one). */}
         {charity.impact_en?.trim() ? (
-          <div className="mb-4 rounded-card bg-honey-soft p-4">
+          <div className="mb-5 rounded-control bg-honey-soft p-4">
             <p className="text-sm font-semibold text-brand">What your gift does</p>
             <p className="mt-1 font-display text-xl leading-snug text-navy">{charity.impact_en.trim()}</p>
           </div>
         ) : null}
-        <dl className="space-y-1 text-sm">
+        <dl className="space-y-1.5 rounded-control border-2 border-border p-4 text-[15px] tabular-nums">
           <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
             <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
@@ -118,88 +117,116 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           </p>
         ) : null}
         {fromApp ? (
-          <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
+          <a href={APP_RETURN_LINK} className="pressable mt-5 block rounded-control bg-brand px-4 py-3.5 text-center font-bold text-brand-contrast">
             Back to the Givezy app
           </a>
         ) : null}
-        <Link href={`/c/${charity.slug}`} className="mt-3 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link>
-      </Card>
+        <Link href={`/c/${charity.slug}`} className="mt-3 inline-block font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link>
+      </Result>
     );
   }
   if (outcome === "paid") {
     // Paid, but we can't show whose it is: no amounts, no giving choice.
     return (
-      <Card headingLevel={1} title="Thank you">
-        <p className="text-sm">Your payment went through. A confirmation is on its way to your email.</p>
+      <Result tone="paid" title="Thank you">
+        <p>Your payment went through. A confirmation is on its way to your email.</p>
         <p className="mt-2 text-sm text-muted">To see the details, open the link from your payment or sign in with the email you gave with.</p>
         {fromApp ? (
-          <a href={APP_RETURN_LINK} className="mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
+          <a href={APP_RETURN_LINK} className="pressable mt-5 block rounded-control bg-brand px-4 py-3.5 text-center font-bold text-brand-contrast">
             Back to the Givezy app
           </a>
         ) : null}
-        <Link href="/charities" className="mt-3 inline-block text-sm text-brand underline">Find a charity</Link>
-      </Card>
+        <Link href="/charities" className="mt-3 inline-block font-semibold text-brand underline underline-offset-4">Find a charity</Link>
+      </Result>
     );
   }
   if (outcome === "failed") {
     const retryHref = charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities";
     return (
-      <Card headingLevel={1} title="Payment didn't go through">
-        <p className="text-sm">
+      <Result tone="failed" title="Payment didn't go through">
+        <p>
           Nothing was charged. This usually means the card was declined or the payment page was closed. You can try again with the same card or a different one.
         </p>
         {fromApp ? (
           <>
-            <a href={APP_RETURN_LINK} className="pressable mt-4 block rounded-control bg-brand px-4 py-3 text-center font-medium text-brand-contrast">
+            <a href={APP_RETURN_LINK} className="pressable mt-5 block rounded-control bg-brand px-4 py-3.5 text-center font-bold text-brand-contrast">
               Back to the Givezy app
             </a>
-            <Link href={retryHref} className="mt-3 inline-block text-sm text-brand underline">Try again on the website</Link>
+            <Link href={retryHref} className="mt-3 inline-block font-semibold text-brand underline underline-offset-4">Try again on the website</Link>
           </>
         ) : (
-          <Link href={retryHref} className="pressable mt-4 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
+          <Link href={retryHref} className="pressable mt-5 inline-block rounded-control bg-brand px-6 py-3 font-bold text-brand-contrast">
             Try again
           </Link>
         )}
         <p className="mt-4 text-sm text-muted">Need help? <HelpLine /></p>
-      </Card>
+      </Result>
     );
   }
   if (outcome === "review") {
     return (
-      <Card headingLevel={1} title="We're checking this payment">
-        <p className="text-sm">Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
+      <Result tone="wait" title="We're checking this payment">
+        <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
         <p className="mt-3 text-sm text-muted">Questions in the meantime? <HelpLine /></p>
-      </Card>
+      </Result>
     );
   }
   if (outcome === "reversed") {
     return (
-      <Card headingLevel={1} title="This donation was refunded">
-        <p className="text-sm">The money went back to your card, so nothing is owed on this donation. The confirmation email you got for it no longer applies.</p>
-        {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block text-sm text-brand underline">Back to {charity.name_en}</Link> : <Link href="/charities" className="mt-4 inline-block text-sm text-brand underline">Find a charity</Link>}
+      <Result tone="neutral" title="This donation was refunded">
+        <p>The money went back to your card, so nothing is owed on this donation. The confirmation email you got for it no longer applies.</p>
+        {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link> : <Link href="/charities" className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Find a charity</Link>}
         <p className="mt-4 text-sm text-muted">Questions? <HelpLine /></p>
-      </Card>
+      </Result>
     );
   }
   if (outcome === "pending") {
     return (
-      <Card headingLevel={1} title="We're confirming your payment">
-        <p className="text-sm">This can take a minute. Please don&apos;t pay again.</p>
+      <Result tone="wait" title="We're confirming your payment">
+        <p>This can take a minute. Please don&apos;t pay again.</p>
         <KeepChecking retryHref={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} />
-      </Card>
+      </Result>
     );
   }
   return (
-    <Card headingLevel={1} title="Donation not found">
+    <Result tone="neutral" title="Donation not found">
       <p className="text-sm text-muted">
         We couldn&apos;t find that donation. If money left your account, send us the date and the amount and we&apos;ll find it: <HelpLine />
       </p>
-      <Link href="/charities" className="mt-4 inline-block text-sm text-brand underline">Find a charity</Link>
-    </Card>
+      <Link href="/charities" className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Find a charity</Link>
+    </Result>
   );
 }
 
 /** A person to reach: the support address once there is one. */
 function HelpLine() {
   return <><SupportContact />.</>;
+}
+
+/**
+ * The page's one card, the same for every outcome (style guide: done, waiting, wrong). A paid gift gets the
+ * logo's three drops; a failed one a calm red heading; waiting a soft lilac clock.
+ */
+function Result({ tone, title, children }: { tone: "paid" | "failed" | "wait" | "neutral"; title: string; children: React.ReactNode }) {
+  return (
+    <section className="relative mx-auto max-w-xl overflow-hidden rounded-[2rem] border-2 border-border bg-surface p-6 sm:p-8">
+      {tone === "paid" ? (
+        <div aria-hidden className="mb-4 flex h-16 items-end gap-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/drop-lilac.png" alt="" className="h-14 w-auto -rotate-8" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/drop-orange.png" alt="" className="h-12 w-auto rotate-10" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/drop-blue.png" alt="" className="mb-1 h-auto w-16" />
+        </div>
+      ) : tone === "wait" ? (
+        <svg aria-hidden width="44" height="44" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mb-4 stroke-brand">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      ) : null}
+      <h1 className={`mb-3 text-[clamp(1.75rem,5vw,2.5rem)] leading-[1.05] ${tone === "failed" ? "text-danger!" : ""}`}>{title}</h1>
+      <div className="space-y-1 [&>p]:leading-relaxed">{children}</div>
+    </section>
+  );
 }

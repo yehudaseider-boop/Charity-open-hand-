@@ -8,8 +8,9 @@ function useFieldId(name: string) {
   return `${name}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 
+// The style guide's field: a soft border, a blue border and ring when focused, red when it has a problem.
 const inputClass =
-  "w-full rounded-control border border-border bg-surface px-3 py-2.5 aria-invalid:border-danger";
+  "w-full rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger";
 
 type Base = {
   name: string;
@@ -22,13 +23,13 @@ function Wrapper({ id, name, label, hint, required, children }: Base & { id: str
   const error = useFieldError(name);
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="block text-sm font-medium">
+      <label htmlFor={id} className="block text-sm font-semibold">
         {label}
         {required ? null : <span className="font-normal text-muted"> (optional)</span>}
       </label>
       {children}
       {hint && !error ? <p id={`${id}-hint`} className="text-xs text-muted">{hint}</p> : null}
-      {error ? <p id={`${id}-error`} role="alert" className="text-xs text-danger">{error}</p> : null}
+      {error ? <p id={`${id}-error`} role="alert" className="text-xs font-semibold text-danger">{error}</p> : null}
     </div>
   );
 }

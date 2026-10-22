@@ -64,6 +64,8 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
   }, { ok: false } as QuoteState);
   const [editingAmount, setEditingAmount] = useState(true);
   const [giveExtra, setGiveExtra] = useState(false);
+  // The suggested amount the donor tapped, shown as chosen until they type their own.
+  const [picked, setPicked] = useState<number | null>(initialAmountCents && suggestedCents.includes(initialAmountCents) ? initialAmountCents : null);
   const amountRef = useRef<HTMLInputElement>(null);
   // The details form stays on screen (and keeps what the donor typed) while they
   // change the amount; it just can't be paid until the new amount is confirmed.
@@ -80,7 +82,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
     <div className="space-y-4">
       <form
         noValidate
-        className="space-y-3 rounded-card bg-honey-soft p-5 sm:p-6"
+        className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6"
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
@@ -88,9 +90,9 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           startTransition(() => requestQuote(fd));
         }}
       >
-        <label htmlFor="amount" className="block font-display text-xl text-indigo">How much would you like to give?</label>
+        <label htmlFor="amount" className="block font-display text-2xl font-semibold text-indigo">How much would you like to give?</label>
         {suggestedCents.length ? (
-          <div className="flex flex-wrap gap-2" role="group" aria-label={`Amounts suggested by ${charityName}`}>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label={`Amounts suggested by ${charityName}`}>
             {suggestedCents.map((c) => (
               <button
                 key={c}
@@ -99,9 +101,11 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                   if (!amountRef.current) return;
                   amountRef.current.value = centsToInput(c);
                   amountRef.current.focus();
+                  setPicked(c);
                   setEditingAmount(true);
                 }}
-                className="rounded-full border-[1.5px] border-brand bg-surface px-4 py-2 font-semibold text-brand hover:bg-brand-soft"
+                aria-pressed={picked === c}
+                className={`rounded-2xl border-2 px-2 py-3 text-[17px] font-bold tabular-nums transition ${picked === c ? "border-brand bg-honey-soft text-brand" : "border-border bg-surface text-navy hover:border-brand"}`}
               >
                 {formatRand(c)}
               </button>
@@ -109,7 +113,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           </div>
         ) : null}
         <div className="flex gap-2">
-          <div className="flex min-w-0 flex-1 items-center rounded-control border-[1.5px] border-border bg-surface px-4 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand">
+          <div className="flex min-w-0 flex-1 items-center rounded-control border-2 border-border bg-surface px-4 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
             <span className="font-display text-2xl text-indigo">R</span>
             <input
               id="amount"
@@ -122,7 +126,10 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
               defaultValue={initialAmountCents ? centsToInput(initialAmountCents) : undefined}
               aria-invalid={amountError ? true : undefined}
               aria-describedby={amountError ? "amount-error" : undefined}
-              onChange={() => setEditingAmount(true)}
+              onChange={() => {
+                setPicked(null);
+                setEditingAmount(true);
+              }}
               className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl text-navy outline-none"
             />
           </div>
@@ -130,11 +137,11 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
-        {amountError ? <p id="amount-error" role="alert" className="text-sm text-danger">{amountError}</p> : null}
-        <p className="text-xs text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
+        {amountError ? <p id="amount-error" role="alert" className="text-sm font-semibold text-danger">{amountError}</p> : null}
+        <p className="text-sm text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
 
-        <div className="space-y-2 rounded-control bg-surface p-3">
-          <label className="flex items-start gap-2 text-sm">
+        <div className="space-y-2 rounded-control bg-honey-soft p-4">
+          <label className="flex items-start gap-2.5 text-sm">
             <input
               type="checkbox"
               name="give_extra"
@@ -150,7 +157,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           {giveExtra ? (
             <div>
               <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Givezy</label>
-              <div className="mt-1 flex items-center rounded-control border border-border bg-surface px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand">
+              <div className="mt-1 flex items-center rounded-[0.875rem] border-2 border-border bg-surface px-3 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft">
                 <span className="text-muted">R</span>
                 <input
                   id="contribution"
@@ -189,12 +196,12 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
 
 function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; charityName: string }) {
   return (
-    <dl className="space-y-1 text-sm">
-      <div className="flex justify-between gap-3"><dt>Donation to {charityName}</dt><dd>{formatRand(q.amountCents)}</dd></div>
+    <dl className="space-y-1.5 rounded-control bg-honey-soft p-4 text-[15px] tabular-nums">
+      <div className="flex justify-between gap-3"><dt>Donation to {charityName}</dt><dd className="shrink-0">{formatRand(q.amountCents)}</dd></div>
       {q.contributionCents > 0 ? (
-        <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(q.contributionCents)}</dd></div>
+        <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd className="shrink-0">{formatRand(q.contributionCents)}</dd></div>
       ) : null}
-      <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Total</dt><dd>{formatRand(q.totalCents)}</dd></div>
+      <div className="flex justify-between gap-3 border-t-2 border-border pt-2 text-lg font-bold"><dt>Total</dt><dd className="shrink-0">{formatRand(q.totalCents)}</dd></div>
     </dl>
   );
 }
@@ -215,7 +222,7 @@ function Check({ name, children, detail, error }: { name: string; children: Reac
   const describedBy = [detail ? `${id}-detail` : null, showError ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   return (
     <div>
-      <div className="flex items-start gap-2 text-sm">
+      <div className="flex items-start gap-2.5 text-sm leading-relaxed">
         <input
           id={id}
           type="checkbox"
@@ -231,7 +238,7 @@ function Check({ name, children, detail, error }: { name: string; children: Reac
           {detail ? <span id={`${id}-detail`}> {detail}</span> : null}
         </span>
       </div>
-      {showError ? <p id={`${id}-error`} role="alert" className="ml-6 text-xs text-danger">{error}</p> : null}
+      {showError ? <p id={`${id}-error`} role="alert" className="ml-7 text-xs font-semibold text-danger">{error}</p> : null}
     </div>
   );
 }
@@ -282,7 +289,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
       <form
         ref={formRef}
         noValidate
-        className="space-y-4 rounded-card border border-border bg-surface p-5"
+        className="space-y-5 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6"
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
@@ -290,14 +297,16 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         }}
       >
         {source ? <input type="hidden" name={SOURCE_PARAM} value={source} /> : null}
+        <h2 className="font-display text-2xl font-semibold">Your gift</h2>
         <Breakdown q={shownQuote} charityName={charityName} />
         {campaign ? <p className="text-sm text-muted">For the campaign: <span className="font-medium text-text">{campaign.title}</span></p> : null}
 
+        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">Your details</h2>
         <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">Giving as</legend>
+          <legend className="text-sm font-semibold">Giving as</legend>
           <div className="flex flex-wrap gap-2">
             {(["individual", "company", "trust"] as const).map((t) => (
-              <label key={t} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
+              <label key={t} className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-border px-4 py-2 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
                 <input type="radio" name="donor_type" value={t} checked={donorType === t} onChange={() => setDonorType(t)} />
                 {t === "individual" ? "Myself" : t === "company" ? "A company" : "A trust"}
               </label>
@@ -321,15 +330,15 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         <TextField name="phone" label="Phone" type="tel" autoComplete="tel" hint="Only for questions about your donation." maxLength={20} />
 
         {receiptsAvailable ? (
-          <div className="space-y-3 rounded-control bg-bg p-3">
-            <label className="flex items-start gap-2 text-sm font-medium">
+          <div className="space-y-3 rounded-control bg-honey-soft p-4">
+            <label className="flex items-start gap-2.5 font-semibold">
               <input type="checkbox" name="wants_18a" className="mt-1" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
               <span>I want an s18A receipt</span>
             </label>
             <Info terms={["s18a"]} label="an s18A receipt" />
             {/* Hidden, not removed, so unticking and ticking again keeps what was typed. Disabled, it isn't sent. */}
             <fieldset hidden={!want18a} disabled={!want18a} className="space-y-3">
-                <p className="text-xs text-muted">
+                <p className="text-sm text-muted">
                   You&apos;ll get one s18A receipt for all your donations to {charityName} each tax year.
                 </p>
                 {!org && account?.savedIdLast4 ? (
@@ -364,7 +373,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
                   </>
                 ) : null}
                 <fieldset className="space-y-3">
-                  <legend className="text-sm font-medium">{org ? "Registered address" : "Your address"}</legend>
+                  <legend className="text-sm font-semibold">{org ? "Registered address" : "Your address"}</legend>
                   <p className="text-xs text-muted">
                     SARS needs it on the receipt.
                     {!org && account?.savedIdLast4 && useSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
@@ -378,11 +387,12 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
             </fieldset>
           </div>
         ) : (
-          <p className="rounded-control bg-warning-soft p-3 text-xs text-warning">
+          <p className="rounded-control bg-warning-soft p-4 text-sm font-semibold text-warning">
             {charityName} is not s18A-approved, so this donation won&apos;t get a tax receipt.
           </p>
         )}
 
+        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">A few extras <span className="font-sans text-base font-normal text-muted">(optional)</span></h2>
         <TextField
           name="giving_label"
           label="Your label"
@@ -397,14 +407,14 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         <TextArea name="message" label={`Message to ${charityName}`} rows={3} maxLength={500} />
 
         {/* Campaign gifts are once-off: a monthly gift would carry on after the campaign ends. */}
-        {campaign ? null : <div className="space-y-2 rounded-control bg-bg p-3">
-          <label className="flex items-start gap-2 text-sm font-medium">
+        {campaign ? null : <div className="space-y-2 rounded-control bg-honey-soft p-4">
+          <label className="flex items-start gap-2.5 font-semibold">
             <input type="checkbox" name="monthly" className="mt-1" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
             <span>Give {formatRand(shownQuote.totalCents)} every month</span>
           </label>
           {monthly ? (
             <>
-              <p className="text-xs text-muted">
+              <p className="text-sm text-muted">
                 Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Card payments only.
                 You can pause or cancel at any time in the Givezy app or from your account on this website.
               </p>
@@ -415,7 +425,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           ) : null}
         </div>}
 
-        <div className="space-y-2">
+        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">Before you pay</h2>
+        <div className="space-y-3">
           <Check name="is_anonymous">
             Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
             <span className="text-muted">{charityName} still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
@@ -435,17 +446,17 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
 
-        {stale ? <p role="status" className="text-sm text-muted">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
+        {stale ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm font-semibold text-warning">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
         <button disabled={pending || stale} className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy disabled:opacity-60">
           {pending ? "Please wait…" : monthly ? `Pay ${formatRand(shownQuote.totalCents)} now, then monthly` : `Pay ${formatRand(shownQuote.totalCents)}`}
         </button>
         {state.message ? (
-          <div role="alert" className="space-y-1 text-sm text-danger">
-            <p>{state.message}</p>
+          <div role="alert" className="space-y-1 rounded-control border-2 border-danger-soft p-4 text-sm">
+            <p className="font-semibold text-danger">{state.message}</p>
             {state.failedToStart ? <p className="text-muted">If it keeps happening: <SupportContact />.</p> : null}
           </div>
         ) : null}
-        <p className="text-xs text-muted">You&apos;ll enter your card details on the payment provider&apos;s secure page. We never see or store them.</p>
+        <p className="text-center text-sm text-muted">You&apos;ll enter your card details on the payment provider&apos;s secure page. We never see or store them.</p>
       </form>
     </FormStateProvider>
   );
@@ -461,10 +472,10 @@ function Dedicate({ error }: { error?: string }) {
   const showError = Boolean(error) && kind === "none";
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-medium">Dedicate this donation <span className="font-normal text-muted">(optional)</span></legend>
+      <legend className="text-sm font-semibold">Dedicate this donation <span className="font-normal text-muted">(optional)</span></legend>
       <div className="flex flex-wrap gap-2">
         {([["none", "No"], ["honour", "In honour of"], ["memory", "In memory of"]] as const).map(([value, label]) => (
-          <label key={value} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft">
+          <label key={value} className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-border px-4 py-2 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
             <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} aria-describedby={showError ? errorId : undefined} />
             {label}
           </label>
@@ -473,7 +484,7 @@ function Dedicate({ error }: { error?: string }) {
       <fieldset hidden={kind === "none"} disabled={kind === "none"}>
         <TextField name="dedication_name" label="Their name" required autoDirection maxLength={80} hint={`${charityLabel(kind === "memory" ? "memory" : "honour")} The charity sees this name; it is not on your s18A receipt.`} />
       </fieldset>
-      {showError ? <p id={errorId} role="alert" className="text-xs text-danger">{error}</p> : null}
+      {showError ? <p id={errorId} role="alert" className="text-xs font-semibold text-danger">{error}</p> : null}
     </fieldset>
   );
 }
