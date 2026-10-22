@@ -54,6 +54,8 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 - [ ] **Database change for cause of the week (needs Yehuda's yes):** `20261022000001_featured_charity.sql` on the Givezy test project, then the live database. Until then the app simply shows no cause of the week, and Admin, Cause of the week shows an error.
 - [ ] **Choose the first causes of the week** (Admin, Cause of the week) before launch, or the app shows none. Needs the app update too.
+- [ ] **Add the cause categories** (Food and welfare, Education, Health and so on). The database has none yet and there is no admin screen for them, so the home page shows no cause chips and the Charities page shows only "All". Decide the list; it needs a small database change or an admin screen.
+- [ ] **Charity photos:** the home page's cause-of-the-week card uses the charity's own cover photo when it has one. Ask the first charities for photos they own and allow us to use.
 
 ## A2. Ask when you reach them (added 21/10/2026, from the Angel Network and Feed a Child meetings)
 

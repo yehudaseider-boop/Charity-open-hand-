@@ -6,7 +6,7 @@ export async function SiteHeader() {
   const viewer = await getViewer();
   return (
     <header className="bg-surface border-b border-border print:hidden">
-      <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-[75rem] items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
         <Link href="/" aria-label={`${platformConfig.appName} home`} className="shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto" />

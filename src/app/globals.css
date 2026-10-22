@@ -107,3 +107,9 @@ h3 {
   transform: translateY(3px);
   box-shadow: 0 1px 0 var(--navy);
 }
+
+/* A page that runs edge to edge (the home page) marks its top element full-bleed; the layout's narrow column steps aside. */
+main:has(> .full-bleed) {
+  max-width: none;
+  padding: 0;
+}

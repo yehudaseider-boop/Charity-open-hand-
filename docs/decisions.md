@@ -1105,3 +1105,24 @@ lines of work had reviewed the same ground, so 35 files clashed. Calls made, so 
   `20261020000002_giver_type.sql` so the two version numbers don't clash.
 - **Not carried over:** `docs/test-site/setup-database.sql` (main regenerated it before this branch's migrations
   existed); it needs regenerating from the full migration list.
+
+## 22/10/2026: Website design direction A ("Splash"), style guide and home page
+
+- **Direction A chosen (Yehuda, 22/10/2026)** out of three home page directions on the design canvas. The style
+  guide for it is on the same canvas (brand, colour with measured contrast, type scale, spacing, buttons, giving
+  controls, cards, forms, loading/empty/done/error states, dashboard pieces, icons and voice). No new colours:
+  every value is the existing v2 one in `globals.css`, `tokens.ts` and `brand-colors.ts`.
+- **Home page rebuilt in that look** (`src/app/page.tsx`): big headline with a sample of the donor's giving page
+  beside it, a pale lilac "find a cause" band (real cause chips from the categories table, the real cause of the
+  week, the newest approved charities), three steps, a navy "your year of giving" block, "what we check, and what
+  we promise", and a last blue call to action. Sample figures are labelled "Sample". The decoration is the logo's
+  three drops (`public/brand/`, the same images as the app), never on top of words.
+- **Claims on the page are only what the product does today:** charities are checked by a person (documents and
+  bank details), card details stay with the payment provider, no Givezy fee (the card provider's fee comes off the
+  gift, as decided 14/10/2026), s18A receipts once a year if the donor asks and the charity may issue them, monthly
+  gifts the donor can pause or stop, the yearly tax pack. No impact numbers, no "100%".
+- **Full width:** the home page runs edge to edge (`full-bleed`, a one-line rule in `globals.css`); every other page
+  keeps its narrow column until it is restyled in phase 3. The header and footer are now 1 200 px wide on every page.
+- **No charities, no causes, no cause of the week:** each part hides itself; with no charities at all the band says
+  the first charities are joining now and links to how charities join.
+
