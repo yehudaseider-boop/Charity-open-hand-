@@ -1180,3 +1180,18 @@ branch still merge); fix the clear findings; bring money rules, legal wording an
   checkout) and the wider helper merges (date helpers, Supabase row unwrap, page-through reads, uuid checks, chip
   styles) wait until the demo-site branch has merged, to avoid conflicts. Low items noted on the checklist.
 
+
+## 22/10/2026: Charity dashboard in design direction A (phase 4)
+
+- **Calmer frame, same parts** (style guide: "the dashboard uses the same parts, calmer"): a pale lilac header band
+  with "Givezy for charities", the charity's name, its status (Approved, Waiting for review...) and "See your public
+  page" once approved. One small orange drop, no big splashes.
+- **The 13 pages are grouped down the side on a laptop:** Giving (Overview, Donations, Monthly donations, Campaigns,
+  s18A receipts, Annual report), People (Donors, Thank donors, Email donors, Team), Your page (Public profile, Photos
+  and updates), Set-up (Application). On a phone they stay one row that scrolls sideways. Same names as before.
+- **Shared card** (dashboard, admin, account): thicker soft border, Fredoka titles. The overview's quick links no
+  longer repeat the menu: only "Print a QR poster" and the download stay.
+- **Phone width:** every dashboard page was checked for content cut off at the edge (a new check, as the page clips
+  sideways scrolling); one real problem (the whole column too wide on phones) was found and fixed.
+- **Not changed:** what any page does. Native date boxes on Donations show the phone's own date format; making them
+  always dd/mm/yyyy needs typed date fields (noted for later).

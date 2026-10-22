@@ -1,14 +1,24 @@
 import type { Metadata } from "next";
-import { CharityNav } from "@/components/charity-nav";
 import Link from "next/link";
+import { CharityNav } from "@/components/charity-nav";
+import { Drop } from "@/components/drop";
 import { getViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
+const statusChip = {
+  neutral: "bg-surface text-muted border-border",
+  warning: "bg-warning-soft text-warning border-warning-soft",
+  success: "bg-success-soft text-success border-success-soft",
+  danger: "bg-danger-soft text-danger border-danger-soft",
+} as const;
+
 /**
- * Every charity page sits under a blue colour-block header with the charity's name and the tabs.
- * The dashboard breaks out of the site's narrow reading column so tables and charts have room.
+ * Every page for one charity: a calm header band with the charity's name and status, the dashboard's
+ * pages down the side (a scrolling row on a phone), and the page itself. It runs wider than the site's
+ * reading column so tables and charts have room.
  */
 export default async function CharityLayout({ children, params }: LayoutProps<"/charity-admin/[id]">) {
   const { id } = await params;
@@ -16,24 +26,42 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
   // Givezy looking at a charity it isn't part of: say so on every page, since what it saves is real.
   const viewer = await getViewer();
   const asGivezy = Boolean(viewer?.isPlatformAdmin && !viewer.managedCharityIds.includes(id));
+  const status = statusLabels[charity.status as CharityStatus] ?? statusLabels.draft;
   return (
-    <div className="relative left-1/2 w-[min(72rem,calc(100vw-2rem))] -translate-x-1/2">
-      <header className="relative mb-6 overflow-hidden rounded-card bg-brand px-5 pb-4 pt-6 text-white print:hidden sm:px-8">
-        <span aria-hidden className="blob absolute hidden sm:block -right-10 -top-14 h-40 w-40 bg-coral" />
-        <span aria-hidden className="blob absolute hidden sm:block -top-14 right-36 h-24 w-28 rotate-12 bg-honey" />
-        <div className="relative">
-          <p className="text-sm font-semibold text-honey">Givezy for charities</p>
-          <p className="font-display text-3xl leading-tight sm:text-4xl">{charity.name_en}</p>
-          <CharityNav id={id} />
+    // full-bleed: the dashboard breaks out of the site's narrow column (see globals.css).
+    <div className="full-bleed overflow-x-clip">
+      <header className="relative overflow-hidden border-b-2 border-border bg-honey-soft print:hidden">
+        <Drop colour="orange" className="-right-6 -top-10 hidden h-28 w-auto rotate-12 sm:block" />
+        <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-bold text-brand">Givezy for charities</p>
+            <p className="font-display text-[clamp(1.75rem,4vw,2.5rem)] font-semibold leading-tight text-indigo">{charity.name_en}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 sm:mr-24">
+            <span className={`rounded-full border-2 px-3 py-1 text-sm font-semibold ${statusChip[status.tone]}`}>{status.label}</span>
+            {charity.status === "approved" ? (
+              <Link href={`/c/${charity.slug}`} className="text-sm font-semibold text-brand underline underline-offset-4">
+                See your public page
+              </Link>
+            ) : null}
+          </div>
         </div>
       </header>
-      {asGivezy ? (
-        <p role="note" className="mb-4 rounded-card border-[1.5px] border-honey bg-honey-soft p-3 text-sm text-navy print:hidden">
-          You&apos;re looking at {charity.name_en}&apos;s dashboard as Givezy, with the owner&apos;s powers. Anything you save, send or remove here is real.{" "}
-          <Link href={`/admin/charities/${id}`} className="font-semibold underline">Back to Admin</Link>
-        </p>
-      ) : null}
-      {children}
+
+      <div className="mx-auto grid max-w-[75rem] grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-10 lg:py-8">
+        <aside className="lg:sticky lg:top-6 lg:self-start">
+          <CharityNav id={id} />
+        </aside>
+        <div className="min-w-0 space-y-5">
+          {asGivezy ? (
+            <p role="note" className="rounded-card border-2 border-honey bg-honey-soft p-4 text-sm text-navy print:hidden">
+              You&apos;re looking at {charity.name_en}&apos;s dashboard as Givezy, with the owner&apos;s powers. Anything you save, send or remove here is real.{" "}
+              <Link href={`/admin/charities/${id}`} className="font-semibold underline">Back to Admin</Link>
+            </p>
+          ) : null}
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

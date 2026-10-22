@@ -13,10 +13,10 @@ export function Card({
   // An h1 picks up Fredoka and the headline colour from globals.css; like every other page title it is never below text-xl.
   const Heading = `h${headingLevel}` as const;
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6">
       {title ? (
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <Heading className={headingLevel === 1 ? "font-display text-xl text-indigo" : "font-display text-lg text-indigo"}>{title}</Heading>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <Heading className={headingLevel === 1 ? "font-display text-2xl font-semibold text-indigo" : "font-display text-xl font-semibold text-indigo"}>{title}</Heading>
           {aside}
         </div>
       ) : null}
@@ -32,5 +32,5 @@ export function Notice({ tone = "neutral", children }: { tone?: "neutral" | "suc
     warning: "bg-warning-soft text-warning",
     danger: "bg-danger-soft text-danger",
   }[tone];
-  return <div className={`rounded-control p-3 text-sm ${cls}`}>{children}</div>;
+  return <div className={`rounded-control p-4 text-sm ${cls}`}>{children}</div>;
 }

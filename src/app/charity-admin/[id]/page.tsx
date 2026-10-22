@@ -176,7 +176,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
                 <ul className="grid grid-cols-2 gap-2">
                   {donorGroups.map((g) => (
                     <li key={g.key}>
-                      <Link href={`${base}/donors?group=${g.key}`} className="block rounded-control border border-border p-3 hover:bg-brand-soft">
+                      <Link href={`${base}/donors?group=${g.key}`} className="block rounded-control border-2 border-border p-3 transition hover:border-brand">
                         <span className="block font-display text-2xl text-indigo">{groups[g.key]}</span>
                         <span className="block text-sm font-semibold">{g.label}</span>
                         <span className="block text-xs text-muted">{g.hint}</span>
@@ -328,12 +328,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
       </div>
 
       <div className="flex flex-wrap gap-2 text-sm">
-        <Link href={`${base}/donations`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Donations</Link>
-        <Link href={`${base}/donors`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Donors</Link>
-        <Link href={`${base}/monthly`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Monthly</Link>
-        <Link href={`${base}/receipts`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Receipts</Link>
-        <Link href={`${base}/poster`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">QR poster</Link>
-        <a href={`${base}/export/donations`} className="rounded-full border border-border bg-surface px-4 py-2 font-medium text-brand hover:bg-brand-soft">Download paid donations (CSV)</a>
+        <Link href={`${base}/poster`} className="rounded-full border-2 border-border bg-surface px-4 py-2 font-semibold text-brand hover:border-brand">Print a QR poster</Link>
+        <a href={`${base}/export/donations`} className="rounded-full border-2 border-border bg-surface px-4 py-2 font-semibold text-brand hover:border-brand">Download paid donations (CSV)</a>
       </div>
     </div>
   );
