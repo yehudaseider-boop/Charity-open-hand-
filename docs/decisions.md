@@ -122,6 +122,16 @@
   for about N ... this tax year". Stored as `impact_unit_cents`, `impact_unit_one`, `impact_unit_many`
   (all or none, R1 to R100 000, 60 characters), migration `20261022000003_charity_impact_unit.sql`.
 
+- **Giving through the app, checked end to end (22/10/2026):** against a running copy of the website, the
+  database and the test gateway: quote, start a gift, pay, decline, a closed payment page, a monthly gift
+  and its next month, a changed total, no consent, no monthly authorisation, a wrong token and an unknown
+  charity. All behaved as intended. The monthly job never charges a month twice, and a declined monthly card
+  is tried three times (then a day later, then three days later) before the monthly donation stops, with an
+  email each time. The check is saved as `scripts/app-giving-check.mjs`. Not yet checked against Paystack
+  itself: that needs the public test site (see `docs/paystack-test-script.md`).
+  **Gap found:** a donor whose monthly card is declined cannot put in a new card; the email tells them to
+  cancel and start again, and gives no way to reach a person. Proposed as the next piece of work.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).
