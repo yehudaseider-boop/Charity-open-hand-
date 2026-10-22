@@ -58,7 +58,7 @@ describe("a deposit", () => {
     const csv = depositsCsv([{ id: "p1", paidOutOn: "2026-10-21", status: "paid", amountCents: 165_000, deposit: d }]);
     const lines = csv.replace(/^﻿/, "").trim().split("\r\n");
     expect(lines[0]).toBe("Deposit date,Deposit total (R),Donor,What,Reference,Gift (R),Fee (R),Reached the bank (R),Adds up");
-    expect(lines[1]).toMatch(/^21\/10\/2026,1650\.00,Donor A,Gift,NL-[0-9A-F]+,500\.00,15\.00,485\.00,Yes$/);
+    expect(lines[1]).toMatch(/^21\/10\/2026,1650\.00,Donor A,Gift,GZ-[0-9A-F]+,500\.00,15\.00,485\.00,Yes$/);
     expect(lines).toHaveLength(4);
   });
 });

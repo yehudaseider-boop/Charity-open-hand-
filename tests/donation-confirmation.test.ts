@@ -5,7 +5,7 @@ import { donationReference } from "@/lib/donations/reference";
 
 describe("donation reference", () => {
   it("is short, upper case and stable", () => {
-    expect(donationReference("3f9a2c71-0b1d-4e5f-9a8b-123456789abc")).toBe("NL-3F9A2C71");
+    expect(donationReference("3f9a2c71-0b1d-4e5f-9a8b-123456789abc")).toBe("GZ-3F9A2C71");
   });
 });
 
@@ -14,7 +14,7 @@ describe("confirmation email", () => {
 
   it("shows the donation, reference and no contribution line when there is none", () => {
     const m = confirmationEmail({ ...base, contributionCents: 0 });
-    expect(m.subject).toContain("NL-3F9A2C71");
+    expect(m.subject).toContain("GZ-3F9A2C71");
     expect(m.text).toContain("Donation to Meals Fund: R180");
     expect(m.text).not.toContain("Contribution");
     expect(m.text).toContain("08/10/2026");

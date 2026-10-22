@@ -14,7 +14,7 @@ describe("payments overview", () => {
       ],
       NOW,
     );
-    expect(rows.map((r) => [r.reference, r.minutes, r.totalCents])).toEqual([["NL-3F9A2C71", 95, 18000], ["NL-BBBBBBBB", 31, 3000]]);
+    expect(rows.map((r) => [r.reference, r.minutes, r.totalCents])).toEqual([["GZ-3F9A2C71", 95, 18000], ["GZ-BBBBBBBB", 31, 3000]]);
   });
 
   it("lists only payment events unfinished for more than 5 minutes", () => {
@@ -27,7 +27,7 @@ describe("payments overview", () => {
       NOW,
     );
     expect(rows.map((r) => r.id)).toEqual(["e3", "e2"]);
-    expect(rows[1].reference).toBe("NL-3F9A2C71");
+    expect(rows[1].reference).toBe("GZ-3F9A2C71");
   });
 
   it("adds up per charity: donations to the charity, contributions to Givezy, in whole cents", () => {

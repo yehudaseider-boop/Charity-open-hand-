@@ -1145,3 +1145,11 @@ lines of work had reviewed the same ground, so 35 files clashed. Calls made, so 
   ticks and radio buttons in Givezy blue, an orange keyboard-focus ring, and the campaign card (orange progress).
 - **Not in this phase:** the donor account pages (giving history, monthly gifts, tax pack) and sign-in; they follow
   with the dashboard work or on request.
+
+## 22/10/2026: Donation references start with GZ-
+
+- **Yehuda, 22/10/2026:** references are now `GZ-` plus the first 8 characters of the gift's id (was `NL-`, from
+  Nadiv Lev). The reference is not stored; it is worked out each time, so every gift, old or new, shows `GZ-` with the
+  same 8 characters on the confirmation page, emails, the charity's donation page, exports and the deposit report.
+  Nothing searches by the prefix. Safe because live payments have never been on, so no real donor holds an `NL-` one.
+

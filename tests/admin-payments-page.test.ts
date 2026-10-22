@@ -59,7 +59,7 @@ describe("the Payments page", () => {
       ],
     };
     const html = await page();
-    expect(html).toContain("NL-3F9A2C71");
+    expect(html).toContain("GZ-3F9A2C71");
     expect(html).toContain("Payments still pending");
     expect(html).toContain("payment_succeeded");
     expect(html).toContain("Amount did not match");

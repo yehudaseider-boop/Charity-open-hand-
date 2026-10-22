@@ -1,10 +1,10 @@
 /**
  * The donor-facing reference for a donation: the first 8 characters of its id,
- * upper case (e.g. "NL-3F9A2C71"). Shown on the confirmation page and email,
+ * upper case (e.g. "GZ-3F9A2C71", GZ for Givezy). Shown on the confirmation page and email,
  * and searchable by the platform team.
  */
 export function donationReference(donationId: string): string {
-  return `NL-${donationId.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+  return `GZ-${donationId.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
 /**
