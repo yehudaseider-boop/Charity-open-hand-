@@ -29,7 +29,7 @@ export const sampleGoals: Goal[] = [
   { id: "sample", name: "Giving goal", basis: "fixed", percentPpm: null, fixedCents: 1_200_000, period: "year", year: "tax", counts: null },
 ];
 
-export type Recurring = { id: string; charitySlug: string; charityName: string; /** The gift to the charity each month. */ cents: number; /** The contribution to Givezy paid with it, if any. */ contributionCents?: number; nextDate: Date | null; status: "active" | "paused" | "cancelled" | "failed"; /** A change is saved and waiting for the payment provider to apply it. */ syncing?: boolean };
+export type Recurring = { id: string; charitySlug: string; charityName: string; /** The gift to the charity each month. */ cents: number; /** The contribution to Givezy paid with it, if any. */ contributionCents?: number; nextDate: Date | null; status: "active" | "paused" | "cancelled" | "failed"; /** A change is saved and waiting for the payment provider to apply it. */ syncing?: boolean; /** The card was declined: the donor can put in a new one. */ needsCard?: boolean };
 
 export const recurring: Recurring[] = [
   { id: "r1", charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 50_000, nextDate: d(2026, 11, 1), status: "active" },

@@ -4,6 +4,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+// "Update my card" has its own tests (monthly-new-card*.test.ts); here no gift is a card update.
+vi.mock("@/lib/donations/new-card", () => ({ finishNewCard: async () => "none", newCardWaitingFor: async () => false, cardUpdateFor: async () => null, newCardPath: () => "" }));
 process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 
 type Recurring = { id: string; status: string; charge_day: number; first_donation_id: string; [k: string]: unknown };

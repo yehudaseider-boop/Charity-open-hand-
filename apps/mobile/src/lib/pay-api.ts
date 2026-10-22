@@ -185,6 +185,18 @@ export async function removeSavedCard(site: string, token: string, send: Send = 
   return { ok: false, message: "We couldn't remove your card just now. Please try again." };
 }
 
+export type NewCardReply = { ok: true; url: string } | { ok: false; message: string };
+
+/**
+ * The donor's own "Update my card" page for a monthly donation whose card was declined. It opens on the
+ * website, where the new card goes in on the payment provider's page; the app never sees a card.
+ */
+export async function requestNewCardPage(site: string, recurringId: string, token: string, post: Post = fetchPost): Promise<NewCardReply> {
+  const r = await call<{ ok: boolean; path?: unknown; message?: string }>(post, api(site, "new-card"), { id: recurringId }, token);
+  if (r.ok && typeof r.path === "string" && r.path.startsWith("/monthly/new-card?")) return { ok: true, url: `${site.replace(/\/+$/, "")}${r.path}` };
+  return { ok: false, message: r.ok ? NETWORK : (r.message ?? NETWORK) };
+}
+
 export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /**

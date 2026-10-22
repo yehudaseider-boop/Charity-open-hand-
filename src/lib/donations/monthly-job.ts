@@ -47,6 +47,8 @@ export interface MonthlyStore {
   recordFailure(id: string, period: Period, failedAttempts: number, retryAt: Date | null): Promise<void>;
   /** The gateway refused the charge outright: the attempt's donation is marked failed (it was never sent for confirmation). */
   failAttempt(donationId: string): Promise<void>;
+  /** The donor has a new-card payment page open for this monthly donation ("Update my card"). */
+  newCardPending?(id: string, now: Date): Promise<boolean>;
 }
 
 export type MonthlyDeps = {
@@ -134,6 +136,11 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       }
       if (!(await store.claim(r.id, now))) {
         summary.waiting.push({ id: r.id, reason: "being handled by another run" });
+        continue;
+      }
+      // The donor is putting in a new card ("Update my card"): never try the old one meanwhile.
+      if (await store.newCardPending?.(r.id, now)) {
+        summary.waiting.push({ id: r.id, reason: "the donor is putting in a new card" });
         continue;
       }
       if (!(await deps.charityState(r.charitySlug)).accepting) {

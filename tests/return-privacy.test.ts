@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("server-only", () => ({}));
+// "Update my card" has its own tests (monthly-new-card*.test.ts); here no gift is a card update.
+vi.mock("@/lib/donations/new-card", () => ({ finishNewCard: async () => "none", newCardWaitingFor: async () => false, cardUpdateFor: async () => null, newCardPath: () => "" }));
 
 const ID = "3f9a2c71-0b1d-4e5f-9a8b-123456789abc";
 const row = {

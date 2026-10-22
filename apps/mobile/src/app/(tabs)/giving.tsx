@@ -17,7 +17,6 @@ import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, hhmm, jhbToday, rand } from "@/lib/format";
-import { openGiveScreen } from "@/lib/give-entry";
 import { helpLine } from "@/lib/help";
 import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving";
 import { goalProgress, knownLabels, MAX_GOALS, monthTiles, type Goal } from "@/lib/goals";
@@ -33,7 +32,9 @@ import { useDirectory } from "@/lib/directory";
 import { savedCharities } from "@/lib/live-charities";
 import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
-import { confirmThen, notify } from "@/lib/open-site";
+import { confirmThen, notify, openUrl } from "@/lib/open-site";
+import { requestNewCardPage } from "@/lib/pay-api";
+import { SITE_URL } from "@/lib/website";
 import { RecordProblem } from "@/components/record-problem";
 import { useStoredRecord } from "@/lib/use-stored-record";
 import type { SaveResult } from "@/lib/stored-result";
@@ -114,6 +115,18 @@ export default function Giving() {
   if (logging === null && logGuard !== null) setLogGuard(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [recurringError, setRecurringError] = useState<string | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
+  // "Update card": the donor's own page on the website, where the new card goes in on the payment provider's page.
+  const updateCard = async (id: string) => {
+    const token = await account.accessToken();
+    if (!SITE_URL || !token) return notify("Not available yet", "Putting in a new card opens on the Givezy website once it is live.");
+    setCardBusy(true);
+    setRecurringError(null);
+    const r = await requestNewCardPage(SITE_URL, id, token).catch(() => ({ ok: false as const, message: "We couldn't reach Givezy. Please check your connection and try again." }));
+    setCardBusy(false);
+    if (!r.ok) return setRecurringError(`${r.message} Nothing was charged and your monthly donation is unchanged.`);
+    openUrl(r.url);
+  };
   // Which goal is open in the editor: its id, "new", or none.
   const [editing, setEditing] = useState<string | null>(null);
   // "Saving…", then "Goal saved." once the phone has kept it (never before).
@@ -572,7 +585,7 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {rand(r.cents)} a month{r.contributionCents ? ` (+ ${rand(r.contributionCents)} to Givezy)` : ""} · {r.status === "failed" ? "Stopped: the card was declined" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {rand(r.cents)} a month{r.contributionCents ? ` (+ ${rand(r.contributionCents)} to Givezy)` : ""} · {r.status === "failed" ? "Stopped: the card was declined" : r.needsCard && r.status === "active" ? "Card declined: tap to update" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
                       <ChevronIcon />
@@ -633,8 +646,8 @@ export default function Giving() {
               <>
                 {open.status === "failed" ? (
                   <View style={{ gap: 10 }}>
-                    <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. To carry on giving monthly, start a new one with a card that works.</Text>
-                    <Button variant="secondary" label={`Give to ${open.charityName} again`} onPress={() => { const slug = open.charitySlug; setOpen(null); openGiveScreen(slug); }} />
+                    <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. Put in a new card to carry it on: this month is paid with it, then it continues as before.</Text>
+                    <Button label={cardBusy ? "Opening…" : "Update card"} disabled={cardBusy} onPress={() => void updateCard(open.id)} />
                     <Text variant="label">{helpLine()}</Text>
                     <Button label={busy ? "Removing…" : "Remove it from my list"} disabled={busy} onPress={() => confirmThen("Remove this monthly donation?", "It has already stopped and nothing more is charged. It will no longer show in your list.", "Remove", () => changeRecurring(open.id, "cancelled"))} />
                   </View>
@@ -648,7 +661,14 @@ export default function Giving() {
                   </View>
                 ) : (
                   <>
+                    {open.needsCard && open.status === "active" ? (
+                      <View style={{ gap: 10 }}>
+                        <Text>Your card was declined this month. Nothing was charged. We will try it again, or you can put in a new card now.</Text>
+                        <Button label={cardBusy ? "Opening…" : "Update card"} disabled={cardBusy} onPress={() => void updateCard(open.id)} />
+                      </View>
+                    ) : null}
                     <Button
+                      variant={open.needsCard && open.status === "active" ? "secondary" : undefined}
                       label={busy ? "Saving…" : open.status === "paused" ? "Resume" : "Pause"}
                       disabled={busy}
                       onPress={() => changeRecurring(open.id, open.status === "paused" ? "active" : "paused")}

@@ -18,6 +18,7 @@ import { HebrewAware } from "@/components/hebrew-aware";
 import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
 import { getViewer } from "@/lib/auth";
 import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
+import { cardUpdateFor, newCardPath } from "@/lib/donations/new-card";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };
@@ -87,6 +88,10 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // A declined card tries again with the same amount filled in (the donor's own figure, not a secret).
   if (outcome === "failed" && d?.amount_cents) retryParams.set("amount", String(d.amount_cents));
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
+  // A new card for a monthly donation ("Update my card"): trying again goes back there, not to a new gift.
+  // Only for the donor holding this payment's credential, who is the one the update link was for.
+  const cardUpdate = holdsToken && d ? await cardUpdateFor(d.id).catch(() => null) : null;
+  const retryHref = cardUpdate ? newCardPath(cardUpdate.recurringId, new Date()) : charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities";
 
   if (outcome === "paid" && d && charity) {
     // What this gift pays for, worked out from the charity's own figure (none when it set no figure).
@@ -117,6 +122,13 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             </div>
           ) : null}
         </dl>
+        {cardUpdate ? (
+          <p className="mt-3 rounded-control bg-honey-soft p-3 text-sm text-navy">
+            {cardUpdate.active
+              ? `Your new card is saved for your monthly donation, which carries on as before${cardUpdate.nextChargeAt ? `. Next on ${formatDate(cardUpdate.nextChargeAt)}` : ""}.`
+              : "This month's donation is paid. Your monthly donation is not active, so nothing more will be collected."}
+          </p>
+        ) : null}
         <p className="mt-3 text-sm text-muted">
           A confirmation is on its way to your email.{" "}
           {d.wants_18a ? "This donation will be on your annual s18A receipt after the tax year closes." : null}
@@ -154,11 +166,10 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     );
   }
   if (outcome === "failed") {
-    const retryHref = charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities";
     return (
       <Result tone="failed" title="Payment didn't go through">
         <p>
-          Nothing was charged. This usually means the card was declined or the payment page was closed. You can try again with the same card or a different one.
+          Nothing was charged{cardUpdate ? " and your monthly donation is unchanged" : ""}. This usually means the card was declined or the payment page was closed. You can try again with the same card or a different one.
         </p>
         {fromApp ? (
           <>
@@ -201,7 +212,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Result tone="wait" title="We're confirming your payment">
         <p>This can take a minute. Please don&apos;t pay again.</p>
-        <KeepChecking retryHref={charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities"} />
+        <KeepChecking retryHref={retryHref} />
       </Result>
     );
   }

@@ -240,3 +240,26 @@ describe("the donor's authorisation to collect monthly", () => {
     });
   });
 });
+
+describe("new-card payments (Update my card)", () => {
+  it("are closed to every browser, including the donor's own", async () => {
+    await tx(async () => {
+      const m = await monthly("failed");
+      await run("insert into public.monthly_card_updates (donation_id, recurring_id, period) values ($1, $2, '2026-11')", [m.first, m.id]);
+      await run("savepoint before_reads");
+      await as(ids.donorUser);
+      await expect(run("select * from public.monthly_card_updates")).rejects.toThrow(/permission denied/);
+      await run("rollback to savepoint before_reads");
+      await run("reset role");
+      await run("set local role anon");
+      await expect(run("select * from public.monthly_card_updates")).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it("only take a month written as yyyy-mm", async () => {
+    await tx(async () => {
+      const m = await monthly("failed");
+      await expect(run("insert into public.monthly_card_updates (donation_id, recurring_id, period) values ($1, $2, 'November')", [m.first, m.id])).rejects.toThrow(/check/);
+    });
+  });
+});

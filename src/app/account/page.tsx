@@ -31,7 +31,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const { data: monthlyGifts } = donorIds.length
     ? await supabase
         .from("recurring_donations")
-        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, charities(name_en, slug)")
+        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, charities(name_en, slug)")
         .in("donor_id", donorIds)
         .in("status", ["active", "paused", "failed"])
         .order("created_at", { ascending: false })
@@ -74,12 +74,18 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                 <li key={m.id} className="rounded-control border-2 border-border p-3 text-sm">
                   <p className="font-medium">{charity ? <Link href={`/c/${charity.slug}`} className="underline underline-offset-4">{charity.name_en}</Link> : "Charity"}: {formatRand(Number(m.amount_cents) + Number(m.contribution_cents))} a month</p>
                   <p className="text-muted">
-                    {m.status === "active" && m.next_charge_at ? `Next payment on ${formatDate(m.next_charge_at)}` : null}
+                    {m.status === "active" && m.failed_attempts > 0 ? "Your card was declined this month. We'll try it again, or you can put in a new card. " : null}
+                    {m.status === "active" && m.next_charge_at ? `${m.failed_attempts > 0 ? "Next try" : "Next payment"} on ${formatDate(m.next_charge_at)}` : null}
                     {m.status === "paused" ? "Paused. Nothing is collected until you resume." : null}
-                    {m.status === "failed" ? "Stopped: we could not collect it from your card. Start a new monthly donation on the charity's page (the link above) to carry on." : null}
+                    {m.status === "failed" ? "Stopped: we could not collect it from your card. Put in a new card to carry it on." : null}
                     {m.card_last4 && m.status !== "failed" ? ` · Card ending ${m.card_last4}` : null}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-3">
+                    {m.status === "failed" || (m.status === "active" && m.failed_attempts > 0) ? (
+                      <Link href={`/monthly/new-card?m=${m.id}`} className="pressable inline-flex min-h-11 items-center rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-brand-contrast">
+                        Update card
+                      </Link>
+                    ) : null}
                     {m.status === "active" ? <MonthlyButton id={m.id} status="paused" label="Pause" /> : null}
                     {m.status === "paused" ? <MonthlyButton id={m.id} status="active" label="Resume" /> : null}
                     {m.status === "failed" ? (

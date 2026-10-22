@@ -7,9 +7,11 @@ import { formatRand } from "@/lib/money";
 import { getGateway } from "@/lib/gateway";
 import { isGatewayNotFound, isGatewayRefusal } from "@/lib/gateway/types";
 import { platformConfig } from "@/config/platform";
+import { legalConfig } from "@/config/legal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore, type MonthlySummary } from "./monthly-job";
 import { monthlyFailedEmail } from "./monthly-email";
+import { DECLINED_REASON, newCardLink, newCardPendingFor } from "./new-card";
 
 type DueRow = {
   id: string;
@@ -115,53 +117,11 @@ export function supabaseMonthlyStore(): MonthlyStore {
     },
 
     async createAttempt(r, donationId, totalCents) {
-      const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id").eq("id", r.id).maybeSingle(), "read the monthly donation");
-      const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at, came_from").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
-      const ins = await db.from("donations").insert({
-        id: donationId,
-        donor_id: rec.donor_id,
-        charity_id: rec.charity_id,
-        campaign_id: rec.campaign_id,
-        recurring_id: r.id,
-        amount_cents: r.amountCents,
-        contribution_cents: r.contributionCents,
-        platform_fee_cents: 0,
-        fee_vat_cents: 0,
-        processing_charge_cents: 0,
-        total_charged_cents: totalCents,
-        status: "pending",
-        gateway: rec.gateway,
-        gateway_ref: donationId,
-        wants_18a: rec.wants_18a,
-        is_anonymous: rec.is_anonymous,
-        message: rec.message,
-        // Each month carries the dedication the donor chose when they set it up.
-        dedication_kind: rec.dedication_kind,
-        dedication_name: rec.dedication_name,
-        // Each month counts where the monthly donation was first set up (website, app, a shared link).
-        came_from: first.came_from ?? null,
-        popia_consent_at: first.popia_consent_at,
-        age_confirmed_at: first.age_confirmed_at,
-      });
-      if (ins.error) throw new Error(`Could not create a collection attempt: ${ins.error.message}`);
-      // The donor's details for the s18A receipt and their own record travel with each monthly gift. If
-      // copying them fails, the attempt (not yet sent to the gateway) is removed again, so the next run
-      // makes it afresh instead of charging a gift with no donor details.
-      try {
-        const details = must(await db.from("donation_checkout_details").select("*").eq("donation_id", rec.first_donation_id).maybeSingle(), "read the donor's details");
-        const copy = await db.from("donation_checkout_details").insert({ ...details, donation_id: donationId });
-        if (copy.error) throw new Error(`Could not copy the donor's details: ${copy.error.message}`);
-        const kind = await db.from("donation_giving_kinds").select("kind, label").eq("donation_id", rec.first_donation_id).maybeSingle();
-        if (kind.data) {
-          const k = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: kind.data.kind, label: kind.data.label });
-          if (k.error) throw new Error(`Could not copy the donor's label: ${k.error.message}`);
-        }
-      } catch (e) {
-        await db.from("donation_giving_kinds").delete().eq("donation_id", donationId);
-        await db.from("donation_checkout_details").delete().eq("donation_id", donationId);
-        await db.from("donations").delete().eq("id", donationId).eq("status", "pending");
-        throw e;
-      }
+      await createMonthlyGift(r.id, donationId, { amountCents: r.amountCents, contributionCents: r.contributionCents, totalCents });
+    },
+
+    async newCardPending(id, now) {
+      return newCardPendingFor(id, now);
     },
 
     async reschedule(id, nextChargeAt) {
@@ -190,11 +150,66 @@ export function supabaseMonthlyStore(): MonthlyStore {
     async recordFailure(id, period, failedAttempts, retryAt) {
       const patch = retryAt
         ? { attempt_period: period, failed_attempts: failedAttempts, next_charge_at: retryAt.toISOString() }
-        : { attempt_period: period, failed_attempts: failedAttempts, status: "failed" as const, ended_reason: "the card was declined every time we tried this month", authorization_encrypted: null };
+        : { attempt_period: period, failed_attempts: failedAttempts, status: "failed" as const, ended_reason: DECLINED_REASON, authorization_encrypted: null };
       const { error } = await db.from("recurring_donations").update(patch).eq("id", id).eq("status", "active");
       if (error) throw new Error(`Could not record a failed attempt: ${error.message}`);
     },
   };
+}
+
+/**
+ * One month's gift of a monthly donation, pending, with the donor's details, consent times and label
+ * copied from its first gift. Used by the monthly job and by "Update my card".
+ */
+export async function createMonthlyGift(recurringId: string, donationId: string, m: { amountCents: number; contributionCents: number; totalCents: number }): Promise<void> {
+  const db = createAdminClient();
+  const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id").eq("id", recurringId).maybeSingle(), "read the monthly donation");
+  const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at, came_from").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
+  const ins = await db.from("donations").insert({
+    id: donationId,
+    donor_id: rec.donor_id,
+    charity_id: rec.charity_id,
+    campaign_id: rec.campaign_id,
+    recurring_id: recurringId,
+    amount_cents: m.amountCents,
+    contribution_cents: m.contributionCents,
+    platform_fee_cents: 0,
+    fee_vat_cents: 0,
+    processing_charge_cents: 0,
+    total_charged_cents: m.totalCents,
+    status: "pending",
+    gateway: rec.gateway,
+    gateway_ref: donationId,
+    wants_18a: rec.wants_18a,
+    is_anonymous: rec.is_anonymous,
+    message: rec.message,
+    // Each month carries the dedication the donor chose when they set it up.
+    dedication_kind: rec.dedication_kind,
+    dedication_name: rec.dedication_name,
+    // Each month counts where the monthly donation was first set up (website, app, a shared link).
+    came_from: first.came_from ?? null,
+    popia_consent_at: first.popia_consent_at,
+    age_confirmed_at: first.age_confirmed_at,
+  });
+  if (ins.error) throw new Error(`Could not create a collection attempt: ${ins.error.message}`);
+  // The donor's details for the s18A receipt and their own record travel with each monthly gift. If
+  // copying them fails, the attempt (not yet sent to the gateway) is removed again, so the next run
+  // makes it afresh instead of charging a gift with no donor details.
+  try {
+    const details = must(await db.from("donation_checkout_details").select("*").eq("donation_id", rec.first_donation_id).maybeSingle(), "read the donor's details");
+    const copy = await db.from("donation_checkout_details").insert({ ...details, donation_id: donationId });
+    if (copy.error) throw new Error(`Could not copy the donor's details: ${copy.error.message}`);
+    const kind = await db.from("donation_giving_kinds").select("kind, label").eq("donation_id", rec.first_donation_id).maybeSingle();
+    if (kind.data) {
+      const k = await db.from("donation_giving_kinds").insert({ donation_id: donationId, kind: kind.data.kind, label: kind.data.label });
+      if (k.error) throw new Error(`Could not copy the donor's label: ${k.error.message}`);
+    }
+  } catch (e) {
+    await db.from("donation_giving_kinds").delete().eq("donation_id", donationId);
+    await db.from("donation_checkout_details").delete().eq("donation_id", donationId);
+    await db.from("donations").delete().eq("id", donationId).eq("status", "pending");
+    throw e;
+  }
 }
 
 /** The real job: Supabase store, the active gateway, the confirmation check and email. */
@@ -232,6 +247,8 @@ export async function runMonthlyGiving(now = new Date()): Promise<MonthlySummary
         cardLast4: r.cardLast4,
         final: info.final,
         manageUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
+        newCardUrl: site ? newCardLink(site, r.id, now) : undefined,
+        helpEmail: legalConfig.supportEmail,
       });
       await getEmailTransport().send({ to: r.email, ...m });
     },

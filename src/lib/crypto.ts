@@ -36,6 +36,11 @@ export function decrypt(stored: string): string {
   return Buffer.concat([decipher.update(Buffer.from(ct, "base64url")), decipher.final()]).toString("utf8");
 }
 
+/** A keyed signature for a link we send (purpose keeps one kind of link from standing in for another). */
+export function signLink(purpose: string, value: string): string {
+  return createHmac("sha256", key()).update(`link|${purpose}|${value}`).digest("base64url");
+}
+
 /** Last 4 characters, for masked display ("•••• 1234"). */
 export function last4(value: string): string {
   return value.replace(/\s/g, "").slice(-4);

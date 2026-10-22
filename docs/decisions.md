@@ -132,6 +132,18 @@
   **Gap found:** a donor whose monthly card is declined cannot put in a new card; the email tells them to
   cancel and start again, and gives no way to reach a person. Proposed as the next piece of work.
 
+- **"Update my card" for a declined monthly donation (22/10/2026, Yehuda said yes):** when the card on a monthly
+  donation is declined, the donor can put in a new card instead of cancelling and starting again. They pay this
+  month's donation with the new card on the payment provider's page (never in the app); once the provider confirms
+  it, that card is kept for the same monthly donation, which carries on (or starts again, if it had stopped after
+  three tries), next collected a month on. Reached from the "we could not collect" and "has stopped" emails (a
+  signed link for that one monthly donation, valid 30 days), from Account, and from the app's Giving tab (it opens
+  the same page in the phone's browser). The monthly job never tries the old card while a new-card payment page is
+  open (48 hours). Only this month is paid; a skipped month is never collected late. Amount and charity cannot be
+  changed this way. The emails no longer tell donors to cancel first or warn about being charged twice, and name a
+  person to ask once Givezy has a support address. Email wording is a draft for Yehuda. Migration
+  `20261022000004_monthly_new_card.sql`.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

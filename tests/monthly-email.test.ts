@@ -33,12 +33,26 @@ describe("monthly donation emails", () => {
 
   it("a failed collection says it will be tried again; the last says it has stopped", () => {
     const again = monthlyFailedEmail({ charityName: "Meals Fund", totalText: "R200", cardLast4: "4081", final: false });
-    expect(again.text).toContain("We will try again shortly");
+    expect(again.text).toContain("We will try the same card again");
+    expect(again.text).toContain("Nothing was charged");
     expect(again.subject).toContain("could not collect");
     const stop = monthlyFailedEmail({ charityName: "Meals Fund", totalText: "R200", cardLast4: null, final: true, manageUrl: "https://example.co.za/account" });
     expect(stop.text).toContain("stopped your monthly donation");
     expect(stop.text).toContain("your card");
     expect(stop.subject).toContain("has stopped");
+  });
+
+  it("offers the donor's own new-card link and a person to ask, and never says to cancel and start again", () => {
+    const link = "https://example.co.za/monthly/new-card?m=x&e=1&s=y";
+    for (const final of [false, true]) {
+      const m = monthlyFailedEmail({ charityName: "Meals Fund", totalText: "R200", cardLast4: "4081", final, newCardUrl: link, helpEmail: "help@example.co.za" });
+      expect(m.text).toContain(link);
+      expect(m.text).toContain("This month's R200 is paid with it");
+      expect(m.text).toContain("help@example.co.za");
+      expect(m.text).not.toMatch(/charged twice|first cancel/i);
+    }
+    // Without a link (no website address yet), the stopped email still says how to carry on.
+    expect(monthlyFailedEmail({ charityName: "Meals Fund", totalText: "R200", cardLast4: null, final: true }).text).toContain("start a new monthly donation");
   });
 
   it("uses no exclamation marks or em dashes", () => {

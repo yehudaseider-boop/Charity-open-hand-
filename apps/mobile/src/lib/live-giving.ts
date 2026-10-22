@@ -23,6 +23,8 @@ export type RecurringRow = {
   contribution_cents?: number | string | null;
   status: string;
   needs_gateway_sync?: boolean;
+  /** Tries this month that the card declined (more to come, or it stopped after three). */
+  failed_attempts?: number | null;
   next_charge_at: string | null;
   charities: { slug: string; name_en: string } | { slug: string; name_en: string }[] | null;
 };
@@ -83,6 +85,7 @@ export function toRecurring(rows: RecurringRow[]): Recurring[] {
         nextDate: r.next_charge_at ? jhbDay(new Date(r.next_charge_at)) : null,
         status: r.status as "active" | "paused" | "cancelled" | "failed",
         syncing: r.needs_gateway_sync === true,
+        ...(r.status === "failed" || (r.status === "active" && Number(r.failed_attempts ?? 0) > 0) ? { needsCard: true } : {}),
       };
     });
 }
@@ -197,6 +200,7 @@ export function fromCache(raw: string | null): Cached | null {
           nextDate: r.nextDate == null ? null : date(r.nextDate),
           status,
           ...(r.syncing === true ? { syncing: true } : {}),
+          ...(r.needsCard === true ? { needsCard: true } : {}),
         };
       }),
       receipts: list(o.receipts).map((r) => ({
