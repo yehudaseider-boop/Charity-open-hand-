@@ -1,3 +1,4 @@
+import type { ImpactUnit } from "@shared/charity/impact";
 /**
  * SAMPLE CONTENT. Fictional organisations and gifts for mock screens only.
  * No real charity names, logos or people.
@@ -38,6 +39,8 @@ export type Charity = {
   campaigns?: Campaign[];
   /** The charity's own impact line ("R180 feeds a family for a week"). Only ever from the charity. */
   impact?: string | null;
+  /** What one gift pays for, in the charity's own figure ("R12 pays for one school breakfast"). Only ever from the charity. */
+  impactUnit?: ImpactUnit | null;
 };
 
 /** A charity's campaign: a goal in Rand and what has been given to it so far (paid gifts only). */

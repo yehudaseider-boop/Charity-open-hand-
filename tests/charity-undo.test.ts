@@ -77,6 +77,13 @@ describe("undo", () => {
     expect(tables.charity_actions[0].undone_at).toBeNull(); // released, nothing changed
   });
 
+  it("treats a whole-cents figure read back as text as unchanged", async () => {
+    tables.charities[0].impact_unit_cents = "1200"; // bigint columns come back as strings
+    tables.charity_actions = [action({ type: "restore", table: "charities", before: { impact_unit_cents: null }, after: { impact_unit_cents: 1200 } })];
+    expect((await undoAction(C, A, "u1", "approved", now)).ok).toBe(true);
+    expect(tables.charities[0].impact_unit_cents).toBeNull();
+  });
+
   it("runs once: a second tap finds it already taken back", async () => {
     tables.charity_actions = [action({ type: "restore", table: "charities", before: { name_en: "Old name" }, after: { name_en: "New name" } })];
     expect((await undoAction(C, A, "u1", "approved", now)).ok).toBe(true);

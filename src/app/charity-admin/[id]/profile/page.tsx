@@ -39,6 +39,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
           charity={{
             name_en: charity.name_en, description_en: charity.description_en, funds_use_en: charity.funds_use_en, thank_you_en: charity.thank_you_en,
             impact_en: charity.impact_en, suggested_amounts_cents: charity.suggested_amounts_cents, website: charity.website,
+            impact_unit_cents: charity.impact_unit_cents, impact_unit_one: charity.impact_unit_one, impact_unit_many: charity.impact_unit_many,
           }}
           categories={categories}
           selected={categoryIds}

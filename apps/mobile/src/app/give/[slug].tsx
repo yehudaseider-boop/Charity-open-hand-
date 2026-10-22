@@ -1,4 +1,5 @@
 import { parseRandToCents } from "@shared/money";
+import { impactLine, impactSource } from "@shared/charity/impact";
 import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
@@ -311,7 +312,8 @@ export default function Give() {
     else router.replace("/home");
   };
   if (done) {
-    return <GiftSent gift={done} charityName={charity.nameEn} impact={charity.impact ?? null} shareText={charityShareText(SITE_URL, charity)} onDone={finish} />;
+    const paidFor = charity.impactUnit ? impactLine(done.cents, charity.impactUnit, { you: true, monthly: done.monthly }) : null;
+    return <GiftSent gift={done} charityName={charity.nameEn} impact={paidFor ? `${paidFor}.` : (charity.impact ?? null)} shareText={charityShareText(SITE_URL, charity)} onDone={finish} />;
   }
 
   // The campaign counts only once the server says it is still running (so a gift never quietly
@@ -327,6 +329,8 @@ export default function Give() {
   const total = gift !== null && contribution !== null ? gift + contribution : null;
   // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
   const isMonthly = monthly && !campaignId && !heldAttempt;
+  // What the typed amount pays for, by the charity's own figure (none when it set no figure).
+  const amountImpact = charity?.impactUnit && gift ? impactLine(gift, charity.impactUnit, { monthly: isMonthly }) : null;
   const authorised = isMonthly && total !== null && authorisedTotal === total;
   const s18aAvailable = server ? server.receiptsAvailable : charity.issues18a;
   const savedLast4 = server?.savedIdLast4 ?? null;
@@ -680,7 +684,13 @@ export default function Give() {
                 style={[styles.amountInput, amount.length > 9 ? { fontSize: 34, lineHeight: 44 } : amount.length > 6 ? { fontSize: 44, lineHeight: 54 } : null]}
               />
             </View>
-            {charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
+            {/* What this amount pays for, by the charity's own figure; otherwise its own impact line. */}
+            {amountImpact && charity.impactUnit ? (
+              <>
+                <Text style={styles.amountImpact} accessibilityLiveRegion="polite">{amountImpact}.</Text>
+                <Text variant="label" style={{ textAlign: "center" }}>{impactSource(charity.nameEn, charity.impactUnit)}</Text>
+              </>
+            ) : charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
           </View>
           {err("amount") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert">{err("amount")}</Text> : minGift ? <Text variant="label">At least {rand(minGift)}.</Text> : null}
           {quick.length ? (

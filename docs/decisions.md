@@ -112,6 +112,16 @@
   page shows this week's cause of the week under the top block, when one is chosen. When Givezy opens a charity's
   dashboard it isn't part of, every page says so, since what it saves there is real.
 
+- **Impact per gift, in the charity's own numbers (22/10/2026, Yehuda chose it):** a charity can set one
+  figure on its public profile: what one thing costs and what it is called (for example R12, "school
+  breakfast", "school breakfasts"). Donors then see "Your R360 pays for 30 school breakfasts" while they
+  choose an amount (website and app), on the thank-you page, and the charity page shows the figure. The
+  count is always rounded down, nothing shows below one, and the charity's name is always on the figure
+  ("Figure from PSFA: R12 pays for one school breakfast"). Givezy never supplies or estimates a figure:
+  all three fields empty means nothing is shown. The overview and annual report show "Your donors paid
+  for about N ... this tax year". Stored as `impact_unit_cents`, `impact_unit_one`, `impact_unit_many`
+  (all or none, R1 to R100 000, 60 characters), migration `20261022000003_charity_impact_unit.sql`.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

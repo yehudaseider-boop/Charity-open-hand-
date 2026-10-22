@@ -15,13 +15,15 @@ import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { Drop } from "@/components/drop";
+import { impactUnitFrom } from "@/lib/charity/impact";
+import { formatRand } from "@/lib/money";
 
 const loadCharity = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("charities")
     .select(
-      "id, slug, name_en, legal_name_en, description_en, funds_use_en, impact_en, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(categories(name_en))",
+      "id, slug, name_en, legal_name_en, description_en, funds_use_en, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(categories(name_en))",
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -47,6 +49,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
   const src = sourceTag((await searchParams).src);
   const charity = await loadCharity((await params).slug);
   if (!charity) notFound();
+  const unit = impactUnitFrom(charity);
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
   const receipts = canIssue18a(charity);
@@ -98,10 +101,15 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
         {/* Giving comes first on a phone, and stays beside the story on a laptop. */}
         <aside className="lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1 lg:self-start">
           <div className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6">
-            {charity.impact_en ? (
+            {charity.impact_en || unit ? (
               <div className="rounded-control bg-honey-soft p-4">
                 <p className="text-sm font-bold text-brand">Your rand at work</p>
-                <p className="mt-1 font-display text-xl font-semibold leading-snug text-navy">{charity.impact_en}</p>
+                {charity.impact_en ? <p className="mt-1 font-display text-xl font-semibold leading-snug text-navy">{charity.impact_en}</p> : null}
+                {unit ? (
+                  <p className={charity.impact_en ? "mt-2 text-sm text-muted" : "mt-1 font-display text-xl font-semibold leading-snug text-navy"}>
+                    {formatRand(unit.cents)} pays for one {unit.one}{charity.impact_en ? ", by their own figure" : ""}.
+                  </p>
+                ) : null}
               </div>
             ) : null}
             {give ? (

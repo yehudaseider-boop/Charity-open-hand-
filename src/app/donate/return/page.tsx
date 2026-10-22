@@ -17,6 +17,7 @@ import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { HebrewAware } from "@/components/hebrew-aware";
 import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
 import { getViewer } from "@/lib/auth";
+import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };
@@ -60,7 +61,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en)";
+  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (holdsToken) {
@@ -69,7 +70,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       d = (await (await createClient()).from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
     }
   }
-  const charity = d?.charities as unknown as { name_en: string; slug: string; impact_en: string | null } | undefined;
+  const charity = d?.charities as unknown as { name_en: string; slug: string; impact_en: string | null; impact_unit_cents: number | null; impact_unit_one: string | null; impact_unit_many: string | null } | undefined;
   type LabelRow = { kind: string | null; label: string | null };
   const kindRow = d?.donation_giving_kinds as unknown as LabelRow | LabelRow[] | null | undefined;
   const givingLabel = labelOf(Array.isArray(kindRow) ? kindRow[0] : kindRow);
@@ -88,13 +89,18 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
 
   if (outcome === "paid" && d && charity) {
+    // What this gift pays for, worked out from the charity's own figure (none when it set no figure).
+    const unit = impactUnitFrom(charity);
+    const paysFor = unit ? impactLine(Number(d.amount_cents), unit, { you: true }) : null;
     return (
       <Result tone="paid" title="Thank you">
         {/* What the gift does, in the charity's own words (left out when it hasn't written one). */}
-        {charity.impact_en?.trim() ? (
+        {charity.impact_en?.trim() || paysFor ? (
           <div className="mb-5 rounded-control bg-honey-soft p-4">
             <p className="text-sm font-semibold text-brand">What your gift does</p>
-            <p className="mt-1 font-display text-xl leading-snug text-navy">{charity.impact_en.trim()}</p>
+            {paysFor ? <p className="mt-1 font-display text-xl leading-snug text-navy">{paysFor}.</p> : null}
+            {charity.impact_en?.trim() ? <p className={paysFor ? "mt-2 text-sm text-navy" : "mt-1 font-display text-xl leading-snug text-navy"}>{charity.impact_en.trim()}</p> : null}
+            {paysFor && unit ? <p className="mt-2 text-xs text-muted">{impactSource(charity.name_en, unit)}</p> : null}
           </div>
         ) : null}
         <dl className="space-y-1.5 rounded-control border-2 border-border p-4 text-[15px] tabular-nums">

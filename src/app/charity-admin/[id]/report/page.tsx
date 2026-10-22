@@ -9,6 +9,7 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import { impactTotal, impactUnitFrom } from "@/lib/charity/impact";
 
 export const metadata: Metadata = { title: "Annual report" };
 
@@ -44,6 +45,7 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
   const thisMonth = saDate(now).slice(0, 7);
   // The two shares always add to 100.
   const monthlyPct = pct(r.monthlyCents, r.totalCents);
+  const unit = impactUnitFrom(charity);
 
   return (
     <div className="space-y-6">
@@ -74,6 +76,13 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
             </Link>
           ))}
         </nav>
+      ) : null}
+
+      {unit && r.totalCents > 0 && impactTotal(r.totalCents, unit) ? (
+        <p className="rounded-card bg-honey-soft p-4 text-sm sm:p-5">
+          <span className="font-display text-xl font-semibold text-indigo">Donors paid for {impactTotal(r.totalCents, unit)}.</span>
+          <span className="mt-1 block text-muted">By your own figure of {formatRand(unit.cents)} for one {unit.one}.</span>
+        </p>
       ) : null}
 
       {r.donationCount === 0 ? (

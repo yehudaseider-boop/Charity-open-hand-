@@ -16,6 +16,7 @@ import { notifyCharity, publicChangeEmail } from "@/lib/charity/emails";
 import { parseSuggestedAmounts } from "@/lib/charity/suggested-amounts";
 import { platformConfig } from "@/config/platform";
 import { formatRand } from "@/lib/money";
+import { checkImpactUnit } from "@/lib/charity/impact";
 
 /** An approved charity is public with a "Verified" badge: tell us when its name or pictures change, so we can look. */
 async function tellReviewer(charity: { id: string; status: string; name_en: string }, what: string) {
@@ -44,12 +45,17 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     platformConfig.minDonationCents,
     formatRand(platformConfig.minDonationCents),
   );
+  const impact = checkImpactUnit({
+    amount: formData.get("impact_unit_amount")?.toString(),
+    one: formData.get("impact_unit_one")?.toString(),
+    many: formData.get("impact_unit_many")?.toString(),
+  });
   // Every problem at once, so nobody fixes one lot and then meets another.
-  if (!parsed.success || !suggested.ok) {
+  if (!parsed.success || !suggested.ok || !impact.ok) {
     return {
       ok: false,
       message: "Please fix the highlighted fields.",
-      fieldErrors: { ...(parsed.success ? {} : zodErrors(parsed.error).fieldErrors), ...(suggested.ok ? {} : suggested.fieldErrors) },
+      fieldErrors: { ...(parsed.success ? {} : zodErrors(parsed.error).fieldErrors), ...(suggested.ok ? {} : suggested.fieldErrors), ...(impact.ok ? {} : impact.fieldErrors) },
     };
   }
   const v = parsed.data;
@@ -62,6 +68,9 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     funds_use_en: v.funds_use_en ?? null,
     thank_you_en: v.thank_you_en ?? null,
     impact_en: v.impact_en ?? null,
+    impact_unit_cents: impact.unit?.cents ?? null,
+    impact_unit_one: impact.unit?.one ?? null,
+    impact_unit_many: impact.unit?.many ?? null,
     suggested_amounts_cents: suggested.cents,
     website: v.website ?? null,
   };

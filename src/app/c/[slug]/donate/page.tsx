@@ -64,6 +64,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           receiptsAvailable={charity.receiptsAvailable}
           minimumLabel={formatRand(platformConfig.minDonationCents)}
           suggestedCents={charity.suggestedCents}
+          impactUnit={charity.impactUnit}
           contributionMinimumLabel={formatRand(platformConfig.minContributionCents)}
           initialLabel={initialLabel}
           initialAmountCents={initialAmountCents}

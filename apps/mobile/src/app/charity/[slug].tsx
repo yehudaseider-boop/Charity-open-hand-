@@ -98,12 +98,17 @@ export default function CharityDetail() {
           {charity.about[0] ? <Text style={styles.lead}>{charity.about[0]}</Text> : null}
 
           {/* What a gift does, in the charity's own words, and how this month's campaign is going. */}
-          {charity.impact || firstCampaign ? (
+          {charity.impact || charity.impactUnit || firstCampaign ? (
             <View style={styles.impactCard}>
               <Blob size={100} color={colors.orange} rotate={20} style={{ right: -55, top: -60 }} />
               <Blob size={80} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -45, bottom: -55 }} />
               <Text style={styles.impactKicker}>Your rand at work</Text>
               {charity.impact ? <Text style={styles.impactLine}>{charity.impact}</Text> : null}
+              {charity.impactUnit ? (
+                <Text style={charity.impact ? styles.impactSub : styles.impactLine}>
+                  {rand(charity.impactUnit.cents)} pays for one {charity.impactUnit.one}{charity.impact ? ", by their own figure" : ""}.
+                </Text>
+              ) : null}
               {firstCampaign ? (
                 <View style={{ gap: 6, marginTop: 6 }}>
                   <View style={styles.track}><View style={[styles.fill, { width: `${Math.max(firstPct ?? 0, 3)}%` }]} /></View>

@@ -115,7 +115,9 @@ export async function undoAction(charityId: string, id: string, userId: string, 
   return { ok: true, row: { ...row, undone_at: now.toISOString() } };
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+/** Bigint columns come back from the database as strings ("1200") but were saved as numbers (1200): both count as the same. */
+const plain = (v: unknown) => JSON.stringify(v ?? null, (_k, x) => (typeof x === "number" ? String(x) : x));
+export const same = (a: unknown, b: unknown) => plain(a) === plain(b);
 
 async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null> {
   const db = createAdminClient();

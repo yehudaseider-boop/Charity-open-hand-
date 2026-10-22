@@ -17,6 +17,7 @@ import { loadDonors, loadInsights, loadMonthlyDonations, loadMonthlyTotals, load
 import { formatDate, isoDateInJhb, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import { impactTotal, impactUnitFrom } from "@/lib/charity/impact";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -105,6 +106,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const today = saDate(now);
   const chart = lastMonths(monthly, today, 12);
   const groups = countDonorGroups(donors, now, lapsedDays);
+  const unit = impactUnitFrom(charity);
   const top = topDonors(donors, 5);
   const giftsTotal = donors.reduce((t, d) => t + d.donation_count, 0);
   const perDonor = giftsPerDonor(giftsTotal, donors.length);
@@ -164,6 +166,22 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
         Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included. The payment provider&apos;s card fee comes off each donation before it reaches your bank.
         {" "}{taxYearLabel(taxYear.taxYear)}.
       </p>
+
+      {/* What this tax year's gifts paid for, by the charity's own figure; or how to set one. */}
+      {unit && year.paid_cents > 0 && impactTotal(year.paid_cents, unit) ? (
+        <p className="rounded-card bg-honey-soft p-4 text-sm sm:p-5">
+          <span className="font-display text-xl font-semibold text-indigo">Your donors paid for {impactTotal(year.paid_cents, unit)} this tax year.</span>
+          <span className="mt-1 block text-muted">
+            By your own figure of {formatRand(unit.cents)} for one {unit.one}. Donors see what their gift pays for when they give.{" "}
+            <Link href={`${base}/profile`} className="text-brand underline">Change it</Link>
+          </span>
+        </p>
+      ) : !unit && all.paid_count > 0 ? (
+        <p className="text-sm text-muted">
+          Show donors what a gift pays for, for example &ldquo;Your R360 pays for 30 school breakfasts&rdquo;:{" "}
+          <Link href={`${base}/profile`} className="text-brand underline">add your own figure</Link>.
+        </p>
+      ) : null}
 
       {all.paid_count > 0 ? (
         <Card title="Needs you this week">

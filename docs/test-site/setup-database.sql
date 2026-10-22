@@ -1,5 +1,5 @@
 -- Givezy: all database setup steps in order, for a NEW EMPTY test project only.
--- Built by scripts/build-setup-sql.sh from supabase/migrations, up to and including 20261022000002_review_fixes.sql.
+-- Built by scripts/build-setup-sql.sh from supabase/migrations, up to and including 20261022000003_charity_impact_unit.sql.
 -- An existing project runs only the sections it does not have yet, in order.
 
 -- ===== 20261006000001_core_schema.sql =====
@@ -4388,3 +4388,17 @@ begin
   end if;
   return new;
 end $$;
+
+-- ===== 20261022000003_charity_impact_unit.sql =====
+-- What one gift pays for, in the charity's own figure ("R12 pays for one school breakfast"). The charity sets
+-- the cost of one thing and what it is called; donors then see "Your R360 pays for 30 school breakfasts".
+-- Only ever written by the charity: Givezy never makes one up. All three are set together, or none.
+alter table public.charities
+  add column impact_unit_cents bigint check (impact_unit_cents between 100 and 10000000),
+  add column impact_unit_one text check (char_length(impact_unit_one) between 1 and 60),
+  add column impact_unit_many text check (char_length(impact_unit_many) between 1 and 60),
+  add constraint impact_unit_all_or_none check (
+    (impact_unit_cents is null) = (impact_unit_one is null) and (impact_unit_one is null) = (impact_unit_many is null)
+  );
+grant select (impact_unit_cents, impact_unit_one, impact_unit_many) on public.charities to anon, authenticated;
+grant update (impact_unit_cents, impact_unit_one, impact_unit_many) on public.charities to authenticated;

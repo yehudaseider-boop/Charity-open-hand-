@@ -8,6 +8,8 @@ import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
 import { TextArea, TextField, useFieldId } from "@/components/forms/fields";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
+import { impactLine, impactSource, type ImpactUnit } from "@/lib/charity/impact";
+import { parseRandToCents } from "@/lib/money";
 
 type Props = {
   slug: string;
@@ -29,6 +31,8 @@ type Props = {
   account?: { email: string; savedIdLast4: string | null };
   /** The shared link's tag (WhatsApp, a copied link, the QR poster), kept on the gift for the charity. */
   source?: SourceTag | null;
+  /** What one gift pays for, in the charity's own figure. */
+  impactUnit?: ImpactUnit | null;
 };
 
 /** As the donor would type it: 180, 180.50. */
@@ -54,7 +58,10 @@ function offlineOrDown(e: unknown, step: "quote" | "pay"): { ok: false; message:
   };
 }
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account, source }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account, source, impactUnit }: Props) {
+  // What the typed amount pays for, as the donor types it (only when the charity set its own figure).
+  const [typedCents, setTypedCents] = useState<number | null>(initialAmountCents ?? null);
+  const typedImpact = impactUnit && typedCents ? impactLine(typedCents, impactUnit) : null;
   const [quoteState, requestQuote, quoting] = useActionState(async (prev: QuoteState, fd: FormData): Promise<QuoteState> => {
     try {
       return await getQuote(slug, prev, fd);
@@ -102,6 +109,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                   amountRef.current.value = centsToInput(c);
                   amountRef.current.focus();
                   setPicked(c);
+                  setTypedCents(c);
                   setEditingAmount(true);
                 }}
                 aria-pressed={picked === c}
@@ -126,8 +134,9 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
               defaultValue={initialAmountCents ? centsToInput(initialAmountCents) : undefined}
               aria-invalid={amountError ? true : undefined}
               aria-describedby={amountError ? "amount-error" : undefined}
-              onChange={() => {
+              onChange={(e) => {
                 setPicked(null);
+                setTypedCents(parseRandToCents(e.target.value));
                 setEditingAmount(true);
               }}
               className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl text-navy outline-none"
@@ -138,6 +147,11 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           </button>
         </div>
         {amountError ? <p id="amount-error" role="alert" className="text-sm font-semibold text-danger">{amountError}</p> : null}
+        {typedImpact && impactUnit && !amountError ? (
+          <p className="rounded-control bg-honey-soft px-4 py-3 text-sm" aria-live="polite">
+            <span className="font-semibold text-navy">{typedImpact}.</span> <span className="text-muted">{impactSource(charityName, impactUnit)}</span>
+          </p>
+        ) : null}
         <p className="text-sm text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
 
         <div className="space-y-2 rounded-control bg-honey-soft p-4">
