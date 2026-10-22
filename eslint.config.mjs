@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The phone app has its own tooling.
     "apps/**",
+    // The PSFA demo is plain browser JavaScript, built and tested on its own (demo/psfa-dashboard/README.md).
+    "demo/**",
   ]),
 ]);
 

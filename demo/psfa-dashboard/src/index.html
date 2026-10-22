@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Givezy dashboard demo</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="demo-bar"><span>Givezy demo for PSFA. The donors and amounts are made up, and everything you do stays in this browser only.</span><button type="button" data-act="reset-demo">Reset the demo</button></div>
+<div id="storage-note" hidden>Your browser is not keeping changes between visits. Everything still works until you close this page.</div>
+<header class="site"><div class="site-in"><a href="#/" aria-label="Givezy dashboard"><img src="assets/logo.png" alt="Givezy" width="97" height="32"></a>
+<nav id="topnav" aria-label="Demo sections"><a href="#/" data-sec="dash">Dashboard</a><a href="#/public" data-sec="public">Public page</a><a href="#/account" data-sec="account">Donor account</a><a href="home.html" data-sec="site">Givezy website</a></nav></div></header>
+<div id="band" hidden><img class="drop" src="assets/drop-orange.png" alt=""><div class="band-in"><div><p class="kick">Givezy for charities</p><h2 id="band-name">PSFA</h2></div><div class="band-r"><span class="badge ok">Approved</span><a href="#/public">See your public page</a></div></div></div>
+<div id="shell"><aside id="side" aria-label="Dashboard menu" hidden><nav id="side-nav" aria-label="Charity dashboard"></nav></aside><main id="main" tabindex="-1"></main></div>
+<div id="toast-root" aria-live="polite"></div>
+<div id="modal-root"></div>
+<noscript><p style="padding:24px">This demo needs JavaScript. Please turn it on and reload the page.</p></noscript>
+<script src="js/app.js"></script>
+</body>
+</html>
