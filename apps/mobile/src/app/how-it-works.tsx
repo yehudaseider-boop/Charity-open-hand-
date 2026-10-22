@@ -45,7 +45,7 @@ export default function HowItWorks() {
           <Text style={{ flex: 1, fontSize: 17 }}>Givezy charges no fee on donations. You can choose to add a contribution to Givezy.</Text>
         </View>
 
-        <Button label="Find a charity" onPress={() => router.navigate("/discover")} />
+        <Button label="Find a charity" onPress={() => router.dismissTo("/discover")} />
       </ScrollView>
     </View>
   );

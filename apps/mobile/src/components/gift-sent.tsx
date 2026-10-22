@@ -187,7 +187,7 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
                 <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>
                   Sign in with {gift.email} and your gifts are counted towards your goal.
                 </Text>
-                <TextLink label="Sign in" onPress={() => router.push("/account")} />
+                <TextLink label="Sign in" onPress={() => router.dismissTo("/account")} />
               </View>
             )}
           </View>
@@ -199,6 +199,8 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
         </View>
 
         <Button label="Done" onPress={invite ? invite.goHome : onDone} />
+        {/* Straight to the gift history, with the giving screens closed behind it. */}
+        <TextLink label="See your giving" onPress={() => router.dismissTo("/giving")} />
       </View>
     </ScrollView>
   );

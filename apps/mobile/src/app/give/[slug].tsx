@@ -1,10 +1,10 @@
 import { parseRandToCents } from "@shared/money";
 import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { isValidSaIdNumber } from "@shared/sa-id";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
@@ -171,12 +171,37 @@ export default function Give() {
     setSectionY((was) => (was[key] === y ? was : { ...was, [key]: y }));
   };
   const [busy, setBusy] = useState<false | "opening" | "checking">(false);
+  // Leaving by the back gesture or the hardware button: ask first when something typed would be lost,
+  // when we are still checking a payment, or when a saved-card charge is waiting for its reply.
+  const navigation = useNavigation();
+  const leaveGuard = useRef<{ typed: boolean; busy: false | "opening" | "checking"; held: boolean; done: boolean }>({ typed: false, busy: false, held: false, done: false });
+  useEffect(() => {
+    return navigation.addListener("beforeRemove", (e) => {
+      const g = leaveGuard.current;
+      if (g.done || (!g.typed && g.busy === false && !g.held)) return;
+      e.preventDefault();
+      const go = () => navigation.dispatch(e.data.action);
+      if (g.busy === "checking") {
+        Alert.alert("We're still checking your payment", "Leaving now may lose the result. It takes a few seconds.", [{ text: "Wait" }, { text: "Leave anyway", style: "destructive", onPress: go }]);
+      } else {
+        Alert.alert("Leave and lose what you typed?", undefined, [{ text: "Keep editing", style: "cancel" }, { text: "Leave", style: "destructive", onPress: go }]);
+      }
+    });
+  }, [navigation]);
+  // Where "Back" goes when there is no screen behind this one (opened cold from a link).
+  const leave = () => (router.canGoBack() ? router.back() : router.replace("/discover"));
   // Two taps in the same frame both see busy as false; the ref stops the second at once.
   const busyRef = useRef(false);
   // A saved-card charge whose answer was lost is asked about again under the same id, never charged twice.
   const attemptRef = useRef<string | null>(null);
   // Paid (or finished and being confirmed), shown here for donors whose giving history won't show it.
   const [done, setDone] = useState<SentGift | null>(null);
+  const typedSomething = Boolean(amount || first || last || emailTyped || phone || idNumber || street || suburb || town || postal || note || extraAmount);
+  const heldOne = heldAttempt !== null;
+  const isDone = done !== null;
+  useEffect(() => {
+    leaveGuard.current = { typed: typedSomething, busy, held: heldOne, done: isDone };
+  }, [typedSomething, busy, heldOne, isDone]);
   // Preview of the after-gift screen for design review: ?demo=sent.
   const [demoShown, setDemoShown] = useState(false);
 
@@ -226,7 +251,7 @@ export default function Give() {
           <Text variant="h2">Give on our website</Text>
           <Text variant="bodyMuted">You give on our secure website. It takes about a minute, and the gift shows here once it&apos;s paid.</Text>
           <Button label="Give on our website" onPress={() => openUrl(websiteUrl)} />
-          <Button label="Back" variant="secondary" onPress={() => router.back()} />
+          <Button label="Back" variant="secondary" onPress={leave} />
         </View>
       </View>
     );
@@ -256,7 +281,7 @@ export default function Give() {
           ) : failed ? (
             <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retryAll} />
           ) : charity === null ? (
-            <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
+            <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: leave }} />
           ) : (
             <>
               <SkeletonBlock height={64} />
@@ -274,7 +299,7 @@ export default function Give() {
       <View style={styles.screen}>
         <TopBar title="Give" />
         <View style={{ padding: space.gutter }}>
-          <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now, so nothing was charged. Please try again later. ${helpLine()}`} action={{ label: "Back", onPress: () => router.back() }} />
+          <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now, so nothing was charged. Please try again later. ${helpLine()}`} action={{ label: "Back", onPress: leave }} />
         </View>
       </View>
     );
@@ -342,7 +367,7 @@ export default function Give() {
           },
           save: async (g) => (await saveGoals([g], owner)).ok,
           shown: () => void markGoalInvited(),
-          goHome: () => router.replace("/home"),
+          goHome: () => { dismissArrived(); router.dismissTo("/home"); },
         }
       : null;
     return {

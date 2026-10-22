@@ -58,8 +58,8 @@ export default function Receipts() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
       <BlueHeader paddingTop={insets.top + 12}>
-        {/* Receipts open from Account, so the way back is Account. */}
-        <Pressable onPress={() => router.navigate("/account")} accessibilityRole="button" accessibilityLabel="Back to Account" style={styles.back}>
+        {/* Back to wherever Receipts was opened from (Account, or the Home tile). */}
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.navigate("/account"))} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
           <BackIcon color={colors.onInk} />
         </Pressable>
         <Text style={styles.headTitle} accessibilityRole="header">Your s18A receipts</Text>

@@ -89,6 +89,12 @@ export default function Welcome() {
       <Backdrop variant="page" />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter, paddingTop: insets.top + 16, paddingBottom: insets.bottom + space.md, gap: space.block }}>
         <View style={styles.topRow}>
+          {/* A way back on every phone, not only Android's hardware button. */}
+          {step > 0 ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={() => setStep(step - 1)}>
+              <Text style={styles.skipText}>Back</Text>
+            </Pressable>
+          ) : null}
           {/* Three segments: where you are in the setup. */}
           <View style={styles.bar} accessible accessibilityLabel={`Step ${step} of ${STEPS}`}>
             {Array.from({ length: STEPS }, (_, i) => (

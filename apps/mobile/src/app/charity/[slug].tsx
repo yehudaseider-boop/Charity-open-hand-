@@ -48,15 +48,21 @@ export default function CharityDetail() {
   const [pop] = useState(() => new Animated.Value(1));
   const [scrollY] = useState(() => new Animated.Value(0));
 
+  // Back to where this page was opened from, or Discover when there is nothing behind it.
+  const leave = () => (router.canGoBack() ? router.back() : router.replace("/discover"));
   if (charity === undefined) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 40, paddingHorizontal: space.gutter, gap: space.block }]}>
         {failed ? (
-          <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retry} away={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
+          <ErrorState body="We couldn't load this charity. Check your connection and try again." onRetry={retry} away={{ label: "Back to Discover", onPress: leave }} />
         ) : (
           <>
             <SkeletonBlock height={220} />
             <SkeletonBlock height={120} />
+            {/* A way back while it loads, not only once it has. */}
+            <View style={[styles.topBar, { top: insets.top + 10 }]} pointerEvents="box-none">
+              <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Back" style={styles.round}><BackIcon /></Pressable>
+            </View>
           </>
         )}
       </View>
@@ -65,7 +71,7 @@ export default function CharityDetail() {
   if (!charity) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 40, paddingHorizontal: space.gutter }]}>
-        <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: () => router.replace("/discover") }} />
+        <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: leave }} />
       </View>
     );
   }
@@ -186,7 +192,7 @@ export default function CharityDetail() {
 
       {/* Header controls over the photo */}
       <View style={[styles.topBar, { top: insets.top + 10 }]} pointerEvents="box-none">
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace("/discover"))} accessibilityRole="button" accessibilityLabel="Back" style={styles.round}>
+        <Pressable onPress={leave} accessibilityRole="button" accessibilityLabel="Back" style={styles.round}>
           <BackIcon />
         </Pressable>
         <View style={{ flexDirection: "row", gap: 10 }}>
