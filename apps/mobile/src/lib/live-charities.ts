@@ -59,6 +59,19 @@ export function toCharity(row: CharityRow, base: string): Charity {
   };
 }
 
+/** The Monday that starts this week on the Johannesburg calendar, as yyyy-mm-dd (cause of the week runs Monday to Sunday). */
+export function weekStartJhb(now: Date = new Date()): string {
+  const jhb = new Date(now.getTime() + 2 * 3_600_000);
+  const day = new Date(Date.UTC(jhb.getUTCFullYear(), jhb.getUTCMonth(), jhb.getUTCDate()));
+  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+  return day.toISOString().slice(0, 10);
+}
+
+/** Mark this week's pick, if Givezy chose one and it is in the directory. Never picks one itself. */
+export function markFeatured(charities: Charity[], featuredId: string | null): Charity[] {
+  return featuredId ? charities.map((c) => (c.id === featuredId ? { ...c, featured: true } : c)) : charities;
+}
+
 export function toCauses(categories: CategoryRow[], charities: Charity[]): Cause[] {
   const used = new Set(charities.flatMap((c) => c.causeIds ?? [c.causeId]));
   return [{ id: "all", label: "All" }, ...categories.filter((c) => used.has(c.id)).map((c) => ({ id: c.id, label: c.name_en }))];

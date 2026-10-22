@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { causes as sampleCauses, charities as sampleCharities, findCharity, type Cause, type Charity } from "@/data/sample";
-import { CHARITY_COLUMNS, raisingNow, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type RaisingNow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
+import { CHARITY_COLUMNS, markFeatured, raisingNow, weekStartJhb, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type RaisingNow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
 import { supabase } from "./supabase";
 import { secureStorage } from "./secure-storage";
 
@@ -60,15 +60,18 @@ function sampleRaising(): RaisingNow[] {
 
 async function loadDirectory(): Promise<Directory> {
   const db = supabase!;
-  const [charities, categories, campaigns] = await Promise.all([
+  const [charities, categories, campaigns, featured] = await Promise.all([
     db.from("charities").select(CHARITY_COLUMNS).eq("status", "approved").order("name_en").limit(500),
     db.from("categories").select("id, name_en").order("sort_order"),
     // Row-level security only shows campaigns of approved charities.
     db.from("campaigns").select("id, charity_id, title, description, target_cents, ends_at").eq("status", "active").order("created_at", { ascending: false }).limit(30),
+    // Cause of the week, chosen by Givezy. Row-level security only shows picks of approved charities.
+    db.from("featured_charities").select("charity_id").eq("week_start", weekStartJhb()).maybeSingle(),
   ]);
   if (charities.error) throw charities.error;
   if (categories.error) throw categories.error;
-  const list = ((charities.data ?? []) as unknown as CharityRow[]).map((r) => toCharity(r, base));
+  // The pick is a bonus too: if it can't load, Discover shows no cause of the week.
+  const list = markFeatured(((charities.data ?? []) as unknown as CharityRow[]).map((r) => toCharity(r, base)), featured.error ? null : ((featured.data?.charity_id as string | undefined) ?? null));
   // Campaigns are a bonus: if they can't load, Discover still works without the row.
   const rows = campaigns.error ? [] : ((campaigns.data ?? []) as (CampaignRow & { charity_id: string })[]);
   const progress = rows.length ? await db.rpc("campaign_progress", { p_campaign_ids: rows.map((c) => c.id) }) : { data: [] };

@@ -94,6 +94,11 @@
   library. "For Xero" on Deposits is Xero's bank statement import layout for a clearing account: per deposit, the
   donations in, card fees out and the deposit out to the bank, adding up to zero.
 
+- **Cause of the week (22/10/2026, from Alza of Feed a Child):** Givezy's admin picks one approved charity for each
+  week, Monday to Sunday on the Johannesburg calendar (Admin, Cause of the week, up to 8 weeks ahead). The app
+  shows it at the top of Discover. A week with no pick shows no card: nothing is chosen automatically, and a
+  charity that stops being approved drops out at once.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

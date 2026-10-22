@@ -52,6 +52,9 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **App update for the "no news" switch** on the give screen (needs Yehuda's approval to publish). In-app giving is off anyway until the app stores confirm.
 - [ ] **First real send to donors:** needs email switched on (Resend, below). Send one test from Email donors to yourself first.
 
+- [ ] **Database change for cause of the week (needs Yehuda's yes):** `20261022000001_featured_charity.sql` on the Givezy test project, then the live database. Until then the app simply shows no cause of the week, and Admin, Cause of the week shows an error.
+- [ ] **Choose the first causes of the week** (Admin, Cause of the week) before launch, or the app shows none. Needs the app update too.
+
 ## A2. Ask when you reach them (added 21/10/2026, from the Angel Network and Feed a Child meetings)
 
 Questions only the charities or their advisers can answer. Bring these up whenever Yehuda says he has spoken to them.
