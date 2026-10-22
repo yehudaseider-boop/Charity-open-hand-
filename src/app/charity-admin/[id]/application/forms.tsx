@@ -78,7 +78,7 @@ export function UploadForm({ action, showMandateDate }: { action: Action; showMa
     <ActionForm action={action} submitLabel="Upload" pendingLabel="Uploading…" resetOnSuccess>
       <SelectField name="document_type" label="Document" required
         options={Object.entries(documentTypes).map(([value, label]) => ({ value, label }))} />
-      <FileField name="file" label="File" required accept="application/pdf,image/jpeg,image/png" hint="PDF, JPG or PNG, up to 5 MB." />
+      <FileField name="file" label="File" required accept="application/pdf,image/jpeg,image/png" hint="PDF, JPG or PNG, up to 4 MB." />
       {showMandateDate ? (
         <TextField name="signed_on" label="Date the mandate was signed" type="date"
           hint="Only needed for the receipting mandate." />

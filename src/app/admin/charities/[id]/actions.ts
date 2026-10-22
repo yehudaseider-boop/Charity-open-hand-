@@ -400,7 +400,7 @@ export async function adminUploadDocument(id: string, _prev: FormState, formData
   const signedOn = String(formData.get("signed_on") ?? "").trim() || null;
   if (!Object.hasOwn(documentTypes, type)) return { ok: false, fieldErrors: { document_type: "Choose a document type" } };
   if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose a file" } };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Files must be 5 MB or smaller" } };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Files must be 4 MB or smaller" } };
   if (!(DOCUMENT_MIME as readonly string[]).includes(file.type) || !(await isRealDocument(file))) {
     return { ok: false, fieldErrors: { file: "Upload a PDF, JPG or PNG" } };
   }

@@ -42,6 +42,7 @@ let claimed = false;
 let failSend = false;
 let skipSend = false;
 let released = 0;
+let recordedOnly = false;
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/email", () => ({
   getEmailTransport: () => ({
@@ -58,6 +59,8 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (table: string) => {
       const b: Record<string, unknown> = {};
       for (const m of ["select", "eq", "order", "limit", "in"]) b[m] = () => b;
+      // Gifts the charity recorded itself are left out: "recordedOnly" means this donor has no other.
+      b.neq = (col: string, val: string) => (table === "donations" && col === "gateway" && val === "recorded" && recordedOnly ? ((b.maybeSingle = async () => ({ data: null, error: null })), b) : b);
       b.maybeSingle = async () => (table === "donations" ? { data: gift, error: null } : { data: stopped ? { email_hash: "h" } : null, error: null });
       b.delete = () => ({ eq: async () => ((released++), { error: null }) });
       b.insert = () => {
@@ -79,6 +82,7 @@ beforeEach(() => {
   failSend = false;
   skipSend = false;
   released = 0;
+  recordedOnly = false;
   gift = details();
   process.env.SITE_URL = "https://g.test";
 });
@@ -90,6 +94,12 @@ describe("sending one donor a thank-you", () => {
     expect(sent[0].to).toBe("sarah@x.co");
     expect(sent[0].replyTo).toBe("office@meals.org");
     expect(emailHash(sent[0].to)).toBe(emailHash("SARAH@x.co"));
+  });
+  it("never to someone whose only gifts the charity recorded itself (an email Givezy never checked)", async () => {
+    recordedOnly = true;
+    const r = await sendDonorThankYou(args);
+    expect(r.ok === false && r.message).toMatch(/only gifts you recorded yourself/);
+    expect(sent).toHaveLength(0);
   });
   it("only once a week per donor", async () => {
     await sendDonorThankYou(args);

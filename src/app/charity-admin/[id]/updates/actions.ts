@@ -24,7 +24,7 @@ function revalidate(charityId: string, slug: string) {
 async function uploadIfAny(charityId: string, folder: "photos" | "updates", formData: FormData, required: boolean) {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return required ? { error: { ok: false, fieldErrors: { file: "Choose a photo" } } as FormState } : { path: null };
-  if (file.size > MAX_UPLOAD_BYTES) return { error: { ok: false, fieldErrors: { file: "Photos must be 5 MB or smaller" } } as FormState };
+  if (file.size > MAX_UPLOAD_BYTES) return { error: { ok: false, fieldErrors: { file: "Photos must be 4 MB or smaller" } } as FormState };
   if (!(IMAGE_MIME as readonly string[]).includes(file.type) || !(await isRealImage(file))) {
     return { error: { ok: false, fieldErrors: { file: "Upload a JPG, PNG or WebP photo" } } as FormState };
   }

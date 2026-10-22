@@ -117,7 +117,7 @@ export async function uploadImage(
   const { charity } = await loadCharityForManager(charityId);
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose an image" } };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Images must be 5 MB or smaller" } };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Images must be 4 MB or smaller" } };
   if (!(IMAGE_MIME as readonly string[]).includes(file.type)) {
     return { ok: false, fieldErrors: { file: "Upload a JPG, PNG or WebP image" } };
   }

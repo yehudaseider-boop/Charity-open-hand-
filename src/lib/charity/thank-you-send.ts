@@ -25,6 +25,8 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
       .select("id, donation_checkout_details(email, first_name, erased_at)")
       .eq("charity_id", charityId)
       .eq("status", "paid")
+      // Only people who gave on Givezy: a gift the charity recorded itself carries an email Givezy never checked.
+      .neq("gateway", "recorded")
       .gte("paid_at", from)
       .lt("paid_at", to)
       .order("id")
@@ -127,10 +129,13 @@ export async function sendDonorThankYou(args: {
     .eq("charity_id", args.charityId)
     .eq("donor_id", args.donorId)
     .eq("status", "paid")
+    // Only to someone who gave on Givezy (as for appeals): a recorded gift's email was never checked by us.
+    .neq("gateway", "recorded")
     .order("paid_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
+  if (!gift) return { ok: false, message: "This donor has only gifts you recorded yourself, so Givezy can't email them. Thank them directly." };
   const raw = gift?.donation_checkout_details as unknown;
   const d = (Array.isArray(raw) ? raw[0] : raw) as {
     email: string | null; first_name: string | null; last_name: string | null; donor_type: string; organisation_name: string | null; contact_person: string | null; erased_at: string | null;

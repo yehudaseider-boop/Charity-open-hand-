@@ -12,6 +12,15 @@ import { dedicationFrom, dedicationLine } from "./dedication";
  * undoes the payment: it is logged for the team to resend.
  */
 export async function notifyDonationPaid(donationId: string, opts: { monthly?: "activated" | "not_reusable" | "none" } = {}) {
+  await sendDonorConfirmation(donationId, opts);
+  await notifyCharityOfDonation(donationId);
+}
+
+/**
+ * The donor's confirmation email. True when it went (or there was no one to send it to); a failure is logged
+ * in the audit log, where the daily check finds it and tries again.
+ */
+export async function sendDonorConfirmation(donationId: string, opts: { monthly?: "activated" | "not_reusable" | "none" } = {}): Promise<boolean> {
   try {
     const { data: d, error } = await createAdminClient()
       .from("donations")
@@ -22,7 +31,7 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
     const charity = d.charities as unknown as { name_en: string };
     const details = d.donation_checkout_details as unknown as { email: string } | { email: string }[] | null;
     const email = (Array.isArray(details) ? details[0] : details)?.email;
-    if (!email || !d.paid_at) return;
+    if (!email || !d.paid_at) return true;
     let monthly: Parameters<typeof confirmationEmail>[0]["monthly"];
     if (d.recurring_id) {
       if (opts.monthly === "not_reusable") monthly = { kind: "not_started" };
@@ -53,6 +62,7 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
       })(),
     });
     await getEmailTransport().send({ to: email, ...m });
+    return true;
   } catch (e) {
     console.error(`[notify] confirmation email for donation ${donationId} failed`, e);
     // The audit log is where the team finds confirmations to resend. Never let that write undo a payment.
@@ -63,8 +73,8 @@ export async function notifyDonationPaid(donationId: string, opts: { monthly?: "
       entityId: donationId,
       details: { message: e instanceof Error ? e.message : String(e) },
     }).catch((err) => console.error("[notify] could not record the failed email", err));
+    return false;
   }
-  await notifyCharityOfDonation(donationId);
 }
 
 /** Tell the charity a donation came in, unless it turned these emails off. Never blocks or undoes anything. */

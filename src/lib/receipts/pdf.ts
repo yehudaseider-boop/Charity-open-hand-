@@ -27,12 +27,25 @@ export function loadLogoHtml(): string {
   return `<img src="data:image/png;base64,${b64}" alt="Givezy">`;
 }
 
-/** Print HTML to an A4 PDF with headless Chrome. CHROME_PATH points at the Chrome or Chromium to use. */
+/**
+ * Which Chrome prints the PDF. CHROME_PATH (a local machine, the receipts command) wins. On the hosted site
+ * (Vercel) there is no Chrome, so a Chromium made for serverless hosts (@sparticuz/chromium) is unpacked and used.
+ */
+async function chrome(): Promise<{ executablePath: string; args: string[] }> {
+  if (process.env.CHROME_PATH) {
+    // Only containers without a sandbox need CHROME_NO_SANDBOX=yes.
+    return { executablePath: process.env.CHROME_PATH, args: process.env.CHROME_NO_SANDBOX === "yes" ? ["--no-sandbox"] : [] };
+  }
+  if (process.env.VERCEL) {
+    const serverless = (await import("@sparticuz/chromium")).default;
+    return { executablePath: await serverless.executablePath(), args: serverless.args };
+  }
+  throw new Error("Set CHROME_PATH to a Chrome or Chromium executable to make receipt PDFs.");
+}
+
+/** Print HTML to an A4 PDF with headless Chrome. */
 export async function htmlToPdf(html: string): Promise<Buffer> {
-  const executablePath = process.env.CHROME_PATH;
-  if (!executablePath) throw new Error("Set CHROME_PATH to a Chrome or Chromium executable to make receipt PDFs.");
-  // Only containers without a sandbox need CHROME_NO_SANDBOX=yes.
-  const browser = await chromium.launch({ executablePath, args: process.env.CHROME_NO_SANDBOX === "yes" ? ["--no-sandbox"] : [] });
+  const browser = await chromium.launch(await chrome());
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "load" });

@@ -98,7 +98,8 @@ export const documentTypes = {
 } as const;
 export type DocumentType = keyof typeof documentTypes;
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+// 4 MB: the hosting (Vercel) refuses any request over 4.5 MB before our code sees it, so the limit sits below that.
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 export const DOCUMENT_MIME = ["application/pdf", "image/jpeg", "image/png"] as const;
 export const IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 

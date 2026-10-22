@@ -1,5 +1,6 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
+import { alertGivezy } from "@/lib/ops/alert";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -122,4 +123,11 @@ export async function handleDispute(reference: string | null, stage: "opened" | 
     entityId: d ? d.id : eventRowId,
     details: { reference, outcome: detail },
   });
+  // A chargeback has a deadline for sending the provider evidence: tell the team now, not in tomorrow's list.
+  if (stage === "opened") {
+    await alertGivezy("a donor disputed a payment (chargeback)", [
+      `The payment provider opened a dispute on payment ${reference ?? "(no reference)"}.${d ? " Any monthly donation it belongs to is paused." : " We could not match it to a donation."}`,
+      "Answer it in the payment provider's dashboard before its deadline, with the charity's help if needed.",
+    ]);
+  }
 }

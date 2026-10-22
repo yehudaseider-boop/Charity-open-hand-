@@ -144,6 +144,18 @@
   person to ask once Givezy has a support address. Email wording is a draft for Yehuda. Migration
   `20261022000004_monthly_new_card.sql`.
 
+- **Launch push, 22/10/2026 (Yehuda: launch before January, nothing paid):** plan and order in `docs/launch-plan.md`.
+  Built: Next.js 16.4.2 (security fix, taken a week after release because it closes critical holes); receipt PDFs
+  on the hosted site with `@sparticuz/chromium` (free) when `CHROME_PATH` is not set and `VERCEL` is; one daily
+  job `/api/jobs/daily` in `vercel.json` (monthly collection, deposit report, pending-payment recheck,
+  confirmation-email resend, a "needs a person" email to `ADMIN_NOTIFY_EMAIL` only when something does);
+  declined-card retries rounded down to the hour so a once-a-day job finds them a day later; chargebacks email
+  Givezy at once; Admin, Causes; `/api/health`; uploads 4 MB. Security review fixes: recorded gifts need an
+  approved charity (code and database, migration `20261022000005_recorded_gifts_need_approval.sql`); thank-yous
+  only to people who gave on Givezy. "Update my card" review fixes: no second page within 30 minutes; a month
+  paid twice is a held item with an email; a new card that can't be reused stops the monthly donation; the
+  confirmation email is sent when a half-finished update is completed.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

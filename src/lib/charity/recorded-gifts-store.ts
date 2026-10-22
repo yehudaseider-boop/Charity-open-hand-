@@ -83,6 +83,9 @@ export async function recordGifts(args: {
         }
       : {}),
   }));
+  // Only an approved charity may put gifts into donors' histories (the database refuses it too).
+  const { data: charity } = await createAdminClient().from("charities").select("status").eq("id", args.charityId).maybeSingle();
+  if (charity?.status !== "approved") return { ok: false, message: "Gifts can be recorded once Givezy has approved your charity. Nothing was recorded." };
   const { data, error } = await createAdminClient().rpc("record_gifts", {
     p_charity_id: args.charityId,
     p_user_id: args.userId,
@@ -91,6 +94,7 @@ export async function recordGifts(args: {
   });
   if (error) {
     if (/gift_imports_once/.test(error.message)) return { ok: false, message: "You've already imported this exact file, so nothing was recorded again. It's under Earlier imports below." };
+    if (/approved charity/.test(error.message)) return { ok: false, message: "Gifts can be recorded once Givezy has approved your charity. Nothing was recorded." };
     if (/donations_recorded_ref/.test(error.message)) return { ok: false, message: "One of these references is already on a gift you recorded, so nothing was recorded. Check the references and try again." };
     console.error("[recorded-gifts]", error.message);
     return { ok: false, message: "Something went wrong while saving, so nothing was recorded. Please try again." };

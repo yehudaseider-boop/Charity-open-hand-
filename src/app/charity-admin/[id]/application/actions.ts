@@ -188,7 +188,7 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
 
   if (!Object.hasOwn(documentTypes, type)) return { ok: false, fieldErrors: { document_type: "Choose a document type" } };
   if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose a file" } };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Files must be 5 MB or smaller" } };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Files must be 4 MB or smaller" } };
   if (!(DOCUMENT_MIME as readonly string[]).includes(file.type)) {
     return { ok: false, fieldErrors: { file: "Upload a PDF, JPG or PNG" } };
   }

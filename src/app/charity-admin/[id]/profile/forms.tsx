@@ -50,7 +50,7 @@ export function ProfileForm({ action, charity, categories, selected }: {
 export function ImageForm({ action, label }: { action: Action; label: string }) {
   return (
     <ActionForm action={action} submitLabel="Upload" pendingLabel="Uploading…" resetOnSuccess>
-      <FileField name="file" label={label} required accept="image/jpeg,image/png,image/webp" hint="JPG, PNG or WebP, up to 5 MB." />
+      <FileField name="file" label={label} required accept="image/jpeg,image/png,image/webp" hint="JPG, PNG or WebP, up to 4 MB." />
     </ActionForm>
   );
 }

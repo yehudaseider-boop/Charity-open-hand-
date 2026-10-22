@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { heldLabel } from "@/lib/ops/held";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { monthlyHealth, staleEvents, stalePending, totalsByCharity, MONTHLY_OVERDUE_HOURS, type PaidRow } from "@/lib/admin/payments-overview";
 import { formatDate, formatDateTime } from "@/lib/dates";
@@ -7,17 +8,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { markDonation } from "./actions";
 
-/** What each held item is, in plain words. */
-const heldLabel: Record<string, string> = {
-  "donation.amount_mismatch": "Amount did not match",
-  "webhook.unmatched_payment": "Payment with no matching donation",
-  "donation.refund_review": "Refund to check (partial, the amount was not given, or it came before the payment was confirmed)",
-  "donation.gateway_mismatch": "Payment on a payment provider we no longer use: check it there",
-  "refund.unmatched": "Refund for a payment we could not find",
-  "donation.dispute_opened": "Dispute (chargeback) opened",
-  "donation.dispute_resolved": "Dispute resolved: check who won",
-  "receipt.needs_reissue": "An issued s18A receipt includes a refunded or charged-back donation: void and re-issue it",
-};
 const HELD = Object.keys(heldLabel);
 
 export const metadata: Metadata = { title: "Payments" };

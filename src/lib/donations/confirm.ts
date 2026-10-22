@@ -169,7 +169,11 @@ async function finishCardKeeping(donation: { id: string; gateway: string }, refe
 async function finishCardUpdate(donation: { id: string; gateway: string; recurring_id: string | null }, reference: string): Promise<void> {
   if (!donation.recurring_id || !(await newCardWaitingFor(donation.id))) return;
   const again = await gatewayByName(donation.gateway).verifyTransaction(reference);
-  if (again.status === "success") await finishNewCard(donation.id, again);
+  if (again.status !== "success") return;
+  await finishNewCard(donation.id, again);
+  // The call that saved this payment stopped before its confirmation email (that is why the update was left
+  // unfinished): send it now.
+  await notifyDonationPaid(donation.id);
 }
 
 async function currentStatus(donationId: string): Promise<string> {

@@ -150,7 +150,7 @@ describe("when the card is declined", () => {
     confirmWith = () => "failed";
     const s = await runMonthlyCharges(deps());
     expect(s).toMatchObject({ failed: 1, stopped: 0 });
-    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: "2026-11-16T06:30:00.000Z" }]);
+    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: "2026-11-16T06:00:00.000Z" }]); // a day later, on the hour
     expect(failedEmails).toEqual([{ final: false }]);
   });
 
@@ -159,7 +159,7 @@ describe("when the card is declined", () => {
     world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 1 })];
     await runMonthlyCharges(deps());
     expect(charges[0].reference).toBe(attemptDonationId("rec1", "2026-11", 1));
-    expect(world.failures[0]).toMatchObject({ n: 2, retryAt: "2026-11-18T06:30:00.000Z" });
+    expect(world.failures[0]).toMatchObject({ n: 2, retryAt: "2026-11-18T06:00:00.000Z" });
   });
 
   it("a retry never charges when an earlier attempt this month went through after all", async () => {
@@ -347,7 +347,7 @@ describe("a charge the gateway refuses outright", () => {
     confirmWith = () => { throw new Error("Transaction reference not found"); };
     const s = await runMonthlyCharges(deps());
     expect(s).toMatchObject({ failed: 1, errors: [] });
-    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: new Date(NOW.getTime() + 24 * 3_600_000).toISOString() }]);
+    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: "2026-11-16T06:00:00.000Z" }]);
     expect(failedEmails).toEqual([{ final: false }]);
     // The attempt's own donation does not stay pending for ever.
     expect(world.attempts.get(attemptDonationId("rec1", "2026-11", 0))).toBe("failed");

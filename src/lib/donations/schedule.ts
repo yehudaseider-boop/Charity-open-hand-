@@ -48,7 +48,9 @@ export function chargeTime(period: Period, chargeDay: number): Date {
 export function retryTime(now: Date, failedAttempts: number): Date | null {
   if (failedAttempts >= MAX_ATTEMPTS) return null;
   const hours = RETRY_AFTER_HOURS[failedAttempts - 1] ?? RETRY_AFTER_HOURS[RETRY_AFTER_HOURS.length - 1];
-  return new Date(now.getTime() + hours * 3_600_000);
+  // On the hour: a job that runs once a day (at a quarter past) then finds the retry due a day later, not two.
+  const at = now.getTime() + hours * 3_600_000;
+  return new Date(at - (at % 3_600_000));
 }
 
 /**

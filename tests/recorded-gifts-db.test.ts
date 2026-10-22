@@ -51,6 +51,19 @@ describe("recorded gifts", () => {
     });
   });
 
+  it("only an approved charity can record them (a draft can't put gifts into someone's history)", async () => {
+    await tx(async () => {
+      const d = await donor();
+      await run("update public.charities set status = 'draft' where id = $1", [charity]);
+      await refused(
+        `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway, status, paid_at, tax_year, recorded_method, came_from)
+         values ($1, $2, 50000, 0, 0, 50000, 'recorded', 'paid', '2026-03-05T12:00:00+02:00', 2027, 'eft', 'recorded')`,
+        [d, charity],
+        /approved charity/,
+      );
+    });
+  });
+
   it("one reference once per charity", async () => {
     await tx(async () => {
       const d = await donor();

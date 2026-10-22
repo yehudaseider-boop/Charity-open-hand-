@@ -40,13 +40,28 @@ const securityHeaders = [
   ...(isDev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]),
 ];
 
+const receiptFiles = [
+  "./node_modules/@sparticuz/chromium/bin/**",
+  "./node_modules/@fontsource/fredoka/files/fredoka-latin-600-normal.woff2",
+  "./node_modules/@fontsource/dm-sans/files/dm-sans-latin-{400,500,600}-normal.woff2",
+  "./node_modules/@fontsource/heebo/files/heebo-hebrew-{400,600}-normal.woff2",
+  "./public/logo.png",
+];
+
 const nextConfig: NextConfig = {
   // Receipt PDFs are printed with Chrome through playwright-core: loaded from node_modules at run time, not bundled.
-  serverExternalPackages: ["playwright-core"],
+  // On the hosted site the Chrome is @sparticuz/chromium (a compressed Chromium for serverless hosts).
+  serverExternalPackages: ["playwright-core", "@sparticuz/chromium"],
+  // Files the receipt pages read from disk at run time (fonts and logo embedded in each PDF, and the packed
+  // Chromium), which the build cannot see from the code: ship them with those pages only.
+  outputFileTracingIncludes: {
+    "/admin/receipts": receiptFiles,
+    "/charity-admin/\\[id\\]/receipts": receiptFiles,
+  },
   experimental: {
-    // Server actions accept 1 MB by default, but charity photos and documents may be up to 5 MB
+    // Server actions accept 1 MB by default, but charity photos and documents may be up to 4 MB
     // (MAX_UPLOAD_BYTES in src/lib/charity/validation.ts). Leave room for the rest of the form.
-    serverActions: { bodySizeLimit: "6mb" },
+    serverActions: { bodySizeLimit: "4.5mb" },
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

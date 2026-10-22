@@ -14,7 +14,7 @@ const groups = [
       { href: "/admin/receipts", label: "Receipts" },
     ],
   },
-  { title: "Content", tabs: [{ href: "/admin/featured", label: "Cause of the week" }] },
+  { title: "Content", tabs: [{ href: "/admin/featured", label: "Cause of the week" }, { href: "/admin/causes", label: "Causes" }] },
   { title: "People", tabs: [{ href: "/admin/requests", label: "Privacy requests" }] },
 ];
 

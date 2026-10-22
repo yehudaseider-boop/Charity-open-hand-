@@ -7,6 +7,7 @@ const sent: { to: string; text: string }[] = [];
 let donations: unknown[] = [];
 let optedOut: string[] = [];
 let claimed = false;
+const neqs: string[] = [];
 const tokens: Record<string, string>[] = [];
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ send: async (m: { to: string; text: string }) => (sent.push(m), "sent") }) }));
@@ -15,6 +16,7 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (table: string) => {
       const b: Record<string, unknown> = {};
       for (const m of ["select", "eq", "gte", "lt", "order", "update"]) b[m] = () => b;
+      b.neq = (col: string, val: string) => (neqs.push(`${table}.${col}!=${val}`), b);
       b.range = async () => ({ data: donations, error: null });
       b.in = async (_c: string, hashes: string[]) => ({ data: hashes.filter((h) => optedOut.includes(h)).map((h) => ({ email_hash: h })), error: null });
       b.insert = (row: Record<string, string>) => {
@@ -52,6 +54,8 @@ describe("sending a thank-you", () => {
     expect(sent[0].text).toMatch(/https:\/\/g\.test\/thanks\/stop\?t=[A-Za-z0-9_-]{43}/);
     expect(tokens).toHaveLength(2);
     expect(tokens[0].email_hash).toBe(emailHash("sarah@x.co"));
+    // Only people who gave on Givezy: never an address a charity typed into a recorded gift.
+    expect(neqs).toContain("donations.gateway!=recorded");
   });
   it("only once for a month", async () => {
     donations = [gift("sarah@x.co", "Sarah")];

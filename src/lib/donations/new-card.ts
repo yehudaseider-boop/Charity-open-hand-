@@ -1,6 +1,7 @@
 import "server-only";
 import { encrypt, signLink } from "@/lib/crypto";
 import { logAudit } from "@/lib/audit";
+import { alertGivezy } from "@/lib/ops/alert";
 import { getGateway } from "@/lib/gateway";
 import type { VerifiedTransaction } from "@/lib/gateway/types";
 import { GatewayError } from "@/lib/gateway/types";
@@ -25,9 +26,12 @@ import { addMonths, chargeTime, periodOf, type Period } from "./schedule";
 const LINK_DAYS = 30;
 /** While a new-card payment page may still be paid, the monthly job leaves the old card alone. */
 const PENDING_HOLD_MS = 48 * 3_600_000;
+/** A new-card payment page opened this recently may still be paid: no second one meanwhile. */
+const NEW_CARD_PAGE_MS = 30 * 60_000;
 /** A try of the old card takes seconds; two minutes after the job took the row, it has been recorded. */
 const JOB_BUSY_MS = 2 * 60_000;
 export const DECLINED_REASON = "the card was declined every time we tried this month";
+export const NEW_CARD_NOT_REUSABLE = "the new card can't be used for monthly payments";
 
 const purpose = "monthly-new-card";
 
@@ -122,7 +126,7 @@ export function needsNewCard(r: Pick<Row, "status" | "failed_attempts" | "attemp
   const current = periodOf(now);
   if (r.last_paid_period === current) return false;
   if (r.status === "active") return r.failed_attempts > 0 && r.attempt_period !== null && r.attempt_period !== r.last_paid_period;
-  return r.status === "failed" && r.ended_reason === DECLINED_REASON;
+  return r.status === "failed" && (r.ended_reason === DECLINED_REASON || r.ended_reason === NEW_CARD_NOT_REUSABLE);
 }
 
 /** Something about this monthly donation's payments is still unsettled (a try in progress, a page not yet paid). */
@@ -143,10 +147,15 @@ async function busy(r: Row, now: Date): Promise<boolean> {
   if (error) throw new Error(`Could not check the monthly donation's payments: ${error.message}`);
   const pending = (data ?? []).map((d) => d.id as string);
   if (pending.length === 0) return false;
-  const updates = await db.from("monthly_card_updates").select("donation_id").in("donation_id", pending);
+  const updates = await db.from("monthly_card_updates").select("donation_id, created_at").in("donation_id", pending);
   if (updates.error) throw new Error(`Could not check the monthly donation's payments: ${updates.error.message}`);
-  const ours = new Set((updates.data ?? []).map((u) => u.donation_id as string));
-  return pending.some((id) => !ours.has(id));
+  const ours = new Map((updates.data ?? []).map((u) => [u.donation_id as string, new Date(u.created_at as string)]));
+  return pending.some((id) => {
+    const opened = ours.get(id);
+    // A try of the old card; or a new-card page opened in the last half hour, which may be paid any moment
+    // (a second page now could charge this month twice). Older pages were most likely closed unpaid.
+    return !opened || now.getTime() - opened.getTime() < NEW_CARD_PAGE_MS;
+  });
 }
 
 /** What "Update my card" would do for this monthly donation now, or why it isn't offered. */
@@ -279,8 +288,12 @@ export async function finishNewCard(donationId: string, tx: VerifiedTransaction)
   let result: "updated" | "not_reusable" | "none" = "none";
   if (r && (r.status === "active" || r.status === "failed")) {
     if (r.last_paid_period === upd.period) {
-      // Paid twice for one month (should not happen: the job holds off while a card update is open).
+      // Paid twice for one month (the old card went through after all, or two pages were paid): a person refunds one.
       await logAudit({ actorUserId: null, action: "monthly.paid_twice", entityType: "donation", entityId: donationId, details: { recurring: r.id, period: upd.period } });
+      await alertGivezy("a monthly donation was paid twice", [
+        `A monthly donation was paid twice for ${upd.period}: once with the old card and once with the new one, or with two new-card pages.`,
+        "Refund one of the two payments in the payment provider's dashboard, then mark it refunded in Admin, Payments.",
+      ]);
     }
     const auth = tx.authorization;
     const reusable = Boolean(auth && auth.reusable);
@@ -299,10 +312,9 @@ export async function finishNewCard(donationId: string, tx: VerifiedTransaction)
           failed_attempts: 0,
           next_charge_at: next,
         }
-      : // The month is paid, but this card can't be charged again: nothing more is collected from it.
-        r.status === "active"
-        ? { last_paid_period: upd.period, attempt_period: null, failed_attempts: 0, next_charge_at: next }
-        : { last_paid_period: upd.period };
+      : // The month is paid, but this card can't be charged again, and the old one was declined: stop, so
+        // nothing more is tried. The donor can put in another card from the same link or their account.
+        { last_paid_period: upd.period, status: "failed" as const, ended_reason: NEW_CARD_NOT_REUSABLE, authorization_encrypted: null };
     const saved = await db.from("recurring_donations").update(patch).eq("id", r.id).in("status", ["active", "failed"]);
     if (saved.error) throw new Error(`Could not keep the new card: ${saved.error.message}`);
     result = reusable ? "updated" : "not_reusable";
