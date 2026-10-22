@@ -100,7 +100,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   if (needs.retrying > 0) todo.push({ key: "retry", text: `${plural(needs.retrying, "monthly donation")} declined this month and being tried again`, href: `${base}/monthly?show=running`, link: "See who" });
   if (needs.endedRecently > 0) todo.push({ key: "ended", text: `${plural(needs.endedRecently, "monthly donation")} stopped or cancelled in the last 30 days (${formatRand(needs.endedRecentlyCents)} a month)`, href: `${base}/monthly?show=ended`, link: "See who" });
   if (needs.pausedRecently > 0) todo.push({ key: "paused", text: `${plural(needs.pausedRecently, "monthly donor")} paused in the last 30 days`, href: `${base}/monthly?show=paused`, link: "See who" });
-  if (groups.lapsed > 0) todo.push({ key: "lapsed", text: `${plural(groups.lapsed, "donor")} haven't given in the last ${lapsedPeriodText(lapsedDays)}`, href: `${base}/donors?group=lapsed`, link: "See who" });
+  if (groups.lapsed > 0) todo.push({ key: "lapsed", text: `${plural(groups.lapsed, "donor")} ${groups.lapsed === 1 ? "hasn't" : "haven't"} given in the last ${lapsedPeriodText(lapsedDays)}`, href: `${base}/donors?group=lapsed`, link: "See who" });
   // Follow-ups the charity set itself, due today or earlier: the first few by name, then the count.
   for (const r of due.slice(0, 5)) todo.push({ key: `f-${r.id}`, text: `Follow up with ${r.donor_name}: ${r.what}${r.due_on < isoDateInJhb(now) ? ` (was due ${formatDate(`${r.due_on}T12:00:00+02:00`)})` : ""}`, href: `${base}/donors/${r.donor_id}`, link: "Open" });
   if (due.length > 5) todo.push({ key: "f-more", text: `${plural(due.length - 5, "more follow-up")} due`, href: `${base}/donors`, link: "See donors" });

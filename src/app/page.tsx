@@ -212,7 +212,7 @@ export default async function Home() {
             </p>
             <ul className="flex flex-col gap-2.5 text-[17px] text-white">
               <li className="flex items-center gap-2.5"><Tick className="stroke-coral" />Every gift, every charity, one list</li>
-              <li className="flex items-center gap-2.5"><Tick className="stroke-coral" />Monthly gifts you can pause or stop yourself</li>
+              <li className="flex items-center gap-2.5"><Tick className="stroke-coral" />Monthly donations you can pause or stop yourself</li>
               <li className="flex items-center gap-2.5"><Tick className="stroke-coral" />A yearly tax pack, ready for your return</li>
             </ul>
           </div>

@@ -134,7 +134,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
               {myTags.map((t) => (
                 <li key={t.id} className="flex items-center gap-1 rounded-full border border-border px-3 py-1">
                   <span>{t.name}</span>
-                  <ButtonForm action={removeDonorTag.bind(null, id, donorId, t.id)} label={`Take off`} pending="…" />
+                  <ButtonForm action={removeDonorTag.bind(null, id, donorId, t.id)} label="Take off" pending="Taking off…" />
                 </li>
               ))}
             </ul>

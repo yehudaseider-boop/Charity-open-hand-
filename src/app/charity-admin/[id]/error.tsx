@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
  * Something failed on a dashboard page (a lost connection, a server error). The header and tabs stay;
  * this says plainly that nothing was changed, and what to do now.
  */
-export default function DashboardError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function DashboardError({ retry }: { error: Error & { digest?: string }; retry: () => void }) {
   const { id } = useParams<{ id: string }>();
   const offline = typeof navigator !== "undefined" && navigator.onLine === false;
   return (
@@ -19,7 +19,7 @@ export default function DashboardError({ reset }: { error: Error & { digest?: st
           : "Nothing was changed. It's usually a dropped connection: try again in a moment."}
       </p>
       <div className="flex flex-wrap items-center gap-4">
-        <button onClick={reset} className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Try again</button>
+        <button onClick={() => retry()} className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Try again</button>
         <Link href={`/charity-admin/${id}`} className="text-sm text-brand underline">Back to your overview</Link>
       </div>
       <p className="text-xs text-muted">If it keeps happening, reply to any email we&apos;ve sent you and a person will help.</p>

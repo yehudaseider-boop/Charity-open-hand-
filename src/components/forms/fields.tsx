@@ -50,7 +50,7 @@ export function TextField({
   hebrew?: boolean;
   /** English or Hebrew: the box follows the direction of what is typed. */
   autoDirection?: boolean;
-  inputMode?: "numeric" | "tel" | "email" | "url";
+  inputMode?: "numeric" | "decimal" | "tel" | "email" | "url";
   autoComplete?: string;
   /** Stops typing past what the server accepts. */
   maxLength?: number;

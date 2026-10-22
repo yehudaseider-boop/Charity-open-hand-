@@ -264,7 +264,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
       try {
         const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, campaign?.id, prev, fd);
         if (next.quote) setShownQuote(next.quote);
-        return { ...next, failedToStart: false };
+        return { ...next, failedToStart: next.failedToStart ?? false };
       } catch (e) {
         return { ...offlineOrDown(e, "pay"), failedToStart: true };
       }
@@ -454,6 +454,11 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           <div role="alert" className="space-y-1 rounded-control border-2 border-danger-soft p-4 text-sm">
             <p className="font-semibold text-danger">{state.message}</p>
             {state.failedToStart ? <p className="text-muted">If it keeps happening: <SupportContact />.</p> : null}
+            {state.campaignEnded ? (
+              <a href={`/c/${slug}/donate?amount=${shownQuote.amountCents}`} className="inline-block font-bold text-brand underline underline-offset-4">
+                Give {formatRand(shownQuote.amountCents)} to {charityName} instead
+              </a>
+            ) : null}
           </div>
         ) : null}
         <p className="text-center text-sm text-muted">You&apos;ll enter your card details on the payment provider&apos;s secure page. We never see or store them.</p>

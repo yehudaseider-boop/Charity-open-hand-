@@ -135,11 +135,14 @@ describe("confirmation page privacy", () => {
 });
 
 describe("checking with the payment provider", () => {
-  it("a visitor over the limit gets 'still confirming' without the provider being asked", async () => {
+  it("a visitor over the limit gets the saved state without the provider being asked", async () => {
     overLimit = true;
-    const html = await page({ t: "good-credential" });
+    outcome = "pending";
+    expect(await page({ t: "good-credential" })).toContain("We&#x27;re confirming your payment");
+    // Settled by the webhook meanwhile: a donor on a busy shared connection still sees it went through.
+    outcome = "paid";
+    expect(await page({ t: "good-credential" })).not.toContain("We&#x27;re confirming your payment");
     expect(confirmCalls).toBe(0);
-    expect(html).toContain("We&#x27;re confirming your payment");
   });
 
   it("under the limit, the donor's own visit checks the payment", async () => {

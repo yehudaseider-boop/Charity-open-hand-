@@ -64,7 +64,7 @@ export type StartResult =
    */
   | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
   /** `savedCardDeclined`: the provider refused the saved card, so the app should offer the payment page with another card. */
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean; attemptMismatch?: boolean };
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean; attemptMismatch?: boolean; providerDown?: boolean; campaignEnded?: boolean };
 
 /**
  * Record a pending donation and hand the donor to the gateway.
@@ -144,7 +144,7 @@ export async function startDonation(args: {
   }
 
   const campaign = args.campaignId ? await loadOpenCampaign(args.campaignId, charity.id) : null;
-  if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity." };
+  if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity.", campaignEnded: true };
   if (campaign && input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
 
   const quoted = quoteDonation(args.giftCents, args.contributionCents);
@@ -368,7 +368,7 @@ export async function startDonation(args: {
     }
     if (e instanceof GatewayError) {
       console.error(e);
-      return { ok: false, message: "We couldn't reach the payment provider. Please try again in a minute." };
+      return { ok: false, message: "We couldn't reach the payment provider, so nothing was charged. What you typed is still here. Please try again in a minute.", providerDown: true };
     }
     throw e;
   }

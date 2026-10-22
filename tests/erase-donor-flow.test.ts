@@ -36,6 +36,7 @@ vi.mock("@/lib/supabase/admin", () => ({
       const q = {
         select: (_c?: string, o?: { head?: boolean }) => (o?.head ? { eq: async () => ({ count: charityAdminCount }) } : q),
         eq: (c: string, v: unknown) => ((f[c] = v), q),
+        in: (c: string, v: unknown) => ((f[c] = v), q),
         maybeSingle: async () => ({ data: profile, error: null }),
         delete: () => ({
           // The charities' personal thank-yous to the erased donors: .in("donor_id", ids)

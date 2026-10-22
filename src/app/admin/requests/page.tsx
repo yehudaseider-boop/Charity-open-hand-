@@ -4,6 +4,7 @@ import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { closeRequest, eraseByEmailForm, eraseForRequest } from "./actions";
 import { EraseByEmailForm } from "./erase-form";
+import { PendingButton } from "@/components/forms/pending-button";
 
 export const metadata: Metadata = { title: "Privacy requests" };
 
@@ -59,14 +60,14 @@ export default async function PrivacyRequestsPage({ searchParams }: PageProps<"/
                     <input type="checkbox" name="checked" className="mt-1" />
                     <span>I have checked this request is really from the person.</span>
                   </label>
-                  <button className="min-h-11 rounded-control border border-danger px-3 py-2 text-danger">Erase their information</button>
+                  <PendingButton pendingLabel="Erasing…" className="min-h-11 rounded-control border border-danger px-3 py-2 text-danger">Erase their information</PendingButton>
                 </form>
               ) : null}
               <form action={closeRequest.bind(null, r.id)} className="space-y-2">
                 <textarea name="response" rows={2} maxLength={2000} aria-label="Reply to the person" placeholder="Reply to the person" className="w-full rounded-control border border-border bg-surface px-3 py-2" />
                 <div className="flex gap-2">
-                  <button name="status" value="done" className="rounded-control bg-brand px-3 py-2 text-brand-contrast">Mark done</button>
-                  <button name="status" value="declined" className="rounded-control border border-border px-3 py-2">Decline</button>
+                  <PendingButton name="status" value="done" pendingLabel="Saving…" className="rounded-control bg-brand px-3 py-2 text-brand-contrast">Mark done</PendingButton>
+                  <PendingButton name="status" value="declined" pendingLabel="Saving…" className="rounded-control border border-border px-3 py-2">Decline</PendingButton>
                 </div>
               </form>
             </li>

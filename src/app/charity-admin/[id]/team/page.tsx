@@ -55,7 +55,11 @@ export default async function TeamPage({ params, searchParams }: PageProps<"/cha
           <p className="mb-3 text-sm text-muted">
             They become an admin. They&apos;ll see your donations and donors&apos; details, so add only people you trust with them. The first time they sign in they set up a second step on their phone.
           </p>
-          <AddMemberForm key={formKey(sp)} action={addTeamMember.bind(null, id)} />
+          {charity.status === "draft" || charity.status === "rejected" ? (
+            <p className="text-sm text-muted">You can add people once your application is sent to Givezy.</p>
+          ) : (
+            <AddMemberForm key={formKey(sp)} action={addTeamMember.bind(null, id)} />
+          )}
         </Card>
       ) : null}
     </div>

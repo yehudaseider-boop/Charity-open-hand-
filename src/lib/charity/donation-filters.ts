@@ -29,7 +29,16 @@ export type DonationFilters = {
   source: GiftSource | "unknown" | "";
 };
 
-const isoDay = /^\d{4}-\d{2}-\d{2}$/;
+const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
+/** A real calendar day written yyyy-mm-dd (30/02 or 2026-13-01 would make the database refuse the whole page). */
+const isoDay = {
+  test(s: string): boolean {
+    if (!isoPattern.test(s)) return false;
+    const [y, m, d] = s.split("-").map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d));
+    return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+  },
+};
 const dayAfter = (d: string) => {
   const [y, m, day] = d.split("-").map(Number);
   const t = new Date(Date.UTC(y, m - 1, day + 1));
@@ -55,7 +64,7 @@ function dates(params: Params, now: Date): Omit<DonationFilters, "campaign" | "s
   const status = rawStatus !== "all" && isDonationStatus(rawStatus) ? rawStatus : "all";
   const q = safeSearch(one(params.q));
   const rawPeriod = one(params.period);
-  let period: PeriodKey = rawPeriod in periodOptions ? (rawPeriod as PeriodKey) : "all";
+  let period: PeriodKey = Object.hasOwn(periodOptions, rawPeriod) ? (rawPeriod as PeriodKey) : "all";
   // Both dates filled in with "Any time" still chosen: they meant those dates.
   if (period === "all" && isoDay.test(one(params.from)) && isoDay.test(one(params.to))) period = "custom";
   const today = saDate(now);

@@ -128,6 +128,24 @@ async function stoppedEmails(charityId: string, emails: string[]): Promise<Set<s
 }
 
 /** Save the email and list its recipients ('waiting'). Nothing is sent yet. */
+/**
+ * The same email (subject and words) this charity created in the last few minutes, if any. Pressing Send again
+ * after a dropped connection must not email everyone a second time: the page points to "Send the rest" instead.
+ */
+export async function recentSameAppeal(charityId: string, subject: string, body: string, minutes = 15): Promise<string | null> {
+  const since = new Date(Date.now() - minutes * 60_000).toISOString();
+  const { data, error } = await db()
+    .from("charity_appeals")
+    .select("id")
+    .eq("charity_id", charityId)
+    .eq("subject", subject)
+    .eq("body", body)
+    .gte("created_at", since)
+    .limit(1);
+  if (error) throw error;
+  return (data?.[0]?.id as string | undefined) ?? null;
+}
+
 export async function createAppeal(args: { charityId: string; userId: string; subject: string; body: string; audience: Audience; pick: AudiencePick }): Promise<string> {
   const { data, error } = await db()
     .from("charity_appeals")

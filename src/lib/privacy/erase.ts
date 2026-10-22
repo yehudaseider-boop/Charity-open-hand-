@@ -76,6 +76,33 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
         if (e) throw new Error(`Could not erase: ${e.message}`);
       }
     }
+    // A gift a charity recorded for them in the last 30 days names them in its "what just happened" row too.
+    const { data: theirGifts, error: giftsError } = await db.from("donations").select("id").in("donor_id", [...ids]);
+    if (giftsError) throw new Error(`Could not erase: ${giftsError.message}`);
+    const giftIds = new Set((theirGifts ?? []).map((g) => g.id as string));
+    if (giftIds.size) {
+      const { data: recorded, error: recordedError } = await db.from("charity_actions").select("id, details, undo").eq("kind", "gift_recorded");
+      if (recordedError) throw new Error(`Could not erase: ${recordedError.message}`);
+      for (const a of recorded ?? []) {
+        const undone = ((a.undo ?? {}) as { donationIds?: unknown }).donationIds;
+        if (Array.isArray(undone) && undone.some((d) => typeof d === "string" && giftIds.has(d))) {
+          const { error: e } = await db.from("charity_actions").update({ details: { ...((a.details ?? {}) as Record<string, unknown>), name: "a donor" } }).eq("id", a.id);
+          if (e) throw new Error(`Could not erase: ${e.message}`);
+        }
+      }
+    }
+  }
+  // If they were on a charity's team, their address goes from the team rows of "what just happened" as well.
+  if (email) {
+    const { data: teamRows, error: teamError } = await db.from("charity_actions").select("id, details").in("kind", ["member_added", "member_removed"]);
+    if (teamError) throw new Error(`Could not erase: ${teamError.message}`);
+    for (const a of teamRows ?? []) {
+      const details = (a.details ?? {}) as Record<string, unknown>;
+      if (typeof details.email === "string" && details.email.toLowerCase() === email) {
+        const { error: e } = await db.from("charity_actions").update({ details: { ...details, email: "A team member" } }).eq("id", a.id);
+        if (e) throw new Error(`Could not erase: ${e.message}`);
+      }
+    }
   }
   const c = (counts ?? {}) as Record<string, number>;
 

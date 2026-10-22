@@ -3,6 +3,7 @@ import Link from "next/link";
 import { TermsAndPrivacyLinks } from "@/components/legal";
 import { getViewer } from "@/lib/auth";
 import { sendLoginLink, verifyLoginCode } from "./actions";
+import { PendingButton } from "@/components/forms/pending-button";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -46,7 +47,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
                 className="w-full rounded-control border border-border bg-surface px-3 py-2.5 text-lg tracking-widest"
               />
               {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-              <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Sign in</button>
+              <PendingButton pendingLabel="Signing in…" className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Sign in</PendingButton>
             </form>
           ) : null}
           <p className="text-xs text-muted">
@@ -70,9 +71,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             className="w-full rounded-control border border-border bg-surface px-3 py-2.5"
           />
           {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-          <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">
+          <PendingButton pendingLabel="Sending…" className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">
             Email me a sign-in link
-          </button>
+          </PendingButton>
           <p className="text-xs text-muted">
             The first time you sign in you&apos;ll be asked to agree to <TermsAndPrivacyLinks />.
           </p>

@@ -18,7 +18,7 @@ import { HebrewAware } from "@/components/hebrew-aware";
 import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
-export const metadata: Metadata = { title: "Thank you", referrer: "no-referrer" };
+export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };
 
 /** The first value of a query parameter, when it is present once or more. */
 function first(value: string | string[] | undefined): string | undefined {
@@ -47,7 +47,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const outcome = !holdsToken
     ? await savedOutcome(ref)
     : limited
-      ? ("pending" as const)
+      ? // Past the limit we stop asking the payment provider, but still read what is saved: a gift the
+        // webhook has settled shows as paid (or declined), never as "still confirming".
+        await savedOutcome(ref)
       : await confirmPayment(ref).catch((e) => {
           console.error(e);
           return "pending" as const;

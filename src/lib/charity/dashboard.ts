@@ -77,7 +77,8 @@ export const donationStatus = {
 export type DonationStatus = keyof typeof donationStatus;
 
 export function isDonationStatus(s: string): s is DonationStatus {
-  return s in donationStatus;
+  // hasOwn, not "in": "constructor" or "toString" must not pass as a status.
+  return Object.hasOwn(donationStatus, s);
 }
 
 /** Address lines as one text line, skipping empty parts. */

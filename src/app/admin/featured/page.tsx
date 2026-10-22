@@ -5,6 +5,7 @@ import { weekStart } from "@/lib/charity/thank-you";
 import { formatDate } from "@/lib/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clearFeatured, setFeatured } from "./actions";
+import { PendingButton } from "@/components/forms/pending-button";
 
 export const metadata: Metadata = { title: "Cause of the week" };
 
@@ -15,6 +16,8 @@ const plusDays = (iso: string, n: number) => {
   return d.toISOString().slice(0, 10);
 };
 const shown = (iso: string) => formatDate(`${iso}T12:00:00+02:00`);
+/** Only a real yyyy-mm-dd from our own redirect is shown; anything else in the address is ignored. */
+const dayParam = (v: string | string[] | undefined) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T12:00:00Z`)) ? v : null);
 
 /**
  * Cause of the week (from Alza of Feed a Child, 21/10/2026): one approved charity per week, Monday to
@@ -34,7 +37,9 @@ export default async function FeaturedPage({ searchParams }: PageProps<"/admin/f
   if (pickError) throw pickError;
   const nameOf = new Map((charities ?? []).map((c) => [c.id as string, c.name_en as string]));
   const pickOf = new Map((picks ?? []).map((p) => [p.week_start as string, p.charity_id as string]));
-  const flash = typeof sp.saved === "string" ? `Saved for the week of ${shown(sp.saved)}.` : typeof sp.cleared === "string" ? `The week of ${shown(sp.cleared)} has no cause of the week now.` : null;
+  const saved = dayParam(sp.saved);
+  const cleared = dayParam(sp.cleared);
+  const flash = saved ? `Saved for the week of ${shown(saved)}.` : cleared ? `The week of ${shown(cleared)} has no cause of the week now.` : null;
   const problem = sp.error === "week" ? "That week can't be chosen: pick this week or a later one. Nothing was changed." : sp.error === "charity" ? "Choose an approved charity. Nothing was changed." : null;
 
   return (
@@ -66,12 +71,12 @@ export default async function FeaturedPage({ searchParams }: PageProps<"/admin/f
                         <option value="" disabled>Choose a charity</option>
                         {(charities ?? []).map((c) => <option key={c.id as string} value={c.id as string}>{c.name_en as string}</option>)}
                       </select>
-                      <button className="pressable rounded-control bg-brand px-4 py-2 font-medium text-brand-contrast">{pick ? "Change" : "Choose"}</button>
+                      <PendingButton pendingLabel="Saving…" className="pressable rounded-control bg-brand px-4 py-2 font-medium text-brand-contrast">{pick ? "Change" : "Choose"}</PendingButton>
                     </form>
                     {pick ? (
                       <form action={clearFeatured}>
                         <input type="hidden" name="week" value={w} />
-                        <button className="rounded-control border border-border px-3 py-2">Clear</button>
+                        <PendingButton pendingLabel="Clearing…" className="rounded-control border border-border px-3 py-2">Clear</PendingButton>
                       </form>
                     ) : null}
                   </div>

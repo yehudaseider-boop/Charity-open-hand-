@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewer } from "@/lib/auth";
-import { createAppeal, pickAudience, sendAppeal } from "@/lib/charity/appeals";
+import { createAppeal, pickAudience, recentSameAppeal, sendAppeal } from "@/lib/charity/appeals";
 import { appealEmail, checkAppeal, parseAudience } from "@/lib/charity/appeals-rules";
 import { recordAction } from "@/lib/charity/charity-actions";
 import { loadCharityForManager } from "@/lib/charity/queries";
@@ -65,6 +65,9 @@ export async function sendAppealNow(charityId: string, _prev: FormState, formDat
   if ("refused" in r) return { ok: false, message: r.refused, fieldErrors: "fieldErrors" in r ? (r.fieldErrors as Record<string, string>) : undefined };
   if (String(formData.get("fingerprint") ?? "") !== fingerprint(r.subject, r.body, r.audienceValue)) {
     return { ok: false, message: "You changed the email or who it goes to since you checked. Nothing was sent. Press Check who it goes to again." };
+  }
+  if (await recentSameAppeal(charityId, r.subject, r.body)) {
+    return { ok: false, message: "This email was already sent a few minutes ago, so it wasn't sent again. If it stopped part way, use Send the rest under Sent below." };
   }
   if (await hitRateLimit("appeal-send", [`charity:${charityId}`], 5, 24 * 60)) return { ok: false, message: "You've sent 5 emails today, the most for one day. Nothing was sent. Please send it tomorrow." };
   const pick = await pickAudience(charityId, r.audience);

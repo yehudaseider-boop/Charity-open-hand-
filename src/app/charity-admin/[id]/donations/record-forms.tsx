@@ -29,7 +29,7 @@ export function RecordGiftForm({
       <fieldset className="space-y-3">
         <legend className="font-semibold text-navy">The gift</legend>
         <TextField name="date" label="Date it came in" type="date" required defaultValue={today} />
-        <TextField name="amount" label="Amount (R)" required inputMode="numeric" hint="For example 1250 or 1250.00" maxLength={20} />
+        <TextField name="amount" label="Amount (R)" required inputMode="decimal" hint="For example 1250 or 1250.00" maxLength={20} />
         <SelectField name="method" label="How it came in" required options={methods} defaultValue="eft" />
         {campaigns.length ? <SelectField name="campaign_id" label="Campaign" options={[{ value: "", label: "No campaign" }, ...campaigns]} defaultValue="" /> : null}
         <TextField name="reference" label="Reference" hint="The bank reference or your own. It stops the same gift being recorded twice." maxLength={100} />

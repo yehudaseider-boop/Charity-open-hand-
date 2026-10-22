@@ -136,7 +136,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
       </p>
 
       <nav className="flex flex-wrap gap-4 text-sm print:hidden">
-        <Link href={`/account/tax-pack/${year - 1}`} className="text-brand underline">Tax pack {year - 1}</Link>
+        {year > 2020 ? <Link href={`/account/tax-pack/${year - 1}`} className="text-brand underline">Tax pack {year - 1}</Link> : null}
         {year < current ? <Link href={`/account/tax-pack/${year + 1}`} className="text-brand underline">Tax pack {year + 1}</Link> : null}
         <Link href="/account" className="text-brand underline">Back to your account</Link>
       </nav>

@@ -42,6 +42,8 @@ export type CheckoutState = {
   quote?: Quote;
   /** The payment never started (offline, or the server failed): the page offers a person to ask. */
   failedToStart?: boolean;
+  /** The campaign ended while the donor was on the page: the page offers giving to the charity instead. */
+  campaignEnded?: boolean;
 };
 
 export async function submitDonation(
@@ -81,7 +83,11 @@ export async function submitDonation(
   const viewer = formData.get("use_saved_id") === "on" ? await getViewer() : null;
   const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
   const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, sourceTag: sourceTagged, input: parsed.data, ip, useSavedIdOf });
-  if (!result.ok) return result.message === "Please check the highlighted fields." && result.fieldErrors ? { ...result, message: fixMessage(result.fieldErrors) } : result;
+  if (!result.ok) {
+    const { providerDown, ...rest } = result;
+    if (rest.message === "Please check the highlighted fields." && rest.fieldErrors) return { ...rest, message: fixMessage(rest.fieldErrors) };
+    return { ...rest, failedToStart: providerDown };
+  }
   // The website never charges a saved card (only the app does), so there is always a payment page.
   if (!result.redirectUrl) return { ok: false, message: "We couldn't start the payment. Please try again." };
   redirect(result.redirectUrl);
