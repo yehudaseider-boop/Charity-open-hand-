@@ -1218,3 +1218,10 @@ PSFA asked on the intro call to explore the product themselves. The first demo w
 - **Works**: record and import gifts, thank-yous and email appeals with a sent log, donor notes, tags, follow-ups and saved lists, campaigns, public profile, photo updates, s18A and annual report pages, team, the public page with a give flow (including a declined card), and a donor view where a monthly donation can be paused or cancelled and shows in the dashboard. Interactive charts: hover, press, range, hide a series, keyboard.
 - **Checked**: 408 browser checks across three suites (every action, empty and silly data, phone, tablet and desktop widths, blocked storage, odd addresses).
 - **Not real**: the payment page is a stand-in, Excel export is CSV only, and the team names (Chantal, Charles) and roles are placeholders from the intro call. A "meals funded" figure is still not shown: it needs PSFA's own cost per meal.
+
+## 22/10/2026: Givezy admin area in design direction A (phase 5)
+- **Same calm frame as a charity's dashboard**: a pale lilac band ("Givezy", "Platform admin", "Givezy staff only", "See the public site"), the pages grouped down the side on a laptop (Review: Overview, Charities, Payments, Receipts; Content: Cause of the week; People: Privacy requests) and one scrolling row on a phone, with the current page marked. Wider than the site's reading column so tables have room.
+- **Overview**: a blue "Waiting for review" block (the number to act on first), four soft cards for the other pages (Cause of the week added: it was only reachable from the menu), and the charities-by-status card.
+- **Headings** on every admin page now use the same title style as the rest of the product.
+- **Not changed**: what any admin page does, and its wording. Checked every admin page at 375px and at laptop width for content cut off: none.
+- **Still to do in the design plan**: the donor account pages (giving history, monthly donations, tax pack, "Your information") and sign-in (sign-in, agree to the terms, the second step), left over from phase 3.

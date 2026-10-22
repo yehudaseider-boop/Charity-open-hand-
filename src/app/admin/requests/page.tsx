@@ -25,7 +25,7 @@ export default async function PrivacyRequestsPage({ searchParams }: PageProps<"/
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Privacy requests</h1>
+      <h1 className="font-display text-2xl text-indigo">Privacy requests</h1>
       {erased === "full" || erased === "kept" || erased === "guest" ? (
         <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success">
           Done. {donors ?? 0} donor {Number(donors) === 1 ? "record was" : "records were"} erased.

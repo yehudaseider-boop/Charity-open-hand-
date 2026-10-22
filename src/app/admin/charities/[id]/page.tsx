@@ -75,7 +75,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
     <div className="space-y-4">
       <div>
         <Link href="/admin/charities" className="text-sm text-muted">← Charities</Link>
-        <h1 className="mt-1 text-xl font-semibold">{charity.name_en}</h1>
+        <h1 className="mt-1 font-display text-2xl text-indigo">{charity.name_en}</h1>
         <div className="mt-2 flex flex-wrap gap-2">
           <Badge tone={status.tone}>{status.label}</Badge>
           {badges.verified ? <Badge tone="brand">Verified</Badge> : null}

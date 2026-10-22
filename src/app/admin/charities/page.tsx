@@ -37,7 +37,7 @@ export default async function AdminCharitiesPage({ searchParams }: PageProps<"/a
   return (
     <div className="space-y-4">
       <Link href="/admin" className="text-sm text-muted">← Platform admin</Link>
-      <h1 className="text-xl font-semibold">Charities</h1>
+      <h1 className="font-display text-2xl text-indigo">Charities</h1>
       <Card title="Invite a charity">
         <InviteForm />
         {invites?.length ? (

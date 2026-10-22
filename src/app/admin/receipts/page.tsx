@@ -48,7 +48,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
   return (
     <div className="space-y-4">
       <Link href="/admin" className="text-sm text-muted">← Platform admin</Link>
-      <h1 className="text-xl font-semibold">s18A receipts</h1>
+      <h1 className="font-display text-2xl text-indigo">s18A receipts</h1>
 
       {justRan?.summary ? <RunDone run={justRan} /> : null}
       {justRan?.status === "cancelled" ? (

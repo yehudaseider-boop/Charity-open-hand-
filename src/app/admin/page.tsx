@@ -17,25 +17,29 @@ export default async function AdminPage() {
   const waiting = counts.get("pending_review") ?? 0;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Platform admin</h1>
-      <Link href="/admin/charities?status=pending_review"
-        className="block rounded-card border border-border bg-surface p-5">
-        <p className="text-3xl font-semibold">{waiting}</p>
-        <p className="text-sm text-muted">{waiting === 1 ? "application" : "applications"} waiting for review</p>
+    <div className="space-y-5">
+      <h1 className="font-display text-2xl text-indigo">Overview</h1>
+      <Link
+        href="/admin/charities?status=pending_review"
+        className="block rounded-card bg-indigo p-5 text-white transition hover:brightness-110 sm:p-6"
+      >
+        <p className="text-sm font-medium text-honey">Waiting for review</p>
+        <p className="mt-1 font-display text-4xl leading-tight">{waiting}</p>
+        <p className="mt-1 text-sm text-white/80">{waiting === 1 ? "application" : "applications"} waiting for a person to look at them</p>
       </Link>
-      <Link href="/admin/payments" className="block rounded-card border border-border bg-surface p-5">
-        <p className="font-semibold">Payments</p>
-        <p className="text-sm text-muted">Anything stuck or held, monthly donations, and what came in by charity</p>
-      </Link>
-      <Link href="/admin/receipts" className="block rounded-card border border-border bg-surface p-5">
-        <p className="font-semibold">s18A receipts</p>
-        <p className="text-sm text-muted">See issued receipts and withdraw one if it is wrong</p>
-      </Link>
-      <Link href="/admin/requests" className="block rounded-card border border-border bg-surface p-5">
-        <p className="font-semibold">Privacy requests</p>
-        <p className="text-sm text-muted">People asking to correct, delete or stop use of their information</p>
-      </Link>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[
+          { href: "/admin/payments", title: "Payments", body: "Anything stuck or held, monthly donations, and what came in by charity" },
+          { href: "/admin/receipts", title: "s18A receipts", body: "See issued receipts and withdraw one if it is wrong" },
+          { href: "/admin/requests", title: "Privacy requests", body: "People asking to correct, delete or stop use of their information" },
+          { href: "/admin/featured", title: "Cause of the week", body: "Choose the cause shown first on the home page" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="block rounded-card border-2 border-border bg-surface p-5 transition hover:border-brand">
+            <p className="font-display text-lg font-semibold text-indigo">{l.title}</p>
+            <p className="mt-1 text-sm text-muted">{l.body}</p>
+          </Link>
+        ))}
+      </div>
       <Card title="Charities by status">
         <ul className="space-y-1 text-sm">
           {(Object.keys(statusLabels) as CharityStatus[]).map((s) => (

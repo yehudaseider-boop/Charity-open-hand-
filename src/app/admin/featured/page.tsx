@@ -45,7 +45,7 @@ export default async function FeaturedPage({ searchParams }: PageProps<"/admin/f
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Cause of the week</h1>
+        <h1 className="font-display text-2xl text-indigo">Cause of the week</h1>
         <p className="text-sm text-muted">One charity a week at the top of Discover in the app, Monday to Sunday. Leave a week empty and the app shows no card that week.</p>
       </div>
       {flash ? <p role="status" className="rounded-card bg-success-soft p-3 text-sm text-success">{flash}</p> : null}

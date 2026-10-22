@@ -89,7 +89,7 @@ export default async function PaymentsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Payments</h1>
+      <h1 className="font-display text-2xl text-indigo">Payments</h1>
       <p className={`rounded-control p-3 text-sm ${needsAttention ? "bg-warning-soft text-warning" : "bg-success-soft text-success"}`} role="status">
         {needsAttention ? `${needsAttention} ${needsAttention === 1 ? "thing needs" : "things need"} a look below.` : "Nothing is stuck. All payments are settled."}
       </p>
