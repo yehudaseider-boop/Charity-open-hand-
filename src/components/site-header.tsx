@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { platformConfig } from "@/config/platform";
 import { getViewer } from "@/lib/auth";
+import { dashboardLink } from "@/lib/dashboard-link";
 
 export async function SiteHeader() {
   const viewer = await getViewer();
+  const dashboard = dashboardLink(viewer);
   return (
     <header className="bg-surface border-b border-border print:hidden">
       <div className="mx-auto flex max-w-[75rem] items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
@@ -15,6 +17,10 @@ export async function SiteHeader() {
           <Link href="/charities" className="hover:text-brand">Charities</Link>
           {/* Phones: the home page and footer link here instead, so the header stays on one line. */}
           <Link href="/for-charities" className="hidden hover:text-brand sm:inline">For charities</Link>
+          {/* A charity admin can always get back to their dashboard from any public page. */}
+          {dashboard ? (
+            <Link href={dashboard.href} className="font-semibold text-brand hover:underline">{dashboard.label}</Link>
+          ) : null}
           {viewer ? (
             <Link href="/account" className="hover:text-brand">Account</Link>
           ) : (
