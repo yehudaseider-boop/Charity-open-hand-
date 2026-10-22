@@ -82,6 +82,10 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
           {badges.s18a ? <Badge tone="success">s18A</Badge> : null}
           {charity.is_s18a && !badges.s18a ? <Badge tone="warning">s18A confirmed, mandate missing</Badge> : null}
         </div>
+        <p className="mt-2 text-sm">
+          <Link href={`/charity-admin/${charity.id}`} className="text-brand underline">Open their dashboard, as they see it</Link>
+          <span className="text-muted"> (donations, donors, notes, campaigns). You have the owner&apos;s powers there, so anything you save, send or remove is real.</span>
+        </p>
       </div>
 
       {charity.rejection_reason ? (
