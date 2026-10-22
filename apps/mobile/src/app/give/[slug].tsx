@@ -447,23 +447,39 @@ export default function Give() {
       popia_consent: agreed,
     };
     const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extra ? extraAmount : "", extra };
-    const r = await startPayment(
-      SITE_URL,
-      {
-        slug: charity!.slug,
-        giftCents: gift!,
-        contributionCents: contribution ?? 0,
-        shownTotalCents: total,
-        campaignId,
-        useSavedId: usingSavedId || undefined,
-        saveCard: (offerSave && saveCard) || undefined,
-        useSavedCard: payWithSaved || undefined,
-        attemptId: payWithSaved ? (attemptRef.current ??= newAttemptId()) : undefined,
-        details,
-      },
-      undefined,
-      usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
-    );
+    // Anything that goes wrong before our server answers (the sign-in token, a bad address) has charged nothing:
+    // say so, and free the Give button, instead of leaving it stuck on "Opening the payment page…".
+    let r: Awaited<ReturnType<typeof startPayment>>;
+    try {
+      r = await startPayment(
+        SITE_URL,
+        {
+          slug: charity!.slug,
+          giftCents: gift!,
+          contributionCents: contribution ?? 0,
+          shownTotalCents: total,
+          campaignId,
+          useSavedId: usingSavedId || undefined,
+          saveCard: (offerSave && saveCard) || undefined,
+          useSavedCard: payWithSaved || undefined,
+          attemptId: payWithSaved ? (attemptRef.current ??= newAttemptId()) : undefined,
+          details,
+        },
+        undefined,
+        usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
+      );
+    } catch {
+      setBusy(false);
+      if (payWithSaved) setHeldAttempt(sent);
+      setMessage(
+        payWithSaved
+          ? "Something went wrong before we could check your card, and we don't know yet whether it was charged. Your gift is held as it was. Tap Give again: we check first, and never charge twice."
+          : "Something went wrong before the payment page opened, so nothing was charged. Your details are still here: tap Give to try again.",
+        payWithSaved ? "wait" : "error",
+        true,
+      );
+      return;
+    }
     // A refusal ends this attempt. No answer keeps its id for the next tap, and so does "already
     // used with other details": the first tap may have charged, so a changed amount keeps hitting
     // the same id (and the server's refusal) until this screen is closed. A saved-card charge keeps
@@ -699,7 +715,7 @@ export default function Give() {
 
           <SwitchRow
             label="Add a contribution to Givezy"
-            description={isMonthly ? "Optional. It helps us keep Givezy running, and repeats each month with your gift." : "Optional. It helps us keep Givezy running. Your gift to the charity stays whole."}
+            description={isMonthly ? "Optional. It helps us keep Givezy running, and repeats each month with your gift." : "Optional. It helps us keep Givezy running, and is kept separate from your gift."}
             value={extra}
             onChange={setExtra}
           />

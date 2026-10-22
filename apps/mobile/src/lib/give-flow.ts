@@ -33,8 +33,26 @@ export type OpenInAppBrowser = (url: string, returnTo: string) => Promise<Browse
  */
 export async function openGivingPage(url: string, open: OpenInAppBrowser): Promise<"returned" | "closed"> {
   if (!url.startsWith("https://")) throw new Error("The payment page must be on a secure address");
-  const result = await open(url, APP_RETURN_LINK);
-  return result.type === "success" ? "returned" : "closed";
+  sheetOpen = true;
+  try {
+    const result = await open(url, APP_RETURN_LINK);
+    return result.type === "success" ? "returned" : "closed";
+  } finally {
+    sheetOpen = false;
+  }
+}
+
+/** True while the payment sheet is open (set and cleared by openGivingPage). */
+let sheetOpen = false;
+
+/**
+ * On Android the payment page's return link (nedivlev://giving) also reaches the app's router, which would
+ * jump to the Giving tab and close the give screen while it is still checking the payment: the donor would
+ * never see "nothing was charged" or the thank-you. While the sheet is open, that link is the sheet's own
+ * and the router must ignore it (src/app/+native-intent.tsx). Opened any other time, it goes to Giving as usual.
+ */
+export function isSheetReturn(path: string, initial: boolean): boolean {
+  return sheetOpen && !initial && /^(nedivlev:\/\/)?\/?giving\/?(\?.*)?$/.test(path);
 }
 
 /** The payment is confirmed by the gateway a moment after the donor returns: look a few times. */

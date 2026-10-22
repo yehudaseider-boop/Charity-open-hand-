@@ -56,3 +56,22 @@ describe("looking for the new gift after paying", () => {
     expect(refresh).toHaveBeenCalledTimes(4);
   });
 });
+
+describe("the payment sheet's return link", () => {
+  it("is ignored by the router only while the sheet is open", async () => {
+    const { isSheetReturn } = await import("../apps/mobile/src/lib/give-flow");
+    expect(isSheetReturn("nedivlev://giving", false)).toBe(false);
+    let during: boolean[] = [];
+    await openGivingPage("https://pay.example/x", async () => {
+      during = [isSheetReturn("nedivlev://giving", false), isSheetReturn("/giving", false), isSheetReturn("nedivlev://giving", true), isSheetReturn("/account", false)];
+      return { type: "success" };
+    });
+    expect(during).toEqual([true, true, false, false]);
+    expect(isSheetReturn("nedivlev://giving", false)).toBe(false);
+  });
+  it("is released even if the sheet fails to open", async () => {
+    const { isSheetReturn } = await import("../apps/mobile/src/lib/give-flow");
+    await expect(openGivingPage("https://pay.example/x", async () => { throw new Error("no browser"); })).rejects.toThrow();
+    expect(isSheetReturn("nedivlev://giving", false)).toBe(false);
+  });
+});

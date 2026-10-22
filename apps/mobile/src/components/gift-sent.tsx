@@ -102,7 +102,7 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
         {gift.confirming ? (
           <View style={styles.streak}>
             <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>
-              Your gift shows in Progress, with your goal and streak, as soon as it&apos;s confirmed. You don&apos;t need to do anything else.
+              Your gift shows in Progress, with your goal and streak, as soon as it&apos;s confirmed. If no confirmation email comes, the payment didn&apos;t go through: you can give again from the charity&apos;s page.
             </Text>
           </View>
         ) : null}
@@ -136,7 +136,7 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
         {invite && phase === "invite" ? (
           <View style={styles.invite}>
             <Text variant="h2" accessibilityRole="header">Make it a habit</Text>
-            <Text variant="bodyMuted">Set a yearly giving goal. Your first gift already counts.</Text>
+            <Text variant="bodyMuted">Set a giving goal for this tax year, and watch it fill up as you give.</Text>
             <Button variant="cta" label="Set my goal" onPress={() => setPhase("editing")} />
             <TextLink label="Maybe later" onPress={invite.goHome} />
           </View>
@@ -177,8 +177,8 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
                 <Text style={styles.cardAmount}>{rand(progress.givenCents)}</Text>
                 <Text variant="bodyMuted" style={{ fontSize: 15 }}>
                   {progress.targetCents
-                    ? `of ${rand(progress.targetCents)}. Your first gift is already counted.`
-                    : "so far, your first gift counted. Log your income on the Progress tab to see your target."}
+                    ? `of ${rand(progress.targetCents)}.${progress.givenCents > 0 ? " Your first gift is already counted." : ""}`
+                    : `so far${progress.givenCents > 0 ? ", your first gift counted" : ""}. Log your income on the Progress tab to see your target.`}
                 </Text>
               </View>
             </View>
