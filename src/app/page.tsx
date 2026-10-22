@@ -6,6 +6,7 @@ import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
+import { Drop } from "@/components/drop";
 
 // Home page, design direction A "Splash" (chosen 22/10/2026). The logo's three drops, cut from the logo and never
 // redrawn, are the decoration; they sit behind or beside words, never on top of them.
@@ -24,12 +25,6 @@ const promises = [
   { title: `No ${platformConfig.appName} fee on your gift`, body: "We don't take a cut. The card provider's fee comes off before the gift reaches the charity." },
   { title: "s18A receipts, once a year", body: "If you ask for one, and the charity is approved to issue them: one receipt per charity for the whole tax year." },
 ];
-
-/** A decorative drop from the logo. */
-function Drop({ colour, className }: { colour: "blue" | "lilac" | "orange"; className: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={`/brand/drop-${colour}.png`} alt="" aria-hidden className={`pointer-events-none absolute select-none ${className}`} />;
-}
 
 function Tick({ className = "stroke-sage" }: { className?: string }) {
   return (

@@ -35,7 +35,3 @@ export function hhmm(moment: Date): string {
   return `${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-/** Same as `rand` (kept for the summaries that used to always show cents). */
-export function randExact(cents: number): string {
-  return formatRand(cents);
-}

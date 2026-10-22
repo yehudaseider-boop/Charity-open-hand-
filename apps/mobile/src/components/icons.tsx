@@ -1,4 +1,4 @@
-import Svg, { Circle, Path, Rect } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 import { colors } from "@/theme/tokens";
 
 /**
@@ -137,19 +137,3 @@ export function InfoIcon({ size = 18, color = colors.muted }: IconProps) {
   );
 }
 
-export function CloseIcon({ size = 20, color = colors.ink }: IconProps) {
-  return (
-    <Svg {...base(size)}>
-      <Path d="M6 6l12 12M18 6L6 18" {...stroke(color)} />
-    </Svg>
-  );
-}
-
-export function CalendarIcon({ size = 20, color = colors.ink }: IconProps) {
-  return (
-    <Svg {...base(size)}>
-      <Rect x="4" y="5.5" width="16" height="14.5" rx="2.5" {...stroke(color)} />
-      <Path d="M8 3.5v4M16 3.5v4M4 10h16" {...stroke(color)} />
-    </Svg>
-  );
-}

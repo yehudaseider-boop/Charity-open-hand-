@@ -39,6 +39,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Typecheck the phone app
+        working-directory: apps/mobile
+        run: npx tsc --noEmit
+
+      - name: Lint the phone app
+        working-directory: apps/mobile
+        run: npx eslint src
+
       - name: Start the test database
         run: npm run db:start
 

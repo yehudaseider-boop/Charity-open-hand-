@@ -4,6 +4,7 @@ import { loadAction, undoFailureText, type UndoFailure } from "@/lib/charity/cha
 import { canUndo, describeDone, describeUndone, minutesLeft, pageOf, PANEL_HOURS } from "@/lib/charity/done";
 import { formatDate } from "@/lib/dates";
 import { FocusOnArrive, UndoButton } from "./done-panel-parts";
+import { firstParam } from "@/lib/form";
 
 /**
  * A key for the page's forms: a new one after each action and after each Undo, so the form shows the
@@ -28,7 +29,7 @@ type Props = {
  * take it back, and the one thing to do next. Shown at the top of the page the action came from.
  */
 export async function DonePanel({ charity, sp, here }: Props) {
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const one = firstParam;
   const undoneId = one(sp.undone);
   const doneId = one(sp.done);
   const id = undoneId ?? doneId;

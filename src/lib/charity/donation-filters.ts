@@ -5,6 +5,7 @@
 import { taxYearFor, taxYearRange } from "@/lib/dates";
 import { isGiftSource, type GiftSource } from "@/lib/donations/source";
 import { containsPattern, isDonationStatus, safeSearch, saDate, type DonationStatus } from "./dashboard";
+import { firstParam } from "@/lib/form";
 
 export const periodOptions = {
   all: "Any time",
@@ -47,7 +48,7 @@ const dayAfter = (d: string) => {
 const lastDayOfMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 
 type Params = Record<string, string | string[] | undefined>;
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+const one = (v: string | string[] | undefined) => firstParam(v) ?? "";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

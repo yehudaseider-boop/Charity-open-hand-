@@ -1,4 +1,5 @@
--- Givezy: all database setup steps in order, for a NEW EMPTY test project only. Generated from supabase/migrations (20/10/2026).
+-- Givezy: all database setup steps in order, for a NEW EMPTY test project only.
+-- Built by scripts/build-setup-sql.sh from supabase/migrations, up to and including 20261022000002_review_fixes.sql.
 -- An existing project runs only the sections it does not have yet, in order.
 
 -- ===== 20261006000001_core_schema.sql =====
@@ -2910,6 +2911,747 @@ end $$;
 revoke execute on function public.charity_monthly_list(uuid) from public, anon;
 grant execute on function public.charity_monthly_list(uuid) to authenticated;
 
+-- ===== 20261016000002_campaigns.sql =====
+-- Givezy: campaigns go live (16/10/2026, Yehuda: "virtual envelopes" with a goal, as in Givelify).
+--
+-- The campaigns table has been in the schema since the start, with no screens. A charity now runs a
+-- campaign ("Pesach food parcels") with a goal in Rand; donors give to it from the app and everyone
+-- sees how close it is. The money goes to the charity like any other donation: the campaign is a
+-- label on the donation plus a public running total.
+
+-- 1. Sensible limits on what a charity writes.
+alter table public.campaigns
+  add constraint campaign_title_length check (char_length(btrim(title)) between 3 and 80),
+  add constraint campaign_description_length check (description is null or char_length(description) <= 500),
+  add constraint campaign_slug_shape check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(slug) <= 80),
+  add constraint campaign_target_limit check (target_cents is null or target_cents <= 100000000000),
+  -- So a donation can point at (campaign, charity) together.
+  add constraint campaigns_id_charity unique (id, charity_id);
+
+-- 2. A gift can only be for the same charity's campaign.
+alter table public.donations
+  add constraint donations_campaign_same_charity foreign key (campaign_id, charity_id)
+  references public.campaigns (id, charity_id);
+create index if not exists donations_campaign on public.donations (campaign_id) where campaign_id is not null;
+
+-- 3. At most 3 active campaigns per charity, so donors aren't spread thin.
+create function public.limit_active_campaigns() returns trigger
+  language plpgsql security definer set search_path = '' as $$
+begin
+  if new.status <> 'active' or (tg_op = 'UPDATE' and old.status = 'active') then
+    return new;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('campaigns:' || new.charity_id::text));
+  if (select count(*) from public.campaigns where charity_id = new.charity_id and status = 'active' and id <> new.id) >= 3 then
+    raise exception 'A charity can run up to 3 campaigns at a time' using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+revoke execute on function public.limit_active_campaigns() from public, anon, authenticated;
+create trigger campaigns_active_limit before insert or update of status on public.campaigns
+  for each row execute function public.limit_active_campaigns();
+
+-- 4. The public running total: paid gifts to the campaign (the gift only, never the contribution to
+-- Givezy) and how many. Refunded or charged-back gifts drop out. Only for campaigns the caller may see.
+create function public.campaign_progress(p_campaign_ids uuid[])
+returns table (campaign_id uuid, raised_cents bigint, gift_count bigint)
+language sql stable security definer set search_path = '' as $$
+  select c.id,
+         coalesce(sum(d.amount_cents) filter (where d.status = 'paid'), 0)::bigint,
+         count(d.id) filter (where d.status = 'paid')
+    from public.campaigns c
+    join public.charities ch on ch.id = c.charity_id
+    left join public.donations d on d.campaign_id = c.id
+   where c.id = any (p_campaign_ids)
+     and ((c.status <> 'draft' and ch.status = 'approved') or public.is_charity_admin(c.charity_id) or public.is_platform_admin())
+   group by c.id
+$$;
+revoke execute on function public.campaign_progress(uuid[]) from public;
+grant execute on function public.campaign_progress(uuid[]) to anon, authenticated;
+
+-- ===== 20261016000003_charity_insights.sql =====
+-- Givezy: insights for charities (16/10/2026, Yehuda: from Givelify's analytics).
+-- Counts only, for the charity's own admins: who is new, who comes back, how many give monthly.
+-- Paid donations only. The contribution to Givezy is never included.
+
+create function public.charity_insights(p_charity_id uuid, p_from timestamptz, p_to timestamptz)
+returns table (
+  new_donors bigint,
+  returning_donors bigint,
+  repeat_donors bigint,
+  all_donors bigint,
+  monthly_active bigint,
+  monthly_active_cents bigint
+)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not (public.is_charity_admin(p_charity_id) or public.is_platform_admin()) then
+    raise exception 'Not allowed';
+  end if;
+  return query
+    with paid as (
+      select d.donor_id, d.paid_at from public.donations d
+       where d.charity_id = p_charity_id and d.status = 'paid' and d.paid_at is not null
+    ),
+    per_donor as (
+      select donor_id, min(paid_at) as first_paid, count(*) as gifts,
+             bool_or(paid_at >= p_from and paid_at < p_to) as gave_in_period
+        from paid group by donor_id
+    )
+    select
+      count(*) filter (where first_paid >= p_from and first_paid < p_to),
+      count(*) filter (where gave_in_period and first_paid < p_from),
+      count(*) filter (where gifts >= 2),
+      count(*),
+      (select count(*) from public.recurring_donations r where r.charity_id = p_charity_id and r.status = 'active'),
+      (select coalesce(sum(r.amount_cents), 0)::bigint from public.recurring_donations r where r.charity_id = p_charity_id and r.status = 'active')
+    from per_donor;
+end $$;
+revoke execute on function public.charity_insights(uuid, timestamptz, timestamptz) from public, anon;
+grant execute on function public.charity_insights(uuid, timestamptz, timestamptz) to authenticated;
+
+-- ===== 20261016000004_charity_invites.sql =====
+-- Givezy: invite a charity (16/10/2026, Yehuda). A platform admin types the charity's name and a
+-- contact email; the charity gets a link that starts its application with the name filled in.
+-- Only the SHA-256 hash of the link's secret is stored. Server-only: no browser can read or write it.
+
+create table public.charity_invites (
+  id uuid primary key default gen_random_uuid(),
+  token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
+  charity_name text not null check (char_length(btrim(charity_name)) between 2 and 120),
+  contact_email text not null check (char_length(contact_email) <= 254 and contact_email like '%@%'),
+  invited_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '30 days',
+  used_at timestamptz,
+  used_by uuid references auth.users (id) on delete set null,
+  charity_id uuid references public.charities (id) on delete set null
+);
+create index charity_invites_created on public.charity_invites (created_at desc);
+
+alter table public.charity_invites enable row level security;
+revoke all on public.charity_invites from anon, authenticated;
+-- Platform admins can see the list (who was invited, and whether they started); nobody writes from a browser.
+grant select on public.charity_invites to authenticated;
+create policy charity_invites_admin_read on public.charity_invites for select to authenticated
+  using (public.is_platform_admin());
+
+-- ===== 20261016000005_charity_donation_emails.sql =====
+-- Givezy: tell a charity when a donation comes in (16/10/2026). On by default; the charity's admins
+-- can turn it off on their profile page. The email names the amount only, never the donor.
+alter table public.charity_private add column notify_donations boolean not null default true;
+
+-- ===== 20261016000006_campaigns_past_end.sql =====
+-- A campaign past its last day counts as ended: it no longer takes one of the 3 places, so the
+-- charity can start a new one without ending the old one by hand.
+create or replace function public.limit_active_campaigns() returns trigger
+  language plpgsql security definer set search_path = '' as $$
+begin
+  if new.status <> 'active' or (tg_op = 'UPDATE' and old.status = 'active') then
+    return new;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('campaigns:' || new.charity_id::text));
+  if (select count(*) from public.campaigns
+      where charity_id = new.charity_id and status = 'active' and id <> new.id
+        and (ends_at is null or ends_at >= now())) >= 3 then
+    raise exception 'A charity can run up to 3 campaigns at a time' using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+revoke execute on function public.limit_active_campaigns() from public, anon, authenticated;
+
+-- ===== 20261016000007_thank_you_emails.sql =====
+-- Thank-you emails: a charity writes one thank-you and Givezy emails it to everyone who gave in a
+-- month. The charity never handles addresses. One per charity per month of donations.
+create table public.charity_thank_yous (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  period_month date not null check (extract(day from period_month) = 1),
+  body text not null check (char_length(body) between 10 and 1000),
+  sent_by uuid references auth.users (id) on delete set null,
+  sent_at timestamptz not null default now(),
+  recipient_count integer not null default 0 check (recipient_count >= 0),
+  unique (charity_id, period_month)
+);
+alter table public.charity_thank_yous enable row level security;
+create policy charity_thank_yous_read on public.charity_thank_yous for select to authenticated
+  using (public.is_charity_admin(charity_id) or public.is_platform_admin());
+revoke insert, update, delete on public.charity_thank_yous from anon, authenticated;
+
+-- Donors who asked not to get thank-you emails from charities. Only a hash of the address is kept.
+create table public.thank_you_opt_outs (
+  email_hash text primary key check (email_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now()
+);
+alter table public.thank_you_opt_outs enable row level security;
+revoke all on public.thank_you_opt_outs from anon, authenticated;
+
+-- The "stop these emails" link in each thank-you: a random token (stored hashed) for one address.
+create table public.email_stop_tokens (
+  token_hash text primary key check (token_hash ~ '^[0-9a-f]{64}$'),
+  email_hash text not null check (email_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now()
+);
+alter table public.email_stop_tokens enable row level security;
+revoke all on public.email_stop_tokens from anon, authenticated;
+
+-- ===== 20261016000008_giving_labels.sql =====
+-- Givezy is for everyone: instead of the fixed maaser / chomesh / tzedaka choice, a donor may give
+-- each gift their own label ("Work giving", "Family", or "Maaser"). Optional. Still private to the
+-- donor: same tables, same row-level security. Old choices become labels; the kind column stays
+-- for history but new rows use label only.
+alter table public.donation_giving_kinds alter column kind drop not null;
+alter table public.donation_giving_kinds add column label text;
+update public.donation_giving_kinds
+  set label = case kind when 'maaser' then 'Maaser' when 'chomesh' then 'Chomesh' else 'Tzedaka' end
+  where label is null;
+alter table public.donation_giving_kinds
+  add constraint donation_giving_label_shape check (label is null or (char_length(label) between 1 and 40 and label !~ '[[:cntrl:]]')),
+  add constraint donation_giving_label_present check (label is not null or kind is not null);
+
+alter table public.external_giving_entries alter column kind drop not null;
+alter table public.external_giving_entries add column label text;
+update public.external_giving_entries
+  set label = case kind when 'maaser' then 'Maaser' when 'chomesh' then 'Chomesh' else 'Tzedaka' end
+  where label is null and kind is not null;
+alter table public.external_giving_entries
+  add constraint external_giving_label_shape check (label is null or (char_length(label) between 1 and 40 and label !~ '[[:cntrl:]]'));
+
+-- ===== 20261016000009_charity_impact_line.sql =====
+-- A charity's own impact line ("R180 feeds a family for a week"), shown with its photo card and on
+-- its page in the app. Only ever written by the charity: Givezy never makes one up.
+alter table public.charities
+  add column impact_en text check (char_length(impact_en) <= 140);
+grant select (impact_en) on public.charities to anon, authenticated;
+grant update (impact_en) on public.charities to authenticated;
+
+-- ===== 20261016000010_saved_cards.sql =====
+-- A donor's saved card for once-off gifts (off until SAVED_CARDS=yes on the server).
+--
+-- The payment partner keeps the card. We keep only its reusable token, encrypted, plus the brand,
+-- last four digits and expiry to show "Card ending 4242". Never card numbers. One card per account,
+-- good for a gift to any charity. Read and written only by the server (service role): there are no
+-- policies, so signed-in users cannot read even their own row, and the app learns the last four
+-- digits from the server instead.
+
+create table public.saved_cards (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  authorization_encrypted text not null,
+  card_brand text,
+  card_last4 text check (card_last4 is null or card_last4 ~ '^[0-9]{4}$'),
+  card_exp text,
+  gateway text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.saved_cards enable row level security;
+revoke all on public.saved_cards from anon, authenticated;
+create trigger saved_cards_updated_at before update on public.saved_cards
+  for each row execute function public.set_updated_at();
+
+-- "Save my card" ticked on a once-off gift: the card is kept once that payment is confirmed.
+create table public.card_save_requests (
+  donation_id uuid primary key references public.donations (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.card_save_requests enable row level security;
+revoke all on public.card_save_requests from anon, authenticated;
+create index card_save_requests_user_idx on public.card_save_requests (user_id);
+
+-- What the donor agreed to: keeping their card for future gifts, until they remove it.
+alter table public.consents drop constraint consents_kind_check;
+alter table public.consents add constraint consents_kind_check check (kind in (
+  'account', 'donation', 'charity_declarations', 'monthly_authorisation',
+  'saved_card'  -- donor allowed us to keep their card for future once-off gifts
+));
+alter table public.consents drop constraint consent_has_subject;
+alter table public.consents add constraint consent_has_subject check (
+  (kind = 'account' and user_id is not null)
+  or (kind in ('donation', 'monthly_authorisation', 'saved_card') and donation_id is not null)
+  or (kind = 'charity_declarations' and charity_id is not null)
+);
+
+-- ===== 20261016000011_function_search_path.sql =====
+-- Supabase security advisor (16/10/2026): pin the search path on every trigger and helper function
+-- that did not set one. All of them already name their tables as public.<table>, so an empty search
+-- path changes nothing they do; it only stops a caller's own search_path from being able to swap in a
+-- look-alike table or function. The SECURITY DEFINER functions already had this.
+
+alter function public.guard_receipt_links() set search_path = '';
+alter function public.set_updated_at() set search_path = '';
+alter function public.guard_audit_append_only() set search_path = '';
+alter function public.guard_charity_admin_fields() set search_path = '';
+alter function public.lock_charity_under_review() set search_path = '';
+alter function public.charity_can_issue_18a(public.charities) set search_path = '';
+alter function public.guard_receipt_immutable() set search_path = '';
+alter function public.guard_donation_status() set search_path = '';
+alter function public.guard_charity_documents() set search_path = '';
+alter function public.guard_charity_bank_fields() set search_path = '';
+
+-- The advisor also lists the SECURITY DEFINER functions that signed-in users (and, for three of them,
+-- visitors) may call. Each is meant to be callable and checks for itself who is asking:
+--   is_charity_admin / is_platform_admin: used inside row-level policies, so every role that reads a
+--     table with such a policy needs EXECUTE. Called directly they only say true or false about the caller.
+--   campaign_progress: public campaign totals for the website and the app; drafts and unapproved charities
+--     are left out unless the caller is that charity's admin.
+--   charity_*: refuse unless is_charity_admin(p_charity_id) or is_platform_admin().
+--   agree_to_policy, link_my_donations, my_donor_ids, set_my_recurring_status: act only on auth.uid().
+
+-- ===== 20261016000012_monthly_totals_split.sql =====
+-- Givezy: donations by month, split into monthly and once-off (16/10/2026, charity insights).
+-- Same rules as before: paid donations only, the contribution to Givezy never included,
+-- months in Johannesburg time. The new column is the part that came from monthly donations.
+
+-- The return type changes, so the old function is renamed out of the way (and closed to everyone)
+-- rather than dropped.
+alter function public.charity_monthly_totals(uuid, int) rename to charity_monthly_totals_before_split;
+revoke execute on function public.charity_monthly_totals_before_split(uuid, int) from public, anon, authenticated;
+
+create function public.charity_monthly_totals(p_charity_id uuid, p_months int default 24)
+returns table (month date, donation_count bigint, amount_cents bigint, monthly_cents bigint)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not (public.is_charity_admin(p_charity_id) or public.is_platform_admin()) then
+    raise exception 'Not allowed';
+  end if;
+  return query
+    select (date_trunc('month', d.paid_at at time zone 'Africa/Johannesburg'))::date as month,
+           count(*),
+           coalesce(sum(d.amount_cents), 0)::bigint,
+           coalesce(sum(d.amount_cents) filter (where d.recurring_id is not null), 0)::bigint
+    from public.donations d
+    where d.charity_id = p_charity_id and d.status = 'paid' and d.paid_at is not null
+    group by 1
+    order by 1 desc
+    limit greatest(1, least(coalesce(p_months, 24), 120));
+end $$;
+
+revoke execute on function public.charity_monthly_totals(uuid, int) from public, anon;
+grant execute on function public.charity_monthly_totals(uuid, int) to authenticated;
+
+-- ===== 20261016000013_no_password_sessions.sql =====
+-- Givezy: a session started with a password sees and changes nothing (16/10/2026, full review).
+--
+-- Givezy signs people in with an emailed code (or Google/Apple) only. Someone could register another
+-- person's email with a password before that person ever signs in; when the real owner later signs in
+-- with a code, the same account is confirmed and their donor records are linked to it. Until now only
+-- donations, receipts and monthly donations (through my_donor_ids) refused password sessions; the
+-- donor's own profile row, notes, favourites, goal records, consents and requests checked the user id
+-- only. One restrictive policy per table now refuses password sessions everywhere, on top of the
+-- existing policies (a restrictive policy can only narrow what they allow).
+
+do $$
+declare t record;
+begin
+  for t in select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public' and c.relkind in ('r', 'p') loop
+    execute format(
+      'create policy no_password_sessions on public.%I as restrictive for all to authenticated
+         using (public.signed_in_without_password()) with check (public.signed_in_without_password())',
+      t.relname);
+  end loop;
+end $$;
+
+-- Pausing, restarting or cancelling a monthly donation: the same rule.
+CREATE OR REPLACE FUNCTION public.set_my_recurring_status(p_id uuid, p_status text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  cur public.recurring_status;
+  r_day int;
+  r_paid text;
+  has_card boolean;
+  this_month timestamp := date_trunc('month', now() at time zone 'Africa/Johannesburg');
+  this_charge timestamptz;
+  new_next timestamptz;
+begin
+  if uid is null then raise exception 'Not signed in'; end if;
+  if not public.signed_in_without_password() then raise exception 'Please sign in with the emailed code'; end if;
+  if p_status not in ('active', 'paused', 'cancelled') then raise exception 'Unknown status'; end if;
+
+  select r.status, r.charge_day, r.last_paid_period, r.authorization_encrypted is not null into cur, r_day, r_paid, has_card
+  from public.recurring_donations r
+  join public.donors d on d.id = r.donor_id
+  where r.id = p_id and d.user_id = uid
+  for update of r;
+  if not found then raise exception 'Monthly donation not found'; end if;
+
+  if cur::text = p_status then return; end if;
+  if not (
+       (cur = 'active' and p_status in ('paused', 'cancelled'))
+    or (cur = 'failed' and p_status = 'cancelled')
+    or (cur = 'paused' and p_status in ('active', 'cancelled'))
+    or (cur = 'pending' and p_status = 'cancelled')
+  ) then
+    raise exception 'A % monthly donation cannot be set to %', cur, p_status;
+  end if;
+  if p_status = 'active' and not has_card then
+    raise exception 'This monthly donation has no card to charge. Start a new monthly donation instead.';
+  end if;
+
+  if p_status = 'active' then
+    this_charge := public.monthly_charge_time(this_month, r_day);
+    new_next := case
+      when r_paid is distinct from to_char(this_month, 'YYYY-MM') and this_charge > now() then this_charge
+      else public.monthly_charge_time(this_month + interval '1 month', r_day)
+    end;
+  end if;
+
+  update public.recurring_donations
+     set status = p_status::public.recurring_status,
+         paused_at = case p_status when 'paused' then now() when 'active' then null else paused_at end,
+         cancelled_at = case p_status when 'cancelled' then now() else cancelled_at end,
+         authorization_encrypted = case p_status when 'cancelled' then null else authorization_encrypted end,
+         -- Removing a stopped one keeps the real reason ("the card was declined ...") for the record.
+         ended_reason = case when p_status = 'cancelled' and cur <> 'failed' then 'cancelled by the donor' else ended_reason end,
+         next_charge_at = case when p_status = 'active' then new_next else next_charge_at end,
+         -- A resumed donation gets the full number of tries again.
+         attempt_period = case when p_status = 'active' then null else attempt_period end,
+         failed_attempts = case when p_status = 'active' then 0 else failed_attempts end,
+         needs_gateway_sync = false
+   where id = p_id;
+end $function$
+;
+
+revoke execute on function public.set_my_recurring_status(uuid, text) from public, anon;
+grant execute on function public.set_my_recurring_status(uuid, text) to authenticated;
+
+-- Functions made later are not callable by signed-in users unless granted (Supabase grants them by default).
+alter default privileges for role postgres in schema public revoke execute on functions from authenticated;
+
+-- s18A approval and the receipting mandate are set only by the server (approval, or setting up receipts
+-- later, with their checks and audit log). The browser grant from 20261015000004 no longer includes them.
+revoke update (is_s18a, s18a_confirmed_at, mandate_signed_at, mandate_document_path) on public.charities from authenticated;
+
+-- ===== 20261016000014_suggested_amounts.sql =====
+-- Givezy: each charity chooses its own suggested amounts for the give screens (16/10/2026).
+-- Up to three, in cents, smallest first. Empty means none: a new donor types the amount.
+-- The minimum donation lives in src/config/platform.ts and is checked by the server when saving.
+
+alter table public.charities
+  add column suggested_amounts_cents bigint[] not null default '{}'
+  constraint charities_suggested_amounts_check
+    check (cardinality(suggested_amounts_cents) <= 3 and 0 < all (suggested_amounts_cents));
+
+-- The charity's admins change it on their profile page (same rules as the other profile fields).
+grant update (suggested_amounts_cents) on public.charities to authenticated;
+
+-- ===== 20261016000015_group_challenges.sql =====
+-- Givezy: group challenges (16/10/2026, Yehuda: "giving with friends").
+--
+-- A signed-in donor starts a challenge for an approved charity ("Our office feeds 50 families",
+-- goal R10 000, optional last day) and shares the link. Anyone can give to it. The money goes to the
+-- charity like any other donation: the challenge is a label on the donation plus a public total.
+-- Givezy and the person who started it never hold money. A challenge goes live at once; the charity
+-- is emailed and can stop it with one button. The public sees the total, the goal, how many gifts and
+-- how many people gave: never who gave or how much each person gave.
+
+create table public.group_challenges (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique
+    constraint challenge_slug_shape check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(slug) <= 90),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  -- Who started it (their account). Cleared if the account is deleted.
+  started_by uuid references auth.users (id) on delete set null,
+  -- The first name they chose to show, for "Started by Sarah".
+  starter_name text not null constraint challenge_starter_name check (char_length(btrim(starter_name)) between 1 and 40),
+  title text not null constraint challenge_title_length check (char_length(btrim(title)) between 3 and 80),
+  reason text constraint challenge_reason_length check (reason is null or char_length(reason) <= 500),
+  target_cents bigint not null constraint challenge_target check (target_cents > 0 and target_cents <= 100000000000),
+  ends_at timestamptz,
+  status text not null default 'active' constraint challenge_status check (status in ('active', 'stopped')),
+  stopped_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint group_challenges_id_charity unique (id, charity_id)
+);
+create index group_challenges_charity on public.group_challenges (charity_id, status);
+create index group_challenges_started_by on public.group_challenges (started_by) where started_by is not null;
+
+-- A gift is for at most one campaign or challenge, and only one of the same charity.
+alter table public.donations add column challenge_id uuid;
+alter table public.donations
+  add constraint donations_challenge_same_charity foreign key (challenge_id, charity_id)
+    references public.group_challenges (id, charity_id),
+  add constraint donations_one_target check (campaign_id is null or challenge_id is null);
+create index donations_challenge on public.donations (challenge_id) where challenge_id is not null;
+
+-- Row-level security: the charity's own admins (and platform admins) read their challenges, and the
+-- person who started one reads their own. Everyone else goes through challenge_public below, which
+-- leaves out who started it. Only the server writes.
+alter table public.group_challenges enable row level security;
+revoke all on public.group_challenges from anon, authenticated;
+grant select on public.group_challenges to authenticated;
+create policy challenges_charity_read on public.group_challenges for select to authenticated
+  using (public.is_charity_admin(charity_id) or public.is_platform_admin());
+create policy challenges_own_read on public.group_challenges for select to authenticated
+  using (started_by = (select auth.uid()));
+create policy no_password_sessions on public.group_challenges as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+
+-- At most 5 running challenges per person, so one account can't flood a charity.
+create function public.limit_running_challenges() returns trigger
+  language plpgsql security definer set search_path = '' as $$
+begin
+  if new.started_by is null or new.status <> 'active' then return new; end if;
+  perform pg_advisory_xact_lock(hashtext('challenges:' || new.started_by::text));
+  if (select count(*) from public.group_challenges
+       where started_by = new.started_by and status = 'active' and id <> new.id
+         and (ends_at is null or ends_at > now())) >= 5 then
+    raise exception 'You can run up to 5 challenges at a time' using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+revoke execute on function public.limit_running_challenges() from public, anon, authenticated;
+create trigger challenges_running_limit before insert on public.group_challenges
+  for each row execute function public.limit_running_challenges();
+
+-- What anyone may see of challenges: by slug (one challenge) or by charity (its running ones). Approved
+-- charities only. Totals count paid gifts only (the gift, never the contribution to Givezy); refunded and
+-- charged-back gifts drop out. "people" counts different donors, never their names or amounts.
+create function public.challenge_public(p_slug text default null, p_charity_id uuid default null)
+returns table (
+  id uuid, slug text, charity_id uuid, charity_slug text, charity_name text, starter_name text, title text,
+  reason text, target_cents bigint, ends_at timestamptz, status text, created_at timestamptz,
+  raised_cents bigint, gift_count bigint, people bigint
+)
+language sql stable security definer set search_path = '' as $$
+  select g.id, g.slug, g.charity_id, ch.slug, ch.name_en, g.starter_name, g.title, g.reason, g.target_cents,
+         g.ends_at, g.status, g.created_at,
+         coalesce(sum(d.amount_cents) filter (where d.status = 'paid'), 0)::bigint,
+         count(d.id) filter (where d.status = 'paid'),
+         count(distinct d.donor_id) filter (where d.status = 'paid')
+    from public.group_challenges g
+    join public.charities ch on ch.id = g.charity_id and ch.status = 'approved'
+    left join public.donations d on d.challenge_id = g.id
+   where (p_slug is not null and g.slug = p_slug)
+      or (p_slug is null and p_charity_id is not null and g.charity_id = p_charity_id and g.status = 'active'
+          and (g.ends_at is null or g.ends_at > now()))
+   group by g.id, ch.slug, ch.name_en
+   order by g.created_at desc
+   limit 50
+$$;
+revoke execute on function public.challenge_public(text, uuid) from public;
+grant execute on function public.challenge_public(text, uuid) to anon, authenticated;
+
+-- For the charity's dashboard: every challenge for the charity (running, ended or stopped) with totals.
+create function public.charity_challenges(p_charity_id uuid)
+returns table (
+  id uuid, slug text, starter_name text, title text, target_cents bigint, ends_at timestamptz, status text,
+  created_at timestamptz, raised_cents bigint, gift_count bigint, people bigint
+)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not (public.is_charity_admin(p_charity_id) or public.is_platform_admin()) then
+    raise exception 'Not allowed';
+  end if;
+  return query
+    select g.id, g.slug, g.starter_name, g.title, g.target_cents, g.ends_at, g.status, g.created_at,
+           coalesce(sum(d.amount_cents) filter (where d.status = 'paid'), 0)::bigint,
+           count(d.id) filter (where d.status = 'paid'),
+           count(distinct d.donor_id) filter (where d.status = 'paid')
+      from public.group_challenges g
+      left join public.donations d on d.challenge_id = g.id
+     where g.charity_id = p_charity_id
+     group by g.id
+     order by g.created_at desc
+     limit 200;
+end $$;
+revoke execute on function public.charity_challenges(uuid) from public, anon;
+grant execute on function public.charity_challenges(uuid) to authenticated;
+
+-- ===== 20261016000016_remove_group_challenges.sql =====
+-- Givezy: group challenges removed again (16/10/2026, Yehuda: "keep it simple for now and see if people
+-- adopt the app"). The feature (20261016000015) was built and never used; nothing was ever given to a
+-- challenge. Its code is in the history (commit d3cc3fd) if it comes back.
+
+drop function public.charity_challenges(uuid);
+drop function public.challenge_public(text, uuid);
+alter table public.donations drop constraint donations_one_target;
+alter table public.donations drop constraint donations_challenge_same_charity;
+drop index public.donations_challenge;
+alter table public.donations drop column challenge_id;
+drop trigger challenges_running_limit on public.group_challenges;
+drop function public.limit_running_challenges();
+drop table public.group_challenges;
+
+-- ===== 20261017000001_security_review.sql =====
+-- Givezy: fixes from the full security review of 17/10/2026.
+
+-- ---------------------------------------------------------------------------
+-- 1. The "a session started with a password sees nothing" rule (16/10) was a policy on tables
+--    only. The charity dashboard reads through security definer functions and owner-run views
+--    (charity_donor_list, charity_monthly_list, charity_insights, charity_donations and so on),
+--    which check is_charity_admin / is_platform_admin, and those checked the second step only.
+--    Putting the rule inside has_second_step() closes it for every function, view and policy
+--    that builds on it, now and later.
+-- ---------------------------------------------------------------------------
+grant execute on function public.signed_in_without_password() to anon, authenticated;
+
+create or replace function public.has_second_step() returns boolean
+language sql stable set search_path = '' as $$
+  select coalesce((select auth.jwt()) ->> 'aal', '') = 'aal2'
+     and public.signed_in_without_password()
+$$;
+
+-- The one remaining write open to a password session: recording "agreed" for the real owner.
+create or replace function public.agree_to_policy(p_version text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid := (select auth.uid());
+begin
+  if uid is null then raise exception 'Not signed in'; end if;
+  if not public.signed_in_without_password() then raise exception 'Please sign in with the emailed code'; end if;
+  if p_version is null or p_version !~ '^[0-9a-z.-]{1,40}$' then raise exception 'Unknown policy version'; end if;
+  insert into public.consents (kind, policy_version, user_id) values ('account', p_version, uid);
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Donors could still write the encrypted ID columns from the browser. The server reads the
+--    ID from the checkout details, never from here (15/10), so nothing should write them but the
+--    server either: a value pasted in could otherwise be decrypted by a future code path.
+-- ---------------------------------------------------------------------------
+revoke update (id_number_encrypted, id_number_last4, tax_reference_encrypted, tax_reference_last4) on public.donors from authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. Privileges that only policies were holding back: take them away too, so a future policy
+--    can never open them by accident. (Campaigns are created by charity admins from the browser
+--    on purpose and keep theirs.)
+-- ---------------------------------------------------------------------------
+revoke insert, delete on public.charities, public.charity_admins, public.categories from authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4. Suggested amounts: a null element slipped past the check (0 < null is null, and a null
+--    check passes), and there was no ceiling. Same ceiling as the largest gift (R1 000 000).
+-- ---------------------------------------------------------------------------
+alter table public.charities drop constraint charities_suggested_amounts_check;
+alter table public.charities add constraint charities_suggested_amounts_check check (
+  cardinality(suggested_amounts_cents) <= 3
+  and array_position(suggested_amounts_cents, null) is null
+  and 0 < all (suggested_amounts_cents)
+  and 100000000 >= all (suggested_amounts_cents)
+);
+grant select (suggested_amounts_cents) on public.charities to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 5. Same value, evaluated once per statement instead of once per row.
+-- ---------------------------------------------------------------------------
+alter policy charity_updates_add on public.charity_updates
+  with check ((public.is_charity_admin(charity_id) or public.is_platform_admin()) and posted_by = (select auth.uid()));
+
+-- ---------------------------------------------------------------------------
+-- 6. Two immutability rules that bound only browser roles now bind the server too, like the
+--    rest: a processed donation is never deleted, and no link is added to a receipt after it
+--    was issued (its amount would no longer equal its gifts).
+-- ---------------------------------------------------------------------------
+create or replace function public.guard_donation_status() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.status <> 'pending' then
+      raise exception 'A processed donation cannot be deleted';
+    end if;
+    return old;
+  end if;
+  if new.status is distinct from old.status and not (
+       (old.status = 'pending' and new.status in ('paid', 'failed'))
+       or (old.status = 'failed' and new.status = 'paid')
+       or (old.status = 'paid' and new.status in ('refunded', 'charged_back'))
+     ) then
+    raise exception 'Donation cannot move from % to %', old.status, new.status;
+  end if;
+  if old.status <> 'pending' and (
+       new.amount_cents, new.platform_fee_cents, new.fee_vat_cents, new.processing_charge_cents,
+       new.contribution_cents, new.total_charged_cents, new.charity_id, new.donor_id)
+     is distinct from (
+       old.amount_cents, old.platform_fee_cents, old.fee_vat_cents, old.processing_charge_cents,
+       old.contribution_cents, old.total_charged_cents, old.charity_id, old.donor_id) then
+    raise exception 'Amounts of a processed donation cannot change';
+  end if;
+  if old.status in ('paid', 'refunded', 'charged_back') and (
+       new.paid_at, new.tax_year, new.wants_18a) is distinct from (old.paid_at, old.tax_year, old.wants_18a) then
+    raise exception 'The date, tax year and receipt choice of a paid donation cannot change';
+  end if;
+  return new;
+end $$;
+create trigger donations_delete_guard before delete on public.donations
+  for each row execute function public.guard_donation_status();
+
+create or replace function public.guard_receipt_links() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    -- issue_s18a_receipt adds the links in the same transaction as the receipt.
+    if exists (select 1 from public.s18a_receipts r where r.id = new.receipt_id and r.issued_at < now() - interval '1 minute') then
+      raise exception 'Links cannot be added to an issued receipt';
+    end if;
+    return new;
+  end if;
+  raise exception 'Receipt donation links are immutable';
+end $$;
+create trigger s18a_receipt_donations_no_late_links before insert on public.s18a_receipt_donations
+  for each row execute function public.guard_receipt_links();
+
+-- ===== 20261018000001_charity_actions.sql =====
+-- Givezy: the charity dashboard's core flow (18/10/2026, Yehuda): after every action the page says what
+-- just happened, lets the person take it back, and shows what to do next.
+--
+-- One row per action a charity admin takes on the dashboard. `details` holds what the message needs
+-- (a campaign's title, how many donors were emailed). `undo` holds what taking it back needs (the
+-- values before a save, a removed row); it is null when the action can't be taken back. Rows are kept
+-- for 30 days; undo is allowed for 30 minutes (src/lib/charity/done.ts).
+--
+-- Server-only: the website reads and writes these with the service role after checking the person
+-- manages the charity. Browsers have no access at all.
+
+create table public.charity_actions (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  user_id uuid references auth.users (id) on delete set null,
+  kind text not null constraint charity_action_kind check (kind ~ '^[a-z_]{3,40}$'),
+  details jsonb not null default '{}'::jsonb,
+  undo jsonb,
+  undone_at timestamptz,
+  undone_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index charity_actions_charity on public.charity_actions (charity_id, created_at desc);
+
+alter table public.charity_actions enable row level security;
+revoke all on public.charity_actions from anon, authenticated;
+create policy no_password_sessions on public.charity_actions as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+
+-- ===== 20261018000002_donor_thank_yous.sql =====
+-- A charity thanks one donor personally (18/10/2026, Yehuda): one short email, sent by Givezy in the
+-- charity's name, replies going to the charity's contact email. At most once a week per donor, so
+-- nobody is flooded: the week (Monday, Johannesburg) is part of the key, and the row is claimed
+-- before the email goes.
+-- Server-only: the website writes and reads these with the service role after checking the person
+-- manages the charity. No client can read or write them.
+
+create table public.charity_donor_thanks (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  donor_id uuid not null references public.donors (id) on delete cascade,
+  week_start date not null,
+  body text not null constraint donor_thanks_body check (char_length(body) between 10 and 1000),
+  sent_by uuid references auth.users (id) on delete set null,
+  sent_at timestamptz not null default now(),
+  constraint donor_thanks_once_a_week unique (charity_id, donor_id, week_start)
+);
+
+create index charity_donor_thanks_charity on public.charity_donor_thanks (charity_id, sent_at desc);
+
+alter table public.charity_donor_thanks enable row level security;
+-- No policies: only the service role reaches it.
+revoke all on public.charity_donor_thanks from anon, authenticated;
+create policy no_password_sessions on public.charity_donor_thanks as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+
 -- ===== 20261020000001_review_fixes.sql =====
 -- Givezy: code review fixes, database (20/10/2026).
 
@@ -3019,3 +3761,630 @@ end $$;
 revoke execute on function public.erase_donor_data(uuid[]) from public, anon, authenticated;
 grant execute on function public.erase_donor_data(uuid[]) to service_role;
 
+-- ===== 20261020000002_giver_type.sql =====
+-- How a donor describes their giving, chosen on first open in the app ("What kind of giver are you?").
+-- Optional: empty if they skip. Kept on the donor's own account row; charities never see it.
+alter table public.profiles
+  add column giver_type text
+  constraint profiles_giver_type check (giver_type in ('regular', 'occasional', 'cause_focused'));
+
+comment on column public.profiles.giver_type is
+  'Chosen by the donor on first open (regular, occasional, cause_focused). Optional. Personal data: in "Download my information", removed with the account.';
+
+-- A signed-in donor may set their own answer. The existing row-level rules (own row only, no password
+-- sessions) apply to it like every other column; nothing else becomes editable.
+grant update (giver_type) on public.profiles to authenticated;
+
+-- ===== 20261021000001_receipt_runs.sql =====
+-- The yearly s18A receipt run, with two approvals (21/10/2026, Yehuda): after the tax year closes the
+-- charity checks its list of receipts on the dashboard and approves it, then Givezy signs off in Admin
+-- and the receipts are issued and emailed. The list is fingerprinted when the charity approves: if it
+-- changes before sign-off (a refund, a late payment), the run goes back to the charity.
+-- Server-only: the website reads and writes these with the service role after checking the person
+-- manages the charity (or is a platform admin). No client can read or write them.
+
+create type public.receipt_run_status as enum ('charity_approved', 'issuing', 'done', 'cancelled');
+
+create table public.receipt_runs (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  tax_year int not null constraint receipt_run_year check (tax_year between 2020 and 2100),
+  status public.receipt_run_status not null default 'charity_approved',
+  -- What the charity approved: the receipts' donors, identities, donations and amounts, hashed.
+  plan_fingerprint text not null constraint receipt_run_fingerprint check (plan_fingerprint ~ '^[0-9a-f]{64}$'),
+  receipts_planned int not null constraint receipt_run_planned check (receipts_planned > 0),
+  total_cents bigint not null constraint receipt_run_total check (total_cents > 0),
+  charity_approved_by uuid references auth.users (id) on delete set null,
+  charity_approved_at timestamptz not null default now(),
+  signed_off_by uuid references auth.users (id) on delete set null,
+  signed_off_at timestamptz,
+  finished_at timestamptz,
+  -- The job's summary: issued, PDFs made, emailed, what failed.
+  summary jsonb,
+  cancelled_at timestamptz,
+  cancelled_reason text constraint receipt_run_reason check (cancelled_reason is null or char_length(cancelled_reason) between 3 and 300),
+  created_at timestamptz not null default now(),
+  constraint receipt_run_cancelled check ((status = 'cancelled') = (cancelled_at is not null and cancelled_reason is not null)),
+  constraint receipt_run_signed_off check (status = 'charity_approved' or status = 'cancelled' or signed_off_at is not null)
+);
+
+-- One open run per charity and tax year: a second approval while one waits is refused.
+create unique index receipt_runs_one_open on public.receipt_runs (charity_id, tax_year) where status in ('charity_approved', 'issuing');
+create index receipt_runs_waiting on public.receipt_runs (status, charity_approved_at);
+
+alter table public.receipt_runs enable row level security;
+-- No policies: only the service role reaches it.
+revoke all on public.receipt_runs from anon, authenticated;
+create policy no_password_sessions on public.receipt_runs as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+
+-- ===== 20261021000002_recorded_gifts.sql =====
+-- Gifts a charity records itself (21/10/2026, Yehuda): EFT, cash, a debit order or another programme
+-- (the Angel Network's Heroes with Halos), typed in one at a time or imported from a CSV file. They
+-- count in the charity's totals and donor history and go on the donor's yearly s18A receipt like any
+-- other gift, so a donor gets one receipt per charity per year.
+--
+-- A recorded gift is a donation with gateway 'recorded': no payment provider, no fee, no
+-- contribution, paid on the date the charity gives. Server-only writes, like every donation.
+-- It can be removed (a typing mistake, a wrong file) only while it is on no receipt, issued or
+-- withdrawn; after that it is part of the record.
+--
+-- Also: where each gift came from (`came_from`): the website, the app, a WhatsApp or other shared
+-- link, the QR poster, or recorded by the charity. Filled in by the website and the app.
+
+create table public.gift_imports (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  file_name text not null constraint gift_import_file check (char_length(file_name) between 1 and 200),
+  gifts int not null constraint gift_import_gifts check (gifts > 0),
+  total_cents bigint not null constraint gift_import_total check (total_cents > 0),
+  created_by uuid references auth.users (id) on delete set null,
+  -- The person importing confirmed the charity may share these donors' details with Givezy for their
+  -- receipts, and that the charity does not issue its own s18A receipt for these gifts.
+  confirmed_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+create index gift_imports_charity on public.gift_imports (charity_id, created_at desc);
+alter table public.gift_imports enable row level security;
+-- No policies: only the service role reaches it.
+revoke all on public.gift_imports from anon, authenticated;
+create policy no_password_sessions on public.gift_imports as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+
+alter table public.donations
+  add column recorded_method text constraint donation_recorded_method check (recorded_method in ('eft', 'cash', 'debit_order', 'other_programme', 'other')),
+  add column recorded_by uuid references auth.users (id) on delete set null,
+  add column import_id uuid references public.gift_imports (id) on delete set null,
+  add column external_ref text constraint donation_external_ref check (external_ref is null or char_length(external_ref) between 1 and 100),
+  add column came_from text constraint donation_came_from check (came_from in ('website', 'app', 'whatsapp', 'share_link', 'qr', 'recorded')),
+  add constraint recorded_gift_shape check (
+    (gateway = 'recorded') = (recorded_method is not null)
+    and (gateway <> 'recorded' or (
+      status in ('paid', 'refunded') and platform_fee_cents = 0 and fee_vat_cents = 0 and processing_charge_cents = 0
+      and contribution_cents = 0 and total_charged_cents = amount_cents and recurring_id is null and came_from = 'recorded'))
+    and (gateway = 'recorded' or came_from is distinct from 'recorded')
+  );
+-- The charity's own reference (a bank statement line) once per charity: the same line twice is refused.
+create unique index donations_recorded_ref on public.donations (charity_id, external_ref) where gateway = 'recorded' and external_ref is not null;
+create index donations_import on public.donations (import_id) where import_id is not null;
+
+-- A recorded gift on no receipt may be removed; every other processed donation still never is.
+create or replace function public.guard_donation_status() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.status <> 'pending' and not (
+         old.gateway = 'recorded'
+         and not exists (select 1 from public.s18a_receipt_donations l where l.donation_id = old.id)
+       ) then
+      raise exception 'A processed donation cannot be deleted';
+    end if;
+    return old;
+  end if;
+  if new.status is distinct from old.status and not (
+       (old.status = 'pending' and new.status in ('paid', 'failed'))
+       or (old.status = 'failed' and new.status = 'paid')
+       or (old.status = 'paid' and new.status in ('refunded', 'charged_back'))
+     ) then
+    raise exception 'Donation cannot move from % to %', old.status, new.status;
+  end if;
+  if old.status <> 'pending' and (
+       new.amount_cents, new.platform_fee_cents, new.fee_vat_cents, new.processing_charge_cents,
+       new.contribution_cents, new.total_charged_cents, new.charity_id, new.donor_id)
+     is distinct from (
+       old.amount_cents, old.platform_fee_cents, old.fee_vat_cents, old.processing_charge_cents,
+       old.contribution_cents, old.total_charged_cents, old.charity_id, old.donor_id) then
+    raise exception 'Amounts of a processed donation cannot change';
+  end if;
+  if old.status in ('paid', 'refunded', 'charged_back') and (
+       new.paid_at, new.tax_year, new.wants_18a) is distinct from (old.paid_at, old.tax_year, old.wants_18a) then
+    raise exception 'The date, tax year and receipt choice of a paid donation cannot change';
+  end if;
+  if old.gateway is distinct from new.gateway or (old.gateway = 'recorded' and (old.recorded_method, old.import_id) is distinct from (new.recorded_method, new.import_id)) then
+    raise exception 'How a donation came in cannot change';
+  end if;
+  return new;
+end $$;
+
+-- The charity's view of its gifts gains how each one came in.
+create or replace view public.charity_donations with (security_barrier = true) as
+  select
+    d.id, d.charity_id, d.donor_id, d.status, d.amount_cents,
+    d.paid_at, d.created_at, d.refunded_at, d.charged_back_at, d.tax_year,
+    d.wants_18a, d.is_anonymous, d.message, d.campaign_id, d.recurring_id,
+    c.donor_type, c.first_name, c.last_name, c.organisation_name, c.registration_number,
+    c.contact_person, c.email, c.phone,
+    c.address_line1, c.address_line2, c.suburb, c.city, c.postal_code,
+    d.dedication_kind, d.dedication_name,
+    d.recorded_method, d.external_ref, d.came_from, d.import_id
+  from public.donations d
+  left join public.donation_checkout_details c on c.donation_id = d.id
+  where d.status in ('paid', 'refunded', 'charged_back')
+    and (public.is_charity_admin(d.charity_id) or public.is_platform_admin());
+
+-- ===== 20261021000003_payouts.sql =====
+-- Deposits (21/10/2026, Juan of the Angel Network): the payment provider pays a charity once a day, with
+-- its fees taken off, so the bank shows less than the gifts. Each payout and its lines are read from the
+-- provider once a day, so a bookkeeper can see which gifts a deposit is made of, each fee, and what reached
+-- the bank. The provider's own figures are kept as it gives them; Givezy never works a fee out itself.
+-- Server-only: the website reads these with the service role after checking the person manages the
+-- charity. No client can read or write them.
+
+create table public.payouts (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  gateway text not null,
+  gateway_payout_ref text not null constraint payout_ref check (char_length(gateway_payout_ref) between 1 and 200),
+  paid_out_on date not null,
+  amount_cents bigint not null,
+  status text not null constraint payout_status check (status in ('paid', 'pending', 'failed')),
+  first_seen_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint payouts_once unique (gateway, gateway_payout_ref)
+);
+create index payouts_charity on public.payouts (charity_id, paid_out_on desc);
+
+create table public.payout_lines (
+  id uuid primary key default gen_random_uuid(),
+  payout_id uuid not null references public.payouts (id) on delete cascade,
+  -- The gift this line is about, when it matches one of ours (by its reference).
+  donation_id uuid references public.donations (id) on delete set null,
+  gateway_reference text,
+  kind text not null constraint payout_line_kind check (kind in ('payment', 'refund', 'chargeback', 'other')),
+  gross_cents bigint not null,
+  fee_cents bigint not null constraint payout_line_fee check (fee_cents >= 0),
+  net_cents bigint not null,
+  line_no int not null,
+  constraint payout_lines_once unique (payout_id, line_no)
+);
+create index payout_lines_payout on public.payout_lines (payout_id);
+create index payout_lines_donation on public.payout_lines (donation_id) where donation_id is not null;
+
+alter table public.payouts enable row level security;
+alter table public.payout_lines enable row level security;
+-- No policies: only the service role reaches them.
+revoke all on public.payouts from anon, authenticated;
+revoke all on public.payout_lines from anon, authenticated;
+create policy no_password_sessions on public.payouts as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+create policy no_password_sessions on public.payout_lines as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+
+-- ===== 20261021000004_record_gifts_in_one_go.sql =====
+-- Recorded gifts, after the code check of 21/10/2026:
+-- 1. A whole import (or one typed gift) is saved by one database function, in one transaction: it is
+--    really all or nothing, even if the website is stopped part way.
+-- 2. The same file can't be imported twice for a charity, even from two tabs at once.
+-- 3. A gift keeps its import: removing an import removes its gifts first (the guard refuses changing
+--    import_id), so the link is "restrict", not "set null".
+
+alter table public.gift_imports
+  add column file_fingerprint text constraint gift_import_fingerprint check (file_fingerprint is null or file_fingerprint ~ '^[0-9a-f]{32}$');
+create unique index gift_imports_once on public.gift_imports (charity_id, file_fingerprint) where file_fingerprint is not null;
+
+alter table public.donations drop constraint donations_import_id_fkey;
+alter table public.donations add constraint donations_import_id_fkey foreign key (import_id) references public.gift_imports (id) on delete restrict;
+
+-- p_import: null for one typed gift, else {file_name, file_fingerprint, confirmed_at}.
+-- p_gifts: the checked gifts, ID and tax numbers already encrypted by the website (the key never reaches
+-- the database). Returns {import_id, donation_ids}.
+create or replace function public.record_gifts(p_charity_id uuid, p_user_id uuid, p_import jsonb, p_gifts jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  g jsonb;
+  v_import uuid;
+  v_donor uuid;
+  v_donation uuid;
+  v_reg text;
+  v_type public.donor_type;
+  v_matches int;
+  v_ids uuid[] := '{}';
+begin
+  if jsonb_typeof(p_gifts) <> 'array' or jsonb_array_length(p_gifts) = 0 then
+    raise exception 'No gifts to record';
+  end if;
+  if p_import is not null then
+    insert into public.gift_imports (charity_id, file_name, file_fingerprint, gifts, total_cents, created_by, confirmed_at)
+    values (p_charity_id, p_import->>'file_name', p_import->>'file_fingerprint', jsonb_array_length(p_gifts),
+            (select sum((x->>'amount_cents')::bigint) from jsonb_array_elements(p_gifts) x), p_user_id, (p_import->>'confirmed_at')::timestamptz)
+    returning id into v_import;
+  end if;
+
+  for g in select * from jsonb_array_elements(p_gifts) loop
+    v_type := (g->>'donor_type')::public.donor_type;
+    v_reg := case when v_type = 'individual' then null else nullif(g->>'registration_number', '') end;
+    -- The donor record for this email and type, shared with online gifts (the same rules as checkout).
+    v_donor := null;
+    if v_reg is not null then
+      select id into v_donor from public.donors where email = g->>'email' and donor_type = v_type and registration_number = v_reg limit 1;
+    elsif v_type = 'individual' then
+      select id into v_donor from public.donors where email = g->>'email' and donor_type = v_type and registration_number is null limit 1;
+    else
+      select count(*) into v_matches from public.donors where email = g->>'email' and donor_type = v_type;
+      if v_matches = 1 then
+        select id into v_donor from public.donors where email = g->>'email' and donor_type = v_type;
+      else
+        select id into v_donor from public.donors where email = g->>'email' and donor_type = v_type and registration_number is null limit 1;
+      end if;
+    end if;
+    if v_donor is null then
+      -- Not the donor's own confirmation of age or consent: the charity recorded the gift.
+      insert into public.donors (email, donor_type, registration_number, first_name, last_name, organisation_name, phone,
+                                 id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code)
+      values (g->>'email', v_type, v_reg, g->>'first_name', g->>'last_name', g->>'organisation_name', g->>'phone',
+              g->>'id_number_last4', g->>'tax_reference_last4', g->>'address_line1', g->>'address_line2', g->>'suburb', g->>'city', g->>'postal_code')
+      returning id into v_donor;
+    end if;
+
+    insert into public.donations (donor_id, charity_id, campaign_id, amount_cents, contribution_cents, platform_fee_cents, fee_vat_cents,
+                                  processing_charge_cents, total_charged_cents, status, paid_at, tax_year, gateway, gateway_ref, wants_18a,
+                                  recorded_method, recorded_by, import_id, external_ref, came_from)
+    values (v_donor, p_charity_id, nullif(g->>'campaign_id', '')::uuid, (g->>'amount_cents')::bigint, 0, 0, 0, 0, (g->>'amount_cents')::bigint,
+            'paid', (g->>'paid_at')::timestamptz, (g->>'tax_year')::int, 'recorded', null, (g->>'wants_18a')::boolean,
+            g->>'method', p_user_id, v_import, nullif(g->>'reference', ''), 'recorded')
+    returning id into v_donation;
+
+    insert into public.donation_checkout_details (donation_id, donor_type, email, first_name, last_name, organisation_name, registration_number, phone,
+                                                  receipt_identity, id_number_encrypted, id_number_last4, tax_reference_encrypted, tax_reference_last4,
+                                                  address_line1, address_line2, suburb, city, postal_code)
+    values (v_donation, v_type, g->>'email', g->>'first_name', g->>'last_name', g->>'organisation_name', v_reg, g->>'phone',
+            g->>'receipt_identity', g->>'id_number_encrypted', g->>'id_number_last4', g->>'tax_reference_encrypted', g->>'tax_reference_last4',
+            g->>'address_line1', g->>'address_line2', g->>'suburb', g->>'city', g->>'postal_code');
+    v_ids := v_ids || v_donation;
+  end loop;
+  return jsonb_build_object('import_id', v_import, 'donation_ids', to_jsonb(v_ids));
+end $$;
+revoke execute on function public.record_gifts(uuid, uuid, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.record_gifts(uuid, uuid, jsonb, jsonb) to service_role;
+
+-- ===== 20261021000005_donor_crm.sql =====
+-- Donor care for charities (21/10/2026, Yehuda, for the Angel Network): notes about a donor, follow-up
+-- reminders, the charity's own tags, saved donor lists (segments), and how long without a gift makes a
+-- donor "lapsed" for this charity. Each belongs to one charity and is about a donor who gave to it.
+-- Server-only: the website reads and writes these with the service role after checking the person
+-- manages the charity. Donors never see them; an erased donor's rows are removed (src/lib/privacy/erase.ts).
+
+create table public.charity_donor_notes (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  donor_id uuid not null references public.donors (id) on delete cascade,
+  body text not null constraint donor_note_body check (char_length(body) between 1 and 2000),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  edited_at timestamptz
+);
+create index charity_donor_notes_donor on public.charity_donor_notes (charity_id, donor_id, created_at desc);
+
+create table public.charity_donor_reminders (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  donor_id uuid not null references public.donors (id) on delete cascade,
+  due_on date not null,
+  what text not null constraint donor_reminder_what check (char_length(what) between 1 and 300),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  done_at timestamptz,
+  done_by uuid references auth.users (id) on delete set null
+);
+create index charity_donor_reminders_due on public.charity_donor_reminders (charity_id, due_on) where done_at is null;
+create index charity_donor_reminders_donor on public.charity_donor_reminders (charity_id, donor_id);
+
+create table public.charity_tags (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  name text not null constraint charity_tag_name check (char_length(name) between 1 and 40),
+  created_at timestamptz not null default now()
+);
+create unique index charity_tags_name on public.charity_tags (charity_id, lower(name));
+
+create table public.charity_donor_tags (
+  tag_id uuid not null references public.charity_tags (id) on delete cascade,
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  donor_id uuid not null references public.donors (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (tag_id, donor_id)
+);
+create index charity_donor_tags_donor on public.charity_donor_tags (charity_id, donor_id);
+
+create table public.charity_segments (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  name text not null constraint charity_segment_name check (char_length(name) between 1 and 60),
+  -- What the list shows: {group?, tag?, q?}. Checked by the website before it is kept.
+  filters jsonb not null,
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create unique index charity_segments_name on public.charity_segments (charity_id, lower(name));
+
+create table public.charity_donor_settings (
+  charity_id uuid primary key references public.charities (id) on delete cascade,
+  -- No gift for this many days makes a donor "lapsed". Givezy's default is 180.
+  lapsed_after_days int not null constraint donor_settings_lapsed check (lapsed_after_days between 30 and 730),
+  updated_at timestamptz not null default now()
+);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['charity_donor_notes', 'charity_donor_reminders', 'charity_tags', 'charity_donor_tags', 'charity_segments', 'charity_donor_settings'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon, authenticated', t);
+    execute format('create policy no_password_sessions on public.%I as restrictive for all to authenticated using (public.signed_in_without_password()) with check (public.signed_in_without_password())', t);
+  end loop;
+end $$;
+
+-- ===== 20261021000006_donor_emails.sql =====
+-- Emails from a charity to its donors (21/10/2026, Yehuda, chunk 5): news and appeals, written on the
+-- dashboard by the charity's owner and sent by Givezy. The charity never handles addresses.
+--
+-- Who may be emailed (POPIA direct marketing to the charity's own donors): anyone with a paid gift to the
+-- charity, unless they said no at checkout or used the stop link in an earlier email. Each email carries
+-- the stop link. At most 4 a month (30 days) to the same donor from the same charity.
+--
+-- Sending is resumable: each email's recipients are listed first ('waiting'), then each is claimed
+-- ('sending') before the email goes, so a second press or a stopped page never emails anyone twice.
+-- Server-only tables, like the rest of donor care.
+
+create table public.charity_appeals (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  subject text not null constraint charity_appeal_subject check (char_length(subject) between 3 and 120),
+  body text not null constraint charity_appeal_body check (char_length(body) between 10 and 5000),
+  -- Who it was for, as chosen: {all|group|tag|segment|campaign, ...}. Shown back on the page.
+  audience jsonb not null,
+  audience_label text not null constraint charity_appeal_audience check (char_length(audience_label) between 1 and 200),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index charity_appeals_charity on public.charity_appeals (charity_id, created_at desc);
+
+create table public.charity_appeal_recipients (
+  appeal_id uuid not null references public.charity_appeals (id) on delete cascade,
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  donor_id uuid not null references public.donors (id) on delete cascade,
+  status text not null default 'waiting' constraint appeal_recipient_status check (status in ('waiting', 'sending', 'sent', 'failed', 'skipped')),
+  claimed_at timestamptz,
+  sent_at timestamptz,
+  primary key (appeal_id, donor_id)
+);
+-- The monthly limit counts what was sent (or may have been) to a donor by a charity.
+create index charity_appeal_recipients_donor on public.charity_appeal_recipients (charity_id, donor_id, claimed_at);
+create index charity_appeal_recipients_waiting on public.charity_appeal_recipients (appeal_id) where status = 'waiting';
+
+-- "No news or appeals from this charity": from the box at checkout or the stop link. A hash of the
+-- address only, like thank-you opt-outs.
+create table public.charity_email_opt_outs (
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  email_hash text not null constraint charity_email_opt_out_hash check (email_hash ~ '^[0-9a-f]{64}$'),
+  source text not null constraint charity_email_opt_out_source check (source in ('checkout', 'stop_link', 'charity')),
+  created_at timestamptz not null default now(),
+  primary key (charity_id, email_hash)
+);
+
+-- The stop link in each email: a random token (stored hashed) for one address at one charity.
+create table public.charity_email_stop_tokens (
+  token_hash text primary key constraint charity_email_stop_token check (token_hash ~ '^[0-9a-f]{64}$'),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  email_hash text not null constraint charity_email_stop_email check (email_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now()
+);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['charity_appeals', 'charity_appeal_recipients', 'charity_email_opt_outs', 'charity_email_stop_tokens'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon, authenticated', t);
+    execute format('create policy no_password_sessions on public.%I as restrictive for all to authenticated using (public.signed_in_without_password()) with check (public.signed_in_without_password())', t);
+  end loop;
+end $$;
+
+-- Claim the next few waiting recipients of one email, leaving out anyone who has had 4 from this charity
+-- in the last 30 days (counted at the moment of claiming, so two emails sent at once can't both get
+-- through). Those are marked 'skipped'. Server only.
+create function public.claim_appeal_recipients(p_appeal_id uuid, p_limit int)
+returns table (donor_id uuid)
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_charity uuid;
+  r record;
+  n int := 0;
+begin
+  select charity_id into v_charity from public.charity_appeals where id = p_appeal_id;
+  if v_charity is null then return; end if;
+  for r in
+    select x.donor_id from public.charity_appeal_recipients x
+     where x.appeal_id = p_appeal_id and x.status = 'waiting'
+     order by x.donor_id
+     for update skip locked
+  loop
+    exit when n >= p_limit;
+    -- One donor at a time per charity, so the count below is never read twice at once.
+    perform pg_advisory_xact_lock(hashtextextended(v_charity::text || r.donor_id::text, 0));
+    if (select count(*) from public.charity_appeal_recipients y
+         where y.charity_id = v_charity and y.donor_id = r.donor_id
+           and y.status in ('sending', 'sent') and y.claimed_at > now() - interval '30 days') >= 4 then
+      update public.charity_appeal_recipients set status = 'skipped' where appeal_id = p_appeal_id and charity_appeal_recipients.donor_id = r.donor_id;
+    else
+      update public.charity_appeal_recipients set status = 'sending', claimed_at = now() where appeal_id = p_appeal_id and charity_appeal_recipients.donor_id = r.donor_id;
+      donor_id := r.donor_id;
+      n := n + 1;
+      return next;
+    end if;
+  end loop;
+end $$;
+revoke execute on function public.claim_appeal_recipients(uuid, int) from public, anon, authenticated;
+
+-- ===== 20261022000001_featured_charity.sql =====
+-- Cause of the week (22/10/2026, from Alza of Feed a Child): Givezy picks one approved charity for each
+-- week, Monday to Sunday (Johannesburg calendar), and the app shows it at the top of Discover. A week with
+-- no pick shows no card: nothing is chosen automatically. Givezy's admins choose; anyone may read the
+-- current and coming picks of approved charities (the app reads them without signing in).
+
+create table public.featured_charities (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  week_start date not null constraint featured_week_monday check (extract(isodow from week_start) = 1),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  constraint featured_one_per_week unique (week_start)
+);
+
+alter table public.featured_charities enable row level security;
+revoke all on public.featured_charities from anon, authenticated;
+grant select on public.featured_charities to anon, authenticated;
+create policy featured_public_read on public.featured_charities for select to anon, authenticated
+  using (exists (select 1 from public.charities c where c.id = charity_id and c.status = 'approved'));
+create policy no_password_sessions on public.featured_charities as restrictive for all to authenticated
+  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
+
+-- ===== 20261022000002_review_fixes.sql =====
+-- Fixes from the full review of 22/10/2026. Each part stands alone and can be run again.
+
+-- 1. Recording a gift (typed or imported) must find the donor whatever the capitals in their email.
+--    Inside this function the search path is empty, so a plain "=" on the citext column is the text
+--    one: "Sarah@Gmail.com" online and "sarah@gmail.com" recorded did not match, the insert then hit the
+--    unique donor rule, and the whole import failed. The citext operator is named in full instead.
+create or replace function public.record_gifts(p_charity_id uuid, p_user_id uuid, p_import jsonb, p_gifts jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  g jsonb;
+  v_import uuid;
+  v_donor uuid;
+  v_donation uuid;
+  v_reg text;
+  v_type public.donor_type;
+  v_matches int;
+  v_ids uuid[] := '{}';
+begin
+  if jsonb_typeof(p_gifts) <> 'array' or jsonb_array_length(p_gifts) = 0 then
+    raise exception 'No gifts to record';
+  end if;
+  if p_import is not null then
+    insert into public.gift_imports (charity_id, file_name, file_fingerprint, gifts, total_cents, created_by, confirmed_at)
+    values (p_charity_id, p_import->>'file_name', p_import->>'file_fingerprint', jsonb_array_length(p_gifts),
+            (select sum((x->>'amount_cents')::bigint) from jsonb_array_elements(p_gifts) x), p_user_id, (p_import->>'confirmed_at')::timestamptz)
+    returning id into v_import;
+  end if;
+
+  for g in select * from jsonb_array_elements(p_gifts) loop
+    v_type := (g->>'donor_type')::public.donor_type;
+    v_reg := case when v_type = 'individual' then null else nullif(g->>'registration_number', '') end;
+    -- The donor record for this email and type, shared with online gifts (the same rules as checkout).
+    v_donor := null;
+    if v_reg is not null then
+      select id into v_donor from public.donors where email operator(public.=) (g->>'email')::public.citext and donor_type = v_type and registration_number = v_reg limit 1;
+    elsif v_type = 'individual' then
+      select id into v_donor from public.donors where email operator(public.=) (g->>'email')::public.citext and donor_type = v_type and registration_number is null limit 1;
+    else
+      select count(*) into v_matches from public.donors where email operator(public.=) (g->>'email')::public.citext and donor_type = v_type;
+      if v_matches = 1 then
+        select id into v_donor from public.donors where email operator(public.=) (g->>'email')::public.citext and donor_type = v_type;
+      else
+        select id into v_donor from public.donors where email operator(public.=) (g->>'email')::public.citext and donor_type = v_type and registration_number is null limit 1;
+      end if;
+    end if;
+    if v_donor is null then
+      -- Not the donor's own confirmation of age or consent: the charity recorded the gift.
+      insert into public.donors (email, donor_type, registration_number, first_name, last_name, organisation_name, phone,
+                                 id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code)
+      values (g->>'email', v_type, v_reg, g->>'first_name', g->>'last_name', g->>'organisation_name', g->>'phone',
+              g->>'id_number_last4', g->>'tax_reference_last4', g->>'address_line1', g->>'address_line2', g->>'suburb', g->>'city', g->>'postal_code')
+      returning id into v_donor;
+    end if;
+
+    insert into public.donations (donor_id, charity_id, campaign_id, amount_cents, contribution_cents, platform_fee_cents, fee_vat_cents,
+                                  processing_charge_cents, total_charged_cents, status, paid_at, tax_year, gateway, gateway_ref, wants_18a,
+                                  recorded_method, recorded_by, import_id, external_ref, came_from)
+    values (v_donor, p_charity_id, nullif(g->>'campaign_id', '')::uuid, (g->>'amount_cents')::bigint, 0, 0, 0, 0, (g->>'amount_cents')::bigint,
+            'paid', (g->>'paid_at')::timestamptz, (g->>'tax_year')::int, 'recorded', null, (g->>'wants_18a')::boolean,
+            g->>'method', p_user_id, v_import, nullif(g->>'reference', ''), 'recorded')
+    returning id into v_donation;
+
+    insert into public.donation_checkout_details (donation_id, donor_type, email, first_name, last_name, organisation_name, registration_number, phone,
+                                                  receipt_identity, id_number_encrypted, id_number_last4, tax_reference_encrypted, tax_reference_last4,
+                                                  address_line1, address_line2, suburb, city, postal_code)
+    values (v_donation, v_type, g->>'email', g->>'first_name', g->>'last_name', g->>'organisation_name', v_reg, g->>'phone',
+            g->>'receipt_identity', g->>'id_number_encrypted', g->>'id_number_last4', g->>'tax_reference_encrypted', g->>'tax_reference_last4',
+            g->>'address_line1', g->>'address_line2', g->>'suburb', g->>'city', g->>'postal_code');
+    v_ids := v_ids || v_donation;
+  end loop;
+  return jsonb_build_object('import_id', v_import, 'donation_ids', to_jsonb(v_ids));
+end $$;
+
+-- 2. Issued s18A receipts, their links, donations and the audit trail are append-only for everyone,
+--    the server included: TRUNCATE skipped the row-level guards, so it is refused as well.
+revoke truncate on public.audit_log, public.s18a_receipts, public.s18a_receipt_donations, public.donations, public.receipt_counters from service_role;
+create or replace function public.refuse_truncate() returns trigger language plpgsql set search_path = '' as $$
+begin
+  raise exception 'This table cannot be emptied: its records are kept by law';
+end $$;
+do $$
+declare t text;
+begin
+  foreach t in array array['audit_log', 's18a_receipts', 's18a_receipt_donations', 'donations', 'receipt_counters'] loop
+    execute format('drop trigger if exists %I on public.%I', t || '_no_truncate', t);
+    execute format('create trigger %I before truncate on public.%I for each statement execute function public.refuse_truncate()', t || '_no_truncate', t);
+  end loop;
+end $$;
+
+-- 3. Cause of the week: visitors may read which charity is chosen for which week, not which Givezy
+--    person chose it.
+revoke select on public.featured_charities from anon, authenticated;
+grant select (id, charity_id, week_start, created_at) on public.featured_charities to anon, authenticated;
+
+-- 4. Only a charity's owner (or Givezy) may change its bank details, in the database too: before, any
+--    admin of a draft charity could change them by calling the database directly.
+create or replace function public.guard_charity_bank_fields() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  st public.charity_status;
+  bank_changed boolean;
+begin
+  if current_user in ('service_role', 'postgres', 'supabase_admin') or public.is_platform_admin() then
+    return new;
+  end if;
+  select status into st from public.charities where id = new.charity_id;
+  bank_changed := new.bank_name is distinct from old.bank_name
+       or new.bank_account_holder is distinct from old.bank_account_holder
+       or new.bank_account_number_encrypted is distinct from old.bank_account_number_encrypted
+       or new.bank_account_last4 is distinct from old.bank_account_last4
+       or new.bank_branch_code is distinct from old.bank_branch_code;
+  if bank_changed and not exists (
+    select 1 from public.charity_admins a
+    where a.charity_id = new.charity_id and a.user_id = (select auth.uid()) and a.role = 'owner'
+  ) then
+    raise exception 'Bank details can only be changed by the charity''s owner';
+  end if;
+  if st in ('approved', 'suspended', 'pending_review') and (bank_changed or new.bank_verified_at is distinct from old.bank_verified_at) then
+    raise exception 'Bank details can only be changed by a platform admin once an application is submitted';
+  end if;
+  if new.bank_verified_at is distinct from old.bank_verified_at then
+    raise exception 'Only the platform can mark bank details verified';
+  end if;
+  if bank_changed then
+    new.bank_verified_at := null;
+  end if;
+  return new;
+end $$;

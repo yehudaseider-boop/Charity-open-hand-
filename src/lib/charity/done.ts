@@ -1,3 +1,4 @@
+import { plural } from "@/lib/text";
 /**
  * The charity dashboard's core flow (18/10/2026, Yehuda): after every action, say what just happened,
  * offer to take it back, and point to what to do next. All the words live here, so they can be
@@ -44,7 +45,6 @@ export type Context = { base: string; publicUrl: string | null; approved: boolea
 export type Done = { what: string; next: { label: string; href: string } | null };
 
 const quote = (s: unknown) => `"${String(s ?? "").trim() || "it"}"`;
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function seePage(c: Context, otherwise: { label: string; href: string }) {
   return c.approved && c.publicUrl ? { label: "See your page as donors see it", href: c.publicUrl } : otherwise;

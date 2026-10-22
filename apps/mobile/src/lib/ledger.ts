@@ -5,11 +5,6 @@
  */
 import { labelOf } from "@shared/donations/labels";
 
-/** Today's date as dd/mm/yyyy for a form's starting value (the phone's own date). */
-export function todayDdMmYyyy(now = new Date()): string {
-  return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
-}
-
 /**
  * dd/mm/yyyy typed by a person -> "yyyy-mm-dd", or null if it isn't a real
  * date (no 31/02) or is in the future. `today` is yyyy-mm-dd.

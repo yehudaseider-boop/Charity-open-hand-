@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { ActionForm } from "@/components/forms/action-form";
-import { APPEAL_BODY_MAX, APPEAL_SUBJECT_MAX } from "@/lib/charity/appeals-rules";
+import { APPEAL_BODY_MAX, APPEAL_SUBJECT_MAX, APPEALS_PER_MONTH } from "@/lib/charity/appeals-rules";
 import type { FormState } from "@/lib/form";
 import type { AppealCheck } from "./actions";
 
@@ -113,7 +113,7 @@ export function AppealForm({
                   {preview.recordedOnly} {preview.recordedOnly === 1 ? "donor who has" : "donors who have"} only given by EFT, cash or a file you imported {preview.recordedOnly === 1 ? "is" : "are"} left out for now: we&apos;re checking with our lawyer that we may email them for you.
                 </p>
               ) : null}
-              <p className="text-muted">Anyone who has already had 4 emails from you in the last 30 days is left out too, and counted after sending.</p>
+              <p className="text-muted">Anyone who has already had {APPEALS_PER_MONTH} emails from you in the last 30 days is left out too, and counted after sending.</p>
               <ActionForm action={async (s, f) => (fields(f), test(s, f))} submitLabel="Send me a test" pendingLabel="Sending the test…" />
               {preview.count ? (
                 <ActionForm

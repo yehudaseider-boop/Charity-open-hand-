@@ -24,7 +24,7 @@ export const platformConfig = {
      * (Yehuda, 14/10/2026). Offering the donor to cover it is not built yet: it
      * needs the gateway's rates below.
      */
-    gatewayChargePaidBy: "charity" as "charity" | "nediv_lev" | null,
+    gatewayChargePaidBy: "charity" as "charity" | "givezy" | null,
     /** The gateway's charge, from its rate sheet. Empty until Yehuda supplies it. */
     gatewayPercent: null as string | null,
     gatewayFixedCents: null as number | null,
@@ -57,4 +57,3 @@ export const platformConfig = {
   },
 } as const;
 
-export type PlatformConfig = typeof platformConfig;

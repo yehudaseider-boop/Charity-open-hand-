@@ -10,6 +10,7 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { dedicationFrom, dedicationLine, isHebrew } from "@/lib/donations/dedication";
 import { formatRand } from "@/lib/money";
+import { plural } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Monthly donations" };
 
@@ -25,7 +26,6 @@ type Filter = (typeof filters)[number]["key"];
 const matches = (f: Filter, s: MonthlyState) =>
   f === "" || (f === "running" && (s === "running" || s === "retrying")) || (f === "paused" && s === "paused") || (f === "ended" && (s === "stopped" || s === "cancelled"));
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export default async function MonthlyPage({ params, searchParams }: PageProps<"/charity-admin/[id]/monthly">) {
   const { id } = await params;

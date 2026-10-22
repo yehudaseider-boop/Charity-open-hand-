@@ -1,11 +1,11 @@
 "use client";
 
 import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
-import { startTransition, useActionState, useEffect, useId, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
 import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
-import { TextArea, TextField } from "@/components/forms/fields";
+import { TextArea, TextField, useFieldId } from "@/components/forms/fields";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
 
@@ -204,11 +204,6 @@ function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; ch
       <div className="flex justify-between gap-3 border-t-2 border-border pt-2 text-lg font-bold"><dt>Total</dt><dd className="shrink-0">{formatRand(q.totalCents)}</dd></div>
     </dl>
   );
-}
-
-/** A page-unique id, safe in id and aria-describedby attributes (as in forms/fields.tsx). */
-function useFieldId(name: string) {
-  return `${name}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 
 /**

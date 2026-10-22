@@ -8,10 +8,10 @@ import { saDate } from "@/lib/charity/dashboard";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { plural } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Annual report" };
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part * 100) / whole) : 0);
 
 function Figure({ label, value, note, strong = false }: { label: string; value: string; note?: string; strong?: boolean }) {

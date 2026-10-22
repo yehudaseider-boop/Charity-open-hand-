@@ -16,7 +16,7 @@ import { GatewayError, type Payout, type PayoutLine, type CardAuthorization, typ
  * `transaction_charge` (a flat amount, in cents) is what stays with the main account: the
  * donor's optional contribution to Givezy. `bearer` says who pays Paystack's own fee:
  * "subaccount" (the charity) or "account" (Givezy), from the platform setting
- * `gatewayChargePaidBy`, which Yehuda has not decided yet.
+ * `gatewayChargePaidBy` (decided 14/10/2026: the charity pays it).
  *
  * Splitting is a switch: PAYSTACK_SPLITS=yes. Off, a charity takes no payments through
  * this gateway (the money would otherwise land with Givezy). Whether Paystack splits for

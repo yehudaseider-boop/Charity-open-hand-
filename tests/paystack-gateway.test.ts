@@ -71,7 +71,7 @@ describe("starting a checkout", () => {
   });
 
   it("Givezy bearing the fee means the main account bears it", async () => {
-    await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "nediv_lev" });
+    await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "givezy" });
     expect(calls[0].body).toMatchObject({ bearer: "account", subaccount: "ACCT_charity1" });
   });
 
@@ -219,7 +219,7 @@ describe("monthly donations", () => {
     answers["/transaction/charge_authorization"] = { status: "success" };
     const r = await paystackGateway.chargeAuthorization({
       reference: base.reference, authorizationCode: "AUTH_abc", email: base.email, totalCents: 20_345,
-      lines: base.lines, charityAccountRef: "ACCT_charity1", feeBearer: "nediv_lev", description: "Monthly donation",
+      lines: base.lines, charityAccountRef: "ACCT_charity1", feeBearer: "givezy", description: "Monthly donation",
     });
     expect(r.status).toBe("success");
     expect(calls[0].body).toMatchObject({

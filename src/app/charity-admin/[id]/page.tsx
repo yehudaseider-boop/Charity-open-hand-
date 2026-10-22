@@ -15,6 +15,7 @@ import { isRunning, progressPercent } from "@/lib/charity/campaigns";
 import { loadDonors, loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
 import { formatDate, isoDateInJhb, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { plural } from "@/lib/text";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -28,7 +29,6 @@ function Stat({ label, value, note, strong = false }: { label: string; value: st
   );
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export default async function CharityDashboardPage({ params }: PageProps<"/charity-admin/[id]">) {
   const { id } = await params;

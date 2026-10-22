@@ -9,6 +9,9 @@ export type FormState = {
 
 export const initialFormState: FormState = { ok: false };
 
+/** The first value of a search parameter that can arrive once, many times, or not at all. */
+export const firstParam = (v: string | string[] | undefined): string | undefined => (Array.isArray(v) ? v[0] : v);
+
 /** FormData -> plain object of trimmed strings (empty -> undefined). */
 export function formToObject(formData: FormData): Record<string, string | undefined> {
   const out: Record<string, string | undefined> = {};

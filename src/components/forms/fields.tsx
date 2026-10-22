@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { useFieldError } from "./action-form";
 
 /** A page-unique id, so two forms with the same field name never share a label. */
-function useFieldId(name: string) {
+export function useFieldId(name: string) {
   return `${name}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 

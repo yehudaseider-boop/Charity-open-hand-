@@ -21,7 +21,7 @@ export type CheckoutRequest = {
    * donation) or Givezy (out of its share). Decided by Yehuda; null until then, and a
    * split payment is never started without it.
    */
-  feeBearer: "charity" | "nediv_lev" | null;
+  feeBearer: "charity" | "givezy" | null;
   email: string;
   /**
    * The donor is starting a monthly donation: take the payment by card only, so the gateway
@@ -67,7 +67,7 @@ export type ChargeRequest = {
   totalCents: number;
   lines: { charityCents: number; contributionCents: number };
   charityAccountRef: string | null;
-  feeBearer: "charity" | "nediv_lev" | null;
+  feeBearer: "charity" | "givezy" | null;
   description: string;
   /** A monthly collection (the default) or a once-off gift charged to the donor's saved card. Recorded with the charge. */
   monthly?: boolean;

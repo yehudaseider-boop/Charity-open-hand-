@@ -1153,3 +1153,30 @@ lines of work had reviewed the same ground, so 35 files clashed. Calls made, so 
   same 8 characters on the confirmation page, emails, the charity's donation page, exports and the deposit report.
   Nothing searches by the prefix. Safe because live payments have never been on, so no real donor holds an `NL-` one.
 
+## 22/10/2026: Full review and tidy-up (six independent reviewers, every finding checked before fixing)
+
+Asked by Yehuda: clean up and check everything. Tidy in place (no folder reshuffle, so main and the demo-site
+branch still merge); fix the clear findings; bring money rules, legal wording and product behaviour to him.
+
+- **Phone app:** the payment sheet's return link no longer sends Android donors to the Progress tab mid-check
+  (`+native-intent`); honest copy on the confirming screen, the goal invite and the Givezy contribution; Give never
+  sticks on "Opening…"; v2 splash and icon colours.
+- **Website and dashboard:** thank-you page shows the saved state past the check limit; dashboard Try again
+  fetches again; crafted filter values can't crash Donations; provider-down and campaign-ended messages give one
+  clear next step; the same donor email can't go out twice on a retry; deposit downloads audited and limited;
+  people can be added to a team only once the application is sent; erasure also clears names in "what just
+  happened"; working state on the remaining plain forms.
+- **Money:** a monthly retry first asks about the month's earlier attempts (no double charge when one went through
+  late); saved-card charges need the app's attempt id; an unreadable provider date can't stop a monthly donation.
+- **Database** (`20261022000002_review_fixes.sql`, waiting for Yehuda's yes): record_gifts matches emails whatever
+  the capitals (inside the function the citext operator was out of reach, so imports failed); receipts, donations
+  and the audit log can't be emptied; visitors can't see who chose the cause of the week; only the owner may change
+  bank details, in the database too.
+- **Tidy:** unused code removed; one copy each of `plural`, `firstParam`, `useFieldId` and the drop decoration;
+  the old `nediv_lev` fee-bearer value is `givezy`; README rewritten with a "where to find things" map; settings
+  examples for the website and the app; CI checks the app too; `docs/test-site/setup-database.sql` rebuilt by
+  `scripts/build-setup-sql.sh`; the old dashboard brief archived.
+- **Left for later, on purpose:** splitting the biggest files (give screen, Progress tab, admin charity actions,
+  checkout) and the wider helper merges (date helpers, Supabase row unwrap, page-through reads, uuid checks, chip
+  styles) wait until the demo-site branch has merged, to avoid conflicts. Low items noted on the checklist.
+

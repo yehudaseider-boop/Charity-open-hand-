@@ -14,6 +14,7 @@ import { loadStories, publicImageUrl } from "@/lib/charity/queries";
 import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
+import { Drop } from "@/components/drop";
 
 const loadCharity = cache(async (slug: string) => {
   const supabase = await createClient();
@@ -222,12 +223,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <dd className="min-w-0 font-semibold">{value}</dd>
     </div>
   );
-}
-
-/** A decorative drop from the logo. */
-function Drop({ colour, className }: { colour: "blue" | "lilac" | "orange"; className: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={`/brand/drop-${colour}.png`} alt="" className={`pointer-events-none absolute select-none ${className}`} />;
 }
 
 /** A sage tick for yes, a slate dash for no (the same pair as the s18A badge). */

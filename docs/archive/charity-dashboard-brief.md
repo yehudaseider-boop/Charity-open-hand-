@@ -1,3 +1,5 @@
+> Archived 22/10/2026: a one-off brief from 08/10/2026. Some of it no longer matches the rules in CLAUDE.md (for example how Rand amounts are written); CLAUDE.md and docs/decisions.md win.
+
 # Brief: charity dashboard (written 08/10/2026 for a fresh session)
 
 Read `CLAUDE.md`, `AGENTS.md` and `docs/decisions.md` first. Branch: `milestone-1-foundation`.

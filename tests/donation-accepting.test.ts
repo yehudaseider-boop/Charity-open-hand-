@@ -28,7 +28,7 @@ const charity = (o: Record<string, unknown> = {}) => ({
   id: "c1", slug: "meals", name_en: "Meals", name_he: null, status: "approved", is_verified: true, is_s18a: true,
   mandate_signed_at: "2026-01-01T00:00:00Z", gateway: "paystack", gateway_subaccount_ref: "ACCT_1", ...o,
 });
-const bearer = (v: "charity" | "nediv_lev" | null) => ((platformConfig.fees as { gatewayChargePaidBy: unknown }).gatewayChargePaidBy = v);
+const bearer = (v: "charity" | "givezy" | null) => ((platformConfig.fees as { gatewayChargePaidBy: unknown }).gatewayChargePaidBy = v);
 
 beforeEach(() => {
   row = charity();

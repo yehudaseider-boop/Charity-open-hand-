@@ -58,6 +58,11 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Add the cause categories** (Food and welfare, Education, Health and so on). The database has none yet and there is no admin screen for them, so the home page shows no cause chips and the Charities page shows only "All". Decide the list; it needs a small database change or an admin screen.
 - [ ] **Charity photos:** the home page's cause-of-the-week card uses the charity's own cover photo when it has one. Ask the first charities for photos they own and allow us to use.
 
+- [ ] **Decide (from the 22/10 review): a monthly donation paused for a chargeback dispute.** Today the donor can tap Resume and the next month is collected during the dispute. Options: hold it until Givezy releases it (needs a small admin button), or leave it with the donor.
+- [ ] **Decide (from the 22/10 review): a chargeback the charity wins.** The money comes back but the gift stays "charged back" and leaves the totals and the s18A receipt. Allow it to return to paid, or record it by hand?
+- [ ] **Before saved cards are switched on (22/10 review):** keep the "never charge twice" attempt on the phone across screens, and settle a saved-card attempt that never reached the provider (today it can show "couldn't check" for ever). Also: the "use my ID ending 1234" should come only from gifts made while signed in.
+- [ ] **Before in-app giving on Android:** test the payment return on a real Android phone (the router fix of 22/10 could only be checked in code).
+
 ## A2. Ask when you reach them (added 21/10/2026, from the Angel Network and Feed a Child meetings)
 
 Questions only the charities or their advisers can answer. Bring these up whenever Yehuda says he has spoken to them.
