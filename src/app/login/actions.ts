@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { clientIp } from "@/lib/client-ip";
+import { demoModeRequested } from "@/lib/demo/mode";
 import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { siteOrigin } from "@/lib/request-origin";
 import { safeNextPath } from "@/lib/safe-path";
@@ -12,6 +13,8 @@ import { linkDonorsToUser } from "@/lib/donors/link";
 const safeNext = (next: FormDataEntryValue | null) => safeNextPath(next);
 
 export async function sendLoginLink(formData: FormData) {
+  // The demo never emails anyone: its people sign in with one click on /demo.
+  if (demoModeRequested()) redirect("/demo");
   const email = String(formData.get("email") ?? "").trim();
   const next = safeNext(formData.get("next"));
   // Keep what they typed if we send them back with a message.
@@ -38,6 +41,7 @@ export async function sendLoginLink(formData: FormData) {
  * in the browser that asked for it (a link tapped in the Gmail app opens in another one).
  */
 export async function verifyLoginCode(formData: FormData) {
+  if (demoModeRequested()) redirect("/demo");
   const email = String(formData.get("email") ?? "").trim();
   const code = String(formData.get("code") ?? "").replace(/\s/g, "");
   const next = safeNext(formData.get("next"));

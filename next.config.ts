@@ -41,6 +41,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The demo's own pages (page.demo.tsx, route.demo.ts) only exist in a build made with DEMO_MODE=yes.
+  // Every other build, the live site's included, leaves them out entirely (see src/lib/demo/mode.ts).
+  pageExtensions: ["tsx", "ts", "jsx", "js", ...(process.env.DEMO_MODE === "yes" ? ["demo.tsx", "demo.ts"] : [])],
   // Receipt PDFs are printed with Chrome through playwright-core: loaded from node_modules at run time, not bundled.
   serverExternalPackages: ["playwright-core"],
   experimental: {

@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Fredoka, Heebo } from "next/font/google";
 import { platformConfig } from "@/config/platform";
+import { DemoBanner } from "@/components/demo-banner";
 import { SiteFooter } from "@/components/legal";
 import { SiteHeader } from "@/components/site-header";
+import { demoModeOn } from "@/lib/demo/mode";
 import "./globals.css";
 
 // The brand fonts, the same as the phone app: Fredoka for page titles, DM Sans for everything else, Heebo for Hebrew.
@@ -24,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en-ZA" className={`${dmSans.variable} ${fredoka.variable} ${heebo.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
+        {demoModeOn() ? <DemoBanner /> : null}
         <SiteHeader />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>
         <SiteFooter />

@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { platformConfig } from "@/config/platform";
 import { logAudit } from "@/lib/audit";
+import { demoModeOn } from "@/lib/demo/mode";
+import { buildReceiptHtml } from "@/lib/receipts/html";
+import type { ReceiptDetails } from "@/lib/receipts/details";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,9 +20,15 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/receipts/[i
 
   const { data: receipt } = await supabase
     .from("s18a_receipts")
-    .select("id, charity_id, status, pdf_path")
+    .select("id, charity_id, status, pdf_path, details")
     .eq("id", id)
     .maybeSingle();
+  // The demo site makes no PDFs (that needs Chrome): its made-up receipts are shown as a page, marked DRAFT.
+  if (receipt && receipt.status === "issued" && !receipt.pdf_path && demoModeOn()) {
+    const details = receipt.details as ReceiptDetails & { receipt_reference: string };
+    const html = buildReceiptHtml({ details, reference: details.receipt_reference, draft: true, platformName: platformConfig.appName, logoHtml: `<img src="/logo.png" alt="${platformConfig.appName}">` });
+    return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+  }
   if (!receipt || receipt.status !== "issued" || !receipt.pdf_path) return new NextResponse("Not found", { status: 404 });
 
   const { data, error } = await createAdminClient().storage.from("receipts").createSignedUrl(receipt.pdf_path, 60, { download: true });

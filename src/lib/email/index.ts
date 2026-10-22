@@ -114,6 +114,8 @@ function onlyAllowed(inner: EmailTransport, allowlist: string | undefined): Emai
 }
 
 export function getEmailTransport(env: Record<string, string | undefined> = process.env): EmailTransport {
+  // The demo site never sends email, whatever else is set (DEMO_MODE, see src/lib/demo/mode.ts).
+  if (env.DEMO_MODE === "yes") return consoleTransport;
   const name = env.EMAIL_TRANSPORT ?? "console";
   const inner = name === "console" ? consoleTransport : name === "resend" ? resendTransport(env) : null;
   if (!inner) throw new EmailError(`Unknown EMAIL_TRANSPORT "${name}".`);

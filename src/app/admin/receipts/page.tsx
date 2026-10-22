@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requirePlatformAdmin } from "@/lib/auth";
+import { demoModeOn } from "@/lib/demo/mode";
 import { containsPattern, safeSearch } from "@/lib/charity/dashboard";
 import { formatDate, formatDateTime, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
@@ -163,7 +164,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
                   <p className="font-medium">{formatRand(r.amount_cents)}</p>
                   {status === "issued" ? (
                     <>
-                      <div>{r.pdf_path ? <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">PDF</Link> : <Badge tone="warning">No PDF yet</Badge>}</div>
+                      <div>{r.pdf_path ? <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">PDF</Link> : demoModeOn() ? <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">View</Link> : <Badge tone="warning">No PDF yet</Badge>}</div>
                       <div>{r.emailed_at ? <Badge tone="success">Emailed {formatDate(r.emailed_at)}</Badge> : <Badge>Not emailed</Badge>}</div>
                     </>
                   ) : null}

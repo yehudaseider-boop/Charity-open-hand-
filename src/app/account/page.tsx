@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { BilingualName } from "@/components/bilingual-name";
 import { requireViewer } from "@/lib/auth";
+import { demoModeOn } from "@/lib/demo/mode";
 import { formatDate, taxYearFor, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
@@ -105,6 +106,8 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                       <Badge tone="warning">Withdrawn</Badge>
                     ) : r.pdf_path ? (
                       <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">Download PDF</Link>
+                    ) : demoModeOn() ? (
+                      <Link href={`/receipts/${r.id}`} prefetch={false} className="text-brand underline">View receipt</Link>
                     ) : (
                       <span className="text-muted">PDF on its way</span>
                     )}
