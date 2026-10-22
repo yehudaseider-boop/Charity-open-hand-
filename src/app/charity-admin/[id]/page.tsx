@@ -59,10 +59,23 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     return (
       <div className="space-y-4">
         <h1 className="font-display text-2xl text-indigo">Overview</h1>
-        <Notice tone="warning">
-          Donations start once your application is approved.{" "}
-          <Link href={`${base}/application`} className="underline">Go to your application</Link>.
-        </Notice>
+        {charity.status === "rejected" ? (
+          <Notice tone="warning">
+            <p className="font-medium">Your application was sent back for changes</p>
+            {charity.rejection_reason ? <p className="mt-1 whitespace-pre-line">{charity.rejection_reason}</p> : null}
+            <p className="mt-2"><Link href={`${base}/application`} className="underline">Make the changes and submit again</Link>.</p>
+          </Notice>
+        ) : charity.status === "pending_review" ? (
+          <Notice tone="neutral">
+            Your application is with us for review. We&apos;ll email you when it&apos;s done.{" "}
+            <Link href={`${base}/application`} className="underline">See your application</Link>.
+          </Notice>
+        ) : (
+          <Notice tone="warning">
+            Donations start once your application is approved.{" "}
+            <Link href={`${base}/application`} className="underline">Finish your application</Link>.
+          </Notice>
+        )}
       </div>
     );
   }

@@ -12,7 +12,7 @@ import { cleanLabel } from "@/lib/donations/labels";
 import { formatRand } from "@/lib/money";
 import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
-import { sourceTag } from "@/lib/donations/source";
+import { sourceTag, withSource } from "@/lib/donations/source";
 import { DonateFlow } from "./donate-flow";
 
 // One lookup serves both the title and the page.
@@ -49,7 +49,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="space-y-2">
-        <Link href={`/c/${charity.slug}`} className="text-sm font-semibold text-brand underline underline-offset-4">← {charity.name_en}</Link>
+        <Link href={withSource(`/c/${charity.slug}`, sourceTag(sp.src))} className="text-sm font-semibold text-brand underline underline-offset-4">← {charity.name_en}</Link>
         <h1 className="text-[clamp(2rem,5vw,2.75rem)] leading-[1.05] text-balance">Give to {charity.name_en}</h1>
         <p className="text-muted">Choose an amount, add your details, then pay on the payment provider&apos;s secure page.</p>
       </div>

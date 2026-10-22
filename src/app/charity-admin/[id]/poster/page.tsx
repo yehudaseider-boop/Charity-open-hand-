@@ -18,7 +18,13 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
   await requireViewer(`/charity-admin/${id}/poster`);
   const { charity } = await loadCharityForManager(id);
   if (charity.status !== "approved") {
-    return <Notice tone="warning">Your QR poster is ready once your charity is approved and listed.</Notice>;
+    return (
+      <div className="space-y-4">
+        <h1 className="font-display text-2xl text-indigo">QR poster</h1>
+        <Notice tone="warning">Your QR poster is ready once your charity is approved and listed.</Notice>
+        <Link href={`/charity-admin/${id}`} className="inline-block text-sm text-brand underline">Back to your overview</Link>
+      </div>
+    );
   }
   const url = charityPageUrl(charity.slug);
   // The code opens the page tagged as the poster; the printed address stays short.

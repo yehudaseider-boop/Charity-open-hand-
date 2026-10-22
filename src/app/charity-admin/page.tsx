@@ -4,11 +4,14 @@ import { Badge } from "@/components/badge";
 import { BilingualName } from "@/components/bilingual-name";
 import { requireCharityAdmin } from "@/lib/auth";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Your charities", robots: { index: false, follow: false } };
 
 export default async function CharityAdminPage() {
   const viewer = await requireCharityAdmin();
+  // Givezy staff who help run no charity have nothing to list here: the admin area is theirs.
+  if (viewer.charities.length === 0 && viewer.isPlatformAdmin) redirect("/admin");
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Your charities</h1>

@@ -1,8 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { CURRENT_PATH_HEADER } from "@/lib/current-path";
 
 /** Keeps the Supabase login session fresh on every page request. */
 export async function proxy(request: NextRequest) {
+  // Tell the page which path (with its query) was asked for, so a detour via sign-in or the second
+  // step can come back to it. Set here, never trusted from the browser.
+  request.headers.set(CURRENT_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

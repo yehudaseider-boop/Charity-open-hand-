@@ -14,11 +14,12 @@ import { createClient } from "@/lib/supabase/server";
  * Two things only the server may read are added for their own donations: the
  * details typed at checkout and the agreements ticked there.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   // Givezy signs people in with an emailed code only; a password session gets nothing (src/lib/auth.ts).
-  if (!user || (await signedInWithPassword(supabase))) return new NextResponse("Please sign in.", { status: 401 });
+  // An expired session gets the sign-in page, not a bare line of text.
+  if (!user || (await signedInWithPassword(supabase))) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent("/account/data")}`, request.url), { status: 303 });
   if (await hitRateLimit("data-export", [`user:${user.id}`], 5, 60)) {
     return new NextResponse("Too many downloads. Please try again in an hour.", { status: 429 });
   }

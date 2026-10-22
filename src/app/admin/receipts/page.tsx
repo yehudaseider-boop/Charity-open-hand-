@@ -128,7 +128,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
         {tabs.map((t) => (
           <Link
             key={t}
-            href={`/admin/receipts?status=${t}`}
+            href={`/admin/receipts?status=${t}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
             className={`rounded-full border px-3 py-1.5 ${t === status ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
           >
             {t === "issued" ? "Issued" : "Withdrawn"}

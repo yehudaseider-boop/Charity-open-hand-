@@ -16,6 +16,7 @@ import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { HebrewAware } from "@/components/hebrew-aware";
 import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
+import { getViewer } from "@/lib/auth";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };
@@ -32,6 +33,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The payment provider adds its own "reference" (the same value) to our address, so a key
   // can arrive twice: take the first.
   const fromApp = first(params.from) === "app";
+  const viewer = await getViewer();
   const ref = first(params.reference) ?? "";
   const t = first(params.t);
   // If the payment provider can't be reached, or the result can't be saved yet, say we're still
@@ -123,7 +125,10 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             Back to the Givezy app
           </a>
         ) : null}
-        <Link href={`/c/${charity.slug}`} className="mt-3 inline-block font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link>
+        <p className="mt-3 flex flex-wrap gap-4">
+          <Link href={`/c/${charity.slug}`} className="font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link>
+          {viewer ? <Link href="/account" className="font-semibold text-brand underline underline-offset-4">See your giving</Link> : null}
+        </p>
       </Result>
     );
   }
@@ -170,6 +175,10 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       <Result tone="wait" title="We're checking this payment">
         <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
         <p className="mt-3 text-sm text-muted">Questions in the meantime? <HelpLine /></p>
+        <p className="mt-4 flex flex-wrap gap-4 text-sm">
+          <Link href="/charities" className="font-semibold text-brand underline underline-offset-4">Find a charity</Link>
+          <Link href="/account" className="font-semibold text-brand underline underline-offset-4">Your account</Link>
+        </p>
       </Result>
     );
   }

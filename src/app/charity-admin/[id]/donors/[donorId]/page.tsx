@@ -17,6 +17,7 @@ import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { addDonorNote, addDonorReminder, addDonorTag, deleteDonorNote, deleteDonorReminder, editDonorNote, markReminder, removeDonorTag } from "../care-actions";
 import { ButtonForm, NoteForm, ReminderForm, TagForm } from "../care-forms";
+import { BackLink } from "@/components/back-link";
 
 export const metadata: Metadata = { title: "Donor" };
 
@@ -60,7 +61,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
 
   return (
     <div className="space-y-4">
-      <Link href={`${base}/donors`} className="text-sm text-muted">← Donors</Link>
+      <BackLink href={`${base}/donors`}>← Donors</BackLink>
       {typeof sp.did === "string" && CARE_DONE[sp.did] ? (
         <p role="status" className="rounded-card bg-success-soft p-3 text-sm text-success">{CARE_DONE[sp.did]}</p>
       ) : null}

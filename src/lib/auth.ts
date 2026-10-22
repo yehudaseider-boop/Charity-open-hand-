@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireSecondStep } from "@/lib/mfa";
 import { legalConfig } from "@/config/legal";
 import { createClient } from "@/lib/supabase/server";
+import { currentNext } from "@/lib/current-path";
 
 export type Viewer = {
   userId: string;
@@ -64,6 +65,7 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer | null
 });
 
 export async function requireViewer(next = "/account"): Promise<Viewer> {
+  next = await currentNext(next);
   const viewer = await getViewer();
   if (!viewer) redirect(`/login?next=${encodeURIComponent(next)}`);
   // Everyone with an account agrees to the current Terms and Privacy Policy first.
@@ -74,13 +76,13 @@ export async function requireViewer(next = "/account"): Promise<Viewer> {
 export async function requirePlatformAdmin(): Promise<Viewer> {
   const viewer = await requireViewer("/admin");
   if (!viewer.isPlatformAdmin) redirect("/account?denied=admin");
-  await requireSecondStep("/admin");
+  await requireSecondStep(await currentNext("/admin"));
   return viewer;
 }
 
 export async function requireCharityAdmin(): Promise<Viewer> {
   const viewer = await requireViewer("/charity-admin");
   if (viewer.managedCharityIds.length === 0 && !viewer.isPlatformAdmin) redirect("/account?denied=charity");
-  await requireSecondStep("/charity-admin");
+  await requireSecondStep(await currentNext("/charity-admin"));
   return viewer;
 }

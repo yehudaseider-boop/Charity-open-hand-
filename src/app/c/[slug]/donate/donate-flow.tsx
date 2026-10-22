@@ -450,7 +450,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
             <p className="font-semibold text-danger">{state.message}</p>
             {state.failedToStart ? <p className="text-muted">If it keeps happening: <SupportContact />.</p> : null}
             {state.campaignEnded ? (
-              <a href={`/c/${slug}/donate?amount=${shownQuote.amountCents}`} className="inline-block font-bold text-brand underline underline-offset-4">
+              <a href={`/c/${slug}/donate?${new URLSearchParams({ amount: String(shownQuote.amountCents), ...(fromApp ? { from: "app" } : {}), ...(source ? { [SOURCE_PARAM]: source } : {}), ...(initialLabel ? { label: initialLabel } : {}) }).toString()}`} className="inline-block font-bold text-brand underline underline-offset-4">
                 Give {formatRand(shownQuote.amountCents)} to {charityName} instead
               </a>
             ) : null}

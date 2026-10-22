@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CharityNav } from "@/components/charity-nav";
 import { Drop } from "@/components/drop";
-import { getViewer } from "@/lib/auth";
+import { getViewer, requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 
@@ -22,6 +22,8 @@ const statusChip = {
  */
 export default async function CharityLayout({ children, params }: LayoutProps<"/charity-admin/[id]">) {
   const { id } = await params;
+  // Signed out: the sign-in page, never "not found" (the layout and the page render side by side).
+  await requireViewer(`/charity-admin/${id}`);
   const { charity } = await loadCharityForManager(id);
   // Givezy looking at a charity it isn't part of: say so on every page, since what it saves is real.
   const viewer = await getViewer();

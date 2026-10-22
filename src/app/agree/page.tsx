@@ -38,6 +38,10 @@ export default async function AgreePage({ searchParams }: PageProps<"/agree">) {
         {sp.error ? <p role="alert" className="text-sm text-danger">Please tick both boxes to continue.</p> : null}
         <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Continue</button>
       </form>
+      {/* Not a trap: the public pages work without an account, and signing out is right here. */}
+      <form action="/auth/signout" method="post" className="text-center">
+        <button className="text-sm text-muted underline">Not now, sign me out</button>
+      </form>
     </div>
   );
 }

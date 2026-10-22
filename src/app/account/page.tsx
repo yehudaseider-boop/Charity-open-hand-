@@ -30,7 +30,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const { data: monthlyGifts } = donorIds.length
     ? await supabase
         .from("recurring_donations")
-        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, charities(name_en)")
+        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, charities(name_en, slug)")
         .in("donor_id", donorIds)
         .in("status", ["active", "paused", "failed"])
         .order("created_at", { ascending: false })
@@ -41,9 +41,11 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       {monthlyResult === "done" ? <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success">Your monthly donation has been updated.</p> : null}
       {monthlyResult === "error" ? <p role="status" className="rounded-control bg-danger-soft p-3 text-sm text-danger">We couldn&apos;t change that monthly donation. Please try again.</p> : null}
       {denied ? (
-        <p className="rounded-control bg-danger-soft p-3 text-sm text-danger">
-          You don&apos;t have access to that page.
-        </p>
+        <div className="space-y-2 rounded-control bg-danger-soft p-3 text-sm text-danger">
+          <p>You don&apos;t have access to that page with this account{viewer.email ? ` (${viewer.email})` : ""}.</p>
+          <p>If you were invited to help run a charity, sign in with the email address the invitation was sent to.</p>
+          <form action="/auth/signout" method="post"><button className="underline">Sign out</button></form>
+        </div>
       ) : null}
       <section className="rounded-card bg-surface border border-border p-5">
         <h1 className="text-xl font-semibold">Your account</h1>
@@ -60,14 +62,14 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           <h2 className="font-semibold">Your monthly donations</h2>
           <ul className="space-y-2">
             {monthlyGifts.map((m) => {
-              const charity = (Array.isArray(m.charities) ? m.charities[0] : m.charities) as { name_en: string } | null;
+              const charity = (Array.isArray(m.charities) ? m.charities[0] : m.charities) as { name_en: string; slug: string } | null;
               return (
                 <li key={m.id} className="rounded-control border border-border p-3 text-sm">
-                  <p className="font-medium">{charity?.name_en ?? "Charity"}: {formatRand(Number(m.amount_cents) + Number(m.contribution_cents))} a month</p>
+                  <p className="font-medium">{charity ? <Link href={`/c/${charity.slug}`} className="underline underline-offset-4">{charity.name_en}</Link> : "Charity"}: {formatRand(Number(m.amount_cents) + Number(m.contribution_cents))} a month</p>
                   <p className="text-muted">
                     {m.status === "active" && m.next_charge_at ? `Next payment on ${formatDate(m.next_charge_at)}` : null}
                     {m.status === "paused" ? "Paused. Nothing is collected until you resume." : null}
-                    {m.status === "failed" ? "Stopped: we could not collect it from your card. Start a new monthly donation on the charity's page to carry on." : null}
+                    {m.status === "failed" ? "Stopped: we could not collect it from your card. Start a new monthly donation on the charity's page (the link above) to carry on." : null}
                     {m.card_last4 && m.status !== "failed" ? ` · Card ending ${m.card_last4}` : null}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-3">

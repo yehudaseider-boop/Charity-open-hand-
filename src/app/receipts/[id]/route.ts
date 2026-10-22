@@ -12,7 +12,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/receipts/[i
   const { id } = await ctx.params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not found", { status: 404 });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not found", { status: 404 });
+  // An expired session gets the sign-in page, not a bare line of text.
+  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent("/account")}`, _request.url), { status: 303 });
 
   const { data: receipt } = await supabase
     .from("s18a_receipts")

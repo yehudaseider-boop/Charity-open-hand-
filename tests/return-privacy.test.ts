@@ -32,6 +32,7 @@ vi.mock("@/lib/donations/confirm", () => ({
   savedOutcome: async () => outcome,
 }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }) }));
+vi.mock("@/lib/auth", () => ({ getViewer: async () => null }));
 vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit, ipKeys: (ip: string) => [`ip:${ip}`] }));
 vi.mock("@/lib/donations/confirmation-access", () => ({
   confirmationTokenMatches: async (_id: string, t?: string) => t === "good-credential",

@@ -17,6 +17,7 @@ import { cameInBy } from "@/lib/charity/recorded-gifts";
 import { giftSourceLabel } from "@/lib/donations/source";
 import { removeRecordedGifts } from "../record-actions";
 import { RemoveImportForm } from "../record-forms";
+import { BackLink } from "@/components/back-link";
 
 export const metadata: Metadata = { title: "Donation" };
 
@@ -48,7 +49,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
 
   return (
     <div className="space-y-4">
-      <Link href={`/charity-admin/${id}/donations`} className="text-sm text-muted">← Donations</Link>
+      <BackLink href={`/charity-admin/${id}/donations`}>← Donations</BackLink>
       <div>
         <p className="text-2xl font-semibold">{formatRand(d.amount_cents)}</p>
         <div className="mt-1"><Badge tone={s.tone}>{s.label}</Badge></div>

@@ -4,6 +4,7 @@ import { TermsAndPrivacyLinks } from "@/components/legal";
 import { getViewer } from "@/lib/auth";
 import { sendLoginLink, verifyLoginCode } from "./actions";
 import { PendingButton } from "@/components/forms/pending-button";
+import { safeNextPath } from "@/lib/safe-path";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -28,7 +29,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <h1 className="text-xl font-semibold">Sign in</h1>
       {viewer && !sent ? (
         <p className="mt-3 text-sm">
-          You&apos;re signed in{viewer.email ? ` as ${viewer.email}` : ""}. <Link href="/account" className="text-brand underline">Go to your account</Link>.
+          You&apos;re signed in{viewer.email ? ` as ${viewer.email}` : ""}. <Link href={safeNextPath(next)} className="text-brand underline">{safeNextPath(next) === "/account" ? "Go to your account" : "Carry on"}</Link>.
         </p>
       ) : sent ? (
         <div className="mt-3 space-y-4">

@@ -2,6 +2,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { requireSecondStep } from "@/lib/mfa";
+import { currentNext } from "@/lib/current-path";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { DocumentType } from "./validation";
@@ -30,7 +31,8 @@ export async function loadCharityForManager(id: string) {
   // Admins prove their second step first: until then the database shows them nothing.
   const viewer = await getViewer();
   if (viewer && (viewer.isPlatformAdmin || viewer.managedCharityIds.includes(id))) {
-    await requireSecondStep(`/charity-admin/${id}`);
+    // Back to the page asked for (not just the overview) once the code is in.
+    await requireSecondStep(await currentNext(`/charity-admin/${id}`));
   }
   const supabase = await createClient();
   // Confirm management rights before reading anything private.
