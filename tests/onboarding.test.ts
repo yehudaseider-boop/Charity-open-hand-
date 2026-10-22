@@ -188,3 +188,27 @@ describe("draft charity", () => {
     );
   });
 });
+
+describe("bank details are the owner's (review 22/10/2026)", () => {
+  it("in a draft, an admin who is not the owner can't change them; the owner can", async () => {
+    // The meals charity back in draft, with the meals admin made a plain admin of it.
+    await scenario(
+      async () => {
+        await run("update public.charities set status = 'draft' where id = $1", [meals]);
+        await run("update public.charity_admins set role = 'admin' where charity_id = $1 and user_id = $2", [meals, mealsAdmin]);
+      },
+      async () => {
+        await expect(run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals])).rejects.toThrow(/owner/);
+      },
+    );
+    await scenario(
+      async () => {
+        await run("update public.charities set status = 'draft' where id = $1", [meals]);
+      },
+      async () => {
+        await expect(run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals])).resolves.toBeTruthy();
+      },
+    );
+  });
+});
+

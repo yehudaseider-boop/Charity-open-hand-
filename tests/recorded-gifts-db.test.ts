@@ -132,6 +132,15 @@ describe("recorded gifts", () => {
     });
   });
 
+  it("finds a donor who gave online with capitals in their email (review 22/10/2026)", async () => {
+    await tx(async () => {
+      const online = (await run("insert into public.donors (email, donor_type) values ('Sarah.Case@Gmail.test', 'individual') returning id")).rows[0].id;
+      const gift = { donor_type: "individual", email: "sarah.case@gmail.test", first_name: "Sarah", last_name: "Case", amount_cents: 50_000, paid_at: "2026-03-05T12:00:00+02:00", tax_year: 2027, method: "eft", wants_18a: false, campaign_id: null, reference: "EFT-CASE" };
+      const r = (await run("select public.record_gifts($1, $2, null, $3) as r", [charity, admin, JSON.stringify([gift])])).rows[0].r;
+      expect((await run("select donor_id from public.donations where id = $1", [r.donation_ids[0]])).rows[0].donor_id).toBe(online);
+    });
+  });
+
   it("only the server may call record_gifts", async () => {
     await tx(async () => {
       await run("set local role authenticated");

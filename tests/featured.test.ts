@@ -38,6 +38,10 @@ describe("cause of the week in the database", () => {
       await run("rollback to savepoint s");
       await run("set local role anon");
       expect((await run("select week_start::text from public.featured_charities order by week_start")).rows.map((r) => r.week_start)).toEqual(["2026-10-26"]);
+      // Which Givezy person chose it is not for visitors (review 22/10/2026).
+      await run("savepoint t");
+      await expect(run("select created_by from public.featured_charities")).rejects.toThrow(/permission denied/);
+      await run("rollback to savepoint t");
       await expect(run("insert into public.featured_charities (charity_id, week_start) values ($1, '2026-11-09')", [approved])).rejects.toThrow(/permission denied/);
     } finally {
       await run("rollback");
