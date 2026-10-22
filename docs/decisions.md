@@ -99,6 +99,13 @@
   shows it at the top of Discover. A week with no pick shows no card: nothing is chosen automatically, and a
   charity that stops being approved drops out at once.
 
+- **Yearly s18A list, draft for SARS (22/10/2026, Yehuda):** per charity and tax year, every issued receipt with the
+  donor, address, number of gifts and amount, a total, and what SARS will want that is missing (no address, no ID
+  or tax number, no registration number). Givezy's version (Admin, s18A receipts) shows the last 4 digits of the ID
+  and tax numbers as printed on the receipt; the charity's (Receipts) only says whether one is on file. CSV and
+  Excel. It is a list to check before the IT3(d) submission, not the SARS file: that waits on the SARS layout, and
+  will need the full numbers decrypted on the server.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

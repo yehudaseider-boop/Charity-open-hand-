@@ -39,6 +39,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
     receipts.push(...((data ?? []) as typeof receipts));
     if (!data || data.length < 1000) break;
   }
+  const issuedYears = [...new Set(receipts.filter((r) => r.status === "issued").map((r) => r.tax_year))].sort((a, b) => b - a);
   const taxYear = thisTaxYear(new Date());
   const { gifts, onIssued } = await loadReceiptGifts(id);
   const progress = receiptProgress(gifts, onIssued, taxYear.taxYear);
@@ -100,6 +101,26 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
                 ) : (
                   <Badge tone="success">All receipted</Badge>
                 )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {issuedYears.length ? (
+        <Card title="Yearly list (draft)">
+          <p className="mb-2 text-sm text-muted">
+            Every s18A receipt issued for a tax year, with what SARS will want that is missing (an address, or an ID or tax number).
+            For your records and to check before the year&apos;s SARS submission. It shows whether an ID or tax number is on file, never the number.
+          </p>
+          <ul className="divide-y divide-border text-sm">
+            {issuedYears.map((y) => (
+              <li key={y} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span>{taxYearLabel(y)}</span>
+                <span className="space-x-3">
+                  <a href={`/charity-admin/${id}/receipts/year-list?year=${y}`} className="text-brand underline">CSV</a>
+                  <a href={`/charity-admin/${id}/receipts/year-list?year=${y}&format=xlsx`} className="text-brand underline">Excel</a>
+                </span>
               </li>
             ))}
           </ul>

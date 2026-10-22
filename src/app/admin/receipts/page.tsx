@@ -10,6 +10,8 @@ import { receiptsEnabled } from "@/config/receipts";
 import { getRun, listUnfinishedRuns, listWaitingRuns, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
 import { finishReceipts, markReceiptsStopped, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
 import { FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
+import { yearsWithReceipts } from "@/lib/receipts/year-list-store";
+import { Card } from "@/components/card";
 
 export const metadata: Metadata = { title: "Receipts" };
 
@@ -39,7 +41,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
   }
   const { data: receipts, error } = await query;
   if (error) throw error;
-  const [waiting, unfinished] = await Promise.all([listWaitingRuns(), listUnfinishedRuns()]);
+  const [waiting, unfinished, years] = await Promise.all([listWaitingRuns(), listUnfinishedRuns(), yearsWithReceipts()]);
   const pending = await Promise.all(waiting.map((w) => pendingAtYearEnd(w.charity_id, w.tax_year)));
   const enabled = receiptsEnabled();
 
@@ -103,6 +105,25 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
           </div>
         ))}
       </section>
+      {years.length ? (
+        <Card title="Yearly lists for SARS (draft)">
+          <p className="mb-2 text-sm text-muted">
+            Every issued receipt for a charity&apos;s tax year, with the last 4 digits of each ID and tax number and anything SARS will want that is missing.
+            A list to check before the IT3(d) submission, not the SARS file itself: that layout comes from SARS and isn&apos;t built yet.
+          </p>
+          <ul className="divide-y divide-border text-sm">
+            {years.map((y) => (
+              <li key={`${y.charityId}-${y.taxYear}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="min-w-0">{y.charityName}, tax year {y.taxYear} <span className="text-muted">({y.count} {y.count === 1 ? "receipt" : "receipts"})</span></span>
+                <span className="space-x-3">
+                  <a href={`/admin/receipts/year-list?charity=${y.charityId}&year=${y.taxYear}`} className="text-brand underline">CSV</a>
+                  <a href={`/admin/receipts/year-list?charity=${y.charityId}&year=${y.taxYear}&format=xlsx`} className="text-brand underline">Excel</a>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
       <nav className="flex gap-2 text-sm">
         {tabs.map((t) => (
           <Link
