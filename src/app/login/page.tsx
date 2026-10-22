@@ -25,8 +25,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const viewer = await getViewer();
 
   return (
-    <div className="mx-auto max-w-sm rounded-card bg-surface border border-border p-6">
-      <h1 className="text-xl font-semibold">Sign in</h1>
+    <div className="mx-auto max-w-md rounded-card border-2 border-border bg-surface p-6 sm:p-8">
+      <h1 className="font-display text-2xl text-indigo">Sign in</h1>
       {viewer && !sent ? (
         <p className="mt-3 text-sm">
           You&apos;re signed in{viewer.email ? ` as ${viewer.email}` : ""}. <Link href={safeNextPath(next)} className="text-brand underline">{safeNextPath(next) === "/account" ? "Go to your account" : "Carry on"}</Link>.
@@ -45,10 +45,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 required
-                className="w-full rounded-control border border-border bg-surface px-3 py-2.5 text-lg tracking-widest"
+                className="w-full rounded-control border-2 border-border bg-surface px-3 py-2.5 text-lg tracking-widest"
               />
               {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-              <PendingButton pendingLabel="Signing in…" className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Sign in</PendingButton>
+              <PendingButton pendingLabel="Signing in…" className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">Sign in</PendingButton>
             </form>
           ) : null}
           <p className="text-xs text-muted">
@@ -69,10 +69,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             required
             autoComplete="email"
             defaultValue={email}
-            className="w-full rounded-control border border-border bg-surface px-3 py-2.5"
+            className="w-full rounded-control border-2 border-border bg-surface px-3 py-2.5"
           />
           {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-          <PendingButton pendingLabel="Sending…" className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">
+          <PendingButton pendingLabel="Sending…" className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">
             Email me a sign-in link
           </PendingButton>
           <p className="text-xs text-muted">

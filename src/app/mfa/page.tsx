@@ -31,8 +31,8 @@ export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
     : null;
 
   return (
-    <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">
-      <h1 className="text-xl font-semibold">{verified ? "Enter your code" : "Set up a second step"}</h1>
+    <div className="mx-auto max-w-md rounded-card border-2 border-border bg-surface p-6 sm:p-8">
+      <h1 className="font-display text-2xl text-indigo">{verified ? "Enter your code" : "Set up a second step"}</h1>
       <div className="mt-4">
         {error ? <p role="alert" className="mb-3 text-sm text-danger">{error}</p> : null}
         {verified ? (

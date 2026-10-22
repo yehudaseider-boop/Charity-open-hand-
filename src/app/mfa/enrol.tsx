@@ -12,7 +12,7 @@ export function Enrol({ next }: { next: string }) {
           Charity accounts need a second step when signing in. Use an authenticator app on your phone, such as Google Authenticator, Microsoft Authenticator or Authy.
         </p>
         {state.error ? <p role="alert" className="text-sm text-danger">{state.error}</p> : null}
-        <button disabled={pending} className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-50">
+        <button disabled={pending} className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy disabled:opacity-50">
           Set up authenticator app
         </button>
       </form>
@@ -22,13 +22,13 @@ export function Enrol({ next }: { next: string }) {
     <form action={verifyCode} className="space-y-3">
       <p className="text-sm">1. Scan this code with your authenticator app.</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={state.qr} alt="QR code for your authenticator app" width={192} height={192} className="mx-auto rounded-control border border-border bg-surface p-2" />
+      <img src={state.qr} alt="QR code for your authenticator app" width={192} height={192} className="mx-auto rounded-control border-2 border-border bg-surface p-2" />
       <p className="text-xs text-muted">Can&apos;t scan? Enter this key instead: <span className="break-all font-mono">{state.secret}</span></p>
       <p className="text-sm">2. Enter the 6-digit code it shows.</p>
       <input type="hidden" name="factorId" value={state.factorId} />
       <input type="hidden" name="next" value={next} />
       <CodeField />
-      <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Confirm and continue</button>
+      <button className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">Confirm and continue</button>
     </form>
   );
 }
@@ -43,7 +43,7 @@ export function CodeField() {
       maxLength={7}
       required
       aria-label="6-digit code"
-      className="w-full rounded-control border border-border bg-surface px-3 py-2.5 text-center text-lg tracking-widest"
+      className="w-full rounded-control border-2 border-border bg-surface px-3 py-2.5 text-center text-lg tracking-widest"
     />
   );
 }

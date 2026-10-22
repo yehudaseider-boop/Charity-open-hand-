@@ -14,7 +14,7 @@ export function MonthlyButton({ id, status, label, danger, confirmText }: { id: 
     >
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="status" value={status} />
-      <PendingButton pendingLabel="Saving…" className={`min-h-11 text-sm underline ${danger ? "text-danger" : "text-brand"}`}>{label}</PendingButton>
+      <PendingButton pendingLabel="Saving…" className={`min-h-11 rounded-full border-2 px-4 py-1.5 text-sm font-semibold transition ${danger ? "border-danger-soft text-danger hover:border-danger" : "border-border text-brand hover:border-brand"}`}>{label}</PendingButton>
     </form>
   );
 }

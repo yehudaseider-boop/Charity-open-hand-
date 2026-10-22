@@ -1225,3 +1225,9 @@ PSFA asked on the intro call to explore the product themselves. The first demo w
 - **Headings** on every admin page now use the same title style as the rest of the product.
 - **Not changed**: what any admin page does, and its wording. Checked every admin page at 375px and at laptop width for content cut off: none.
 - **Still to do in the design plan**: the donor account pages (giving history, monthly donations, tax pack, "Your information") and sign-in (sign-in, agree to the terms, the second step), left over from phase 3.
+
+## 22/10/2026: Donor account and sign-in in design direction A (phase 6)
+- **Account** (`/account`): a pale lilac header band with the signed-in email as the title and the person's roles as chips, then soft cards (monthly donations, s18A receipts, tax packs, manage, your information) with the same card and title style as the dashboard. Pause, resume and "Cancel for good" are now real buttons (a soft outline, red for cancel) instead of bare underlined words; cancelling still asks first.
+- **Sign-in, agree to the terms, the second step**: one soft card each, title in the product's heading style, thicker field borders, and the one orange pressable button per screen (navy text). What each page does is unchanged, including the "Not now, sign me out" way out on the agreement page.
+- **Your information and the tax pack** use the same card and title style.
+- **Checked** at 375px and laptop width for content cut off: none. The design plan's six phases are now done (style guide, home, donor pages, dashboard, admin, account and sign-in).

@@ -23,7 +23,7 @@ export default async function YourInformationPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Your information</h1>
+      <h1 className="font-display text-2xl text-indigo">Your information</h1>
       <p className="text-sm text-muted">
         What we keep and why is set out in our <Link href="/privacy" className="text-brand underline">Privacy Policy</Link>.
       </p>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
+import { Drop } from "@/components/drop";
 import { BilingualName } from "@/components/bilingual-name";
 import { requireViewer } from "@/lib/auth";
 import { formatDate, taxYearFor, taxYearLabel } from "@/lib/dates";
@@ -37,7 +38,23 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
     : { data: [] };
 
   return (
-    <div className="space-y-4">
+    // full-bleed: the header band runs edge to edge, like a charity's dashboard (see globals.css).
+    <div className="full-bleed overflow-x-clip">
+      <header className="relative overflow-hidden border-b-2 border-border bg-honey-soft">
+        <Drop colour="orange" className="-right-6 -top-10 hidden h-28 w-auto rotate-12 sm:block" />
+        <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-bold text-brand">Your account</p>
+            <h1 className="break-all font-display text-[clamp(1.5rem,4vw,2.25rem)] font-semibold leading-tight text-indigo">{viewer.email}</h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:mr-24">
+            <Badge>Donor</Badge>
+            {viewer.managedCharityIds.length > 0 ? <Badge tone="brand">Charity admin</Badge> : null}
+            {viewer.isPlatformAdmin ? <Badge tone="success">Platform admin</Badge> : null}
+          </div>
+        </div>
+      </header>
+      <div className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
       {monthlyResult === "done" ? <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success">Your monthly donation has been updated.</p> : null}
       {monthlyResult === "error" ? <p role="status" className="rounded-control bg-danger-soft p-3 text-sm text-danger">We couldn&apos;t change that monthly donation. Please try again.</p> : null}
       {denied ? (
@@ -47,24 +64,14 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           <form action="/auth/signout" method="post"><button className="underline">Sign out</button></form>
         </div>
       ) : null}
-      <section className="rounded-card bg-surface border border-border p-5">
-        <h1 className="text-xl font-semibold">Your account</h1>
-        <p className="mt-1 break-all text-sm text-muted">{viewer.email}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge>Donor</Badge>
-          {viewer.managedCharityIds.length > 0 ? <Badge tone="brand">Charity admin</Badge> : null}
-          {viewer.isPlatformAdmin ? <Badge tone="success">Platform admin</Badge> : null}
-        </div>
-      </section>
-
       {monthlyGifts && monthlyGifts.length > 0 ? (
-        <section className="rounded-card bg-surface border border-border p-5 space-y-3">
-          <h2 className="font-semibold">Your monthly donations</h2>
+        <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
+          <h2 className="font-display text-xl font-semibold text-indigo">Your monthly donations</h2>
           <ul className="space-y-2">
             {monthlyGifts.map((m) => {
               const charity = (Array.isArray(m.charities) ? m.charities[0] : m.charities) as { name_en: string; slug: string } | null;
               return (
-                <li key={m.id} className="rounded-control border border-border p-3 text-sm">
+                <li key={m.id} className="rounded-control border-2 border-border p-3 text-sm">
                   <p className="font-medium">{charity ? <Link href={`/c/${charity.slug}`} className="underline underline-offset-4">{charity.name_en}</Link> : "Charity"}: {formatRand(Number(m.amount_cents) + Number(m.contribution_cents))} a month</p>
                   <p className="text-muted">
                     {m.status === "active" && m.next_charge_at ? `Next payment on ${formatDate(m.next_charge_at)}` : null}
@@ -88,12 +95,12 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         </section>
       ) : null}
 
-      <section className="rounded-card bg-surface border border-border p-5 space-y-3">
-        <h2 className="font-semibold">Your s18A receipts</h2>
+      <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
+        <h2 className="font-display text-xl font-semibold text-indigo">Your s18A receipts</h2>
         {receipts && receipts.length > 0 ? (
           <ul className="space-y-2">
             {receipts.map((r) => (
-              <li key={r.id} className="rounded-control border border-border p-3 text-sm">
+              <li key={r.id} className="rounded-control border-2 border-border p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{r.reference}</p>
@@ -123,8 +130,8 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         )}
       </section>
 
-      <section className="rounded-card bg-surface border border-border p-5 space-y-2">
-        <h2 className="font-semibold">Tax packs</h2>
+      <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-2">
+        <h2 className="font-display text-xl font-semibold text-indigo">Tax packs</h2>
         <p className="text-sm text-muted">Every donation in a tax year, what goes on s18A receipts, and the totals. Save it as a PDF or a spreadsheet for your tax return.</p>
         <ul className="flex flex-wrap gap-2">
           {[0, 1, 2].map((back) => {
@@ -141,34 +148,35 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       </section>
 
       {viewer.managedCharityIds.length > 0 || viewer.isPlatformAdmin ? (
-        <section className="rounded-card bg-surface border border-border p-5 space-y-3">
-          <h2 className="font-semibold">Manage</h2>
+        <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
+          <h2 className="font-display text-xl font-semibold text-indigo">Manage</h2>
           {viewer.charities.map((c) => (
-            <Link key={c.id} href={`/charity-admin/${c.id}`} className="block rounded-control border border-border p-3">
+            <Link key={c.id} href={`/charity-admin/${c.id}`} className="block rounded-control border-2 border-border p-3">
               <BilingualName en={c.name_en} he={c.name_he} />
             </Link>
           ))}
           {viewer.managedCharityIds.length > 0 && viewer.charities.length === 0 ? (
-            <Link href="/charity-admin" className="block rounded-control border border-border p-3">
+            <Link href="/charity-admin" className="block rounded-control border-2 border-border p-3">
               Your charities (you&apos;ll be asked for your authenticator code)
             </Link>
           ) : null}
           {viewer.isPlatformAdmin ? (
-            <Link href="/admin" className="block rounded-control border border-border p-3">
+            <Link href="/admin" className="block rounded-control border-2 border-border p-3">
               Platform admin
             </Link>
           ) : null}
         </section>
       ) : null}
 
-      <Link href="/account/data" className="block rounded-card border border-border bg-surface p-5 text-sm">
-        <span className="font-semibold">Your information</span>
+      <Link href="/account/data" className="block rounded-card border-2 border-border bg-surface p-5 text-sm transition hover:border-brand">
+        <span className="font-display text-lg font-semibold text-indigo">Your information</span>
         <span className="block text-muted">Download it, or ask us to correct or delete it</span>
       </Link>
 
       <form action="/auth/signout" method="post">
         <button className="text-sm text-muted underline">Sign out</button>
       </form>
+      </div>
     </div>
   );
 }

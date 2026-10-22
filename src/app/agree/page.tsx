@@ -18,8 +18,8 @@ export default async function AgreePage({ searchParams }: PageProps<"/agree">) {
   if (viewer.agreedToCurrentPolicy) redirect(next);
 
   return (
-    <div className="mx-auto max-w-sm space-y-4 rounded-card border border-border bg-surface p-6">
-      <h1 className="text-xl font-semibold">Before you continue</h1>
+    <div className="mx-auto max-w-md space-y-4 rounded-card border-2 border-border bg-surface p-6 sm:p-8">
+      <h1 className="font-display text-2xl text-indigo">Before you continue</h1>
       <DraftNotice />
       <p className="text-sm text-muted">
         {platformConfig.appName} keeps your email address and your giving records so you can see them here and in the app.
@@ -36,7 +36,7 @@ export default async function AgreePage({ searchParams }: PageProps<"/agree">) {
           <span>I am 18 or older.</span>
         </label>
         {sp.error ? <p role="alert" className="text-sm text-danger">Please tick both boxes to continue.</p> : null}
-        <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Continue</button>
+        <button className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">Continue</button>
       </form>
       {/* Not a trap: the public pages work without an account, and signing out is right here. */}
       <form action="/auth/signout" method="post" className="text-center">
