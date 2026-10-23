@@ -135,7 +135,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
         each charity issues. Donations only: any contribution to {platformConfig.appName} is a separate payment and is not listed. Dates are in South African time.
       </p>
 
-      <nav className="flex flex-wrap gap-4 text-sm print:hidden">
+      <nav aria-label="Tax packs" className="flex flex-wrap gap-4 text-sm print:hidden">
         {year > 2020 ? <Link href={`/account/tax-pack/${year - 1}`} className="text-brand underline">Tax pack {year - 1}</Link> : null}
         {year < current ? <Link href={`/account/tax-pack/${year + 1}`} className="text-brand underline">Tax pack {year + 1}</Link> : null}
         <Link href="/account" className="text-brand underline">Back to your account</Link>

@@ -55,7 +55,7 @@ export default async function AdminCharitiesPage({ searchParams }: PageProps<"/a
           </ul>
         ) : null}
       </Card>
-      <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
+      <nav aria-label="Show charities" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
         {tabs.map((t) => (
           <Link
             key={t}

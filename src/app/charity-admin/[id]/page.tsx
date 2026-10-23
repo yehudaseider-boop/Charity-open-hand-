@@ -24,7 +24,7 @@ export const metadata: Metadata = { title: "Overview" };
 function Stat({ label, value, note, strong = false }: { label: string; value: string; note?: string; strong?: boolean }) {
   return (
     <div className={`rounded-card p-5 ${strong ? "bg-indigo text-white" : "bg-honey-soft"}`}>
-      <p className={`text-sm font-medium ${strong ? "text-honey" : "text-muted"}`}>{label}</p>
+      <p className={`text-sm font-medium ${strong ? "text-honey-soft" : "text-muted"}`}>{label}</p>
       <p className="mt-1 font-display text-3xl leading-tight">{value}</p>
       {note ? <p className={`mt-1 text-sm ${strong ? "text-white/80" : "text-muted"}`}>{note}</p> : null}
     </div>

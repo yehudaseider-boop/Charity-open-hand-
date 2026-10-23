@@ -23,7 +23,7 @@ export default async function AdminPage() {
         href="/admin/charities?status=pending_review"
         className="block rounded-card bg-indigo p-5 text-white transition hover:brightness-110 sm:p-6"
       >
-        <p className="text-sm font-medium text-honey">Waiting for review</p>
+        <p className="text-sm font-medium text-honey-soft">Waiting for review</p>
         <p className="mt-1 font-display text-4xl leading-tight">{waiting}</p>
         <p className="mt-1 text-sm text-white/80">{waiting === 1 ? "application" : "applications"} waiting for a person to look at them</p>
       </Link>

@@ -128,7 +128,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
           </ul>
         </Card>
       ) : null}
-      <nav className="flex gap-2 text-sm">
+      <nav aria-label="Show receipts" className="flex gap-2 text-sm">
         {tabs.map((t) => (
           <Link
             key={t}

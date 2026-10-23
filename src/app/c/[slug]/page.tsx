@@ -99,7 +99,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
 
       <div className="mx-auto grid max-w-[75rem] gap-8 px-4 pb-20 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12">
         {/* Giving comes first on a phone, and stays beside the story on a laptop. */}
-        <aside className="lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1 lg:self-start">
+        <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1 lg:self-start">
           <div className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6">
             {charity.impact_en || unit ? (
               <div className="rounded-control bg-honey-soft p-4">
@@ -135,7 +135,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
             </ul>
             <Info terms={["s18a"]} label="an s18A receipt" />
           </div>
-        </aside>
+        </div>
 
         <div className="min-w-0 space-y-10 lg:col-start-1 lg:row-start-1">
           {/* What they're raising for right now comes before the story. */}

@@ -158,6 +158,8 @@
 
 - **More launch fixes, 23/10/2026:** Paystack bank names mapped (FNB, TymeBank and Capitec would not have connected; found by comparing our list with Paystack's public bank list); a receipt is marked emailed only after a real send; a charity renaming itself is audited; the daily job repeats the monthly collection (50 a run) within 40 seconds; receipt pages ask for 60 seconds. Not verified from here: Vercel's free-plan limits on schedule frequency and run time (see `docs/launch-plan.md`).
 
+- **Accessibility check, 23/10/2026:** an automated check (axe, WCAG 2 A and AA plus best practice) run on every public page, every charity dashboard page, every admin page and the account pages, at phone and laptop width, against a production build. Found and fixed: small labels on the blue stat tiles were pale lavender (contrast 4.28, needs 4.5), now pale lilac; the navigation areas had no names for a screen reader (Main, Show donations and so on); the charity page's side panel was marked as a second landmark inside the page. All pages now pass. Automated checks do not replace a person trying it with a screen reader and the keyboard.
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

@@ -13,7 +13,7 @@ export async function SiteHeader() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto" />
         </Link>
-        <nav className="flex items-center gap-3 whitespace-nowrap text-sm sm:gap-4">
+        <nav aria-label="Main" className="flex items-center gap-3 whitespace-nowrap text-sm sm:gap-4">
           <Link href="/charities" className="hover:text-brand">Charities</Link>
           {/* Phones: the home page and footer link here instead, so the header stays on one line. */}
           <Link href="/for-charities" className="hidden hover:text-brand sm:inline">For charities</Link>

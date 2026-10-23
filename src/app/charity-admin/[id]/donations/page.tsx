@@ -147,7 +147,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
         ) : null}
       </div>
 
-      <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
+      <nav aria-label="Show donations" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
         {statusTabs.map((f) => (
           <Link
             key={f}
