@@ -44,6 +44,9 @@ In the Expo project's environment (production): `EXPO_PUBLIC_SUPABASE_URL`, `EXP
 
 ## After saving
 
+Redeploy, sign in as admin and open Admin, **Settings check** (`/admin/settings`). It ticks each setting or says in plain words what to fix, and never shows a value.
+
+
 1. Redeploy (Deployments, the latest one, Redeploy).
 2. Open `/api/health`. Expect `{"ok":true}`.
 3. Settings, Cron Jobs: one job, `/api/jobs/daily`. (If Vercel refuses the schedule on the free plan, tell Claude what it says.)

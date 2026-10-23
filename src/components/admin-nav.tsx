@@ -16,6 +16,7 @@ const groups = [
   },
   { title: "Content", tabs: [{ href: "/admin/featured", label: "Cause of the week" }, { href: "/admin/causes", label: "Causes" }] },
   { title: "People", tabs: [{ href: "/admin/requests", label: "Privacy requests" }] },
+  { title: "Setup", tabs: [{ href: "/admin/settings", label: "Settings check" }] },
 ];
 
 /**

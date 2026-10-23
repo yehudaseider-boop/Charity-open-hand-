@@ -37,6 +37,7 @@ Each step: Yehuda clicks, Claude checks. About 2 to 3 hours. Bring: GoDaddy logi
 1. Vercel, project `charity-open-hand`, Settings, Git: production branch `milestone-1-foundation`.
 2. Settings, Environment Variables: Claude reads the list out one by one (site address, database keys, `ENCRYPTION_KEY`, `CRON_SECRET`, `CLIENT_IP_HEADER=x-real-ip`, `EMAIL_ALLOWLIST`, `ADMIN_NOTIFY_EMAIL`, test gateway for now). Never pasted into chat.
 3. Redeploy, then open `https://charity-open-hand.vercel.app/api/health`. Expect `{"ok":true}`.
+   Then sign in as admin and open **Admin, Settings check** (`/admin/settings`): a tick or a plain-words fix for every setting and the newest database changes, never showing a value. Open it again after each step below.
 
 ### 3. test.givezy.co.za (20 minutes, plus waiting for DNS)
 1. Vercel, Settings, Domains, add `test.givezy.co.za`. Vercel shows a record to add.
