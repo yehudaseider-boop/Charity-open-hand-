@@ -28,6 +28,8 @@ Nothing here costs money until a step says **Approval needed**. Claude stops at 
 
 Each step: Yehuda clicks, Claude checks. About 2 to 3 hours. Bring: GoDaddy login, Vercel login, Supabase login, an email address for Paystack.
 
+**Progress, 23/10/2026 (Session 1, part 1).** Step 1 done: all seven database changes are on the test project (paste file `docs/test-site/2026-10-23-paste-once.sql` run, every check true). Step 2: all 11 Vercel settings are in (CLIENT_IP_HEADER, CRON_SECRET and ADMIN_NOTIFY_EMAIL added today); the site is built from `milestone-1-foundation` and `/api/health` answers ok. **Next: click Redeploy in Vercel so the new settings take effect, then open Admin, Settings check.** Then steps 3 to 5. Still open: support email, company name and number, partial refunds on s18A, the Paystack test card table.
+
 ### 1. Test database up to date (Supabase, 10 minutes)
 1. Yehuda says yes to the four waiting changes. Claude runs them on the test project:
    `20261022000003_charity_impact_unit.sql`, `20261022000004_monthly_new_card.sql`, `20261022000005_recorded_gifts_need_approval.sql`, and the cause list (Admin, Causes, "Add the launch list" once the site is up).
