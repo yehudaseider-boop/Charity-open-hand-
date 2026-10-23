@@ -14,6 +14,8 @@ export function typedDay(raw: unknown): string | null {
   else if ((match = /^(\d{1,2})\s*[/.\- ]\s*(\d{1,2})\s*[/.\- ]\s*(\d{4})$/.exec(s))) [d, m, y] = [Number(match[1]), Number(match[2]), Number(match[3])];
   else if ((match = /^(\d{2})(\d{2})(\d{4})$/.exec(s))) [d, m, y] = [Number(match[1]), Number(match[2]), Number(match[3])];
   else return null;
+  // A year before 1900 is a typing slip (yyyymmdd typed into ddmmyyyy, or a dropped digit), never a real date here.
+  if (y < 1900) return null;
   const t = new Date(Date.UTC(y, m - 1, d));
   if (t.getUTCFullYear() !== y || t.getUTCMonth() !== m - 1 || t.getUTCDate() !== d) return null;
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;

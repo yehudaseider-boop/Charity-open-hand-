@@ -18,7 +18,7 @@ describe("typedDay", () => {
     expect(typedDay("31/04/2026")).toBeNull();
   });
   it("refuses empty, silly and two-digit-year input", () => {
-    for (const s of ["", "   ", "tomorrow", "5/3/26", "2026/03/05", "0/0/0000", "1234567", "<script>", null, undefined]) expect(typedDay(s)).toBeNull();
+    for (const s of ["05/03/0999", "20111205", "", "   ", "tomorrow", "5/3/26", "2026/03/05", "0/0/0000", "1234567", "<script>", null, undefined]) expect(typedDay(s)).toBeNull();
   });
   it("shows yyyy-mm-dd as dd/mm/yyyy and leaves anything else as typed", () => {
     expect(showDay("2026-10-23")).toBe("23/10/2026");

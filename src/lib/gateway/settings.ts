@@ -7,7 +7,7 @@ import type { SettingCheck } from "@/lib/ops/settings-check";
 type Env = Record<string, string | undefined>;
 
 export function gatewaySettings(env: Env, site: "live" | "test" | "unknown"): SettingCheck[] {
-  const gateway = env.PAYMENT_GATEWAY || "test";
+  const gateway = env.PAYMENT_GATEWAY ?? "test";
   const out: SettingCheck[] = [];
   if (gateway === "test") {
     out.push(

@@ -13,7 +13,7 @@ type Env = Record<string, string | undefined>;
 export function siteKind(env: Env): "live" | "test" | "unknown" {
   try {
     const host = new URL(env.SITE_URL ?? "").hostname;
-    return host.startsWith("test.") || host === "localhost" || host === "127.0.0.1" ? "test" : "live";
+    return host.startsWith("test.") || host.endsWith(".vercel.app") || host === "localhost" || host === "127.0.0.1" ? "test" : "live";
   } catch {
     return "unknown";
   }

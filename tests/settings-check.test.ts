@@ -38,6 +38,7 @@ describe("the settings check", () => {
     expect(siteKind({ SITE_URL: "https://test.givezy.co.za" })).toBe("test");
     expect(siteKind({ SITE_URL: "https://givezy.co.za" })).toBe("live");
     expect(siteKind({})).toBe("unknown");
+    expect(siteKind({ SITE_URL: "https://charity-open-hand.vercel.app" })).toBe("test");
   });
 
   it("catches the payment key mix-ups that cost money or block gifts", () => {
@@ -52,6 +53,8 @@ describe("the settings check", () => {
     const t = { ...testSite, PAYMENT_GATEWAY: "test", TEST_GATEWAY_SECRET: "s", ALLOW_TEST_GATEWAY: "yes" };
     expect(fixes(t)).toEqual([]);
     expect(fixes({ ...t, ALLOW_TEST_GATEWAY: "" })).toEqual(["ALLOW_TEST_GATEWAY"]);
+    // Empty is not "test": the site refuses an empty gateway name, so the check must too.
+    expect(fixes({ ...testSite, PAYMENT_GATEWAY: "" })).toEqual(["PAYMENT_GATEWAY"]);
     expect(fixes({ ...t, SITE_URL: "https://givezy.co.za", EMAIL_ALLOWLIST: "" })).toEqual(["PAYMENT_GATEWAY"]);
   });
 
