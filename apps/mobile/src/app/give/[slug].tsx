@@ -330,7 +330,7 @@ export default function Give() {
   // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
   const isMonthly = monthly && !campaignId && !heldAttempt;
   // What the typed amount pays for, by the charity's own figure (none when it set no figure).
-  const amountImpact = charity?.impactUnit && gift ? impactLine(gift, charity.impactUnit, { monthly: isMonthly }) : null;
+  const amountImpact = charity?.impactUnit && gift && gift >= minGift && (maxGift === null || gift <= maxGift) ? impactLine(gift, charity.impactUnit, { monthly: isMonthly }) : null;
   const authorised = isMonthly && total !== null && authorisedTotal === total;
   const s18aAvailable = server ? server.receiptsAvailable : charity.issues18a;
   const savedLast4 = server?.savedIdLast4 ?? null;

@@ -26,7 +26,7 @@ describe("causes", () => {
   });
 });
 
-const quiet: DailyChecks = { pending: { checked: 3, paid: 2, failed: 1, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 1, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+const quiet: DailyChecks = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 3, paid: 2, failed: 1, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 1, failedAgain: 0 }, unhandledEvents: 0, held: {} };
 const fine: JobProblems = { monthlyErrors: 0, monthlyReview: 0, monthlyStopped: 0, payoutsFailed: false, monthlyFailed: false };
 
 describe("the daily safety-net email", () => {
@@ -44,6 +44,7 @@ describe("the daily safety-net email", () => {
     expect(lines).toContain("3 confirmation emails to donors still could not be sent.");
     expect(lines).toContain("Dispute (chargeback) opened: 1");
     expect(lines.some((l) => l.startsWith("A monthly donation was paid twice"))).toBe(true);
+    expect(dailyDigest({ ...quiet, incomplete: true }, { ...fine, monthlyCutOff: true }).join("\n")).toMatch(/monthly collection ran out of time[\s\S]*daily checks ran out of time/);
     expect(lines.join("\n")).not.toMatch(/!|—/);
   });
 });
@@ -63,18 +64,26 @@ describe("the scheduler's key", () => {
 describe("collecting monthly donations run after run", () => {
   const { collectMonthlyWithin } = awaitedOps;
   const empty = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [] };
-  it("keeps going while a full run of 50 comes back, then stops", async () => {
-    const answers = [50, 50, 12];
+  it("keeps going while donations are being collected, and stops when a run finds none due", async () => {
+    const answers = [50, 50, 12, 0];
     let calls = 0;
-    const r = await collectMonthlyWithin(async () => ({ ...empty, considered: answers[calls++], paid: answers[calls - 1] }), 40_000, () => 0);
-    expect(r).toMatchObject({ runs: 3, considered: 112, paid: 112 });
+    const r = await collectMonthlyWithin(async () => ({ ...empty, considered: answers[calls++], paid: answers[calls - 1] }), 35_000, () => 0);
+    expect(r).toMatchObject({ runs: 4, considered: 112, paid: 112 });
+  });
+  it("stops when a run makes no progress, so rows that only error don't come back every run", async () => {
+    const r = await collectMonthlyWithin(async () => ({ ...empty, considered: 3, errors: [{ id: "x", message: "m" }] }), 35_000, () => 0);
+    expect(r.runs).toBe(1);
+    expect(r.errors).toHaveLength(1);
+  });
+  it("passes each run its deadline, stops when a run says it was cut off, and says so", async () => {
+    const deadlines: number[] = [];
+    const r = await collectMonthlyWithin(async (d) => (deadlines.push(d), { ...empty, considered: 5, paid: 5, cutOff: true }), 35_000, () => 1_000);
+    expect(deadlines).toEqual([36_000]);
+    expect(r).toMatchObject({ runs: 1, cutOff: true });
   });
   it("stops when the time is used, and always does at least one run", async () => {
     let clock = 0;
-    let calls = 0;
-    const r = await collectMonthlyWithin(async () => ({ ...empty, considered: (calls++, 50), errors: [{ id: "x", message: "m" }] }), 40_000, () => (clock += 20_000));
+    const r = await collectMonthlyWithin(async () => ({ ...empty, considered: 50, paid: 50 }), 35_000, () => (clock += 40_000));
     expect(r.runs).toBe(1);
-    expect(r.errors).toHaveLength(1);
-    expect(calls).toBe(1);
   });
 });

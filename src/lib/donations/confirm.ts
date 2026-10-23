@@ -8,6 +8,9 @@ import { cardSaveWaitingFor, finishCardSave } from "./saved-card";
 import { finishNewCard, newCardWaitingFor } from "./new-card";
 import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyHandledElsewhere, monthlyWaitingFor } from "./recurring";
 
+/** A payment saved this recently is still being finished by the call that saved it. */
+const RECENT_PAYMENT_MS = 3 * 60_000;
+
 export type ConfirmOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /** The donation could not be read or written, so no final answer can be given. Safe to retry. */
@@ -165,15 +168,20 @@ async function finishCardKeeping(donation: { id: string; gateway: string }, refe
   if (again.status === "success") await finishCardSave(donation.id, again, donation.gateway);
 }
 
-/** A paid card update whose card was not kept yet (the first confirmation died part-way): do it now. */
+/**
+ * A paid card update whose card was not kept yet (the call that saved the payment stopped part-way): finish it now.
+ * Leaves a payment saved in the last few minutes alone: the call that saved it is most likely still finishing it,
+ * and two at once would only repeat the same changes and the same email. The daily check comes back later.
+ */
 async function finishCardUpdate(donation: { id: string; gateway: string; recurring_id: string | null }, reference: string): Promise<void> {
   if (!donation.recurring_id || !(await newCardWaitingFor(donation.id))) return;
   const again = await gatewayByName(donation.gateway).verifyTransaction(reference);
   if (again.status !== "success") return;
-  await finishNewCard(donation.id, again);
-  // The call that saved this payment stopped before its confirmation email (that is why the update was left
-  // unfinished): send it now.
-  await notifyDonationPaid(donation.id);
+  const paidAt = again.paidAt ? new Date(again.paidAt).getTime() : 0;
+  if (Number.isFinite(paidAt) && Date.now() - paidAt < RECENT_PAYMENT_MS) return;
+  const done = await finishNewCard(donation.id, again);
+  // Only the call that really finished it sends the confirmation the first call never got to send.
+  if (done.finishedHere) await notifyDonationPaid(donation.id);
 }
 
 async function currentStatus(donationId: string): Promise<string> {

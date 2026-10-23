@@ -60,7 +60,7 @@ export function ChangeBankForm({ action, current }: { action: Action; current: {
       submitLabel="Change bank details"
       confirm="Change this charity's bank details? It will come off the payment gateway until you connect it again, and its contact will be emailed."
     >
-      <SelectField name="bank_name" label="Bank" required defaultValue={current.bank_name} options={bankNames.map((b) => ({ value: b, label: b }))} />
+      <SelectField name="bank_name" label="Bank" required defaultValue={current.bank_name} hint="A Capitec business account? Choose Capitec Business." options={bankNames.map((b) => ({ value: b, label: b }))} />
       <TextField name="bank_account_holder" label="Account holder" required defaultValue={current.bank_account_holder ?? ""} />
       <TextField name="bank_account_number" label="Account number" required inputMode="numeric" autoComplete="off" hint="6 to 16 digits." />
       <TextField name="bank_branch_code" label="Branch code" required inputMode="numeric" defaultValue={current.bank_branch_code ?? ""} hint="6 digits." />

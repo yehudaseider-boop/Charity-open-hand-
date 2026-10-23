@@ -100,6 +100,10 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     entityId: charityId,
     details: renamed ? { name_from: charity.name_en, name_to: v.name_en } : undefined,
   });
+  const figureBefore = [charity.impact_unit_cents, charity.impact_unit_one, charity.impact_unit_many].map((x) => (x == null ? "" : String(x))).join("|");
+  const figureAfter = [impact.unit?.cents, impact.unit?.one, impact.unit?.many].map((x) => (x == null ? "" : String(x))).join("|");
+  // The figure sits under the "Verified" badge and is a claim, so a change to it is told to the reviewer too.
+  if (figureBefore !== figureAfter) await tellReviewer(charity, "its \"what one gift pays for\" figure");
   if (renamed) await tellReviewer(charity, `its name, from "${charity.name_en}" to "${v.name_en}"`);
   const done = await recordAction(charityId, viewer.userId, "profile_saved", {}, { type: "restore", table: "charities", before, after, categories: categoriesBefore, categoriesAfter: categoryIds });
   revalidate(charityId, charity.slug);

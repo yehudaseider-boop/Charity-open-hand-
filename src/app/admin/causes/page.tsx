@@ -24,8 +24,9 @@ export default async function CausesPage({ searchParams }: PageProps<"/admin/cau
   if (linkError) throw linkError;
   const used = new Map<string, number>();
   for (const l of links ?? []) used.set(l.category_id as string, (used.get(l.category_id as string) ?? 0) + 1);
-  const done = typeof sp.done === "string" ? causeMessages[sp.done] : undefined;
-  const problem = typeof sp.error === "string" ? causeMessages[sp.error] : undefined;
+  const said = (k: unknown) => (typeof k === "string" && Object.hasOwn(causeMessages, k) ? causeMessages[k] : undefined);
+  const done = said(sp.done);
+  const problem = said(sp.error);
   const list = causes ?? [];
 
   return (

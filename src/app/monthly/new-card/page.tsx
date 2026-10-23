@@ -18,7 +18,7 @@ function tryMessage(x: string): string | null {
   if (x === "link") return "This link has expired or isn't complete. Sign in to your account to update your card there.";
   if (x === "limit") return "That was a few tries in a short time. Nothing was charged. Please wait ten minutes, then try again.";
   if (x === "error") return "Something went wrong on our side. Nothing was charged and your monthly donation is unchanged. Please try again.";
-  if (["not_needed", "busy", "charity_closed", "gone", "gateway"].includes(x)) return offerMessage(x as NotOffered | "gateway");
+  if (["not_needed", "busy", "charity_closed", "gone", "gateway", "start_again"].includes(x)) return offerMessage(x as NotOffered | "gateway");
   return null;
 }
 
@@ -66,9 +66,10 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
   }
   if (!offer.ok) {
     return (
-      <Shell title={offer.reason === "not_needed" ? "Nothing to update" : "Your card can't be updated right now"}>
+      <Shell title={offer.reason === "not_needed" ? "Nothing to update" : offer.reason === "start_again" ? "Your monthly donation has stopped" : "Your card can't be updated right now"}>
         <p>{offerMessage(offer.reason)}</p>
         <p className="mt-4 flex flex-wrap gap-4">
+          {offer.charitySlug ? <Link href={`/c/${offer.charitySlug}/donate`} className="font-semibold text-brand underline underline-offset-4">Start a new monthly donation</Link> : null}
           <Link href="/account" className="font-semibold text-brand underline underline-offset-4">Your account</Link>
           <Link href="/charities" className="font-semibold text-brand underline underline-offset-4">Find a charity</Link>
         </p>

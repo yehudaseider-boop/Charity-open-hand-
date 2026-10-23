@@ -79,3 +79,29 @@ describe("a charity's own impact figure", () => {
       expect(cleared.rowCount).toBe(1);
     }));
 });
+
+describe("impact names and causes (second review)", () => {
+  it("a unit name cannot start with a digit, even written straight to the database", async () => {
+    await run("begin");
+    try {
+      await run("savepoint s");
+      await expect(run("update public.charities set impact_unit_cents = 1200, impact_unit_one = '30 meals', impact_unit_many = 'meals' where id = $1", [ids.meals])).rejects.toThrow(/impact_unit_names_start_with_letter/);
+      await run("rollback to savepoint s");
+      await expect(run("update public.charities set impact_unit_cents = 1200, impact_unit_one = 'meal', impact_unit_many = 'meals' where id = $1", [ids.meals])).resolves.toBeTruthy();
+    } finally {
+      await run("rollback");
+    }
+  });
+  it("a cause a charity has chosen cannot be deleted", async () => {
+    await run("begin");
+    try {
+      await run("insert into public.categories (slug, name_en) values ('review-test-cause', 'Review test') ");
+      const cat = (await run("select id from public.categories where slug = 'review-test-cause'")).rows[0].id;
+      await run("insert into public.charity_categories (charity_id, category_id) values ($1, $2)", [ids.meals, cat]);
+      await run("savepoint s");
+      await expect(run("delete from public.categories where id = $1", [cat])).rejects.toThrow(/charity_categories_category_id_fkey/);
+    } finally {
+      await run("rollback");
+    }
+  });
+});

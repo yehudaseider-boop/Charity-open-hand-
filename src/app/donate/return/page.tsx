@@ -62,7 +62,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many)";
+  const select = "id, recurring_id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (holdsToken) {
@@ -96,7 +96,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "paid" && d && charity) {
     // What this gift pays for, worked out from the charity's own figure (none when it set no figure).
     const unit = impactUnitFrom(charity);
-    const paysFor = unit ? impactLine(Number(d.amount_cents), unit, { you: true }) : null;
+    const paysFor = unit ? impactLine(Number(d.amount_cents), unit, { you: true, monthly: Boolean(d.recurring_id) }) : null;
     return (
       <Result tone="paid" title="Thank you">
         {/* What the gift does, in the charity's own words (left out when it hasn't written one). */}

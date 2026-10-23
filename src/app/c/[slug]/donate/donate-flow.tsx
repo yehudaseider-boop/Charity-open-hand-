@@ -9,6 +9,7 @@ import { TextArea, TextField, useFieldId } from "@/components/forms/fields";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
 import { impactLine, impactSource, type ImpactUnit } from "@/lib/charity/impact";
+import { platformConfig } from "@/config/platform";
 import { parseRandToCents } from "@/lib/money";
 
 type Props = {
@@ -61,7 +62,8 @@ function offlineOrDown(e: unknown, step: "quote" | "pay"): { ok: false; message:
 export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account, source, impactUnit }: Props) {
   // What the typed amount pays for, as the donor types it (only when the charity set its own figure).
   const [typedCents, setTypedCents] = useState<number | null>(initialAmountCents ?? null);
-  const typedImpact = impactUnit && typedCents ? impactLine(typedCents, impactUnit) : null;
+  // Only for an amount we can take: never a "pays for" line next to an amount the server will refuse.
+  const typedImpact = impactUnit && typedCents && typedCents >= platformConfig.minDonationCents && typedCents <= platformConfig.maxDonationCents ? impactLine(typedCents, impactUnit) : null;
   const [quoteState, requestQuote, quoting] = useActionState(async (prev: QuoteState, fd: FormData): Promise<QuoteState> => {
     try {
       return await getQuote(slug, prev, fd);

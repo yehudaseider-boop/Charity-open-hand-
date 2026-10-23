@@ -17,6 +17,7 @@ import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
 import { ddmmyyyy, hhmm, jhbToday, rand } from "@/lib/format";
+import { openGiveScreen } from "@/lib/give-entry";
 import { helpLine } from "@/lib/help";
 import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving";
 import { goalProgress, knownLabels, MAX_GOALS, monthTiles, type Goal } from "@/lib/goals";
@@ -585,7 +586,7 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {rand(r.cents)} a month{r.contributionCents ? ` (+ ${rand(r.contributionCents)} to Givezy)` : ""} · {r.status === "failed" ? "Stopped: the card was declined" : r.needsCard && r.status === "active" ? "Card declined: tap to update" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {rand(r.cents)} a month{r.contributionCents ? ` (+ ${rand(r.contributionCents)} to Givezy)` : ""} · {r.status === "failed" ? (r.needsCard ? "Stopped: the card was declined" : "Stopped: start a new monthly donation") : r.needsCard && r.status === "active" ? "Card declined: tap to update" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
                       <ChevronIcon />
@@ -646,8 +647,17 @@ export default function Giving() {
               <>
                 {open.status === "failed" ? (
                   <View style={{ gap: 10 }}>
-                    <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. Put in a new card to carry it on: this month is paid with it, then it continues as before.</Text>
-                    <Button label={cardBusy ? "Opening…" : "Update card"} disabled={cardBusy} onPress={() => void updateCard(open.id)} />
+                    {open.needsCard ? (
+                      <>
+                        <Text>We could not collect this monthly donation from your card, so it has stopped and nothing more will be charged. Put in a new card to carry it on: this month is paid with it, then it continues as before.</Text>
+                        <Button label={cardBusy ? "Opening…" : "Update card"} disabled={cardBusy} onPress={() => void updateCard(open.id)} />
+                      </>
+                    ) : (
+                      <>
+                        <Text>The card you put in can&apos;t be used for monthly payments, so this monthly donation has stopped and nothing more will be charged. To carry on giving monthly, start a new one with a different card.</Text>
+                        <Button variant="secondary" label={`Give to ${open.charityName} again`} onPress={() => { const slug = open.charitySlug; setOpen(null); openGiveScreen(slug); }} />
+                      </>
+                    )}
                     <Text variant="label">{helpLine()}</Text>
                     <Button label={busy ? "Removing…" : "Remove it from my list"} disabled={busy} onPress={() => confirmThen("Remove this monthly donation?", "It has already stopped and nothing more is charged. It will no longer show in your list.", "Remove", () => changeRecurring(open.id, "cancelled"))} />
                   </View>

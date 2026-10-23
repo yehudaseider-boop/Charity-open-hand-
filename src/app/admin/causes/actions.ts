@@ -30,6 +30,8 @@ export async function addCause(formData: FormData): Promise<void> {
   const { data: same } = await db.from("categories").select("id").eq("slug", checked.slug).maybeSingle();
   if (same) redirect(back({ error: "duplicate" }));
   const { error } = await db.from("categories").insert({ slug: checked.slug, name_en: checked.name, sort_order: await nextOrder() });
+  // Two admins adding the same cause at once: the second is told it is already there.
+  if (error?.code === "23505") redirect(back({ error: "duplicate" }));
   if (error) throw error;
   await logAudit({ actorUserId: admin.userId, action: "cause.added", entityType: "category", entityId: checked.slug });
   refresh();
@@ -100,6 +102,8 @@ export async function removeCause(formData: FormData): Promise<void> {
   const { count } = await db.from("charity_categories").select("charity_id", { count: "exact", head: true }).eq("category_id", id);
   if (count) redirect(back({ error: "in_use" }));
   const { data: gone, error } = await db.from("categories").delete().eq("id", id).select("id");
+  // A charity chose it after the count above: the database refuses (it never silently drops their choice).
+  if (error?.code === "23503") redirect(back({ error: "in_use" }));
   if (error) throw error;
   if (!gone?.length) redirect(back({ error: "missing" }));
   await logAudit({ actorUserId: admin.userId, action: "cause.removed", entityType: "category", entityId: id });

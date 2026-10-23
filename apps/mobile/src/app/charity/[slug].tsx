@@ -106,7 +106,7 @@ export default function CharityDetail() {
               {charity.impact ? <Text style={styles.impactLine}>{charity.impact}</Text> : null}
               {charity.impactUnit ? (
                 <Text style={charity.impact ? styles.impactSub : styles.impactLine}>
-                  {rand(charity.impactUnit.cents)} pays for one {charity.impactUnit.one}{charity.impact ? ", by their own figure" : ""}.
+                  {rand(charity.impactUnit.cents)} pays for one {charity.impactUnit.one}{charity.impact ? `, by ${charity.nameEn}'s own figure` : ""}.
                 </Text>
               ) : null}
               {firstCampaign ? (

@@ -52,6 +52,8 @@ export interface MonthlyStore {
 }
 
 export type MonthlyDeps = {
+  /** Stop starting new donations after this time (epoch milliseconds): a host kills a run that goes on too long. */
+  deadline?: number;
   store: MonthlyStore;
   charge(req: { reference: string; r: DueMonthly; totalCents: number }): Promise<void>;
   confirm(reference: string): Promise<ConfirmOutcome>;
@@ -71,6 +73,8 @@ export type MonthlySummary = {
   paid: number;
   failed: number;
   stopped: number;
+  /** The run stopped early, out of time: the rest is collected by the next run. */
+  cutOff?: boolean;
   /** Not settled yet, or skipped: checked again next run. */
   waiting: { id: string; reason: string }[];
   alreadyPaid: number;
@@ -124,6 +128,11 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
   const { rows, unreadable } = await store.due(now, deps.limit ?? 50);
   summary.errors.push(...unreadable);
   for (const r of rows) {
+    // Out of time: stop before the next donation (nothing is half done, and what is left is taken next run).
+    if (deps.deadline !== undefined && Date.now() > deps.deadline) {
+      summary.cutOff = true;
+      break;
+    }
     summary.considered += 1;
     try {
       const period = collectingPeriod(r, now);

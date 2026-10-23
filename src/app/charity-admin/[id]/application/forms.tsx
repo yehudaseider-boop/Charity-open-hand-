@@ -62,7 +62,7 @@ export function BankForm({ action, priv }: {
 }) {
   return (
     <ActionForm action={action} submitLabel="Save bank details">
-      <SelectField name="bank_name" label="Bank" required defaultValue={priv?.bank_name}
+      <SelectField name="bank_name" label="Bank" required defaultValue={priv?.bank_name} hint="A Capitec business account? Choose Capitec Business."
         options={bankNames.map((b) => ({ value: b, label: b }))} />
       <TextField name="bank_account_holder" label="Account holder" required defaultValue={priv?.bank_account_holder}
         hint="Must be the organisation itself, not a person." />

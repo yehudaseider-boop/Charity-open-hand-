@@ -18,8 +18,10 @@ async function handle(request: NextRequest) {
   if (allowed === null) return new NextResponse("Switched off", { status: 503 });
   if (!allowed) return new NextResponse("Not allowed", { status: 401 });
 
-  // Up to 40 seconds of the minute for the monthly collection: it goes run after run while donations are due.
-  const monthly = await collectMonthlyWithin(() => runMonthlyGiving(), 40_000).catch((e) => {
+  // The function is allowed 60 seconds: up to 35 for the monthly collection (it goes run after run while donations
+  // are due, and stops starting new ones at its deadline), and the checks stop at 52.
+  const started = Date.now();
+  const monthly = await collectMonthlyWithin((deadline) => runMonthlyGiving(new Date(), deadline), 35_000).catch((e) => {
     console.error("[daily] monthly collection failed", e);
     return null;
   });
@@ -29,7 +31,7 @@ async function handle(request: NextRequest) {
   });
   let checks;
   try {
-    checks = await runDailyChecks();
+    checks = await runDailyChecks(new Date(), started + 52_000);
   } catch (e) {
     console.error("[daily] checks failed", e);
     await alertGivezy("the daily check could not run", ["The daily safety check stopped with an error (see the job log). Nothing was charged by it. It runs again tomorrow."]);
@@ -37,6 +39,7 @@ async function handle(request: NextRequest) {
   }
   const lines = dailyDigest(checks, {
     monthlyFailed: monthly === null,
+    monthlyCutOff: monthly?.cutOff === true,
     monthlyErrors: monthly?.errors.length ?? 0,
     monthlyReview: monthly?.review.length ?? 0,
     monthlyStopped: monthly?.stopped ?? 0,
@@ -44,7 +47,16 @@ async function handle(request: NextRequest) {
   });
   if (lines.length) await alertGivezy(`${lines.length} ${lines.length === 1 ? "thing needs" : "things need"} a person today`, lines);
   // Only counts come back: no donor details.
-  return NextResponse.json({ monthly, payouts, checks, attention: lines.length }, { headers: { "Cache-Control": "no-store" } });
+  const counts = (a: unknown[]) => a.length;
+  return NextResponse.json(
+    {
+      monthly: monthly && { ...monthly, waiting: counts(monthly.waiting), review: counts(monthly.review), errors: counts(monthly.errors) },
+      payouts: payouts && { ...payouts, failed: counts(payouts.failed) },
+      checks,
+      attention: lines.length,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export const GET = handle;

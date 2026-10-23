@@ -70,7 +70,8 @@ export async function loadCategories() {
   const { data, error } = await supabase
     .from("categories")
     .select("id, slug, name_en, name_he")
-    .order("sort_order");
+    .order("sort_order")
+    .order("name_en");
   if (error) throw error;
   return data;
 }

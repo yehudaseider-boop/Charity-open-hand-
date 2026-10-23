@@ -8,6 +8,7 @@ import { formatDate, taxYearFor, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyButton } from "./monthly-button";
+import { DECLINED_REASON, NEW_CARD_NOT_REUSABLE } from "@/lib/donations/monthly-reasons";
 
 export const metadata: Metadata = { title: "Account", robots: { index: false, follow: false } };
 
@@ -77,11 +78,11 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                     {m.status === "active" && m.failed_attempts > 0 ? "Your card was declined this month. We'll try it again, or you can put in a new card. " : null}
                     {m.status === "active" && m.next_charge_at ? `${m.failed_attempts > 0 ? "Next try" : "Next payment"} on ${formatDate(m.next_charge_at)}` : null}
                     {m.status === "paused" ? "Paused. Nothing is collected until you resume." : null}
-                    {m.status === "failed" ? "Stopped: we could not collect it from your card. Put in a new card to carry it on." : null}
+                    {m.status === "failed" ? (m.ended_reason === NEW_CARD_NOT_REUSABLE ? "Stopped: the card you put in can't be used for monthly payments. Start a new monthly donation on the charity's page to carry on." : "Stopped: we could not collect it from your card. Put in a new card to carry it on.") : null}
                     {m.card_last4 && m.status !== "failed" ? ` · Card ending ${m.card_last4}` : null}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-3">
-                    {m.status === "failed" || (m.status === "active" && m.failed_attempts > 0) ? (
+                    {(m.status === "failed" && m.ended_reason === DECLINED_REASON) || (m.status === "active" && m.failed_attempts > 0) ? (
                       <Link href={`/monthly/new-card?m=${m.id}`} className="pressable inline-flex min-h-11 items-center rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-brand-contrast">
                         Update card
                       </Link>

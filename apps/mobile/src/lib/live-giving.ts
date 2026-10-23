@@ -2,6 +2,7 @@
  * Turning the donor's own rows from the database into what the screens show.
  * Pure functions (no React Native), so the website's test suite can check them.
  */
+import { DECLINED_REASON } from "@shared/donations/monthly-reasons";
 import type { Gift, Receipt, Recurring } from "../data/giving";
 import { cleanLabel, labelOf } from "@shared/donations/labels";
 import { jhbDay } from "./format";
@@ -25,6 +26,8 @@ export type RecurringRow = {
   needs_gateway_sync?: boolean;
   /** Tries this month that the card declined (more to come, or it stopped after three). */
   failed_attempts?: number | null;
+  /** Why it stopped (read only to tell a declined card, which can be replaced, from a new card that can't be used monthly). */
+  ended_reason?: string | null;
   next_charge_at: string | null;
   charities: { slug: string; name_en: string } | { slug: string; name_en: string }[] | null;
 };
@@ -85,7 +88,7 @@ export function toRecurring(rows: RecurringRow[]): Recurring[] {
         nextDate: r.next_charge_at ? jhbDay(new Date(r.next_charge_at)) : null,
         status: r.status as "active" | "paused" | "cancelled" | "failed",
         syncing: r.needs_gateway_sync === true,
-        ...(r.status === "failed" || (r.status === "active" && Number(r.failed_attempts ?? 0) > 0) ? { needsCard: true } : {}),
+        ...((r.status === "failed" && r.ended_reason === DECLINED_REASON) || (r.status === "active" && Number(r.failed_attempts ?? 0) > 0) ? { needsCard: true } : {}),
       };
     });
 }

@@ -107,7 +107,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
                 {charity.impact_en ? <p className="mt-1 font-display text-xl font-semibold leading-snug text-navy">{charity.impact_en}</p> : null}
                 {unit ? (
                   <p className={charity.impact_en ? "mt-2 text-sm text-muted" : "mt-1 font-display text-xl font-semibold leading-snug text-navy"}>
-                    {formatRand(unit.cents)} pays for one {unit.one}{charity.impact_en ? ", by their own figure" : ""}.
+                    {formatRand(unit.cents)} pays for one {unit.one}{charity.impact_en ? `, by ${charity.name_en}'s own figure` : ""}.
                   </p>
                 ) : null}
               </div>

@@ -62,7 +62,7 @@ async function loadDirectory(): Promise<Directory> {
   const db = supabase!;
   const [charities, categories, campaigns, featured] = await Promise.all([
     db.from("charities").select(CHARITY_COLUMNS).eq("status", "approved").order("name_en").limit(500),
-    db.from("categories").select("id, name_en").order("sort_order"),
+    db.from("categories").select("id, name_en").order("sort_order").order("name_en"),
     // Row-level security only shows campaigns of approved charities.
     db.from("campaigns").select("id, charity_id, title, description, target_cents, ends_at").eq("status", "active").order("created_at", { ascending: false }).limit(30),
     // Cause of the week, chosen by Givezy. Row-level security only shows picks of approved charities.

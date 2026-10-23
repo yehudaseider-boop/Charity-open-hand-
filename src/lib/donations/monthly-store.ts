@@ -11,7 +11,8 @@ import { legalConfig } from "@/config/legal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore, type MonthlySummary } from "./monthly-job";
 import { monthlyFailedEmail } from "./monthly-email";
-import { DECLINED_REASON, newCardLink, newCardPendingFor } from "./new-card";
+import { newCardLink, newCardPendingFor } from "./new-card";
+import { DECLINED_REASON } from "./monthly-reasons";
 
 type DueRow = {
   id: string;
@@ -151,7 +152,8 @@ export function supabaseMonthlyStore(): MonthlyStore {
       const patch = retryAt
         ? { attempt_period: period, failed_attempts: failedAttempts, next_charge_at: retryAt.toISOString() }
         : { attempt_period: period, failed_attempts: failedAttempts, status: "failed" as const, ended_reason: DECLINED_REASON, authorization_encrypted: null };
-      const { error } = await db.from("recurring_donations").update(patch).eq("id", id).eq("status", "active");
+      // Never over a month that was paid meanwhile (a new card paid for it): a late failure must not stop the donation.
+      const { error } = await db.from("recurring_donations").update(patch).eq("id", id).eq("status", "active").or(`last_paid_period.is.null,last_paid_period.neq.${period}`);
       if (error) throw new Error(`Could not record a failed attempt: ${error.message}`);
     },
   };
@@ -213,9 +215,10 @@ export async function createMonthlyGift(recurringId: string, donationId: string,
 }
 
 /** The real job: Supabase store, the active gateway, the confirmation check and email. */
-export async function runMonthlyGiving(now = new Date()): Promise<MonthlySummary> {
+export async function runMonthlyGiving(now = new Date(), deadline?: number): Promise<MonthlySummary> {
   const gateway = getGateway();
   const deps: MonthlyDeps = {
+    deadline,
     store: supabaseMonthlyStore(),
     now,
     async charge({ reference, r, totalCents }) {
