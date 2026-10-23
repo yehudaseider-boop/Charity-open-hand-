@@ -16,7 +16,7 @@ type Waiting = { id: string; charge_day: number };
 
 /** Why a monthly donation is closed when its first payment is seen to fail. */
 export const FIRST_PAYMENT_FAILED = "the first payment failed";
-const NOT_REUSABLE = "this payment method cannot be charged again";
+export const NOT_REUSABLE = "this payment method cannot be charged again";
 
 /**
  * The monthly donation whose first payment this is and which has not started. That includes one

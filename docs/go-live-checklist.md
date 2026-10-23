@@ -147,6 +147,7 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 - [ ] Check the confirmation link from a different device and from a signed-in account.
 - [ ] Look at unprocessed rows in `gateway_events` at the end of the day. There should be none.
 - [ ] Watch the first week: any payment stuck as pending, any error emails.
+- [ ] Tell Google about the site (free): add givezy.co.za to Google Search Console (it asks for one DNS record at GoDaddy) and submit `https://givezy.co.za/sitemap.xml`. The site map lists the public pages and every approved charity, and refreshes within the hour when a charity is approved. Only once the live site is up, never for test.givezy.co.za.
 
 ## D. Later ideas (not for go-live)
 

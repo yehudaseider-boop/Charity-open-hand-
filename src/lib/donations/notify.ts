@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
+import { NOT_REUSABLE } from "./recurring";
 
 /**
  * Called once, when a donation is confirmed paid (by the webhook or the
@@ -14,6 +15,23 @@ import { dedicationFrom, dedicationLine } from "./dedication";
 export async function notifyDonationPaid(donationId: string, opts: { monthly?: "activated" | "not_reusable" | "none" } = {}) {
   await sendDonorConfirmation(donationId, opts);
   await notifyCharityOfDonation(donationId);
+}
+
+/**
+ * What a confirmation sent after the fact says about the monthly donation. A later collection says "monthly
+ * donation". A first payment says "first payment of your monthly donation" only while it is still running (a
+ * donor who has since paused or cancelled is not told we will collect again); one whose card could not be kept
+ * says the monthly donation didn't start; one that never started at all is just a gift.
+ */
+export function monthlyLineLater(
+  donationId: string,
+  r: { first_donation_id: string | null; status: string; ended_reason: string | null; charge_day: number | null; card_last4: string | null } | null,
+): Parameters<typeof confirmationEmail>[0]["monthly"] {
+  if (!r) return undefined;
+  if (r.first_donation_id !== donationId) return { kind: "repeat" };
+  if (r.ended_reason === NOT_REUSABLE) return { kind: "not_started" };
+  if (r.status === "active") return { kind: "first", chargeDay: r.charge_day ?? 1, cardLast4: r.card_last4 };
+  return undefined;
 }
 
 /**
@@ -39,10 +57,9 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
         const { data: r } = await createAdminClient().from("recurring_donations").select("charge_day, card_last4").eq("id", d.recurring_id).maybeSingle();
         monthly = { kind: "first", chargeDay: r?.charge_day ?? 1, cardLast4: r?.card_last4 ?? null };
       } else {
-        // A later collection says "monthly donation". The first payment of a monthly donation that
-        // never started (no monthly set-up happened) is just a gift, and says so.
-        const { data: r } = await createAdminClient().from("recurring_donations").select("first_donation_id").eq("id", d.recurring_id).maybeSingle();
-        monthly = r?.first_donation_id === d.id ? undefined : { kind: "repeat" };
+        // Sent again later (the daily check resending a failed email): work out from the monthly donation as it is now.
+        const { data: r } = await createAdminClient().from("recurring_donations").select("first_donation_id, status, ended_reason, charge_day, card_last4").eq("id", d.recurring_id).maybeSingle();
+        monthly = monthlyLineLater(d.id, r);
       }
     }
     const site = process.env.SITE_URL;
