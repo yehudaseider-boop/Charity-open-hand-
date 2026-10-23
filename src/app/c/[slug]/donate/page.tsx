@@ -9,7 +9,7 @@ import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { givingKinds } from "@/lib/donations/validation";
 import { cleanLabel } from "@/lib/donations/labels";
-import { formatRand } from "@/lib/money";
+import { formatRand, parseRandToCents } from "@/lib/money";
 import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { sourceTag, withSource } from "@/lib/donations/source";
@@ -36,8 +36,12 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   const fromApp = sp.from === "app";
   const kind = typeof sp.kind === "string" && Object.hasOwn(givingKinds, sp.kind) ? givingKinds[sp.kind as keyof typeof givingKinds] : null;
   const initialLabel = cleanLabel(sp.label) ?? kind ?? undefined;
-  // Trying again after a declined card keeps the amount the donor chose.
-  const again = typeof sp.amount === "string" && /^\d{1,12}$/.test(sp.amount) ? Number(sp.amount) : 0;
+  // Trying again after a declined card keeps the amount the donor chose (our links carry it in cents). A
+  // phone that sends the amount box before the page has finished loading sends what was typed, in Rand.
+  const again =
+    typeof sp.cents === "string" && /^\d{1,12}$/.test(sp.cents) ? Number(sp.cents)
+    : typeof sp.amount === "string" ? (parseRandToCents(sp.amount.slice(0, 16)) ?? 0)
+    : 0;
   const initialAmountCents = again > 0 && again <= platformConfig.maxDonationCents ? again : undefined;
   const charity = await loadCharity(slug);
   if (!charity) notFound();

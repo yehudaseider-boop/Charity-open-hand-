@@ -177,7 +177,7 @@ describe("trying again", () => {
     outcome = "failed";
     sessionRow = { ...row, campaign_id: "c0ffee00-0000-4000-8000-000000000001" } as typeof row;
     const html = await page({});
-    expect(html).toContain('href="/c/northcliff-meals-fund/donate?label=Maaser&amp;campaign=c0ffee00-0000-4000-8000-000000000001&amp;amount=18000"');
+    expect(html).toContain('href="/c/northcliff-meals-fund/donate?label=Maaser&amp;campaign=c0ffee00-0000-4000-8000-000000000001&amp;cents=18000"');
   });
 });
 

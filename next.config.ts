@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { checkoutOrigins } from "./src/lib/gateway/checkout-origins";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -14,8 +15,9 @@ const supabaseOrigin = (() => {
 /**
  * Content security policy without nonces (see the Next.js CSP guide).
  * frame-ancestors 'none' stops other sites showing our pages in a frame
- * (clickjacking on checkout). form-action 'self': our forms only post to us; the
- * payment provider's page is reached by a server-side redirect, not a form post.
+ * (clickjacking on checkout). form-action: our forms only post to us, and may land on the payment
+ * provider's page. Once the page has loaded, that page is reached by a script, but a tap before then is a
+ * plain form post, and the browser refuses to follow our redirect unless its address is named here.
  */
 const csp = [
   "default-src 'self'",
@@ -26,7 +28,7 @@ const csp = [
   `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  ["form-action 'self'", ...checkoutOrigins(process.env.PAYMENT_GATEWAY)].join(" "),
   "frame-ancestors 'none'",
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");

@@ -86,7 +86,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const tag = tagOf(d?.came_from);
   if (tag) retryParams.set(SOURCE_PARAM, tag);
   // A declined card tries again with the same amount filled in (the donor's own figure, not a secret).
-  if (outcome === "failed" && d?.amount_cents) retryParams.set("amount", String(d.amount_cents));
+  if (outcome === "failed" && d?.amount_cents) retryParams.set("cents", String(d.amount_cents));
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
   // A new card for a monthly donation ("Update my card"): trying again goes back there, not to a new gift.
   // Only for the donor holding this payment's credential, who is the one the update link was for.
