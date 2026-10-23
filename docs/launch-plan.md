@@ -52,8 +52,16 @@ Each step: Yehuda clicks, Claude checks. About 2 to 3 hours. Bring: GoDaddy logi
 3. Same page: Test Webhook URL `https://test.givezy.co.za/api/webhooks/paystack`.
 4. Work through `docs/paystack-test-script.md` together: connect a charity, a once-off gift, a declined card, a monthly gift, "Update my card", a refund, the deposit report. Claude fixes anything that doesn't match, the same day.
 
-### 5. Email (only if free)
-Resend: Claude checks the current free allowance and price on the day. **Approval needed** before anything paid. Then the sending records go into GoDaddy DNS so mail doesn't land in spam.
+### 5. Email sending: needed before anyone but you can sign in (30 minutes)
+
+Checked against Supabase's own documentation on 23/10/2026: until a custom email service is connected, Supabase refuses to send sign-in codes to anyone who is not on your Supabase team ("Email address not authorized"), and its built-in sender is limited and "not meant for production". Sign-in codes are the only way to log in, so **no pilot charity, donor or app user can sign in until this is done.** It is the first thing that would otherwise look like "the site is broken" on the first demo.
+
+1. **Approval needed first:** Resend has a free allowance; Claude checks the current free limit and price on the day and shows you in Rand before you sign up. Nothing paid without your yes.
+2. Create the Resend account under Givezy, add `givezy.co.za` as a sending domain, and put the records it shows (SPF, DKIM) into GoDaddy DNS. Wait until Resend shows the domain as verified.
+3. Resend, API Keys: create a key for the website. Vercel settings: `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY`, `EMAIL_FROM` (for example `hello@givezy.co.za`), and on the **test** site `EMAIL_ALLOWLIST` so a test can never email a real donor. Redeploy.
+4. Supabase, Authentication, Emails, SMTP Settings: switch on custom SMTP with Resend's SMTP host, port, user and password, and the same From address. (This is what sends the sign-in codes.)
+5. Supabase, Authentication, Emails, the Magic Link template: include the code (`{{ .Token }}`) as the app needs (see `docs/decisions.md`, "To switch on").
+6. Check: sign in to test.givezy.co.za with a non-team email address. A code arrives within a minute.
 
 ## From session 1 to launch
 
