@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { runMonthlyGiving } from "@/lib/donations/monthly-store";
 import { syncPayouts } from "@/lib/donations/payouts";
 import { alertGivezy, cronAllowed } from "@/lib/ops/alert";
-import { dailyDigest, runDailyChecks } from "@/lib/ops/daily";
+import { collectMonthlyWithin, dailyDigest, runDailyChecks } from "@/lib/ops/daily";
 
 /**
  * Everything that runs once a day, in order: collect the monthly donations that are due, read the payment
@@ -18,7 +18,8 @@ async function handle(request: NextRequest) {
   if (allowed === null) return new NextResponse("Switched off", { status: 503 });
   if (!allowed) return new NextResponse("Not allowed", { status: 401 });
 
-  const monthly = await runMonthlyGiving().catch((e) => {
+  // Up to 40 seconds of the minute for the monthly collection: it goes run after run while donations are due.
+  const monthly = await collectMonthlyWithin(() => runMonthlyGiving(), 40_000).catch((e) => {
     console.error("[daily] monthly collection failed", e);
     return null;
   });

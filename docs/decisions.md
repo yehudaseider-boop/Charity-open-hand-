@@ -156,6 +156,8 @@
   paid twice is a held item with an email; a new card that can't be reused stops the monthly donation; the
   confirmation email is sent when a half-finished update is completed.
 
+- **More launch fixes, 23/10/2026:** Paystack bank names mapped (FNB, TymeBank and Capitec would not have connected; found by comparing our list with Paystack's public bank list); a receipt is marked emailed only after a real send; a charity renaming itself is audited; the daily job repeats the monthly collection (50 a run) within 40 seconds; receipt pages ask for 60 seconds. Not verified from here: Vercel's free-plan limits on schedule frequency and run time (see `docs/launch-plan.md`).
+
 ## Changes from the brief's starting data model
 
 - `users` became `profiles` (Supabase already has an auth users table).

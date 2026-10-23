@@ -18,6 +18,10 @@ import { ApproveReceiptsForm, WithdrawReceiptsForm } from "./forms";
 
 export const metadata: Metadata = { title: "s18A receipts" };
 
+// The sign-off issues, prints and emails every receipt in one go (its actions run under this page's limit).
+// 60 seconds is safe on any hosting plan; raise it (up to 300) once on a plan that allows it.
+export const maxDuration = 60;
+
 export default async function CharityReceiptsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/receipts">) {
   const { id } = await params;
   const sp = await searchParams;

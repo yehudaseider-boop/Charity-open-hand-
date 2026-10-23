@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const { causeSlug, checkCauseName, SUGGESTED_CAUSES, causeMessages } = await import("@/lib/charity/causes");
-const { dailyDigest } = await import("@/lib/ops/daily");
+const awaitedOps = await import("@/lib/ops/daily");
+const { dailyDigest } = awaitedOps;
 const { cronAllowed } = await import("@/lib/ops/alert");
 import type { DailyChecks, JobProblems } from "@/lib/ops/daily";
 
@@ -56,5 +57,24 @@ describe("the scheduler's key", () => {
     expect(cronAllowed(req("Bearer s3cret-value"))).toBe(true);
     expect(cronAllowed(req("Bearer s3cret-valuE"))).toBe(false);
     expect(cronAllowed(req())).toBe(false);
+  });
+});
+
+describe("collecting monthly donations run after run", () => {
+  const { collectMonthlyWithin } = awaitedOps;
+  const empty = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [] };
+  it("keeps going while a full run of 50 comes back, then stops", async () => {
+    const answers = [50, 50, 12];
+    let calls = 0;
+    const r = await collectMonthlyWithin(async () => ({ ...empty, considered: answers[calls++], paid: answers[calls - 1] }), 40_000, () => 0);
+    expect(r).toMatchObject({ runs: 3, considered: 112, paid: 112 });
+  });
+  it("stops when the time is used, and always does at least one run", async () => {
+    let clock = 0;
+    let calls = 0;
+    const r = await collectMonthlyWithin(async () => ({ ...empty, considered: (calls++, 50), errors: [{ id: "x", message: "m" }] }), 40_000, () => (clock += 20_000));
+    expect(r.runs).toBe(1);
+    expect(r.errors).toHaveLength(1);
+    expect(calls).toBe(1);
   });
 });

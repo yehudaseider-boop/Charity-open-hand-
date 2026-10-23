@@ -2,6 +2,20 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { GatewayError, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
+/** Paystack's name for each bank our application offers (lower case). Banks not listed here are matched by name. */
+const BANK_NAMES: Record<string, string> = {
+  absa: "Absa Bank Limited, South Africa",
+  "african bank": "African Bank Limited",
+  capitec: "Capitec Bank Limited",
+  "capitec business": "Capitec Business",
+  "discovery bank": "Discovery Bank Limited",
+  fnb: "First National Bank",
+  investec: "Investec Bank Ltd",
+  nedbank: "Nedbank",
+  "standard bank": "Standard Bank South Africa",
+  tymebank: "GoTyme Bank",
+};
+
 /**
  * Paystack adapter.
  *
@@ -228,8 +242,13 @@ export const paystackGateway: PaymentGateway = {
   async createCharityAccount(req) {
     // Paystack needs its own bank code, looked up from its bank list. VERIFY
     // the South African list and how ZA account verification works.
-    const banks = await call<{ name: string; code: string }[]>("/bank?country=south%20africa");
-    const want = req.bankName.trim().toLowerCase();
+    const banks = await call<{ name: string; code: string }[]>("/bank?country=south%20africa&perPage=100");
+    // Our application's bank names are not Paystack's ("FNB" is "First National Bank", "TymeBank" is
+    // "GoTyme Bank", and Capitec has a personal and a business entry). The names the application offers are
+    // mapped here, looked up in Paystack's own list each time so the code is never typed in by hand. Checked
+    // against Paystack's live South African list on 23/10/2026.
+    const want = (BANK_NAMES[req.bankName.trim().toLowerCase()] ?? req.bankName).trim().toLowerCase();
+    if (want === "other") throw new GatewayError(`This charity chose "Other" as its bank. Ask which bank it is and have the bank corrected on its application before connecting it.`);
     // An exact name wins; otherwise exactly one bank must contain the name ("Standard" alone could be two banks).
     const matches = banks.filter((b) => b.name.toLowerCase() === want);
     const candidates = matches.length ? matches : banks.filter((b) => b.name.toLowerCase().includes(want));

@@ -143,6 +143,7 @@ describe("the yearly job", () => {
     const issued: IssuedReceipt[] = [];
     const pdfs = new Map<string, Buffer>();
     const emailed = new Set<string>();
+    const claimed = new Set<string>();
     let seq = 0;
     const store: ReceiptStore = {
       listDonations: async () => donations,
@@ -158,8 +159,9 @@ describe("the yearly job", () => {
       savePdf: async (r, pdf) => void pdfs.set(r.id, pdf),
       listToEmail: async () => issued.filter((r) => pdfs.has(r.id) && !emailed.has(r.id)).map((r) => ({ ...r, email: "sarah@example.co.za" })),
       readPdf: async (r) => pdfs.get(r.id)!,
-      claimEmail: async (r) => (emailed.has(r.id) ? false : (emailed.add(r.id), true)),
-      releaseEmail: async (r) => void emailed.delete(r.id),
+      claimEmail: async (r) => (emailed.has(r.id) || claimed.has(r.id) ? false : (claimed.add(r.id), true)),
+      markEmailed: async (r) => void emailed.add(r.id),
+      releaseEmail: async (r) => void claimed.delete(r.id),
     };
     return { store, issued, pdfs, emailed };
   }
@@ -259,6 +261,7 @@ describe("emailing receipts", () => {
     const issued: IssuedReceipt[] = [];
     const pdfs = new Map<string, Buffer>();
     const emailed = new Set<string>();
+    const claimed = new Set<string>();
     const receipted = new Set<string>();
     let seq = 0;
     const store: ReceiptStore = {
@@ -276,8 +279,9 @@ describe("emailing receipts", () => {
       savePdf: async (r, pdf) => void pdfs.set(r.id, pdf),
       listToEmail: async () => issued.filter((r) => pdfs.has(r.id) && !emailed.has(r.id)).map((r) => ({ ...r, email: `donor-${r.id}@example.co.za` })),
       readPdf: async (r) => pdfs.get(r.id)!,
-      claimEmail: async (r) => (emailed.has(r.id) ? false : (emailed.add(r.id), true)),
-      releaseEmail: async (r) => void emailed.delete(r.id),
+      claimEmail: async (r) => (emailed.has(r.id) || claimed.has(r.id) ? false : (claimed.add(r.id), true)),
+      markEmailed: async (r) => void emailed.add(r.id),
+      releaseEmail: async (r) => void claimed.delete(r.id),
     };
     return { store, emailed };
   }

@@ -128,6 +128,35 @@ describe("registering a charity's bank account", () => {
   });
 });
 
+describe("every bank the application offers connects", () => {
+  // Paystack's South African list as read on 23/10/2026 (names and codes).
+  const live = [
+    ["Absa Bank Limited, South Africa", "632005"], ["Access Bank South Africa", "410506"], ["African Bank Limited", "430000"], ["African Business Bank", "584000"],
+    ["Capitec Bank Limited", "470010"], ["Capitec Business", "450105"], ["Discovery Bank Limited", "679000"], ["First National Bank", "250655"],
+    ["FirstRand Bank", "201419"], ["GoTyme Bank", "678910"], ["Investec Bank Ltd", "580105"], ["Nedbank", "198765"], ["Standard Bank South Africa", "051001"],
+    ["Standard Chartered Bank", "730020"], ["Ubank Ltd", "431010"],
+  ].map(([name, code]) => ({ name, code }));
+  const expected: Record<string, string> = {
+    Absa: "632005", "African Bank": "430000", Capitec: "470010", "Capitec Business": "450105", "Discovery Bank": "679000", FNB: "250655",
+    Investec: "580105", Nedbank: "198765", "Standard Bank": "051001", TymeBank: "678910",
+  };
+  it("maps each to the right Paystack bank code", async () => {
+    for (const [bankName, code] of Object.entries(expected)) {
+      calls.length = 0;
+      answers["/bank"] = live;
+      answers["/subaccount"] = { subaccount_code: "ACCT_x" };
+      await paystackGateway.createCharityAccount({ charityId: "c1", businessName: "X NPC", bankName, accountNumber: "1234567890", branchCode: code, accountHolder: "X NPC" });
+      expect(calls[1].body, bankName).toMatchObject({ settlement_bank: code });
+    }
+  });
+  it("every bank on the application form is covered by the test above, and Other asks for the real bank", async () => {
+    const { bankNames } = await import("@/lib/charity/validation");
+    expect(bankNames.filter((b) => b !== "Other" && !(b in expected))).toEqual([]);
+    answers["/bank"] = live;
+    await expect(paystackGateway.createCharityAccount({ charityId: "c1", businessName: "X NPC", bankName: "Other", accountNumber: "1", branchCode: "1", accountHolder: "X" })).rejects.toThrow(/chose "Other"/);
+  });
+});
+
 describe("reading a payment's status", () => {
   const verify = (status: string, reference = base.reference) => {
     answers["/transaction/verify"] = { id: 42, status, amount: 20_345, currency: "ZAR", reference, paid_at: "2026-10-13T08:00:00.000Z" };

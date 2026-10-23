@@ -11,6 +11,38 @@ import { heldLabel } from "./held";
  * that failed, and lists what needs a person.
  */
 
+import type { MonthlySummary } from "@/lib/donations/monthly-job";
+
+/** How many monthly donations one collection run takes (monthly-job.ts). More are taken by running again. */
+const RUN_SIZE = 50;
+
+/**
+ * Collect the monthly donations that are due, run after run, until none are left or the time budget is
+ * used. One run handles 50, and a charity can have far more due on the same day. Safe to repeat and to be cut
+ * off: a donation is claimed before it is tried, so it is never charged twice, and what is left is picked up by
+ * the next call (tomorrow's job, or the hourly one once the host allows it).
+ */
+export async function collectMonthlyWithin(run: () => Promise<MonthlySummary>, budgetMs: number, now: () => number = Date.now): Promise<MonthlySummary & { runs: number }> {
+  const total: MonthlySummary & { runs: number } = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [], runs: 0 };
+  const started = now();
+  // Each run may take up to about 25 seconds: don't begin one that could run past the budget.
+  while (total.runs === 0 || now() - started < budgetMs - 25_000) {
+    const s = await run();
+    total.runs += 1;
+    total.considered += s.considered;
+    total.paid += s.paid;
+    total.failed += s.failed;
+    total.stopped += s.stopped;
+    total.alreadyPaid += s.alreadyPaid;
+    total.waiting.push(...s.waiting);
+    total.review.push(...s.review);
+    total.errors.push(...s.errors);
+    if (s.considered < RUN_SIZE) break;
+    if (total.runs >= 20) break;
+  }
+  return total;
+}
+
 export type DailyChecks = {
   pending: { checked: number; paid: number; failed: number; still: number; errors: number };
   /** Pending for more than 3 days: the provider still has no answer. */

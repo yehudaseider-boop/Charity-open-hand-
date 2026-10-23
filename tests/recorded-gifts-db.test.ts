@@ -161,3 +161,25 @@ describe("recorded gifts", () => {
     });
   });
 });
+
+describe("an approved charity renaming itself", () => {
+  const asUser = async (who: string) => {
+    await run("set local role authenticated");
+    await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: who, role: "authenticated", aal: "aal2", amr: [{ method: "otp", timestamp: 0 }] })]);
+  };
+  it("is written to the audit log when the charity's own admin does it, and not when Givezy staff do", async () => {
+    await tx(async () => {
+      await asUser(admin);
+      await run("update public.charities set name_en = 'Renamed Meals Fund' where id = $1", [charity]);
+      await run("reset role");
+      const rows = (await run("select details, actor_user_id from public.audit_log where action = 'charity.public_name_changed' and entity_id = $1", [charity])).rows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].details).toMatchObject({ name_to: "Renamed Meals Fund" });
+      expect(rows[0].actor_user_id).toBe(admin);
+      // The server (no signed-in person) renaming it records nothing more.
+      await run("select set_config('request.jwt.claims', '', true)");
+      await run("update public.charities set name_en = 'Northcliff Meals Fund' where id = $1", [charity]);
+      expect((await run("select 1 from public.audit_log where action = 'charity.public_name_changed' and entity_id = $1", [charity])).rows).toHaveLength(1);
+    });
+  });
+});

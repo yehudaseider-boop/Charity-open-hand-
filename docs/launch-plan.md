@@ -70,6 +70,14 @@ Resend: Claude checks the current free allowance and price on the day. **Approva
 | Early December | First live day: one small real gift with Yehuda's card, refund it, check everything (go-live checklist section C) | Yehuda + Claude |
 | December | Open to the pilot charities, then to donors | |
 
+## Two things about the hosting I could not verify
+
+I could not open Vercel's own pages from here, so these are from memory and need checking on the day (Vercel dashboard, Settings, or its Pricing page):
+1. **A daily scheduled job on the free plan, and nothing more often.** The job is set to once a day on purpose. If Vercel refuses the schedule when the project is deployed, that is the first thing to look at.
+2. **A 60-second limit per job run.** The daily job and the receipt pages ask for 60 seconds; that is within what I believe every plan allows. On Pro the limit and the schedule both loosen: then add an hourly monthly collection (`/api/jobs/monthly-giving`) to `vercel.json`, and raise the receipt pages to 300 seconds.
+
+Because one run handles 50 monthly donations, the daily job now repeats the collection (up to 40 seconds' worth) until none are due. A charity with more than a few hundred monthly donors on one day (Heroes with Halos has about 130) still needs the hourly job on Pro to be sure everyone is charged the same day.
+
 ## Decisions still needed (none of these can be guessed)
 
 1. **Support email address** for donors and charities (shown on every error screen and in the declined-card emails).

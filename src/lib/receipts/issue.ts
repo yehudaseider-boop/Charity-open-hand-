@@ -29,10 +29,12 @@ export interface ReceiptStore {
   listToEmail(taxYear: number, charityId?: string): Promise<(IssuedReceipt & { email: string })[]>;
   readPdf(receipt: IssuedReceipt): Promise<Buffer>;
   /**
-   * Mark a receipt emailed before its email goes, so two runs at once never both send it. False when another
-   * run got there first (it is sending it). A send that doesn't happen hands it back with releaseEmail.
+   * Claim a receipt before its email goes, so two runs at once never both send it. False when another run
+   * got there first (it is sending it). A claim cut off mid-send expires after 15 minutes. A real send is then
+   * marked with markEmailed; one that doesn't happen hands the claim back with releaseEmail.
    */
   claimEmail(receipt: IssuedReceipt): Promise<boolean>;
+  markEmailed(receipt: IssuedReceipt): Promise<void>;
   releaseEmail(receipt: IssuedReceipt): Promise<void>;
 }
 
@@ -163,8 +165,11 @@ export async function runReceiptsJob(args: {
         });
         // Only a real send marks the receipt emailed: the console transport (local runs) and skipped
         // addresses leave it for a later run with a real transport.
-        if (sent === "sent") summary.emailed += 1;
-        else await store.releaseEmail(r);
+        if (sent === "sent") {
+          // If this write fails the receipt is released and sent again next run: a second copy beats none.
+          await store.markEmailed(r);
+          summary.emailed += 1;
+        } else await store.releaseEmail(r);
       } catch (e) {
         await store.releaseEmail(r).catch(() => undefined);
         summary.emailFailed += 1;

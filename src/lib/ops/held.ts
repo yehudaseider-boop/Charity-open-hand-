@@ -8,5 +8,6 @@ export const heldLabel: Record<string, string> = {
   "donation.dispute_opened": "Dispute (chargeback) opened",
   "donation.dispute_resolved": "Dispute resolved: check who won",
   "monthly.paid_twice": "A monthly donation was paid twice for one month: refund one of the two payments",
+  "charity.public_name_changed": "An approved charity changed its public name: check it is still the same charity",
   "receipt.needs_reissue": "An issued s18A receipt includes a refunded or charged-back donation: void and re-issue it",
 };

@@ -57,6 +57,7 @@ export const bankNames = [
   "Absa",
   "African Bank",
   "Capitec",
+  "Capitec Business",
   "Discovery Bank",
   "FNB",
   "Investec",

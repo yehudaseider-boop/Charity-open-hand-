@@ -23,6 +23,9 @@ function identityOf(embed: unknown): string {
   return ((row as { receipt_identity?: string | null } | null | undefined)?.receipt_identity ?? "") || "";
 }
 
+/** How long a send may hold a receipt before another run may take it over. */
+const EMAIL_CLAIM_MINUTES = 15;
+
 export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
   return {
     async listDonations(taxYear, charityId) {
@@ -176,13 +179,26 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
     },
 
     async claimEmail(receipt) {
-      const { data, error } = await db.from("s18a_receipts").update({ emailed_at: new Date().toISOString() }).eq("id", receipt.id).is("emailed_at", null).select("id");
+      // The claim is a lock for the minutes a send takes. One older than that was cut off mid-send: take it over.
+      const stale = new Date(Date.now() - EMAIL_CLAIM_MINUTES * 60_000).toISOString();
+      const { data, error } = await db
+        .from("s18a_receipts")
+        .update({ email_claimed_at: new Date().toISOString() })
+        .eq("id", receipt.id)
+        .is("emailed_at", null)
+        .or(`email_claimed_at.is.null,email_claimed_at.lt.${stale}`)
+        .select("id");
       if (error) throw new Error(error.message);
       return Boolean(data?.length);
     },
 
+    async markEmailed(receipt) {
+      const { error } = await db.from("s18a_receipts").update({ emailed_at: new Date().toISOString() }).eq("id", receipt.id);
+      if (error) throw new Error(error.message);
+    },
+
     async releaseEmail(receipt) {
-      const { error } = await db.from("s18a_receipts").update({ emailed_at: null }).eq("id", receipt.id);
+      const { error } = await db.from("s18a_receipts").update({ email_claimed_at: null }).eq("id", receipt.id).is("emailed_at", null);
       if (error) throw new Error(error.message);
     },
 

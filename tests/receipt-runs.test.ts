@@ -79,6 +79,7 @@ describe("finishing never issues a receipt nobody approved", () => {
       listToEmail: async (_y, c) => (asked.push(c), pdfs.has("r1") ? [{ ...already, pdfPath: "c1/r1.pdf", email: "sarah@example.co.za" }] : []),
       readPdf: async () => Buffer.from("%PDF"),
       claimEmail: async () => true,
+      markEmailed: async () => {},
       releaseEmail: async () => {},
     };
     const send = vi.fn(async () => "sent" as const);
@@ -112,7 +113,7 @@ describe("a sign-off never issues more than was approved", () => {
     const store = {
       listDonations: async () => [gift], listCharities: async () => [charity], receiptedDonationIds: async () => new Set<string>(),
       donorDetailsFor: async () => [], issue, listIssuedWithoutPdf: async () => [], savePdf: async () => {}, listToEmail: async () => [],
-      readPdf: async () => Buffer.from(""), claimEmail: async () => true, releaseEmail: async () => {},
+      readPdf: async () => Buffer.from(""), claimEmail: async () => true, markEmailed: async () => {}, releaseEmail: async () => {},
     } as unknown as ReceiptStore;
     const approved = fingerprintPlan([{ donorId: "u1", donorIdentity: "", donationIds: ["other"], totalCents: 1 }]);
     await expect(
