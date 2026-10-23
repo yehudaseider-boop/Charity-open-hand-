@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { TYPED_DAY_MESSAGE, typedDay } from "@/lib/typed-date";
 import { recordAction } from "@/lib/charity/charity-actions";
 import { logAudit } from "@/lib/audit";
 import { legalConfig } from "@/config/legal";
@@ -184,7 +185,8 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
 
   const type = String(formData.get("document_type") ?? "") as DocumentType;
   const file = formData.get("file");
-  const signedOn = String(formData.get("signed_on") ?? "").trim() || null;
+  const signedTyped = String(formData.get("signed_on") ?? "").trim();
+  const signedOn = typedDay(signedTyped);
 
   if (!Object.hasOwn(documentTypes, type)) return { ok: false, fieldErrors: { document_type: "Choose a document type" } };
   if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose a file" } };
@@ -194,8 +196,8 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
   }
   if (!(await isRealDocument(file))) return { ok: false, fieldErrors: { file: "That file isn't a PDF, JPG or PNG" } };
   if (type === "receipting_mandate") {
-    if (!signedOn || !/^\d{4}-\d{2}-\d{2}$/.test(signedOn)) {
-      return { ok: false, fieldErrors: { signed_on: "Enter the date the mandate was signed" } };
+    if (!signedOn) {
+      return { ok: false, fieldErrors: { signed_on: signedTyped ? TYPED_DAY_MESSAGE : "Enter the date the mandate was signed" } };
     }
     if (signedOn > isoDateInJhb()) {
       return { ok: false, fieldErrors: { signed_on: "The signing date can't be in the future" } };

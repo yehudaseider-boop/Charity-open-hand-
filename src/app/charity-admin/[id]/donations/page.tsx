@@ -13,6 +13,7 @@ import { formatDate } from "@/lib/dates";
 import { DonePanel } from "@/components/done-panel";
 import { RECORDED_METHODS, type RecordedMethod } from "@/lib/charity/recorded-gifts";
 import { formatRand } from "@/lib/money";
+import { showDay } from "@/lib/typed-date";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Donations" };
@@ -27,6 +28,10 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   const { charity } = await loadCharityForManager(id);
   const sp = await searchParams;
   const filters = parseDonationFilters(sp);
+  // "Choose dates" with dates we couldn't read: say so, and keep what was typed, rather than quietly showing everything.
+  const typedFrom = typeof sp.from === "string" ? sp.from.slice(0, 10) : "";
+  const typedTo = typeof sp.to === "string" ? sp.to.slice(0, 10) : "";
+  const datesUnread = sp.period === "custom" && filters.period !== "custom";
   const { status, q } = filters;
   const page = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
 
@@ -94,10 +99,14 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
           <select id="period" name="period" defaultValue={filters.period} className="rounded-control border border-border bg-surface px-3 py-2.5">
             {Object.entries(periodOptions).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
           </select>
-          <label className="flex items-center gap-1 text-sm">From <input type="date" name="from" defaultValue={filters.period === "custom" ? filters.fromDate ?? "" : ""} className="rounded-control border border-border bg-surface px-2 py-2" /></label>
-          <label className="flex items-center gap-1 text-sm">To <input type="date" name="to" defaultValue={filters.period === "custom" ? filters.toDate ?? "" : ""} className="rounded-control border border-border bg-surface px-2 py-2" /></label>
+          <label className="flex items-center gap-1 text-sm">From <input type="text" name="from" placeholder="dd/mm/yyyy" autoComplete="off" maxLength={10} defaultValue={filters.period === "custom" ? showDay(filters.fromDate) : datesUnread ? typedFrom : ""} className="w-32 rounded-control border border-border bg-surface px-2 py-2 tabular-nums" /></label>
+          <label className="flex items-center gap-1 text-sm">To <input type="text" name="to" placeholder="dd/mm/yyyy" autoComplete="off" maxLength={10} defaultValue={filters.period === "custom" ? showDay(filters.toDate) : datesUnread ? typedTo : ""} className="w-32 rounded-control border border-border bg-surface px-2 py-2 tabular-nums" /></label>
         </div>
-        <p className="text-xs text-muted">For your own dates, choose &quot;Choose dates&quot; and fill in both.</p>
+        {datesUnread ? (
+          <p role="alert" className="rounded-control bg-danger-soft p-2 text-sm text-danger">We couldn&apos;t read those dates, so this shows all donations. Write both as dd/mm/yyyy, for example 01/03/2026, and search again.</p>
+        ) : (
+          <p className="text-xs text-muted">For your own dates, choose &quot;Choose dates&quot; and fill in both, as dd/mm/yyyy.</p>
+        )}
         <div className="flex flex-wrap gap-2">
           {campaigns.size ? (
             <>

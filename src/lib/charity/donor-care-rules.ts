@@ -3,6 +3,7 @@
  * period. Pure: no database, no clock (the caller passes "today", yyyy-mm-dd in Johannesburg time).
  */
 import { isDonorGroup, type DonorGroup } from "./insights";
+import { TYPED_DAY_MESSAGE, typedDay } from "@/lib/typed-date";
 
 /** Line breaks kept in notes; control and direction characters removed (they could hide text). */
 function clean(v: string, keepLines: boolean): string {
@@ -25,10 +26,10 @@ export function checkReminder(what: unknown, dueOn: unknown, today: string): { o
   const w = clean(String(what ?? ""), false);
   if (!w) e.what = "Say what to do, for example \"Phone to thank for the Pesach gift\"";
   else if (w.length > 300) e.what = "Keep it to 300 characters";
-  const d = String(dueOn ?? "").trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
-  const real = m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toISOString().slice(0, 10) === d;
-  if (!real) e.due_on = "Choose a date";
+  const typed = String(dueOn ?? "").trim();
+  const d = typedDay(typed) ?? typed;
+  if (!typed) e.due_on = "Enter a date";
+  else if (!typedDay(typed)) e.due_on = TYPED_DAY_MESSAGE;
   else if (d < today) e.due_on = "Choose today or a later date";
   else if (d > `${Number(today.slice(0, 4)) + 2}${today.slice(4)}`) e.due_on = "Choose a date within the next two years";
   return Object.keys(e).length ? { ok: false, errors: e } : { ok: true, what: w, dueOn: d };

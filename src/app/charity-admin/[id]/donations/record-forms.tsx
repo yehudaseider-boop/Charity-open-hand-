@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { ActionForm, useFieldError } from "@/components/forms/action-form";
-import { SelectField, TextField } from "@/components/forms/fields";
+import { DateField, SelectField, TextField } from "@/components/forms/fields";
 import { RECORDED_METHODS, MAX_IMPORT_BYTES } from "@/lib/charity/recorded-gifts";
 import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
@@ -28,7 +28,7 @@ export function RecordGiftForm({
     <ActionForm action={action} submitLabel="Record this gift" pendingLabel="Recording…">
       <fieldset className="space-y-3">
         <legend className="font-semibold text-navy">The gift</legend>
-        <TextField name="date" label="Date it came in" type="date" required defaultValue={today} />
+        <DateField name="date" label="Date it came in" required defaultValue={today} />
         <TextField name="amount" label="Amount (R)" required inputMode="decimal" hint="For example 1250 or 1250.00" maxLength={20} />
         <SelectField name="method" label="How it came in" required options={methods} defaultValue="eft" />
         {campaigns.length ? <SelectField name="campaign_id" label="Campaign" options={[{ value: "", label: "No campaign" }, ...campaigns]} defaultValue="" /> : null}

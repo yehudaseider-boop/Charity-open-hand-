@@ -6,6 +6,7 @@
  */
 import { platformConfig } from "@/config/platform";
 import { taxYearFor } from "@/lib/dates";
+import { typedDay } from "@/lib/typed-date";
 import { formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { isValidSaIdNumber } from "@/lib/sa-id";
 
@@ -102,14 +103,12 @@ export function parseGiftAmount(raw: string | undefined): { cents: number } | { 
 export function parseGiftDate(raw: string | undefined, today: string): { date: string } | { error: string } {
   const s = (raw ?? "").trim();
   if (!s) return { error: "Date missing" };
-  let y: number, m: number, d: number;
-  let match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
-  if (match) [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  else if ((match = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(s))) [d, m, y] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  else return { error: `"${s}" isn't a date we can read. Write it as dd/mm/yyyy, for example 05/03/2026` };
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return { error: `"${s}" isn't a real date (dd/mm/yyyy)` };
-  const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const iso = typedDay(s);
+  if (!iso) {
+    const shaped = /^(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s*[/.\- ]\s*\d{1,2}\s*[/.\- ]\s*\d{4}|\d{8})$/.test(s);
+    return { error: shaped ? `"${s}" isn't a real date (dd/mm/yyyy)` : `"${s}" isn't a date we can read. Write it as dd/mm/yyyy, for example 05/03/2026` };
+  }
+  const y = Number(iso.slice(0, 4));
   if (iso > today) return { error: `${s} is in the future` };
   if (y < 2000) return { error: `${s} is too long ago to record` };
   return { date: iso };

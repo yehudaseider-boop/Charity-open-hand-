@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { useFieldError } from "./action-form";
+import { showDay } from "@/lib/typed-date";
 
 /** A page-unique id, so two forms with the same field name never share a label. */
 export function useFieldId(name: string) {
@@ -45,7 +46,7 @@ export function TextField({
   ...base
 }: Base & {
   defaultValue?: string | null;
-  type?: "text" | "email" | "tel" | "url" | "date";
+  type?: "text" | "email" | "tel" | "url";
   /** Hebrew input: right-to-left. */
   hebrew?: boolean;
   /** English or Hebrew: the box follows the direction of what is typed. */
@@ -74,6 +75,22 @@ export function TextField({
         className={inputClass}
       />
     </Wrapper>
+  );
+}
+
+/**
+ * A date typed as dd/mm/yyyy. Not the browser's date picker: that shows mm/dd/yyyy on a phone or browser set
+ * to US English, which turns 05/03 into 3 May. The server reads it with typedDay (src/lib/typed-date.ts).
+ */
+export function DateField({ defaultValue, hint, ...base }: Base & { defaultValue?: string | null }) {
+  return (
+    <TextField
+      {...base}
+      defaultValue={showDay(defaultValue)}
+      autoComplete="off"
+      maxLength={10}
+      hint={hint ? `${hint} Write it as dd/mm/yyyy.` : "Write it as dd/mm/yyyy, for example 31/12/2026."}
+    />
   );
 }
 

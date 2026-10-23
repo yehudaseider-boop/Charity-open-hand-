@@ -1,7 +1,7 @@
 "use client";
 
 import { ActionForm } from "@/components/forms/action-form";
-import { TextArea, TextField } from "@/components/forms/fields";
+import { DateField, TextArea, TextField } from "@/components/forms/fields";
 import type { FormState } from "@/lib/form";
 
 type Action = (s: FormState, f: FormData) => Promise<FormState>;
@@ -18,7 +18,7 @@ export function ReminderForm({ action, today }: { action: Action; today: string 
   return (
     <ActionForm action={action} submitLabel="Add follow-up" pendingLabel="Saving…" resetOnSuccess>
       <TextField name="what" label="What to do" required maxLength={300} />
-      <TextField name="due_on" label="When" type="date" required defaultValue={today} />
+      <DateField name="due_on" label="When" required defaultValue={today} />
     </ActionForm>
   );
 }

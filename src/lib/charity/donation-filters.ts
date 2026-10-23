@@ -3,6 +3,7 @@
  * matches the screen. Pure (tested). Periods are Johannesburg calendar days, inclusive.
  */
 import { taxYearFor, taxYearRange } from "@/lib/dates";
+import { typedDay } from "@/lib/typed-date";
 import { isGiftSource, type GiftSource } from "@/lib/donations/source";
 import { containsPattern, isDonationStatus, safeSearch, saDate, type DonationStatus } from "./dashboard";
 import { firstParam } from "@/lib/form";
@@ -86,8 +87,9 @@ function dates(params: Params, now: Date): Omit<DonationFilters, "campaign" | "s
       return { status, q, period, fromDate: start, toDate: end };
     }
     case "custom": {
-      const from = one(params.from);
-      const to = one(params.to);
+      // Typed as dd/mm/yyyy in the boxes; our own links carry yyyy-mm-dd.
+      const from = typedDay(one(params.from)) ?? "";
+      const to = typedDay(one(params.to)) ?? "";
       if (!isoDay.test(from) || !isoDay.test(to)) return { status, q, period: "all", fromDate: null, toDate: null };
       return from <= to ? { status, q, period, fromDate: from, toDate: to } : { status, q, period, fromDate: to, toDate: from };
     }

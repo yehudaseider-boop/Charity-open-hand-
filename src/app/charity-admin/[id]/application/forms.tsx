@@ -1,7 +1,7 @@
 "use client";
 
 import { ActionForm } from "@/components/forms/action-form";
-import { FileField, SelectField, TextField } from "@/components/forms/fields";
+import { DateField, FileField, SelectField, TextField } from "@/components/forms/fields";
 import { bankNames, documentTypes } from "@/lib/charity/validation";
 import type { FormState } from "@/lib/form";
 
@@ -80,7 +80,7 @@ export function UploadForm({ action, showMandateDate }: { action: Action; showMa
         options={Object.entries(documentTypes).map(([value, label]) => ({ value, label }))} />
       <FileField name="file" label="File" required accept="application/pdf,image/jpeg,image/png" hint="PDF, JPG or PNG, up to 4 MB." />
       {showMandateDate ? (
-        <TextField name="signed_on" label="Date the mandate was signed" type="date"
+        <DateField name="signed_on" label="Date the mandate was signed"
           hint="Only needed for the receipting mandate." />
       ) : null}
     </ActionForm>

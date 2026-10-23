@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { COMMA_THOUSANDS_MESSAGE, parseRandToCents, usesCommaThousands } from "@/lib/money";
+import { TYPED_DAY_MESSAGE, typedDay } from "@/lib/typed-date";
 
 /** A charity's new campaign, as typed. The goal is required: it is what donors watch fill up. */
 export const campaignSchema = z.object({
   title: z.string({ error: (i) => (i.input === undefined ? "Give it a short name" : undefined) }).trim().min(3, "Give it a short name, at least 3 letters").max(80, "Please keep the name to 80 characters or fewer"),
   description: z.string().trim().max(500, "Please keep it to 500 characters or fewer").optional(),
   target: z.string({ error: (i) => (i.input === undefined ? "Enter the goal in Rand, for example 50000" : undefined) }).trim().min(1, "Enter the goal in Rand, for example 50000"),
-  ends_on: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date").optional(),
+  ends_on: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, TYPED_DAY_MESSAGE).optional(),
 });
 
 export type CampaignInput = { title: string; description: string | null; targetCents: number; endsAt: string | null };
@@ -18,6 +19,9 @@ export type CampaignInput = { title: string; description: string | null; targetC
 export function checkCampaign(raw: Record<string, string | undefined>, today: string):
   | { ok: true; value: CampaignInput }
   | { ok: false; fieldErrors: Record<string, string> } {
+  // The last day as typed (dd/mm/yyyy), read as yyyy-mm-dd; a date we can't read stays as typed and fails the check.
+  const endsTyped = raw.ends_on?.trim();
+  raw = { ...raw, ends_on: endsTyped ? (typedDay(endsTyped) ?? endsTyped) : undefined };
   const parsed = campaignSchema.safeParse(raw);
   const fieldErrors: Record<string, string> = {};
   if (!parsed.success) for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;

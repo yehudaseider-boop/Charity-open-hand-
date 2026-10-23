@@ -18,8 +18,10 @@ describe("follow-ups", () => {
     expect(checkReminder("Phone to say thanks", "2026-10-21", today)).toEqual({ ok: true, what: "Phone to say thanks", dueOn: "2026-10-21" });
     expect(checkReminder("", "2026-10-20", today)).toEqual({ ok: false, errors: { what: expect.any(String), due_on: "Choose today or a later date" } });
     expect(checkReminder("x", "2028-10-22", today)).toMatchObject({ ok: false, errors: { due_on: expect.stringMatching(/two years/) } });
-    expect(checkReminder("x", "2026-02-30", today)).toMatchObject({ ok: false, errors: { due_on: "Choose a date" } });
-    expect(checkReminder("x", "21/10/2026", today)).toMatchObject({ ok: false, errors: { due_on: "Choose a date" } });
+    expect(checkReminder("x", "2026-02-30", today)).toMatchObject({ ok: false, errors: { due_on: expect.stringContaining("dd/mm/yyyy") } });
+    expect(checkReminder("x", "", today)).toMatchObject({ ok: false, errors: { due_on: "Enter a date" } });
+    // Typed the South African way, as the field asks.
+    expect(checkReminder("x", "21/10/2026", today)).toEqual({ ok: true, what: "x", dueOn: "2026-10-21" });
   });
   it("sort by date, overdue first", () => {
     expect(sortReminders([{ due_on: "2026-11-01" }, { due_on: "2026-10-01" }]).map((r) => r.due_on)).toEqual(["2026-10-01", "2026-11-01"]);

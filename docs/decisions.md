@@ -2,6 +2,12 @@
 
 ## Decided
 
+- **Typed dates on the dashboard (23/10/2026):** the five date fields (gift date, follow-up, campaign last day,
+  mandate date, donations filter) are plain boxes typed as dd/mm/yyyy, not the browser's date picker, which
+  shows mm/dd/yyyy on a phone or browser set to US English and would turn 05/03 into 3 May on an s18A gift.
+  One reader for all of them (`src/lib/typed-date.ts`) also takes d/m/yyyy, dots, dashes, spaces, ddmmyyyy and
+  yyyy-mm-dd, and never reads mm/dd. A date it can't read gets one plain message, and the typed text is kept.
+
 - **Stack:** Next.js 16 + TypeScript, Supabase (Postgres, auth, storage), Vitest.
   Hosting: Vercel. Email: Resend (behind an adapter). PDFs: HTML printed by
   headless Chrome, because simpler PDF libraries break Hebrew right-to-left text.
