@@ -21,6 +21,7 @@ export function CharityImage({
   labelPosition,
   labelOffset,
   bare = false,
+  veil = false,
 }: {
   charity: Charity;
   live: boolean;
@@ -31,6 +32,11 @@ export function CharityImage({
   labelOffset?: number;
   /** No initials and no placeholder label: text will be set over the image. */
   bare?: boolean;
+  /**
+   * White text is set over the bottom of the image: a deep ink veil over a real photo keeps it readable, and on
+   * the blue block (no veil, it would turn the orange brown) the lavender splash moves to the top, away from it.
+   */
+  veil?: boolean;
 }) {
   const shape = [styles.box, rounded && { borderRadius: compact ? radius.control : radius.card }, style];
   // A photo that can't load (no connection, moved) shows the blue block instead of an empty box.
@@ -39,6 +45,7 @@ export function CharityImage({
     return (
       <View style={shape}>
         <Image source={{ uri: charity.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`Photo from ${charity.nameEn}`} onError={() => setBroken(charity.coverUrl ?? null)} />
+        {veil ? <View style={styles.veil} /> : null}
       </View>
     );
   }
@@ -47,7 +54,7 @@ export function CharityImage({
     return (
       <View style={[shape, styles.centre, styles.blue]} accessible={false}>
         <Blob size={150 * s} color={colors.orange} rotate={25} style={{ right: -55 * s, top: -60 * s }} />
-        <Blob size={110 * s} color={colors.lilac} rotate={-15} stretch={1.3} style={{ left: -45 * s, bottom: -55 * s }} />
+        <Blob size={110 * s} color={colors.lilac} rotate={-15} stretch={1.3} style={veil ? { left: -45 * s, top: -55 * s } : { left: -45 * s, bottom: -55 * s }} />
         {bare ? null : <Text style={[styles.initials, compact && { fontSize: 26 }]}>{initials(charity.nameEn)}</Text>}
       </View>
     );
@@ -59,5 +66,6 @@ const styles = StyleSheet.create({
   box: { backgroundColor: colors.lilacSoft, overflow: "hidden" },
   centre: { alignItems: "center", justifyContent: "center" },
   blue: { backgroundColor: colors.blue },
+  veil: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.navy, opacity: 0.55 },
   initials: { fontFamily: fonts.display, fontSize: 52, color: colors.onInk, letterSpacing: 1 },
 });
