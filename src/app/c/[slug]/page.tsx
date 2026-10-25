@@ -14,7 +14,8 @@ import { loadStories, publicImageUrl } from "@/lib/charity/queries";
 import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
-import { Drop } from "@/components/drop";
+import { Splash } from "@/components/splash";
+import { StickyGive } from "@/components/sticky-give";
 import { impactUnitFrom } from "@/lib/charity/impact";
 import { formatRand } from "@/lib/money";
 
@@ -72,17 +73,17 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt="" className="aspect-[16/9] w-full rounded-[2rem] object-cover sm:aspect-[3/1]" />
         ) : (
-          <div aria-hidden className="relative aspect-[5/2] w-full overflow-hidden rounded-[2rem] bg-brand sm:aspect-[4/1]">
-            <Drop colour="lilac" className="-top-10 right-28 h-32 w-auto -rotate-12 sm:right-48 sm:h-44" />
-            <Drop colour="orange" className="-top-6 right-6 h-28 w-auto rotate-12 sm:right-16 sm:h-40" />
+          // No cover photo yet: a soft lilac band with the logo's splash, whole, on the right.
+          <div aria-hidden className="relative flex h-36 w-full items-center justify-end overflow-hidden rounded-[2rem] bg-honey-soft pr-6 sm:h-52 sm:pr-14">
+            <Splash className="h-auto w-36 sm:w-56" />
           </div>
         )}
-        <header className="flex flex-wrap items-end gap-x-5 gap-y-3 px-1 sm:px-4">
+        <header className="flex flex-wrap items-end gap-x-5 gap-y-3 px-4 sm:px-8">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt="" className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-card border-4 border-surface bg-surface object-cover sm:-mt-16 sm:h-32 sm:w-32" />
+            <img src={logo} alt="" className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-[1.75rem] bg-surface object-cover shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32" />
           ) : (
-            <div aria-hidden className="relative z-10 -mt-12 flex h-24 w-24 shrink-0 items-center justify-center rounded-card border-4 border-surface bg-peach font-display text-3xl font-semibold text-brand sm:-mt-16 sm:h-32 sm:w-32 sm:text-4xl">
+            <div aria-hidden className="relative z-10 -mt-12 flex h-24 w-24 shrink-0 items-center justify-center rounded-[1.75rem] bg-peach font-display text-3xl font-semibold text-brand shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32 sm:text-4xl">
               {monogram}
             </div>
           )}
@@ -91,15 +92,15 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
             {area ? <p className="mt-1 text-muted">{area}</p> : null}
           </div>
         </header>
-        <div className="mt-4 flex flex-wrap gap-2 px-1 sm:px-4">
+        <div className="mt-4 flex flex-wrap gap-2 px-4 sm:px-8">
           <CharityBadges charity={charity} />
           {categories.map((c) => <Badge key={c.name_en}>{c.name_en}</Badge>)}
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-[75rem] gap-8 px-4 pb-20 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12">
+      <div className={`mx-auto grid max-w-[75rem] gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12 pb-20`}>
         {/* Giving comes first on a phone, and stays beside the story on a laptop. */}
-        <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1 lg:self-start">
+        <div className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
           <div className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6">
             {charity.impact_en || unit ? (
               <div className="rounded-control bg-honey-soft p-4">
@@ -113,7 +114,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
               </div>
             ) : null}
             {give ? (
-              <Link href={give} className="pressable block w-full rounded-control bg-coral px-4 py-4 text-center text-lg font-bold text-navy">
+              <Link id="give-button" href={give} className="pressable block w-full rounded-control bg-coral px-4 py-4 text-center text-lg font-bold text-navy">
                 Give to {charity.name_en}
               </Link>
             ) : (
@@ -211,6 +212,8 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
           </Section>
         </div>
       </div>
+      {/* Phones: Give stays in reach at the bottom once the card's own button has scrolled away. */}
+      {give ? <StickyGive href={give} label={`Give to ${charity.name_en}`} watch="give-button" /> : null}
     </article>
   );
 }

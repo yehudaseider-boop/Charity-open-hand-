@@ -6,10 +6,11 @@ import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
-import { Drop } from "@/components/drop";
+import { Chevron } from "@/components/chevron";
+import { Splash } from "@/components/splash";
 
-// Home page, design direction A "Splash" (chosen 22/10/2026). The logo's three drops, cut from the logo and never
-// redrawn, are the decoration; they sit behind or beside words, never on top of them.
+// Home page, design direction A "Splash" (chosen 22/10/2026). The logo's splash (all three drops together, cut from
+// the logo and never redrawn) appears once, whole, behind the hero picture; the rest of the page stays quiet.
 
 const min = formatRand(platformConfig.minDonationCents);
 
@@ -61,11 +62,6 @@ export default async function Home() {
       {/* Hero */}
       <section className="mx-auto flex max-w-[75rem] flex-wrap items-center gap-12 px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-12">
         <div className="relative z-10 flex min-w-0 flex-[1_1_28rem] flex-col items-start gap-6">
-          <p className="inline-flex items-center gap-2 rounded-full bg-honey-soft px-3.5 py-2 text-[15px] font-bold text-brand">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/drop-orange.png" alt="" aria-hidden className="h-4 w-auto" />
-            Giving made easy.
-          </p>
           <h1 className="text-[clamp(2.75rem,6.4vw,5.25rem)] leading-[0.98] tracking-[-0.02em] text-balance">Give in a minute. We keep the paperwork.</h1>
           <p className="max-w-[33rem] text-lg leading-normal text-muted sm:text-xl">
             Find a registered South African charity, give from {min}, and see every gift in one place. If the charity issues s18A
@@ -80,10 +76,9 @@ export default async function Home() {
         </div>
 
         {/* The donor's giving page as the hero picture: the product, not stock photos. */}
-        <div className="relative flex min-w-0 flex-[1_1_22rem] justify-center pb-5 pt-16">
-          <Drop colour="lilac" className="left-[calc(50%+2.5rem)] -top-2 h-32 w-auto -rotate-8 sm:h-44" />
-          <Drop colour="orange" className="left-[calc(50%+6.5rem)] top-0 h-28 w-auto rotate-10 sm:left-[calc(50%+7.5rem)] sm:h-36" />
-          <Drop colour="blue" className="left-[calc(50%+5rem)] top-28 hidden w-48 -rotate-4 sm:block" />
+        <div className="relative flex min-w-0 flex-[1_1_22rem] justify-center pb-5 pt-20 sm:pt-24">
+          {/* The splash rises from behind the card's top corner, whole, inside the page. */}
+          <Splash className="absolute right-[max(0px,calc(50%-12rem))] top-0 h-auto w-40 sm:right-[calc(50%-13.5rem)] sm:w-56" />
           <div className="relative z-10 flex w-[19rem] max-w-full flex-col gap-4 rounded-[2.25rem] border-2 border-border bg-surface px-5 pb-6 pt-5 shadow-[0_30px_60px_rgba(9,37,119,0.16)]">
             <p className="text-[13px] font-bold text-muted">Your giving · this tax year</p>
             <div className="flex justify-center">
@@ -114,11 +109,11 @@ export default async function Home() {
 
           {categories.length > 0 ? (
             <ul className="flex flex-wrap gap-3" aria-label="Causes">
-              {categories.map((c, i) => (
+              {categories.map((c) => (
                 <li key={c.id}>
                   <Link
                     href={`/charities?category=${c.slug}`}
-                    className={`inline-block rounded-full border-2 border-border bg-surface px-4.5 py-2.5 font-semibold text-navy transition hover:border-brand ${i % 3 === 1 ? "-rotate-2" : i % 4 === 3 ? "rotate-2" : ""}`}
+                    className="inline-block rounded-full border-2 border-border bg-surface px-4.5 py-2.5 font-semibold text-navy transition-colors hover:border-brand"
                   >
                     {c.name_en}
                   </Link>
@@ -137,7 +132,7 @@ export default async function Home() {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {cover ? <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
-                  {cover ? <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/50 to-navy/10" /> : <Drop colour="orange" className="-bottom-16 -right-12 h-36 w-auto rotate-150 sm:-bottom-10 sm:-right-9" />}
+                  {cover ? <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/50 to-navy/10" /> : null}
                   <span className="relative text-sm font-bold text-honey">Cause of the week</span>
                   <span className="relative font-display text-[clamp(1.875rem,3.4vw,2.75rem)] font-semibold leading-[1.05]">{featured.name_en}</span>
                   {featured.description_en ? <span className="relative line-clamp-3 max-w-[29rem] text-[17px] leading-normal text-honey-soft">{featured.description_en}</span> : null}
@@ -151,7 +146,7 @@ export default async function Home() {
                     const place = [c.suburb, c.city].filter(Boolean).join(", ");
                     return (
                       <li key={c.id}>
-                        <Link href={`/c/${c.slug}`} className="flex h-full items-center gap-4 rounded-card border-2 border-border bg-surface p-5 transition hover:border-brand">
+                        <Link href={`/c/${c.slug}`} className="group flex h-full items-center gap-4 rounded-card border-2 border-border bg-surface p-5 transition-colors hover:border-brand">
                           {logo ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={logo} alt="" className="h-14 w-14 shrink-0 rounded-control border border-border object-cover" />
@@ -160,10 +155,11 @@ export default async function Home() {
                               {initials(c.name_en)}
                             </span>
                           )}
-                          <span className="flex min-w-0 flex-col gap-1">
+                          <span className="flex min-w-0 flex-1 flex-col gap-1">
                             <span className="text-[17px] font-bold text-navy">{c.name_en}</span>
                             {place ? <span className="text-sm text-muted">{place}</span> : null}
                           </span>
+                          <Chevron />
                         </Link>
                       </li>
                     );
@@ -182,7 +178,7 @@ export default async function Home() {
       </section>
 
       {/* How it works: a path, not three identical boxes */}
-      <section id="how" className="mx-auto flex max-w-[75rem] scroll-mt-4 flex-col gap-12 px-4 py-20 sm:px-6 sm:py-24">
+      <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-12 px-4 py-20 sm:px-6 sm:py-24">
         <h2 className="text-center font-display text-[clamp(2.125rem,4vw,3.25rem)] font-semibold leading-[1.05] text-balance">Three steps. Then it&apos;s done.</h2>
         <ol className="flex flex-wrap justify-center gap-8">
           {steps.map((s, i) => (
@@ -198,7 +194,6 @@ export default async function Home() {
       {/* Your year of giving (a sample of the donor's account) */}
       <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6 sm:pb-24">
         <div className="relative flex flex-wrap items-center gap-12 overflow-hidden rounded-[2.5rem] bg-navy p-[clamp(1.75rem,5vw,4rem)]">
-          <Drop colour="lilac" className="-left-8 -top-28 h-44 w-auto rotate-160" />
           <div className="relative flex min-w-0 flex-[1_1_22rem] flex-col gap-4.5">
             <h2 className="font-display text-[clamp(2rem,3.8vw,3rem)] font-semibold leading-[1.05] text-white! text-balance">Your year of giving, on one page.</h2>
             <p className="text-lg leading-relaxed text-brand-soft">
@@ -248,8 +243,6 @@ export default async function Home() {
       {/* Last call to action */}
       <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6 sm:pb-22">
         <div className="relative flex flex-wrap items-center justify-between gap-7 overflow-hidden rounded-[2.5rem] bg-brand px-[clamp(1.75rem,5vw,4rem)] py-[clamp(2.5rem,6vw,4.5rem)]">
-          <Drop colour="orange" className="-right-10 -top-16 h-32 w-auto rotate-200 sm:-bottom-28 sm:-left-12 sm:right-auto sm:top-auto sm:h-44 sm:-rotate-30" />
-          <Drop colour="lilac" className="-top-24 left-[50%] hidden h-40 w-auto rotate-160 lg:block" />
           <h2 className="relative max-w-[40rem] font-display text-[clamp(2.125rem,4.4vw,3.5rem)] font-semibold leading-[1.02] text-white! text-balance">Ready when you are.</h2>
           <div className="relative flex flex-wrap items-center gap-5">
             <Link href="/charities" className="pressable rounded-control bg-coral px-7 py-4 text-lg font-bold text-navy">

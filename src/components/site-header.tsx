@@ -2,29 +2,30 @@ import Link from "next/link";
 import { platformConfig } from "@/config/platform";
 import { getViewer } from "@/lib/auth";
 import { dashboardLink } from "@/lib/dashboard-link";
+import { NavLink } from "@/components/nav-link";
 
 export async function SiteHeader() {
   const viewer = await getViewer();
   const dashboard = dashboardLink(viewer);
   return (
-    <header className="bg-surface border-b border-border print:hidden">
-      <div className="mx-auto flex max-w-[75rem] items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
-        <Link href="/" aria-label={`${platformConfig.appName} home`} className="shrink-0">
+    // Stays at the top while the page scrolls, so Charities and Sign in are always one tap away.
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur-md print:hidden">
+      <div className="mx-auto flex h-16 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-[4.5rem] sm:px-6">
+        <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1 shrink-0 rounded-lg p-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto" />
+          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-9" />
         </Link>
-        <nav aria-label="Main" className="flex items-center gap-3 whitespace-nowrap text-sm sm:gap-4">
-          <Link href="/charities" className="hover:text-brand">Charities</Link>
+        <nav aria-label="Main" className="flex items-center gap-1 whitespace-nowrap text-[15px] sm:gap-2">
+          {/* On a phone a charity admin sees Dashboard instead of Charities, so the header stays on one line. */}
+          <NavLink href="/charities" className={dashboard ? "hidden sm:inline-block" : ""}>Charities</NavLink>
           {/* Phones: the home page and footer link here instead, so the header stays on one line. */}
-          <Link href="/for-charities" className="hidden hover:text-brand sm:inline">For charities</Link>
+          <NavLink href="/for-charities" className="hidden sm:inline-block">For charities</NavLink>
           {/* A charity admin can always get back to their dashboard from any public page. */}
-          {dashboard ? (
-            <Link href={dashboard.href} className="font-semibold text-brand hover:underline">{dashboard.label}</Link>
-          ) : null}
+          {dashboard ? <NavLink href={dashboard.href}>{dashboard.label}</NavLink> : null}
           {viewer ? (
-            <Link href="/account" className="hover:text-brand">Account</Link>
+            <NavLink href="/account">Account</NavLink>
           ) : (
-            <Link href="/login" className="rounded-control bg-brand px-3 py-1.5 text-brand-contrast">
+            <Link href="/login" className="ml-1 rounded-full bg-brand px-4 py-2 font-semibold text-brand-contrast transition-colors hover:bg-navy">
               Sign in
             </Link>
           )}

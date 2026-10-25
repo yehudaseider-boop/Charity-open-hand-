@@ -51,7 +51,7 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
       </header>
 
       <div className="mx-auto grid max-w-[75rem] grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-10 lg:py-8">
-        <aside className="lg:sticky lg:top-6 lg:self-start">
+        <aside className="lg:sticky lg:top-24 lg:self-start">
           <CharityNav id={id} />
         </aside>
         <div className="min-w-0 space-y-5">

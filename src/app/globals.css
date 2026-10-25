@@ -69,6 +69,17 @@
   --font-hebrew: var(--font-heebo), var(--font-dm-sans), system-ui, sans-serif;
 }
 
+/* In-page links (#how) land below the sticky header, not under it. */
+html {
+  scroll-padding-top: 5.5rem;
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   background: var(--bg);
   color: var(--text);

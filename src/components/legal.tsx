@@ -22,15 +22,47 @@ export function TermsAndPrivacyLinks() {
   );
 }
 
+const footerGroups = [
+  { title: "Give", links: [["Find a charity", "/charities"], ["How it works", "/#how"], ["Your account", "/account"]] },
+  { title: "Charities", links: [["For charities", "/for-charities"], ["List your charity", "/apply"], ["Charity sign in", "/login"]] },
+  { title: "Your privacy", links: [["Privacy Policy", "/privacy"], ["Terms", "/terms"], ["Your information", "/account/data"]] },
+] as const;
+
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border bg-surface print:hidden">
-      <div className="mx-auto flex max-w-[75rem] flex-wrap gap-x-4 gap-y-1 px-4 py-4 text-xs text-muted sm:px-6">
-        <Link href="/for-charities" className="hover:text-brand">For charities</Link>
-        <Link href="/privacy" className="hover:text-brand">Privacy Policy</Link>
-        <Link href="/terms" className="hover:text-brand">Terms</Link>
-        <Link href="/account/data" className="hover:text-brand">Your information</Link>
-        <span>Card details are handled by our payment provider. We never see or store them.</span>
+    <footer className="mt-auto bg-honey-soft print:hidden">
+      <div className="mx-auto grid max-w-[75rem] grid-cols-2 gap-x-6 gap-y-9 px-4 pb-8 pt-12 sm:grid-cols-3 sm:px-6 md:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
+        <div className="col-span-2 flex flex-col items-start gap-3 sm:col-span-3 md:col-span-1">
+          <Link href="/" aria-label="Givezy home" className="-ml-1 rounded-lg p-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Givezy" width={97} height={32} className="h-8 w-auto" />
+          </Link>
+          <p className="max-w-[18rem] text-[15px] leading-relaxed text-muted">Registered South African charities, checked by us. Give in a minute, and keep every gift in one place.</p>
+        </div>
+        {footerGroups.map((g) => (
+          <nav key={g.title} aria-label={g.title} className="flex flex-col gap-2.5">
+            <h2 className="text-sm font-bold text-navy">{g.title}</h2>
+            <ul className="flex flex-col gap-2 text-[15px]">
+              {g.links.map(([label, href]) => (
+                <li key={href}>
+                  <Link href={href} className="text-muted underline-offset-4 transition-colors hover:text-brand hover:underline">{label}</Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+      <div className="mx-auto max-w-[75rem] px-4 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border py-5 text-[13px] text-muted">
+        <p className="flex items-center gap-2">
+          <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-sage">
+            <rect x="5" y="11" width="14" height="9" rx="2" />
+            <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+          </svg>
+          Card details are handled by our payment provider. We never see or store them.
+        </p>
+        <p>© {new Date().getFullYear()} Givezy</p>
+      </div>
       </div>
     </footer>
   );

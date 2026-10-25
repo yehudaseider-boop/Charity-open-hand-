@@ -2,6 +2,14 @@
 
 ## Decided
 
+- **Website craft pass (25/10/2026, Yehuda: "every little detail must be precise").** Same v2 colours and fonts. The
+  logo's splash is now used on the website as in the app: all three drops together (`public/brand/splash.png`, the
+  app's own image), once per page, whole, never over words or cut off by an edge (`src/components/splash.tsx`); the
+  scattered single drops on the home, charities and charity pages are gone. The header stays at the top while scrolling
+  and shows which section you are in; the footer has the logo, three link groups and the card-safety line. Charity
+  cards show an arrow; a charity page without a cover photo has a lilac band with the splash; on phones a Give bar
+  slides up once the page's own Give button has scrolled away, and steps aside for the footer. Next: the give flow,
+  thank-you, sign in and the charity sign-up pages, then the dashboard and the app.
 - **Donors can cover the card charge (25/10/2026, Yehuda).** Givezy stays free: no fee for charities or donors. A new
   optional box, unticked, lets the donor add the payment provider's charge so the charity gets the full gift. The amount
   is worked out on the whole payment (rounded up, so the charity is never a cent short) and kept per payment in

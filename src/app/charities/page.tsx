@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { BilingualName } from "@/components/bilingual-name";
 import { CharityBadges } from "@/components/charity-badges";
+import { Chevron } from "@/components/chevron";
+import { Splash } from "@/components/splash";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -51,8 +53,8 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
     // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
     <div className="full-bleed overflow-x-clip">
       <section className="relative overflow-hidden bg-honey-soft">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/drop-orange.png" alt="" aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-28 w-auto rotate-12 select-none sm:right-10 sm:h-36" />
+        {/* The logo's splash, whole, beside the search on a laptop; phones keep the band clear. */}
+        <Splash className="absolute right-[max(1.5rem,calc(50%-36rem))] top-12 hidden h-auto w-56 lg:block" />
         <div className="relative mx-auto max-w-[75rem] space-y-5 px-4 pb-8 pt-10 sm:px-6 sm:pb-10 sm:pt-14">
           <h1 className="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.02] text-balance">Find a charity</h1>
           <p className="max-w-[36rem] text-lg text-muted">Registered South African charities, checked by us before they can take a gift.</p>
@@ -114,7 +116,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
             const logo = publicImageUrl(c.logo_path);
             return (
               <li key={c.id}>
-                <Link href={`/c/${c.slug}`} className="flex h-full gap-4 rounded-card border-2 border-border bg-surface p-5 transition hover:border-brand">
+                <Link href={`/c/${c.slug}`} className="group flex h-full gap-4 rounded-card border-2 border-border bg-surface p-5 transition-colors hover:border-brand">
                   {logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={logo} alt="" className="h-16 w-16 shrink-0 rounded-control border border-border object-cover" />
@@ -134,6 +136,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
                       ))}
                     </div>
                   </div>
+                  <span className="self-center"><Chevron /></span>
                 </Link>
               </li>
             );
