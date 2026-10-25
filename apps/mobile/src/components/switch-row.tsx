@@ -48,10 +48,11 @@ export function CheckRow({ label, value, onChange, error }: { label: string; val
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 16, minHeight: touch, paddingVertical: 6 },
   label: { fontFamily: fonts.bodySemibold, fontSize: 17, lineHeight: 23, color: colors.ink },
-  track: { width: 50, height: 30, borderRadius: 15, backgroundColor: colors.hairline, padding: 3, justifyContent: "center" },
-  trackOn: { backgroundColor: colors.blue },
-  knob: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surface },
-  knobOn: { alignSelf: "flex-end" },
+  // Off is a slate outline and a slate knob, so it reads as a switch on white; on is solid blue with a white knob.
+  track: { width: 50, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: colors.muted, backgroundColor: colors.surface, padding: 3, justifyContent: "center" },
+  trackOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.muted },
+  knobOn: { alignSelf: "flex-end", backgroundColor: colors.surface },
   checkRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: touch - 8, paddingVertical: 4 },
   box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.muted, alignItems: "center", justifyContent: "center", marginTop: 1 },
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
