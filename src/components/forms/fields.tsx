@@ -30,7 +30,12 @@ function Wrapper({ id, name, label, hint, required, children }: Base & { id: str
       </label>
       {children}
       {hint && !error ? <p id={`${id}-hint`} className="text-xs text-muted">{hint}</p> : null}
-      {error ? <p id={`${id}-error`} role="alert" className="text-xs font-semibold text-danger">{error}</p> : null}
+      {error ? (
+        <p id={`${id}-error`} role="alert" className="flex items-start gap-1.5 text-sm font-semibold text-danger">
+          <ErrorMark />
+          <span>{error}</span>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -211,5 +216,15 @@ export function CheckboxGroup({
         ))}
       </div>
     </fieldset>
+  );
+}
+
+/** The small warning mark beside a field's error, so an error is not shown by colour alone. */
+export function ErrorMark() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 stroke-current">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5.5M12 16.5h.01" />
+    </svg>
   );
 }

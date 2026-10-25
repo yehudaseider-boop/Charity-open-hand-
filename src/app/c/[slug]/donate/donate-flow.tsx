@@ -5,7 +5,7 @@ import { startTransition, useActionState, useEffect, useRef, useState } from "re
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
 import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
-import { TextArea, TextField, useFieldId } from "@/components/forms/fields";
+import { ErrorMark, TextArea, TextField, useFieldId } from "@/components/forms/fields";
 import { formatRand } from "@/lib/money";
 import { getQuote, submitDonation, type CheckoutState, type QuoteState } from "./actions";
 import { impactLine, impactSource, type ImpactUnit } from "@/lib/charity/impact";
@@ -160,7 +160,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             {quoting ? "Checking…" : "Continue"}
           </button>
         </div>
-        {amountError ? <p id="amount-error" role="alert" className="text-sm font-semibold text-danger">{amountError}</p> : null}
+        {amountError ? <p id="amount-error" role="alert" className="flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{amountError}</span></p> : null}
         {typedImpact && impactUnit && !amountError ? (
           <p className="rounded-control bg-honey-soft px-4 py-3 text-sm" aria-live="polite">
             <span className="font-semibold text-navy">{typedImpact}.</span> <span className="text-muted">{impactSource(charityName, impactUnit)}</span>
@@ -300,7 +300,7 @@ function Check({ name, children, detail, error }: { name: string; children: Reac
           {detail ? <span id={`${id}-detail`}> {detail}</span> : null}
         </span>
       </div>
-      {showError ? <p id={`${id}-error`} role="alert" className="ml-[2.125rem] text-xs font-semibold text-danger">{error}</p> : null}
+      {showError ? <p id={`${id}-error`} role="alert" className="ml-[2.125rem] flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{error}</span></p> : null}
     </div>
   );
 }
@@ -340,6 +340,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   const formRef = useRef<HTMLFormElement>(null);
   // The folded extras (label, dedication, message): open from the start when the app sent a label.
   const [extrasOpen, setExtrasOpen] = useState(Boolean(initialLabel));
+  // How many things needed fixing at the last press of Pay (the count is refreshed on the next press).
+  const fixCount = Object.keys(state.fieldErrors ?? {}).length;
   const extrasNeedFixing = ["giving_label", "dedication_kind", "dedication_name", "message"].some((k) => Boolean(state.fieldErrors?.[k]));
   // After a refusal, take the donor to the first thing to fix (it may be far above the Pay button).
   useEffect(() => {
@@ -535,7 +537,21 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         </button>
         {state.message ? (
           <div role="alert" className="space-y-1 rounded-control border-2 border-danger-soft p-4 text-sm">
-            <p className="font-semibold text-danger">{state.message}</p>
+            <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{state.message}</span></p>
+            {/* The page has already jumped to the first problem; this takes the donor back to it after scrolling down. */}
+            {fixCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const first = formRef.current?.querySelector<HTMLElement>("[aria-invalid=true]");
+                  first?.focus();
+                  first?.scrollIntoView({ block: "center", behavior: "smooth" });
+                }}
+                className="min-h-11 font-bold text-brand underline underline-offset-4"
+              >
+                Show me the first one
+              </button>
+            ) : null}
             {state.failedToStart ? <p className="text-muted">If it keeps happening: <SupportContact />.</p> : null}
             {state.campaignEnded ? (
               <a href={`/c/${slug}/donate?${new URLSearchParams({ cents: String(shownQuote.amountCents), ...(fromApp ? { from: "app" } : {}), ...(source ? { [SOURCE_PARAM]: source } : {}), ...(initialLabel ? { label: initialLabel } : {}) }).toString()}`} className="inline-block font-bold text-brand underline underline-offset-4">
