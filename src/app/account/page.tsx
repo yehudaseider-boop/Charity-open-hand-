@@ -8,6 +8,8 @@ import { formatDate, taxYearFor, taxYearLabel } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyButton } from "./monthly-button";
+import { loadTaxPack } from "@/lib/tax-pack/load";
+import type { TaxPack } from "@/lib/tax-pack/build";
 import { DECLINED_REASON, NEW_CARD_NOT_REUSABLE } from "@/lib/donations/monthly-reasons";
 
 export const metadata: Metadata = { title: "Account", robots: { index: false, follow: false } };
@@ -38,6 +40,17 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         .order("created_at", { ascending: false })
     : { data: [] };
 
+  // This tax year's gifts, from the same reading as the tax pack (paid donations only, Johannesburg dates).
+  const thisYear = taxYearFor(new Date());
+  let giving: TaxPack | null | "unavailable" = null;
+  try {
+    giving = await loadTaxPack(viewer.userId, thisYear);
+  } catch (e) {
+    console.error(e);
+    giving = "unavailable";
+  }
+  const recent = giving && giving !== "unavailable" ? [...giving.lines].reverse().slice(0, 5) : [];
+
   return (
     // full-bleed: the header band runs edge to edge, like a charity's dashboard (see globals.css).
     <div className="full-bleed overflow-x-clip">
@@ -45,8 +58,8 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         <Drop colour="orange" className="-right-6 -top-10 hidden h-28 w-auto rotate-12 sm:block" />
         <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-bold text-brand">Your account</p>
-            <h1 className="break-all font-display text-[clamp(1.5rem,4vw,2.25rem)] font-bold leading-tight text-indigo">{viewer.email}</h1>
+            <h1 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] font-extrabold leading-tight text-indigo">Your account</h1>
+            <p className="break-all text-[15px] text-muted">{viewer.email}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:mr-24">
             <Badge>Donor</Badge>
@@ -65,6 +78,48 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           <form action="/auth/signout" method="post"><button className="underline">Sign out</button></form>
         </div>
       ) : null}
+      {/* What a donor came for first: what they gave this tax year, and the latest gifts. */}
+      <section aria-labelledby="your-giving" className="space-y-4 rounded-card border-2 border-border bg-surface p-5 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 id="your-giving" className="font-display text-xl font-bold text-indigo">Your giving</h2>
+          <span className="text-sm text-muted">Tax year {thisYear} so far</span>
+        </div>
+        {giving === "unavailable" ? (
+          <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">
+            We couldn&apos;t load your gifts just now. Nothing has changed. Refresh the page to try again.
+          </p>
+        ) : giving && giving.lines.length > 0 ? (
+          <>
+            <div className="flex flex-col gap-1">
+              <span className="font-display text-[2.5rem] font-extrabold leading-none tabular-nums text-navy">{formatRand(giving.totalCents)}</span>
+              <span className="text-sm text-muted">
+                {giving.lines.length === 1 ? "1 gift" : `${giving.lines.length} gifts`} to{" "}
+                {giving.byCharity.length === 1 ? "1 charity" : `${giving.byCharity.length} charities`}
+              </span>
+            </div>
+            <ul className="divide-y divide-border border-y border-border">
+              {recent.map((g) => (
+                <li key={g.id} className="flex items-center justify-between gap-4 py-3">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-semibold">{g.charityName}</span>
+                    <span className="text-sm text-muted">{formatDate(g.paidAt)}{g.monthly ? " · Monthly" : ""}</span>
+                  </span>
+                  <span className="shrink-0 font-bold tabular-nums">{formatRand(g.cents)}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href={`/account/tax-pack/${thisYear}`} className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">
+              {giving.lines.length > recent.length ? `See all ${giving.lines.length} gifts in your tax pack` : "See your tax pack"}
+            </Link>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-muted">No gifts yet this tax year. Gifts made with this email address show here.</p>
+            <Link href="/charities" className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">Find a charity</Link>
+          </div>
+        )}
+      </section>
+
       {monthlyGifts && monthlyGifts.length > 0 ? (
         <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
           <h2 className="font-display text-xl font-bold text-indigo">Your monthly donations</h2>
