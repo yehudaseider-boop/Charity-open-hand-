@@ -76,7 +76,7 @@ export default function Home() {
   const nextMonthly = monthlyList.filter((r) => r.status === "active" && r.nextDate).sort((a, b) => (a.nextDate as Date).getTime() - (b.nextDate as Date).getTime())[0] ?? null;
   const glance = [
     yearGifts.length ? { key: "year", kicker: `Given, tax year ${thisYear}`, value: rand(yearCents), sub: `${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving" as const } : null,
-    nextMonthly ? { key: "next", kicker: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)}, ${nextMonthly.charityName}`, to: "/giving" as const } : null,
+    nextMonthly ? { key: "next", kicker: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)}\n${nextMonthly.charityName}`, to: "/giving" as const } : null,
     receiptList.length ? { key: "receipts", kicker: "s18A receipts", value: `${receiptList.length}`, sub: receiptList.length === 1 ? "receipt to download" : "receipts to download", to: "/receipts" as const } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);
   // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
@@ -161,10 +161,10 @@ export default function Home() {
         {glance.length ? (
           <View style={[styles.gutter, styles.glanceRow]}>
             {glance.map((t) => (
-              <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.kicker}: ${t.value}. ${t.sub}`} style={({ pressed }) => [styles.glance, pressed && { opacity: 0.85 }]}>
-                <Text style={styles.glanceKicker} numberOfLines={1}>{t.kicker}</Text>
+              <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.kicker}: ${t.value}. ${t.sub.replace("\n", ", ")}`} style={({ pressed }) => [styles.glance, pressed && { opacity: 0.85 }]}>
+                <Text style={styles.glanceKicker} numberOfLines={2}>{t.kicker}</Text>
                 <Text style={styles.glanceValue} numberOfLines={1}>{t.value}</Text>
-                <Text style={styles.glanceSub} numberOfLines={2}>{t.sub}</Text>
+                <Text style={styles.glanceSub} numberOfLines={4}>{t.sub}</Text>
               </Pressable>
             ))}
           </View>
@@ -221,10 +221,10 @@ const styles = StyleSheet.create({
   goalKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilacSoft },
   goalAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
   glanceRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  glance: { flexGrow: 1, flexBasis: "30%", minWidth: 92, padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft, gap: 2 },
-  glanceKicker: { fontFamily: fonts.bodySemibold, fontSize: 12, color: colors.muted },
+  glance: { flexGrow: 1, flexBasis: "40%", minWidth: 130, padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft, gap: 2 },
+  glanceKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 18, color: colors.muted },
   glanceValue: { fontFamily: fonts.bodyBold, fontSize: 18, color: colors.navy },
-  glanceSub: { fontFamily: fonts.bodyMedium, fontSize: 13, lineHeight: 18, color: colors.muted },
+  glanceSub: { fontFamily: fonts.bodyMedium, fontSize: 14, lineHeight: 19, color: colors.muted },
   notNow: { minHeight: 44, alignItems: "center", justifyContent: "center" },
   notNowText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lilacSoft, textDecorationLine: "underline" },
   goalSub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
