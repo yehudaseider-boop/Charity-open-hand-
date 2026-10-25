@@ -1,7 +1,7 @@
 import { Tabs, usePathname } from "expo-router";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Pressable, StyleSheet, Text, View, type ColorValue } from "react-native";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View, type ColorValue } from "react-native";
 import { Backdrop, type BackdropVariant } from "@/components/backdrop";
 import { QuickGive } from "@/components/quick-give";
 import { Sheet } from "@/components/sheet";
@@ -11,10 +11,12 @@ import { AccountIcon, DiscoverIcon, HomeIcon, ProgressIcon } from "@/components/
 import { Splash } from "@/components/splash";
 import { colors, fonts, lift, radius } from "@/theme/tokens";
 
-/** Our own label: the default one clips this font's descenders. */
+/** Our own label: the default one clips this font's descenders. On small phones (under 360 wide) it is a size
+ * smaller, so "Progress" and "Account" don't run into each other. */
 const label = (title: string) =>
   function TabLabel({ color }: { color: ColorValue }) {
-    return <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 20, color, marginTop: 2 }}>{title}</Text>;
+    const small = useWindowDimensions().width < 360;
+    return <Text style={{ fontFamily: fonts.bodySemibold, fontSize: small ? 13 : 14, lineHeight: 20, color, marginTop: 2 }}>{title}</Text>;
   };
 
 /** The icon sits in a soft blue pill while its tab is open. */
@@ -87,6 +89,8 @@ export default function TabsLayout() {
         animation: "fade",
         tabBarActiveTintColor: colors.blue,
         tabBarInactiveTintColor: colors.muted,
+        // No side padding inside each tab, so the longer labels have the whole width.
+        tabBarItemStyle: { paddingHorizontal: 0 },
         tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 1.5, borderTopColor: colors.lightPurple, height: 68 + insets.bottom, paddingTop: 8, paddingBottom: insets.bottom + 4 },
         sceneStyle: { backgroundColor: "transparent" },
       }}
