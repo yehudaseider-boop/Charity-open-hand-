@@ -98,7 +98,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
         </div>
       </div>
 
-      <div className={`mx-auto grid max-w-[75rem] gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12 pb-20`}>
+      <div className={`mx-auto grid max-w-[75rem] grid-cols-1 gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12 pb-20`}>
         {/* Giving comes first on a phone, and stays beside the story on a laptop. */}
         <div className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
           <div className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6">
@@ -114,8 +114,10 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
               </div>
             ) : null}
             {give ? (
-              <Link id="give-button" href={give} className="pressable block w-full rounded-control bg-coral px-4 py-4 text-center text-lg font-bold text-navy">
-                Give to {charity.name_en}
+              <Link id="give-button" href={give} aria-label={`Give to ${charity.name_en}`} className="pressable flex w-full min-w-0 flex-col items-center rounded-control bg-coral px-4 py-3.5 text-center text-navy">
+                {/* "Give" stays big; the name sits on one smaller line, so a long name never makes a giant button. */}
+                <span className="text-lg font-bold leading-tight">Give</span>
+                <span className="block w-full min-w-0 truncate text-sm font-semibold">to {charity.name_en}</span>
               </Link>
             ) : (
               <p className="rounded-control bg-honey-soft p-4 text-center text-muted">

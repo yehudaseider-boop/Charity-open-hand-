@@ -32,7 +32,7 @@ export function StickyGive({ href, label, watch }: { href: string; label: string
       aria-hidden={!show}
       className={`fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-md transition-transform duration-200 motion-reduce:transition-none lg:hidden ${show ? "translate-y-0" : "pointer-events-none translate-y-full"}`}
     >
-      <Link href={href} tabIndex={show ? undefined : -1} className="pressable block w-full rounded-control bg-coral px-4 py-3.5 text-center text-[17px] font-bold text-navy">
+      <Link href={href} tabIndex={show ? undefined : -1} aria-label={label} className="pressable block w-full truncate rounded-control bg-coral px-4 py-3.5 text-center text-[17px] font-bold text-navy">
         {label}
       </Link>
     </div>
