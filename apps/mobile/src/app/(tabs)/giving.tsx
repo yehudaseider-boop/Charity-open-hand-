@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
   tileWrap: { flex: 1, alignItems: "center", gap: 4 },
   tile: { width: "100%", height: 22, borderRadius: 7 },
   tileGiven: { backgroundColor: colors.orange },
-  tileEmpty: { backgroundColor: colors.navy },
+  tileEmpty: { backgroundColor: colors.blueTrack },
   tileFuture: { borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.lilac },
   tileNow: { borderWidth: 2, borderColor: colors.onInk },
   tileLabel: { fontFamily: fonts.bodySemibold, fontSize: 11, color: colors.lilacSoft },

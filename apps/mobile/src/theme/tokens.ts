@@ -29,6 +29,7 @@ export const colors = {
   danger: "#B3261E", // errors and destructive actions only (6.4:1)
   onInk: "#FFFFFF", // text on blue
   navyEdge: "#04123D", // deep navy at half brightness: the pressable edge under navy buttons
+  blueTrack: "rgba(255,255,255,0.18)", // ring tracks and empty months on blue grounds (white, see-through)
   scrim: "rgba(14,27,61,0.45)", // deep ink veil behind pop-ups
   scrimSoft: "rgba(14,27,61,0.35)", // lighter veil behind bottom sheets
   creamClear: "rgba(255,255,255,0)", // the page colour, see-through: where a fade to the page starts
