@@ -166,7 +166,8 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             <span className="font-semibold text-navy">{typedImpact}.</span> <span className="text-muted">{impactSource(charityName, impactUnit)}</span>
           </p>
         ) : null}
-        <p className="text-sm text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
+        {/* While the amount has a problem, its message says what to do; the hint comes back once it is fixed. */}
+        {amountError ? null : <p className="text-sm text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>}
 
         <div className="space-y-2 rounded-control bg-honey-soft p-4">
           <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
