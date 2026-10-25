@@ -145,7 +145,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
             const year = taxYearFor(new Date()) - back;
             return (
               <li key={year}>
-                <Link href={`/account/tax-pack/${year}`} className="inline-block rounded-control border border-brand px-3 py-1.5 text-sm font-semibold text-brand">
+                <Link href={`/account/tax-pack/${year}`} className="inline-flex min-h-11 items-center rounded-control border border-brand px-4 text-sm font-semibold text-brand">
                   Tax year {year}{back === 0 ? " so far" : ""}
                 </Link>
               </li>
@@ -181,7 +181,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       </Link>
 
       <form action="/auth/signout" method="post">
-        <button className="text-sm text-muted underline">Sign out</button>
+        <button className="inline-flex min-h-11 items-center text-sm text-muted underline">Sign out</button>
       </form>
       </div>
     </div>

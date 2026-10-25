@@ -11,7 +11,7 @@ export function NavLink({ href, children, className = "" }: { href: string; chil
     <Link
       href={href}
       aria-current={here ? "page" : undefined}
-      className={`rounded-full px-2.5 py-2 sm:px-3 font-semibold transition-colors hover:bg-honey-soft ${here ? "bg-honey-soft text-brand" : "text-navy"} ${className}`}
+      className={`inline-flex min-h-11 items-center rounded-full px-2.5 sm:px-3 font-semibold transition-colors hover:bg-honey-soft ${here ? "bg-honey-soft text-brand" : "text-navy"} ${className}`}
     >
       {children}
     </Link>

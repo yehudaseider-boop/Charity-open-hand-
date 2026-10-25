@@ -143,7 +143,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
           })}
         </ul>
         <p className="pt-4 text-muted">
-          Run a charity? <Link href="/apply" className="font-bold text-brand underline underline-offset-4">List it here for free</Link>
+          Run a charity? <Link href="/apply" className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">List it here for free</Link>
         </p>
       </section>
     </div>

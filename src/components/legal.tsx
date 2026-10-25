@@ -33,19 +33,19 @@ export function SiteFooter() {
     <footer className="mt-auto bg-honey-soft print:hidden">
       <div className="mx-auto grid max-w-[75rem] grid-cols-2 gap-x-6 gap-y-9 px-4 pb-8 pt-12 sm:grid-cols-3 sm:px-6 md:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
         <div className="col-span-2 flex flex-col items-start gap-3 sm:col-span-3 md:col-span-1">
-          <Link href="/" aria-label="Givezy home" className="-ml-1 rounded-lg p-1">
+          <Link href="/" aria-label="Givezy home" className="-ml-1.5 rounded-lg p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="Givezy" width={97} height={32} className="h-8 w-auto" />
           </Link>
           <p className="max-w-[18rem] text-[15px] leading-relaxed text-muted">Registered South African charities, checked by us. Give in a minute, and keep every gift in one place.</p>
         </div>
         {footerGroups.map((g) => (
-          <nav key={g.title} aria-label={g.title} className="flex flex-col gap-2.5">
+          <nav key={g.title} aria-label={g.title} className="flex flex-col gap-1">
             <h2 className="text-sm font-bold text-navy">{g.title}</h2>
-            <ul className="flex flex-col gap-2 text-[15px]">
+            <ul className="flex flex-col text-[15px]">
               {g.links.map(([label, href]) => (
                 <li key={href}>
-                  <Link href={href} className="text-muted underline-offset-4 transition-colors hover:text-brand hover:underline">{label}</Link>
+                  <Link href={href} className="inline-flex min-h-11 items-center text-muted underline-offset-4 transition-colors hover:text-brand hover:underline">{label}</Link>
                 </li>
               ))}
             </ul>

@@ -55,7 +55,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             </form>
           ) : null}
           <p className="text-xs text-muted">
-            Nothing arrived? Check spam, or <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-brand underline">ask for a new email</Link>.
+            Nothing arrived? Check spam, or <Link href={`/login?next=${encodeURIComponent(next)}`} className="-my-3.5 inline-block py-3.5 text-brand underline">ask for a new email</Link>.
           </p>
         </div>
       ) : (

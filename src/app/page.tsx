@@ -71,7 +71,7 @@ export default async function Home() {
             <Link href="/charities" className="pressable rounded-control bg-coral px-7 py-4 text-lg font-bold text-navy">
               Find a charity
             </Link>
-            <Link href="#how" className="text-[17px] font-bold text-brand underline underline-offset-[5px]">How it works</Link>
+            <Link href="#how" className="inline-flex min-h-12 items-center text-[17px] font-bold text-brand underline underline-offset-[5px]">How it works</Link>
           </div>
           <ul className="mt-1 flex flex-wrap gap-x-6 gap-y-2.5 text-[15px] font-semibold">
             <li className="flex items-center gap-2"><Tick />Every charity checked by a person</li>
@@ -112,7 +112,7 @@ export default async function Home() {
         <div className="mx-auto flex max-w-[75rem] flex-col gap-9 px-4 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <h2 className="max-w-[40rem] font-display text-[clamp(2.125rem,4vw,3.25rem)] font-bold leading-[1.05] text-balance">Find a cause that feels close to home.</h2>
-            <Link href="/charities" className="text-[17px] font-bold text-brand underline underline-offset-4">See all charities</Link>
+            <Link href="/charities" className="inline-flex min-h-12 items-center text-[17px] font-bold text-brand underline underline-offset-4">See all charities</Link>
           </div>
 
           {categories.length > 0 ? (

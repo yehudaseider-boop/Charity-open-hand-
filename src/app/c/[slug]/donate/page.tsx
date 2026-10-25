@@ -54,7 +54,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="space-y-2">
-        <Link href={withSource(`/c/${charity.slug}`, sourceTag(sp.src))} className="text-sm font-semibold text-brand underline underline-offset-4">← {charity.name_en}</Link>
+        <Link href={withSource(`/c/${charity.slug}`, sourceTag(sp.src))} className="inline-flex min-h-11 max-w-full items-center text-sm font-semibold text-brand underline underline-offset-4"><span className="truncate">← {charity.name_en}</span></Link>
         <h1 className="text-[clamp(2rem,5vw,2.75rem)] leading-[1.05] text-balance">Give to {charity.name_en}</h1>
       </div>
       {campaign && charity.acceptingPayments ? <CampaignProgress campaign={campaign} compact /> : null}
