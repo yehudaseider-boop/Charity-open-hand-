@@ -3,10 +3,10 @@ import { cardChargeToCover } from "@shared/fees";
 import { impactLine, impactSource } from "@shared/charity/impact";
 import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { isValidSaIdNumber } from "@shared/sa-id";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
@@ -167,30 +167,13 @@ export default function Give() {
   // card, email) until the server says paid or declined, so no second donation can be started around it.
   const [heldAttempt, setHeldAttempt] = useState<Snapshot | null>(null);
   // Where each part of the form sits, so a failed tap scrolls to the first thing to fix.
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
   const at = (key: string) => (e: LayoutChangeEvent) => {
     const y = e.nativeEvent.layout.y;
     setSectionY((was) => (was[key] === y ? was : { ...was, [key]: y }));
   };
   const [busy, setBusy] = useState<false | "opening" | "checking">(false);
-  // Leaving by the back gesture or the hardware button: ask first when something typed would be lost,
-  // when we are still checking a payment, or when a saved-card charge is waiting for its reply.
-  const navigation = useNavigation();
-  const leaveGuard = useRef<{ typed: boolean; busy: false | "opening" | "checking"; held: boolean; done: boolean }>({ typed: false, busy: false, held: false, done: false });
-  useEffect(() => {
-    return navigation.addListener("beforeRemove", (e) => {
-      const g = leaveGuard.current;
-      if (g.done || (!g.typed && g.busy === false && !g.held)) return;
-      e.preventDefault();
-      const go = () => navigation.dispatch(e.data.action);
-      if (g.busy === "checking") {
-        Alert.alert("We're still checking your payment", "Leaving now may lose the result. It takes a few seconds.", [{ text: "Wait" }, { text: "Leave anyway", style: "destructive", onPress: go }]);
-      } else {
-        Alert.alert("Leave and lose what you typed?", undefined, [{ text: "Keep editing", style: "cancel" }, { text: "Leave", style: "destructive", onPress: go }]);
-      }
-    });
-  }, [navigation]);
   // Where "Back" goes when there is no screen behind this one (opened cold from a link).
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/discover"));
   // Two taps in the same frame both see busy as false; the ref stops the second at once.
@@ -202,9 +185,15 @@ export default function Give() {
   const typedSomething = Boolean(amount || first || last || emailTyped || phone || idNumber || street || suburb || town || postal || note || extraAmount);
   const heldOne = heldAttempt !== null;
   const isDone = done !== null;
-  useEffect(() => {
-    leaveGuard.current = { typed: typedSomething, busy, held: heldOne, done: isDone };
-  }, [typedSomething, busy, heldOne, isDone]);
+  // Leaving by the back gesture or the hardware button: ask first when something typed would be lost,
+  // when we are still checking a payment, or when a saved-card charge is waiting for its reply.
+  usePreventRemove(!isDone && (typedSomething || busy !== false || heldOne), ({ repeat }) => {
+    if (busy === "checking") {
+      Alert.alert("We're still checking your payment", "Leaving now may lose the result. It takes a few seconds.", [{ text: "Wait" }, { text: "Leave anyway", style: "destructive", onPress: repeat }]);
+    } else {
+      Alert.alert("Leave and lose what you typed?", undefined, [{ text: "Keep editing", style: "cancel" }, { text: "Leave", style: "destructive", onPress: repeat }]);
+    }
+  });
   // Preview of the after-gift screen for design review: ?demo=sent.
   const [demoShown, setDemoShown] = useState(false);
 
