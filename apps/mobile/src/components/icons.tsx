@@ -47,6 +47,14 @@ export function GivingIcon({ size = 24, color = colors.ink }: IconProps) {
   );
 }
 
+export function CalendarIcon({ size = 24, color = colors.ink }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M5.5 5.5h13a1 1 0 011 1v12a1 1 0 01-1 1h-13a1 1 0 01-1-1v-12a1 1 0 011-1zM4.5 10h15M8.5 3.5v4M15.5 3.5v4" {...stroke(color)} />
+    </Svg>
+  );
+}
+
 export function ReceiptsIcon({ size = 24, color = colors.ink }: IconProps) {
   return (
     <Svg {...base(size)}>

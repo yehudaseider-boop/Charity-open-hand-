@@ -7,7 +7,7 @@ import { Blob } from "@/components/blob";
 import { Button } from "@/components/button";
 import { CharityPhotoCard } from "@/components/charity-photo-card";
 import { GoalRing } from "@/components/goal-ring";
-import { ChevronIcon, ReceiptsIcon } from "@/components/icons";
+import { CalendarIcon, ChevronIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { useStatusCover } from "@/components/status-cover";
 import { Logo } from "@/components/logo";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
@@ -28,7 +28,7 @@ import { dismissGoalCard, goalCardDismissed } from "@/lib/first-run";
 import type { IncomeEntry } from "@/lib/ledger";
 import { useSaved } from "@/lib/saved";
 import { useStoredRecord } from "@/lib/use-stored-record";
-import { colors, fonts, radius, space } from "@/theme/tokens";
+import { colors, fonts, radius, space, tabular } from "@/theme/tokens";
 
 const noGoals: Goal[] = [];
 const noIncome: IncomeEntry[] = [];
@@ -67,7 +67,8 @@ export default function Home() {
   // "First gift" only when we know: fresh giving from the server with none in it (not while it loads or fails).
   const firstGift = preview ? demoState === "empty" : account.status === "signed-in" && account.live !== null && !account.live.fromCache && gifts.length === 0;
   const goal = goals.value[0] ?? null;
-  // At a glance, quieter than the goal card: given this tax year, the next monthly gift, and receipts.
+  // At a glance, quieter than the goal card: one list, a full-width row each, so nothing is ever cut short.
+  // "Through Givezy" because the goal above also counts giving logged elsewhere, so the two totals can differ.
   const monthlyList = preview ? sampleRecurring : (account.live?.recurring ?? []);
   const receiptList = preview ? sampleReceipts : (account.live?.receipts ?? []);
   const thisYear = taxYearFor(jhbToday());
@@ -75,9 +76,9 @@ export default function Home() {
   const yearCents = yearGifts.reduce((n, g) => n + g.cents, 0);
   const nextMonthly = monthlyList.filter((r) => r.status === "active" && r.nextDate).sort((a, b) => (a.nextDate as Date).getTime() - (b.nextDate as Date).getTime())[0] ?? null;
   const glance = [
-    yearGifts.length ? { key: "year", kicker: `Given, tax year ${thisYear}`, value: rand(yearCents), sub: `${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving" as const } : null,
-    nextMonthly ? { key: "next", kicker: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)}\n${nextMonthly.charityName}`, to: "/giving" as const } : null,
-    receiptList.length ? { key: "receipts", kicker: "s18A receipts", value: `${receiptList.length}`, sub: receiptList.length === 1 ? "receipt to download" : "receipts to download", to: "/receipts" as const } : null,
+    yearGifts.length ? { key: "year", Icon: GivingIcon, title: "Given through Givezy", value: rand(yearCents), sub: `Tax year ${thisYear} · ${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving" as const } : null,
+    nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving" as const } : null,
+    receiptList.length ? { key: "receipts", Icon: ReceiptsIcon, title: "s18A receipts", value: `${receiptList.length}`, sub: "To download", to: "/receipts" as const } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);
   // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
   // While the choice is being read it stays hidden, so it never flashes up and away.
@@ -159,14 +160,20 @@ export default function Home() {
         </View>}
 
         {glance.length ? (
-          <View style={[styles.gutter, styles.glanceRow]}>
-            {glance.map((t) => (
-              <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.kicker}: ${t.value}. ${t.sub.replace("\n", ", ")}`} style={({ pressed }) => [styles.glance, pressed && { opacity: 0.85 }]}>
-                <Text style={styles.glanceKicker} numberOfLines={2}>{t.kicker}</Text>
-                <Text style={styles.glanceValue} numberOfLines={1}>{t.value}</Text>
-                <Text style={styles.glanceSub} numberOfLines={4}>{t.sub}</Text>
-              </Pressable>
-            ))}
+          <View style={styles.gutter}>
+            <View style={styles.glance}>
+              {glance.map((t, i) => (
+                <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.title}: ${t.value}. ${t.sub}`} style={({ pressed }) => [styles.glanceRow, i > 0 && styles.glanceDivider, pressed && { backgroundColor: colors.lilacSoft }]}>
+                  <View style={styles.glanceIcon}><t.Icon size={22} color={colors.blue} /></View>
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Text style={styles.glanceTitle}>{t.title}</Text>
+                    <Text style={styles.glanceValue}>{t.value}</Text>
+                    <Text style={styles.glanceSub}>{t.sub}</Text>
+                  </View>
+                  <ChevronIcon />
+                </Pressable>
+              ))}
+            </View>
           </View>
         ) : null}
 
@@ -221,11 +228,13 @@ const styles = StyleSheet.create({
   goalKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilacSoft },
   goalWindow: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.lilacSoft, marginBottom: 2 },
   goalAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
-  glanceRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  glance: { flexGrow: 1, flexBasis: "40%", minWidth: 130, padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft, gap: 2 },
-  glanceKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 18, color: colors.muted },
-  glanceValue: { fontFamily: fonts.bodyBold, fontSize: 18, color: colors.navy },
-  glanceSub: { fontFamily: fonts.bodyMedium, fontSize: 14, lineHeight: 19, color: colors.muted },
+  glance: { borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.hairline, backgroundColor: colors.surface, overflow: "hidden" },
+  glanceRow: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 72, paddingVertical: 14, paddingLeft: 14, paddingRight: 12 },
+  glanceDivider: { borderTopWidth: 1, borderTopColor: colors.hairline },
+  glanceIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.lilacSoft, alignItems: "center", justifyContent: "center" },
+  glanceTitle: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 19, color: colors.muted },
+  glanceValue: { ...tabular, fontFamily: fonts.bodyBold, fontSize: 20, lineHeight: 26, color: colors.ink },
+  glanceSub: { fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.muted },
   notNow: { minHeight: 44, alignItems: "center", justifyContent: "center" },
   notNowText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lilacSoft, textDecorationLine: "underline" },
   goalSub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
