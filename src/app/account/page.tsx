@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
-import { Drop } from "@/components/drop";
+import { Splash } from "@/components/splash";
 import { BilingualName } from "@/components/bilingual-name";
 import { requireViewer } from "@/lib/auth";
 import { formatDate, taxYearFor, taxYearLabel } from "@/lib/dates";
@@ -55,7 +55,8 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
     // full-bleed: the header band runs edge to edge, like a charity's dashboard (see globals.css).
     <div className="full-bleed overflow-x-clip">
       <header className="relative overflow-hidden border-b-2 border-border bg-honey-soft">
-        <Drop colour="orange" className="-right-6 -top-10 hidden h-28 w-auto rotate-12 sm:block" />
+        {/* The logo's splash, whole, in the space kept free beside the badges (laptops only). */}
+        <Splash className="absolute right-[max(1.5rem,calc(50%-36rem))] top-1/2 hidden h-auto w-20 -translate-y-1/2 sm:block" />
         <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
           <div className="min-w-0 space-y-1">
             <h1 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] font-extrabold leading-tight text-indigo">Your account</h1>

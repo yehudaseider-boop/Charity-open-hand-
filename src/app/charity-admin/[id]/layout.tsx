@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CharityNav } from "@/components/charity-nav";
-import { Drop } from "@/components/drop";
+import { Splash } from "@/components/splash";
 import { getViewer, requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
@@ -33,7 +33,8 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
     // full-bleed: the dashboard breaks out of the site's narrow column (see globals.css).
     <div className="full-bleed overflow-x-clip">
       <header className="relative overflow-hidden border-b-2 border-border bg-honey-soft print:hidden">
-        <Drop colour="orange" className="-right-6 -top-10 hidden h-28 w-auto rotate-12 sm:block" />
+        {/* The logo's splash, whole, in the space kept free beside the badges (laptops only). */}
+        <Splash className="absolute right-[max(1.5rem,calc(50%-36rem))] top-1/2 hidden h-auto w-20 -translate-y-1/2 sm:block" />
         <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-bold text-brand">Givezy for charities</p>
