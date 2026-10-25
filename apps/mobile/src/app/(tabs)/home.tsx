@@ -8,6 +8,7 @@ import { Button } from "@/components/button";
 import { CharityPhotoCard } from "@/components/charity-photo-card";
 import { GoalRing } from "@/components/goal-ring";
 import { ChevronIcon, ReceiptsIcon } from "@/components/icons";
+import { useStatusCover } from "@/components/status-cover";
 import { Logo } from "@/components/logo";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { useScreenState } from "@/lib/screen-state";
@@ -38,6 +39,7 @@ const noIncome: IncomeEntry[] = [];
  */
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const status = useStatusCover();
   const { width } = useWindowDimensions();
   const account = useAccount();
   const preview = account.status === "preview";
@@ -90,118 +92,121 @@ export default function Home() {
   const initial = (account.email ?? (preview ? "Sarah" : "?")).slice(0, 1).toUpperCase();
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, gap: space.block }}>
-      <View style={[styles.gutter, styles.top]}>
-        <Logo width={104} />
-        <Pressable onPress={() => router.push("/account")} accessibilityRole="button" accessibilityLabel="Your account" style={styles.avatar}>
-          <Text style={styles.avatarText}>{initial}</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.gutter}>
-        <Text variant="h1" accessibilityRole="header">{firstGift ? "Welcome in. Ready for your first gift?" : "Ready to do some good?"}</Text>
-      </View>
-
-      {/* The main goal, as a ring on blue. Without a goal it is a soft invitation that can be dismissed. */}
-      {hideGoalCard ? null : <View style={styles.gutter}>
-        <View style={styles.goalCard}>
-          <Blob size={100} color={colors.orange} rotate={20} style={{ right: -55, top: -60 }} />
-          <Blob size={90} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -50, bottom: -60 }} />
-          {goals.status === "problem" && !preview ? (
-            <View style={{ gap: 12 }}>
-              <Text style={styles.goalSub}>Your goals could not be opened on this phone. Nothing has been changed.</Text>
-              <Button variant="white" label="Open Progress" onPress={() => router.push("/giving")} />
-            </View>
-          ) : goals.status !== "ready" && !preview ? (
-            <SkeletonBlock height={120} />
-          ) : goal && progress ? (
-            <Pressable
-              onPress={() => router.push("/giving")}
-              accessibilityRole="button"
-              accessibilityLabel={`${goal.name}: ${rand(progress.givenCents)}${progress.targetCents !== null ? ` of ${rand(progress.targetCents)}` : ""}. Open your goals`}
-              style={({ pressed }) => [styles.goalRow, pressed && { opacity: 0.85 }]}
-            >
-              <GoalRing percent={pct} onBlue size={width < 360 ? 96 : 118} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.goalKicker}>{goal.name} · {progress.window.label}</Text>
-                <Text style={[styles.goalAmount, bigAmountSize(rand(progress.givenCents), width, 34)]}>{rand(progress.givenCents)}</Text>
-                <Text style={styles.goalSub}>
-                  {progress.targetCents !== null ? `of ${rand(progress.targetCents)}` : "Log income to see the target"} · {counted} {counted === 1 ? "gift" : "gifts"}
-                </Text>
-              </View>
-              <ChevronIcon color={colors.onInk} />
-            </Pressable>
-          ) : (
-            <View style={{ gap: 12 }}>
-              <Text style={styles.goalAmount}>Set a giving goal</Text>
-              <Text style={styles.goalSub}>A set amount or a share of your income. Only you see it.</Text>
-              <Button variant="white" label="Set a goal" onPress={() => router.push("/giving")} />
-              {preview ? null : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Not now: hide the goal card"
-                  hitSlop={8}
-                  onPress={() => {
-                    setCardGone(true);
-                    void dismissGoalCard();
-                  }}
-                  style={styles.notNow}
-                >
-                  <Text style={styles.notNowText}>Not now</Text>
-                </Pressable>
-              )}
-            </View>
-          )}
-        </View>
-      </View>}
-
-      {glance.length ? (
-        <View style={[styles.gutter, styles.glanceRow]}>
-          {glance.map((t) => (
-            <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.kicker}: ${t.value}. ${t.sub}`} style={({ pressed }) => [styles.glance, pressed && { opacity: 0.85 }]}>
-              <Text style={styles.glanceKicker} numberOfLines={1}>{t.kicker}</Text>
-              <Text style={styles.glanceValue} numberOfLines={1}>{t.value}</Text>
-              <Text style={styles.glanceSub} numberOfLines={2}>{t.sub}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={{ gap: 12 }}>
-        <View style={[styles.gutter, styles.sectionHead]}>
-          <Text variant="h2" accessibilityRole="header">Your causes</Text>
-          <Pressable onPress={() => router.push("/discover")} accessibilityRole="link" hitSlop={12}>
-            <Text style={styles.seeAll}>See all</Text>
+    <>
+      <ScrollView style={styles.screen} onScroll={status.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, gap: space.block }}>
+        <View style={[styles.gutter, styles.top]}>
+          <Logo width={104} />
+          <Pressable onPress={() => router.push("/account")} accessibilityRole="button" accessibilityLabel="Your account" style={styles.avatar}>
+            <Text style={styles.avatarText}>{initial}</Text>
           </Pressable>
         </View>
-        {(preview && demoState === "error") || (directory.failed && !causes.length) ? (
-          <View style={styles.gutter}>
-            <ErrorState body="We can't load charities right now. Check your connection, then try again." onRetry={directory.retry} />
-          </View>
-        ) : (preview && demoState === "loading") || (!directory.data && !directory.failed) ? (
-          <View style={styles.gutter}><SkeletonBlock height={260} /></View>
-        ) : !causes.length ? (
-          <View style={styles.gutter}>
-            <EmptyState title="No charities here yet" body="New charities join Givezy every week. Have a look again soon." action={{ label: "Go to Discover", onPress: () => router.push("/discover") }} />
-          </View>
-        ) : causes.length ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingHorizontal: space.gutter }}>
-            {causes.map((c) => (
-              <CharityPhotoCard key={c.slug} charity={c} live={directory.live} width={268} onGive={(ch) => openGiveScreen(ch.slug)} />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.gutter}><SkeletonBlock height={260} /></View>
-        )}
-      </View>
 
-      <View style={styles.gutter}>
-        <View style={styles.strip}>
-          <ReceiptsIcon color={colors.blue} />
-          <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>Ask for an s18A receipt when you give, and it arrives on its own at tax time.</Text>
+        <View style={styles.gutter}>
+          <Text variant="h1" accessibilityRole="header">{firstGift ? "Welcome in. Ready for your first gift?" : "Ready to do some good?"}</Text>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* The main goal, as a ring on blue. Without a goal it is a soft invitation that can be dismissed. */}
+        {hideGoalCard ? null : <View style={styles.gutter}>
+          <View style={styles.goalCard}>
+            <Blob size={100} color={colors.orange} rotate={20} style={{ right: -55, top: -60 }} />
+            <Blob size={90} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -50, bottom: -60 }} />
+            {goals.status === "problem" && !preview ? (
+              <View style={{ gap: 12 }}>
+                <Text style={styles.goalSub}>Your goals could not be opened on this phone. Nothing has been changed.</Text>
+                <Button variant="white" label="Open Progress" onPress={() => router.push("/giving")} />
+              </View>
+            ) : goals.status !== "ready" && !preview ? (
+              <SkeletonBlock height={120} />
+            ) : goal && progress ? (
+              <Pressable
+                onPress={() => router.push("/giving")}
+                accessibilityRole="button"
+                accessibilityLabel={`${goal.name}: ${rand(progress.givenCents)}${progress.targetCents !== null ? ` of ${rand(progress.targetCents)}` : ""}. Open your goals`}
+                style={({ pressed }) => [styles.goalRow, pressed && { opacity: 0.85 }]}
+              >
+                <GoalRing percent={pct} onBlue size={width < 360 ? 96 : 118} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.goalKicker}>{goal.name} · {progress.window.label}</Text>
+                  <Text style={[styles.goalAmount, bigAmountSize(rand(progress.givenCents), width, 34)]}>{rand(progress.givenCents)}</Text>
+                  <Text style={styles.goalSub}>
+                    {progress.targetCents !== null ? `of ${rand(progress.targetCents)}` : "Log income to see the target"} · {counted} {counted === 1 ? "gift" : "gifts"}
+                  </Text>
+                </View>
+                <ChevronIcon color={colors.onInk} />
+              </Pressable>
+            ) : (
+              <View style={{ gap: 12 }}>
+                <Text style={styles.goalAmount}>Set a giving goal</Text>
+                <Text style={styles.goalSub}>A set amount or a share of your income. Only you see it.</Text>
+                <Button variant="white" label="Set a goal" onPress={() => router.push("/giving")} />
+                {preview ? null : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Not now: hide the goal card"
+                    hitSlop={8}
+                    onPress={() => {
+                      setCardGone(true);
+                      void dismissGoalCard();
+                    }}
+                    style={styles.notNow}
+                  >
+                    <Text style={styles.notNowText}>Not now</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </View>
+        </View>}
+
+        {glance.length ? (
+          <View style={[styles.gutter, styles.glanceRow]}>
+            {glance.map((t) => (
+              <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.kicker}: ${t.value}. ${t.sub}`} style={({ pressed }) => [styles.glance, pressed && { opacity: 0.85 }]}>
+                <Text style={styles.glanceKicker} numberOfLines={1}>{t.kicker}</Text>
+                <Text style={styles.glanceValue} numberOfLines={1}>{t.value}</Text>
+                <Text style={styles.glanceSub} numberOfLines={2}>{t.sub}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={{ gap: 12 }}>
+          <View style={[styles.gutter, styles.sectionHead]}>
+            <Text variant="h2" accessibilityRole="header">Your causes</Text>
+            <Pressable onPress={() => router.push("/discover")} accessibilityRole="link" hitSlop={12}>
+              <Text style={styles.seeAll}>See all</Text>
+            </Pressable>
+          </View>
+          {(preview && demoState === "error") || (directory.failed && !causes.length) ? (
+            <View style={styles.gutter}>
+              <ErrorState body="We can't load charities right now. Check your connection, then try again." onRetry={directory.retry} />
+            </View>
+          ) : (preview && demoState === "loading") || (!directory.data && !directory.failed) ? (
+            <View style={styles.gutter}><SkeletonBlock height={260} /></View>
+          ) : !causes.length ? (
+            <View style={styles.gutter}>
+              <EmptyState title="No charities here yet" body="New charities join Givezy every week. Have a look again soon." action={{ label: "Go to Discover", onPress: () => router.push("/discover") }} />
+            </View>
+          ) : causes.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingHorizontal: space.gutter }}>
+              {causes.map((c) => (
+                <CharityPhotoCard key={c.slug} charity={c} live={directory.live} width={268} onGive={(ch) => openGiveScreen(ch.slug)} />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.gutter}><SkeletonBlock height={260} /></View>
+          )}
+        </View>
+
+        <View style={styles.gutter}>
+          <View style={styles.strip}>
+            <ReceiptsIcon color={colors.blue} />
+            <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>Ask for an s18A receipt when you give, and it arrives on its own at tax time.</Text>
+          </View>
+        </View>
+      </ScrollView>
+      {status.cover}
+    </>
   );
 }
 

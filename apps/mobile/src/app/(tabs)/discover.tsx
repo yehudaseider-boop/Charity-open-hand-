@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useStatusCover } from "@/components/status-cover";
 import { RaisingNowRow } from "@/components/raising-now";
 import { CharityPhotoCard, CheckedBadge } from "@/components/charity-photo-card";
 import { CharityImage } from "@/components/charity-image";
@@ -25,6 +26,7 @@ import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 /** Discover: search on lilac, cause chips, the cause of the week, then every charity as a photo card. */
 export default function Discover() {
   const insets = useSafeAreaInsets();
+  const status = useStatusCover();
   const demoState = useScreenState();
   const directory = useDirectory();
   const { live } = directory;
@@ -62,87 +64,92 @@ export default function Discover() {
   const rest = results.filter((c) => c !== featured);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={live ? <RefreshControl refreshing={directory.refreshing} onRefresh={directory.refresh} /> : undefined}
-    >
-      <View style={[styles.gutter, { gap: 14 }]}>
-        <Text variant="h1" accessibilityRole="header">Find a cause</Text>
-        <View style={styles.searchBlock}>
-          <View style={styles.search}>
-            <SearchIcon />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search by name, cause or area"
-              placeholderTextColor={colors.muted}
-              accessibilityLabel="Search charities"
-              returnKeyType="search"
-              style={styles.searchInput}
-            />
-          </View>
-        </View>
-        {directory.offlineSince ? <OfflineNote savedAt={directory.offlineSince} /> : null}
-        <SeasonalCard />
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityRole="radiogroup">
-        {causes.map((c) => {
-          const on = cause === c.id;
-          return (
-            <Pressable key={c.id} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setCause(c.id); }} style={[styles.chip, on && styles.chipOn]}>
-              <Text style={[styles.chipText, on && { color: colors.onInk }]}>{c.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.gutter}>
-        {state === "loading" ? (
-          <View style={{ gap: space.block }}>
-            <SkeletonBlock height={258} />
-            <LoadingList count={2} imageHeight={99} />
-          </View>
-        ) : state === "error" ? (
-          <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => (live ? directory.retry() : router.replace("/discover"))} />
-        ) : noneYet ? (
-          <EmptyState title="Charities are on their way" body="The first charities are joining Givezy. Check back soon." />
-        ) : results.length === 0 ? (
-          <EmptyState
-            title="No charities found"
-            body={query.trim() ? `Nothing matches "${query.trim()}". Try another name or a different cause.` : "No charities in this cause yet. Try another one."}
-            action={{ label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } }}
-          />
-        ) : (
-          <View style={{ gap: space.block }}>
-            {!query && cause === "all" && directory.data?.raising.length ? (
-              <View style={{ marginHorizontal: -space.gutter }}>
-                <RaisingNowRow items={directory.data.raising} />
-              </View>
-            ) : null}
-            {featured ? (
-              <FadeUp index={0}>
-                <CauseOfTheWeek charity={featured} live={live} />
-              </FadeUp>
-            ) : null}
-            <View style={{ gap: 16 }}>
-              {rest.length ? <Text style={styles.listHead}>{cause === "all" && !searching ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
-              {rest.map((c, i) => (
-                <FadeUp key={c.slug} index={i + 1}>
-                  <CharityPhotoCard charity={c} live={live} onGive={onGive} />
-                </FadeUp>
-              ))}
+    <>
+      <ScrollView
+        style={styles.screen}
+        onScroll={status.onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={live ? <RefreshControl refreshing={directory.refreshing} onRefresh={directory.refresh} /> : undefined}
+      >
+        <View style={[styles.gutter, { gap: 14 }]}>
+          <Text variant="h1" accessibilityRole="header">Find a cause</Text>
+          <View style={styles.searchBlock}>
+            <View style={styles.search}>
+              <SearchIcon />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search by name, cause or area"
+                placeholderTextColor={colors.muted}
+                accessibilityLabel="Search charities"
+                returnKeyType="search"
+                style={styles.searchInput}
+              />
             </View>
-            {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities for design review</Text>}
           </View>
-        )}
-      </View>
-      <Sheet visible={giveTo !== null} onClose={() => setGiveTo(null)}>
-        {giveTo ? <GiveSheet charityName={giveTo.nameEn} slug={giveTo.slug} onDone={() => setGiveTo(null)} /> : null}
-      </Sheet>
-    </ScrollView>
+          {directory.offlineSince ? <OfflineNote savedAt={directory.offlineSince} /> : null}
+          <SeasonalCard />
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityRole="radiogroup">
+          {causes.map((c) => {
+            const on = cause === c.id;
+            return (
+              <Pressable key={c.id} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setCause(c.id); }} style={[styles.chip, on && styles.chipOn]}>
+                <Text style={[styles.chipText, on && { color: colors.onInk }]}>{c.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.gutter}>
+          {state === "loading" ? (
+            <View style={{ gap: space.block }}>
+              <SkeletonBlock height={258} />
+              <LoadingList count={2} imageHeight={99} />
+            </View>
+          ) : state === "error" ? (
+            <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => (live ? directory.retry() : router.replace("/discover"))} />
+          ) : noneYet ? (
+            <EmptyState title="Charities are on their way" body="The first charities are joining Givezy. Check back soon." />
+          ) : results.length === 0 ? (
+            <EmptyState
+              title="No charities found"
+              body={query.trim() ? `Nothing matches "${query.trim()}". Try another name or a different cause.` : "No charities in this cause yet. Try another one."}
+              action={{ label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } }}
+            />
+          ) : (
+            <View style={{ gap: space.block }}>
+              {!query && cause === "all" && directory.data?.raising.length ? (
+                <View style={{ marginHorizontal: -space.gutter }}>
+                  <RaisingNowRow items={directory.data.raising} />
+                </View>
+              ) : null}
+              {featured ? (
+                <FadeUp index={0}>
+                  <CauseOfTheWeek charity={featured} live={live} />
+                </FadeUp>
+              ) : null}
+              <View style={{ gap: 16 }}>
+                {rest.length ? <Text style={styles.listHead}>{cause === "all" && !searching ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
+                {rest.map((c, i) => (
+                  <FadeUp key={c.slug} index={i + 1}>
+                    <CharityPhotoCard charity={c} live={live} onGive={onGive} />
+                  </FadeUp>
+                ))}
+              </View>
+              {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities for design review</Text>}
+            </View>
+          )}
+        </View>
+        <Sheet visible={giveTo !== null} onClose={() => setGiveTo(null)}>
+          {giveTo ? <GiveSheet charityName={giveTo.nameEn} slug={giveTo.slug} onDone={() => setGiveTo(null)} /> : null}
+        </Sheet>
+      </ScrollView>
+      {status.cover}
+    </>
   );
 }
 

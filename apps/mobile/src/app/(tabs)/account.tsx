@@ -5,6 +5,7 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Updates from "expo-updates";
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useStatusCover } from "@/components/status-cover";
 import { Button } from "@/components/button";
 import { GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { BlueHeader } from "@/components/backdrop";
@@ -48,6 +49,7 @@ function confirmStartAgain() {
 
 export default function Account() {
   const insets = useSafeAreaInsets();
+  const status = useStatusCover();
   const p = useLocalSearchParams<{ demo?: string }>();
   const account = useAccount();
   const [demoSignedIn, setDemoSignedIn] = useState(p.demo === "signedin");
@@ -88,72 +90,75 @@ export default function Account() {
   ];
 
   return (
-    <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
-      <BlueHeader paddingTop={insets.top + 20}>
-        {signedIn ? (
-          <View style={styles.profile}>
-            <View style={styles.avatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <Text style={styles.avatarText}>{preview ? initials(sampleDonor.name) : (account.email ?? "?").slice(0, 1).toUpperCase()}</Text>
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.headTitle} accessibilityRole="header" numberOfLines={1}>{preview ? sampleDonor.name : "Your account"}</Text>
-              <Text style={styles.headLine} numberOfLines={1}>{preview ? sampleDonor.email : account.email}</Text>
-            </View>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.headTitle} accessibilityRole="header">{account.status === "agreeing" ? "Nearly there." : "Let's get you set up."}</Text>
-            <Text style={styles.headLine}>All your giving and s18A receipts, kept in one place. No password needed.</Text>
-          </>
-        )}
-      </BlueHeader>
-      <View style={{ paddingHorizontal: space.gutter, gap: space.block }}>
-      {account.status === "loading" ? (
-        <SkeletonBlock height={180} />
-      ) : account.status === "agreeing" ? (
-        <Agree />
-      ) : signedIn ? (
-        <>
-          {/* The two places people come back to, as big tiles rather than list rows. */}
-          <View style={styles.tiles}>
-            <Tile label={jewish ? "Progress and maaser" : "Your progress"} icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
-            <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.blueSoft} onPress={() => router.push("/receipts")} />
-          </View>
-
-          <SavedCardRow />
-          {preferences}
-          <SettingsGroup title="App" cells={support} />
-          <SettingsGroup
-            title="Your information"
-            cells={[
-              { label: "Download my information", onPress: open("/account/data") },
-              { label: "Delete my account", onPress: open("/account/data") },
-            ]}
-          />
-          <SettingsGroup
-            cells={[{ label: "Sign out", destructive: true, onPress: () => (preview ? setDemoSignedIn(false) : account.signOut()) }]}
-          />
-        </>
-      ) : (
-        <>
-          {preview ? (
-            <View style={styles.prompt}>
-              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Keep your giving in one place</Text>
-              <Text variant="bodyMuted">
-                Sign in with your email to see every donation and keep track of your giving goal. No password needed.
-              </Text>
-              <Button label="Show a sample account" onPress={() => setDemoSignedIn(true)} />
-              <Text variant="label">Preview: real sign-in switches on once the live service is connected.</Text>
+    <>
+      <ScrollView style={styles.screen} onScroll={status.onScroll} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
+        <BlueHeader paddingTop={insets.top + 20}>
+          {signedIn ? (
+            <View style={styles.profile}>
+              <View style={styles.avatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <Text style={styles.avatarText}>{preview ? initials(sampleDonor.name) : (account.email ?? "?").slice(0, 1).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.headTitle} accessibilityRole="header" numberOfLines={1}>{preview ? sampleDonor.name : "Your account"}</Text>
+                <Text style={styles.headLine} numberOfLines={1}>{preview ? sampleDonor.email : account.email}</Text>
+              </View>
             </View>
           ) : (
-            <SignIn />
+            <>
+              <Text style={styles.headTitle} accessibilityRole="header">{account.status === "agreeing" ? "Nearly there." : "Let's get you set up."}</Text>
+              <Text style={styles.headLine}>All your giving and s18A receipts, kept in one place. No password needed.</Text>
+            </>
           )}
-          {preferences}
-          <SettingsGroup title="App" cells={support} />
-        </>
-      )}
-      </View>
-    </ScrollView>
+        </BlueHeader>
+        <View style={{ paddingHorizontal: space.gutter, gap: space.block }}>
+        {account.status === "loading" ? (
+          <SkeletonBlock height={180} />
+        ) : account.status === "agreeing" ? (
+          <Agree />
+        ) : signedIn ? (
+          <>
+            {/* The two places people come back to, as big tiles rather than list rows. */}
+            <View style={styles.tiles}>
+              <Tile label={jewish ? "Progress and maaser" : "Your progress"} icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
+              <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.blueSoft} onPress={() => router.push("/receipts")} />
+            </View>
+
+            <SavedCardRow />
+            {preferences}
+            <SettingsGroup title="App" cells={support} />
+            <SettingsGroup
+              title="Your information"
+              cells={[
+                { label: "Download my information", onPress: open("/account/data") },
+                { label: "Delete my account", onPress: open("/account/data") },
+              ]}
+            />
+            <SettingsGroup
+              cells={[{ label: "Sign out", destructive: true, onPress: () => (preview ? setDemoSignedIn(false) : account.signOut()) }]}
+            />
+          </>
+        ) : (
+          <>
+            {preview ? (
+              <View style={styles.prompt}>
+                <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Keep your giving in one place</Text>
+                <Text variant="bodyMuted">
+                  Sign in with your email to see every donation and keep track of your giving goal. No password needed.
+                </Text>
+                <Button label="Show a sample account" onPress={() => setDemoSignedIn(true)} />
+                <Text variant="label">Preview: real sign-in switches on once the live service is connected.</Text>
+              </View>
+            ) : (
+              <SignIn />
+            )}
+            {preferences}
+            <SettingsGroup title="App" cells={support} />
+          </>
+        )}
+        </View>
+      </ScrollView>
+      {status.cover}
+    </>
   );
 }
 

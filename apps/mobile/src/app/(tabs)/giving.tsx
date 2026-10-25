@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { bigAmountSize } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useStatusCover } from "@/components/status-cover";
 import { Button, TextLink } from "@/components/button";
 import { BlueHeader } from "@/components/backdrop";
 import { GoalRing } from "@/components/goal-ring";
@@ -44,6 +45,7 @@ import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 /** Progress (was Giving): the main goal as a big ring on blue, month by month, then the donor's records and history. */
 export default function Giving() {
   const insets = useSafeAreaInsets();
+  const status = useStatusCover();
   const { width } = useWindowDimensions();
   const account = useAccount();
   const preview = account.status === "preview";
@@ -264,6 +266,8 @@ export default function Giving() {
   return (
     <View style={styles.screen}>
       <ScrollView
+        onScroll={status.onScroll}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined}
@@ -633,6 +637,7 @@ export default function Giving() {
         )}
         </View>
       </ScrollView>
+      {status.cover}
       <UndoToast message={undo} />
 
       <Sheet visible={open !== null} onClose={() => { setOpen(null); setConfirmCancel(false); setRecurringError(null); }}>
