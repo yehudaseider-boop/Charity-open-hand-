@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { InputAccessoryView, Keyboard, Platform, Pressable, StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import { colors, fonts, radius, touch } from "@/theme/tokens";
 import { Text } from "./text";
@@ -14,15 +14,24 @@ export function Field({
   // iPhone number pads have no return key, so give them a Done bar to close the keyboard.
   const accessoryId = `field-${useId()}`;
   const needsDone = Platform.OS === "ios" && NUMBER_PADS.has(String(input.keyboardType));
+  const [focused, setFocused] = useState(false);
   return (
     <View style={styles.wrap}>
       <Text variant="label" style={{ color: colors.ink }}>{label}</Text>
-      <View style={[styles.box, error ? { borderColor: colors.danger } : null]}>
+      <View style={[styles.box, focused && { borderColor: colors.blue }, error ? { borderColor: colors.danger } : null]}>
         {prefix ? <Text style={styles.prefix}>{prefix}</Text> : null}
         <TextInput
           placeholderTextColor={colors.muted}
           accessibilityLabel={label}
           {...input}
+          onFocus={(e) => {
+            setFocused(true);
+            input.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            input.onBlur?.(e);
+          }}
           inputAccessoryViewID={needsDone ? accessoryId : input.inputAccessoryViewID}
           style={styles.input}
         />
@@ -52,8 +61,9 @@ const styles = StyleSheet.create({
   box: {
     minHeight: touch + 4,
     borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    // Like the website's fields: a 2px light purple border, blue while typing, red when it needs fixing.
+    borderWidth: 2,
+    borderColor: colors.lightPurple,
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
