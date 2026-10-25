@@ -19,6 +19,7 @@ import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
 import { getViewer } from "@/lib/auth";
 import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
 import { cardUpdateFor, newCardPath } from "@/lib/donations/new-card";
+import { Splash } from "@/components/splash";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };
@@ -98,7 +99,11 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     const unit = impactUnitFrom(charity);
     const paysFor = unit ? impactLine(Number(d.amount_cents), unit, { you: true, monthly: Boolean(d.recurring_id) }) : null;
     return (
-      <Result tone="paid" title="Thank you">
+      <Result
+        tone="paid"
+        title="Thank you"
+        lead={<>{formatRand(d.amount_cents)} to {charity.name_en}{d.recurring_id ? ", every month" : ""}</>}
+      >
         {/* What the gift does, in the charity's own words (left out when it hasn't written one). */}
         {charity.impact_en?.trim() || paysFor ? (
           <div className="mb-5 rounded-control bg-honey-soft p-4">
@@ -146,9 +151,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             Back to the Givezy app
           </a>
         ) : null}
-        <p className="mt-3 flex flex-wrap gap-4">
-          <Link href={`/c/${charity.slug}`} className="font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link>
-          {viewer ? <Link href="/account" className="font-semibold text-brand underline underline-offset-4">See your giving</Link> : null}
+        <p className="mt-6 flex flex-wrap gap-3">
+          {viewer ? <Link href="/account" className="rounded-full bg-brand px-5 py-2.5 font-semibold text-brand-contrast transition-colors hover:bg-navy">See your giving</Link> : null}
+          <Link href={`/c/${charity.slug}`} className="rounded-full border-2 border-border px-5 py-2 font-semibold text-brand transition-colors hover:border-brand">Back to {charity.name_en}</Link>
         </p>
       </Result>
     );
@@ -172,7 +177,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Result tone="failed" title="Payment didn't go through">
         <p>
-          Nothing was charged{cardUpdate ? " and your monthly donation is unchanged" : ""}. This usually means the card was declined or the payment page was closed. You can try again with the same card or a different one.
+          <strong className="font-semibold text-navy">Nothing was charged{cardUpdate ? " and your monthly donation is unchanged" : ""}.</strong> This usually means the card was declined or the payment page was closed. You can try again with the same card or a different one.
         </p>
         {fromApp ? (
           <>
@@ -186,7 +191,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             Try again
           </Link>
         )}
-        <p className="mt-4 text-sm text-muted">Need help? <HelpLine /></p>
+        <p className="mt-4 text-sm text-muted">Need help: <HelpLine /></p>
       </Result>
     );
   }
@@ -194,7 +199,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Result tone="wait" title="We're checking this payment">
         <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
-        <p className="mt-3 text-sm text-muted">Questions in the meantime? <HelpLine /></p>
+        <p className="mt-3 text-sm text-muted">Questions in the meantime: <HelpLine /></p>
         <p className="mt-4 flex flex-wrap gap-4 text-sm">
           <Link href="/charities" className="font-semibold text-brand underline underline-offset-4">Find a charity</Link>
           <Link href="/account" className="font-semibold text-brand underline underline-offset-4">Your account</Link>
@@ -207,7 +212,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       <Result tone="neutral" title="This donation was refunded">
         <p>The money went back to your card, so nothing is owed on this donation. The confirmation email you got for it no longer applies.</p>
         {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link> : <Link href="/charities" className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Find a charity</Link>}
-        <p className="mt-4 text-sm text-muted">Questions? <HelpLine /></p>
+        <p className="mt-4 text-sm text-muted">Questions: <HelpLine /></p>
       </Result>
     );
   }
@@ -236,28 +241,32 @@ function HelpLine() {
 
 /**
  * The page's one card, the same for every outcome (style guide: done, waiting, wrong). A paid gift gets the
- * logo's three drops; a failed one a calm red heading; waiting a soft lilac clock.
+ * logo's splash and the amount in large type; a failed one a calm card icon (the words carry it, never a red
+ * headline); waiting a soft clock.
  */
-function Result({ tone, title, children }: { tone: "paid" | "failed" | "wait" | "neutral"; title: string; children: React.ReactNode }) {
+function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wait" | "neutral"; title: string; lead?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="relative mx-auto max-w-xl overflow-hidden rounded-[2rem] border-2 border-border bg-surface p-6 sm:p-8">
+    <section className="relative mx-auto mt-2 max-w-xl rounded-[2rem] border-2 border-border bg-surface p-6 shadow-[0_24px_48px_rgba(9,37,119,0.08)] sm:mt-6 sm:p-9">
       {tone === "paid" ? (
-        <div aria-hidden className="mb-4 flex h-16 items-end gap-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/drop-lilac.png" alt="" className="h-14 w-auto -rotate-8" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/drop-orange.png" alt="" className="h-12 w-auto rotate-10" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/drop-blue.png" alt="" className="mb-1 h-auto w-16" />
-        </div>
+        <Splash className="mb-4 h-auto w-28 sm:w-32" />
       ) : tone === "wait" ? (
-        <svg aria-hidden width="44" height="44" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mb-4 stroke-brand">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 7v5l3 2" />
-        </svg>
+        <span aria-hidden className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-honey-soft">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="stroke-brand">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+          </svg>
+        </span>
+      ) : tone === "failed" ? (
+        <span aria-hidden className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" className="stroke-danger">
+            <rect x="3" y="6" width="18" height="12" rx="2.5" />
+            <path d="M3 10h18M7 15h3" />
+          </svg>
+        </span>
       ) : null}
-      <h1 className={`mb-3 text-[clamp(1.75rem,5vw,2.5rem)] leading-[1.05] ${tone === "failed" ? "text-danger!" : ""}`}>{title}</h1>
-      <div className="space-y-1 [&>p]:leading-relaxed">{children}</div>
+      <h1 className="text-[clamp(1.875rem,5vw,2.5rem)] leading-[1.05]">{title}</h1>
+      {lead ? <p className="mt-1 font-display text-[clamp(1.375rem,4vw,1.75rem)] font-semibold leading-snug text-navy">{lead}</p> : null}
+      <div className="mt-4 space-y-1 [&>p]:leading-relaxed">{children}</div>
     </section>
   );
 }

@@ -56,7 +56,6 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
       <div className="space-y-2">
         <Link href={withSource(`/c/${charity.slug}`, sourceTag(sp.src))} className="text-sm font-semibold text-brand underline underline-offset-4">← {charity.name_en}</Link>
         <h1 className="text-[clamp(2rem,5vw,2.75rem)] leading-[1.05] text-balance">Give to {charity.name_en}</h1>
-        <p className="text-muted">Choose an amount, add your details, then pay on the payment provider&apos;s secure page.</p>
       </div>
       {campaign && charity.acceptingPayments ? <CampaignProgress campaign={campaign} compact /> : null}
       {typeof sp.campaign === "string" && !campaign ? (

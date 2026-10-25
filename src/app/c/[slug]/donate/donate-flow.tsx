@@ -86,11 +86,19 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
   const fresh = quoteState.ok ? quoteState.quote : undefined;
   if (fresh && fresh !== kept) setKept(fresh);
   const quote = fresh ?? kept;
+  // Continue accepted a new amount: bring "Your gift" into view (on a phone it opens below the fold).
+  const detailsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!fresh || !detailsRef.current) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    detailsRef.current.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+  }, [fresh]);
   // The amount's problem sits right under the box, and goes once the donor edits it.
   const amountError = !quoteState.ok && quoteState.message && !editingAmount ? quoteState.message : null;
 
   return (
     <div className="space-y-4">
+      <Steps current={quote && !editingAmount ? 1 : 0} />
       <form
         noValidate
         className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6"
@@ -117,7 +125,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                   setEditingAmount(true);
                 }}
                 aria-pressed={picked === c}
-                className={`rounded-2xl border-2 px-2 py-3 text-[17px] font-bold tabular-nums transition ${picked === c ? "border-brand bg-honey-soft text-brand" : "border-border bg-surface text-navy hover:border-brand"}`}
+                className={`rounded-2xl border-2 px-2 py-3 text-[17px] font-bold tabular-nums transition ${picked === c ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand"}`}
               >
                 {formatRand(c)}
               </button>
@@ -201,6 +209,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
       </form>
 
       {quote ? (
+        <div ref={detailsRef} className="scroll-mt-24">
         <DetailsStep
           stale={editingAmount || !quoteState.ok}
           quote={quote}
@@ -213,8 +222,37 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           account={account}
           source={source}
         />
+        </div>
       ) : null}
     </div>
+  );
+}
+
+/** Where the donor is: choosing the amount, filling in details, then paying on the provider's page. */
+function Steps({ current }: { current: 0 | 1 }) {
+  const steps = ["Amount", "Your details", "Pay securely"];
+  return (
+    <ol className="grid grid-cols-3 gap-2" aria-label="Steps">
+      {steps.map((label, i) => {
+        const done = i < current;
+        const here = i === current;
+        return (
+          <li key={label} aria-current={here ? "step" : undefined} className="flex flex-col gap-1.5">
+            <span aria-hidden className={`h-1.5 rounded-full transition-colors ${done || here ? "bg-brand" : "bg-brand-soft"}`} />
+            <span className={`flex items-center gap-1.5 text-[13px] font-semibold ${here ? "text-brand" : done ? "text-navy" : "text-muted"}`}>
+              {i === 2 ? (
+                <svg aria-hidden viewBox="0 0 24 24" width="13" height="13" fill="none" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-current">
+                  <rect x="5" y="11" width="14" height="9" rx="2" />
+                  <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                </svg>
+              ) : null}
+              {label}
+              {done ? <span className="sr-only"> (done)</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -414,7 +452,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           </p>
         )}
 
-        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">A few extras <span className="font-sans text-base font-normal text-muted">(optional)</span></h2>
+        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">A few extras</h2>
         <TextField
           name="giving_label"
           label="Your label"
