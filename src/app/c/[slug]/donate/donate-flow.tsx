@@ -109,7 +109,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           startTransition(() => requestQuote(fd));
         }}
       >
-        <label htmlFor="amount" className="block font-display text-2xl font-semibold text-indigo">How much would you like to give?</label>
+        <label htmlFor="amount" className="block font-display text-2xl font-bold text-indigo">How much would you like to give?</label>
         {suggestedCents.length ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label={`Amounts suggested by ${charityName}`}>
             {suggestedCents.map((c) => (
@@ -357,11 +357,11 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         }}
       >
         {source ? <input type="hidden" name={SOURCE_PARAM} value={source} /> : null}
-        <h2 className="font-display text-2xl font-semibold">Your gift</h2>
+        <h2 className="font-display text-2xl font-bold">Your gift</h2>
         <Breakdown q={shownQuote} charityName={charityName} />
         {campaign ? <p className="text-sm text-muted">For the campaign: <span className="font-medium text-text">{campaign.title}</span></p> : null}
 
-        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">Your details</h2>
+        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-bold">Your details</h2>
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold">Giving as</legend>
           <div className="flex flex-wrap gap-2">
@@ -452,7 +452,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           </p>
         )}
 
-        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">A few extras</h2>
+        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-bold">A few extras</h2>
         <TextField
           name="giving_label"
           label="Your label"
@@ -485,7 +485,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           ) : null}
         </div>}
 
-        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-semibold">Before you pay</h2>
+        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-bold">Before you pay</h2>
         <div className="space-y-3">
           <Check name="is_anonymous">
             Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}

@@ -15,9 +15,9 @@ import { Splash } from "@/components/splash";
 const min = formatRand(platformConfig.minDonationCents);
 
 const steps = [
-  { title: "Pick a charity", body: "Search by name, cause or area. We check every charity before it can take a gift.", badge: "bg-brand text-white" },
-  { title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page, so we never see your card.", badge: "-rotate-6 bg-coral text-navy" },
-  { title: "Keep track, without trying", body: `Every gift sits in your ${platformConfig.appName} account, ready for tax season.`, badge: "rotate-6 bg-honey text-navy" },
+  { title: "Pick a charity", body: "Search by name, cause or area. A person checks every charity's registration and bank details before it can take a gift.", rule: "border-brand", num: "text-brand" },
+  { title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page, so we never see your card.", rule: "border-coral", num: "text-[#b4501a]" },
+  { title: "Keep track, without trying", body: `Every gift sits in your ${platformConfig.appName} account. When the tax year ends, your s18A receipts are ready in one place.`, rule: "border-honey", num: "text-[#5b3fb0]" },
 ];
 
 const promises = [
@@ -61,8 +61,8 @@ export default async function Home() {
     <div className="full-bleed overflow-x-clip">
       {/* Hero */}
       <section className="mx-auto flex max-w-[75rem] flex-wrap items-center gap-12 px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-12">
-        <div className="relative z-10 flex min-w-0 flex-[1_1_28rem] flex-col items-start gap-6">
-          <h1 className="text-[clamp(2.75rem,6.4vw,5.25rem)] leading-[0.98] tracking-[-0.02em] text-balance">Give in a minute. We keep the paperwork.</h1>
+        <div className="relative z-10 flex min-w-0 flex-[1_1_34rem] flex-col items-start gap-6">
+          <h1 className="text-[clamp(3rem,6.2vw,5.25rem)] leading-[0.96] text-balance">Give in a minute. We keep the paperwork.</h1>
           <p className="max-w-[33rem] text-lg leading-normal text-muted sm:text-xl">
             Find a registered South African charity, give from {min}, and see every gift in one place. If the charity issues s18A
             receipts, you can get one a year for everything you gave it.
@@ -71,30 +71,38 @@ export default async function Home() {
             <Link href="/charities" className="pressable rounded-control bg-coral px-7 py-4 text-lg font-bold text-navy">
               Find a charity
             </Link>
-            <Link href="#how" className="text-[17px] font-semibold text-brand underline underline-offset-4">See how it works</Link>
+            <Link href="#how" className="text-[17px] font-bold text-brand underline underline-offset-[5px]">How it works</Link>
           </div>
+          <ul className="mt-1 flex flex-wrap gap-x-6 gap-y-2.5 text-[15px] font-semibold">
+            <li className="flex items-center gap-2"><Tick />Every charity checked by a person</li>
+            <li className="flex items-center gap-2"><Tick />No Givezy fee on your gift</li>
+            <li className="flex items-center gap-2"><Tick />Your card stays with the bank</li>
+          </ul>
         </div>
 
         {/* The donor's giving page as the hero picture: the product, not stock photos. */}
-        <div className="relative flex min-w-0 flex-[1_1_22rem] justify-center pb-5 pt-20 sm:pt-24">
-          {/* The splash rises from behind the card's top corner, whole, inside the page. */}
-          <Splash className="absolute right-[max(0px,calc(50%-12rem))] top-0 h-auto w-40 sm:right-[calc(50%-13.5rem)] sm:w-56" />
-          <div className="relative z-10 flex w-[19rem] max-w-full flex-col gap-4 rounded-[2.25rem] border-2 border-border bg-surface px-5 pb-6 pt-5 shadow-[0_30px_60px_rgba(9,37,119,0.16)]">
-            <p className="text-[13px] font-bold text-muted">Your giving · this tax year</p>
-            <div className="flex justify-center">
-              <svg width="190" height="190" viewBox="0 0 190 190" role="img" aria-label="Sample: R4 250 given of a R6 000 goal">
-                <circle cx="95" cy="95" r="78" fill="none" stroke="var(--brand-soft)" strokeWidth="18" />
-                <circle cx="95" cy="95" r="78" fill="none" stroke="var(--coral)" strokeWidth="18" strokeLinecap="round" strokeDasharray="348 490" transform="rotate(-90 95 95)" />
-                <text x="95" y="92" textAnchor="middle" fontFamily="var(--font-fredoka), sans-serif" fontWeight="600" fontSize="34" fill="var(--brand)">R4 250</text>
-                <text x="95" y="118" textAnchor="middle" fontFamily="var(--font-dm-sans), sans-serif" fontSize="14" fill="var(--text-muted)">of R6 000 goal</text>
+        <div className="relative flex min-w-0 flex-[1_1_22rem] justify-center pb-5 pt-36 sm:pt-40">
+          {/* The splash sits whole above the card's top corner, inside the page. */}
+          <Splash className="absolute right-[max(0px,calc(50%-12.5rem))] top-0 h-auto w-44 sm:w-52" />
+          <div className="relative z-10 flex w-full max-w-[25rem] flex-col gap-3.5">
+            <div className="flex items-center gap-5 rounded-[1.875rem] bg-brand p-6 text-white shadow-[0_30px_60px_rgba(23,73,181,0.25)]">
+              <svg width="128" height="128" viewBox="0 0 124 124" role="img" aria-label="Sample: 71 percent of a R6 000 goal" className="shrink-0">
+                <circle cx="62" cy="62" r="52" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="14" />
+                <circle cx="62" cy="62" r="52" fill="none" stroke="var(--coral)" strokeWidth="14" strokeLinecap="round" strokeDasharray="232 327" transform="rotate(-90 62 62)" />
+                <text x="62" y="68" textAnchor="middle" fontFamily="var(--font-bricolage), sans-serif" fontWeight="700" fontSize="22" fill="#fff">71%</text>
               </svg>
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="text-[13px] font-semibold text-honey-soft/80">Your giving this tax year</span>
+                <span className="font-display text-[2.5rem] font-extrabold leading-none tabular-nums">R4 250</span>
+                <span className="text-sm text-honey-soft/90">of a R6 000 goal</span>
+              </div>
             </div>
-            <div className="flex flex-col gap-2.5 text-sm">
-              <div className="flex items-center justify-between gap-3 rounded-2xl bg-honey-soft px-3.5 py-3"><span className="font-semibold">A food parcel charity</span><span className="shrink-0 whitespace-nowrap font-bold">R500</span></div>
-              <div className="flex items-center justify-between gap-3 rounded-2xl bg-honey-soft px-3.5 py-3"><span className="font-semibold">A school charity</span><span className="shrink-0 whitespace-nowrap font-bold">R250</span></div>
-              <p className="flex items-center gap-2 text-[13px] font-semibold text-success"><Tick />s18A receipt after the tax year</p>
+            <div className="ml-8 flex items-center gap-3.5 rounded-3xl border-[1.5px] border-border bg-surface px-[18px] py-4 shadow-[0_20px_40px_rgba(14,27,61,0.08)]">
+              <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.875rem] bg-peach font-display font-bold text-brand">NM</span>
+              <span className="flex min-w-0 flex-1 flex-col"><span className="text-[15px] font-bold">A food parcel charity</span><span className="text-[13px] text-muted">02/10/2026 · s18A receipt</span></span>
+              <span className="font-display font-extrabold tabular-nums">R500</span>
             </div>
-            <p className="text-center text-xs text-muted">Sample figures</p>
+            <p className="self-center text-xs text-muted">Sample figures</p>
           </div>
         </div>
       </section>
@@ -103,7 +111,7 @@ export default async function Home() {
       <section id="discover" className="bg-honey-soft py-16 sm:py-22">
         <div className="mx-auto flex max-w-[75rem] flex-col gap-9 px-4 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <h2 className="max-w-[40rem] font-display text-[clamp(2.125rem,4vw,3.25rem)] font-semibold leading-[1.05] text-balance">Find a cause that feels close to home.</h2>
+            <h2 className="max-w-[40rem] font-display text-[clamp(2.125rem,4vw,3.25rem)] font-bold leading-[1.05] text-balance">Find a cause that feels close to home.</h2>
             <Link href="/charities" className="text-[17px] font-bold text-brand underline underline-offset-4">See all charities</Link>
           </div>
 
@@ -134,7 +142,7 @@ export default async function Home() {
                   {cover ? <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
                   {cover ? <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/50 to-navy/10" /> : null}
                   <span className="relative text-sm font-bold text-honey">Cause of the week</span>
-                  <span className="relative font-display text-[clamp(1.875rem,3.4vw,2.75rem)] font-semibold leading-[1.05]">{featured.name_en}</span>
+                  <span className="relative font-display text-[clamp(1.875rem,3.4vw,2.75rem)] font-bold leading-[1.05]">{featured.name_en}</span>
                   {featured.description_en ? <span className="relative line-clamp-3 max-w-[29rem] text-[17px] leading-normal text-honey-soft">{featured.description_en}</span> : null}
                   <span className="relative mt-2 inline-flex items-center gap-1 self-start font-bold text-white underline underline-offset-4">See their work</span>
                 </Link>
@@ -151,7 +159,7 @@ export default async function Home() {
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={logo} alt="" className="h-14 w-14 shrink-0 rounded-control border border-border object-cover" />
                           ) : (
-                            <span aria-hidden className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-control font-display text-xl font-semibold text-brand ${i % 2 ? "bg-brand-soft" : "bg-peach"}`}>
+                            <span aria-hidden className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-control font-display text-xl font-bold text-brand ${i % 2 ? "bg-brand-soft" : "bg-peach"}`}>
                               {initials(c.name_en)}
                             </span>
                           )}
@@ -169,7 +177,7 @@ export default async function Home() {
             </div>
           ) : (
             <div className="flex flex-col items-start gap-2 rounded-card border-2 border-border bg-surface p-6">
-              <p className="font-display text-xl font-semibold text-brand">The first charities are joining now</p>
+              <p className="font-display text-xl font-bold text-brand">The first charities are joining now</p>
               <p className="text-muted">Check back soon, or tell a charity you love about {platformConfig.appName}.</p>
               <Link href="/for-charities" className="font-bold text-brand underline underline-offset-4">How charities join</Link>
             </div>
@@ -179,13 +187,13 @@ export default async function Home() {
 
       {/* How it works: a path, not three identical boxes */}
       <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-12 px-4 py-20 sm:px-6 sm:py-24">
-        <h2 className="text-center font-display text-[clamp(2.125rem,4vw,3.25rem)] font-semibold leading-[1.05] text-balance">Three steps. Then it&apos;s done.</h2>
-        <ol className="flex flex-wrap justify-center gap-8">
-          {steps.map((s, i) => (
-            <li key={s.title} className="flex min-w-0 max-w-[22.5rem] flex-[1_1_16rem] flex-col items-start gap-3">
-              <span className={`pressable flex h-16 w-16 items-center justify-center rounded-[1.375rem] font-display text-3xl font-semibold ${s.badge}`}>{i + 1}</span>
-              <h3 className="mt-1 font-display text-[1.625rem] font-semibold text-navy">{s.title}</h3>
-              <p className="text-[17px] leading-relaxed text-muted">{s.body}</p>
+        <h2 className="font-display text-[clamp(2.125rem,4.4vw,3.5rem)] font-extrabold leading-none text-balance">Three steps, then it&apos;s done</h2>
+        <ol className="flex flex-wrap gap-8">
+          {steps.map((st, i) => (
+            <li key={st.title} className={`flex min-w-0 flex-[1_1_16rem] flex-col gap-3 border-t-[3px] pt-5 ${st.rule}`}>
+              <span className={`font-display text-lg font-extrabold tabular-nums ${st.num}`}>{i + 1}</span>
+              <h3 className="font-display text-[1.625rem] font-bold text-navy">{st.title}</h3>
+              <p className="text-[17px] leading-relaxed text-muted">{st.body}</p>
             </li>
           ))}
         </ol>
@@ -195,7 +203,7 @@ export default async function Home() {
       <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6 sm:pb-24">
         <div className="relative flex flex-wrap items-center gap-12 overflow-hidden rounded-[2.5rem] bg-navy p-[clamp(1.75rem,5vw,4rem)]">
           <div className="relative flex min-w-0 flex-[1_1_22rem] flex-col gap-4.5">
-            <h2 className="font-display text-[clamp(2rem,3.8vw,3rem)] font-semibold leading-[1.05] text-white! text-balance">Your year of giving, on one page.</h2>
+            <h2 className="font-display text-[clamp(2rem,3.8vw,3rem)] font-bold leading-[1.05] text-white! text-balance">Your year of giving, on one page.</h2>
             <p className="text-lg leading-relaxed text-brand-soft">
               See what you gave, to whom and when. Set a goal if you like. When the tax year ends, download your tax pack with your
               s18A receipts in it.
@@ -208,12 +216,12 @@ export default async function Home() {
           </div>
           <div className="relative flex min-w-0 flex-[1_1_24rem] flex-col gap-3.5 rounded-[1.75rem] bg-surface p-5 sm:p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-display text-[1.375rem] font-semibold text-brand">Giving history</span>
+              <span className="font-display text-[1.375rem] font-bold text-brand">Giving history</span>
               <span className="text-[13px] text-muted">Sample</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-control bg-honey-soft p-3.5"><p className="text-[13px] text-muted">Given this year</p><p className="mt-1 font-display text-[1.75rem] font-semibold">R4 250</p></div>
-              <div className="rounded-control bg-honey-soft p-3.5"><p className="text-[13px] text-muted">Charities</p><p className="mt-1 font-display text-[1.75rem] font-semibold">3</p></div>
+              <div className="rounded-control bg-honey-soft p-3.5"><p className="text-[13px] text-muted">Given this year</p><p className="mt-1 font-display text-[1.75rem] font-bold">R4 250</p></div>
+              <div className="rounded-control bg-honey-soft p-3.5"><p className="text-[13px] text-muted">Charities</p><p className="mt-1 font-display text-[1.75rem] font-bold">3</p></div>
             </div>
             <ul className="text-[15px]">
               <li className="flex justify-between gap-3 border-b border-border py-3"><span>02/10/2026 · A food parcel charity</span><span className="shrink-0 whitespace-nowrap font-bold">R500</span></li>
@@ -226,7 +234,7 @@ export default async function Home() {
 
       {/* What we check and promise: plain facts, nothing we can't back */}
       <section className="mx-auto flex max-w-[75rem] flex-wrap gap-10 px-4 pb-20 sm:px-6 sm:pb-24">
-        <h2 className="min-w-0 flex-[1_1_18rem] font-display text-[clamp(2rem,3.8vw,2.875rem)] font-semibold leading-[1.05] text-balance">What we check, and what we promise.</h2>
+        <h2 className="min-w-0 flex-[1_1_18rem] font-display text-[clamp(2rem,3.8vw,2.875rem)] font-bold leading-[1.05] text-balance">What we check, and what we promise.</h2>
         <div className="min-w-0 flex-[2_1_30rem] space-y-6">
           <dl className="grid gap-x-9 gap-y-7 sm:grid-cols-2">
             {promises.map((p) => (
@@ -240,18 +248,16 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Last call to action */}
-      <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6 sm:pb-22">
+      {/* For charities: the other half of the product, in one band */}
+      <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6 sm:pb-24">
         <div className="relative flex flex-wrap items-center justify-between gap-7 overflow-hidden rounded-[2.5rem] bg-brand px-[clamp(1.75rem,5vw,4rem)] py-[clamp(2.5rem,6vw,4.5rem)]">
-          <h2 className="relative max-w-[40rem] font-display text-[clamp(2.125rem,4.4vw,3.5rem)] font-semibold leading-[1.02] text-white! text-balance">Ready when you are.</h2>
-          <div className="relative flex flex-wrap items-center gap-5">
-            <Link href="/charities" className="pressable rounded-control bg-coral px-7 py-4 text-lg font-bold text-navy">
-              Find a charity
-            </Link>
-            <Link href="/for-charities" className="text-[17px] font-semibold text-white underline underline-offset-4">
-              Run a charity? Join {platformConfig.appName}
-            </Link>
+          <div className="relative flex min-w-0 flex-[1_1_24rem] flex-col gap-3.5">
+            <h2 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-extrabold leading-none text-white! text-balance">Run a charity? Join for free.</h2>
+            <p className="max-w-[34rem] text-lg leading-relaxed text-honey-soft">No sign-up fee and no monthly fee. Gifts go straight to your own bank account, and your donors&apos; s18A receipts are made for you once a year.</p>
           </div>
+          <Link href="/for-charities" className="relative rounded-[1.125rem] bg-white px-7 py-4 text-lg font-bold text-navy transition-colors hover:bg-honey-soft">
+            See how it works for charities
+          </Link>
         </div>
       </section>
     </div>

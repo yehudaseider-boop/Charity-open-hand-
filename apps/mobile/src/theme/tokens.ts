@@ -11,26 +11,26 @@
 export const colors = {
   cream: "#FFFFFF", // page background (white in v2; the name stays so every screen follows)
   surface: "#FFFFFF", // cards and forms
-  ink: "#092577", // deep navy: body text and headlines on light grounds
-  navy: "#092577", // deep navy: the pressable edge under buttons, text on orange and lilac
+  ink: "#0E1B3D", // deep ink: body text and headlines on light grounds
+  navy: "#0E1B3D", // deep ink: text on orange and lilac, the edge under buttons
   blue: "#1749B5", // confirmed logo blue: headlines, buttons, tabs, colour-block sections (white on it 7.0:1)
   blueSoft: "#E5D9FF", // selected chips and quiet tints (light purple)
-  muted: "#34466A", // slate: secondary text (9.6:1 on white)
-  hairline: "#E5D9FF", // light purple: card borders and dividers
-  orange: "#FF914D", // the one call to action, splashes, goal rings, streaks (navy text on it)
+  muted: "#4A5878", // slate: secondary text (7.1:1 on white)
+  hairline: "#ECE8F6", // light purple: card borders and dividers
+  orange: "#FF8A3D", // the one call to action, splashes, goal rings, streaks (ink text on it, 7.2:1)
   orangeText: "#B84A0A", // small orange text, if ever needed (5.1:1 on white)
   orangeSoft: "#FFEBDD", // peach tint: background splashes only
   peach: "#FFEBDD", // peach tint: background splashes only
   lilac: "#C9B4FA", // soft lavender: splashes, the edge under white buttons
   lightPurple: "#E5D9FF", // card borders, ring tracks
-  lilacSoft: "#F2ECFF", // pale lilac: soft cards
+  lilacSoft: "#F4F1FF", // pale lilac: soft cards
   sage: "#2E9D6B", // s18A tick and success graphics (graphics only)
   successText: "#1F6B4A", // small success text (6.3:1)
   danger: "#B3261E", // errors and destructive actions only (6.4:1)
   onInk: "#FFFFFF", // text on blue
   navyEdge: "#04123D", // deep navy at half brightness: the pressable edge under navy buttons
-  scrim: "rgba(9,37,119,0.45)", // deep navy veil behind pop-ups
-  scrimSoft: "rgba(9,37,119,0.35)", // lighter veil behind bottom sheets
+  scrim: "rgba(14,27,61,0.45)", // deep ink veil behind pop-ups
+  scrimSoft: "rgba(14,27,61,0.35)", // lighter veil behind bottom sheets
   creamClear: "rgba(255,255,255,0)", // the page colour, see-through: where a fade to the page starts
 } as const;
 

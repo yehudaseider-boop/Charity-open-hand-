@@ -34,7 +34,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
 
       {!pack || pack.lines.length === 0 ? (
         <section className="rounded-card border-2 border-border bg-surface p-5">
-          <h2 className="font-display text-xl font-semibold text-indigo">No donations in this tax year</h2>
+          <h2 className="font-display text-xl font-bold text-indigo">No donations in this tax year</h2>
           <p className="mt-1 text-sm text-muted">Paid donations made with this account between those dates appear here.</p>
         </section>
       ) : (
@@ -42,19 +42,19 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
           <section className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-card bg-brand-soft p-4">
               <p className="text-sm font-semibold text-indigo">Total given</p>
-              <p className="font-display text-3xl font-semibold text-indigo">{formatRand(pack.totalCents)}</p>
+              <p className="font-display text-3xl font-bold text-indigo">{formatRand(pack.totalCents)}</p>
               <p className="text-sm text-muted">{pack.lines.length} {pack.lines.length === 1 ? "donation" : "donations"}</p>
             </div>
             {yearOpen || pack.receipts.length === 0 ? (
               <>
                 <div className="rounded-card border-2 border-border bg-surface p-4">
                   <p className="text-sm font-semibold text-success">s18A receipt asked for</p>
-                  <p className="font-display text-3xl font-semibold">{formatRand(pack.s18aCents)}</p>
+                  <p className="font-display text-3xl font-bold">{formatRand(pack.s18aCents)}</p>
                   <p className="text-sm text-muted">{yearOpen ? "Receipts come after the tax year closes" : "Receipts not issued yet"}</p>
                 </div>
                 <div className="rounded-card border-2 border-border bg-surface p-4">
                   <p className="text-sm font-semibold text-muted">No s18A receipt asked for</p>
-                  <p className="font-display text-3xl font-semibold">{formatRand(pack.otherCents)}</p>
+                  <p className="font-display text-3xl font-bold">{formatRand(pack.otherCents)}</p>
                   <p className="text-sm text-muted">Not tax-deductible</p>
                 </div>
               </>
@@ -62,12 +62,12 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
               <>
                 <div className="rounded-card border-2 border-border bg-surface p-4">
                   <p className="text-sm font-semibold text-success">On your s18A receipts</p>
-                  <p className="font-display text-3xl font-semibold">{formatRand(pack.receiptedCents)}</p>
+                  <p className="font-display text-3xl font-bold">{formatRand(pack.receiptedCents)}</p>
                   <p className="text-sm text-muted">{pack.receipts.length} {pack.receipts.length === 1 ? "receipt" : "receipts"} issued</p>
                 </div>
                 <div className="rounded-card border-2 border-border bg-surface p-4">
                   <p className="text-sm font-semibold text-muted">Not on an s18A receipt</p>
-                  <p className="font-display text-3xl font-semibold">{formatRand(pack.totalCents - pack.receiptedCents)}</p>
+                  <p className="font-display text-3xl font-bold">{formatRand(pack.totalCents - pack.receiptedCents)}</p>
                   <p className="text-sm text-muted">Not tax-deductible</p>
                 </div>
               </>
@@ -75,7 +75,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
           </section>
 
           <section className="rounded-card border-2 border-border bg-surface p-5 print:break-inside-avoid">
-            <h2 className="font-display text-xl font-semibold text-indigo">By charity</h2>
+            <h2 className="font-display text-xl font-bold text-indigo">By charity</h2>
             <table className="mt-2 w-full text-sm">
               <thead><tr className="text-left text-muted"><th className="py-1 font-medium">Charity</th><th className="hidden py-1 text-right font-medium sm:table-cell print:table-cell">Donations</th><th className="py-1 pl-2 text-right font-medium">s18A</th><th className="py-1 pl-2 text-right font-medium">Total</th></tr></thead>
               <tbody>
@@ -95,7 +95,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
           </section>
 
           <section className="rounded-card border-2 border-border bg-surface p-5 print:break-inside-avoid">
-            <h2 className="font-display text-xl font-semibold text-indigo">s18A receipts issued</h2>
+            <h2 className="font-display text-xl font-bold text-indigo">s18A receipts issued</h2>
             {pack.receipts.length ? (
               <ul className="mt-2 space-y-1 text-sm">
                 {pack.receipts.map((r) => (
@@ -111,7 +111,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
           </section>
 
           <section className="rounded-card border-2 border-border bg-surface p-5">
-            <h2 className="font-display text-xl font-semibold text-indigo">Every donation</h2>
+            <h2 className="font-display text-xl font-bold text-indigo">Every donation</h2>
             <ul className="mt-2 text-sm">
               {pack.lines.map((l) => (
                 <li key={l.id} className="flex items-start justify-between gap-3 border-t border-border py-2 print:break-inside-avoid">

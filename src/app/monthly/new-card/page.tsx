@@ -115,7 +115,7 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mx-auto max-w-xl rounded-[2rem] border-2 border-border bg-surface p-6 sm:p-8">
-      <h1 className="mb-3 font-display text-3xl font-semibold text-indigo [text-wrap:balance]">{title}</h1>
+      <h1 className="mb-3 font-display text-3xl font-bold text-indigo [text-wrap:balance]">{title}</h1>
       {children}
     </section>
   );

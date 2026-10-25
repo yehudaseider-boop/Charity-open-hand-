@@ -83,6 +83,7 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 
 ## B. Before the switch (technical)
 
+- [ ] **New look, v2.1 (25/10/2026):** the website has it; the phone app has the new colours in code but not on the phone until an update is published to the preview (needs Yehuda's yes), and its headline font is still Fredoka. The charity dashboard layout and charts, the receipt PDFs and the email templates still use the old headline font. See `docs/decisions.md`.
 - [ ] **"Cover the card charge" (built 25/10/2026):** fill in Paystack's rates in `src/config/platform.ts` (`gatewayPercent`, `gatewayFixedCents`, `gatewayRatesIncludeVat`) from Paystack's rate sheet; until then the box stays hidden. Check one test payment: the charity's settlement should equal the gift. If Paystack caps or waives its charge on some amounts, the cover may be a few cents more than needed (never less).
 - [ ] **Yosef:** does a covered card charge count on the s18A receipt? Built to leave it off (gift only).
 - [x] **Test database:** `20261025000001_cover_card_charge.sql` applied 25/10/2026 (checked). Still to do on the live database at launch.

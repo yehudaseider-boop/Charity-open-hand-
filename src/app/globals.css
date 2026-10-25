@@ -1,31 +1,31 @@
 @import "tailwindcss";
 
 /*
- * Givezy colours, v2 (16/10/2026): white pages, deep navy text, logo blue for headlines, buttons and
- * links, one orange call to action per page (navy text on it, never white), lavender and pale lilac
+ * Givezy colours, v2.1 (25/10/2026): white pages, deep ink text and headlines, logo blue for buttons, links and
+ * colour blocks, one orange call to action per page (ink text on it, never white), lavender and pale lilac
  * for splashes and soft cards, light purple borders. The same values as the phone app (apps/mobile/src/theme/tokens.ts) and as
  * src/lib/brand-colors.ts (receipt PDFs and emails); change all three together.
  * The variable names describe the role, not the colour: --indigo is the headline colour,
  * --brand the button and link colour, --coral the one accent, --honey the soft highlight.
  */
 :root {
-  --indigo: #1749b5; /* headlines: Givezy blue (7.0:1 on white) */
+  --indigo: #0e1b3d; /* headlines: deep ink (16.9:1 on white) */
   --brand: #1749b5; /* buttons and links: Givezy blue (white on it 7.0:1) */
   --brand-contrast: #ffffff;
   --brand-soft: #e5d9ff; /* light purple tint */
   --accent: #1749b5;
-  --coral: #ff914d; /* the one call to action: orange, navy text on it */
+  --coral: #ff8a3d; /* the one call to action: orange, ink text on it (7.2:1) */
   --honey: #c9b4fa; /* soft lavender: splashes and highlights (navy text on it) */
-  --honey-soft: #f2ecff; /* pale lilac cards */
+  --honey-soft: #f4f1ff; /* pale lilac cards */
   --sage: #2e9d6b; /* s18A badge and progress, graphics only */
-  --navy: #092577; /* deep navy: body text, the pressable edge under buttons */
+  --navy: #0e1b3d; /* deep ink: body text and headlines, text on orange */
   --peach: #ffebdd; /* background splashes only */
 
   --bg: #ffffff; /* white */
   --surface: #ffffff;
-  --text: #092577; /* deep navy */
-  --text-muted: #34466a; /* slate */
-  --border: #e5d9ff; /* light purple */
+  --text: #0e1b3d; /* deep ink */
+  --text-muted: #4a5878; /* slate (7.1:1 on white) */
+  --border: #ece8f6; /* light purple */
 
   --success: #1f6b4a; /* darker green, for small text */
   --success-soft: #e3f2ea;
@@ -65,7 +65,7 @@
   --radius-card: var(--radius);
   --radius-control: var(--radius-sm);
   --font-sans: var(--font-dm-sans), system-ui, sans-serif;
-  --font-display: var(--font-fredoka), var(--font-dm-sans), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-dm-sans), system-ui, sans-serif;
   --font-hebrew: var(--font-heebo), var(--font-dm-sans), system-ui, sans-serif;
 }
 
@@ -87,15 +87,18 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Page titles are Fredoka 600 in Givezy blue (never below 20 px: all are text-xl or larger). Other headings stay DM Sans. */
-h1 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  color: var(--indigo);
-}
+/* Headlines are Bricolage Grotesque in deep ink (decided 25/10/2026): confident and warm, and Rand amounts look solid. */
+h1,
 h2,
 h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--indigo);
+}
+h1 {
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
 /* Hebrew text is set in Heebo. */
@@ -109,14 +112,18 @@ h3 {
   pointer-events: none;
 }
 
-/* Pressable buttons: a solid navy edge underneath that sinks when pressed (v2). */
+/* Pressable buttons: a solid darker edge underneath that sinks when pressed (blue buttons: deep blue; the orange call to action: burnt orange). */
 .pressable {
-  box-shadow: 0 4px 0 var(--navy);
+  --edge: #0b2a73;
+  box-shadow: 0 4px 0 var(--edge);
   transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.pressable.bg-coral {
+  --edge: #d9621c;
 }
 .pressable:active {
   transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--navy);
+  box-shadow: 0 1px 0 var(--edge);
 }
 
 /* A page that runs edge to edge (the home page) marks its top element full-bleed; the layout's narrow column steps aside. */

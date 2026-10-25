@@ -170,7 +170,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
       {/* What this tax year's gifts paid for, by the charity's own figure; or how to set one. */}
       {unit && year.paid_cents > 0 && impactTotal(year.paid_cents, unit) ? (
         <p className="rounded-card bg-honey-soft p-4 text-sm sm:p-5">
-          <span className="font-display text-xl font-semibold text-indigo">Your donors paid for {impactTotal(year.paid_cents, unit)} this tax year.</span>
+          <span className="font-display text-xl font-bold text-indigo">Your donors paid for {impactTotal(year.paid_cents, unit)} this tax year.</span>
           <span className="mt-1 block text-muted">
             By your own figure of {formatRand(unit.cents)} for one {unit.one}. Donors see what their gift pays for when they give.{" "}
             <Link href={`${base}/profile`} className="text-brand underline">Change it</Link>

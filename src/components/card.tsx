@@ -10,13 +10,13 @@ export function Card({
   children: React.ReactNode;
   aside?: React.ReactNode;
 }) {
-  // An h1 picks up Fredoka and the headline colour from globals.css; like every other page title it is never below text-xl.
+  // An h1 picks up Bricolage Grotesque and the headline colour from globals.css; like every other page title it is never below text-xl.
   const Heading = `h${headingLevel}` as const;
   return (
     <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6">
       {title ? (
         <div className="mb-4 flex items-start justify-between gap-3">
-          <Heading className={headingLevel === 1 ? "font-display text-2xl font-semibold text-indigo" : "font-display text-xl font-semibold text-indigo"}>{title}</Heading>
+          <Heading className={headingLevel === 1 ? "font-display text-2xl font-bold text-indigo" : "font-display text-xl font-bold text-indigo"}>{title}</Heading>
           {aside}
         </div>
       ) : null}

@@ -1,3 +1,4 @@
+import { brandColors } from "@/lib/brand-colors";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -10,6 +11,6 @@ describe("charity QR poster", () => {
   it("draws a QR code as SVG in the brand's navy", async () => {
     const svg = await qrSvg("https://givezy.test/c/northcliff-meals-fund");
     expect(svg).toMatch(/^<svg[\s\S]*<\/svg>\s*$/);
-    expect(svg.toLowerCase()).toContain("#092577");
+    expect(svg.toLowerCase()).toContain(brandColors.ink.toLowerCase());
   });
 });

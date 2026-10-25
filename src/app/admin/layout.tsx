@@ -18,7 +18,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-bold text-brand">Givezy</p>
-            <p className="font-display text-[clamp(1.75rem,4vw,2.5rem)] font-semibold leading-tight text-indigo">Platform admin</p>
+            <p className="font-display text-[clamp(1.75rem,4vw,2.5rem)] font-bold leading-tight text-indigo">Platform admin</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:mr-24">
             <span className="rounded-full border-2 border-border bg-surface px-3 py-1 text-sm font-semibold text-navy">Givezy staff only</span>

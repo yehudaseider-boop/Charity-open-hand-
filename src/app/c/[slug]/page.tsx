@@ -83,7 +83,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logo} alt="" className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-[1.75rem] bg-surface object-cover shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32" />
           ) : (
-            <div aria-hidden className="relative z-10 -mt-12 flex h-24 w-24 shrink-0 items-center justify-center rounded-[1.75rem] bg-peach font-display text-3xl font-semibold text-brand shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32 sm:text-4xl">
+            <div aria-hidden className="relative z-10 -mt-12 flex h-24 w-24 shrink-0 items-center justify-center rounded-[1.75rem] bg-peach font-display text-3xl font-bold text-brand shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32 sm:text-4xl">
               {monogram}
             </div>
           )}
@@ -103,11 +103,11 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
         <div className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
           <div className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6">
             {charity.impact_en || unit ? (
-              <div className="rounded-control bg-honey-soft p-4">
-                <p className="text-sm font-bold text-brand">Your rand at work</p>
-                {charity.impact_en ? <p className="mt-1 font-display text-xl font-semibold leading-snug text-navy">{charity.impact_en}</p> : null}
+              <div className="rounded-control bg-[#fff4ec] p-4">
+                <p className="text-sm font-bold text-[#b4501a]">What your gift does</p>
+                {charity.impact_en ? <p className="mt-1 font-display text-xl font-bold leading-snug text-navy">{charity.impact_en}</p> : null}
                 {unit ? (
-                  <p className={charity.impact_en ? "mt-2 text-sm text-muted" : "mt-1 font-display text-xl font-semibold leading-snug text-navy"}>
+                  <p className={charity.impact_en ? "mt-2 text-sm text-muted" : "mt-1 font-display text-xl font-bold leading-snug text-navy"}>
                     {formatRand(unit.cents)} pays for one {unit.one}{charity.impact_en ? `, by ${charity.name_en}'s own figure` : ""}.
                   </p>
                 ) : null}
@@ -221,7 +221,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-4">
-      <h2 className="font-display text-[1.75rem] font-semibold leading-tight">{title}</h2>
+      <h2 className="font-display text-[1.75rem] font-bold leading-tight">{title}</h2>
       {children}
     </section>
   );

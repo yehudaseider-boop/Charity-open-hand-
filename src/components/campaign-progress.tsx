@@ -10,7 +10,7 @@ export function CampaignProgress({ campaign: c, giveHref, compact = false }: { c
   return (
     <section className="space-y-3 rounded-card border-2 border-border bg-surface p-5 sm:p-6">
       <p className="text-sm font-bold text-brand">Campaign</p>
-      <h2 className="font-display text-2xl font-semibold leading-tight">{c.title}</h2>
+      <h2 className="font-display text-2xl font-bold leading-tight">{c.title}</h2>
       {!compact && c.description ? <p className="whitespace-pre-line leading-relaxed text-muted">{c.description}</p> : null}
       <div className="space-y-1.5">
         <p className="flex flex-wrap items-baseline justify-between gap-x-3">

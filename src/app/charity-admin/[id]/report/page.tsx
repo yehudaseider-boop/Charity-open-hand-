@@ -80,7 +80,7 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
 
       {unit && r.totalCents > 0 && impactTotal(r.totalCents, unit) ? (
         <p className="rounded-card bg-honey-soft p-4 text-sm sm:p-5">
-          <span className="font-display text-xl font-semibold text-indigo">Donors paid for {impactTotal(r.totalCents, unit)}.</span>
+          <span className="font-display text-xl font-bold text-indigo">Donors paid for {impactTotal(r.totalCents, unit)}.</span>
           <span className="mt-1 block text-muted">By your own figure of {formatRand(unit.cents)} for one {unit.one}.</span>
         </p>
       ) : null}

@@ -35,7 +35,7 @@ export default async function AdminPage() {
           { href: "/admin/featured", title: "Cause of the week", body: "Choose the cause shown first on the home page" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="block rounded-card border-2 border-border bg-surface p-5 transition hover:border-brand">
-            <p className="font-display text-lg font-semibold text-indigo">{l.title}</p>
+            <p className="font-display text-lg font-bold text-indigo">{l.title}</p>
             <p className="mt-1 text-sm text-muted">{l.body}</p>
           </Link>
         ))}

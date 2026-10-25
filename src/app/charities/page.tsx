@@ -100,7 +100,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
           <div className="flex flex-col items-start gap-2 rounded-card border-2 border-border p-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/drop-lilac.png" alt="" aria-hidden className="h-12 w-auto" />
-            <h2 className="font-display text-xl font-semibold">{q || category ? "No charities match" : "No charities yet"}</h2>
+            <h2 className="font-display text-xl font-bold">{q || category ? "No charities match" : "No charities yet"}</h2>
             <p className="text-muted">
               {q || category ? `Nothing for ${q ? `“${q}”` : ""}${q && category ? " in " : ""}${category ? category.name_en : ""}. Try a different word or cause.` : "The first charities are joining now. Check back soon."}
             </p>
@@ -121,7 +121,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={logo} alt="" className="h-16 w-16 shrink-0 rounded-control border border-border object-cover" />
                   ) : (
-                    <div aria-hidden className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-control font-display text-xl font-semibold text-brand ${i % 2 ? "bg-brand-soft" : "bg-peach"}`}>
+                    <div aria-hidden className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-control font-display text-xl font-bold text-brand ${i % 2 ? "bg-brand-soft" : "bg-peach"}`}>
                       {initials(c.name_en)}
                     </div>
                   )}

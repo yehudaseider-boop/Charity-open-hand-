@@ -6,14 +6,14 @@
 export const brandColors = {
   cream: "#FFFFFF", // page background (white in v2)
   surface: "#FFFFFF",
-  ink: "#092577", // deep navy: body text
+  ink: "#0E1B3D", // deep ink: body text and headlines
   blue: "#1749B5", // headlines, buttons, links
   blueSoft: "#E5D9FF",
-  muted: "#34466A", // slate
-  hairline: "#E5D9FF", // light purple
-  hairlineSoft: "#F2ECFF", // table rules on white
-  orange: "#FF914D", // graphics and calls to action, navy text on it
+  muted: "#4A5878", // slate (7.1:1 on white)
+  hairline: "#ECE8F6", // light purple
+  hairlineSoft: "#F4F1FF", // table rules on white
+  orange: "#FF8A3D", // graphics and calls to action, ink text on it
   lilac: "#C9B4FA",
-  lilacSoft: "#F2ECFF",
+  lilacSoft: "#F4F1FF",
   danger: "#B3261E",
 } as const;

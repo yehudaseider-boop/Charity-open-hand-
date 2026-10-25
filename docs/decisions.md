@@ -2,6 +2,18 @@
 
 ## Decided
 
+- **World-class look, v2.1 (25/10/2026, Yehuda: "I think we need a world class ui design").** Built as a clickable
+  prototype first (Design canvas, link kept in the chat), approved by Yehuda the same day. Logo, logo blue and the
+  splash stay. Changes: headlines and amounts are Bricolage Grotesque (700 and 800) instead of Fredoka, in deep ink
+  #0E1B3D instead of blue; orange is #FF8A3D and is only the main giving button (burnt-orange edge); secondary text
+  #4A5878 (7.1:1 on white); card borders #ECE8F6; soft fills #F4F1FF. Blue is for colour blocks, links and secondary
+  buttons. Small grey text must be at least 4.5:1 (#6B7794 is 4.48:1 and is not used). Charts: interactive by default
+  (hover or tap a month for its figures, range and series switches, a table view); chart colours are checked with the
+  palette validator, which rejected the pale lilac #C9B4FA for once-off gifts, so charts use #9A7DF5 next to blue.
+  Done on the website (home, charity pages, give flow, thank-you, sign in), tokens in `src/app/globals.css`,
+  `src/lib/brand-colors.ts` (emails and receipts) and `apps/mobile/src/theme/tokens.ts` (colours only). **Still to do:**
+  the app's fonts, the charity dashboard layout and interactive charts, the receipt PDFs' headline font (still
+  Fredoka), and the email templates' headline font.
 - **Website craft pass (25/10/2026, Yehuda: "every little detail must be precise").** Same v2 colours and fonts. The
   logo's splash is now used on the website as in the app: all three drops together (`public/brand/splash.png`, the
   app's own image), once per page, whole, never over words or cut off by an edge (`src/components/splash.tsx`); the

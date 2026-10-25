@@ -265,7 +265,7 @@ function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wa
         </span>
       ) : null}
       <h1 className="text-[clamp(1.875rem,5vw,2.5rem)] leading-[1.05]">{title}</h1>
-      {lead ? <p className="mt-1 font-display text-[clamp(1.375rem,4vw,1.75rem)] font-semibold leading-snug text-navy">{lead}</p> : null}
+      {lead ? <p className="mt-1 font-display text-[clamp(1.375rem,4vw,1.75rem)] font-bold leading-snug text-navy">{lead}</p> : null}
       <div className="mt-4 space-y-1 [&>p]:leading-relaxed">{children}</div>
     </section>
   );

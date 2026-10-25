@@ -46,7 +46,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-bold text-brand">Your account</p>
-            <h1 className="break-all font-display text-[clamp(1.5rem,4vw,2.25rem)] font-semibold leading-tight text-indigo">{viewer.email}</h1>
+            <h1 className="break-all font-display text-[clamp(1.5rem,4vw,2.25rem)] font-bold leading-tight text-indigo">{viewer.email}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:mr-24">
             <Badge>Donor</Badge>
@@ -67,7 +67,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       ) : null}
       {monthlyGifts && monthlyGifts.length > 0 ? (
         <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
-          <h2 className="font-display text-xl font-semibold text-indigo">Your monthly donations</h2>
+          <h2 className="font-display text-xl font-bold text-indigo">Your monthly donations</h2>
           <ul className="space-y-2">
             {monthlyGifts.map((m) => {
               const charity = (Array.isArray(m.charities) ? m.charities[0] : m.charities) as { name_en: string; slug: string } | null;
@@ -103,7 +103,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       ) : null}
 
       <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
-        <h2 className="font-display text-xl font-semibold text-indigo">Your s18A receipts</h2>
+        <h2 className="font-display text-xl font-bold text-indigo">Your s18A receipts</h2>
         {receipts && receipts.length > 0 ? (
           <ul className="space-y-2">
             {receipts.map((r) => (
@@ -138,7 +138,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       </section>
 
       <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-2">
-        <h2 className="font-display text-xl font-semibold text-indigo">Tax packs</h2>
+        <h2 className="font-display text-xl font-bold text-indigo">Tax packs</h2>
         <p className="text-sm text-muted">Every donation in a tax year, what goes on s18A receipts, and the totals. Save it as a PDF or a spreadsheet for your tax return.</p>
         <ul className="flex flex-wrap gap-2">
           {[0, 1, 2].map((back) => {
@@ -156,7 +156,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
 
       {viewer.managedCharityIds.length > 0 || viewer.isPlatformAdmin ? (
         <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
-          <h2 className="font-display text-xl font-semibold text-indigo">Manage</h2>
+          <h2 className="font-display text-xl font-bold text-indigo">Manage</h2>
           {viewer.charities.map((c) => (
             <Link key={c.id} href={`/charity-admin/${c.id}`} className="block rounded-control border-2 border-border p-3">
               <BilingualName en={c.name_en} he={c.name_he} />
@@ -176,7 +176,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       ) : null}
 
       <Link href="/account/data" className="block rounded-card border-2 border-border bg-surface p-5 text-sm transition hover:border-brand">
-        <span className="font-display text-lg font-semibold text-indigo">Your information</span>
+        <span className="font-display text-lg font-bold text-indigo">Your information</span>
         <span className="block text-muted">Download it, or ask us to correct or delete it</span>
       </Link>
 
