@@ -15,6 +15,8 @@ export type DueMonthly = {
   charityName: string;
   amountCents: number;
   contributionCents: number;
+  /** The donor chose to cover the card charge: this month's cover, from the current rates. 0 or missing when not. */
+  cardChargeCents?: number;
   chargeDay: number;
   authorizationCode: string;
   email: string;
@@ -159,7 +161,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
 
       const attempt = r.attemptPeriod === period ? r.failedAttempts : 0;
       const donationId = attemptDonationId(r.id, period, attempt);
-      const totalCents = r.amountCents + r.contributionCents;
+      const totalCents = r.amountCents + r.contributionCents + (r.cardChargeCents ?? 0);
       const existing = await store.attemptStatus(donationId);
       // Before a retry, ask about this month's earlier attempts: one that was turned down may have gone
       // through after all (a late webhook, the provider finishing it). Then this month is paid, and a new

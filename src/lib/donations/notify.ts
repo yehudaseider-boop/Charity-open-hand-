@@ -42,7 +42,7 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
   try {
     const { data: d, error } = await createAdminClient()
       .from("donations")
-      .select("id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_checkout_details(email)")
+      .select("id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_checkout_details(email)")
       .eq("id", donationId)
       .single();
     if (error) throw error;
@@ -70,6 +70,7 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
       charityName: charity.name_en,
       amountCents: Number(d.amount_cents),
       contributionCents: Number(d.contribution_cents),
+      cardChargeCents: Number(d.processing_charge_cents ?? 0),
       totalCents: Number(d.total_charged_cents),
       paidAt: d.paid_at,
       wants18a: d.wants_18a,

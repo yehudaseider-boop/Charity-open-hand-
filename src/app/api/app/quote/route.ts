@@ -10,6 +10,6 @@ export async function POST(request: NextRequest) {
   if (!body.success) return NextResponse.json({ ok: false, message: "Check the amount and try again." }, { status: 400 });
   const charity = await loadDonatableCharity(body.data.slug);
   if (!charity?.acceptingPayments) return NextResponse.json({ ok: false, message: "This charity can't take online donations right now." }, { status: 409 });
-  const result = quoteDonation(body.data.giftCents, body.data.contributionCents);
+  const result = quoteDonation(body.data.giftCents, body.data.contributionCents, body.data.coverCardCharge === true);
   return NextResponse.json(result, { status: result.ok ? 200 : 422 });
 }

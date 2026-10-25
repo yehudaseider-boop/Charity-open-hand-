@@ -13,11 +13,13 @@ import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore
 import { monthlyFailedEmail } from "./monthly-email";
 import { newCardLink, newCardPendingFor } from "./new-card";
 import { DECLINED_REASON } from "./monthly-reasons";
+import { monthlyCardCharge } from "./card-charge";
 
 type DueRow = {
   id: string;
   amount_cents: number;
   contribution_cents: number;
+  covers_card_charge: boolean | null;
   charge_day: number;
   authorization_encrypted: string;
   card_last4: string | null;
@@ -42,7 +44,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
       const rows = must(
         await db
           .from("recurring_donations")
-          .select("id, amount_cents, contribution_cents, charge_day, authorization_encrypted, card_last4, last_paid_period, attempt_period, failed_attempts, next_charge_at, first_donation_id, charities(slug, name_en)")
+          .select("id, amount_cents, contribution_cents, covers_card_charge, charge_day, authorization_encrypted, card_last4, last_paid_period, attempt_period, failed_attempts, next_charge_at, first_donation_id, charities(slug, name_en)")
           .eq("status", "active")
           .eq("gateway", gateway.name)
           .not("authorization_encrypted", "is", null)
@@ -78,6 +80,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
           charityName: r.charities.name_en,
           amountCents: Number(r.amount_cents),
           contributionCents: Number(r.contribution_cents),
+          cardChargeCents: monthlyCardCharge(Number(r.amount_cents), Number(r.contribution_cents), r.covers_card_charge === true),
           chargeDay: r.charge_day,
           authorizationCode,
           email: details.data.email as string,
@@ -118,7 +121,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
     },
 
     async createAttempt(r, donationId, totalCents) {
-      await createMonthlyGift(r.id, donationId, { amountCents: r.amountCents, contributionCents: r.contributionCents, totalCents });
+      await createMonthlyGift(r.id, donationId, { amountCents: r.amountCents, contributionCents: r.contributionCents, cardChargeCents: r.cardChargeCents ?? 0, totalCents });
     },
 
     async newCardPending(id, now) {
@@ -163,7 +166,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
  * One month's gift of a monthly donation, pending, with the donor's details, consent times and label
  * copied from its first gift. Used by the monthly job and by "Update my card".
  */
-export async function createMonthlyGift(recurringId: string, donationId: string, m: { amountCents: number; contributionCents: number; totalCents: number }): Promise<void> {
+export async function createMonthlyGift(recurringId: string, donationId: string, m: { amountCents: number; contributionCents: number; cardChargeCents?: number; totalCents: number }): Promise<void> {
   const db = createAdminClient();
   const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id").eq("id", recurringId).maybeSingle(), "read the monthly donation");
   const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at, came_from").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
@@ -177,7 +180,7 @@ export async function createMonthlyGift(recurringId: string, donationId: string,
     contribution_cents: m.contributionCents,
     platform_fee_cents: 0,
     fee_vat_cents: 0,
-    processing_charge_cents: 0,
+    processing_charge_cents: m.cardChargeCents ?? 0,
     total_charged_cents: m.totalCents,
     status: "pending",
     gateway: rec.gateway,
@@ -230,7 +233,7 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
         authorizationCode: r.authorizationCode,
         email: r.email,
         totalCents,
-        lines: { charityCents: r.amountCents, contributionCents: r.contributionCents },
+        lines: { charityCents: r.amountCents + (r.cardChargeCents ?? 0), contributionCents: r.contributionCents },
         charityAccountRef: charity?.splitAccountRef ?? null,
         feeBearer: platformConfig.fees.gatewayChargePaidBy,
         description: `Monthly donation to ${r.charityName}`,

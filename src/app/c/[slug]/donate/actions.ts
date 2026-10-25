@@ -31,7 +31,7 @@ export async function getQuote(slug: string, _prev: QuoteState, formData: FormDa
     if (c === null) return { ok: false, message: "Enter your contribution in Rand, for example 10 or 25.50." };
     contribution = c;
   }
-  const result = quoteDonation(cents, contribution);
+  const result = quoteDonation(cents, contribution, formData.get("cover_card_charge") === "on");
   return result.ok ? { ok: true, quote: result.quote } : { ok: false, message: result.message };
 }
 
@@ -50,6 +50,7 @@ export async function submitDonation(
   slug: string,
   giftCents: number,
   contributionCents: number,
+  coverCardCharge: boolean,
   shownTotalCents: number,
   fromApp: boolean,
   campaignId: string | undefined,
@@ -82,7 +83,7 @@ export async function submitDonation(
   // "Use my ID ending 1234": only for the signed-in person, checked here on the server.
   const viewer = formData.get("use_saved_id") === "on" ? await getViewer() : null;
   const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, shownTotalCents, fromApp, campaignId, sourceTag: sourceTagged, input: parsed.data, ip, useSavedIdOf });
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, coverCardCharge, shownTotalCents, fromApp, campaignId, sourceTag: sourceTagged, input: parsed.data, ip, useSavedIdOf });
   if (!result.ok) {
     const { providerDown, ...rest } = result;
     if (rest.message === "Please check the highlighted fields." && rest.fieldErrors) return { ...rest, message: fixMessage(rest.fieldErrors) };

@@ -13,6 +13,7 @@ import { issueConfirmationToken } from "./confirmation-access";
 import { createMonthlyGift } from "./monthly-store";
 import { DECLINED_REASON, NEW_CARD_NOT_REUSABLE } from "./monthly-reasons";
 import { addMonths, chargeTime, periodOf, type Period } from "./schedule";
+import { monthlyCardCharge } from "./card-charge";
 
 /**
  * "Update my card" for a monthly donation whose card was declined. The donor pays this month's donation
@@ -86,6 +87,8 @@ export type NewCardOffer =
       charitySlug: string;
       amountCents: number;
       contributionCents: number;
+      /** The donor chose to cover the card charge: this payment's cover, from the current rates. */
+      cardChargeCents: number;
       totalCents: number;
       cardLast4: string | null;
       /** It had stopped after three tries (rather than still being tried). */
@@ -102,6 +105,7 @@ type Row = {
   status: string;
   amount_cents: number | string;
   contribution_cents: number | string;
+  covers_card_charge?: boolean | null;
   card_last4: string | null;
   charge_day: number;
   last_paid_period: string | null;
@@ -117,7 +121,7 @@ type Row = {
 async function readMonthly(recurringId: string): Promise<Row | null> {
   const { data, error } = await createAdminClient()
     .from("recurring_donations")
-    .select("id, status, amount_cents, contribution_cents, card_last4, charge_day, last_paid_period, attempt_period, failed_attempts, last_attempt_at, ended_reason, first_donation_id, gateway, charities(slug, name_en)")
+    .select("id, status, amount_cents, contribution_cents, covers_card_charge, card_last4, charge_day, last_paid_period, attempt_period, failed_attempts, last_attempt_at, ended_reason, first_donation_id, gateway, charities(slug, name_en)")
     .eq("id", recurringId)
     .maybeSingle();
   if (error) throw new Error(`Could not read the monthly donation: ${error.message}`);
@@ -177,6 +181,7 @@ export async function loadNewCardOffer(recurringId: string, now: Date): Promise<
   const period = periodOf(now);
   const amountCents = Number(r.amount_cents);
   const contributionCents = Number(r.contribution_cents ?? 0);
+  const cardChargeCents = monthlyCardCharge(amountCents, contributionCents, r.covers_card_charge === true);
   return {
     ok: true,
     recurringId: r.id,
@@ -184,7 +189,8 @@ export async function loadNewCardOffer(recurringId: string, now: Date): Promise<
     charitySlug: r.charities.slug,
     amountCents,
     contributionCents,
-    totalCents: amountCents + contributionCents,
+    cardChargeCents,
+    totalCents: amountCents + contributionCents + cardChargeCents,
     cardLast4: r.card_last4,
     stopped: r.status === "failed",
     period,
@@ -213,7 +219,7 @@ export async function startNewCardPayment(recurringId: string, now: Date, opts: 
   if (open) return { ok: true, redirectUrl: open };
 
   const donationId = crypto.randomUUID();
-  await createMonthlyGift(recurringId, donationId, { amountCents: offer.amountCents, contributionCents: offer.contributionCents, totalCents: offer.totalCents });
+  await createMonthlyGift(recurringId, donationId, { amountCents: offer.amountCents, contributionCents: offer.contributionCents, cardChargeCents: offer.cardChargeCents, totalCents: offer.totalCents });
   // From here, anything that goes wrong closes this gift as failed (nothing was charged), so it never holds
   // the monthly donation up.
   try {
@@ -233,7 +239,7 @@ export async function startNewCardPayment(recurringId: string, now: Date, opts: 
     const { redirectUrl } = await getGateway().createCheckout({
       reference: donationId,
       totalCents: offer.totalCents,
-      lines: { charityCents: offer.amountCents, contributionCents: offer.contributionCents },
+      lines: { charityCents: offer.amountCents + offer.cardChargeCents, contributionCents: offer.contributionCents },
       charityAccountRef: charity.splitAccountRef,
       feeBearer: platformConfig.fees.gatewayChargePaidBy,
       email,

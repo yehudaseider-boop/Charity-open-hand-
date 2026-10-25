@@ -62,7 +62,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, recurring_id, amount_cents, contribution_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many)";
+  const select = "id, recurring_id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (holdsToken) {
@@ -112,6 +112,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
             <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
+          ) : null}
+          {Number(d.processing_charge_cents) > 0 ? (
+            <div className="flex justify-between gap-3"><dt className="min-w-0">Card charge you covered</dt><dd>{formatRand(d.processing_charge_cents)}</dd></div>
           ) : null}
           <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
           <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>

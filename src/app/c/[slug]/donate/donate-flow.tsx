@@ -34,6 +34,8 @@ type Props = {
   source?: SourceTag | null;
   /** What one gift pays for, in the charity's own figure. */
   impactUnit?: ImpactUnit | null;
+  /** The payment provider's rates are known, so the donor may cover the card charge. */
+  cardChargeAvailable?: boolean;
 };
 
 /** As the donor would type it: 180, 180.50. */
@@ -59,7 +61,7 @@ function offlineOrDown(e: unknown, step: "quote" | "pay"): { ok: false; message:
   };
 }
 
-export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account, source, impactUnit }: Props) {
+export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, fromApp, campaign, account, source, impactUnit, cardChargeAvailable = false }: Props) {
   // What the typed amount pays for, as the donor types it (only when the charity set its own figure).
   const [typedCents, setTypedCents] = useState<number | null>(initialAmountCents ?? null);
   // Only for an amount we can take: never a "pays for" line next to an amount the server will refuse.
@@ -189,6 +191,12 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
               <p className="mt-1 text-xs text-muted">Any amount, minimum {contributionMinimumLabel}. Paid together with your donation, kept separate from it.</p>
             </div>
           ) : null}
+          {cardChargeAvailable ? (
+            <label className="flex items-start gap-2.5 border-t border-border pt-2 text-sm">
+              <input type="checkbox" name="cover_card_charge" className="mt-1" onChange={() => setEditingAmount(true)} />
+              <span>Cover the card charge, so {charityName} gets your full donation. Optional. You&apos;ll see the amount before you pay.</span>
+            </label>
+          ) : null}
         </div>
       </form>
 
@@ -216,6 +224,9 @@ function Breakdown({ q, charityName }: { q: NonNullable<QuoteState["quote"]>; ch
       <div className="flex justify-between gap-3"><dt>Donation to {charityName}</dt><dd className="shrink-0">{formatRand(q.amountCents)}</dd></div>
       {q.contributionCents > 0 ? (
         <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd className="shrink-0">{formatRand(q.contributionCents)}</dd></div>
+      ) : null}
+      {q.cardChargeCents > 0 ? (
+        <div className="flex justify-between gap-3"><dt className="min-w-0">Card charge, so {charityName} gets the full {formatRand(q.amountCents)}</dt><dd className="shrink-0">{formatRand(q.cardChargeCents)}</dd></div>
       ) : null}
       <div className="flex justify-between gap-3 border-t-2 border-border pt-2 text-lg font-bold"><dt>Total</dt><dd className="shrink-0">{formatRand(q.totalCents)}</dd></div>
     </dl>
@@ -273,7 +284,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData): Promise<CheckoutState> => {
       try {
-        const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.totalCents, fromApp, campaign?.id, prev, fd);
+        const next = await submitDonation(slug, shownQuote.amountCents, shownQuote.contributionCents, shownQuote.cardChargeCents > 0, shownQuote.totalCents, fromApp, campaign?.id, prev, fd);
         if (next.quote) setShownQuote(next.quote);
         return { ...next, failedToStart: next.failedToStart ?? false };
       } catch (e) {

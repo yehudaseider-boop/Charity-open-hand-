@@ -1,4 +1,5 @@
 import { parseRandToCents } from "@shared/money";
+import { cardChargeToCover } from "@shared/fees";
 import { impactLine, impactSource } from "@shared/charity/impact";
 import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
 import { isValidSaIdNumber } from "@shared/sa-id";
@@ -122,6 +123,7 @@ export default function Give() {
   const labelSuggestions = useLabelSuggestions();
   const [monthly, setMonthly] = useState(false);
   const [extra, setExtra] = useState(false);
+  const [coverCharge, setCoverCharge] = useState(false);
   const [extraAmount, setExtraAmount] = useState("");
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
@@ -326,7 +328,10 @@ export default function Give() {
   const maxGift = server?.maxGiftCents ?? null;
   const gift = parseRandToCents(amount);
   const contribution = extra ? parseRandToCents(extraAmount) : 0;
-  const total = gift !== null && contribution !== null ? gift + contribution : null;
+  // "Cover the card charge": shown only when the server sent the provider's rates (never a made-up figure).
+  const rates = server?.cardChargeRates ?? null;
+  const cardCharge = coverCharge && rates && gift !== null && gift > 0 && contribution !== null ? cardChargeToCover(gift + contribution, rates) : 0;
+  const total = gift !== null && contribution !== null ? gift + contribution + cardCharge : null;
   // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
   const isMonthly = monthly && !campaignId && !heldAttempt;
   // What the typed amount pays for, by the charity's own figure (none when it set no figure).
@@ -486,6 +491,7 @@ export default function Give() {
           slug: charity!.slug,
           giftCents: gift!,
           contributionCents: contribution ?? 0,
+          coverCardCharge: cardCharge > 0 || undefined,
           shownTotalCents: total,
           campaignId,
           useSavedId: usingSavedId || undefined,
@@ -746,7 +752,18 @@ export default function Give() {
           ) : goal ? (
             <Text variant="bodyMuted">Every gift counts towards {goal.name}.</Text>
           ) : null}
-          {/* "Cover the card fee" stays hidden until the payment provider's rates are in the platform config: the fee is never a made-up figure. */}
+          {rates ? (
+            <SwitchRow
+              label="Cover the card charge"
+              description={
+                cardCharge
+                  ? `Adds ${rand(cardCharge)}, so ${charity.nameEn} gets your full ${rand(gift ?? 0)}.${isMonthly ? " Each month too." : ""}`
+                  : `Optional. ${charity.nameEn} then gets your full donation.${isMonthly ? " Each month too." : ""}`
+              }
+              value={coverCharge}
+              onChange={setCoverCharge}
+            />
+          ) : null}
 
           <SwitchRow
             label="Add a contribution to Givezy"
@@ -980,7 +997,7 @@ export default function Give() {
               <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
             )}
             <Text variant="label" style={{ textAlign: "center" }}>
-              {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}. ` : ""}
+              {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. ` : ""}
               {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
             </Text>
           </View>

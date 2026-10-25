@@ -13,6 +13,7 @@ import { formatRand, parseRandToCents } from "@/lib/money";
 import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { sourceTag, withSource } from "@/lib/donations/source";
+import { cardChargeRates } from "@/lib/donations/card-charge";
 import { DonateFlow } from "./donate-flow";
 
 // One lookup serves both the title and the page.
@@ -76,6 +77,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           campaign={campaign ? { id: campaign.id, title: campaign.title } : undefined}
           account={account}
           source={sourceTag(sp.src)}
+          cardChargeAvailable={cardChargeRates() !== null}
         />
       ) : (
         <Card><p className="text-sm">{charity.name_en} isn&apos;t taking online donations yet.</p></Card>

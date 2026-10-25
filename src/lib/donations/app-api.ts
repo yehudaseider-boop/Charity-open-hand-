@@ -14,11 +14,13 @@ export const appQuoteSchema = z.object({
   slug: z.string().min(1).max(120),
   giftCents: cents,
   contributionCents: cents,
+  /** "Cover the card charge": ignored while the provider's rates are unknown. */
+  coverCardCharge: flag,
 });
 
 export const appCheckoutSchema = appQuoteSchema.extend({
-  /** Gift plus contribution, so it can be up to twice the single-gift ceiling. */
-  shownTotalCents: z.number().int().min(0).max(2 * platformConfig.maxDonationCents),
+  /** Gift plus contribution plus any card charge cover, so it can be over twice the single-gift ceiling. */
+  shownTotalCents: z.number().int().min(0).max(3 * platformConfig.maxDonationCents),
   /** One of the charity's campaigns, when the gift is for it. */
   campaignId: z.uuid().optional(),
   /** "Use my ID ending 1234": the server fills in the number for the signed-in donor. */

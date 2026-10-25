@@ -15,11 +15,11 @@ function code(fn: () => unknown) {
 
 describe("priceDonation", () => {
   it("charges exactly the donation when there is no contribution (no fees)", () => {
-    expect(priceDonation(18_000, 0, mins)).toEqual({ amountCents: 18_000, contributionCents: 0, totalCents: 18_000 });
+    expect(priceDonation(18_000, 0, mins)).toEqual({ amountCents: 18_000, contributionCents: 0, cardChargeCents: 0, totalCents: 18_000 });
   });
 
   it("adds the contribution as a separate line", () => {
-    expect(priceDonation(3_000, 1_000, mins)).toEqual({ amountCents: 3_000, contributionCents: 1_000, totalCents: 4_000 });
+    expect(priceDonation(3_000, 1_000, mins)).toEqual({ amountCents: 3_000, contributionCents: 1_000, cardChargeCents: 0, totalCents: 4_000 });
     expect(priceDonation(12_345, 2_501, mins).totalCents).toBe(14_846);
   });
 

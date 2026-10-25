@@ -21,8 +21,9 @@ export const platformConfig = {
      * The donor may tick a box to give Givezy a separate contribution.
      *
      * The gateway's own charge is paid by the charity, out of its donation
-     * (Yehuda, 14/10/2026). Offering the donor to cover it is not built yet: it
-     * needs the gateway's rates below.
+     * (Yehuda, 14/10/2026). The donor may tick "cover the card charge" so the
+     * charity gets the full gift (Yehuda, 25/10/2026); the box only shows once
+     * the gateway's rates below are filled in.
      */
     gatewayChargePaidBy: "charity" as "charity" | "givezy" | null,
     /** The gateway's charge, from its rate sheet. Empty until Yehuda supplies it. */

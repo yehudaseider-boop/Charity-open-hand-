@@ -14,6 +14,7 @@ import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
+import { cardChargeRates } from "./card-charge";
 import { issueConfirmationToken, reissueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
 import { cameFromOf } from "./source";
@@ -25,7 +26,8 @@ import { parseDedication } from "./dedication";
 export type Quote = Pricing;
 
 export type QuoteResult =
-  | { ok: true; quote: Quote }
+  /** `cardChargeOffer`: what "cover the card charge" would add to this gift, or null when the box doesn't show (no provider rates yet). */
+  | { ok: true; quote: Quote; cardChargeOffer: number | null }
   | { ok: false; message: string };
 
 const minimums = {
@@ -45,10 +47,16 @@ function feeErrorMessage(e: FeeError): string {
   return e.message;
 }
 
-/** Work out what the donor will pay: the donation plus any contribution. No fees. */
-export function quoteDonation(giftCents: number, contributionCents: number): QuoteResult {
+/**
+ * Work out what the donor will pay: the donation plus any contribution, plus the card charge when the donor ticked
+ * "cover the card charge" and the provider's rates are known. No fees.
+ */
+export function quoteDonation(giftCents: number, contributionCents: number, coverCardCharge = false): QuoteResult {
   try {
-    return { ok: true, quote: priceDonation(giftCents, contributionCents, minimums) };
+    const rates = cardChargeRates();
+    const quote = priceDonation(giftCents, contributionCents, minimums, coverCardCharge ? rates : null);
+    const cardChargeOffer = rates ? (quote.cardChargeCents || priceDonation(giftCents, contributionCents, minimums, rates).cardChargeCents) : null;
+    return { ok: true, quote, cardChargeOffer };
   } catch (e) {
     if (e instanceof FeeError) return { ok: false, message: feeErrorMessage(e) };
     throw e;
@@ -75,6 +83,8 @@ export async function startDonation(args: {
   charitySlug: string;
   giftCents: number;
   contributionCents: number;
+  /** The donor ticked "cover the card charge". Ignored while the provider's rates are unknown (the box doesn't show then). */
+  coverCardCharge?: boolean;
   shownTotalCents: number;
   /** Came from the phone app: the confirmation page then offers a way back. */
   fromApp?: boolean;
@@ -147,7 +157,7 @@ export async function startDonation(args: {
   if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity.", campaignEnded: true };
   if (campaign && input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
 
-  const quoted = quoteDonation(args.giftCents, args.contributionCents);
+  const quoted = quoteDonation(args.giftCents, args.contributionCents, args.coverCardCharge);
   if (!quoted.ok) return { ok: false, message: quoted.message };
   const fees = quoted.quote;
   if (fees.totalCents !== args.shownTotalCents) {
@@ -222,6 +232,8 @@ export async function startDonation(args: {
       charity_id: charity.id,
       amount_cents: fees.amountCents,
       contribution_cents: fees.contributionCents,
+      // Each month's collection covers the card charge too, worked out from the rates of the day.
+      ...(fees.cardChargeCents > 0 ? { covers_card_charge: true } : {}),
       status: "pending",
       wants_18a: want18a,
       is_anonymous: v.is_anonymous === "on",
@@ -245,7 +257,8 @@ export async function startDonation(args: {
     contribution_cents: fees.contributionCents,
     platform_fee_cents: 0,
     fee_vat_cents: 0,
-    processing_charge_cents: 0,
+    // The donor's cover for the card charge: it goes to the charity's line, and the provider takes its charge from there.
+    processing_charge_cents: fees.cardChargeCents,
     total_charged_cents: fees.totalCents,
     status: "pending",
     gateway: gateway.name,
@@ -338,7 +351,7 @@ export async function startDonation(args: {
         authorizationCode: savedToken.code,
         email: v.email,
         totalCents: fees.totalCents,
-        lines: { charityCents: fees.amountCents, contributionCents: fees.contributionCents },
+        lines: { charityCents: fees.amountCents + fees.cardChargeCents, contributionCents: fees.contributionCents },
         charityAccountRef: charity.splitAccountRef,
         feeBearer: platformConfig.fees.gatewayChargePaidBy,
         description: `Donation to ${charity.name_en}`,
@@ -357,7 +370,7 @@ export async function startDonation(args: {
     const { redirectUrl } = await gateway.createCheckout({
       reference: donationId,
       totalCents: fees.totalCents,
-      lines: { charityCents: fees.amountCents, contributionCents: fees.contributionCents },
+      lines: { charityCents: fees.amountCents + fees.cardChargeCents, contributionCents: fees.contributionCents },
       charityAccountRef: charity.splitAccountRef,
       feeBearer: platformConfig.fees.gatewayChargePaidBy,
       email: v.email,

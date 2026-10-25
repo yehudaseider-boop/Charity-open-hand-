@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     charitySlug: body.data.slug,
     giftCents: body.data.giftCents,
     contributionCents: body.data.contributionCents,
+    coverCardCharge: body.data.coverCardCharge === true,
     shownTotalCents: body.data.shownTotalCents,
     fromApp: true,
     campaignId: body.data.campaignId,

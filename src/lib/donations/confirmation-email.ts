@@ -12,6 +12,8 @@ export function confirmationEmail(d: {
   charityName: string;
   amountCents: number;
   contributionCents: number;
+  /** The card charge the donor chose to cover (not part of the donation, and not on the s18A receipt). */
+  cardChargeCents?: number;
   totalCents: number;
   paidAt: string;
   wants18a: boolean;
@@ -28,6 +30,7 @@ export function confirmationEmail(d: {
     "",
     `Donation to ${d.charityName}: ${formatRand(d.amountCents)}`,
     ...(d.contributionCents > 0 ? [`Contribution to Givezy: ${formatRand(d.contributionCents)}`] : []),
+    ...(d.cardChargeCents ? [`Card charge you covered, so ${d.charityName} gets the full donation: ${formatRand(d.cardChargeCents)}`] : []),
     `Total paid: ${formatRand(d.totalCents)} on ${formatDate(d.paidAt)}`,
     `Reference: ${ref}`,
     ...(d.dedication ? [d.dedication] : []),

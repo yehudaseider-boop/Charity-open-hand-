@@ -2,6 +2,15 @@
 
 ## Decided
 
+- **Donors can cover the card charge (25/10/2026, Yehuda).** Givezy stays free: no fee for charities or donors. A new
+  optional box, unticked, lets the donor add the payment provider's charge so the charity gets the full gift. The amount
+  is worked out on the whole payment (rounded up, so the charity is never a cent short) and kept per payment in
+  `processing_charge_cents`; it goes to the charity's line and the provider takes its charge from there. On a monthly
+  donation the choice carries on every month, worked out again from the rates of the day. The s18A receipt shows the
+  gift only, never the cover, until Yosef says otherwise. Website and app alike. The box stays hidden until the
+  provider's rates are filled in `src/config/platform.ts` (never a guessed rate). Code: `src/lib/fees.ts`
+  (`cardChargeToCover`), `src/lib/donations/card-charge.ts`.
+
 - **Typed dates on the dashboard (23/10/2026):** the five date fields (gift date, follow-up, campaign last day,
   mandate date, donations filter) are plain boxes typed as dd/mm/yyyy, not the browser's date picker, which
   shows mm/dd/yyyy on a phone or browser set to US English and would turn 05/03 into 3 May on an s18A gift.

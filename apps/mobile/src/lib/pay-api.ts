@@ -4,7 +4,9 @@
  * No imports on purpose: the website's tests run this file too.
  */
 
-export type Pricing = { amountCents: number; contributionCents: number; totalCents: number };
+import type { CardChargeRates } from "@shared/fees";
+
+export type Pricing = { amountCents: number; contributionCents: number; cardChargeCents?: number; totalCents: number };
 export type QuoteReply = { ok: true; quote: Pricing } | { ok: false; message: string };
 export type CheckoutReply =
   | { ok: true; redirectUrl: string; charged?: undefined; reference: string; token: string }
@@ -84,6 +86,8 @@ export function startPayment(
     slug: string;
     giftCents: number;
     contributionCents: number;
+    /** "Cover the card charge": the server works it out again from its own rates and checks the total. */
+    coverCardCharge?: boolean;
     shownTotalCents: number;
     campaignId?: string;
     useSavedId?: boolean;
@@ -103,7 +107,7 @@ export function startPayment(
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null }
+  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
@@ -127,12 +131,22 @@ export async function checkReady(site: string, slug: string, campaignId: string 
         suggestedCents: Array.isArray(j.suggestedCents) ? j.suggestedCents.filter((c): c is number => Number.isSafeInteger(c) && c > 0).slice(0, 3) : [],
         savedCardsOpen: j.savedCardsOpen === true,
         savedCard: cleanSavedCard(j.savedCard),
+        cardChargeRates: cleanRates(j.cardChargeRates),
       };
     }
   } catch {
     // fall through
   }
   return { ok: false, message: NETWORK };
+}
+
+/** The provider's rates as the server sends them, or null (which hides "cover the card charge"). Anything odd is null. */
+export function cleanRates(v: unknown): CardChargeRates | null {
+  if (!v || typeof v !== "object") return null;
+  const r = v as Record<string, unknown>;
+  const ok = (n: unknown, max: number) => Number.isSafeInteger(n) && (n as number) >= 0 && (n as number) < max;
+  if (!ok(r.percentPpm, 500_000) || !ok(r.fixedCents, 100_000) || !ok(r.vatOnTopPpm, 1_000_000)) return null;
+  return { percentPpm: r.percentPpm as number, fixedCents: r.fixedCents as number, vatOnTopPpm: r.vatOnTopPpm as number };
 }
 
 /** A saved card as the server describes it: brand, last four digits and expiry only; anything else is dropped. */

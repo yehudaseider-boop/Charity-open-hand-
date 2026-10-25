@@ -6,6 +6,7 @@ import { loadDonatableCharity } from "@/lib/donations/charity";
 import { loadOpenCampaign } from "@/lib/donations/checkout";
 import { appAccount } from "@/lib/app-auth";
 import { savedIdLast4 as savedIdLast4For } from "@/lib/donations/saved-id";
+import { cardChargeRates } from "@/lib/donations/card-charge";
 
 /**
  * Asked by the app's give screen before the donor fills anything in: is giving in the app open,
@@ -38,5 +39,7 @@ export async function POST(request: NextRequest) {
     suggestedCents: charity?.suggestedCents ?? [],
     savedCardsOpen: cardsOpen,
     savedCard,
+    // The payment provider's rates, so the app can show "cover the card charge" with the amount; null hides the box.
+    cardChargeRates: cardChargeRates(),
   });
 }
