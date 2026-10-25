@@ -169,11 +169,11 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
         <p className="text-sm text-muted">Minimum {minimumLabel}. No Givezy fee.{campaign ? "" : " You can make it monthly below."}</p>
 
         <div className="space-y-2 rounded-control bg-honey-soft p-4">
-          <label className="flex items-start gap-2.5 text-sm">
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
             <input
               type="checkbox"
               name="give_extra"
-              className="mt-1"
+              className="mt-0.5"
               checked={giveExtra}
               onChange={(e) => {
                 setGiveExtra(e.target.checked);
@@ -202,8 +202,8 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
             </div>
           ) : null}
           {cardChargeAvailable ? (
-            <label className="flex items-start gap-2.5 border-t border-border pt-2 text-sm">
-              <input type="checkbox" name="cover_card_charge" className="mt-1" onChange={() => setEditingAmount(true)} />
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 border-t border-border py-1 pt-3 text-sm">
+              <input type="checkbox" name="cover_card_charge" className="mt-0.5" onChange={() => setEditingAmount(true)} />
               <span>Cover the card charge, so {charityName} gets your full donation. Optional. You&apos;ll see the amount before you pay.</span>
             </label>
           ) : null}
@@ -284,12 +284,12 @@ function Check({ name, children, detail, error }: { name: string; children: Reac
   const describedBy = [detail ? `${id}-detail` : null, showError ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   return (
     <div>
-      <div className="flex items-start gap-2.5 text-sm leading-relaxed">
+      <div className="flex min-h-11 items-start gap-3 py-1 text-sm leading-relaxed">
         <input
           id={id}
           type="checkbox"
           name={name}
-          className="mt-1"
+          className="mt-0.5"
           checked={checked}
           onChange={(e) => setChecked(e.target.checked)}
           aria-invalid={showError || undefined}
@@ -300,7 +300,7 @@ function Check({ name, children, detail, error }: { name: string; children: Reac
           {detail ? <span id={`${id}-detail`}> {detail}</span> : null}
         </span>
       </div>
-      {showError ? <p id={`${id}-error`} role="alert" className="ml-7 text-xs font-semibold text-danger">{error}</p> : null}
+      {showError ? <p id={`${id}-error`} role="alert" className="ml-[2.125rem] text-xs font-semibold text-danger">{error}</p> : null}
     </div>
   );
 }
@@ -396,8 +396,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         {receiptsAvailable ? (
           <div className="space-y-3 rounded-control bg-honey-soft p-4">
-            <label className="flex items-start gap-2.5 font-semibold">
-              <input type="checkbox" name="wants_18a" className="mt-1" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold">
+              <input type="checkbox" name="wants_18a" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
               <span>I want an s18A receipt</span>
             </label>
             <Info terms={["s18a"]} label="an s18A receipt" />
@@ -491,8 +491,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
 
         {/* Campaign gifts are once-off: a monthly gift would carry on after the campaign ends. */}
         {campaign ? null : <div className="space-y-2 rounded-control bg-honey-soft p-4">
-          <label className="flex items-start gap-2.5 font-semibold">
-            <input type="checkbox" name="monthly" className="mt-1" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold">
+            <input type="checkbox" name="monthly" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
             <span>Give {formatRand(shownQuote.totalCents)} every month</span>
           </label>
           {monthly ? (

@@ -132,12 +132,12 @@ main:has(> .full-bleed) {
   padding: 0;
 }
 
-/* Ticks and radio buttons in Givezy blue, big enough to hit. */
+/* Ticks and radio buttons in Givezy blue, big enough to hit (22 px; the row around them is the real tap area). */
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--brand);
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.375rem;
+  height: 1.375rem;
   flex-shrink: 0;
 }
 
