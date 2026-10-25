@@ -136,6 +136,14 @@ export function CheckIcon({ size = 18, color = colors.sage }: IconProps) {
   );
 }
 
+export function StarIcon({ size = 18, color = colors.ink }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8L12 3.8z" {...stroke(color)} />
+    </Svg>
+  );
+}
+
 export function InfoIcon({ size = 18, color = colors.muted }: IconProps) {
   return (
     <Svg {...base(size)}>

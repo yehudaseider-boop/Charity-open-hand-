@@ -12,7 +12,7 @@ import { Sheet } from "@/components/sheet";
 import type { Charity } from "@/data/sample";
 import { FadeUp } from "@/components/fade-up";
 import { PressableScale } from "@/components/pressable-scale";
-import { SearchIcon } from "@/components/icons";
+import { SearchIcon, StarIcon } from "@/components/icons";
 import { EmptyState, ErrorState, LoadingList, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { useDirectory } from "@/lib/directory";
@@ -153,14 +153,20 @@ export default function Discover() {
   );
 }
 
-/** The featured charity as a big photo with a navy overlay and its name in white. */
+/**
+ * The featured charity as a big photo with a navy overlay and its name in white, framed in orange with the
+ * pressable orange edge and an orange "Cause of the week" tag, so it stands apart from the cards below.
+ */
 function CauseOfTheWeek({ charity, live }: { charity: Charity; live: boolean }) {
   return (
     <PressableScale onPress={() => router.push(`/charity/${charity.slug}`)} accessibilityRole="button" accessibilityLabel={`Cause of the week: ${charity.nameEn}. ${charity.cause}`} style={styles.week} to={0.98}>
       <CharityImage charity={charity} live={live} rounded={false} bare veil style={StyleSheet.absoluteFill} />
       <CheckedBadge issues18a={charity.issues18a} style={{ alignSelf: "flex-start" }} />
       <View style={{ flex: 1 }} />
-      <Text style={styles.weekKicker}>Cause of the week</Text>
+      <View style={styles.weekTag}>
+        <StarIcon size={16} color={colors.navy} />
+        <Text style={styles.weekTagText}>Cause of the week</Text>
+      </View>
       <Text style={styles.weekName} numberOfLines={2}>{charity.nameEn}</Text>
       <Text style={styles.weekLine} numberOfLines={2}>{charity.cause}</Text>
     </PressableScale>
@@ -178,8 +184,9 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   listHead: { fontFamily: fonts.bodyBold, fontSize: 14, letterSpacing: 0.3, color: colors.muted },
-  week: { minHeight: 300, borderRadius: radius.card, overflow: "hidden", padding: 18, gap: 4 },
-  weekKicker: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.lilac },
+  week: { minHeight: 300, borderRadius: radius.card, overflow: "hidden", padding: 18, gap: 4, borderWidth: 4, borderColor: colors.orange, borderBottomWidth: 8, borderBottomColor: colors.orangeEdge },
+  weekTag: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 6, paddingVertical: 5, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: colors.orange },
+  weekTagText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.navy },
   weekName: { fontFamily: fonts.display, fontSize: 30, lineHeight: 35, color: colors.onInk },
   weekLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft },
 });

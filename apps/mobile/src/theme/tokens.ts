@@ -18,6 +18,7 @@ export const colors = {
   muted: "#4A5878", // slate: secondary text (7.1:1 on white)
   hairline: "#ECE8F6", // light purple: card borders and dividers
   orange: "#FF8A3D", // the one call to action, splashes, goal rings, streaks (ink text on it, 7.2:1)
+  orangeEdge: "#D9621C", // the solid edge under orange (the pressable look), e.g. round the cause of the week
   orangeText: "#B84A0A", // small orange text, if ever needed (5.1:1 on white)
   orangeSoft: "#FFEBDD", // peach tint: background splashes only
   peach: "#FFEBDD", // peach tint: background splashes only
