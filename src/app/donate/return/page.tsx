@@ -152,9 +152,15 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           </a>
         ) : null}
         <p className="mt-6 flex flex-wrap gap-3">
-          {viewer ? <Link href="/account" className="rounded-full bg-brand px-5 py-2.5 font-semibold text-brand-contrast transition-colors hover:bg-navy">See your giving</Link> : null}
-          <Link href={`/c/${charity.slug}`} className="rounded-full border-2 border-border px-5 py-2 font-semibold text-brand transition-colors hover:border-brand">Back to {charity.name_en}</Link>
+          {viewer ? (
+            <Link href="/account" className="inline-flex min-h-12 items-center rounded-full bg-brand px-5 font-semibold text-brand-contrast transition-colors hover:bg-navy">See your giving</Link>
+          ) : (
+            // A first-time donor isn't signed in: show where this gift is kept, the same way the account page puts it.
+            <Link href="/login?next=%2Faccount" className="inline-flex min-h-12 items-center rounded-full bg-brand px-5 font-semibold text-brand-contrast transition-colors hover:bg-navy">See this gift in your account</Link>
+          )}
+          <Link href={`/c/${charity.slug}`} className="inline-flex min-h-12 max-w-full items-center rounded-full border-2 border-border px-5 font-semibold text-brand transition-colors hover:border-brand"><span className="truncate">Back to {charity.name_en}</span></Link>
         </p>
+        {viewer ? null : <p className="mt-2 text-sm text-muted">Sign in with the same email address you gave with.</p>}
       </Result>
     );
   }
