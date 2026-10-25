@@ -159,7 +159,7 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 
 HTML version of the confirmation email, yahrzeit giving, real charity photos from the charities. (Tax pack and dedications were built on 15/10/2026.)
 
-- [ ] Donor-covers-the-fee option: needs Paystack's rate sheet (percentage, fixed amount, VAT included or not) and Yehuda's answer on how the receipt shows it. Fee payer itself is decided: the charity.
-- [ ] Apply migration `20261018000002_donor_thank_yous.sql` (personal thank-yous) to the hosted database, together with the other migrations not yet applied there.
+- [x] Donor-covers-the-fee option: built 25/10/2026 ("Cover the card charge", see section B). Shows once Paystack's rates are filled in; the s18A receipt shows the gift only.
+- [x] Apply migration `20261018000002_donor_thank_yous.sql` (personal thank-yous) to the hosted test database: done 21/10/2026. Still to run on the live database at launch, with the rest in order.
 - [ ] **Email sending (needs Yehuda's approval, may cost money):** create the Resend account under Givezy, add the givezy.co.za sending records (SPF and DKIM) in GoDaddy DNS so emails don't land in spam, then set `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY` and `EMAIL_FROM` (for example hello@givezy.co.za, a real inbox someone reads) on the server. Keep `EMAIL_ALLOWLIST` set on the test site. Send one of each email to a test address before launch: the Resend code has never run against Resend itself. Check Resend's current price before signing up.
 - [ ] **Phone app packages:** `npm audit` in `apps/mobile` lists three vulnerable packages pulled in by Expo 57 (braces, decode-uri-component, node-forge). Upgrade Expo when the patched SDK is out, then re-run the audit; `npm audit fix --force` would break the app today.
