@@ -336,6 +336,9 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
   const [monthly, setMonthly] = useState(false);
   const org = donorType !== "individual";
   const formRef = useRef<HTMLFormElement>(null);
+  // The folded extras (label, dedication, message): open from the start when the app sent a label.
+  const [extrasOpen, setExtrasOpen] = useState(Boolean(initialLabel));
+  const extrasNeedFixing = ["giving_label", "dedication_kind", "dedication_name", "message"].some((k) => Boolean(state.fieldErrors?.[k]));
   // After a refusal, take the donor to the first thing to fix (it may be far above the Pay button).
   useEffect(() => {
     if (!state.fieldErrors) return;
@@ -452,19 +455,37 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
           </p>
         )}
 
-        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-bold">A few extras</h2>
-        <TextField
-          name="giving_label"
-          label="Your label"
-          maxLength={80}
-          defaultValue={initialLabel}
-          autoDirection
-          hint="Only you see it, in your giving records. For example: Work giving, Family, or Maaser."
-        />
+        {/* The optional extras stay folded so the form is short on a phone. A closed section still sends its fields;
+            it opens by itself when something in it is already filled in (a label from the app) or needs fixing. */}
+        <details
+          open={extrasOpen || extrasNeedFixing}
+          onToggle={(e) => setExtrasOpen(e.currentTarget.open)}
+          className="group rounded-control border-2 border-border open:pb-4"
+        >
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="flex flex-col">
+              <span className="font-semibold text-navy">Add a label, dedication or message</span>
+              <span className="text-sm text-muted">Optional</span>
+            </span>
+            <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-brand transition-transform group-open:rotate-180">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </summary>
+          <div className="space-y-5 px-4 pt-2">
+            <TextField
+              name="giving_label"
+              label="Your label"
+              maxLength={80}
+              defaultValue={initialLabel}
+              autoDirection
+              hint="Only you see it, in your giving records. For example: Work giving, Family, or Maaser."
+            />
 
-        <Dedicate error={state.fieldErrors?.dedication_name} />
+            <Dedicate error={state.fieldErrors?.dedication_name} />
 
-        <TextArea name="message" label={`Message to ${charityName}`} rows={3} maxLength={500} />
+            <TextArea name="message" label={`Message to ${charityName}`} rows={3} maxLength={500} />
+          </div>
+        </details>
 
         {/* Campaign gifts are once-off: a monthly gift would carry on after the campaign ends. */}
         {campaign ? null : <div className="space-y-2 rounded-control bg-honey-soft p-4">
