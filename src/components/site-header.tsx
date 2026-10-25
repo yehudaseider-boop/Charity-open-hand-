@@ -17,9 +17,9 @@ export async function SiteHeader() {
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1 whitespace-nowrap text-[15px] sm:gap-2">
           {/* On a phone a charity admin sees Dashboard instead of Charities, so the header stays on one line. */}
-          <NavLink href="/charities" className={dashboard ? "hidden sm:inline-block" : ""}>Charities</NavLink>
+          <NavLink href="/charities" className={dashboard ? "max-sm:hidden" : ""}>Charities</NavLink>
           {/* Phones: the home page and footer link here instead, so the header stays on one line. */}
-          <NavLink href="/for-charities" className="hidden sm:inline-block">For charities</NavLink>
+          <NavLink href="/for-charities" className="max-sm:hidden">For charities</NavLink>
           {/* A charity admin can always get back to their dashboard from any public page. */}
           {dashboard ? <NavLink href={dashboard.href}>{dashboard.label}</NavLink> : null}
           {viewer ? (
