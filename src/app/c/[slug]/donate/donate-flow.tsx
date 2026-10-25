@@ -92,6 +92,8 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
     if (!fresh || !detailsRef.current) return;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     detailsRef.current.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+    // Keyboard and screen-reader users land there too: "Your gift" is read out, and Tab carries on from it.
+    detailsRef.current.querySelector<HTMLElement>("#your-gift")?.focus({ preventScroll: true });
   }, [fresh]);
   // The amount's problem sits right under the box, and goes once the donor edits it.
   const amountError = !quoteState.ok && quoteState.message && !editingAmount ? quoteState.message : null;
@@ -360,7 +362,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         }}
       >
         {source ? <input type="hidden" name={SOURCE_PARAM} value={source} /> : null}
-        <h2 className="font-display text-2xl font-bold">Your gift</h2>
+        <h2 id="your-gift" tabIndex={-1} className="font-display text-2xl font-bold">Your gift</h2>
         <Breakdown q={shownQuote} charityName={charityName} />
         {campaign ? <p className="text-sm text-muted">For the campaign: <span className="font-medium text-text">{campaign.title}</span></p> : null}
 
