@@ -444,9 +444,10 @@ export default function Giving() {
                   />
                 ) : null}
 
-                <View style={{ flexDirection: "row", gap: 10 }}>
-                  <View style={{ flex: 1 }}><Button variant="secondary" label="Log income" disabled={!incomeReady} onPress={() => setLogging("income")} /></View>
-                  <View style={{ flex: 1 }}><Button variant="secondary" label="Given elsewhere" onPress={() => setLogging("elsewhere")} /></View>
+                {/* Side by side only where both labels fit on one line; on most phones they stack. */}
+                <View style={{ flexDirection: width < 430 ? "column" : "row", gap: 10 }}>
+                  <View style={{ flex: width < 430 ? undefined : 1 }}><Button variant="secondary" label="Log income" disabled={!incomeReady} onPress={() => setLogging("income")} /></View>
+                  <View style={{ flex: width < 430 ? undefined : 1 }}><Button variant="secondary" label="Given elsewhere" onPress={() => setLogging("elsewhere")} /></View>
                 </View>
 
                 {income.length > 0 ? (
