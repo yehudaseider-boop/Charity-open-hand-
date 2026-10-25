@@ -279,7 +279,8 @@ export default function Giving() {
               <View style={styles.ringRow}>
                 <GoalRing percent={mainPct} size={width < 360 ? 112 : 140} onBlue stroke={14} />
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.headKicker}>{main.name} · {mainProgress.window.label}</Text>
+                  <Text style={styles.headKicker} numberOfLines={1}>{main.name}</Text>
+                  <Text style={styles.headWindow} numberOfLines={2}>{mainProgress.window.label}</Text>
                   <Text style={[styles.headAmount, bigAmountSize(rand(mainProgress.givenCents), width, 34)]}>{rand(mainProgress.givenCents)}</Text>
                   <Text style={styles.headLine}>
                     {mainProgress.targetCents === null ? "Log your income to see the goal" : `of ${rand(mainProgress.targetCents)}`}
@@ -812,6 +813,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
   headTitle: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
   headKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilac },
+  headWindow: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.lilacSoft, marginBottom: 2 },
   headAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
   headLine: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
   ringRow: { flexDirection: "row", alignItems: "center", gap: 18 },

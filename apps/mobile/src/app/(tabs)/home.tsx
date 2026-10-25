@@ -126,11 +126,11 @@ export default function Home() {
               >
                 <GoalRing percent={pct} onBlue size={width < 360 ? 96 : 118} />
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.goalKicker}>{goal.name} · {progress.window.label}</Text>
+                  <Text style={styles.goalKicker} numberOfLines={1}>{goal.name}</Text>
+                  <Text style={styles.goalWindow} numberOfLines={2}>{progress.window.label}</Text>
                   <Text style={[styles.goalAmount, bigAmountSize(rand(progress.givenCents), width, 34)]}>{rand(progress.givenCents)}</Text>
-                  <Text style={styles.goalSub}>
-                    {progress.targetCents !== null ? `of ${rand(progress.targetCents)}` : "Log income to see the target"} · {counted} {counted === 1 ? "gift" : "gifts"}
-                  </Text>
+                  <Text style={styles.goalSub}>{progress.targetCents !== null ? `of ${rand(progress.targetCents)}` : "Log income to see the target"}</Text>
+                  <Text style={styles.goalSub}>{counted} {counted === 1 ? "gift" : "gifts"}</Text>
                 </View>
                 <ChevronIcon color={colors.onInk} />
               </Pressable>
@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
   goalCard: { backgroundColor: colors.blue, borderRadius: radius.card, padding: 20, overflow: "hidden" },
   goalRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   goalKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilacSoft },
+  goalWindow: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.lilacSoft, marginBottom: 2 },
   goalAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
   glanceRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   glance: { flexGrow: 1, flexBasis: "40%", minWidth: 130, padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft, gap: 2 },
