@@ -18,12 +18,15 @@ const look: Record<Variant, { bg: string; text: string; edge: string; border?: s
   dark: { bg: colors.navy, text: colors.onInk, edge: colors.navyEdge },
 };
 
+const off = { bg: colors.lilacSoft, text: colors.muted, edge: colors.hairline, border: colors.hairline };
+
 /**
  * A pressable button: big rounded corners, bold DM Sans 18, and a solid bottom edge so it looks
  * tappable. It nudges down 2px when pressed, as the edge squashes.
  */
 export function Button({ label, style, variant = "primary", icon, ...rest }: Omit<PressableProps, "style"> & { label: string; style?: object; variant?: Variant; icon?: React.ReactNode }) {
-  const l = look[variant];
+  // Not ready yet: a soft lilac face with slate text, still readable, instead of a faded copy of the button.
+  const l = rest.disabled ? off : look[variant];
   return (
     <Pressable
       accessibilityRole="button"
@@ -37,7 +40,6 @@ export function Button({ label, style, variant = "primary", icon, ...rest }: Omi
         styles.base,
         { backgroundColor: l.bg, borderBottomColor: l.edge, borderBottomWidth: pressed ? 2 : 5, marginTop: pressed ? 3 : 0 },
         l.border ? { borderColor: l.border, borderWidth: 1.5, borderBottomWidth: pressed ? 2 : 5, borderBottomColor: l.edge } : null,
-        rest.disabled && { opacity: 0.45 },
         style,
       ]}
     >
