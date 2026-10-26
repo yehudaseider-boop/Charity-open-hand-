@@ -74,7 +74,7 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   // Keep the last tab's background while a pushed screen (a charity page) is on top, so it doesn't swap underneath.
   const first = usePathname().split("/")[1] || "home";
-  const tab = (["home", "discover", "giving", "receipts", "account"] as const).find((t) => t === first);
+  const tab = (["home", "discover", "giving", "account"] as const).find((t) => t === first);
   const [variant, setVariant] = useState<BackdropVariant>(tab ?? "home");
   if (tab && tab !== variant) setVariant(tab);
   const [giving, setGiving] = useState(false);
@@ -100,8 +100,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="give-now" options={{ title: "Give", tabBarButton: () => <GiveButton onPress={() => setGiving(true)} /> }} />
       <Tabs.Screen name="giving" options={{ title: "Progress", tabBarLabel: tabs.progress.label, tabBarIcon: tabs.progress.icon }} />
       <Tabs.Screen name="account" options={{ title: "Account", tabBarLabel: tabs.account.label, tabBarIcon: tabs.account.icon }} />
-      {/* Receipts are opened from Account (and Home); the page keeps its address. */}
-      <Tabs.Screen name="receipts" options={{ title: "Receipts", href: null }} />
     </Tabs>
     <Sheet visible={giving} onClose={() => setGiving(false)}>
       <QuickGive onDone={() => setGiving(false)} />

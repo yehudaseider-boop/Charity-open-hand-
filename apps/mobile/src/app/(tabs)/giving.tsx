@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
 import { bigAmountSize } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStatusCover } from "@/components/status-cover";
@@ -61,7 +61,18 @@ export default function Giving() {
         : signedIn && !account.live
           ? "loading"
           : "ready";
-  const p = useLocalSearchParams<{ demo?: string; sheet?: string }>();
+  const p = useLocalSearchParams<{ demo?: string; sheet?: string; section?: "year" | "monthly"; at?: string }>();
+  // Opened from a Home row: scroll to that row's section once it is laid out. `at` makes each tap a new jump.
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const [bodyY, setBodyY] = useState<number | null>(null);
+  const [sectionY, setSectionY] = useState<Partial<Record<"year" | "monthly", number>>>({});
+  const jumped = useRef<string | null>(null);
+  useEffect(() => {
+    const target = p.section ? sectionY[p.section] : undefined;
+    if (!p.section || !p.at || jumped.current === p.at || state !== "ready" || bodyY === null || target === undefined) return;
+    jumped.current = p.at;
+    scrollRef.current?.scrollTo({ y: Math.max(0, bodyY + target - insets.top - 16), animated: true });
+  }, [p.section, p.at, state, bodyY, sectionY, insets.top]);
   const newDonor = preview ? demoState === "empty" : !signedIn;
   const previewGoals = !preview || newDonor || p.demo === "first" ? noGoals : sampleGoals;
   const jewish = useJewishMode();
@@ -266,6 +277,7 @@ export default function Giving() {
   return (
     <View style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         onScroll={status.onScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
@@ -303,7 +315,7 @@ export default function Giving() {
             <Text style={styles.headLine}>Your giving, your goals and what you have given elsewhere, in one place.</Text>
           )}
         </BlueHeader>
-        <View style={{ paddingHorizontal: space.gutter, gap: space.block }}>
+        <View style={{ paddingHorizontal: space.gutter, gap: space.block }} onLayout={(e) => setBodyY(e.nativeEvent.layout.y)}>
         {state === "loading" ? (
           <View style={{ gap: space.block }}>
             <SkeletonBlock height={190} />
@@ -500,7 +512,7 @@ export default function Giving() {
             ) : null}
 
             {myGifts.length > 0 ? (
-              <View style={{ gap: 12 }}>
+              <View style={{ gap: 12 }} onLayout={(e) => setSectionY((s) => ({ ...s, year: e.nativeEvent.layout.y }))}>
                 <Text variant="h2" style={styles.heading}>
                   {shownYear === "all" ? "All your giving" : shownYear === taxYear ? `Tax year ${shownYear} so far` : `Tax year ${shownYear} in numbers`}
                 </Text>
@@ -581,7 +593,7 @@ export default function Giving() {
             {/* Signed out (live): there is no history to show yet, so no empty sections. */}
             {preview || signedIn ? (
             <>
-            <View style={{ gap: 12 }}>
+            <View style={{ gap: 12 }} onLayout={(e) => setSectionY((s) => ({ ...s, monthly: e.nativeEvent.layout.y }))}>
               <Text variant="h2" style={styles.heading}>Monthly donations</Text>
               {recurring.length === 0 ? (
                 <Text variant="bodyMuted">No monthly donations yet. Switch on &quot;Give every month&quot; when you give.</Text>

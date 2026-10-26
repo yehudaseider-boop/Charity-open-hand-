@@ -68,6 +68,7 @@ export default function Home() {
   const firstGift = preview ? demoState === "empty" : account.status === "signed-in" && account.live !== null && !account.live.fromCache && gifts.length === 0;
   const goal = goals.value[0] ?? null;
   // At a glance, quieter than the goal card: one list, a full-width row each, so nothing is ever cut short.
+  // Each row opens the exact place it is about: its section on Progress, or the Receipts page.
   // "Through Givezy" because the goal above also counts giving logged elsewhere, so the two totals can differ.
   const monthlyList = preview ? sampleRecurring : (account.live?.recurring ?? []);
   const receiptList = preview ? sampleReceipts : (account.live?.receipts ?? []);
@@ -76,9 +77,9 @@ export default function Home() {
   const yearCents = yearGifts.reduce((n, g) => n + g.cents, 0);
   const nextMonthly = monthlyList.filter((r) => r.status === "active" && r.nextDate).sort((a, b) => (a.nextDate as Date).getTime() - (b.nextDate as Date).getTime())[0] ?? null;
   const glance = [
-    yearGifts.length ? { key: "year", Icon: GivingIcon, title: "Given through Givezy", value: rand(yearCents), sub: `Tax year ${thisYear} · ${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving" as const } : null,
-    nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving" as const } : null,
-    receiptList.length ? { key: "receipts", Icon: ReceiptsIcon, title: "s18A receipts", value: `${receiptList.length}`, sub: "To download", to: "/receipts" as const } : null,
+    yearGifts.length ? { key: "year", Icon: GivingIcon, title: "Given through Givezy", value: rand(yearCents), sub: `Tax year ${thisYear} · ${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving?section=year" } : null,
+    nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving?section=monthly" } : null,
+    receiptList.length ? { key: "receipts", Icon: ReceiptsIcon, title: "s18A receipts", value: `${receiptList.length}`, sub: "To download", to: "/receipts" } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);
   // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
   // While the choice is being read it stays hidden, so it never flashes up and away.
@@ -163,7 +164,7 @@ export default function Home() {
           <View style={styles.gutter}>
             <View style={styles.glance}>
               {glance.map((t, i) => (
-                <Pressable key={t.key} onPress={() => router.push(t.to)} accessibilityRole="button" accessibilityLabel={`${t.title}: ${t.value}. ${t.sub}`} style={({ pressed }) => [styles.glanceRow, i > 0 && styles.glanceDivider, pressed && { backgroundColor: colors.lilacSoft }]}>
+                <Pressable key={t.key} onPress={() => router.push((t.to.includes("?") ? `${t.to}&at=${Date.now()}` : t.to) as never)} accessibilityRole="button" accessibilityLabel={`${t.title}: ${t.value}. ${t.sub}`} style={({ pressed }) => [styles.glanceRow, i > 0 && styles.glanceDivider, pressed && { backgroundColor: colors.lilacSoft }]}>
                   <View style={styles.glanceIcon}><t.Icon size={22} color={colors.blue} /></View>
                   <View style={{ flex: 1, gap: 1 }}>
                     <Text style={styles.glanceTitle}>{t.title}</Text>
