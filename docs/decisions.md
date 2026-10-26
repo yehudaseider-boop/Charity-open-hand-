@@ -2,6 +2,14 @@
 
 ## Decided
 
+- **Give form fixes on the website (26/10/2026).** (1) Switching "Giving as" between Myself and a company or trust
+  keeps what was typed in each (names, organisation, ID number): the other set is hidden and not sent, never removed.
+  (2) When the saved ID number can't be used, Pay's "take me to it" lands on the message next to the saved number
+  (there is no ID box to highlight). (3) A monthly gift that includes a contribution or card charge says what each
+  month's total is made of ("Each month's R105 is R100 to …, R5 to Givezy"). The app already did all three.
+- **Sign-in codes (26/10/2026).** The website and the app both already take the 6-digit code from the sign-in email;
+  the Supabase email templates (Magic link, Confirm signup) still need `{{ .Token }}` added for the code to arrive.
+
 - **Paystack adapter checked against Paystack's own API spec (26/10/2026).** Source: Paystack's public OpenAPI spec
   (github.com/PaystackOSS/openapi, `dist/paystack.yaml`, last updated 09/06/2026), because paystack.com and
   api.paystack.co are blocked from cloud sessions. It does not cover webhooks or test cards; those stay VERIFY.

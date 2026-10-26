@@ -345,6 +345,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
   const [want18a, setWant18a] = useState(false);
   const [monthly, setMonthly] = useState(false);
   const org = donorType !== "individual";
+  const idBoxesShown = org || !(account?.savedIdLast4 && useSavedId);
   const formRef = useRef<HTMLFormElement>(null);
   // The folded extras (label, dedication, message): open from the start when the app sent a label.
   const [extrasOpen, setExtrasOpen] = useState(Boolean(initialLabel));
@@ -354,7 +355,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
   // After a refusal, take the donor to the first thing to fix (it may be far above the Pay button).
   useEffect(() => {
     if (!state.fieldErrors) return;
-    const first = formRef.current?.querySelector<HTMLElement>("[aria-invalid=true]");
+    const first = formRef.current?.querySelector<HTMLElement>(FIX_TARGET);
     first?.focus();
     first?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [state]);
@@ -389,18 +390,17 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
           </div>
         </fieldset>
 
-        {org ? (
-          <>
-            <TextField name="organisation_name" label={donorType === "company" ? "Company name" : "Trust name"} required autoComplete="organization" maxLength={200} />
-            <TextField name="registration_number" label="Registration number" required={want18a} maxLength={40} />
-            <TextField name="contact_person" label="Contact person" required autoComplete="name" maxLength={120} />
-          </>
-        ) : (
-          <>
-            <TextField name="first_name" label="First name" required autoComplete="given-name" maxLength={80} />
-            <TextField name="last_name" label="Surname" required autoComplete="family-name" maxLength={80} />
-          </>
-        )}
+        {/* Both sets stay on the page, the other one hidden and disabled (so not sent), so switching between
+            "Myself" and a company or trust keeps what was typed in each. */}
+        <fieldset hidden={!org} disabled={!org} className="space-y-5">
+          <TextField name="organisation_name" label={donorType === "trust" ? "Trust name" : "Company name"} required autoComplete="organization" maxLength={200} />
+          <TextField name="registration_number" label="Registration number" required={want18a} maxLength={40} />
+          <TextField name="contact_person" label="Contact person" required autoComplete="name" maxLength={120} />
+        </fieldset>
+        <fieldset hidden={org} disabled={org} className="space-y-5">
+          <TextField name="first_name" label="First name" required autoComplete="given-name" maxLength={80} />
+          <TextField name="last_name" label="Surname" required autoComplete="family-name" maxLength={80} />
+        </fieldset>
         <TextField name="email" label="Email" type="email" required autoComplete="email" defaultValue={account?.email} hint="Your confirmation goes here." maxLength={254} />
         <TextField name="phone" label="Phone" type="tel" autoComplete="tel" hint="Only for questions about your donation." maxLength={20} />
 
@@ -431,22 +431,22 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
                       <>
                         <input type="hidden" name="use_saved_id" value="on" />
                         <p className="text-xs text-muted">From your last s18A gift. Give with your account&apos;s email ({account.email}) to use it.</p>
-                        {/* There's no ID box to mark in red here, so a problem with the saved number is said in words. */}
+                        {/* There's no ID box to mark in red here, so a problem with the saved number is said in words,
+                            and Pay's "take me to it" lands on these words. */}
                         {state.fieldErrors?.id_number ? (
-                          <p role="alert" className="text-xs font-medium text-danger">{state.fieldErrors.id_number}</p>
+                          <p role="alert" tabIndex={-1} data-fix className="text-xs font-medium text-danger">{state.fieldErrors.id_number}</p>
                         ) : null}
                       </>
                     ) : null}
                   </fieldset>
                 ) : null}
-                {org || !(account?.savedIdLast4 && useSavedId) ? (
-                  <>
-                    {org ? null : (
-                      <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." maxLength={17} />
-                    )}
-                    <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={10} hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
-                  </>
-                ) : null}
+                {/* Hidden and disabled rather than removed, so a number typed here survives switching back and forth. */}
+                <fieldset hidden={!idBoxesShown} disabled={!idBoxesShown} className="space-y-3">
+                  <fieldset hidden={org} disabled={org}>
+                    <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." maxLength={17} />
+                  </fieldset>
+                  <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={10} hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
+                </fieldset>
                 <fieldset className="space-y-3">
                   <legend className="text-sm font-semibold">{org ? "Registered address" : "Your address"}</legend>
                   <p className="text-xs text-muted">
@@ -511,6 +511,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
                 Your first payment is today. After that we collect the same amount on this day of each month (the last day, in shorter months) from the same card, until you cancel. Card payments only.
                 You can pause or cancel at any time in the Givezy app or from your account on this website.
               </p>
+              {shownQuote.totalCents !== shownQuote.amountCents ? <p className="text-sm text-muted">{monthlyParts(shownQuote, charityName)}</p> : null}
               <Check key={shownQuote.totalCents} name="monthly_authorised" error={state.fieldErrors?.monthly_authorised}>
                 I authorise Givezy to collect {formatRand(shownQuote.totalCents)} from my card every month until I cancel.
               </Check>
@@ -552,7 +553,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
               <button
                 type="button"
                 onClick={() => {
-                  const first = formRef.current?.querySelector<HTMLElement>("[aria-invalid=true]");
+                  const first = formRef.current?.querySelector<HTMLElement>(FIX_TARGET);
                   first?.focus();
                   first?.scrollIntoView({ block: "center", behavior: "smooth" });
                 }}
@@ -602,5 +603,17 @@ function Dedicate({ error }: { error?: string }) {
   );
 }
 
-const charityLabel = (kind: "honour" | "memory") => (kind === "honour" ? "Shown as \u201cIn honour of\u201d this person." : "Shown as \u201cIn memory of\u201d this person.");
+/** The first thing to fix after Pay: a field marked invalid, or a message that stands in for one (the saved ID number has no box). */
+const FIX_TARGET = "[aria-invalid=true]:not(:disabled), [data-fix]";
+
+/** What each monthly collection is made of, when it is more than the donation itself. */
+function monthlyParts(q: { amountCents: number; contributionCents: number; cardChargeCents: number; totalCents: number }, charityName: string): string {
+  const parts = [`${formatRand(q.amountCents)} to ${charityName}`];
+  if (q.contributionCents > 0) parts.push(`${formatRand(q.contributionCents)} to Givezy`);
+  if (q.cardChargeCents > 0) parts.push(`${formatRand(q.cardChargeCents)} card charge`);
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
+  return `Each month's ${formatRand(q.totalCents)} is ${list}.`;
+}
+
+const charityLabel =(kind: "honour" | "memory") => (kind === "honour" ? "Shown as \u201cIn honour of\u201d this person." : "Shown as \u201cIn memory of\u201d this person.");
 
