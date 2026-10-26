@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import { Backdrop, BlueHeader } from "@/components/backdrop";
@@ -54,7 +54,7 @@ export default function Insights() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop variant="receipts" />
-      <ScrollView style={{ flex: 1 }} onScroll={status.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingBottom: insets.bottom + 40, gap: space.block }}>
+      <ScrollView style={{ flex: 1 }} onScroll={status.onScroll} scrollEventThrottle={16} refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined} contentContainerStyle={{ paddingBottom: insets.bottom + 40, gap: space.block }}>
         <BlueHeader paddingTop={insets.top + 12}>
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.navigate("/giving"))} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
             <BackIcon color={colors.onInk} />
@@ -71,6 +71,8 @@ export default function Insights() {
             </View>
           ) : state === "error" ? (
             <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => account.refresh()} />
+          ) : account.status === "agreeing" ? (
+            <EmptyState title="One more step" body="Agree to the Terms and Privacy Policy on the Account tab, and your giving appears here." action={{ label: "Go to Account", onPress: () => router.navigate("/account") }} />
           ) : !preview && !signedIn ? (
             <EmptyState title="See your giving here" body="Sign in with the email you give with, and your gifts show up here with your insights." action={{ label: "Sign in", onPress: () => router.navigate("/account") }} />
           ) : (

@@ -21,24 +21,27 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   // Only the receipts that belong to this person as a donor (not every receipt
   // of a charity they manage).
   const supabase = await createClient();
-  const { data: myDonors } = await supabase.from("donors").select("id").eq("user_id", viewer.userId);
+  const { data: myDonors, error: donorsError } = await supabase.from("donors").select("id").eq("user_id", viewer.userId);
   const donorIds = (myDonors ?? []).map((d) => d.id as string);
-  const { data: receipts } = donorIds.length
+  const { data: receipts, error: receiptsError } = donorIds.length
     ? await supabase
         .from("s18a_receipts")
         .select("id, tax_year, amount_cents, issued_at, status, pdf_path, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en")
         .in("donor_id", donorIds)
         .order("issued_at", { ascending: false })
-    : { data: [] };
+    : { data: [], error: null };
 
-  const { data: monthlyGifts } = donorIds.length
+  const { data: monthlyGifts, error: monthlyError } = donorIds.length
     ? await supabase
         .from("recurring_donations")
         .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, charities(name_en, slug)")
         .in("donor_id", donorIds)
         .in("status", ["active", "paused", "failed"])
         .order("created_at", { ascending: false })
-    : { data: [] };
+    : { data: [], error: null };
+  // A section that could not be read says so, rather than looking empty (nothing changed; a refresh tries again).
+  const receiptsFailed = Boolean(donorsError || receiptsError);
+  const monthlyFailed = Boolean(donorsError || monthlyError);
 
   // This tax year's gifts, from the same reading as the tax pack (paid donations only, Johannesburg dates).
   const thisYear = taxYearFor(new Date());
@@ -121,7 +124,12 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
         )}
       </section>
 
-      {monthlyGifts && monthlyGifts.length > 0 ? (
+      {monthlyFailed ? (
+        <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-2">
+          <h2 className="font-display text-xl font-bold text-indigo">Your monthly donations</h2>
+          <p className="text-sm text-muted" role="status">We couldn&apos;t load your monthly donations just now. Nothing has changed. Refresh the page to try again.</p>
+        </section>
+      ) : monthlyGifts && monthlyGifts.length > 0 ? (
         <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
           <h2 className="font-display text-xl font-bold text-indigo">Your monthly donations</h2>
           <ul className="space-y-2">
@@ -146,7 +154,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                     {m.status === "active" ? <MonthlyButton id={m.id} status="paused" label="Pause" /> : null}
                     {m.status === "paused" ? <MonthlyButton id={m.id} status="active" label="Resume" /> : null}
                     {m.status === "failed" ? (
-                      <MonthlyButton id={m.id} status="cancelled" label="Remove" />
+                      <MonthlyButton id={m.id} status="cancelled" label="Remove" confirmText="Remove this stopped monthly donation? You won't be able to put in a new card for it afterwards." />
                     ) : (
                       <MonthlyButton id={m.id} status="cancelled" label="Cancel for good" danger confirmText="Cancel this monthly donation for good? We will forget your card and collect nothing more." />
                     )}
@@ -160,7 +168,9 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
 
       <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-3">
         <h2 className="font-display text-xl font-bold text-indigo">Your s18A receipts</h2>
-        {receipts && receipts.length > 0 ? (
+        {receiptsFailed ? (
+          <p className="text-sm text-muted" role="status">We couldn&apos;t load your s18A receipts just now. Nothing has changed. Refresh the page to try again.</p>
+        ) : receipts && receipts.length > 0 ? (
           <ul className="space-y-2">
             {receipts.map((r) => (
               <li key={r.id} className="rounded-control border-2 border-border p-3 text-sm">

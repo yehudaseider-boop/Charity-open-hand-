@@ -43,7 +43,7 @@ export async function verifyLoginCode(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const back = `/login?sent=1&error=code&next=${encodeURIComponent(next)}&email=${encodeURIComponent(email.slice(0, 200))}`;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6,10}$/.test(code)) redirect(back);
-  if (await hitRateLimit("login-code", [`email:${email.toLowerCase()}`, `ip:${clientIp(await headers())}`], 10, 60)) redirect(back);
+  if (await hitRateLimit("login-code", [`email:${email.toLowerCase()}`, ...ipKeys(clientIp(await headers()))], 10, 60)) redirect(back);
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
   if (error || !data.user) redirect(back);

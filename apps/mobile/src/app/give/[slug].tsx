@@ -671,6 +671,7 @@ export default function Give() {
               <Text style={styles.amountR}>R</Text>
               <TextInput
                 ref={amountRef}
+                editable={!locked}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
@@ -781,7 +782,7 @@ export default function Give() {
             value={extra}
             onChange={setExtra}
           />
-          {extra ? <View onLayout={at("extra")}><Field label="Contribution" prefix="R" keyboardType="decimal-pad" value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `At least ${rand(minExtra)}.` : undefined} /></View> : null}
+          {extra ? <View onLayout={at("extra")}><Field label="Contribution" prefix="R" keyboardType="decimal-pad" editable={!locked} value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `At least ${rand(minExtra)}.` : undefined} /></View> : null}
 
           {showDetailFields ? (
             <View style={{ gap: 14 }} onLayout={at("details")}>

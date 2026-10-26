@@ -1,5 +1,6 @@
 import { cleanGoals, goalsFromOldTarget, type Goal } from "./goals";
 import { loadOwned, saveOwned } from "./owned-storage";
+import { recordsChanged } from "./record-changes";
 import type { LoadResult, SaveResult } from "./stored-result";
 import { loadTarget } from "./targets";
 
@@ -34,6 +35,7 @@ export async function loadGoals(userId: string | null): Promise<LoadResult<Goal[
 export async function saveGoals(goals: Goal[], userId: string | null): Promise<SaveResult> {
   try {
     await saveOwned(KEY, userId, JSON.stringify(goals));
+    recordsChanged();
     return { ok: true };
   } catch {
     return { ok: false };
@@ -46,6 +48,7 @@ export async function setAsideGoals(userId: string | null): Promise<SaveResult> 
     const old = await loadOwned(KEY, userId);
     if (old !== null) await saveOwned(BACKUP_KEY, userId, old);
     await saveOwned(KEY, userId, "[]");
+    recordsChanged();
     return { ok: true };
   } catch {
     return { ok: false };

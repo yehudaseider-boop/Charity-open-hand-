@@ -75,7 +75,9 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     .neq("gateway", "recorded")
     .lt("created_at", new Date(now.getTime() - 0.5 * HOUR).toISOString())
     .gte("created_at", new Date(now.getTime() - 7 * 24 * HOUR).toISOString())
-    .order("created_at")
+    // Newest first: every payment is checked in its first days, and a week of abandoned checkouts (still
+    // "pending" at the provider) can never crowd a real, recent payment out of the 100.
+    .order("created_at", { ascending: false })
     .limit(100);
   if (pErr) throw new Error(`Could not list pending payments: ${pErr.message}`);
   for (const p of pending ?? []) {

@@ -111,6 +111,12 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
           startTransition(() => requestQuote(fd));
         }}
       >
+        {/* Sent only if Continue is pressed before the page has loaded (the browser posts the form itself): the
+            page reads these back, so the campaign, the way back to the app, the label and the share tag stay. */}
+        {campaign ? <input type="hidden" name="campaign" value={campaign.id} /> : null}
+        {fromApp ? <input type="hidden" name="from" value="app" /> : null}
+        {initialLabel ? <input type="hidden" name="label" value={initialLabel} /> : null}
+        {source ? <input type="hidden" name="src" value={source} /> : null}
         <label htmlFor="amount" className="block font-display text-2xl font-bold text-indigo">How much would you like to give?</label>
         {suggestedCents.length ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label={`Amounts suggested by ${charityName}`}>
@@ -214,7 +220,8 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
       {quote ? (
         <div ref={detailsRef} className="scroll-mt-24">
         <DetailsStep
-          stale={editingAmount || !quoteState.ok}
+          stale={editingAmount || quoting || !quoteState.ok}
+          checking={quoting}
           quote={quote}
           slug={slug}
           charityName={charityName}
@@ -306,8 +313,8 @@ function Check({ name, children, detail, error }: { name: string; children: Reac
   );
 }
 
-function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initialLabel, fromApp, campaign, account, source }: {
-  slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean;
+function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, checking, initialLabel, fromApp, campaign, account, source }: {
+  slug: string; charityName: string; receiptsAvailable: boolean; quote: NonNullable<QuoteState["quote"]>; stale: boolean; checking: boolean;
   initialLabel?: string; fromApp: boolean; campaign?: { id: string; title: string };
   account?: { email: string; savedIdLast4: string | null };
   source?: SourceTag | null;
@@ -532,7 +539,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, initi
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
 
-        {stale ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm font-semibold text-warning">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
+        {/* While a new amount is being checked, Pay waits too: it must never go through at the old amount. */}
+        {checking ? <p role="status" className="rounded-control bg-brand-soft p-3 text-sm font-semibold text-indigo">Checking the new amount…</p> : stale ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm font-semibold text-warning">You changed the amount. Press Continue above to confirm it before paying.</p> : null}
         <button disabled={pending || stale} className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy disabled:opacity-60">
           {pending ? "Please wait…" : monthly ? `Pay ${formatRand(shownQuote.totalCents)} now, then monthly` : `Pay ${formatRand(shownQuote.totalCents)}`}
         </button>

@@ -85,6 +85,7 @@ export async function continueAppeal(charityId: string, appealId: string, _prev:
   const viewer = await requireViewer();
   const { charity, priv } = await loadCharityForManager(charityId);
   if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can email your donors. Nothing was sent." };
+  if (charity.status !== "approved") return { ok: false, message: "Your page isn't live just now, so the rest weren't sent. Contact Givezy if you think this is a mistake." };
   if (!/^[0-9a-f-]{36}$/i.test(appealId)) return { ok: false, message: "That email isn't there any more." };
   const p = await sendAppeal({ charityId, appealId, charityName: charity.name_en, replyTo: priv?.contact_email ?? null, userId: viewer.userId });
   if (!p) return { ok: false, message: "That email isn't there any more." };

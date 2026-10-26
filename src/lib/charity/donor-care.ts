@@ -70,22 +70,44 @@ export async function listReminders(charityId: string, donorId: string): Promise
   return (data ?? []) as Reminder[];
 }
 
-/** Open follow-ups due on or before a day (yyyy-mm-dd), for the overview, with the donor's name. */
+/**
+ * Open follow-ups due on or before a day (yyyy-mm-dd), for the overview, with the donor's name. The name is
+ * the one given with their latest paid gift to this charity (as on the charity's donor list), never the
+ * shared donor record: a charity must not learn a name someone gave another charity.
+ */
 export async function dueReminders(charityId: string, onOrBefore: string): Promise<(Reminder & { donor_name: string })[]> {
   const { data, error } = await db()
     .from("charity_donor_reminders")
-    .select("id, donor_id, due_on, what, done_at, created_at, donors(first_name, last_name, organisation_name, donor_type)")
+    .select("id, donor_id, due_on, what, done_at, created_at")
     .eq("charity_id", charityId)
     .is("done_at", null)
     .lte("due_on", onOrBefore)
     .order("due_on")
     .limit(50);
   if (error) throw error;
-  return (data ?? []).map((r) => {
-    const d = (Array.isArray(r.donors) ? r.donors[0] : r.donors) as { first_name: string | null; last_name: string | null; organisation_name: string | null; donor_type: string } | null;
-    const name = d ? (d.donor_type === "individual" ? [d.first_name, d.last_name].filter(Boolean).join(" ") : d.organisation_name) || "A donor" : "A donor";
-    return { ...(r as unknown as Reminder), donor_name: name };
-  });
+  const rows = (data ?? []) as Reminder[];
+  const ids = [...new Set(rows.map((r) => r.donor_id))];
+  const names = new Map<string, string>();
+  if (ids.length) {
+    const { data: gifts, error: gErr } = await db()
+      .from("donations")
+      .select("donor_id, paid_at, donation_checkout_details(donor_type, first_name, last_name, organisation_name)")
+      .eq("charity_id", charityId)
+      .eq("status", "paid")
+      .in("donor_id", ids)
+      .order("paid_at", { ascending: false })
+      .limit(1000);
+    if (gErr) throw gErr;
+    for (const g of gifts ?? []) {
+      if (names.has(g.donor_id as string)) continue;
+      const raw = g.donation_checkout_details as unknown;
+      const c = (Array.isArray(raw) ? raw[0] : raw) as { donor_type: string; first_name: string | null; last_name: string | null; organisation_name: string | null } | null;
+      if (!c) continue;
+      const name = c.donor_type === "individual" ? [c.first_name, c.last_name].filter(Boolean).join(" ") : c.organisation_name;
+      if (name) names.set(g.donor_id as string, name);
+    }
+  }
+  return rows.map((r) => ({ ...r, donor_name: names.get(r.donor_id) ?? "A donor" }));
 }
 
 export async function addReminder(charityId: string, donorId: string, what: string, dueOn: string, userId: string): Promise<string> {

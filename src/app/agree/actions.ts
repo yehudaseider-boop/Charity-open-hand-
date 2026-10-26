@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { legalConfig } from "@/config/legal";
 import { logAudit } from "@/lib/audit";
 import { safeNextPath } from "@/lib/safe-path";
+import { signedInWithPassword } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +13,8 @@ export async function agreeToPolicy(formData: FormData) {
   const next = safeNextPath(formData.get("next"));
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  // A password session is never Givezy's sign-in (the database refuses it too): it can't agree for anyone.
+  if (!user || (await signedInWithPassword(supabase))) redirect(`/login?next=${encodeURIComponent(next)}`);
   if (formData.get("agree") !== "on" || formData.get("age") !== "on") {
     redirect(`/agree?error=1&next=${encodeURIComponent(next)}`);
   }

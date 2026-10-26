@@ -90,7 +90,7 @@ describe("confirmation page privacy", () => {
     sessionRow = row;
     const html = await page({});
     expect(html).toContain("R23.45");
-    expect(html).toContain("Labelled &quot;Maaser&quot;");
+    expect(html).toContain("Labelled &quot;<bdi>Maaser</bdi>&quot;");
   });
 
   it("a guest with the credential from their payment link sees their confirmation", async () => {

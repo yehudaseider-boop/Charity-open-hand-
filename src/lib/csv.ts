@@ -1,7 +1,9 @@
 /**
  * CSV for exports. Opening a CSV in a spreadsheet can run a "formula" if a cell
  * starts with = + - or @, and donors type their own names and messages, so any
- * text cell that could be read as a formula gets a leading apostrophe.
+ * text cell that could be read as a formula gets a leading apostrophe. South African Excel splits a CSV on
+ * semicolons (comma is the decimal mark), so a cell holding a ; is quoted too, and a formula hidden after one
+ * ("Thanks;=cmd…") is defused the same way.
  */
 
 const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
@@ -9,7 +11,8 @@ const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
 export function csvCell(value: string | number | null | undefined): string {
   let s = value === null || value === undefined ? "" : String(value);
   if (/^[=+\-@\t\r]/.test(s) && !PLAIN_NUMBER.test(s)) s = `'${s}`;
-  if (/[",\n\r]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+  s = s.replace(/([;,])(\s*)([=+\-@])/g, "$1$2'$3");
+  if (/[",;\n\r]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 

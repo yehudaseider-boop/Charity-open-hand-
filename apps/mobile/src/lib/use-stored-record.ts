@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { onRecordsChanged } from "./record-changes";
 import type { LoadResult } from "./stored-result";
 
 /**
@@ -11,6 +12,7 @@ import type { LoadResult } from "./stored-result";
  * When `enabled` is false (design preview) there is nothing to read: the record is `initial` and `ready`.
  * When `waiting` is true (who is using the phone is not known yet: signing in, or agreeing to the terms)
  * nothing is read either, and the record is `loading`, so nothing can be saved over someone's record.
+ * When any screen saves a record, it is read again here quietly (no loading state), so this screen is never stale.
  */
 export function useStoredRecord<T>({
   enabled,
@@ -29,7 +31,6 @@ export function useStoredRecord<T>({
   const key = enabled ? `${attempt}|${owner === null ? "device" : `user:${owner}`}` : "preview";
   const [loaded, setLoaded] = useState<{ key: string; result: LoadResult<T> } | null>(null);
   const [edit, setEdit] = useState<{ key: string; value: T } | null>(null);
-
   useEffect(() => {
     if (!enabled) return;
     let live = true;
@@ -38,6 +39,24 @@ export function useStoredRecord<T>({
     });
     return () => {
       live = false;
+    };
+  }, [enabled, owner, key, load]);
+
+  // Another screen saved a record: read it again quietly. What was saved is now the truth, so this screen's
+  // own edit (already saved, or about to be) gives way to it. A plain switch of person never clears edits.
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    const stop = onRecordsChanged(() => {
+      load(owner).then((result) => {
+        if (!live || !result.ok) return;
+        setLoaded({ key, result });
+        setEdit((e) => (e?.key === key ? null : e));
+      });
+    });
+    return () => {
+      live = false;
+      stop();
     };
   }, [enabled, owner, key, load]);
 

@@ -8,6 +8,9 @@ describe("csv export", () => {
     expect(csvCell("line one\nline two")).toBe('"line one\nline two"');
     expect(csvCell(null)).toBe("");
     expect(csvCell(1250)).toBe("1250");
+    // South African Excel splits on semicolons: a formula hidden after one is defused, and the cell is quoted.
+    expect(csvCell("Thanks;=cmd|'/C calc'!A0;x")).toBe(`"Thanks;'=cmd|'/C calc'!A0;x"`);
+    expect(csvCell("a, @SUM(1)")).toBe(`"a, '@SUM(1)"`);
   });
 
   it("neutralises anything a spreadsheet could read as a formula", () => {

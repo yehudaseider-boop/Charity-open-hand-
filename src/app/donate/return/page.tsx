@@ -143,7 +143,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         </p>
         {givingLabel ? (
           <p className="mt-2 text-sm text-muted">
-            Labelled &quot;{givingLabel}&quot; in your records.
+            Labelled &quot;<bdi>{givingLabel}</bdi>&quot; in your records.
           </p>
         ) : null}
         {fromApp ? (

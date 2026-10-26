@@ -18,7 +18,7 @@ import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
 import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
-import { ddmmyyyy, hhmm, jhbToday, rand } from "@/lib/format";
+import { ddmmyyyy, hhmm, jhbDay, jhbToday, rand } from "@/lib/format";
 import { openGiveScreen } from "@/lib/give-entry";
 import { helpLine } from "@/lib/help";
 import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving";
@@ -68,12 +68,6 @@ export default function Giving() {
   const [bodyY, setBodyY] = useState<number | null>(null);
   const [sectionY, setSectionY] = useState<Partial<Record<"year" | "monthly", number>>>({});
   const jumped = useRef<string | null>(null);
-  useEffect(() => {
-    const target = p.section ? sectionY[p.section] : undefined;
-    if (!p.section || !p.at || jumped.current === p.at || state !== "ready" || bodyY === null || target === undefined) return;
-    jumped.current = p.at;
-    scrollRef.current?.scrollTo({ y: Math.max(0, bodyY + target - insets.top - 16), animated: true });
-  }, [p.section, p.at, state, bodyY, sectionY, insets.top]);
   const newDonor = preview ? demoState === "empty" : !signedIn;
   const previewGoals = !preview || newDonor || p.demo === "first" ? noGoals : sampleGoals;
   const jewish = useJewishMode();
@@ -105,6 +99,14 @@ export default function Giving() {
   // Income (for a goal set as a share of income) stays on this phone only. Nothing is logged until the saved log has loaded.
   const incomeRecord = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
   const income = incomeRecord.value;
+  // Jump only once everything above the section has its final height (goals and income change the header).
+  const settled = state === "ready" && goalsRecord.status !== "loading" && incomeRecord.status !== "loading";
+  useEffect(() => {
+    const target = p.section ? sectionY[p.section] : undefined;
+    if (!p.section || !p.at || jumped.current === p.at || !settled || bodyY === null || target === undefined) return;
+    jumped.current = p.at;
+    scrollRef.current?.scrollTo({ y: Math.max(0, bodyY + target - insets.top - 16), animated: true });
+  }, [p.section, p.at, settled, bodyY, sectionY, insets.top]);
   const incomeReady = incomeRecord.status === "ready";
   const incomeProblem = incomeRecord.reason;
   const [incomeSaveFailedFor, setIncomeSaveFailedFor] = useState<{ owner: string | null } | null>(null);
@@ -180,6 +182,14 @@ export default function Giving() {
   const labels = knownLabels(goalRows, jewish ? JEWISH_LABELS : []);
   const byLabel = labelTotals(yearGifts);
   const [openGift, setOpenGift] = useState<Gift | null>(null);
+  // A different person on the phone: nothing from the last person's session (an Undo, an open sheet) carries over.
+  const [shownFor, setShownFor] = useState(owner);
+  if (shownFor !== owner) {
+    setShownFor(owner);
+    setUndo(null);
+    setOpen(null);
+    setOpenGift(null);
+  }
   const usesIncome = goals.some((g) => g.basis === "income");
   const main = goals[0] ?? null;
   const mainProgress = main ? goalProgress(main, goalRows, income, now) : null;
@@ -647,7 +657,7 @@ export default function Giving() {
             ) : null}
             {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample giving history for design review</Text> : null}
             {signedIn && account.live ? (
-              <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(account.live.loadedAt)} at {hhmm(account.live.loadedAt)}. Pull down to refresh.</Text>
+              <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(jhbDay(account.live.loadedAt))} at {hhmm(account.live.loadedAt)}. Pull down to refresh.</Text>
             ) : null}
           </>
         )}

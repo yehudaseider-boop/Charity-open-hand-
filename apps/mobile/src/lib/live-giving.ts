@@ -200,6 +200,7 @@ export function fromCache(raw: string | null): Cached | null {
           charitySlug: str(r.charitySlug),
           charityName: str(r.charityName),
           cents: cents(r.cents),
+          ...(r.contributionCents == null ? {} : { contributionCents: cents(r.contributionCents) }),
           nextDate: r.nextDate == null ? null : date(r.nextDate),
           status,
           ...(r.syncing === true ? { syncing: true } : {}),

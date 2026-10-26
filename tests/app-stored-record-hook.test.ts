@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useStoredRecord } from "../apps/mobile/src/lib/use-stored-record";
 import type { LoadResult } from "../apps/mobile/src/lib/stored-result";
+import { recordsChanged } from "../apps/mobile/src/lib/record-changes";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -64,6 +65,16 @@ describe("useStoredRecord", () => {
     // Ann's own unsaved entry is still hers when she is back; it never appeared for Ben.
     await show("ann");
     expect(latest.value).toEqual(["ann-1", "unsaved"]);
+  });
+
+  it("reads again when another screen saves, so it never shows (or saves over) an older record", async () => {
+    await show("ann");
+    expect(latest.value).toEqual(["ann-1"]);
+    disk.ann = ["ann-1", "goal set on another screen"];
+    await act(async () => recordsChanged());
+    expect(latest.status).toBe("ready");
+    expect(latest.value).toEqual(["ann-1", "goal set on another screen"]);
+    disk.ann = ["ann-1"];
   });
 
   it("is loading, not ready, in the render where the person changes", async () => {

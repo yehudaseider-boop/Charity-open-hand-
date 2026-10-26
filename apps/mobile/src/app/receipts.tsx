@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop, BlueHeader } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
@@ -58,7 +58,7 @@ export default function Receipts() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop variant="receipts" />
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
+      <ScrollView style={styles.screen} refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined} contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
         <BlueHeader paddingTop={insets.top + 12}>
           {/* Back to wherever Receipts was opened from (Account, or the Home tile). */}
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.navigate("/account"))} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
@@ -96,7 +96,13 @@ export default function Receipts() {
             </View>
             ) : null}
   
-            {!preview && !signedIn ? (
+            {account.status === "agreeing" ? (
+              <View style={{ gap: 12, alignItems: "center", paddingVertical: 24 }}>
+                <Text variant="h2" style={{ textAlign: "center" }}>One more step</Text>
+                <Text variant="bodyMuted" style={{ textAlign: "center" }}>Agree to the Terms and Privacy Policy on the Account tab, and your receipts appear here.</Text>
+                <Button label="Go to Account" onPress={() => router.push("/account")} />
+              </View>
+            ) : !preview && !signedIn ? (
               <View style={{ gap: 12, alignItems: "center", paddingVertical: 24 }}>
                 <Text variant="h2" style={{ textAlign: "center" }}>Sign in to see your receipts</Text>
                 <Button label="Sign in" onPress={() => router.push("/account")} />

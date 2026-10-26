@@ -1,5 +1,6 @@
 import { cleanIncome, type IncomeEntry } from "./ledger";
 import { loadOwned, saveOwned } from "./owned-storage";
+import { recordsChanged } from "./record-changes";
 import type { LoadResult, SaveResult } from "./stored-result";
 
 /**
@@ -33,6 +34,7 @@ export async function loadIncome(userId: string | null): Promise<LoadResult<Inco
 export async function saveIncome(entries: IncomeEntry[], userId: string | null): Promise<SaveResult> {
   try {
     await saveOwned(KEY, userId, JSON.stringify(entries));
+    recordsChanged();
     return { ok: true };
   } catch {
     return { ok: false };
@@ -49,6 +51,7 @@ export async function startNewIncomeLog(userId: string | null): Promise<SaveResu
     const old = await loadOwned(KEY, userId);
     if (old !== null) await saveOwned(BACKUP_KEY, userId, old);
     await saveOwned(KEY, userId, "[]");
+    recordsChanged();
     return { ok: true };
   } catch {
     return { ok: false };
