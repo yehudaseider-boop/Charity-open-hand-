@@ -125,6 +125,21 @@ describe("pausing, resuming and cancelling", () => {
     });
   });
 
+  it("one held while a disputed payment is looked into cannot be resumed by the donor, but can be cancelled", async () => {
+    await tx(async () => {
+      const { id } = await monthly();
+      await run("update public.recurring_donations set status = 'paused', paused_at = now(), held_reason = 'a payment was disputed' where id = $1", [id]);
+      await asWho(ids.donorUser);
+      expect((await run("select held_reason from public.recurring_donations where id = $1", [id])).rows[0].held_reason).toBe("a payment was disputed");
+      await run("savepoint h");
+      await expect(change(id, "active")).rejects.toThrow(/looked into/);
+      await run("rollback to savepoint h");
+      expect(await status(id)).toMatchObject({ status: "paused" });
+      await change(id, "cancelled");
+      expect(await status(id)).toMatchObject({ status: "cancelled" });
+    });
+  });
+
   it("resuming waits for the charge day instead of collecting within the hour", async () => {
     await tx(async () => {
       const { id } = await monthly();

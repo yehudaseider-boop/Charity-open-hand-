@@ -34,7 +34,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const { data: monthlyGifts, error: monthlyError } = donorIds.length
     ? await supabase
         .from("recurring_donations")
-        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, charities(name_en, slug)")
+        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, held_reason, charities(name_en, slug)")
         .in("donor_id", donorIds)
         .in("status", ["active", "paused", "failed"])
         .order("created_at", { ascending: false })
@@ -141,7 +141,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                   <p className="text-muted">
                     {m.status === "active" && m.failed_attempts > 0 ? "Your card was declined this month. We'll try it again, or you can put in a new card. " : null}
                     {m.status === "active" && m.next_charge_at ? `${m.failed_attempts > 0 ? "Next try" : "Next payment"} on ${formatDate(m.next_charge_at)}` : null}
-                    {m.status === "paused" ? "Paused. Nothing is collected until you resume." : null}
+                    {m.status === "paused" ? (m.held_reason ? "Paused while a payment on it is looked into. Nothing is collected, and Givezy will be in touch. You can still cancel it." : "Paused. Nothing is collected until you resume.") : null}
                     {m.status === "failed" ? (m.ended_reason === NEW_CARD_NOT_REUSABLE ? "Stopped: the card you put in can't be used for monthly payments. Start a new monthly donation on the charity's page to carry on." : "Stopped: we could not collect it from your card. Put in a new card to carry it on.") : null}
                     {m.card_last4 && m.status !== "failed" ? ` · Card ending ${m.card_last4}` : null}
                   </p>
@@ -152,7 +152,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                       </Link>
                     ) : null}
                     {m.status === "active" ? <MonthlyButton id={m.id} status="paused" label="Pause" /> : null}
-                    {m.status === "paused" ? <MonthlyButton id={m.id} status="active" label="Resume" /> : null}
+                    {m.status === "paused" && !m.held_reason ? <MonthlyButton id={m.id} status="active" label="Resume" /> : null}
                     {m.status === "failed" ? (
                       <MonthlyButton id={m.id} status="cancelled" label="Remove" confirmText="Remove this stopped monthly donation? You won't be able to put in a new card for it afterwards." />
                     ) : (

@@ -50,10 +50,20 @@ export async function reverseDonation(donationId: string, kind: ReverseKind, act
   // A chargeback disputes the authority to charge the card, so a monthly donation paid with it stops
   // and the card is dropped: every further collection would be another chargeback.
   if (kind === "charged_back") await stopMonthlyFor(donationId, actorUserId, "the payment was charged back");
-  // An s18A receipt already issued with this donation on it is now wrong: a person voids and re-issues it.
+  // An s18A receipt already issued with this donation on it is now wrong. It is withdrawn straight away, so
+  // it can no longer be downloaded, emailed or shown as valid; a person then issues the corrected one (the
+  // donor's other gifts go back on the charity's receipts list, as after any withdrawal).
   const { data: links, error: linkError } = await db.from("s18a_receipt_donations").select("receipt_id, s18a_receipts!inner(status)").eq("donation_id", donationId).eq("s18a_receipts.status", "issued");
   if (linkError) throw linkError;
   for (const l of links ?? []) {
+    const reason = `Withdrawn automatically: a donation on it was ${kind === "refunded" ? "refunded" : "charged back"}. A corrected receipt follows.`;
+    const { error: voidError } = await db
+      .from("s18a_receipts")
+      .update({ status: "void", voided_at: new Date().toISOString(), void_reason: reason })
+      .eq("id", l.receipt_id as string)
+      .eq("status", "issued");
+    if (voidError) throw voidError;
+    await logAudit({ actorUserId, action: "receipt.voided", entityType: "s18a_receipt", entityId: l.receipt_id as string, details: { reason, donationId, kind } });
     await logAudit({ actorUserId, action: "receipt.needs_reissue", entityType: "s18a_receipt", entityId: l.receipt_id as string, details: { donationId, kind } });
   }
   return outcome;
@@ -83,11 +93,12 @@ async function pauseMonthlyFor(donationId: string): Promise<void> {
   const { data: d, error } = await db.from("donations").select("recurring_id").eq("id", donationId).maybeSingle();
   if (error) throw error;
   if (!d?.recurring_id) return;
+  // Held, not just paused: the donor cannot resume it until a person has looked (releaseDisputeHold).
   const { data: paused, error: pauseError } = await db
     .from("recurring_donations")
-    .update({ status: "paused", paused_at: new Date().toISOString() })
+    .update({ status: "paused", paused_at: new Date().toISOString(), held_reason: "a payment was disputed" })
     .eq("id", d.recurring_id)
-    .eq("status", "active")
+    .in("status", ["active", "paused"])
     .select("id");
   if (pauseError) throw pauseError;
   if (paused?.length) {
@@ -130,4 +141,25 @@ export async function handleDispute(reference: string | null, stage: "opened" | 
       "Answer it in the payment provider's dashboard before its deadline, with the charity's help if needed.",
     ]);
   }
+}
+
+/**
+ * A platform admin, after the dispute was won: the monthly donation stays paused, and the donor may resume
+ * it again. Returns false when there was no hold to release. Logged.
+ */
+export async function releaseDisputeHold(donationId: string, actorUserId: string): Promise<boolean> {
+  const db = createAdminClient();
+  const { data: d, error } = await db.from("donations").select("recurring_id").eq("id", donationId).maybeSingle();
+  if (error) throw error;
+  if (!d?.recurring_id) return false;
+  const { data: released, error: releaseError } = await db
+    .from("recurring_donations")
+    .update({ held_reason: null })
+    .eq("id", d.recurring_id)
+    .not("held_reason", "is", null)
+    .select("id");
+  if (releaseError) throw releaseError;
+  if (!released?.length) return false;
+  await logAudit({ actorUserId, action: "recurring.hold_released", entityType: "recurring_donation", entityId: d.recurring_id as string, details: { donationId } });
+  return true;
 }

@@ -6,7 +6,7 @@ import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RemoveButton } from "@/components/forms/remove-button";
-import { markDonation } from "./actions";
+import { markDonation, releaseHold } from "./actions";
 
 const HELD = Object.keys(heldLabel);
 
@@ -121,6 +121,11 @@ export default async function PaymentsPage() {
                   <form action={markDonation.bind(null, donationId, "charged_back")}>
                     <RemoveButton label="Mark charged back" what={`donation ${donationId.slice(0, 8)}`} confirmText="Mark this donation charged back? It stops counting for the charity and on s18A receipts. Only do this once the gateway shows the dispute was lost." />
                   </form>
+                  {a.action === "donation.dispute_opened" || a.action === "donation.dispute_resolved" ? (
+                    <form action={releaseHold.bind(null, donationId)}>
+                      <RemoveButton label="Dispute won: let the donor resume" what={`the hold on donation ${donationId.slice(0, 8)}`} confirmText="Let the donor resume the monthly donation this dispute paused? Only do this once the gateway shows the dispute was won." />
+                    </form>
+                  ) : null}
                 </div>
               ) : donationId && status ? (
                 <p className="pt-1 text-xs text-muted">Donation {donationId.slice(0, 8)} is now {status.replace("_", " ")}.</p>

@@ -420,7 +420,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       async setRecurringStatus(id, status) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
         const { error } = await supabase.rpc("set_my_recurring_status", { p_id: id, p_status: status });
-        if (error) return { ok: false, message: "We couldn't change that. Please try again." };
+        // A monthly donation held while a disputed payment is looked into says so (from the database).
+        if (error) return { ok: false, message: /looked into/.test(error.message) ? error.message : "We couldn't change that. Please try again." };
         await refresh();
         return { ok: true };
       },

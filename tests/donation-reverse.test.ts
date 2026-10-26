@@ -1,6 +1,6 @@
 /**
  * Refunds and chargebacks: a full refund marks a paid donation refunded; a partial refund, an unknown
- * payment or any dispute is held for a person; an issued s18A receipt with the donation is flagged.
+ * payment or any dispute is held for a person; an issued s18A receipt with the donation is withdrawn and flagged.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,7 +8,8 @@ vi.mock("server-only", () => ({}));
 
 type Donation = { id: string; gateway_ref: string; status: string; total_charged_cents: number; recurring_id?: string | null };
 let donations: Donation[];
-let recurring: { id: string; status: string; authorization_encrypted: string | null; ended_reason?: string | null }[];
+let recurring: { id: string; status: string; authorization_encrypted: string | null; ended_reason?: string | null; held_reason?: string | null }[];
+let voided: string[];
 let receiptLinks: { receipt_id: string; donation_id: string }[];
 const audits: { action: string; entityId?: string | null; details?: Record<string, unknown> }[] = [];
 
@@ -27,11 +28,16 @@ vi.mock("@/lib/supabase/admin", () => ({
           return { data: d ?? null, error: null };
         },
         in: (c: string, v: unknown[]) => ((f[`${c}:in`] = v), q),
+        not: (c: string) => ((f[`${c}:set`] = true), q),
         then: (ok: (v: unknown) => unknown) => {
           if (table === "s18a_receipt_donations") return Promise.resolve({ data: receiptLinks.filter((l) => l.donation_id === f.donation_id), error: null }).then(ok);
+          if (table === "s18a_receipts") {
+            if (patch?.status === "void" && f.status === "issued") voided.push(String(f.id));
+            return Promise.resolve({ data: null, error: null }).then(ok);
+          }
           if (table === "recurring_donations") {
             const allowed = (f["status:in"] as string[] | undefined) ?? (f.status ? [f.status] : null);
-            const hit = recurring.filter((r) => r.id === f.id && (!allowed || allowed.includes(r.status)));
+            const hit = recurring.filter((r) => r.id === f.id && (!allowed || allowed.includes(r.status)) && (!f["held_reason:set"] || r.held_reason != null));
             if (patch) for (const r of hit) Object.assign(r, patch);
             return Promise.resolve({ data: hit.map((r) => ({ id: r.id })), error: null }).then(ok);
           }
@@ -46,12 +52,13 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-const { handleDispute, handleRefund, reverseDonation } = await import("@/lib/donations/reverse");
+const { handleDispute, handleRefund, releaseDisputeHold, reverseDonation } = await import("@/lib/donations/reverse");
 
 beforeEach(() => {
   donations = [{ id: "d1", gateway_ref: "ref-1", status: "paid", total_charged_cents: 20_000 }];
   recurring = [];
   receiptLinks = [];
+  voided = [];
   audits.length = 0;
 });
 
@@ -79,18 +86,20 @@ describe("refunds", () => {
     expect(audits.map((a) => a.action)).toEqual(["refund.unmatched", "refund.unmatched"]);
   });
 
-  it("flags an issued s18A receipt that had the donation on it", async () => {
+  it("withdraws an issued s18A receipt that had the donation on it, and flags it for re-issue", async () => {
     receiptLinks = [{ receipt_id: "rcpt-1", donation_id: "d1" }];
     expect(await reverseDonation("d1", "charged_back", "admin-1", "marked by an admin")).toBe("done");
     expect(donations[0].status).toBe("charged_back");
-    expect(audits.map((a) => [a.action, a.entityId])).toEqual([["donation.charged_back", "d1"], ["receipt.needs_reissue", "rcpt-1"]]);
+    expect(voided).toEqual(["rcpt-1"]);
+    expect(audits.map((a) => [a.action, a.entityId])).toEqual([["donation.charged_back", "d1"], ["receipt.voided", "rcpt-1"], ["receipt.needs_reissue", "rcpt-1"]]);
   });
 
   it("a retry after a failed first try still flags the receipt", async () => {
     receiptLinks = [{ receipt_id: "rcpt-1", donation_id: "d1" }];
     donations[0].status = "refunded"; // the first try changed it, then failed before logging
     await handleRefund("ref-1", 20_000, "evt");
-    expect(audits.map((a) => a.action)).toEqual(["donation.refunded", "receipt.needs_reissue"]);
+    expect(voided).toEqual(["rcpt-1"]);
+    expect(audits.map((a) => a.action)).toEqual(["donation.refunded", "receipt.voided", "receipt.needs_reissue"]);
   });
 
   it("only a paid donation can be reversed", async () => {
@@ -126,13 +135,24 @@ describe("monthly donations behind a reversed payment", () => {
     expect(recurring[0].status).toBe("active");
   });
 
-  it("an opened dispute pauses it until a person has looked; a resolved one changes nothing", async () => {
+  it("an opened dispute pauses and holds it until a person has looked; a resolved one changes nothing", async () => {
     await handleDispute("ref-1", "opened", null, "ev1");
     expect(recurring[0].status).toBe("paused");
+    expect(recurring[0].held_reason).toBe("a payment was disputed");
     expect(donations[0].status).toBe("paid");
     recurring[0].status = "active";
     await handleDispute("ref-1", "resolved", "won", "ev2");
     expect(recurring[0].status).toBe("active");
+  });
+
+  it("a dispute holds a donation the donor had paused too; a person releases the hold once it is won", async () => {
+    recurring[0].status = "paused";
+    await handleDispute("ref-1", "opened", null, "ev1");
+    expect(recurring[0].held_reason).toBe("a payment was disputed");
+    expect(await releaseDisputeHold("d1", "admin-1")).toBe(true);
+    expect(recurring[0]).toMatchObject({ status: "paused", held_reason: null });
+    expect(await releaseDisputeHold("d1", "admin-1")).toBe(false);
+    expect(audits.at(-1)?.action).toBe("recurring.hold_released");
   });
 
   it("a refund in another currency is never matched by its number alone", async () => {
