@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   if (!details.ok) return NextResponse.json({ ok: false, message: "Please check the highlighted fields.", fieldErrors: details.fieldErrors }, { status: 422 });
 
   // Saved cards: only for the signed-in donor, checked from their token (and only when switched on, which startDonation checks).
-  const account = body.data.saveCard || body.data.useSavedCard || body.data.useSavedId ? ((await appAccount(request)) ?? undefined) : undefined;
+  const account = body.data.saveCard || body.data.useSavedCard || body.data.useSavedId ? ((await appAccount(request, { forMoney: true })) ?? undefined) : undefined;
   if ((body.data.saveCard || body.data.useSavedCard) && !account) {
     return NextResponse.json({ ok: false, message: "Please sign in again to use a saved card." }, { status: 401 });
   }

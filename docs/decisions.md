@@ -2,6 +2,12 @@
 
 ## Decided
 
+- **Security fixes (26/10/2026, code check).** (1) A charity's address is locked in the database once its application
+  is submitted, as the website already said: it is printed on every s18A receipt. A platform admin can still correct
+  it (`20261026000002_lock_charity_address.sql`). (2) The phone app's money calls (giving with a saved card or saved
+  ID number, saving a card, the saved card screen, "Update my card") now also ask Supabase that the session is still
+  live, so a token from a phone that signed out can't be used in the hour before it expires.
+
 - **World-class look, v2.1 (25/10/2026, Yehuda: "I think we need a world class ui design").** Built as a clickable
   prototype first (Design canvas, link kept in the chat), approved by Yehuda the same day. Logo, logo blue and the
   splash stay. Changes: headlines and amounts are Bricolage Grotesque (700 and 800) instead of Fredoka, in deep ink

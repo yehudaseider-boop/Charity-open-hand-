@@ -52,6 +52,21 @@ describe("approved charity", () => {
     });
   });
 
+  it("can't change its address (it is printed on s18A receipts)", async () => {
+    await scenario(noop, async () => {
+      await expect(run("update public.charities set city = 'Elsewhere' where id = $1", [meals])).rejects.toThrow(
+        /address of a submitted or approved charity/,
+      );
+    });
+  });
+
+  it("a platform admin can still correct its address", async () => {
+    await scenario(
+      async () => { await run("update public.profiles set role = 'platform_admin' where id = $1", [mealsAdmin]); },
+      async () => { await run("update public.charities set postal_code = '2196' where id = $1", [meals]); },
+    );
+  });
+
   it("can't change its bank account", async () => {
     await scenario(noop, async () => {
       await expect(
@@ -120,6 +135,7 @@ describe("draft charity", () => {
     await scenario(toDraft, async () => {
       await run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals]);
       await run("update public.charities set legal_name_en = 'Changed' where id = $1", [meals]);
+      await run("update public.charities set city = 'Changed' where id = $1", [meals]);
     });
   });
 

@@ -10,7 +10,7 @@ const body = z.object({ id: z.uuid() });
  * on the website). The card goes in on the payment provider's page there; the app never sees it.
  */
 export async function POST(request: NextRequest) {
-  const account = await appAccount(request);
+  const account = await appAccount(request, { forMoney: true });
   if (!account) return NextResponse.json({ ok: false, message: "Please sign in again." }, { status: 401 });
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, message: "Something went wrong. Please try again." }, { status: 400 });
