@@ -25,6 +25,8 @@ export const colors = {
   lilac: "#C9B4FA", // soft lavender: splashes, the edge under white buttons
   lightPurple: "#E5D9FF", // card borders, ring tracks
   lilacSoft: "#F4F1FF", // pale lilac: soft cards
+  chartPurple: "#9A7DF5", // third chart colour, after blue and orange (checked for colour-blind separation)
+  chartOther: "#A7AEC2", // the "Other" slice of a chart: a quiet slate, never a brand hue
   sage: "#2E9D6B", // s18A tick and success graphics (graphics only)
   successText: "#1F6B4A", // small success text (6.3:1)
   danger: "#B3261E", // errors and destructive actions only (6.4:1)

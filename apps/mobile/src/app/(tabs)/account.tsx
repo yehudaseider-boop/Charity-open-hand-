@@ -5,6 +5,7 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Updates from "expo-updates";
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { InsightsLink } from "@/components/insights-link";
 import { useStatusCover } from "@/components/status-cover";
 import { Button } from "@/components/button";
 import { GivingIcon, ReceiptsIcon } from "@/components/icons";
@@ -122,6 +123,7 @@ export default function Account() {
               <Tile label={jewish ? "Progress and maaser" : "Your progress"} icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
               <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.blueSoft} onPress={() => router.push("/receipts")} />
             </View>
+            <InsightsLink />
 
             <SavedCardRow />
             {preferences}

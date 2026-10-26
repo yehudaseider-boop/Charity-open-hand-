@@ -7,6 +7,7 @@ import { useStatusCover } from "@/components/status-cover";
 import { Button, TextLink } from "@/components/button";
 import { BlueHeader } from "@/components/backdrop";
 import { GoalRing } from "@/components/goal-ring";
+import { InsightsLink } from "@/components/insights-link";
 import { FadeUp } from "@/components/fade-up";
 import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
@@ -327,6 +328,7 @@ export default function Giving() {
         ) : (
           <>
             {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
+            {preview || signedIn ? <InsightsLink /> : null}
             {account.status === "signed-out" ? (
               <View style={styles.card}>
                 <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
