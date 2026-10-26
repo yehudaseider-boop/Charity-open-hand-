@@ -6,7 +6,7 @@ import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent, type ScrollViewInstance } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
@@ -168,6 +168,7 @@ export default function Give() {
   const [heldAttempt, setHeldAttempt] = useState<Snapshot | null>(null);
   // Where each part of the form sits, so a failed tap scrolls to the first thing to fix.
   const scrollRef = useRef<ScrollViewInstance>(null);
+  const amountRef = useRef<TextInputInstance>(null);
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
   const at = (key: string) => (e: LayoutChangeEvent) => {
     const y = e.nativeEvent.layout.y;
@@ -669,6 +670,7 @@ export default function Give() {
             <View style={styles.amountRow}>
               <Text style={styles.amountR}>R</Text>
               <TextInput
+                ref={amountRef}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
@@ -688,8 +690,7 @@ export default function Give() {
             ) : charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
           </View>
           {err("amount") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert">{err("amount")}</Text> : minGift ? <Text variant="label">At least {rand(minGift)}.</Text> : null}
-          {quick.length ? (
-          <View style={styles.chips} accessibilityLabel={pastAmounts.length ? "Amounts you gave before" : `Amounts suggested by ${charity.nameEn}`}>
+          <View style={styles.chips} accessibilityLabel={!quick.length ? "Amount" : pastAmounts.length ? "Amounts you gave before" : `Amounts suggested by ${charity.nameEn}`}>
             {quick.map((c) => {
               const on = gift === c;
               return (
@@ -699,8 +700,28 @@ export default function Give() {
                 </Pressable>
               );
             })}
+            {/* Your own amount: clears the suggestion and opens the keyboard on the big amount above. */}
+            {(() => {
+              const own = amount !== "" && (gift === null || !quick.includes(gift));
+              return (
+                <Pressable
+                  disabled={locked}
+                  onPress={() => {
+                    haptic.tap();
+                    if (!own) setAmount("");
+                    amountRef.current?.focus();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Type your own amount"
+                  accessibilityState={{ selected: own, disabled: locked }}
+                  style={[styles.chip, styles.chipRow, own && styles.chipOn, locked && styles.chipOff]}
+                >
+                  {own ? <CheckIcon size={16} color={colors.onInk} /> : null}
+                  <Text style={[styles.chipText, own && { color: colors.onInk }]}>Other amount</Text>
+                </Pressable>
+              );
+            })()}
           </View>
-          ) : null}
 
           {/* Once-off or monthly: both options always visible, the chosen one filled, an unavailable one struck through with the reason. */}
           <View style={{ gap: 6 }}>
