@@ -7,9 +7,9 @@ import { recordAction } from "@/lib/charity/charity-actions";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { canIssue18a } from "@/lib/charities";
 import {
+  alreadyRecorded,
   checkFile,
   checkGift,
-  giftKey,
   isRecordedMethod,
   paidAtOf,
   taxYearOfGift,
@@ -49,12 +49,15 @@ export async function recordOneGift(charityId: string, _prev: FormState, formDat
     if (!data) return { ok: false, fieldErrors: { campaign_id: "Choose one of your campaigns" } };
     campaign = data.id as string;
   }
-  if ((await recordedKeys(charityId)).has(giftKey(g))) {
+  const hit = alreadyRecorded(await recordedKeys(charityId), g);
+  if (hit) {
     return {
       ok: false,
       message: g.reference
         ? `You've already recorded a gift with the reference "${g.reference}". Nothing was recorded.`
-        : "You've already recorded a gift from this email for this amount on this date. If it's a second gift, add a reference (for example the bank reference) and record it again.",
+        : hit === "erased"
+          ? "You've already recorded a gift of this amount on this date for a donor whose details were erased at their request, so this may be the same gift. Nothing was recorded. If it's a different gift, add a reference (for example the bank reference) and record it again."
+          : "You've already recorded a gift from this email for this amount on this date. If it's a second gift, add a reference (for example the bank reference) and record it again.",
     };
   }
   const r = await recordGifts({ charityId, userId: viewer.userId, gifts: [{ ...g, campaignId: campaign }] });
@@ -116,7 +119,10 @@ export async function checkImport(charityId: string, _prev: ImportPreview, formD
     .filter((r) => !r.check.ok || r.duplicateOf)
     .map((r) => ({
       line: r.line,
-      messages: r.check.ok ? ["Already recorded (same reference, or the same email, amount and date). Left out."] : Object.values(r.check.errors).filter((m): m is string => Boolean(m)),
+      messages: r.check.ok
+        ? [r.duplicateOfErased
+          ? "May already be recorded: a gift of this amount on this date belongs to a donor whose details were erased. Left out. Add a reference if it's a different gift."
+          : "Already recorded (same reference, or the same email, amount and date). Left out."] : Object.values(r.check.errors).filter((m): m is string => Boolean(m)),
     }));
   const gifts = file.rows.flatMap((r) => (r.check.ok && !r.duplicateOf ? [r.check.gift] : []));
   const warnings: string[] = [];

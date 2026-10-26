@@ -1,5 +1,6 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
+import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { confirmPayment } from "@/lib/donations/confirm";
 import { sendDonorConfirmation } from "@/lib/donations/notify";
@@ -134,12 +135,23 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
   const { data: failedMail } = await db.from("audit_log").select("entity_id").eq("action", "donation.confirmation_email_failed").gte("created_at", since).limit(200);
   const { data: resentMail } = await db.from("audit_log").select("entity_id").eq("action", "donation.confirmation_email_resent").gte("created_at", since).limit(1000);
   const done = new Set((resentMail ?? []).map((r) => r.entity_id as string));
-  for (const id of new Set((failedMail ?? []).map((r) => r.entity_id as string))) {
-    if (!id || done.has(id)) continue;
+  const waiting = [...new Set((failedMail ?? []).map((r) => r.entity_id as string))].filter((id) => id && !done.has(id));
+  // Only gifts that are still paid: a refunded or charged-back gift gets no "thank you for your donation".
+  const stillPaid = new Set<string>();
+  if (waiting.length) {
+    const { data: rows, error: statusError } = await db.from("donations").select("id").in("id", waiting).eq("status", "paid");
+    if (statusError) throw statusError;
+    for (const r of rows ?? []) stillPaid.add(r.id as string);
+  }
+  for (const id of waiting) {
+    if (!stillPaid.has(id)) continue;
     if (Date.now() > deadline) {
       out.incomplete = true;
       break;
     }
+    // Claimed first: the scheduler can call this job twice at once, and the donor must get one email, not two.
+    // If two runs claim together, neither sends; tomorrow's run tries again.
+    if (await hitRateLimit("confirmation-resend", [`donation:${id}`], 1, 20 * 60)) continue;
     if (await sendDonorConfirmation(id)) {
       out.confirmations.resent += 1;
       await logAudit({ actorUserId: null, action: "donation.confirmation_email_resent", entityType: "donation", entityId: id });

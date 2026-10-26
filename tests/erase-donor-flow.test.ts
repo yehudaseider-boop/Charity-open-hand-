@@ -37,6 +37,10 @@ vi.mock("@/lib/supabase/admin", () => ({
         select: (_c?: string, o?: { head?: boolean }) => (o?.head ? { eq: async () => ({ count: charityAdminCount }) } : q),
         eq: (c: string, v: unknown) => ((f[c] = v), q),
         in: (c: string, v: unknown) => ((f[c] = v), q),
+        ilike: (c: string, v: unknown) => ((f[c] = v), q),
+        order: () => q,
+        // Pages of the history scans: nothing on the page past the first.
+        range: async (from: number) => ({ data: from === 0 && table === "donors" ? (f.user_id ? donorsByUser : donorsByEmail).map((id) => ({ id })) : [], error: null }),
         maybeSingle: async () => ({ data: profile, error: null }),
         delete: () => ({
           // The charities' personal thank-yous to the erased donors: .in("donor_id", ids)

@@ -107,6 +107,13 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
     case "thank_you_sent": {
       const sent = Number(d.sent ?? 0);
       const failed = Number(d.failed ?? 0);
+      const remaining = Number(d.remaining ?? 0);
+      if (remaining) {
+        return {
+          what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: nobody gets it twice.`,
+          next: { label: "Send the rest", href: `${c.base}/thank-donors#unfinished` },
+        };
+      }
       return {
         what: sent
           ? `Your thank-you for ${String(d.month ?? "that month")} went to ${plural(sent, "donor")}.${failed ? ` ${plural(failed, "email")} could not be sent.` : ""}`

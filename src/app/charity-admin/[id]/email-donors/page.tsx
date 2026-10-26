@@ -14,6 +14,9 @@ import { formatDate } from "@/lib/dates";
 import { checkAppealAudience, continueAppeal, sendAppealNow, sendTestAppeal } from "./actions";
 import { AppealForm, ContinueForm } from "./forms";
 
+// Sending runs until about 40 seconds, then offers "Send the rest".
+export const maxDuration = 60;
+
 export const metadata: Metadata = { title: "Email donors" };
 
 /**

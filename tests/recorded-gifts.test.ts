@@ -1,6 +1,6 @@
 /** Gifts a charity records itself: amounts and dates are never guessed, files are read safely, repeats are caught. */
 import { describe, expect, it } from "vitest";
-import { cameInBy, checkFile, checkGift, dateReadsBothWays, giftKey, mapHeadings, parseCsv, parseGiftAmount, parseGiftDate, taxYearOfGift } from "@/lib/charity/recorded-gifts";
+import { alreadyRecorded, cameInBy, checkFile, checkGift, dateReadsBothWays, erasedGiftKey, giftKey, mapHeadings, parseCsv, parseGiftAmount, parseGiftDate, taxYearOfGift } from "@/lib/charity/recorded-gifts";
 
 const today = "2026-10-21";
 
@@ -116,6 +116,22 @@ describe("files", () => {
     expect(r.bad).toBe(3);
     expect(r.totalCents).toBe(50_000 + 125_050);
     expect(r.rows.map((x) => [x.line, x.check.ok, Boolean(x.duplicateOf)])).toEqual([[2, true, false], [3, true, false], [4, false, false], [5, true, true], [6, true, true]]);
+  });
+  it("holds back a gift that matches one whose donor was erased, unless it has a reference", () => {
+    // The erased gift kept only its amount and date (no email, no name).
+    const seen = new Set([erasedGiftKey({ amountCents: 50_000, date: "2026-03-05" })]);
+    const text = [
+      "Date,Amount,First name,Surname,Email,Reference",
+      "05/03/2026,500,Sarah,Levin,sarah@x.co.za,",
+      "05/03/2026,500,Sarah,Levin,sarah@x.co.za,BANK-77",
+      "06/03/2026,500,Sarah,Levin,sarah@x.co.za,",
+    ].join("\n");
+    const r = checkFile(text, { today, fallbackMethod: "eft", seen });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rows.map((x) => [x.line, Boolean(x.duplicateOf), Boolean(x.duplicateOfErased)])).toEqual([[2, true, true], [3, false, false], [4, false, false]]);
+    expect(alreadyRecorded(seen, { reference: null, email: "x@y.co", amountCents: 50_000, date: "2026-03-05" })).toBe("erased");
+    expect(alreadyRecorded(seen, { reference: "R1", email: "x@y.co", amountCents: 50_000, date: "2026-03-05" })).toBeNull();
   });
   it("refuses a file with no gifts, missing columns, too many rows or too many bytes, with what to do", () => {
     expect(checkFile("Date,Amount,Email\n", { today, fallbackMethod: "eft" })).toEqual({ ok: false, message: expect.stringMatching(/no gifts/) });

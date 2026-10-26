@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { logAudit } from "@/lib/audit";
 import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { giftKey, paidAtOf, taxYearOfGift, type CleanGift } from "./recorded-gifts";
+import { isErasedEmail } from "./dashboard";
+import { erasedGiftKey, giftKey, paidAtOf, taxYearOfGift, type CleanGift } from "./recorded-gifts";
 
 /**
  * Saving gifts a charity records itself. Every call here comes after the caller checked the signed-in person
@@ -27,6 +28,8 @@ export async function recordedKeys(charityId: string): Promise<Set<string>> {
       const det = (Array.isArray(d.donation_checkout_details) ? d.donation_checkout_details[0] : d.donation_checkout_details) as { email: string } | null;
       const date = String(d.paid_at).slice(0, 10);
       keys.add(giftKey({ reference: d.external_ref as string | null, email: det?.email ?? "", amountCents: Number(d.amount_cents), date }));
+      // An erased donor's gift: its email is gone, so it is matched by amount and date (see erasedGiftKey).
+      if (!det?.email || isErasedEmail(det.email)) keys.add(erasedGiftKey({ amountCents: Number(d.amount_cents), date }));
     }
     if (!data || data.length < 1000) break;
   }
@@ -148,13 +151,23 @@ export async function listImports(charityId: string) {
   const imports = (data ?? []) as { id: string; file_name: string; created_at: string }[];
   const live = new Map<string, { gifts: number; cents: number }>();
   if (imports.length) {
-    const { data: rows, error: rowError } = await db.from("donations").select("import_id, amount_cents").eq("charity_id", charityId).in("import_id", imports.map((i) => i.id));
-    if (rowError) throw rowError;
-    for (const r of rows ?? []) {
-      const t = live.get(r.import_id as string) ?? { gifts: 0, cents: 0 };
-      t.gifts += 1;
-      t.cents += Number(r.amount_cents);
-      live.set(r.import_id as string, t);
+    // In pages: twenty imports can hold far more than the 1 000 rows the database returns at a time.
+    for (let from = 0; ; from += 1000) {
+      const { data: rows, error: rowError } = await db
+        .from("donations")
+        .select("import_id, amount_cents")
+        .eq("charity_id", charityId)
+        .in("import_id", imports.map((i) => i.id))
+        .order("id")
+        .range(from, from + 999);
+      if (rowError) throw rowError;
+      for (const r of rows ?? []) {
+        const t = live.get(r.import_id as string) ?? { gifts: 0, cents: 0 };
+        t.gifts += 1;
+        t.cents += Number(r.amount_cents);
+        live.set(r.import_id as string, t);
+      }
+      if (!rows || rows.length < 1000) break;
     }
   }
   return imports

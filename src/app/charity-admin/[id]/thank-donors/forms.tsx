@@ -11,3 +11,7 @@ export function ThankYouForm({ action, defaultBody, confirm }: { action: (s: For
     </ActionForm>
   );
 }
+
+export function SendRestForm({ action, confirm }: { action: (s: FormState, f: FormData) => Promise<FormState>; confirm: string }) {
+  return <ActionForm action={action} submitLabel="Send the rest" pendingLabel="Sending…" confirm={confirm} confirmLabel="Yes, send the rest" />;
+}

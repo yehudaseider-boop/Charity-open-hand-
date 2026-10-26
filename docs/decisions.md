@@ -2,6 +2,18 @@
 
 ## Decided
 
+- **Bookkeeping fixes for big charities (26/10/2026, code check).** The database hands back at most 1 000 rows
+  at a time, and a few lists didn't page past that. Now: Deposits read every line (a busy charity's deposits no
+  longer look as if they "don't add up", and the CSV, Excel and Xero files are complete), and one deposit is
+  opened on its own; "Earlier imports" counts every gift; erasure finds a person's rows in every charity's history.
+  A monthly thank-you that runs out of time can be finished with "Send the rest" (each address is claimed as a hash
+  before its email goes, so nobody gets it twice: `20261026000003_thank_you_resume.sql`); the thank-donors and
+  email-donors pages allow 60 seconds. Re-importing a bank file after a donor was erased no longer records their
+  gifts again: an erased gift is matched by amount and date only, and the charity can add a reference if it really is
+  a different gift. The daily job resends a failed confirmation email only for a gift that is still paid, and claims
+  it first so two runs at once don't send it twice. (Left as is: two daily runs at once can each send the Givezy team
+  its daily alert email; a second copy is better than none.)
+
 - **Security fixes (26/10/2026, code check).** (1) A charity's address is locked in the database once its application
   is submitted, as the website already said: it is printed on every s18A receipt. A platform admin can still correct
   it (`20261026000002_lock_charity_address.sql`). (2) The phone app's money calls (giving with a saved card or saved

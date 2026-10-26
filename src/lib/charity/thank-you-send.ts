@@ -53,13 +53,17 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   return all.filter((r) => !stopped.has(emailHash(r.email)));
 }
 
-export type SendResult = { ok: true; sent: number; failed: number } | { ok: false; message: string };
+export type SendResult = { ok: true; sent: number; failed: number; remaining: number } | { ok: false; message: string };
 
-/** Send the charity's thank-you for one month. Only once per month: the row is claimed first. */
-export async function sendThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string; replyTo?: string | null }): Promise<SendResult> {
+/**
+ * Send the charity's thank-you for one month, until the time runs out (a web request can't run for ever).
+ * The month is claimed once; each donor's address is claimed (as a hash) before their email goes, so "Send the
+ * rest" carries on where a send stopped and nobody is emailed twice.
+ */
+export async function sendThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string; replyTo?: string | null; budgetMs?: number }): Promise<SendResult> {
   const db = createAdminClient();
   // Before claiming the month: a sending set-up problem must not use up the month with nothing sent.
-  const transport = getEmailTransport();
+  getEmailTransport();
   const claim = await db
     .from("charity_thank_yous")
     .insert({ charity_id: args.charityId, period_month: args.month, body: args.body, sent_by: args.userId })
@@ -69,42 +73,101 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
     if (claim.error.code === "23505") return { ok: false, message: "You've already thanked the donors for that month." };
     throw claim.error;
   }
-  // Nothing sent yet: hand the month back, so the charity can try again.
-  const release = () => db.from("charity_thank_yous").delete().eq("id", claim.data.id);
-  let recipients: Awaited<ReturnType<typeof thankYouRecipients>>;
-  try {
-    recipients = await thankYouRecipients(args.charityId, args.month);
-  } catch (e) {
-    await release();
-    throw e;
+  const r = await runThankYou({ ...args, thankYouId: claim.data.id as string });
+  // Nothing went out to anyone: hand the month back, so the charity can try again.
+  if (r.ok && r.sent === 0 && r.failed > 0) {
+    await db.from("charity_thank_yous").delete().eq("id", claim.data.id);
+    return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
   }
+  return r;
+}
+
+/** "Send the rest": carry on with a month's thank-you that stopped part way, with the same words. */
+export async function continueThankYou(args: { charityId: string; charityName: string; month: string; userId: string; replyTo?: string | null; budgetMs?: number }): Promise<SendResult> {
+  const { data, error } = await createAdminClient()
+    .from("charity_thank_yous")
+    .select("id, body, finished_at")
+    .eq("charity_id", args.charityId)
+    .eq("period_month", args.month)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, message: "There's no thank-you for that month to finish." };
+  if (data.finished_at) return { ok: false, message: "This thank-you has already reached everyone." };
+  return runThankYou({ ...args, body: data.body as string, thankYouId: data.id as string });
+}
+
+async function runThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string; replyTo?: string | null; budgetMs?: number; thankYouId: string }): Promise<SendResult> {
+  const started = Date.now();
+  const budget = args.budgetMs ?? 40_000;
+  const db = createAdminClient();
+  const transport = getEmailTransport();
+  const recipients = await thankYouRecipients(args.charityId, args.month);
+  const claimed = await claimedHashes(args.thankYouId);
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
-  let sent = 0;
-  let failed = 0;
+  let stoppedEarly = false;
   for (const r of recipients) {
+    const hash = emailHash(r.email);
+    if (claimed.has(hash)) continue;
+    if (Date.now() - started >= budget) {
+      stoppedEarly = true;
+      break;
+    }
+    // Claim this address first. Someone else pressing at the same time gets nothing back and moves on.
+    const got = await db.from("charity_thank_you_recipients").upsert({ thank_you_id: args.thankYouId, email_hash: hash }, { onConflict: "thank_you_id,email_hash", ignoreDuplicates: true }).select("email_hash");
+    if (got.error) throw got.error;
+    claimed.add(hash);
+    if (!got.data?.length) continue;
+    const mark = (status: "sent" | "failed") => db.from("charity_thank_you_recipients").update({ status }).eq("thank_you_id", args.thankYouId).eq("email_hash", hash);
     const token = randomBytes(32).toString("base64url");
-    const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), email_hash: emailHash(r.email) });
+    const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), email_hash: hash });
     if (saved.error) {
-      failed++;
+      await mark("failed");
       continue;
     }
     try {
       const outcome = await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }));
       // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
-      if (outcome === "sent") sent++;
-      else failed++;
+      await mark(outcome === "sent" ? "sent" : "failed");
     } catch (e) {
       console.error("[thank-you] not sent", e instanceof Error ? e.message : e);
-      failed++;
+      await mark("failed");
     }
   }
-  if (sent === 0 && failed > 0) {
-    await release();
-    return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
+  const counts = await thankYouCounts(args.thankYouId);
+  const remaining = stoppedEarly ? recipients.filter((r) => !claimed.has(emailHash(r.email))).length : 0;
+  await db
+    .from("charity_thank_yous")
+    .update({ recipient_count: counts.sent, ...(remaining === 0 ? { finished_at: new Date().toISOString() } : {}) })
+    .eq("id", args.thankYouId);
+  await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining } });
+  return { ok: true, sent: counts.sent, failed: counts.failed, remaining };
+}
+
+/** Addresses (as hashes) already claimed for this thank-you, in pages. */
+async function claimedHashes(thankYouId: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await createAdminClient().from("charity_thank_you_recipients").select("email_hash").eq("thank_you_id", thankYouId).order("email_hash").range(from, from + 999);
+    if (error) throw error;
+    for (const r of data ?? []) out.add(r.email_hash as string);
+    if (!data || data.length < 1000) break;
   }
-  await db.from("charity_thank_yous").update({ recipient_count: sent }).eq("id", claim.data.id);
-  await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, sent, failed } });
-  return { ok: true, sent, failed };
+  return out;
+}
+
+/** How far a thank-you got. A "sending" left by a stopped page may have gone, so it is never sent again: counted as failed. */
+async function thankYouCounts(thankYouId: string): Promise<{ sent: number; failed: number }> {
+  const c = { sent: 0, failed: 0 };
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await createAdminClient().from("charity_thank_you_recipients").select("status").eq("thank_you_id", thankYouId).order("email_hash").range(from, from + 999);
+    if (error) throw error;
+    for (const r of data ?? []) {
+      if (r.status === "sent") c.sent++;
+      else c.failed++;
+    }
+    if (!data || data.length < 1000) break;
+  }
+  return c;
 }
 
 export type DonorThankResult = { ok: true; name: string } | { ok: false; message: string };

@@ -288,7 +288,7 @@ export function mapHeadings(header: string[]): { columns: Partial<Record<GiftFie
   return { columns, unknown, missing };
 }
 
-export type RowResult = { line: number; fields: GiftFields; check: GiftCheck; duplicateOf?: string };
+export type RowResult = { line: number; fields: GiftFields; check: GiftCheck; duplicateOf?: string; duplicateOfErased?: boolean };
 export type FileCheck =
   | { ok: false; message: string }
   | { ok: true; rows: RowResult[]; unknownColumns: string[]; good: number; bad: number; totalCents: number; datesReadBothWays: boolean };
@@ -312,7 +312,9 @@ export function checkFile(text: string, opts: { today: string; fallbackMethod: R
     const r: RowResult = { line: i + 2, fields, check };
     if (check.ok) {
       const key = giftKey(check.gift);
-      if (seen.has(key)) r.duplicateOf = key;
+      const hit = alreadyRecorded(seen, check.gift);
+      if (hit) r.duplicateOf = key;
+      if (hit === "erased") r.duplicateOfErased = true;
       seen.add(key);
     }
     return r;
@@ -336,4 +338,20 @@ export function checkFile(text: string, opts: { today: string; fallbackMethod: R
  */
 export function giftKey(g: { reference: string | null; email: string; amountCents: number; date: string }): string {
   return g.reference ? `ref:${g.reference.toLowerCase()}` : `gift:${g.email.toLowerCase()}|${g.amountCents}|${g.date}`;
+}
+
+/**
+ * A recorded gift whose donor was erased has lost its email, so its own key can't catch the same bank line
+ * imported again. It keeps this key instead: amount and date only, and nothing about the person. A new gift
+ * without a reference that matches it is held back too; with a reference it can be recorded.
+ */
+export function erasedGiftKey(g: { amountCents: number; date: string }): string {
+  return `erased:${g.amountCents}|${g.date}`;
+}
+
+/** Is this gift already recorded: by its own key, or (without a reference) as an erased donor's gift? */
+export function alreadyRecorded(seen: Set<string>, g: { reference: string | null; email: string; amountCents: number; date: string }): "same" | "erased" | null {
+  if (seen.has(giftKey(g))) return "same";
+  if (!g.reference && seen.has(erasedGiftKey(g))) return "erased";
+  return null;
 }

@@ -67,9 +67,11 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     // The charities' personal thank-yous to them, and their name in the dashboard's "what just happened" rows.
     const { error: thanksError } = await db.from("charity_donor_thanks").delete().in("donor_id", [...ids]);
     if (thanksError) throw new Error(`Could not erase: ${thanksError.message}`);
-    const { data: actions, error: actionsError } = await db.from("charity_actions").select("id, details").eq("kind", "donor_thanked");
-    if (actionsError) throw new Error(`Could not erase: ${actionsError.message}`);
-    for (const a of actions ?? []) {
+    // Filtered in the database and read in pages: the history of every charity is far more than one page.
+    const actions = await allPages((from) =>
+      db.from("charity_actions").select("id, details").eq("kind", "donor_thanked").in("details->>donorId", [...ids]).order("id").range(from, from + 999),
+    );
+    for (const a of actions) {
       const details = (a.details ?? {}) as Record<string, unknown>;
       if (typeof details.donorId === "string" && ids.has(details.donorId)) {
         const { error: e } = await db.from("charity_actions").update({ details: { ...details, name: "a donor" } }).eq("id", a.id);
@@ -77,13 +79,11 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       }
     }
     // A gift a charity recorded for them in the last 30 days names them in its "what just happened" row too.
-    const { data: theirGifts, error: giftsError } = await db.from("donations").select("id").in("donor_id", [...ids]);
-    if (giftsError) throw new Error(`Could not erase: ${giftsError.message}`);
-    const giftIds = new Set((theirGifts ?? []).map((g) => g.id as string));
+    const theirGifts = await allPages((from) => db.from("donations").select("id").in("donor_id", [...ids]).order("id").range(from, from + 999));
+    const giftIds = new Set(theirGifts.map((g) => g.id as string));
     if (giftIds.size) {
-      const { data: recorded, error: recordedError } = await db.from("charity_actions").select("id, details, undo").eq("kind", "gift_recorded");
-      if (recordedError) throw new Error(`Could not erase: ${recordedError.message}`);
-      for (const a of recorded ?? []) {
+      const recorded = await allPages((from) => db.from("charity_actions").select("id, details, undo").eq("kind", "gift_recorded").order("id").range(from, from + 999));
+      for (const a of recorded) {
         const undone = ((a.undo ?? {}) as { donationIds?: unknown }).donationIds;
         if (Array.isArray(undone) && undone.some((d) => typeof d === "string" && giftIds.has(d))) {
           const { error: e } = await db.from("charity_actions").update({ details: { ...((a.details ?? {}) as Record<string, unknown>), name: "a donor" } }).eq("id", a.id);
@@ -94,9 +94,11 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
   }
   // If they were on a charity's team, their address goes from the team rows of "what just happened" as well.
   if (email) {
-    const { data: teamRows, error: teamError } = await db.from("charity_actions").select("id, details").in("kind", ["member_added", "member_removed"]);
-    if (teamError) throw new Error(`Could not erase: ${teamError.message}`);
-    for (const a of teamRows ?? []) {
+    const exact = email.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const teamRows = await allPages((from) =>
+      db.from("charity_actions").select("id, details").in("kind", ["member_added", "member_removed"]).ilike("details->>email", exact).order("id").range(from, from + 999),
+    );
+    for (const a of teamRows) {
       const details = (a.details ?? {}) as Record<string, unknown>;
       if (typeof details.email === "string" && details.email.toLowerCase() === email) {
         const { error: e } = await db.from("charity_actions").update({ details: { ...details, email: "A team member" } }).eq("id", a.id);
@@ -187,4 +189,16 @@ async function accountBlocker(userId: string): Promise<string | null> {
   if (profile?.role === "platform_admin") return "Their sign-in account was kept because they are a platform admin.";
   if ((charities ?? 0) > 0) return "Their sign-in account was kept because they manage a charity. Remove them from the charity first.";
   return null;
+}
+
+/** Every row of a query, page by page (the database returns at most 1 000 rows at a time). */
+async function allPages<T extends Record<string, unknown>>(page: (from: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await page(from);
+    if (error) throw new Error(`Could not erase: ${error.message}`);
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
 }
