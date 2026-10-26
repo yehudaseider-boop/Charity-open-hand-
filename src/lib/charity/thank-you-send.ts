@@ -53,7 +53,7 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   return all.filter((r) => !stopped.has(emailHash(r.email)));
 }
 
-export type SendResult = { ok: true; sent: number; failed: number; remaining: number } | { ok: false; message: string };
+export type SendResult = { ok: true; sent: number; failed: number; remaining: number; sentThisRun?: number } | { ok: false; message: string };
 
 /**
  * Send the charity's thank-you for one month, until the time runs out (a web request can't run for ever).
@@ -75,7 +75,9 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
   }
   const r = await runThankYou({ ...args, thankYouId: claim.data.id as string });
   // Nothing went out to anyone: hand the month back, so the charity can try again.
-  if (r.ok && r.sent === 0 && r.failed > 0) {
+  // Decided from what this run's emails actually did, not the saved statuses (a status that failed to save must
+  // never lead to everyone being emailed again).
+  if (r.ok && (r.sentThisRun ?? 0) === 0 && r.sent === 0 && r.failed > 0) {
     await db.from("charity_thank_yous").delete().eq("id", claim.data.id);
     return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
   }
@@ -105,6 +107,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
   const claimed = await claimedHashes(args.thankYouId);
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   let stoppedEarly = false;
+  let sentThisRun = 0;
   for (const r of recipients) {
     const hash = emailHash(r.email);
     if (claimed.has(hash)) continue;
@@ -117,7 +120,10 @@ async function runThankYou(args: { charityId: string; charityName: string; month
     if (got.error) throw got.error;
     claimed.add(hash);
     if (!got.data?.length) continue;
-    const mark = (status: "sent" | "failed") => db.from("charity_thank_you_recipients").update({ status }).eq("thank_you_id", args.thankYouId).eq("email_hash", hash);
+    const mark = async (status: "sent" | "failed") => {
+      const { error: markError } = await db.from("charity_thank_you_recipients").update({ status }).eq("thank_you_id", args.thankYouId).eq("email_hash", hash);
+      if (markError) console.error("[thank-you] status not saved", markError.message);
+    };
     const token = randomBytes(32).toString("base64url");
     const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), email_hash: hash });
     if (saved.error) {
@@ -127,6 +133,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
     try {
       const outcome = await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }));
       // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
+      if (outcome === "sent") sentThisRun++;
       await mark(outcome === "sent" ? "sent" : "failed");
     } catch (e) {
       console.error("[thank-you] not sent", e instanceof Error ? e.message : e);
@@ -140,7 +147,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
     .update({ recipient_count: counts.sent, ...(remaining === 0 ? { finished_at: new Date().toISOString() } : {}) })
     .eq("id", args.thankYouId);
   await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining } });
-  return { ok: true, sent: counts.sent, failed: counts.failed, remaining };
+  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun };
 }
 
 /** Addresses (as hashes) already claimed for this thank-you, in pages. */

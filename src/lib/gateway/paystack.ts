@@ -351,16 +351,23 @@ export const paystackGateway: PaymentGateway = {
         // Before `since`: not asked for (the filter may have been ignored).
         if (dated && day < since) continue;
         const owner = ownerOf(st);
-        // Another charity's settlement (or Givezy's own): never fetched, never shown.
+        // Another charity's settlement (or Givezy's own), when it says so: its transactions aren't even read.
         if (owner !== null && owner !== charityAccountRef) continue;
         const lines: PayoutLine[] = [];
         const txOwners: (string | null)[] = [];
-        for (let tp = 1; tp <= 50; tp++) {
+        let someoneElses = false;
+        for (let tp = 1; tp <= 50 && !someoneElses; tp++) {
           const txs = await call<({ reference?: string | null; amount?: number; fees?: number; type?: string; status?: string } & Owned)[]>(
             `/settlement/${st.id}/transactions?perPage=100&page=${tp}`,
           );
           for (const t of txs) {
-            txOwners.push(ownerOf(t));
+            const txOwner = ownerOf(t);
+            txOwners.push(txOwner);
+            // A transaction that names another subaccount settles it: this isn't the charity's, stop reading it.
+            if (owner === null && txOwner !== null && txOwner !== charityAccountRef) {
+              someoneElses = true;
+              break;
+            }
             const gross = Number(t.amount ?? 0);
             const fee = Number(t.fees ?? 0);
             const kind = t.type === "refund" ? "refund" : t.type === "dispute" || t.type === "chargeback" ? "chargeback" : t.type === undefined || t.type === "transaction" ? "payment" : "other";

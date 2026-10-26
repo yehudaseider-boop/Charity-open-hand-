@@ -9,7 +9,10 @@ let priv: Record<string, string> | null = null;
 let saved: Record<string, unknown> | null = null;
 let stored: Record<string, unknown> | null = null;
 let check: ((req: unknown) => Promise<unknown>) | undefined;
-vi.mock("@/lib/gateway", () => ({ getGateway: () => ({ name: "fake", checkBankAccount: check }) }));
+vi.mock("@/lib/gateway", () => ({
+  getGateway: () => ({ name: "fake", checkBankAccount: check }),
+  isGatewayRefusal: (e: unknown) => Boolean((e as { refused?: boolean })?.refused),
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
@@ -50,6 +53,27 @@ describe("checking a charity's bank account", () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const r = await checkCharityBank("c1", "u1");
     expect(r).toMatchObject({ outcome: "not_checked", verified: null });
+    err.mockRestore();
+  });
+
+  it("the provider turned the account down: that is 'checked, not verified', not 'not checked'", async () => {
+    check = async () => {
+      throw Object.assign(new Error("Account not found"), { refused: true });
+    };
+    expect(await checkCharityBank("c1", "u1")).toMatchObject({ outcome: "checked", verified: false });
+  });
+
+  it("couldn't ask this time: an earlier answer about the same account is kept, not wiped", async () => {
+    stored = { account_last4: "1234", outcome: "checked" };
+    check = async () => {
+      throw new Error("could not be reached");
+    };
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await checkCharityBank("c1", "u1");
+    expect(saved).toBeNull();
+    stored = { account_last4: "9999", outcome: "checked" };
+    await checkCharityBank("c1", "u1");
+    expect(saved).toMatchObject({ outcome: "not_checked", account_last4: "1234" });
     err.mockRestore();
   });
 

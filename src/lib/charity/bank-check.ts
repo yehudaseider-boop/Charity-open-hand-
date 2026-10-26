@@ -1,7 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { decrypt, last4 } from "@/lib/crypto";
-import { getGateway } from "@/lib/gateway";
+import { getGateway, isGatewayRefusal } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -41,6 +41,11 @@ export async function checkCharityBank(charityId: string, actorUserId: string | 
     if (gateway.checkBankAccount) {
       const answer = await Promise.race([
         gateway.checkBankAccount({ bankName: priv.bank_name as string, accountNumber, accountHolder: priv.bank_account_holder as string }).catch((e) => {
+          // The provider answered and turned the account down (for example, no such account): that is an answer,
+          // "not verified", never "not checked". An outage or an unsupported bank stays "not checked".
+          if (isGatewayRefusal(e)) {
+            return { verified: false, accountOpen: false, acceptsCredits: false, holderMatches: false, openMoreThanThreeMonths: false, message: "The check was turned down: the bank details may be wrong." };
+          }
           console.error("[bank-check] not checked", e instanceof Error ? e.message : e);
           return null;
         }),
@@ -57,6 +62,11 @@ export async function checkCharityBank(charityId: string, actorUserId: string | 
           message: answer.message,
         });
       }
+    }
+    // Couldn't ask this time: an earlier answer about this same account stays, rather than being wiped.
+    if (row.outcome === "not_checked") {
+      const { data: earlier } = await db.from("charity_bank_checks").select("account_last4, outcome").eq("charity_id", charityId).maybeSingle();
+      if (earlier?.outcome === "checked" && earlier.account_last4 === row.account_last4) return row;
     }
     const { error: saveError } = await db.from("charity_bank_checks").upsert({ charity_id: charityId, ...row }, { onConflict: "charity_id" });
     if (saveError) {

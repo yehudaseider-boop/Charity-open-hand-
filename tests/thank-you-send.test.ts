@@ -9,6 +9,7 @@ let optedOut: string[] = [];
 // The month's claim row, and the addresses claimed for it (hash -> status).
 let month: { id: string; body: string; finished_at: string | null } | null = null;
 let recipients = new Map<string, string>();
+let statusSaveFails = false;
 const neqs: string[] = [];
 const tokens: Record<string, string>[] = [];
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
@@ -51,7 +52,10 @@ vi.mock("@/lib/supabase/admin", () => ({
         },
       });
       b.then = (ok: (v: unknown) => unknown) => {
-        if (patch && table === "charity_thank_you_recipients") recipients.set(filters.email_hash as string, patch.status as string);
+        if (patch && table === "charity_thank_you_recipients") {
+          if (statusSaveFails) return Promise.resolve({ error: { message: "down" } }).then(ok);
+          recipients.set(filters.email_hash as string, patch.status as string);
+        }
         if (patch && table === "charity_thank_yous" && month && "finished_at" in patch) month.finished_at = patch.finished_at as string;
         return Promise.resolve({ error: null }).then(ok);
       };
@@ -70,6 +74,7 @@ beforeEach(() => {
   month = null;
   recipients = new Map();
   optedOut = [];
+  statusSaveFails = false;
   process.env.SITE_URL = "https://g.test";
 });
 
@@ -78,7 +83,7 @@ describe("sending a thank-you", () => {
     donations = [gift("sarah@x.co", "Sarah"), gift("SARAH@x.co", "Sarah"), gift("erased+1@erased.invalid", null), gift("gone@x.co", "Gone", true), gift("stop@x.co", "Stop"), gift("david@x.co", "David")];
     optedOut = [emailHash("stop@x.co")];
     const r = await sendThankYou(args);
-    expect(r).toEqual({ ok: true, sent: 2, failed: 0, remaining: 0 });
+    expect(r).toMatchObject({ ok: true, sent: 2, failed: 0, remaining: 0 });
     expect(sent.map((m) => m.to)).toEqual(["sarah@x.co", "david@x.co"]);
     expect(sent[0].text).toMatch(/https:\/\/g\.test\/thanks\/stop\?t=[A-Za-z0-9_-]{43}/);
     expect(tokens).toHaveLength(2);
@@ -100,12 +105,12 @@ describe("sending a thank-you", () => {
     donations = [gift("a@x.co", "A"), gift("b@x.co", "B"), gift("c@x.co", "C")];
     // No time at all: nothing is claimed, and the month stays open to finish.
     const first = await sendThankYou({ ...args, budgetMs: 0 });
-    expect(first).toEqual({ ok: true, sent: 0, failed: 0, remaining: 3 });
+    expect(first).toMatchObject({ ok: true, sent: 0, failed: 0, remaining: 3 });
     expect(month?.finished_at).toBeNull();
     // One already went out before the page stopped (claimed and sent).
     recipients.set(emailHash("a@x.co"), "sent");
     const rest = await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" });
-    expect(rest).toEqual({ ok: true, sent: 3, failed: 0, remaining: 0 });
+    expect(rest).toMatchObject({ ok: true, sent: 3, failed: 0, remaining: 0 });
     expect(sent.map((m) => m.to)).toEqual(["b@x.co", "c@x.co"]);
     expect(month?.finished_at).not.toBeNull();
     expect(await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" })).toEqual({ ok: false, message: "This thank-you has already reached everyone." });
@@ -117,6 +122,19 @@ describe("sending a thank-you", () => {
     recipients.set(emailHash("a@x.co"), "sending");
     const rest = await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" });
     expect(sent.map((m) => m.to)).toEqual(["b@x.co"]);
-    expect(rest).toEqual({ ok: true, sent: 1, failed: 1, remaining: 0 });
+    expect(rest).toMatchObject({ ok: true, sent: 1, failed: 1, remaining: 0 });
+  });
+
+  it("emails that went out are never sent again, even if their status couldn't be saved", async () => {
+    donations = [gift("a@x.co", "A"), gift("b@x.co", "B")];
+    statusSaveFails = true;
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await sendThankYou(args);
+    err.mockRestore();
+    // The month is kept (not handed back), so pressing again can't email them a second time.
+    expect(r.ok).toBe(true);
+    expect(month).not.toBeNull();
+    expect(await sendThankYou(args)).toEqual({ ok: false, message: "You've already thanked the donors for that month." });
+    expect(sent.map((m) => m.to)).toEqual(["a@x.co", "b@x.co"]);
   });
 });

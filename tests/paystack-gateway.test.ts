@@ -422,6 +422,16 @@ describe("deposits: settlements are kept to this charity's own money", () => {
     warn.mockRestore();
   });
 
+  it("stops reading a settlement's transactions as soon as one names another charity", async () => {
+    const many = Array.from({ length: 100 }, (_, i) => tx(`x${i}`, "ACCT_other"));
+    answer([{ id: 30, status: "success", settlement_date: "2026-10-20" }], { "30": many });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: ours, since: "2026-10-01" })).toEqual([]);
+    warn.mockRestore();
+    // One page of its transactions, not fifty.
+    expect(calls.filter((c) => c.url.startsWith("/settlement/30/")).length).toBe(1);
+  });
+
   it("drops anything paid out before the day asked for", async () => {
     answer(
       [

@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
   const accepting = Boolean(charity?.acceptingPayments);
   const campaignOpen = charity && body.data.campaignId ? Boolean(await loadOpenCampaign(body.data.campaignId, charity.id)) : false;
   // A signed-in donor sees "Use my ID ending 1234" (the last four digits only).
-  const account = await appAccount(request);
+  // It can return the saved card and ID details, so the session must still be live (as for the money calls).
+  const account = await appAccount(request, { forMoney: true });
   const who = charity?.receiptsAvailable ? account : null;
   const savedIdLast4 = who ? await savedIdLast4For(who.userId) : null;
   // Saved cards, when switched on: offer to keep a card, or pay with the one kept (brand and last four digits only).
