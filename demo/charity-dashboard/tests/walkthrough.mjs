@@ -27,9 +27,11 @@ for (const width of [390, 1280]) {
 
   await page.goto(URL_ + "#overview");
   ok(await page.getByText("Sample data").first().isVisible(), "Sample data tag shows");
-  for (const h of ["overview", "donations", "donors", "donor-d22", "receipts", "payouts", "campaigns"]) { await goto(h); await noOverflow(h); ok(await page.getByText("Sample data").first().isVisible(), `Sample data tag on ${h}`); }
+  for (const h of ["overview", "donations", "deposits", "donors", "donor-d22", "receipts", "campaigns"]) { await goto(h); await noOverflow(h); ok(await page.getByText("Sample data").first().isVisible(), `Sample data tag on ${h}`); }
   await goto("overview");
   const before = await page.locator(".stat.strong .value").innerText();
+  const labels = await page.locator(".chart text[text-anchor=middle]").evaluateAll((els) => els.map((e) => e.textContent));
+  ok(labels.length === 12 && labels.every((t) => /^(0[1-9]|1[0-2])$/.test(t)), `chart months as numbers, as on the real dashboard (${labels.join(" ")})`);
 
   // a. a new gift arrives: Saving… then Saved, on Overview and Donations
   await page.getByRole("button", { name: "Show a new gift" }).click();
@@ -78,12 +80,16 @@ for (const width of [390, 1280]) {
   await page.getByRole("button", { name: "Save note" }).click(); await page.waitForTimeout(1000);
   await shot("c-note");
 
-  // d. Payouts: the gift is matched to a deposit
-  await page.locator("main").getByRole("link", { name: /Payouts/ }).click(); await page.waitForTimeout(200);
-  ok((await text()).includes("Matched: Naledi Example's R1 500 is in the"), "gift matched to a deposit");
-  ok(await page.locator("li.fresh-row").count() === 1, "deposit opened to show the gift");
+  // d. Deposits: the gift is matched to a deposit
+  await page.locator("main").getByRole("link", { name: /See where the money lands: Deposits/ }).click(); await page.waitForTimeout(200);
+  ok((await text()).includes("Matched: Naledi Example's R1 500 is in this deposit"), "gift matched to a deposit");
+  ok(await page.locator("main tr.fresh").count() === 1, "the gift is picked out in the deposit");
+  ok((await text()).includes("Deposit of ") && (await text()).includes("Reached the bank"), "deposit page as in the real dashboard");
+  await page.getByRole("link", { name: "← Deposits" }).click(); await page.waitForTimeout(150);
+  ok(await page.locator(".deposit-row.fresh-dep").count() === 1, "deposit list picks out the new gift's deposit");
+  ok(!(await page.locator("nav").innerText()).includes("Payouts"), "no Payouts tab");
   ok((await page.locator(".walk").innerText()).includes("4 of 4") || width < 600, "walkthrough shows 4 of 4");
-  await shot("d-payouts");
+  await shot("d-deposits");
 
   // CSV download (works from the file; the dialog has the copy fallback)
   await goto("donations");
@@ -124,7 +130,7 @@ for (const width of [390, 1280]) {
 
   // a brand-new charity: every screen empty, and designed
   await page.evaluate(() => document.querySelector('[data-act="mode-empty"]').click()); await page.waitForTimeout(150);
-  for (const h of ["overview", "donations", "donors", "receipts", "payouts", "campaigns"]) {
+  for (const h of ["overview", "donations", "deposits", "donors", "receipts", "campaigns"]) {
     await goto(h); await noOverflow(`empty ${h}`);
     ok(/No donations yet|No donors yet|No drafts|No deposits yet|No campaigns yet/.test(await text()), `empty ${h} says what will appear`);
     if (h === "overview") ok((await page.locator(".stat.strong .value").innerText()) === "R0", "zero shows as R0");

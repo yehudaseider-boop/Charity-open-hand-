@@ -74,8 +74,8 @@ function totals() {
 function lastTwelveMonths() {
   const nowKey = monthKey(state.now);
   const out = [];
-  for (let k = nowKey - 11; k <= nowKey; k++) out.push({ key: k, y: Math.floor(k / 12), m: (k % 12) + 1, cents: 0 });
-  for (const g of paid()) { const row = out.find((r) => r.key === monthKey(g.at)); if (row) row.cents += g.cents; }
+  for (let k = nowKey - 11; k <= nowKey; k++) out.push({ key: k, y: Math.floor(k / 12), m: (k % 12) + 1, cents: 0, monthlyCents: 0, count: 0 });
+  for (const g of paid()) { const row = out.find((r) => r.key === monthKey(g.at)); if (row) { row.cents += g.cents; row.count += 1; if (g.kind === "monthly") row.monthlyCents += g.cents; } }
   return out;
 }
 function niceStep(max) {
@@ -86,13 +86,14 @@ function niceStep(max) {
 
 // ---------- Routes ----------
 const NAV = [
-  { title: "Giving", tabs: [["overview", "Overview"], ["donations", "Donations"], ["campaigns", "Campaigns"], ["receipts", "s18A receipts"], ["payouts", "Payouts"]] },
+  { title: "Giving", tabs: [["overview", "Overview"], ["donations", "Donations"], ["campaigns", "Campaigns"], ["receipts", "s18A receipts"]] },
   { title: "People", tabs: [["donors", "Donors"]] },
 ];
-const TITLES = { overview: "Overview", donations: "Donations", campaigns: "Campaigns", receipts: "s18A receipts", payouts: "Payouts", donors: "Donors", donor: "Donor" };
+const TITLES = { overview: "Overview", donations: "Donations", campaigns: "Campaigns", receipts: "s18A receipts", deposits: "Deposits", deposit: "Deposit", donors: "Donors", donor: "Donor" };
 function route() {
   const h = (location.hash || "").replace(/^#/, "");
   if (/^donor-d\d+$/.test(h)) return { name: "donor", id: h.slice(6) };
+  if (/^deposit-\d{4}-\d{2}-\d{2}$/.test(h)) return { name: "deposit", id: h };
   return { name: TITLES[h] ? h : "overview" };
 }
 function go(name) { if (location.hash === `#${name}`) render(); else location.hash = name; window.scrollTo(0, 0); }
@@ -100,7 +101,7 @@ function go(name) { if (location.hash === `#${name}`) render(); else location.ha
 // ---------- Shell ----------
 function shell() {
   const r = route();
-  const tab = r.name === "donor" ? "donors" : r.name;
+  const tab = r.name === "donor" ? "donors" : ["deposits", "deposit"].includes(r.name) ? "donations" : r.name;
   const link = ([id, label]) => `<a href="#${id}"${id === tab ? ' aria-current="page"' : ""}>${esc(label)}</a>`;
   document.getElementById("nav-row").innerHTML = NAV.flatMap((g) => g.tabs).map(link).join("");
   document.getElementById("nav-side").innerHTML = NAV.map((g) => `<div><p>${esc(g.title)}</p>${g.tabs.map(link).join("")}</div>`).join("");
@@ -111,14 +112,14 @@ function status() {
   if (!navigator.onLine) { el.dataset.state = "offline"; el.innerHTML = `<span class="dot"></span>Offline: the demo still works`; return; }
   if (saving) { el.dataset.state = "saving"; el.innerHTML = `<span class="dot"></span>${esc(saving)}`; return; }
   el.dataset.state = "saved";
-  el.innerHTML = `<span class="dot"></span>${state.savedAt ? `Saved<span class="hide-phone">&nbsp;at</span> ${time(state.savedAt)}` : "Up to date"}`;
+  el.innerHTML = `<span class="dot"></span>${state.savedAt ? `<span>Saved<span class="hide-phone"> at</span> ${time(state.savedAt)}</span>` : "Up to date"}`;
 }
 
 /** What just happened, take it back, what next: the dashboard's pattern after every action. */
 function happenedCard() {
   if (!lastAction) return "";
   const here = route();
-  const name = here.name === "donor" ? `donor-${here.id}` : here.name;
+  const name = here.name === "donor" ? `donor-${here.id}` : here.name === "deposit" ? here.id : here.name;
   if (lastAction.where && name !== "overview" && name !== lastAction.where) return "";
   return `<section class="happened" aria-live="polite">
     <div class="row"><span class="tick" aria-hidden="true">✓</span><p class="what grow wrap-any">${esc(lastAction.text)}</p>
@@ -145,7 +146,7 @@ function overview() {
   </div>
   <p class="small muted">Amounts are the donations only. Fee: to be confirmed. Tax year ${t.ty} runs from 01/03/${t.ty - 1} to ${date(atJhb(t.ty, 3, 1) - DAY)}.</p>
   <div class="two-col">
-    <section class="card"><div class="card-head"><h2>Month by month</h2><span class="small muted">Last 12 months</span></div>${chart(months)}</section>
+    <section class="card"><div class="card-head"><h2>Donations by month</h2><span class="small muted">Last 12 months</span></div>${chart(months)}</section>
     <section class="card"><h2>Needs you this week</h2>${needsYou()}</section>
   </div>
   <section class="card">
@@ -177,41 +178,47 @@ function needsYou() {
   if (!items.length) return `<p class="muted">Nothing needs you right now. New donors, declined monthly donations and campaigns about to end show up here.</p>`;
   return `<ul class="list">${items.map(([text, r, label]) => `<li><span class="grow wrap-any">${esc(text)}</span><a href="#${r}">${esc(label)}</a></li>`).join("")}</ul>`;
 }
+/**
+ * "Donations by month", as on the real Overview: one bar a month, the monthly donations in blue at the bottom and
+ * once-off gifts in lavender on top, this month ringed in orange, months labelled by number (10 = October), and
+ * the same figures listed underneath.
+ */
 function chart(months) {
   const narrow = window.innerWidth < 600;
-  const W = narrow ? 360 : 640, H = narrow ? 220 : 230, L = narrow ? 58 : 64, B = 30, T = 12;
+  const W = narrow ? 360 : 640, H = narrow ? 200 : 220, L = narrow ? 58 : 64, B = 26, T = 10;
   const max = Math.max(...months.map((m) => m.cents), 0);
-  if (max === 0) return `<p class="muted">No donations in the last 12 months yet. Each month's total shows here.</p>`;
+  if (max === 0) return `<p class="muted">No paid donations in the last 12 months. They appear here once the first one comes in.</p>`;
   const step = niceStep(max); const top = Math.ceil(max / step) * step;
   const y = (c) => T + (H - T - B) * (1 - c / top);
   const bw = (W - L) / 12;
   let grid = "";
   for (let v = 0; v <= top + 1; v += step) grid += `<line class="grid" x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${rand(v)}</text>`;
   const bars = months.map((m, i) => {
-    const x = L + i * bw + bw * 0.18; const h = Math.max(0, y(0) - y(m.cents));
-    const now = i === 11;
-    return `<g><title>${MONTHS[m.m - 1]} ${m.y}: ${rand(m.cents)}${now ? " so far" : ""}</title>
-      <rect class="bar${now ? " now" : ""}" x="${x}" y="${y(m.cents)}" width="${bw * 0.64}" height="${h}" rx="6"/>
-      <text x="${x + bw * 0.32}" y="${H - 10}" text-anchor="middle">${narrow ? MONTHS[m.m - 1][0] : MONTHS[m.m - 1].slice(0, 3)}</text></g>`;
+    const x = L + i * bw + bw * 0.16, w = bw * 0.68; const now = i === 11;
+    const hAll = Math.max(0, y(0) - y(m.cents)), hMonthly = Math.max(0, y(0) - y(m.monthlyCents));
+    return `<g><title>${pad(m.m)}/${m.y}: ${rand(m.cents)}, ${plural(m.count, "donation")}</title>
+      ${m.cents ? `<rect class="bar-once" x="${x}" y="${y(m.cents)}" width="${w}" height="${hAll}" rx="5"/>` : `<rect class="bar-none" x="${x}" y="${y(0) - 2}" width="${w}" height="2"/>`}
+      ${m.monthlyCents ? `<rect class="bar-monthly" x="${x}" y="${y(m.monthlyCents)}" width="${w}" height="${hMonthly}"/>` : ""}
+      ${now && m.cents ? `<rect class="bar-now" x="${x - 2}" y="${y(m.cents) - 2}" width="${w + 4}" height="${hAll + 2}" rx="6"/>` : ""}
+      <text x="${x + w / 2}" y="${H - 8}" text-anchor="middle"${now ? ' class="now"' : ""}>${pad(m.m)}</text></g>`;
   }).join("");
-  const best = months.reduce((a, b) => (b.cents > a.cents ? b : a));
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Donations per month for the last 12 months">${grid}${bars}</svg>
-    <div class="chart-key"><span>This month so far: <strong>${rand(months[11].cents)}</strong></span><span>Best month: <strong>${MONTHS[best.m - 1]} ${best.y}, ${rand(best.cents)}</strong></span></div>`;
+  return `<div class="chart-key"><span><i class="key-monthly"></i>Monthly</span><span><i class="key-once"></i>Once-off</span></div>
+    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Donations per month for the last 12 months, listed below">${grid}${bars}</svg>
+    <ul class="list month-list">${[...months].reverse().filter((m) => m.cents > 0).map((m) => `<li><span>${pad(m.m)}/${m.y}</span><span>${rand(m.cents)} <span class="muted">(${plural(m.count, "donation")}${m.monthlyCents ? `, ${rand(m.monthlyCents)} monthly` : ""})</span></span></li>`).join("")}</ul>`;
 }
-
 function placeholder(name) {
   return `<div class="page-head"><h1>${esc(TITLES[name])}</h1></div><div class="notice neutral"><p>This screen comes in the next chunk of the demo.</p></div>`;
 }
 
 // ---------- Render ----------
-const VIEWS = { overview, donations, donors, donor, receipts, payouts, campaigns };
+const VIEWS = { overview, donations, deposits: depositsPage, deposit: depositPage, donors, donor, receipts, campaigns };
 function render() {
   shell();
   const r = route();
   const view = VIEWS[r.name];
-  if (r.name === "payouts" && state.newGiftId && !saving) {
-    const dep = deposits().find((d) => d.gifts.some((g) => g.id === state.newGiftId));
-    if (dep && !state.walk.payout) { state.walk.payout = true; ui.openDeposit = dep.id; persist(); }
+  if (r.name === "deposit" && state.newGiftId && !saving && !state.walk.payout) {
+    const dep = depositOfNewGift();
+    if (dep && dep.id === r.id) { state.walk.payout = true; persist(); }
   }
   document.getElementById("main").innerHTML = view ? view(r) : placeholder(r.name);
   document.getElementById("demo-controls").innerHTML = `<button class="btn quiet small hide-phone" data-act="reset">Reset demo</button>`;
@@ -246,7 +253,7 @@ function act({ label = "Saving…", apply, text, undoText, next, walk }) {
     state.savedAt = Date.now();
     saving = null;
     const r = route();
-    lastAction = { text, undoText, next, before, where: r.name === "donor" ? `donor-${r.id}` : r.name };
+    lastAction = { text, undoText, next, before, where: ["donor", "deposit"].includes(r.name) ? (r.name === "donor" ? `donor-${r.id}` : r.id) : r.name };
     persist(); render();
   }, 700);
 }
@@ -298,7 +305,7 @@ Object.assign(ACTIONS, SCREEN_ACTIONS, {
       },
       text: due ? `Note saved for ${d.name}, with a reminder on ${keyToDate(due)}.` : `Note saved for ${d.name}.`,
       undoText: `The note for ${d.name} is taken off.`,
-      next: isNewDonor ? { label: "See where the money lands: Payouts", route: "payouts" } : { label: "Back to Donors", route: "donors" },
+      next: isNewDonor && depositOfNewGift() ? { label: "See where the money lands: Deposits", route: depositOfNewGift().id } : { label: "Back to Donors", route: "donors" },
       walk: isNewDonor ? "note" : null,
     });
   },
@@ -334,7 +341,7 @@ const STEPS = [
   { key: "gift", label: "Show a new gift", route: "overview" },
   { key: "receipt", label: "Issue its s18A receipt", route: "receipts" },
   { key: "note", label: "Add a follow-up note to Naledi", route: "donor-d01" },
-  { key: "payout", label: "See it matched in Payouts", route: "payouts" },
+  { key: "payout", label: "See it matched in Deposits", route: () => (depositOfNewGift() ? depositOfNewGift().id : "deposits") },
 ];
 // Open on a laptop; folded away on a phone so it doesn't cover the screen (it remembers your choice).
 let walkOpen = (() => { try { const v = localStorage.getItem(`${STORE}-walk`); if (v) return v === "open"; } catch (e) { /* fine */ } return window.innerWidth >= 600; })();
@@ -354,7 +361,7 @@ function walkPanel() {
     <div class="walk-head"><button data-act="walk-toggle" aria-expanded="${walkOpen}"><span>Walkthrough</span><span class="pill">${done} of ${STEPS.length}</span></button>
       <button data-act="walk-toggle" class="small muted" aria-hidden="true" tabindex="-1">${walkOpen ? "Hide" : "Show"}</button></div>
     <div class="walk-body" style="display:${walkOpen ? "grid" : "none"};gap:10px">
-      <ol>${STEPS.map((s, i) => `<li class="${state.walk[s.key] ? "done" : s === current ? "current" : ""}"><span class="num">${state.walk[s.key] ? "✓" : i + 1}</span><a class="step" href="#${s.route}">${esc(s.label)}</a></li>`).join("")}
+      <ol>${STEPS.map((s, i) => `<li class="${state.walk[s.key] ? "done" : s === current ? "current" : ""}"><span class="num">${state.walk[s.key] ? "✓" : i + 1}</span><a class="step" href="#${typeof s.route === "function" ? s.route() : s.route}">${esc(s.label)}</a></li>`).join("")}
         <li class="${done === STEPS.length ? "current" : ""}"><span class="num">5</span><button class="link-btn step" data-act="reset">Reset demo</button></li></ol>
       <p class="small muted">Also worth showing: <a href="#donations">a declined monthly donation</a> · <button class="link-btn" data-act="mode-empty">a brand-new charity</button></p>
     </div></aside>`;
@@ -378,7 +385,7 @@ function seedLatest() {
 function startOver(mode) {
   state = fresh();
   if (mode === "empty") { state.mode = "empty"; state.donors = []; state.gifts = []; state.campaign = null; }
-  Object.assign(ui, { period: "all", campaign: "all", kind: "all", q: "", shown: 25, receiptTab: "draft", donorQ: "", donorShown: 30, openDeposit: null, depositsShown: 6, noteError: "", noteDraft: "", noteDue: "" });
+  Object.assign(ui, { period: "all", campaign: "all", kind: "all", q: "", shown: 25, receiptTab: "draft", donorQ: "", donorShown: 30, depositsShown: 10, noteError: "", noteDraft: "", noteDue: "" });
   lastAction = null; saving = null;
   seedLatest();
   persist();

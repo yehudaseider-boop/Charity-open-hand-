@@ -1,10 +1,10 @@
-/* The demo's other screens: Donations, Donors and one donor, s18A receipts, Payouts and Campaigns.
+/* The demo's other screens: Donations (and its Deposits), Donors and one donor, s18A receipts and Campaigns.
    Only function declarations and plain values here: the helpers they use (rand, date, esc, state...) live in
    app.js, which is loaded after this file and calls these at render time. */
 "use strict";
 
 /** What each screen is filtered or opened to. Not saved: a fresh page starts with everything showing. */
-const ui = { period: "all", campaign: "all", kind: "all", q: "", shown: 25, receiptTab: "draft", donorQ: "", donorShown: 30, openDeposit: null, depositsShown: 6, noteError: "", noteDraft: "", noteDue: "" };
+const ui = { period: "all", campaign: "all", kind: "all", q: "", shown: 25, receiptTab: "draft", donorQ: "", donorShown: 30, depositsShown: 10, noteError: "", noteDraft: "", noteDue: "" };
 
 const campaignName = (id) => (id && state.campaign && state.campaign.id === id ? state.campaign.title : "");
 const kindLabel = (g) => (g.kind === "monthly" ? "Monthly donation" : "Once-off");
@@ -44,7 +44,7 @@ function donations() {
   const declined = state.gifts.filter((g) => g.status === "declined");
   return `
   <div class="page-head"><div><h1>Donations</h1><p class="lead">Every gift to Sample Charity: through Givezy, and EFT or cash gifts you recorded.</p></div>
-    <button class="btn cta" data-act="csv">Download CSV</button></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn quiet" href="#deposits">Deposits</a><button class="btn cta" data-act="csv">Download CSV</button></div></div>
   ${happenedCard()}
   ${declined.map(declinedNotice).join("")}
   <section class="card">
@@ -234,54 +234,67 @@ function receiptPreview(g) {
   </div>`;
 }
 
-// ---------- Payouts ----------
-/** Card gifts paid into the charity's bank in weekly deposits (a sample schedule), each matched to its gifts. */
+// ---------- Deposits (under Donations, as in the real dashboard) ----------
+/**
+ * The payment provider pays card gifts into the charity's bank in one deposit a day: each day's gifts go out
+ * on the next weekday (a sample schedule). Recorded EFT and cash gifts never pass through it. No fee is shown:
+ * the demo says "To be confirmed" wherever a fee, or an amount after fees, would be.
+ */
+function nextWeekday(ms) { let t = ms + DAY; while ([0, 6].includes(jhb(t).dow)) t += DAY; return t; }
 function deposits() {
-  const weekStart = (ms) => { const p = jhb(ms); const mon = atJhb(p.y, p.m, p.d, 0, 0) - ((p.dow + 6) % 7) * DAY; return mon; };
   const groups = new Map();
   for (const g of state.gifts) {
     if (g.status !== "paid" || g.via !== "card") continue;
-    const k = weekStart(g.at);
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(g);
+    const p = jhb(g.at);
+    const out = nextWeekday(atJhb(p.y, p.m, p.d, 12, 0));
+    const k = dayKey(out);
+    if (!groups.has(k)) groups.set(k, { key: k, payDay: out, gifts: [] });
+    groups.get(k).gifts.push(g);
   }
-  return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([start, gifts]) => {
-    const payDay = start + 9 * DAY + 10 * 3600000; // the Wednesday after the week ends (sample schedule)
-    return { id: `dep-${dayKey(start)}`, start, end: start + 6 * DAY, payDay, gifts: gifts.sort((a, b) => b.at - a.at), cents: gifts.reduce((t, g) => t + g.cents, 0), paidIn: payDay <= state.now };
-  });
+  const today = dayKey(state.now);
+  return [...groups.values()].sort((a, b) => b.payDay - a.payDay).map((d) => ({
+    ...d, id: `deposit-${d.key}`, gifts: d.gifts.sort((a, b) => b.at - a.at), cents: d.gifts.reduce((t, g) => t + g.cents, 0), paidIn: d.key < today,
+  }));
 }
-function payouts() {
+const depositOfNewGift = () => (state.newGiftId ? deposits().find((d) => d.gifts.some((g) => g.id === state.newGiftId)) : null);
+function depositSummary(dep) { return `${plural(dep.gifts.length, "gift")}, ${rand(dep.cents)}, less fees: to be confirmed`; }
+function downloadLinks(scope) {
+  return `<span class="dl-links"><button class="link-btn" data-act="csv-deposits" data-scope="${scope}">CSV</button><button class="link-btn" data-act="file-note" data-kind="Excel" data-scope="${scope}">Excel</button><button class="link-btn" data-act="file-note" data-kind="For Xero" data-scope="${scope}">For Xero</button></span>`;
+}
+function depositsPage() {
   const list = deposits();
-  const recorded = state.gifts.filter((g) => g.status === "paid" && g.via === "eft").length;
-  const open = ui.openDeposit;
-  const row = (dep) => {
-    const hasNew = dep.gifts.some((g) => g.id === state.newGiftId);
-    const isOpen = open === dep.id;
-    return `<section class="card${hasNew ? "" : ""}" style="${hasNew ? "border-color:var(--orange)" : ""}">
-      <div class="card-head">
-        <div style="min-width:0"><h2>${dep.paidIn ? `Paid in on ${date(dep.payDay)}` : `On its way, expected ${date(dep.payDay)}`}</h2>
-          <p class="small muted">Gifts from ${date(dep.start)} to ${date(dep.end)}</p></div>
-        <span class="chip ${dep.paidIn ? "success" : "warning"}">${dep.paidIn ? `Matched: ${dep.gifts.length} of ${dep.gifts.length} gifts` : "On its way"}</span>
-      </div>
-      <dl class="facts">
-        <div><dt>Gifts</dt><dd><span class="amount">${rand(dep.cents)}</span> <span class="muted small">(${plural(dep.gifts.length, "gift")})</span></dd></div>
-        <div><dt>Fee</dt><dd>To be confirmed</dd></div>
-        <div><dt>Paid into your bank</dt><dd>Gifts less the fee</dd></div>
-        <div><dt>Reference</dt><dd>${esc(dep.id.toUpperCase())} <span class="muted small">(sample)</span></dd></div>
-      </dl>
-      <p style="margin-top:12px"><button class="link-btn" data-act="toggle-deposit" data-id="${dep.id}" aria-expanded="${isOpen}">${isOpen ? "Hide the gifts" : `See the ${plural(dep.gifts.length, "gift")} in this deposit`}</button></p>
-      ${isOpen ? `<ul class="list" style="margin-top:10px">${dep.gifts.map((g) => `<li class="${g.id === state.newGiftId ? "fresh-row" : ""}"><span class="grow wrap-any">${esc(donorOf(g).name)} <span class="muted small">· ${date(g.at)} · ${kindLabel(g)}</span></span><span>${dep.paidIn || g.id === state.newGiftId ? `<span class="s18a" style="color:var(--success)">Matched</span> ` : ""}<span class="amount">${rand(g.cents)}</span></span></li>`).join("")}</ul>` : ""}
-    </section>`;
-  };
   return `
-  <div class="page-head"><div><h1>Payouts</h1><p class="lead">Each deposit into Sample Charity's bank account, matched to the gifts in it, so your bookkeeper can tick them off.</p></div>
-    <button class="btn cta" data-act="csv-deposits">Download for your bookkeeper</button></div>
+  <p class="small"><a href="#donations" class="muted">← Donations</a></p>
+  <div class="page-head"><div><h1>Deposits</h1><p class="lead">The payment provider pays your gifts into your bank account in one deposit a day, with its fees taken off. Each deposit here shows the gifts it is made of, each fee, and what reached your bank, so it matches your bank statement line for line. s18A receipts are always for the full gift.</p></div>
+    ${list.length ? `<div class="small" style="text-align:right"><p class="muted">Download all</p>${downloadLinks("all")}</div>` : ""}</div>
   ${happenedCard()}
-  ${(() => { const dep = list.find((d) => d.gifts.some((g) => g.id === state.newGiftId)); if (!dep) return ""; const g = dep.gifts.find((x) => x.id === state.newGiftId);
-      return `<section class="happened"><div class="row"><span class="tick" aria-hidden="true">✓</span><p class="what grow wrap-any">Matched: ${esc(donorOf(g).name)}'s ${rand(g.cents)} is in the ${dep.paidIn ? `deposit paid in on ${date(dep.payDay)}` : `next deposit, on its way and expected ${date(dep.payDay)}`}${dep.gifts.length > 1 ? `, with ${plural(dep.gifts.length - 1, "other gift")}` : ""}. Your bookkeeper sees it ticked off against the bank.</p></div><p class="next">What next: <button class="link-btn" data-act="reset">Reset demo</button> to run it again</p></section>`; })()}
-  ${list.length ? list.slice(0, ui.depositsShown).map(row).join("") : `<div class="notice neutral"><p class="title">No deposits yet</p><p>When the first card gifts come in, each deposit shows here with the gifts it pays out.</p></div>`}
-  ${list.length > ui.depositsShown ? `<p><button class="btn quiet small" data-act="more-deposits">Show older deposits</button></p>` : ""}
-  <p class="small muted">Sample weekly schedule. ${recorded ? `${plural(recorded, "recorded EFT or cash gift")} went straight to your bank, so ${recorded === 1 ? "it is" : "they are"} not in these deposits.` : ""}</p>`;
+  ${list.length ? `<details class="small"><summary style="cursor:pointer;color:var(--blue)">Using Xero?</summary><p class="muted" style="margin-top:8px">"For Xero" is a bank statement file for a clearing account in Xero (for example "Givezy donations"). Each deposit becomes the donations in, the card fees out and the deposit out to your bank, so the clearing account comes back to zero and the deposit matches the line on your real bank feed. In Xero: Accounting, Bank accounts, your clearing account, Import a statement. Ask your bookkeeper to set up the clearing account once.</p></details>` : ""}
+  <div class="notice neutral"><p>Not in deposits: gifts you recorded yourself (EFT, cash), which never pass through the payment provider, and donors' contributions to Givezy, which go to Givezy.</p></div>
+  ${list.length === 0 ? `<section class="card"><p class="muted">No deposits yet. They appear here a day or two after the payment provider pays your bank account, once gifts start coming in through Givezy.</p></section>`
+    : `<ul class="deposit-list">${list.slice(0, ui.depositsShown).map((dep) => `<li><a class="deposit-row${dep.gifts.some((g) => g.id === state.newGiftId) ? " fresh-dep" : ""}" href="#${dep.id}">
+        <span style="min-width:0"><strong>${date(dep.payDay)}</strong><br><span class="muted">${depositSummary(dep)}</span><br>
+          ${dep.paidIn ? "" : `<span class="pill">On its way</span> `}<span class="pill saved">Adds up</span></span>
+        <span style="text-align:right;flex:0 0 auto"><strong>To be confirmed</strong><br><span class="muted small">to your bank</span></span></a></li>`).join("")}</ul>
+      ${list.length > ui.depositsShown ? `<p><button class="btn quiet small" data-act="more-deposits">Show older deposits</button></p>` : ""}`}
+  <p class="small muted">Sample deposits: one a day, on the next weekday. No fee is shown in this demo.</p>`;
+}
+function depositPage(r) {
+  const dep = deposits().find((d) => d.id === r.id);
+  if (!dep) return `<p class="small"><a href="#deposits" class="muted">← Deposits</a></p><div class="page-head"><h1>Deposit not found</h1></div><div class="notice neutral"><p>This deposit isn't in the demo any more, perhaps after Reset demo. <a href="#deposits">See all deposits</a></p></div>`;
+  const fresh = dep.gifts.find((g) => g.id === state.newGiftId);
+  return `
+  <p class="small"><a href="#deposits" class="muted">← Deposits</a></p>
+  <div class="page-head"><div><h1>Deposit of ${date(dep.payDay)}</h1><p class="amount" style="font-size:1.5rem;margin-top:4px">To be confirmed</p>
+    <p style="margin-top:6px">${dep.paidIn ? `<span class="pill saved">Paid to your bank</span>` : `<span class="pill">On its way to your bank</span>`}</p></div>
+    <div class="small">${downloadLinks(dep.id)}</div></div>
+  ${fresh ? `<section class="happened"><div class="row"><span class="tick" aria-hidden="true">✓</span><p class="what grow wrap-any">Matched: ${esc(donorOf(fresh).name)}'s ${rand(fresh.cents)} is in this deposit${dep.gifts.length > 1 ? `, with ${plural(dep.gifts.length - 1, "other gift")}` : ""}. It will match the line on your bank statement.</p></div><p class="next">What next: <button class="link-btn" data-act="reset">Reset demo</button> to run it again</p></section>` : happenedCard()}
+  <div class="notice ${"neutral"}" style="background:var(--success-soft)"><p>Every line adds up, and the lines add up to the deposit. (Sample: the fee and what reached the bank show once the fee is confirmed.)</p></div>
+  <section class="card"><div class="table-wrap"><table style="min-width:32rem">
+    <thead><tr><th>Donor</th><th>What</th><th class="r">Gift</th><th class="r">Fee</th><th class="r">Reached the bank</th></tr></thead>
+    <tbody>${dep.gifts.map((g) => `<tr${g.id === state.newGiftId ? ' class="fresh"' : ""}><td class="wrap-any" style="max-width:14rem"><a href="#donor-${g.donorId}">${esc(donorOf(g).name)}</a></td><td>Gift</td><td class="r">${rand(g.cents)}</td><td class="r muted">To be confirmed</td><td class="r muted">To be confirmed</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td colspan="2"><strong>Deposit total</strong></td><td class="r"><strong>${rand(dep.cents)}</strong></td><td class="r muted">To be confirmed</td><td class="r muted">To be confirmed</td></tr></tfoot>
+  </table></div></section>
+  <p class="small muted">Fees are the payment provider's own, as it reports them. Each s18A receipt is for the full gift, not what reached the bank.</p>`;
 }
 
 // ---------- Campaigns ----------
@@ -345,9 +358,8 @@ const SCREEN_ACTIONS = {
   "more-gifts"() { ui.shown += 25; document.getElementById("results").innerHTML = donationResults(); },
   "clear-donor-search"() { ui.donorQ = ""; render(); },
   "more-donors"() { ui.donorShown += 30; document.getElementById("results").innerHTML = donorResults(); },
-  "more-deposits"() { ui.depositsShown += 6; render(); },
+  "more-deposits"() { ui.depositsShown += 10; render(); },
   "receipt-tab"(el) { ui.receiptTab = el.dataset.tab; render(); },
-  "toggle-deposit"(el) { ui.openDeposit = ui.openDeposit === el.dataset.id ? null : el.dataset.id; render(); },
   "campaign-donations"() { Object.assign(ui, { period: "all", campaign: state.campaign.id, kind: "all", q: "", shown: 25 }); go("donations"); },
   preview(el) { const g = state.gifts.find((x) => x.id === el.dataset.id); if (g) openDialog(receiptPreview(g)); },
   "share-campaign"() { openDialog(shareDialog()); },
@@ -358,13 +370,20 @@ const SCREEN_ACTIONS = {
     download(csv, name);
     openDialog(csvDialog(csv, list.length, name));
   },
-  "csv-deposits"() {
-    const rows = [["Deposit", "Status", "Expected or paid in", "Gifts from", "Gifts to", "Gift date", "Donor", "Amount (rand)", "Fee"]];
-    for (const dep of deposits()) for (const g of dep.gifts) rows.push([dep.id.toUpperCase(), dep.paidIn ? "Paid in" : "On its way", date(dep.payDay), date(dep.start), date(dep.end), date(g.at), donorOf(g).name, (g.cents / 100).toFixed(2), "To be confirmed"]);
+  "csv-deposits"(el) {
+    const scope = el.dataset.scope;
+    const list = deposits().filter((d) => scope === "all" || d.id === scope);
+    const rows = [["Deposit date", "Status", "Donor", "What", "Gift (rand)", "Fee", "Reached the bank"]];
+    for (const dep of list) for (const g of dep.gifts) rows.push([date(dep.payDay), dep.paidIn ? "Paid to your bank" : "On its way", donorOf(g).name, "Gift", (g.cents / 100).toFixed(2), "To be confirmed", "To be confirmed"]);
     const csv = rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
-    const name = `sample-charity-deposits-${dayKey(state.now)}.csv`;
+    const name = scope === "all" ? `sample-charity-deposits-${dayKey(state.now)}.csv` : `sample-charity-${scope}.csv`;
     download(csv, name);
     openDialog(csvDialog(csv, rows.length - 1, name));
+  },
+  "file-note"(el) {
+    openDialog(`<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="fn-title"><h2 id="fn-title">${esc(el.dataset.kind)}</h2>
+      <p>${el.dataset.kind === "Excel" ? "In Givezy this downloads the same deposits as an Excel file." : "In Givezy this downloads a bank statement file to import into a clearing account in Xero."} The demo can only make the CSV.</p>
+      <div class="actions"><button class="btn quiet" data-act="close-dialog">Close</button><button class="btn" data-act="csv-deposits" data-scope="${esc(el.dataset.scope)}">Show the CSV</button></div></div>`);
   },
   "close-dialog"() { closeDialog(); },
   copy(el) {

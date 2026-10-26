@@ -6,14 +6,15 @@ Everything in it is sample data: the charity is "Sample Charity" and every donor
 payments. What the presenter does is kept only in their own browser, and "Reset demo" puts it all back.
 
 Screens: Overview, Donations (filters and CSV), Donors and one donor (first, latest and largest gift, notes and
-follow-ups), s18A receipts (drafts, issued, a preview marked SAMPLE), Payouts (each deposit matched to its gifts)
-and Campaigns (goal ring). No fee or rate is shown anywhere: "Fee: to be confirmed". No gateway is named.
+follow-ups), s18A receipts (drafts, issued, a preview marked SAMPLE), Deposits (under Donations, as in the real dashboard:
+one deposit a day, each opening to the gifts in it) and Campaigns (goal ring). The Overview chart is the real
+one's "Donations by month": monthly and once-off stacked, months labelled by number (10 = October). No fee or rate is shown anywhere: "Fee: to be confirmed". No gateway is named.
 
 The five-minute walkthrough (the panel under the menu, or at the bottom on a phone):
 1. Overview: "Show a new gift". It shows "Saving…" then "Saved", and appears on Overview and Donations.
 2. s18A receipts: "Issue" on the new gift. It moves to Issued, with Undo.
 3. Naledi's donor page: write a note, optionally a reminder, "Save note". With Undo.
-4. Payouts: the gift is matched to the next deposit.
+4. Deposits: the gift is matched to the next deposit.
 5. "Reset demo" (asks first) puts everything back to the start.
 Also: a declined monthly donation on Donations ("Nothing was charged", one next step), and "a brand-new charity"
 for the empty dashboard.
