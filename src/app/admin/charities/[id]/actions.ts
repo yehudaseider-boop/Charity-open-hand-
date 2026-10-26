@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
+import { checkCharityBank } from "@/lib/charity/bank-check";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { adminRemovedEmail, approvedEmail, connectedEmail, notifyCharity, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, sentBackEmail, suspendedEmail } from "@/lib/charity/emails";
@@ -313,6 +314,8 @@ export async function changeBankDetails(id: string, _prev: FormState, formData: 
     entityId: id,
     details: { from: { bank_name: before?.bank_name ?? null, last4: before?.bank_account_last4 ?? null }, to: { bank_name: v.bank_name, last4: last4(v.bank_account_number) }, gateway_disconnected: wasConnected },
   });
+  // Ask the payment provider about the new account. Information only; the admin has checked the bank letter.
+  await checkCharityBank(id, admin.userId);
 
   if (before?.contact_email) {
     try {
@@ -470,4 +473,14 @@ export async function setUpReceipts(id: string, _prev: FormState, formData: Form
   if (ready && priv?.contact_email) await notifyCharity(receiptsReadyEmail(priv.contact_email, charity.name_en, id));
   refresh(id, charity.slug);
   return { ok: true, message: ready ? "s18A receipts are set up, and the charity has been emailed." : "Saved. Receipts start once both the s18A approval and the mandate are confirmed." };
+}
+
+/** Ask the payment provider about the charity's bank account again (for example after it couldn't be reached). */
+export async function recheckBank(id: string): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isUuid(id)) return { ok: false, message: "Unknown charity." };
+  const r = await checkCharityBank(id, admin.userId);
+  revalidatePath(`/admin/charities/${id}`);
+  if (!r) return { ok: false, message: "There's no bank account to check, or the check couldn't be saved. Try again in a minute." };
+  return { ok: true, message: r.outcome === "checked" ? "Checked. The answer is shown above." : "The payment provider couldn't be asked just now. Nothing is held up by it; try again later." };
 }

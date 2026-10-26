@@ -65,7 +65,8 @@ describe("starting a checkout", () => {
       reference: base.reference,
       callback_url: base.returnUrl,
       subaccount: "ACCT_charity1",
-      transaction_charge: 2_345,
+      // Paystack's API spec types transaction_charge as a string. Still cents.
+      transaction_charge: "2345",
       bearer: "subaccount",
     });
   });
@@ -93,9 +94,15 @@ describe("starting a checkout", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("keeps the charity and contribution lines in the metadata", async () => {
+  it("keeps the charity and contribution lines in the metadata (an object on initialize, as the spec says)", async () => {
     await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "charity" });
     expect(calls[0].body!.metadata).toMatchObject({ charity_cents: 18_000, contribution_cents: 2_345 });
+  });
+
+  it("a R0 contribution is sent as \"0\", and a contribution that isn't whole cents is refused", async () => {
+    await paystackGateway.createCheckout({ ...base, totalCents: 18_000, lines: { charityCents: 18_000, contributionCents: 0 }, charityAccountRef: "ACCT_charity1", feeBearer: "charity" });
+    expect(calls[0].body).toMatchObject({ transaction_charge: "0" });
+    await expect(paystackGateway.createCheckout({ ...base, lines: { charityCents: 18_000, contributionCents: 23.45 }, charityAccountRef: "ACCT_charity1", feeBearer: "charity" })).rejects.toBeInstanceOf(GatewayError);
   });
 });
 
@@ -253,8 +260,11 @@ describe("monthly donations", () => {
     expect(r.status).toBe("success");
     expect(calls[0].body).toMatchObject({
       authorization_code: "AUTH_abc", email: base.email, amount: 20_345, currency: "ZAR", reference: base.reference,
-      subaccount: "ACCT_charity1", transaction_charge: 2_345, bearer: "account",
+      subaccount: "ACCT_charity1", transaction_charge: "2345", bearer: "account",
     });
+    // On charge_authorization the spec says metadata is "Stringified JSON".
+    expect(typeof calls[0].body!.metadata).toBe("string");
+    expect(JSON.parse(calls[0].body!.metadata as string)).toEqual({ description: "Monthly donation", charity_cents: 18_000, contribution_cents: 2_345, monthly: true });
   });
 
   it("will not charge a split payment while who pays the gateway charge is undecided", async () => {
@@ -351,5 +361,101 @@ describe("split payments never quietly drop the charity", () => {
       }),
     ).rejects.toBeInstanceOf(GatewayError);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("deposits: settlements are kept to this charity's own money", () => {
+  // Paystack's API spec lists only perPage and page for GET /settlement, so the subaccount and from filters
+  // may be ignored. These answers ignore them: every settlement on the integration comes back.
+  const tx = (reference: string, subaccount: unknown, amount = 10_000, fees = 300) => ({ reference, amount, fees, subaccount });
+  function answer(settlements: Record<string, unknown>[], txsById: Record<string, Record<string, unknown>[]>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const path = url.replace("https://api.paystack.co", "");
+        calls.push({ url: path, body: null });
+        const m = /^\/settlement\/(\d+)\/transactions/.exec(path);
+        const data = m ? txsById[m[1]] ?? [] : path.startsWith("/settlement?") ? settlements : [];
+        return new Response(JSON.stringify({ status: true, data }), { status: 200 });
+      }),
+    );
+  }
+  const ours = "ACCT_ours";
+
+  it("still asks with the filters, but never shows another charity's settlement", async () => {
+    answer(
+      [
+        { id: 1, status: "success", settlement_date: "2026-10-20T08:00:00Z", total_amount: 9_700, subaccount: { subaccount_code: ours } },
+        { id: 2, status: "success", settlement_date: "2026-10-20T08:00:00Z", total_amount: 50_000, subaccount: { subaccount_code: "ACCT_other" } },
+        { id: 3, status: "success", settlement_date: "2026-10-21", total_amount: 9_700, subaccount: "ACCT_other" },
+      ],
+      { "1": [tx("d1", ours)], "2": [tx("x1", "ACCT_other")], "3": [tx("x2", "ACCT_other")] },
+    );
+    const out = await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: ours, since: "2026-10-01" });
+    expect(out.map((p) => p.ref)).toEqual(["1"]);
+    expect(calls[0].url).toContain("subaccount=ACCT_ours");
+    expect(calls[0].url).toContain("from=2026-10-01");
+    // Another charity's settlement isn't even opened.
+    expect(calls.some((c) => c.url.startsWith("/settlement/2/") || c.url.startsWith("/settlement/3/"))).toBe(false);
+  });
+
+  it("without an owner on the settlement, keeps it only when every transaction is this charity's", async () => {
+    answer(
+      [
+        { id: 10, status: "success", settlement_date: "2026-10-20" },
+        { id: 11, status: "success", settlement_date: "2026-10-20" },
+        { id: 12, status: "success", settlement_date: "2026-10-20" },
+        { id: 13, status: "success", settlement_date: "2026-10-20" },
+      ],
+      {
+        "10": [tx("d1", { subaccount_code: ours }), tx("d2", ours)],
+        "11": [tx("d3", ours), tx("x1", "ACCT_other")],
+        "12": [tx("x2", null)],
+        "13": [],
+      },
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const out = await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: ours, since: "2026-10-01" });
+    expect(out.map((p) => p.ref)).toEqual(["10"]);
+    expect(out[0].lines.map((l) => l.reference)).toEqual(["d1", "d2"]);
+    expect(warn).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+
+  it("drops anything paid out before the day asked for", async () => {
+    answer(
+      [
+        { id: 20, status: "success", settlement_date: "2026-09-30T23:00:00Z", subaccount: ours },
+        { id: 21, status: "success", settlement_date: "2026-10-01", subaccount: ours },
+      ],
+      { "20": [tx("d0", ours)], "21": [tx("d1", ours)] },
+    );
+    const out = await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: ours, since: "2026-10-01" });
+    expect(out.map((p) => [p.ref, p.paidOutOn])).toEqual([["21", "2026-10-01"]]);
+  });
+});
+
+describe("checking a charity's bank account (POST /bank/validate)", () => {
+  it("looks the bank up among the banks Paystack can check, and sends what the spec asks for", async () => {
+    // The fake answers by the first matching path prefix: the longer path goes first.
+    answers["/bank/validate"] = { verified: true, verificationMessage: "Account is verified", accountOpen: true, accountAcceptsCredits: true, accountAcceptsDebits: true, accountHolderMatch: true, accountOpenForMoreThanThreeMonths: true };
+    answers["/bank"] = [{ name: "First National Bank", code: "250655" }];
+    const r = await paystackGateway.checkBankAccount!({ bankName: "FNB", accountNumber: "62000000000", accountHolder: "Meals Fund NPC" });
+    expect(calls[0].url).toContain("enabled_for_verification=true");
+    expect(calls[0].url).toContain("country=south%20africa");
+    expect(calls[1].url).toBe("/bank/validate");
+    expect(calls[1].body).toEqual({ account_name: "Meals Fund NPC", account_number: "62000000000", account_type: "business", bank_code: "250655", country_code: "ZA", document_type: "businessRegistrationNumber" });
+    expect(r).toEqual({ verified: true, accountOpen: true, acceptsCredits: true, holderMatches: true, openMoreThanThreeMonths: true, message: "Account is verified" });
+  });
+
+  it("anything missing from the answer reads as no, never as yes", async () => {
+    answers["/bank/validate"] = { verified: "true", accountOpen: 1 };
+    answers["/bank"] = [{ name: "First National Bank", code: "250655" }];
+    expect(await paystackGateway.checkBankAccount!({ bankName: "FNB", accountNumber: "1", accountHolder: "X" })).toEqual({ verified: false, accountOpen: false, acceptsCredits: false, holderMatches: false, openMoreThanThreeMonths: false, message: null });
+  });
+
+  it("a bank Paystack can't check at is an error (shown as not checked), not a failed check", async () => {
+    answers["/bank"] = [];
+    await expect(paystackGateway.checkBankAccount!({ bankName: "FNB", accountNumber: "1", accountHolder: "X" })).rejects.toBeInstanceOf(GatewayError);
   });
 });

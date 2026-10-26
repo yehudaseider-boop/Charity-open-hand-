@@ -4,6 +4,7 @@ import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
 import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/charity-summary";
 import { requirePlatformAdmin } from "@/lib/auth";
+import { bankCheckLines, loadBankCheck } from "@/lib/charity/bank-check";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { charityBadges } from "@/lib/charities";
 import { loadCharityForManager, publicImageUrl } from "@/lib/charity/queries";
@@ -22,6 +23,7 @@ import {
   reinstateCharity,
   rejectCharity,
   changeBankDetails,
+  recheckBank,
   revealBankAccount,
   revokeS18a,
   suspendCharity,
@@ -36,6 +38,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
   await requirePlatformAdmin();
   const { id } = await params;
   const { charity, priv, documents } = await loadCharityForManager(id);
+  const bankCheck = bankCheckLines(await loadBankCheck(id, priv?.bank_account_last4 ?? null));
   const supabase = await createClient();
   const [{ data: memberships }, { data: history }, { data: updates }, { data: campaignRows }] = await Promise.all([
     supabase.from("charity_admins").select("user_id, role").eq("charity_id", id),
@@ -160,6 +163,17 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
       <Card title="Organisation"><OrganisationSummary c={charity} /></Card>
       <Card title="Contact and bank">
         <PrivateSummary p={priv} />
+        {priv?.bank_account_last4 ? (
+          <div className="mt-4 space-y-2 border-t border-border pt-3 text-sm">
+            <p className="font-medium">
+              Bank account check by the payment provider:{" "}
+              <Badge tone={bankCheck.tone === "success" ? "success" : bankCheck.tone === "warning" ? "warning" : "neutral"}>{bankCheck.headline}</Badge>
+            </p>
+            <ul className="list-disc space-y-0.5 pl-5 text-muted">{bankCheck.points.map((p) => <li key={p}>{p}</li>)}</ul>
+            <p className="text-xs text-muted">Information only. It never approves the charity or its bank details: check the bank confirmation letter as always.</p>
+            <SimpleForm action={recheckBank.bind(null, id)} submitLabel="Check again" />
+          </div>
+        ) : null}
         <div className="mt-3">
           <SimpleForm action={revealBankAccount.bind(null, id)} submitLabel="Show full account number" />
           <p className="mt-1 text-xs text-muted">Shown once and logged in the audit trail.</p>

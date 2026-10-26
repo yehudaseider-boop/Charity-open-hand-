@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { GatewayError, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
+import { GatewayError, type BankAccountCheck, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /** Paystack's name for each bank our application offers (lower case). Banks not listed here are matched by name. */
 const BANK_NAMES: Record<string, string> = {
@@ -23,6 +23,11 @@ const BANK_NAMES: Record<string, string> = {
  * paystack.com and api.paystack.co. Written to Paystack's published API;
  * every call must be checked in test mode before use. Points to verify are
  * marked VERIFY.
+ *
+ * Checked on 26/10/2026 against Paystack's own public OpenAPI spec (github.com/PaystackOSS/openapi,
+ * dist/paystack.yaml, last updated 09/06/2026): request fields and types for initialize,
+ * charge_authorization, verify, subaccount, the bank list, settlements and bank/validate. The spec
+ * doesn't cover webhooks or test cards; those stay VERIFY.
  *
  * Split payments (https://paystack.com/docs/payments/split-payments/): each charity is
  * registered as a Paystack SUBACCOUNT (settlement bank + account). A checkout started with
@@ -83,9 +88,11 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 /** The split part of a checkout: the charity's subaccount, our flat share, and who bears Paystack's fee. */
 function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines">) {
   if (!req.feeBearer) throw new GatewayError("Who pays the gateway charge is not decided, so a split payment cannot start.");
+  if (!Number.isSafeInteger(req.lines.contributionCents) || req.lines.contributionCents < 0) throw new GatewayError("The contribution must be a whole number of cents.");
   return {
     subaccount: req.charityAccountRef,
-    transaction_charge: req.lines.contributionCents,
+    // Paystack's API spec types this as a string (on initialize and on charge_authorization). Still cents.
+    transaction_charge: String(req.lines.contributionCents),
     bearer: req.feeBearer === "charity" ? "subaccount" : "account",
   };
 }
@@ -110,6 +117,33 @@ function toAuthorization(a: { authorization_code?: string; reusable?: boolean; l
     brand: (a.brand ?? a.card_type ?? "").trim().toLowerCase() || null,
     expires: a.exp_month && a.exp_year ? `${a.exp_month}/${a.exp_year}` : null,
   };
+}
+
+/**
+ * Paystack's bank (and its code) for the bank name the charity chose. Our application's bank names are not
+ * Paystack's ("FNB" is "First National Bank", "TymeBank" is "GoTyme Bank", and Capitec has a personal and a
+ * business entry). The names the application offers are mapped here, looked up in Paystack's own list each time
+ * so the code is never typed in by hand. Checked against Paystack's live South African list on 23/10/2026.
+ * `forChecks`: only the banks Paystack can check accounts at (`enabled_for_verification`, in its API spec).
+ */
+async function findBank(bankName: string, { forChecks = false }: { forChecks?: boolean } = {}): Promise<{ name: string; code: string }> {
+  const banks = await call<{ name: string; code: string }[]>(`/bank?country=south%20africa&perPage=100${forChecks ? "&enabled_for_verification=true" : ""}`);
+  const want = (BANK_NAMES[bankName.trim().toLowerCase()] ?? bankName).trim().toLowerCase();
+  if (want === "other") throw new GatewayError(`This charity chose "Other" as its bank. Ask which bank it is and have the bank corrected on its application before connecting it.`);
+  // An exact name wins; otherwise exactly one bank must contain the name ("Standard" alone could be two banks).
+  const matches = banks.filter((b) => b.name.toLowerCase() === want);
+  const candidates = matches.length ? matches : banks.filter((b) => b.name.toLowerCase().includes(want));
+  if (candidates.length === 0) throw new GatewayError(forChecks ? `Paystack can't check accounts at "${bankName}".` : `Paystack has no bank matching "${bankName}".`);
+  if (candidates.length > 1) throw new GatewayError(`More than one Paystack bank matches "${bankName}": ${candidates.map((b) => b.name).join(", ")}. Use the exact bank name.`);
+  return candidates[0];
+}
+
+/** The subaccount a settlement or transaction says it belongs to, in whichever form Paystack gives it; null if it doesn't say. */
+function ownerOf(x: { subaccount?: string | { subaccount_code?: string } | null; subaccount_code?: string | null }): string | null {
+  if (typeof x.subaccount === "string" && x.subaccount) return x.subaccount;
+  if (x.subaccount && typeof x.subaccount === "object" && x.subaccount.subaccount_code) return x.subaccount.subaccount_code;
+  if (typeof x.subaccount_code === "string" && x.subaccount_code) return x.subaccount_code;
+  return null;
 }
 
 export const paystackGateway: PaymentGateway = {
@@ -181,7 +215,8 @@ export const paystackGateway: PaymentGateway = {
         currency: "ZAR",
         reference: req.reference,
         ...splitOrNone(req, paystackGateway.splitsPayments),
-        metadata: { description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: req.monthly ?? true },
+        // Paystack's API spec: on charge_authorization, metadata is "Stringified JSON" (on initialize it is an object).
+        metadata: JSON.stringify({ description: req.description, charity_cents: req.lines.charityCents, contribution_cents: req.lines.contributionCents, monthly: req.monthly ?? true }),
       }),
     });
     return { status: data.status === "success" ? ("success" as const) : ["failed", "reversed"].includes(data.status) ? ("failed" as const) : ("pending" as const) };
@@ -242,19 +277,7 @@ export const paystackGateway: PaymentGateway = {
   async createCharityAccount(req) {
     // Paystack needs its own bank code, looked up from its bank list. VERIFY
     // the South African list and how ZA account verification works.
-    const banks = await call<{ name: string; code: string }[]>("/bank?country=south%20africa&perPage=100");
-    // Our application's bank names are not Paystack's ("FNB" is "First National Bank", "TymeBank" is
-    // "GoTyme Bank", and Capitec has a personal and a business entry). The names the application offers are
-    // mapped here, looked up in Paystack's own list each time so the code is never typed in by hand. Checked
-    // against Paystack's live South African list on 23/10/2026.
-    const want = (BANK_NAMES[req.bankName.trim().toLowerCase()] ?? req.bankName).trim().toLowerCase();
-    if (want === "other") throw new GatewayError(`This charity chose "Other" as its bank. Ask which bank it is and have the bank corrected on its application before connecting it.`);
-    // An exact name wins; otherwise exactly one bank must contain the name ("Standard" alone could be two banks).
-    const matches = banks.filter((b) => b.name.toLowerCase() === want);
-    const candidates = matches.length ? matches : banks.filter((b) => b.name.toLowerCase().includes(want));
-    if (candidates.length === 0) throw new GatewayError(`Paystack has no bank matching "${req.bankName}".`);
-    if (candidates.length > 1) throw new GatewayError(`More than one Paystack bank matches "${req.bankName}": ${candidates.map((b) => b.name).join(", ")}. Use the exact bank name.`);
-    const bank = candidates[0];
+    const bank = await findBank(req.bankName);
     const data = await call<{ subaccount_code: string }>("/subaccount", {
       method: "POST",
       body: JSON.stringify({
@@ -268,26 +291,76 @@ export const paystackGateway: PaymentGateway = {
   },
 
   /**
+   * Check a charity's bank account with the bank (POST /bank/validate, from Paystack's API spec: South African
+   * accounts). Information for the Givezy admin only. A charity is a business, so the account type is "business"
+   * and the document type a business registration number; Givezy holds no company registration number, so
+   * none is sent (the spec doesn't require one). VERIFY in test mode: that this works for charity accounts, what
+   * the bank needs to match the holder, and whether the call costs anything.
+   */
+  async checkBankAccount(req): Promise<BankAccountCheck> {
+    const bank = await findBank(req.bankName, { forChecks: true });
+    const data = await call<{
+      verified?: boolean; verificationMessage?: string; accountOpen?: boolean; accountAcceptsCredits?: boolean;
+      accountHolderMatch?: boolean; accountOpenForMoreThanThreeMonths?: boolean;
+    }>("/bank/validate", {
+      method: "POST",
+      body: JSON.stringify({
+        account_name: req.accountHolder,
+        account_number: req.accountNumber,
+        account_type: "business",
+        bank_code: bank.code,
+        country_code: "ZA",
+        document_type: "businessRegistrationNumber",
+      }),
+    });
+    // Only an explicit "true" counts: anything missing reads as no, never as yes.
+    return {
+      verified: data?.verified === true,
+      accountOpen: data?.accountOpen === true,
+      acceptsCredits: data?.accountAcceptsCredits === true,
+      holderMatches: data?.accountHolderMatch === true,
+      openMoreThanThreeMonths: data?.accountOpenForMoreThanThreeMonths === true,
+      message: typeof data?.verificationMessage === "string" && data.verificationMessage.trim() ? data.verificationMessage.trim().slice(0, 300) : null,
+    };
+  },
+
+  /**
    * Payouts ("settlements") to one charity's subaccount, each with its transactions. Amounts are in the
    * smallest unit (cents for rand). VERIFY in test mode, before any charity sees the report: that
    * /settlement filters by subaccount; the names of the date, amount, fee and status fields; whether a
    * transaction's amount is the whole charge or the subaccount's share; and how refunds and chargebacks
    * taken out of a settlement are listed. Until then the report's own check (each gift minus its fee
    * equals what reached the bank, and the lines add up to the deposit) shows any mismatch.
+   *
+   * Paystack's API spec lists only `perPage` and `page` for GET /settlement. The `subaccount` and `from`
+   * filters are still sent (Paystack's docs site may support them), but nothing here relies on them: a
+   * settlement is kept only when it is shown to be this charity's (its own subaccount field, or else every one of
+   * its transactions naming this subaccount), and anything paid out before `since` is dropped. A settlement that
+   * can't be shown to be this charity's is left out: another charity's money must never appear in a deposit report.
    */
   async listPayouts({ charityAccountRef, since }) {
     const out: Payout[] = [];
+    type Owned = { subaccount?: string | { subaccount_code?: string } | null; subaccount_code?: string | null };
     for (let page = 1; page <= 20; page++) {
       const settlements = await call<
-        { id: number; status: string; settlement_date?: string; createdAt?: string; effective_amount?: number; total_amount?: number }[]
+        ({ id: number; status: string; settlement_date?: string; createdAt?: string; effective_amount?: number; total_amount?: number } & Owned)[]
       >(`/settlement?subaccount=${encodeURIComponent(charityAccountRef)}&from=${encodeURIComponent(since)}&perPage=100&page=${page}`);
       for (const st of settlements) {
+        const day = String(st.settlement_date ?? st.createdAt ?? "").slice(0, 10);
+        const dated = /^\d{4}-\d{2}-\d{2}$/.test(day);
+        // Before `since`: not asked for (the filter may have been ignored).
+        if (dated && day < since) continue;
+        const owner = ownerOf(st);
+        // Another charity's settlement (or Givezy's own): never fetched, never shown.
+        if (owner !== null && owner !== charityAccountRef) continue;
         const lines: PayoutLine[] = [];
+        const txOwners: (string | null)[] = [];
         for (let tp = 1; tp <= 50; tp++) {
-          const txs = await call<{ reference?: string | null; amount?: number; fees?: number; type?: string; status?: string }[]>(
+          const txs = await call<({ reference?: string | null; amount?: number; fees?: number; type?: string; status?: string } & Owned)[]>(
             `/settlement/${st.id}/transactions?perPage=100&page=${tp}`,
           );
           for (const t of txs) {
+            txOwners.push(ownerOf(t));
             const gross = Number(t.amount ?? 0);
             const fee = Number(t.fees ?? 0);
             const kind = t.type === "refund" ? "refund" : t.type === "dispute" || t.type === "chargeback" ? "chargeback" : t.type === undefined || t.type === "transaction" ? "payment" : "other";
@@ -296,10 +369,14 @@ export const paystackGateway: PaymentGateway = {
           }
           if (txs.length < 100) break;
         }
-        const day = String(st.settlement_date ?? st.createdAt ?? "").slice(0, 10);
+        // No owner on the settlement itself: it is this charity's only if every transaction in it says so.
+        if (owner === null && (txOwners.length === 0 || txOwners.some((o) => o !== charityAccountRef))) {
+          console.warn(`[paystack] settlement ${st.id} left out of a deposit report: it could not be shown to be this charity's`);
+          continue;
+        }
         out.push({
           ref: String(st.id),
-          paidOutOn: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : since,
+          paidOutOn: dated ? day : since,
           amountCents: Number(st.effective_amount ?? st.total_amount ?? 0),
           status: st.status === "success" || st.status === "processed" ? "paid" : st.status === "failed" ? "failed" : "pending",
           lines,

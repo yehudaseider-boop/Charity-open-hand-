@@ -2,6 +2,24 @@
 
 ## Decided
 
+- **Paystack adapter checked against Paystack's own API spec (26/10/2026).** Source: Paystack's public OpenAPI spec
+  (github.com/PaystackOSS/openapi, `dist/paystack.yaml`, last updated 09/06/2026), because paystack.com and
+  api.paystack.co are blocked from cloud sessions. It does not cover webhooks or test cards; those stay VERIFY.
+  (1) `transaction_charge` is sent as a string, as the spec types it on initialize and charge_authorization (still
+  cents; a contribution that isn't whole cents is refused), and `metadata` on charge_authorization is sent as
+  stringified JSON (on initialize it stays an object, as the spec says). (2) Settlements: the spec lists only
+  `perPage` and `page`, so the `subaccount` and `from` filters are still sent but not relied on. A settlement is kept
+  only when it is shown to be the charity's own (its subaccount field, or else every transaction in it), and anything
+  before the start day is dropped: another charity's money is never shown in a deposit report. (3) **Bank account
+  check (decided 26/10/2026):** when a charity's bank details are saved or changed, Givezy asks the payment provider
+  whether the account is open, takes payments in, is in the holder's name and has been open for over three months
+  (Paystack: POST /bank/validate, a business account, banks from the `enabled_for_verification` list). The answer is
+  shown to the Givezy admin on the charity's page with a "Check again" button. It never approves anything by
+  itself and never holds anything up: if the provider can't be reached, it says "not checked yet". The answer is
+  kept server-only, one per charity, with the last four digits of the account it was about, so an old answer is never
+  shown for a new account (`20261026000004_bank_account_checks.sql`). Not run against Paystack yet: VERIFY. (4) Payment
+  channels unchanged; which options donors see for once-off gifts is an open decision on the go-live list.
+
 - **Bookkeeping fixes for big charities (26/10/2026, code check).** The database hands back at most 1 000 rows
   at a time, and a few lists didn't page past that. Now: Deposits read every line (a busy charity's deposits no
   longer look as if they "don't add up", and the CSV, Excel and Xero files are complete), and one deposit is

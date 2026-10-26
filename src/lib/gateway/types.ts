@@ -100,6 +100,27 @@ export type CharityAccountRequest = {
   accountHolder: string;
 };
 
+/** A charity's bank account, to ask the gateway whether it is real and in the charity's name. */
+export type BankAccountCheckRequest = {
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+};
+
+/**
+ * What the gateway says about a charity's bank account. Information for the Givezy admin only: it never
+ * approves anything by itself, and a charity is never held up because the check couldn't run.
+ */
+export type BankAccountCheck = {
+  verified: boolean;
+  accountOpen: boolean;
+  acceptsCredits: boolean;
+  holderMatches: boolean;
+  openMoreThanThreeMonths: boolean;
+  /** The gateway's own words, if it gives any. */
+  message: string | null;
+};
+
 /** One line of a payout: a payment paid out to the charity, or money taken back out of the payout. */
 export type PayoutLine = {
   /** Our reference for the payment (the donation id), when the gateway gives it. */
@@ -152,6 +173,11 @@ export interface PaymentGateway {
    * the payments in it, each payment's fee, and anything taken back out (refunds, chargebacks).
    */
   listPayouts(args: { charityId: string; charityAccountRef: string; since: string }): Promise<Payout[]>;
+  /**
+   * Optional: check a charity's bank account with the bank (is it open, does it take payments in, is it in the
+   * charity's name). A gateway without it simply shows "not checked".
+   */
+  checkBankAccount?(req: BankAccountCheckRequest): Promise<BankAccountCheck>;
 }
 
 export class GatewayError extends Error {

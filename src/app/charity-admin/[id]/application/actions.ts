@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkCharityBank } from "@/lib/charity/bank-check";
 import { redirect } from "next/navigation";
 import { TYPED_DAY_MESSAGE, typedDay } from "@/lib/typed-date";
 import { recordAction } from "@/lib/charity/charity-actions";
@@ -170,6 +171,8 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
     entityId: charityId,
     details: { bank_name: v.bank_name, last4: last4(v.bank_account_number) },
   });
+  // Ask the payment provider about the account, for Givezy's review. Information only; never holds anything up.
+  await checkCharityBank(charityId, viewer.userId);
   // Taking it back puts the previous details back; they are checked again before going live either way.
   const done = await recordAction(charityId, viewer.userId, "bank_saved", { last4: last4(v.bank_account_number) }, {
     type: "restore", table: "charity_private", before: pick(was, Object.keys(after)), after,
