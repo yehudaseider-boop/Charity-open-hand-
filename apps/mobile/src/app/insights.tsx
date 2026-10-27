@@ -192,13 +192,20 @@ function MonthByMonth({ gifts, year, today }: { gifts: Gift[]; year: number; tod
 function WhereItWent({ gifts, charities, causes }: { gifts: Gift[]; charities: { slug: string; causeId: string }[]; causes: { id: string; label: string }[] }) {
   const [by, setBy] = useState<"charity" | "cause">("charity");
   const [picked, setPicked] = useState<string | null>(null);
+  const causeOf = (g: Gift) => {
+    const id = charities.find((c) => c.slug === g.charitySlug)?.causeId ?? "";
+    return { key: id || "unlisted", name: causes.find((c) => c.id === id)?.label ?? "Not in a cause" };
+  };
   const rows =
     by === "charity"
       ? shares(gifts, (g) => ({ key: g.charitySlug, name: g.charityName }))
-      : shares(gifts, (g) => {
-          const id = charities.find((c) => c.slug === g.charitySlug)?.causeId ?? "";
-          return { key: id || "unlisted", name: causes.find((c) => c.id === id)?.label ?? "Not in a cause" };
-        });
+      : shares(gifts, causeOf);
+  // By cause, each row says which charities it is made of, so the switch visibly regroups the giving.
+  const shown = new Set(rows.map((x) => x.key));
+  const membersOf = (key: string) =>
+    [...new Set(gifts.filter((g) => (key === "other" ? !shown.has(causeOf(g).key) : causeOf(g).key === key)).map((g) => g.charityName))];
+  // One charity per cause: the split looks the same as By charity, so say why rather than seem to do nothing.
+  const sameSplit = by === "cause" && rows.every((x) => membersOf(x.key).length === 1);
   const total = rows.reduce((n, r) => n + r.cents, 0);
   const sel = rows.find((r) => r.key === picked) ?? null;
   const size = 176;
@@ -219,6 +226,9 @@ function WhereItWent({ gifts, charities, causes }: { gifts: Gift[]; charities: {
         onChange={(v) => { setBy(v); setPicked(null); }}
         options={[{ value: "charity", label: "By charity" }, { value: "cause", label: "By cause" }]}
       />
+      {sameSplit ? (
+        <Text variant="bodyMuted">Each charity you gave to is in a different cause, so the split is the same as By charity.</Text>
+      ) : null}
       <View style={{ alignItems: "center", marginTop: 6 }}>
         <View style={{ width: size, height: size }}>
           <Svg width={size} height={size}>
@@ -262,7 +272,10 @@ function WhereItWent({ gifts, charities, causes }: { gifts: Gift[]; charities: {
               style={[styles.legendRow, i > 0 && styles.divider, on && { backgroundColor: colors.lilacSoft }]}
             >
               <View style={[styles.dot, { backgroundColor: sliceColour(row, i) }]} />
-              <Text style={{ flex: 1, fontSize: 16, lineHeight: 21 }}>{row.name}</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontSize: 16, lineHeight: 21 }}>{row.name}</Text>
+                {by === "cause" ? <Text variant="label" numberOfLines={2}>{membersOf(row.key).join(", ")}</Text> : null}
+              </View>
               <Text variant="label">{row.percent}%</Text>
               <Text style={styles.giftAmount}>{rand(row.cents)}</Text>
             </Pressable>
