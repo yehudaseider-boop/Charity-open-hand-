@@ -8,6 +8,7 @@
   no database reads or writes, no payment (giving says "This is the preview, so no payment is taken"). It is
   remembered on the phone until "Sign out" on the Account tab, and ends by itself if someone really signs in.
   Built on the app's existing sample-data ("preview") mode; `TEST_BUILD` moved to `src/lib/test-build.ts`.
+  Published to the Expo preview channel 27/10/2026 (update group 221b3c44-e100-4725-ab52-8e270a5b9d3f, SDK 58).
 - **Give form fixes on the website (26/10/2026).** (1) Switching "Giving as" between Myself and a company or trust
   keeps what was typed in each (names, organisation, ID number): the other set is hidden and not sent, never removed.
   (2) When the saved ID number can't be used, Pay's "take me to it" lands on the message next to the saved number
