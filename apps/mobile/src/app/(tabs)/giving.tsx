@@ -23,6 +23,7 @@ import { openGiveScreen } from "@/lib/give-entry";
 import { helpLine } from "@/lib/help";
 import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving";
 import { goalProgress, knownLabels, MAX_GOALS, monthTiles, type Goal } from "@/lib/goals";
+import { monthDetail } from "@/lib/month-detail";
 import { loadGoals, saveGoals, setAsideGoals } from "@/lib/goals-store";
 import { useJewishMode } from "@/lib/jewish-mode";
 import { JEWISH_LABELS } from "@shared/donations/labels";
@@ -195,6 +196,13 @@ export default function Giving() {
   const mainProgress = main ? goalProgress(main, goalRows, income, now) : null;
   const mainPct = mainProgress?.targetCents ? Math.floor((mainProgress.givenCents * 100) / mainProgress.targetCents) : 0;
   const tiles = main ? monthTiles(main, goalRows, now, mainProgress?.targetCents ?? null) : [];
+  // The month whose panel is open: this month to start with; tapping the open month closes it.
+  const [pickedMonth, setPickedMonth] = useState<number | "closed" | null>(null);
+  const currentKey = now.getFullYear() * 12 + now.getMonth();
+  const openMonth = pickedMonth === "closed" ? null : (pickedMonth ?? currentKey);
+  const detail = main && mainProgress && openMonth !== null && tiles.some((t) => t.key === openMonth)
+    ? monthDetail(main, goalRows, now, openMonth, mainProgress)
+    : null;
 
   const addIncome = (e: { cents: number; date: string; note: string }) => {
     if (!incomeReady) return;
@@ -315,15 +323,48 @@ export default function Giving() {
               </View>
               <View style={styles.tiles} accessibilityLabel="Months with a gift, filled by how much of each month's share of the goal was given">
                 {tiles.map((t, i) => (
-                  <View key={i} style={styles.tileWrap}>
+                  <Pressable
+                    key={i}
+                    style={styles.tileWrap}
+                    onPress={() => setPickedMonth(openMonth === t.key ? "closed" : t.key)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: openMonth === t.key }}
+                    accessibilityLabel={`${t.label}: show this month`}
+                    hitSlop={{ top: 6, bottom: 6 }}
+                  >
                     {/* A given month fills from the bottom by how much of that month's share of the goal was given. */}
                     <View style={[styles.tile, t.future && !t.given ? styles.tileFuture : styles.tileEmpty, t.current && styles.tileNow]}>
                       {t.given ? <View style={[styles.tileFill, { height: `${t.fill / 10}%` }]} /> : null}
                     </View>
-                    <Text style={[styles.tileLabel, width < 340 && { fontSize: 8.5 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t.label}</Text>
-                  </View>
+                    <Text style={[styles.tileLabel, width < 340 && { fontSize: 8.5 }, openMonth === t.key && styles.tileLabelOn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t.label}</Text>
+                  </Pressable>
                 ))}
               </View>
+              {detail ? (
+                <View style={styles.monthPanel} accessibilityLiveRegion="polite">
+                  <View style={styles.monthPanelHead}>
+                    <Text style={styles.monthPanelTitle}>{detail.when === "current" ? `${detail.title.split(" ")[0]} so far` : detail.title}</Text>
+                    <Text style={styles.monthPanelAmount}>
+                      {detail.when === "future" ? "Still to come" : detail.shareCents !== null ? `${rand(detail.givenCents)} of ${rand(detail.shareCents)}` : rand(detail.givenCents)}
+                    </Text>
+                  </View>
+                  {detail.when !== "future" && detail.shareCents !== null ? (
+                    <View style={styles.monthBarTrack}>
+                      <View style={[styles.monthBarFill, { width: `${Math.min(100, Math.floor((detail.givenCents * 100) / detail.shareCents))}%` }]} />
+                    </View>
+                  ) : null}
+                  {detail.line ? <Text variant="bodyMuted">{detail.line}</Text> : null}
+                  {detail.gifts.map((g) => (
+                    <View key={g.id} style={styles.monthGift}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text numberOfLines={2} style={{ fontSize: 16, lineHeight: 21 }}>{g.name}</Text>
+                        <Text variant="label">{[ddmmyyyy(g.date), g.label, g.elsewhere ? "Given elsewhere" : null].filter(Boolean).join(" · ")}</Text>
+                      </View>
+                      <Text style={styles.monthGiftAmount}>{rand(g.cents)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
           ) : (
             <Text style={styles.headLine}>Your giving, your goals and what you have given elsewhere, in one place.</Text>
@@ -853,6 +894,16 @@ const styles = StyleSheet.create({
   tileFuture: { borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.lilac },
   tileNow: { borderWidth: 2, borderColor: colors.onInk },
   tileLabel: { fontFamily: fonts.bodySemibold, fontSize: 10, color: colors.lilacSoft, textAlign: "center" },
+  tileLabelOn: { color: colors.onInk, fontFamily: fonts.bodyBold },
+  monthPanel: { gap: 8, padding: 16, borderRadius: radius.card, backgroundColor: colors.surface },
+  // Title and amount side by side; on a narrow phone the amount moves under the title, never split.
+  monthPanelHead: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline", columnGap: 12, rowGap: 2 },
+  monthPanelTitle: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.ink, flexShrink: 0 },
+  monthPanelAmount: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.ink, flexShrink: 0 },
+  monthBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.lightPurple, overflow: "hidden" },
+  monthBarFill: { height: 8, borderRadius: 4, backgroundColor: colors.orange },
+  monthGift: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.lightPurple },
+  monthGiftAmount: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.ink },
   goalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
   goalChipAdd: { borderStyle: "dashed", borderColor: colors.blue },

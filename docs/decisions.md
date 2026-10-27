@@ -2,6 +2,14 @@
 
 ## Decided
 
+- **Progress: tap a month (27/10/2026, Yehuda).** Tapping a month tile opens a panel under the tiles (this month is open
+  to start with; tapping the open month closes it). Past month: "June 2026 · R720 of R1 000", a bar, one plain line
+  ("R280 under June's share", "R200 over…", "June's share reached", "No gifts in June") and that month's gifts, with
+  giving logged elsewhere marked. This month: "October so far", "R140 to go this month". Future month: the plan ("About
+  R1 812 a month gets you to R12 000 by 28/02/2027", or "Goal reached. Anything more is extra."). A yearly goal's share is
+  the target split evenly over its months; a monthly goal is its own amount; a share of income with no income logged
+  says so instead of guessing. No guilt words at all: no "fell short", "missed", "only", and no comparison with another
+  month (a test checks the wording). Logic in `apps/mobile/src/lib/month-detail.ts`.
 - **Donor tap-through of the app (27/10/2026).** Every screen in the demo, every control tapped, every label read as a
   stranger would. Fixed: month initials (M A M J J…) on Progress and the Insights chart now read Mar, Apr…; Progress month
   tiles fill by each month's share of the goal; "By cause" names the charities in each cause and says when the split

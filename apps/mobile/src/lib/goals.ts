@@ -162,6 +162,8 @@ export function knownLabels(rows: { label: string | null }[], extra: readonly st
 }
 
 export type MonthTile = {
+  /** year * 12 + month (the Johannesburg calendar month). */
+  key: number;
   label: string;
   given: boolean;
   future: boolean;
@@ -199,7 +201,7 @@ export function monthTiles(goal: Goal, rows: Row[], today: Date, targetCents: nu
     const cents = byMonth.get(m) ?? 0;
     const given = byMonth.has(m);
     const fill = !given ? 0 : !measurable ? 1000 : Math.max(MIN_FILL, Math.min(1000, Math.floor((cents * per * 1000) / targetCents!)));
-    tiles.push({ label: MONTHS[m % 12].slice(0, 3), given, future: m > now, current: m === now, fill });
+    tiles.push({ key: m, label: MONTHS[m % 12].slice(0, 3), given, future: m > now, current: m === now, fill });
   }
   return tiles;
 }
