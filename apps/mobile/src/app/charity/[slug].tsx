@@ -188,7 +188,7 @@ export default function CharityDetail() {
               ? `Ask for an s18A receipt when you give, and your donations count towards one receipt a year, issued on ${charity.nameEn}'s behalf after the tax year closes.`
               : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
           </Text>
-          {live ? null : <Text variant="label" style={{ marginTop: 12 }}>Sample charity for design review</Text>}
+          {live ? null : <Text variant="label" style={{ marginTop: 12 }}>Sample charity (demo data)</Text>}
         </View>
       </Animated.ScrollView>
 

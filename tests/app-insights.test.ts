@@ -23,7 +23,7 @@ describe("app giving insights", () => {
   it("lays out March to February, with totals, gifts and future months", () => {
     const months = monthsOfTaxYear(inTaxYear(gifts, 2027), 2027, d(2026, 10, 26));
     expect(months).toHaveLength(12);
-    expect(months[0]).toMatchObject({ label: "March 2026", short: "M", cents: 10_000, future: false });
+    expect(months[0]).toMatchObject({ label: "March 2026", short: "Mar", cents: 10_000, future: false });
     expect(months[1].cents).toBe(25_000);
     expect(months[1].gifts.map((g) => g.cents)).toEqual([5_000, 20_000]); // newest first
     expect(months[11]).toMatchObject({ label: "February 2027", cents: 7_000, future: true });

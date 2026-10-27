@@ -13,6 +13,7 @@ import { secureStorage } from "./secure-storage";
 import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
 import { TEST_BUILD } from "./test-build";
+import { setDirectoryDemo } from "./directory";
 
 /**
  * Who is using the app, and their real giving.
@@ -194,6 +195,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setDemo(false);
     void secureStorage.removeItem(DEMO_KEY).catch(() => undefined);
   }, []);
+  // The demo shows the sample charities too, so the sample giving points at charities that exist.
+  useEffect(() => setDirectoryDemo(demo), [demo]);
   // Until the phone has said whether the demo is on, nothing is shown as signed out.
   const status: AccountStatus = !demoRead ? "loading" : demo ? "preview" : realStatus;
   const [live, setLive] = useState<Live | null>(null);

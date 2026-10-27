@@ -103,7 +103,7 @@ export default function Insights() {
                 </>
               )}
               <Text variant="label" style={{ textAlign: "center" }}>
-                {preview ? "Sample giving for design review." : "Only gifts through Givezy. Giving you logged elsewhere is on Progress."}
+                {preview ? "Sample data: the demo donor's giving." : "Only gifts through Givezy. Giving you logged elsewhere is on Progress."}
               </Text>
             </>
           )}
@@ -153,7 +153,7 @@ function MonthByMonth({ gifts, year, today }: { gifts: Gift[]; year: number; tod
                   {h > 0 ? (
                     <View style={{ position: "absolute", top: H - h, width: bar, height: h, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: on ? colors.orange : colors.blue, opacity: picked >= 0 && !on ? 0.55 : 1 }} />
                   ) : null}
-                  <Text style={[styles.monthLetter, { top: H + 6 }, on && { color: colors.ink, fontFamily: fonts.bodyBold }, m.future && { color: colors.chartOther }]}>{m.short}</Text>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.monthLetter, { top: H + 6, width: col, fontSize: col < 26 ? 9 : 11 }, on && { color: colors.ink, fontFamily: fonts.bodyBold }, m.future && { color: colors.chartOther }]}>{m.short}</Text>
                 </Pressable>
               );
             })}
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 22, lineHeight: 28 },
   hero: { ...tabular, fontFamily: fonts.displayBold, fontSize: 36, lineHeight: 42, color: colors.ink },
   baseline: { position: "absolute", left: 0, right: 0, height: 1, backgroundColor: colors.hairline },
-  monthLetter: { position: "absolute", fontFamily: fonts.bodySemibold, fontSize: 13, color: colors.muted },
+  monthLetter: { position: "absolute", fontFamily: fonts.bodySemibold, fontSize: 11, color: colors.muted, textAlign: "center" },
   detail: { gap: 6, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
   detailHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 12 },
   detailTitle: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.ink },

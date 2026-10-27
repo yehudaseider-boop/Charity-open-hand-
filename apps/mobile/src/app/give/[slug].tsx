@@ -85,6 +85,8 @@ export default function Give() {
   const { charity, failed, retry } = useCharity(slug);
   const account = useAccount();
   const preview = account.status === "preview";
+  // The preview and the demo account never talk to the server: no readiness check, no payment page.
+  const site = preview ? "" : SITE_URL;
   const history = preview ? sampleGifts : (account.live?.gifts ?? []);
   const elsewhere = preview ? sampleElsewhere : (account.live?.elsewhere ?? []);
   const pastAmounts = slug ? quickAmounts(history, slug) : [];
@@ -222,20 +224,21 @@ export default function Give() {
 
   const { accessToken } = account;
   useEffect(() => {
-    if (!GIVE_IN_APP || !SITE_URL || !slug) return;
+    if (!GIVE_IN_APP || !site || !slug) return;
     let live = true;
     accessToken()
-      .then((token) => checkReady(SITE_URL, slug, campaignParam, undefined, token))
+      .then((token) => checkReady(site, slug, campaignParam, undefined, token))
       .then((r) => live && setReady(r))
       // Anything unexpected shows "Try again", never an endless skeleton.
       .catch(() => live && setReady({ ok: false, message: "We couldn't reach Givezy. Please check your connection and try again." }));
     return () => {
       live = false;
     };
-  }, [slug, campaignParam, readyAttempt, accessToken]);
+  }, [slug, campaignParam, readyAttempt, accessToken, site]);
 
   const websiteUrl = slug ? donateUrl(SITE_URL, slug, label, campaignParam) : null;
-  const closedHere = !GIVE_IN_APP || (ready && !ready.ok && ready.closed);
+  // The preview and the demo always show the form (nothing is charged there); live, the switch decides.
+  const closedHere = !preview && (!GIVE_IN_APP || (ready && !ready.ok && ready.closed));
   if (closedHere) {
     return (
       <View style={styles.screen}>
@@ -250,7 +253,7 @@ export default function Give() {
     );
   }
 
-  const waitingForServer = Boolean(SITE_URL) && ready === undefined;
+  const waitingForServer = Boolean(site) && ready === undefined;
   const serverFailed = ready && !ready.ok && !ready.closed;
   // Loading (undefined), not found (null) or could not load: never a blank screen.
   if (!charity || waitingForServer || serverFailed) {
@@ -352,7 +355,7 @@ export default function Give() {
       s18aAvailable && want18a ? "s18A receipt at tax time" : null,
       pr && goal ? `Counts towards ${goal.name}` : null,
     ].filter((b): b is string => Boolean(b));
-    const inviteNow = (demo === "invite" && !SITE_URL) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift, confirming });
+    const inviteNow = (demo === "invite" && !site) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift, confirming });
     const invite: GoalInvite | null = inviteNow
       ? {
           jewish,
@@ -381,7 +384,7 @@ export default function Give() {
       badges,
     };
   }
-  if ((demo === "sent" || demo === "invite") && !SITE_URL && !demoShown) {
+  if ((demo === "sent" || demo === "invite") && !site && !demoShown) {
     setDemoShown(true);
     setDone(sentSummary({ cents: 18_000, contributionCents: 0, email: "sarah@example.co.za", monthly: false, label }, false));
   }
@@ -442,8 +445,8 @@ export default function Give() {
       showProblems(e);
       return;
     }
-    if (!SITE_URL) {
-      setMessage(`This is the preview, so no payment is taken. On the live app this opens the secure payment page for ${rand(total)}.`, "info");
+    if (!site) {
+      setMessage(`This is the demo, so no payment is taken. In the real app this opens the secure payment page for ${rand(total)}.`, "info");
       return;
     }
     setBusy("opening");
@@ -476,7 +479,7 @@ export default function Give() {
     let r: Awaited<ReturnType<typeof startPayment>>;
     try {
       r = await startPayment(
-        SITE_URL,
+        site,
         {
           slug: charity!.slug,
           giftCents: gift!,
@@ -573,13 +576,13 @@ export default function Give() {
     // Closing the page doesn't say whether the donor paid: ask. Coming back from a finished
     // payment, the provider's confirmation can take a few seconds, so ask once more.
     setBusy("checking");
-    let outcome = await paymentStatus(SITE_URL, r.reference, r.token);
+    let outcome = await paymentStatus(site, r.reference, r.token);
     // A saved-card charge has no payment page to come back from, so "pending" is not an answer:
     // ask a few more times before giving up.
     const asks = r.charged ? 4 : shown === "returned" ? 1 : 0;
     for (let i = 0; i < asks && (outcome === "pending" || outcome === "unknown"); i++) {
       await new Promise((ok) => setTimeout(ok, 3_000));
-      outcome = await paymentStatus(SITE_URL, r.reference, r.token);
+      outcome = await paymentStatus(site, r.reference, r.token);
     }
     setBusy(false);
     // Back from the payment page with our server saying the provider is still catching up counts as given.
@@ -609,7 +612,7 @@ export default function Give() {
     busyRef.current = true;
     setBusy("checking");
     try {
-      const outcome = await paymentStatus(SITE_URL, unsettled.reference, unsettled.token);
+      const outcome = await paymentStatus(site, unsettled.reference, unsettled.token);
       setBusy(false);
       const settles = outcome === "paid" || outcome === "failed" || outcome === "not_found" || outcome === "reversed";
       if (settles) {

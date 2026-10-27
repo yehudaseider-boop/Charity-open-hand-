@@ -20,7 +20,8 @@ export function monthsOfTaxYear<G extends InsightGift>(gifts: G[], year: number,
     const inMonth = gifts.filter((g) => g.date.getFullYear() === calYear && g.date.getMonth() === month);
     return {
       label: `${MONTHS[month]} ${calYear}`,
-      short: MONTHS[month].slice(0, 1),
+      // Three letters: single letters (M A M J J…) read like the days of the week.
+      short: MONTHS[month].slice(0, 3),
       cents: inMonth.reduce((n, g) => n + g.cents, 0),
       gifts: [...inMonth].sort((a, b) => b.date.getTime() - a.date.getTime()),
       future: calYear * 12 + month > todayKey,

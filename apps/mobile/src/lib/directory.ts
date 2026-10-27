@@ -78,13 +78,41 @@ async function loadDirectory(): Promise<Directory> {
   return { charities: list, causes: toCauses((categories.data ?? []) as CategoryRow[], list), raising: raisingNow(rows, (progress.data ?? []) as ProgressRow[], list) };
 }
 
-/** Cause names, if the directory has loaded (live) or from the sample (preview). */
+/**
+ * The demo account (test builds) shows the sample donor's giving, so it shows the sample charities too:
+ * otherwise their gifts would point at charities the live directory doesn't have (no cause, no page).
+ */
+let demoMode = false;
+const demoListeners = new Set<() => void>();
+export function setDirectoryDemo(on: boolean) {
+  if (demoMode === on) return;
+  demoMode = on;
+  demoListeners.forEach((l) => l());
+}
+function useDemoMode(): boolean {
+  const [on, setOn] = useState(demoMode);
+  useEffect(() => {
+    const l = () => setOn(demoMode);
+    demoListeners.add(l);
+    l();
+    return () => {
+      demoListeners.delete(l);
+    };
+  }, []);
+  return on;
+}
+// One copy, so screens that watch the directory don't see a "new" list on every draw.
+let sampleDirectory: Directory | null = null;
+const SAMPLE_DIRECTORY = (): Directory => (sampleDirectory ??= { charities: sampleCharities, causes: sampleCauses, raising: sampleRaising() });
+
+/** Cause names, if the directory has loaded (live) or from the sample (preview and the demo). */
 export function causeList(): Cause[] {
-  return supabase ? (cached?.causes ?? []) : sampleCauses;
+  return supabase && !demoMode ? (cached?.causes ?? []) : sampleCauses;
 }
 
 export function useDirectory() {
-  const live = supabase !== null;
+  const demo = useDemoMode();
+  const live = supabase !== null && !demo;
   const [data, setData] = useState<Directory | null>(live ? cached : { charities: sampleCharities, causes: sampleCauses, raising: sampleRaising() });
   const [savedAt, setSavedAt] = useState<Date | null>(live ? cachedSavedAt : null);
   const [failed, setFailed] = useState(false);
@@ -142,6 +170,7 @@ export function useDirectory() {
   }, []);
   /** Offline with a saved list: show it with "this is what was saved on…". */
   const offlineSince = failed && savedAt ? savedAt : null;
+  if (!live) return { live, data: data && supabase === null ? data : SAMPLE_DIRECTORY(), failed: false, retry, refresh, refreshing: false, offlineSince: null };
   return { live, data, failed, retry, refresh, refreshing, offlineSince };
 }
 
@@ -169,7 +198,8 @@ async function loadCharity(slug: string): Promise<Charity | null> {
 
 /** One charity with its photos and latest updates. */
 export function useCharity(slug: string | undefined) {
-  const live = supabase !== null;
+  const demo = useDemoMode();
+  const live = supabase !== null && !demo;
   const [charity, setCharity] = useState<Charity | null | undefined>(live ? (cached?.charities.find((c) => c.slug === slug) ?? undefined) : (findCharity(slug) ?? null));
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -192,5 +222,6 @@ export function useCharity(slug: string | undefined) {
     setFailed(false);
     setAttempt((n) => n + 1);
   }, []);
+  if (!live) return { live, charity: findCharity(slug) ?? null, failed: false, retry };
   return { live, charity, failed, retry };
 }

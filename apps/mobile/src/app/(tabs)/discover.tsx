@@ -140,7 +140,7 @@ export default function Discover() {
                   </FadeUp>
                 ))}
               </View>
-              {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities for design review</Text>}
+              {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities (demo data)</Text>}
             </View>
           )}
         </View>

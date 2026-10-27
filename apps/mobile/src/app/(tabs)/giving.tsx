@@ -658,7 +658,7 @@ export default function Giving() {
             </View>
             </>
             ) : null}
-            {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample giving history for design review</Text> : null}
+            {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample data: the demo donor&apos;s giving</Text> : null}
             {signedIn && account.live ? (
               <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(jhbDay(account.live.loadedAt))} at {hhmm(account.live.loadedAt)}. Pull down to refresh.</Text>
             ) : null}

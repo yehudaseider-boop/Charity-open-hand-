@@ -173,7 +173,7 @@ export default function Receipts() {
                 </Text>
               </View>
             ) : null}
-            {preview && years.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample receipts for design review</Text> : null}
+            {preview && years.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample data: the demo donor&apos;s receipts</Text> : null}
           </>
         )}
         </View>
