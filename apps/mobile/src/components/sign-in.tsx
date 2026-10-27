@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useAccount } from "@/lib/account";
 import { cleanCode, looksLikeEmail } from "@/lib/live-giving";
 import { openSite } from "@/lib/open-site";
+import { TEST_BUILD } from "@/lib/test-build";
 import { colors, radius, type } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { Field } from "./field";
@@ -79,6 +80,8 @@ export function SignIn() {
             await step(setBusy, setError, () => account.sendCode(email), () => setSentTo(email.trim()));
           }}
         />
+        {/* Test builds only (Expo Go and the preview channel): look around as a sample donor, no sign-in. */}
+        {TEST_BUILD ? <TextLink label="Try the demo (sample data)" onPress={account.enterDemo} /> : null}
       </View>
     );
   }

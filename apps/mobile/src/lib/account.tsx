@@ -12,6 +12,7 @@ import { syncGiverType } from "./giver-type";
 import { secureStorage } from "./secure-storage";
 import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
+import { TEST_BUILD } from "./test-build";
 
 /**
  * Who is using the app, and their real giving.
@@ -53,6 +54,10 @@ type AccountValue = {
   addElsewhere(e: { cents: number; date: string; recipient: string; label: string | null }): Promise<Result>;
   removeElsewhere(id: string): Promise<Result>;
   setRecurringStatus(id: string, status: "active" | "paused" | "cancelled"): Promise<Result>;
+  /** Test builds only: look around as a sample donor, without signing in. The screens show sample data (status "preview"). */
+  demo: boolean;
+  enterDemo(): void;
+  exitDemo(): void;
 };
 
 const AccountContext = createContext<AccountValue | null>(null);
@@ -164,9 +169,33 @@ async function hasAgreed(userId: string): Promise<boolean | null> {
   return Boolean(data && data.length > 0);
 }
 
+const DEMO_KEY = "nediv-lev.demo";
+
 export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [status, setStatus] = useState<AccountStatus>(supabase ? "loading" : "preview");
+  const [realStatus, setStatus] = useState<AccountStatus>(supabase ? "loading" : "preview");
+  // The demo (test builds only) is remembered on this phone, so it is still there next time the app opens.
+  const [demo, setDemo] = useState(false);
+  const [demoRead, setDemoRead] = useState(!TEST_BUILD);
+  useEffect(() => {
+    if (!TEST_BUILD) return;
+    secureStorage
+      .getItem(DEMO_KEY)
+      .then((v) => setDemo(v === "yes"))
+      .catch(() => undefined)
+      .finally(() => setDemoRead(true));
+  }, []);
+  const enterDemo = useCallback(() => {
+    if (!TEST_BUILD) return;
+    setDemo(true);
+    void secureStorage.setItem(DEMO_KEY, "yes").catch(() => undefined);
+  }, []);
+  const exitDemo = useCallback(() => {
+    setDemo(false);
+    void secureStorage.removeItem(DEMO_KEY).catch(() => undefined);
+  }, []);
+  // Until the phone has said whether the demo is on, nothing is shown as signed out.
+  const status: AccountStatus = !demoRead ? "loading" : demo ? "preview" : realStatus;
   const [live, setLive] = useState<Live | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -198,6 +227,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       setArrived([]);
     }
     lastUser.current = s.user.id;
+    // Someone really signed in: the demo is over.
+    setDemo(false);
+    void secureStorage.removeItem(DEMO_KEY).catch(() => undefined);
     // Already checked for this person in this session: nothing to ask again.
     if (agreedFor.current === s.user.id) return setStatus("signed-in");
     const agreed = await hasAgreed(s.user.id);
@@ -386,6 +418,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
       },
       refresh,
+      demo,
+      enterDemo,
+      exitDemo,
       async signOut() {
         // Their giving and remembered details don't stay on the phone once they sign out (goals and
         // income are kept, by design: "stay on this phone", under their own user id).
@@ -426,7 +461,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
       },
     }),
-    [status, session, live, loadError, refreshing, refresh, arrived, accessToken],
+    [status, session, live, loadError, refreshing, refresh, arrived, accessToken, demo, enterDemo, exitDemo],
   );
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;

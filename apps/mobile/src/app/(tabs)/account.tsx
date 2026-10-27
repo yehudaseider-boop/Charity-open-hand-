@@ -1,8 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import Constants, { ExecutionEnvironment } from "expo-constants";
-import * as Updates from "expo-updates";
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { InsightsLink } from "@/components/insights-link";
@@ -22,14 +20,13 @@ import { SavedCardRow } from "@/components/saved-card-row";
 import { SwitchRow } from "@/components/switch-row";
 import { notify, openSite } from "@/lib/open-site";
 import { helpLine, helpMailto } from "@/lib/help";
+import { TEST_BUILD } from "@/lib/test-build";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
 /**
  * Screen 9: Account. Live: email-code sign-in, then agreement, then the
  * account. Preview (no live database yet): the sample account, ?demo=signedin.
  */
-/** Only in test builds (Expo Go, or the preview update channel), never in the store app. */
-const TEST_BUILD = __DEV__ || Constants.executionEnvironment === ExecutionEnvironment.StoreClient || Updates.channel === "preview";
 
 /** Asks first, then resets this phone's first-open choices and shows the welcome again. */
 function confirmStartAgain() {
@@ -55,7 +52,7 @@ export default function Account() {
   const account = useAccount();
   const [demoSignedIn, setDemoSignedIn] = useState(p.demo === "signedin");
   const preview = account.status === "preview";
-  const signedIn = preview ? demoSignedIn : account.status === "signed-in";
+  const signedIn = preview ? account.demo || demoSignedIn : account.status === "signed-in";
 
   // Legal pages live on the website (one source of truth). Apple requires a
   // privacy policy link in the app, and a way to start deleting your account.
@@ -124,6 +121,9 @@ export default function Account() {
               <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.blueSoft} onPress={() => router.push("/receipts")} />
             </View>
             <InsightsLink />
+            {account.demo ? (
+              <Text variant="label" style={{ textAlign: "center" }}>Demo account. Sample data only: nothing here is real and no payment is taken.</Text>
+            ) : null}
 
             <SavedCardRow />
             {preferences}
@@ -136,7 +136,7 @@ export default function Account() {
               ]}
             />
             <SettingsGroup
-              cells={[{ label: "Sign out", destructive: true, onPress: () => (preview ? setDemoSignedIn(false) : account.signOut()) }]}
+              cells={[{ label: "Sign out", destructive: true, onPress: () => (account.demo ? account.exitDemo() : preview ? setDemoSignedIn(false) : account.signOut()) }]}
             />
           </>
         ) : (

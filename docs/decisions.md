@@ -2,6 +2,12 @@
 
 ## Decided
 
+- **Demo account in the phone app (27/10/2026).** Test builds only (Expo Go, the preview update channel, development;
+  never the store app): the sign-in card has "Try the demo (sample data)". It shows the app as the sample donor
+  (Sarah Levin, sample giving, goal and s18A receipts), with a "Demo account" line on the Account tab. No sign-in,
+  no database reads or writes, no payment (giving says "This is the preview, so no payment is taken"). It is
+  remembered on the phone until "Sign out" on the Account tab, and ends by itself if someone really signs in.
+  Built on the app's existing sample-data ("preview") mode; `TEST_BUILD` moved to `src/lib/test-build.ts`.
 - **Give form fixes on the website (26/10/2026).** (1) Switching "Giving as" between Myself and a company or trust
   keeps what was typed in each (names, organisation, ID number): the other set is hidden and not sent, never removed.
   (2) When the saved ID number can't be used, Pay's "take me to it" lands on the message next to the saved number
