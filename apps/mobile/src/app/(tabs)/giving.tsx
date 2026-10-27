@@ -317,7 +317,7 @@ export default function Giving() {
                 {tiles.map((t, i) => (
                   <View key={i} style={styles.tileWrap}>
                     <View style={[styles.tile, t.given ? styles.tileGiven : t.future ? styles.tileFuture : styles.tileEmpty, t.current && styles.tileNow]} />
-                    <Text style={styles.tileLabel}>{t.label.slice(0, 1)}</Text>
+                    <Text style={[styles.tileLabel, width < 340 && { fontSize: 8.5 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t.label}</Text>
                   </View>
                 ))}
               </View>
@@ -843,13 +843,13 @@ const styles = StyleSheet.create({
   headLine: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
   ringRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   tiles: { flexDirection: "row", gap: 4 },
-  tileWrap: { flex: 1, alignItems: "center", gap: 4 },
+  tileWrap: { flex: 1, alignItems: "center", gap: 4, minWidth: 0 },
   tile: { width: "100%", height: 22, borderRadius: 7 },
   tileGiven: { backgroundColor: colors.orange },
   tileEmpty: { backgroundColor: colors.blueTrack },
   tileFuture: { borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.lilac },
   tileNow: { borderWidth: 2, borderColor: colors.onInk },
-  tileLabel: { fontFamily: fonts.bodySemibold, fontSize: 11, color: colors.lilacSoft },
+  tileLabel: { fontFamily: fonts.bodySemibold, fontSize: 10, color: colors.lilacSoft, textAlign: "center" },
   goalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
   goalChipAdd: { borderStyle: "dashed", borderColor: colors.blue },
