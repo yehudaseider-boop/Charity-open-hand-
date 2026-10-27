@@ -2,6 +2,14 @@
 
 ## Decided
 
+- **Clear names for the two work areas, and one address (27/10/2026, Yehuda).** Givezy's own area is "Givezy
+  admin" and a charity's own area is "Charity dashboard", in the header (both show for Givezy staff who also run
+  a charity; a phone shows "Admin" and "Dashboard"), on the area itself and on the account page. Before, a platform
+  admin who also ran a charity saw only "Dashboard", which led to the charity's area, and the admin area had no
+  header link at all. One address: on the deployed site every page visit on an address other than SITE_URL moves
+  to SITE_URL (a temporary redirect, `src/lib/canonical-host.ts`), because a sign-in link only works on the address
+  it was asked for from and always points at SITE_URL. `/api/` (payment messages, the app) and sent forms are never
+  moved.
 - **Charity-only links and the website button (27/10/2026, Yehuda).** A charity asked for a Givezy button for its own
   website. Anyone who arrives from a charity's own link (the "Give with Givezy" button, a copied link, WhatsApp, the QR
   poster, or a share from the app) sees only that charity: a slim header with the logo and "Secure giving" and no menu,

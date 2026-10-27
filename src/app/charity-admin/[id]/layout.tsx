@@ -37,7 +37,7 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
         <Splash className="absolute right-[max(1.5rem,calc(50%-36rem))] top-1/2 hidden h-auto w-20 -translate-y-1/2 sm:block" />
         <div className="relative mx-auto flex max-w-[75rem] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-6 sm:px-6">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-bold text-brand">Givezy for charities</p>
+            <p className="text-sm font-bold text-brand">Charity dashboard</p>
             <p className="font-display text-[clamp(1.75rem,4vw,2.5rem)] font-bold leading-tight text-indigo">{charity.name_en}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:mr-24">
@@ -59,7 +59,7 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
           {asGivezy ? (
             <p role="note" className="rounded-card border-2 border-honey bg-honey-soft p-4 text-sm text-navy print:hidden">
               You&apos;re looking at {charity.name_en}&apos;s dashboard as Givezy, with the owner&apos;s powers. Anything you save, send or remove here is real.{" "}
-              <Link href={`/admin/charities/${id}`} className="font-semibold underline">Back to Admin</Link>
+              <Link href={`/admin/charities/${id}`} className="font-semibold underline">Back to Givezy admin</Link>
             </p>
           ) : null}
           {children}

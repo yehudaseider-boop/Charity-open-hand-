@@ -5,7 +5,7 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Platform admin" };
+export const metadata: Metadata = { title: "Givezy admin" };
 
 export default async function AdminPage() {
   await requirePlatformAdmin();

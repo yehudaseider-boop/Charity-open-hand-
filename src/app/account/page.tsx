@@ -68,7 +68,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           <div className="flex flex-wrap items-center gap-2 sm:mr-24">
             <Badge>Donor</Badge>
             {viewer.managedCharityIds.length > 0 ? <Badge tone="brand">Charity admin</Badge> : null}
-            {viewer.isPlatformAdmin ? <Badge tone="success">Platform admin</Badge> : null}
+            {viewer.isPlatformAdmin ? <Badge tone="success">Givezy admin</Badge> : null}
           </div>
         </div>
       </header>
@@ -235,7 +235,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           ) : null}
           {viewer.isPlatformAdmin ? (
             <Link href="/admin" className="block rounded-control border-2 border-border p-3">
-              Platform admin
+              Givezy admin
             </Link>
           ) : null}
         </section>
