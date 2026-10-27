@@ -2,6 +2,14 @@
 
 ## Decided
 
+- **Donor tap-through of the app (27/10/2026).** Every screen in the demo, every control tapped, every label read as a
+  stranger would. Fixed: month initials (M A M J J…) on Progress and the Insights chart now read Mar, Apr…; Progress month
+  tiles fill by each month's share of the goal; "By cause" names the charities in each cause and says when the split
+  matches "By charity"; the demo now uses the sample charities everywhere (before, the sample gifts pointed at the live
+  test directory, so causes showed as "Not in a cause"); the give screen in the demo never contacts the server and always
+  shows the form (it showed "We can't open giving"); the Jewish calendar switch's promised greeting and Hebrew date are
+  back on Home (removed by mistake in the 22/10 tidy-up); "for design review" notes now say "Sample data". From now on,
+  every screen gets this tap-through before it is called done.
 - **Demo account in the phone app (27/10/2026).** Test builds only (Expo Go, the preview update channel, development;
   never the store app): the sign-in card has "Try the demo (sample data)". It shows the app as the sample donor
   (Sarah Levin, sample giving, goal and s18A receipts), with a "Demo account" line on the Account tab. No sign-in,

@@ -1,3 +1,4 @@
+import { DayLine } from "@/components/day-greeting";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -103,7 +104,8 @@ export default function Home() {
           </Pressable>
         </View>
 
-        <View style={styles.gutter}>
+        <View style={[styles.gutter, { gap: 6 }]}>
+          <DayLine />
           <Text variant="h1" accessibilityRole="header">{firstGift ? "Welcome in. Ready for your first gift?" : "Ready to do some good?"}</Text>
         </View>
 
