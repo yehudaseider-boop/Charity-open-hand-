@@ -194,7 +194,7 @@ export default function Giving() {
   const main = goals[0] ?? null;
   const mainProgress = main ? goalProgress(main, goalRows, income, now) : null;
   const mainPct = mainProgress?.targetCents ? Math.floor((mainProgress.givenCents * 100) / mainProgress.targetCents) : 0;
-  const tiles = main ? monthTiles(main, goalRows, now) : [];
+  const tiles = main ? monthTiles(main, goalRows, now, mainProgress?.targetCents ?? null) : [];
 
   const addIncome = (e: { cents: number; date: string; note: string }) => {
     if (!incomeReady) return;
@@ -313,10 +313,13 @@ export default function Giving() {
                   ) : null}
                 </View>
               </View>
-              <View style={styles.tiles} accessibilityLabel="Months with a gift">
+              <View style={styles.tiles} accessibilityLabel="Months with a gift, filled by how much of each month's share of the goal was given">
                 {tiles.map((t, i) => (
                   <View key={i} style={styles.tileWrap}>
-                    <View style={[styles.tile, t.given ? styles.tileGiven : t.future ? styles.tileFuture : styles.tileEmpty, t.current && styles.tileNow]} />
+                    {/* A given month fills from the bottom by how much of that month's share of the goal was given. */}
+                    <View style={[styles.tile, t.future && !t.given ? styles.tileFuture : styles.tileEmpty, t.current && styles.tileNow]}>
+                      {t.given ? <View style={[styles.tileFill, { height: `${t.fill / 10}%` }]} /> : null}
+                    </View>
                     <Text style={[styles.tileLabel, width < 340 && { fontSize: 8.5 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t.label}</Text>
                   </View>
                 ))}
@@ -844,8 +847,8 @@ const styles = StyleSheet.create({
   ringRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   tiles: { flexDirection: "row", gap: 4 },
   tileWrap: { flex: 1, alignItems: "center", gap: 4, minWidth: 0 },
-  tile: { width: "100%", height: 22, borderRadius: 7 },
-  tileGiven: { backgroundColor: colors.orange },
+  tile: { width: "100%", height: 22, borderRadius: 7, overflow: "hidden", justifyContent: "flex-end" },
+  tileFill: { width: "100%", backgroundColor: colors.orange },
   tileEmpty: { backgroundColor: colors.blueTrack },
   tileFuture: { borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.lilac },
   tileNow: { borderWidth: 2, borderColor: colors.onInk },

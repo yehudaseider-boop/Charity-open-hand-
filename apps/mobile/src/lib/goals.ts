@@ -161,20 +161,45 @@ export function knownLabels(rows: { label: string | null }[], extra: readonly st
   return [...seen.values()].sort((a, b) => b.n - a.n || a.label.localeCompare(b.label)).map((s) => s.label);
 }
 
-export type MonthTile = { label: string; given: boolean; future: boolean; current: boolean };
+export type MonthTile = {
+  label: string;
+  given: boolean;
+  future: boolean;
+  current: boolean;
+  /** How full the tile is, 0 to 1000: what was given that month against the month's share of the goal. */
+  fill: number;
+};
+
+/** A month with a gift never looks empty, however small the gift. */
+const MIN_FILL = 150;
 
 /**
  * One tile per month of the goal's year (a monthly goal shows the tax year): given when a gift
  * that counts towards the goal was made that month, future for months still to come.
+ *
+ * Each given month fills by its share of the goal: a yearly goal is split evenly over its months
+ * (R12 000 over 12 months is R1 000 a month), a monthly goal is its own amount each month. A month
+ * at or above its share is full. With no target to measure against (a share of income with no
+ * income logged, or a monthly share of income, whose target changes each month), a given month is full.
  */
-export function monthTiles(goal: Goal, rows: Row[], today: Date): MonthTile[] {
+export function monthTiles(goal: Goal, rows: Row[], today: Date, targetCents: number | null = null): MonthTile[] {
   const w = goalWindow(goal.period === "year" ? goal : { period: "year", year: "tax" }, today);
   const key = (d: Date) => d.getFullYear() * 12 + d.getMonth();
-  const given = new Set(rows.filter((r) => counts(goal, r.label)).map((r) => key(r.date)));
+  const byMonth = new Map<number, number>();
+  for (const r of rows) if (counts(goal, r.label)) byMonth.set(key(r.date), (byMonth.get(key(r.date)) ?? 0) + r.cents);
   const now = key(today);
+  const first = key(w.start);
+  const last = key(w.end);
+  const months = last - first + 1;
+  // The month's share, kept as a fraction (target / per) so no cents are rounded away.
+  const measurable = targetCents !== null && targetCents > 0 && !(goal.period === "month" && goal.basis === "income");
+  const per = goal.period === "month" ? 1 : months;
   const tiles: MonthTile[] = [];
-  for (let m = key(w.start); m <= key(w.end); m++) {
-    tiles.push({ label: MONTHS[m % 12].slice(0, 3), given: given.has(m), future: m > now, current: m === now });
+  for (let m = first; m <= last; m++) {
+    const cents = byMonth.get(m) ?? 0;
+    const given = byMonth.has(m);
+    const fill = !given ? 0 : !measurable ? 1000 : Math.max(MIN_FILL, Math.min(1000, Math.floor((cents * per * 1000) / targetCents!)));
+    tiles.push({ label: MONTHS[m % 12].slice(0, 3), given, future: m > now, current: m === now, fill });
   }
   return tiles;
 }

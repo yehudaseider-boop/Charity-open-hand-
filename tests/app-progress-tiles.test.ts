@@ -31,4 +31,26 @@ describe("month tiles", () => {
     expect(t[1].given).toBe(false);
     expect(t[2].given).toBe(true);
   });
+
+  it("fills each month by its share of a yearly goal: R12 000 is R1 000 a month", () => {
+    const rows = [
+      { date: d(2026, 6, 1), cents: 50_000, label: null }, // R500: half
+      { date: d(2026, 8, 1), cents: 100_000, label: null }, // R1 000: full
+      { date: d(2026, 9, 1), cents: 30_000, label: null }, // R300 and R100 the same month: 40%
+      { date: d(2026, 9, 20), cents: 10_000, label: null },
+      { date: d(2026, 10, 1), cents: 250_000, label: null }, // R2 500: full, never past full
+      { date: d(2026, 4, 1), cents: 1_000, label: null }, // R10: still visibly given
+    ];
+    const t = monthTiles(goal(), rows, d(2026, 10, 16), 1_200_000);
+    expect(t.map((x) => x.fill)).toEqual([0, 150, 0, 500, 0, 1000, 400, 1000, 0, 0, 0, 0]);
+  });
+  it("a monthly goal fills against its own amount each month", () => {
+    const t = monthTiles(goal({ period: "month", fixedCents: 20_000 }), [{ date: d(2026, 5, 3), cents: 10_000, label: null }], d(2026, 10, 16), 20_000);
+    expect(t[2].fill).toBe(500);
+  });
+  it("with no target to measure against, a given month is full", () => {
+    const t = monthTiles(goal({ basis: "income", percentPpm: 100_000, fixedCents: null }), [{ date: d(2026, 5, 3), cents: 100, label: null }], d(2026, 10, 16), null);
+    expect(t[2].fill).toBe(1000);
+    expect(t[3].fill).toBe(0);
+  });
 });
