@@ -2,6 +2,18 @@
 
 ## Decided
 
+- **Charity-only links and the website button (27/10/2026, Yehuda).** A charity asked for a Givezy button for its own
+  website. Anyone who arrives from a charity's own link (the "Give with Givezy" button, a copied link, WhatsApp, the QR
+  poster, or a share from the app) sees only that charity: a slim header with the logo and "Secure giving" and no menu,
+  a short footer (card safety, Privacy, Terms), and a thank-you page whose way on is "Back to the charity's page", never
+  "Find a charity". It lasts 3 hours (a cookie, `gz_focus`), only on that charity's pages and the thank-you page, and ends
+  when the person goes to the home page or the charities list. Logic in `src/lib/focus.ts`. The button: Dashboard,
+  Website button, pick blue or white and "Give with Givezy" or "Donate", optionally one open campaign, see it, copy the
+  code (a plain link with inline styles and the logo's splash on white, no script of ours on their site) or just the
+  link, with steps for WordPress, Wix, Squarespace and a web designer. Gifts from it show as "Website button"
+  (`?src=button`, stored as `website_button`; database change `20261027000001_website_button_source.sql`). Shared links
+  open the web page, not the app: opening the app from a link needs our own domain on the live site and a store build
+  (go-live checklist).
 - **Tax years are written "2026/27" (27/10/2026, Yehuda).** "Tax year 2027" read as next year to donors in 2026. Everywhere
   people read it (app, website, dashboards, s18A receipt PDFs, exports, the dashboard's "what happened" lines) it is now
   "2026/27 tax year" for 01/03/2026 to 28/02/2027, from one helper (`taxYearName` in `src/lib/dates.ts`, and the same in

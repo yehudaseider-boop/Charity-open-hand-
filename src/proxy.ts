@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { CURRENT_PATH_HEADER } from "@/lib/current-path";
+import { SOURCE_PARAM } from "@/lib/donations/source";
+import { FOCUS_COOKIE, FOCUS_SECONDS, focusChange } from "@/lib/focus";
 
 /** Keeps the Supabase login session fresh on every page request. */
 export async function proxy(request: NextRequest) {
@@ -26,6 +28,15 @@ export async function proxy(request: NextRequest) {
 
   // Do not remove: this call refreshes an expired session.
   await supabase.auth.getUser();
+
+  // A charity's own link (button, share, QR) keeps the visit on that charity; the home page or the
+  // charities list ends it.
+  const focus = focusChange(request.nextUrl.pathname, request.nextUrl.searchParams.get(SOURCE_PARAM));
+  if (focus === "clear") {
+    if (request.cookies.has(FOCUS_COOKIE)) response.cookies.delete(FOCUS_COOKIE);
+  } else if (focus) {
+    response.cookies.set(FOCUS_COOKIE, focus.set, { httpOnly: true, sameSite: "lax", secure: request.nextUrl.protocol === "https:", maxAge: FOCUS_SECONDS, path: "/" });
+  }
   return response;
 }
 

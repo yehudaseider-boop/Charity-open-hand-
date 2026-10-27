@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, Heebo } from "next/font/google";
 import { platformConfig } from "@/config/platform";
-import { SiteFooter } from "@/components/legal";
+import { PageFooter } from "@/components/page-footer";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col font-sans">
         <SiteHeader />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>
-        <SiteFooter />
+        <PageFooter />
       </body>
     </html>
   );

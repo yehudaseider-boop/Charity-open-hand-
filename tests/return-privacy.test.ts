@@ -33,7 +33,11 @@ vi.mock("@/lib/donations/confirm", () => ({
   // Without the donor's credential the page shows only what is saved, and never asks the provider.
   savedOutcome: async () => outcome,
 }));
-vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }) }));
+let focusCookie: string | undefined; // set when the donor came from the charity's own link
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7", "x-givezy-path": "/donate/return" }),
+  cookies: async () => ({ get: (name: string) => (name === "gz_focus" && focusCookie ? { name, value: focusCookie } : undefined) }),
+}));
 vi.mock("@/lib/auth", () => ({ getViewer: async () => null }));
 vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit, ipKeys: (ip: string) => [`ip:${ip}`] }));
 vi.mock("@/lib/donations/confirmation-access", () => ({
@@ -64,6 +68,7 @@ beforeEach(() => {
   confirmCalls = 0;
   overLimit = false;
   sessionRow = null;
+  focusCookie = undefined;
 });
 
 describe("confirmation page privacy", () => {
@@ -134,6 +139,17 @@ describe("confirmation page privacy", () => {
     expect(await page({})).not.toMatch(/maaser|R23\.45/i);
     outcome = "not_found";
     expect(await page({})).toContain("Donation not found");
+  });
+
+  it("a donor from the charity's own link is never sent to other charities", async () => {
+    outcome = "not_found";
+    expect(await page({})).toContain('href="/charities"');
+    focusCookie = "northcliff-meals-fund";
+    const html = await page({});
+    expect(html).not.toContain('href="/charities"');
+    expect(html).toContain('href="/c/northcliff-meals-fund"');
+    outcome = "paid";
+    expect(await page({})).not.toContain("Find a charity");
   });
 });
 

@@ -1,14 +1,15 @@
 /**
  * Where a gift came from, for the charity's dashboard: the website, the app, a link shared on WhatsApp
- * or elsewhere, or the QR poster. A shared link carries `?src=` (whatsapp, link or qr); the donor's
- * pages pass it on to the payment and it is kept on the gift. Only these values are ever stored.
+ * or elsewhere, the QR poster, or the "Give with Givezy" button on the charity's own website. A link
+ * carries `?src=` (whatsapp, link, qr or button); the donor's pages pass it on to the payment and it
+ * is kept on the gift. Only these values are ever stored.
  * No imports, so the app's share code can use the same tags.
  */
 
 export const SOURCE_PARAM = "src";
 
 /** The tag on a shared link, and what it is stored as. */
-const TAGS = { whatsapp: "whatsapp", link: "share_link", qr: "qr" } as const;
+const TAGS = { whatsapp: "whatsapp", link: "share_link", qr: "qr", button: "website_button" } as const;
 export type SourceTag = keyof typeof TAGS;
 
 export const GIFT_SOURCES = {
@@ -17,6 +18,7 @@ export const GIFT_SOURCES = {
   whatsapp: "WhatsApp",
   share_link: "Shared link",
   qr: "QR poster",
+  website_button: "Website button",
   recorded: "Recorded by you",
 } as const;
 export type GiftSource = keyof typeof GIFT_SOURCES;

@@ -20,6 +20,7 @@ import { getViewer } from "@/lib/auth";
 import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
 import { cardUpdateFor, newCardPath } from "@/lib/donations/new-card";
 import { Splash } from "@/components/splash";
+import { currentFocus } from "@/lib/focus-server";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };
@@ -37,6 +38,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // can arrive twice: take the first.
   const fromApp = first(params.from) === "app";
   const viewer = await getViewer();
+  // Came from a charity's own link: the way on stays with that charity, never "Find a charity".
+  const focus = await currentFocus();
+  const elsewhere = focus ? { href: `/c/${focus}`, label: "Back to the charity's page" } : { href: "/charities", label: "Find a charity" };
   const ref = first(params.reference) ?? "";
   const t = first(params.t);
   // If the payment provider can't be reached, or the result can't be saved yet, say we're still
@@ -92,7 +96,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // A new card for a monthly donation ("Update my card"): trying again goes back there, not to a new gift.
   // Only for the donor holding this payment's credential, who is the one the update link was for.
   const cardUpdate = holdsToken && d ? await cardUpdateFor(d.id).catch(() => null) : null;
-  const retryHref = cardUpdate ? newCardPath(cardUpdate.recurringId, new Date()) : charity ? `/c/${charity.slug}/donate${retryQuery}` : "/charities";
+  const retryHref = cardUpdate ? newCardPath(cardUpdate.recurringId, new Date()) : charity ? `/c/${charity.slug}/donate${retryQuery}` : elsewhere.href;
 
   if (outcome === "paid" && d && charity) {
     // What this gift pays for, worked out from the charity's own figure (none when it set no figure).
@@ -175,7 +179,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             Back to the Givezy app
           </a>
         ) : null}
-        <Link href="/charities" className="mt-3 inline-block font-semibold text-brand underline underline-offset-4">Find a charity</Link>
+        <Link href={elsewhere.href} className="mt-3 inline-block font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>
       </Result>
     );
   }
@@ -207,7 +211,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
         <p className="mt-3 text-sm text-muted">Questions in the meantime: <HelpLine /></p>
         <p className="mt-4 flex flex-wrap gap-4 text-sm">
-          <Link href="/charities" className="font-semibold text-brand underline underline-offset-4">Find a charity</Link>
+          <Link href={elsewhere.href} className="font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>
           <Link href="/account" className="font-semibold text-brand underline underline-offset-4">Your account</Link>
         </p>
       </Result>
@@ -217,7 +221,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Result tone="neutral" title="This donation was refunded">
         <p>The money went back to your card, so nothing is owed on this donation. The confirmation email you got for it no longer applies.</p>
-        {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link> : <Link href="/charities" className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Find a charity</Link>}
+        {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link> : <Link href={elsewhere.href} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>}
         <p className="mt-4 text-sm text-muted">Questions: <HelpLine /></p>
       </Result>
     );
@@ -235,7 +239,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       <p className="text-sm text-muted">
         We couldn&apos;t find that donation. If money left your account, send us the date and the amount and we&apos;ll find it: <HelpLine />
       </p>
-      <Link href="/charities" className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Find a charity</Link>
+      <Link href={elsewhere.href} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>
     </Result>
   );
 }

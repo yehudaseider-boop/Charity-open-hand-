@@ -3,8 +3,27 @@ import { platformConfig } from "@/config/platform";
 import { getViewer } from "@/lib/auth";
 import { dashboardLink } from "@/lib/dashboard-link";
 import { NavLink } from "@/components/nav-link";
+import { currentFocus } from "@/lib/focus-server";
 
 export async function SiteHeader() {
+  // Arrived from a charity's own link: only that charity, so no way off to other charities from here.
+  if (await currentFocus()) {
+    return (
+      <header className="border-b border-border bg-surface print:hidden">
+        <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:px-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
+          <p className="flex items-center gap-1.5 text-sm text-muted">
+            <svg aria-hidden viewBox="0 0 24 24" width="15" height="15" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-sage">
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+            Secure giving
+          </p>
+        </div>
+      </header>
+    );
+  }
   const viewer = await getViewer();
   const dashboard = dashboardLink(viewer);
   return (

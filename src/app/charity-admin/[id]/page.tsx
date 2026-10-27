@@ -152,6 +152,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
             <p className="mb-2">Share your Givezy page with your supporters:</p>
             <ShareLinks url={publicLink} message={`Give to ${charity.name_en} on Givezy:`} />
             <Link href={`${base}/poster`} className="mt-2 inline-block text-brand underline">Print a QR poster for your notice board</Link>
+            <Link href={`${base}/website-button`} className="mt-2 block text-brand underline">Add a &quot;Give with Givezy&quot; button to your website</Link>
           </div>
         </Card>
       ) : null}
@@ -359,6 +360,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
       <div className="flex flex-wrap gap-2 text-sm">
         <Link href={`${base}/poster`} className="rounded-full border-2 border-border bg-surface px-4 py-2 font-semibold text-brand hover:border-brand">Print a QR poster</Link>
+        <Link href={`${base}/website-button`} className="rounded-full border-2 border-border bg-surface px-4 py-2 font-semibold text-brand hover:border-brand">Website button</Link>
         <a href={`${base}/export/donations`} className="rounded-full border-2 border-border bg-surface px-4 py-2 font-semibold text-brand hover:border-brand">Download paid donations (CSV)</a>
       </div>
     </div>
