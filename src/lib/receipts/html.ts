@@ -9,6 +9,7 @@
 import { formatRand } from "@/lib/money";
 import { brandColors as colours } from "@/lib/brand-colors";
 import type { ReceiptDetails } from "./details";
+import { taxYearName } from "@/lib/dates";
 
 export function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -81,7 +82,7 @@ ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
   <div class="ref">
     <div class="muted">Receipt number</div><div><strong>${esc(reference)}</strong></div>
     <div class="muted" style="margin-top:2mm">Date issued</div><div>${esc(d.issued_on)}</div>
-    <div class="muted" style="margin-top:2mm">Tax year</div><div>${esc(String(d.tax_year))} (${esc(d.period)})</div>
+    <div class="muted" style="margin-top:2mm">Tax year</div><div>${esc(taxYearName(Number(d.tax_year)))} (${esc(d.period)})</div>
   </div>
 </div>
 

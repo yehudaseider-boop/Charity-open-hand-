@@ -6,7 +6,7 @@
  * check it. Money is whole cents; percentages are parts per million (10% = 100 000).
  */
 import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "./hebrew-year";
-import { taxYearFor } from "./tax-year";
+import { taxYearFor, taxYearName } from "./tax-year";
 
 export type GoalPeriod = "month" | "year";
 /** "tax": SARS tax year, 1 March to end February. "hebrew": Rosh Hashana to Rosh Hashana. */
@@ -103,7 +103,7 @@ export function goalWindow(goal: Pick<Goal, "period" | "year">, today: Date): Go
   const start = new Date(ty - 1, 2, 1);
   const end = new Date(ty, 2, 0);
   const monthsLeft = Math.max(1, (end.getFullYear() - today.getFullYear()) * 12 + (end.getMonth() - today.getMonth()) + 1);
-  return { start, end, label: `Tax year ${ty}`, endLabel: dmy(end), monthsLeft };
+  return { start, end, label: `${taxYearName(ty)} tax year`, endLabel: dmy(end), monthsLeft };
 }
 
 type Row = { date: Date; cents: number; label: string | null };

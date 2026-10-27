@@ -34,6 +34,6 @@ describe("taxYearRange", () => {
     expect(taxYearRange(2028)).toEqual({ start: "2027-03-01", end: "2028-02-29" });
   });
   it("labels", () => {
-    expect(taxYearLabel(2027)).toBe("Tax year 2027 (01/03/2026 to 28/02/2027)");
+    expect(taxYearLabel(2027)).toBe("2026/27 tax year (01/03/2026 to 28/02/2027)");
   });
 });

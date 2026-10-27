@@ -60,9 +60,18 @@ export function taxYearRange(taxYear: number): { start: string; end: string } {
   return { start, end };
 }
 
-/** "Tax year 2027 (01/03/2026 to 28/02/2027)" */
+/**
+ * How a tax year is written for people: "2026/27" for the year 1 March 2026 to the end of February 2027
+ * (decided 27/10/2026: "Tax year 2027" read as next year to donors in 2026). The number stays the year it
+ * ends, as SARS numbers it, everywhere it is stored.
+ */
+export function taxYearName(taxYear: number): string {
+  return `${taxYear - 1}/${String(taxYear % 100).padStart(2, "0")}`;
+}
+
+/** "2026/27 tax year (01/03/2026 to 28/02/2027)" */
 export function taxYearLabel(taxYear: number): string {
   const { start, end } = taxYearRange(taxYear);
   const fmt = (iso: string) => iso.split("-").reverse().join("/");
-  return `Tax year ${taxYear} (${fmt(start)} to ${fmt(end)})`;
+  return `${taxYearName(taxYear)} tax year (${fmt(start)} to ${fmt(end)})`;
 }

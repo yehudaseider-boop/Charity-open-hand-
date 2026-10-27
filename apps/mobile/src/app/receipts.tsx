@@ -16,7 +16,7 @@ import { useAccount } from "@/lib/account";
 import { notify, openSite } from "@/lib/open-site";
 import { useDirectory } from "@/lib/directory";
 import { useScreenState } from "@/lib/screen-state";
-import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
+import { taxYearFor, taxYearName, taxYearRangeLabel } from "@/lib/tax-year";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
 /** Screen 8: Receipts. Annual s18A receipts, grouped by tax year. A page opened from Home and Account, not a tab. */
@@ -84,7 +84,7 @@ export default function Receipts() {
             {preview || signedIn ? (
             <View style={styles.summary}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Text style={styles.summaryKicker}>Tax year {current} so far</Text>
+                <Text style={styles.summaryKicker}>{taxYearName(current)} tax year so far</Text>
                 <InfoButton terms={["s18a"]} />
               </View>
               <Text variant="amount" style={{ fontSize: 44, lineHeight: 50 }}>{rand(thisYearCents)}</Text>
@@ -120,7 +120,7 @@ export default function Receipts() {
                 return (
                   <FadeUp key={y} index={yi} style={{ gap: 8 }}>
                     <View style={{ gap: 2 }}>
-                      <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">Tax year {y}</Text>
+                      <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">{taxYearName(y)} tax year</Text>
                       <Text variant="label">{taxYearRangeLabel(y)}</Text>
                     </View>
                     <View style={{ gap: 14 }}>
@@ -129,7 +129,7 @@ export default function Receipts() {
                           key={r.id}
                           receipt={r}
                           onShare={() =>
-                            Share.share({ message: `s18A receipt${r.number ? ` ${r.number}` : ""} from ${r.charityName}, tax year ${y}` }).catch(() =>
+                            Share.share({ message: `s18A receipt${r.number ? ` ${r.number}` : ""} from ${r.charityName}, ${taxYearName(y)} tax year` }).catch(() =>
                               notify("Couldn't share", "Sharing isn't available here."),
                             )
                           }
@@ -156,7 +156,7 @@ export default function Receipts() {
                     <Button
                       key={y}
                       variant="secondary"
-                      label={y === current ? `Tax year ${y} so far` : `Tax year ${y}`}
+                      label={y === current ? `${taxYearName(y)} tax year so far` : `${taxYearName(y)} tax year`}
                       style={{ paddingHorizontal: 18 }}
                       onPress={() => (preview ? notify("Sample tax pack", "In the live app this opens your tax pack on our website.") : openSite(`/account/tax-pack/${y}`))}
                     />

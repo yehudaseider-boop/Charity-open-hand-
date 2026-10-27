@@ -19,7 +19,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl">Tax pack {year}</h1>
-          <p className="text-sm text-muted">{taxYearLabel(year).replace(/^Tax year \d+ /, "").replace(/[()]/g, "")}</p>
+          <p className="text-sm text-muted">{taxYearLabel(year).replace(/^\d{4}\/\d{2} tax year /, "").replace(/[()]/g, "")}</p>
           <p className="text-sm text-muted break-all">{email} · made on {formatDate(new Date())}</p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">

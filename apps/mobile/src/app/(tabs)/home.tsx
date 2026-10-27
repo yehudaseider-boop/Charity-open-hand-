@@ -18,7 +18,7 @@ import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, receipts as sa
 import { useAccount } from "@/lib/account";
 import { useDirectory } from "@/lib/directory";
 import { ddmmyyyy, rand, jhbToday } from "@/lib/format";
-import { taxYearFor } from "@/lib/tax-year";
+import { taxYearFor, taxYearName } from "@/lib/tax-year";
 import { openGiveScreen } from "@/lib/give-entry";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
@@ -78,7 +78,7 @@ export default function Home() {
   const yearCents = yearGifts.reduce((n, g) => n + g.cents, 0);
   const nextMonthly = monthlyList.filter((r) => r.status === "active" && r.nextDate).sort((a, b) => (a.nextDate as Date).getTime() - (b.nextDate as Date).getTime())[0] ?? null;
   const glance = [
-    yearGifts.length ? { key: "year", Icon: GivingIcon, title: "Given through Givezy", value: rand(yearCents), sub: `Tax year ${thisYear} · ${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving?section=year" } : null,
+    yearGifts.length ? { key: "year", Icon: GivingIcon, title: "Given through Givezy", value: rand(yearCents), sub: `${taxYearName(thisYear)} tax year · ${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving?section=year" } : null,
     nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving?section=monthly" } : null,
     receiptList.length ? { key: "receipts", Icon: ReceiptsIcon, title: "s18A receipts", value: `${receiptList.length}`, sub: "To download", to: "/receipts" } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);

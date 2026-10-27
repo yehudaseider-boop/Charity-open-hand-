@@ -8,7 +8,7 @@ import { thisTaxYear } from "@/lib/charity/dashboard";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { loadReceiptGifts } from "@/lib/charity/dashboard-queries";
 import { receiptProgress } from "@/lib/charity/insights";
-import { formatDate, taxYearLabel } from "@/lib/dates";
+import { formatDate, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { DonePanel } from "@/components/done-panel";
@@ -87,7 +87,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
             {progress.map((y) => (
               <li key={y.taxYear} className="flex items-start justify-between gap-3 py-2">
                 <div className="min-w-0">
-                  <p className="font-medium">{y.current ? `Tax year ${y.taxYear} so far` : taxYearLabel(y.taxYear)}</p>
+                  <p className="font-medium">{y.current ? `${taxYearName(y.taxYear)} tax year so far` : taxYearLabel(y.taxYear)}</p>
                   <p className="text-muted">
                     {y.donors} {y.donors === 1 ? "donor" : "donors"} asked for an s18A receipt
                     {y.current

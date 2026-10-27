@@ -14,7 +14,7 @@ import { dueReminders, lapsedDaysFor } from "@/lib/charity/donor-care";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { isRunning, progressPercent } from "@/lib/charity/campaigns";
 import { loadDonors, loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview } from "@/lib/charity/dashboard-queries";
-import { formatDate, isoDateInJhb, taxYearLabel } from "@/lib/dates";
+import { formatDate, isoDateInJhb, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
 import { impactTotal, impactUnitFrom } from "@/lib/charity/impact";
@@ -158,7 +158,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat strong label="This month" value={formatRand(month.paid_cents)} note={`${plural(month.paid_count, "donation")} · last month ${formatRand(prev.paid_cents)}`} />
-        <Stat label={`Tax year ${taxYear.taxYear}`} value={formatRand(year.paid_cents)} note={plural(year.paid_count, "donation")} />
+        <Stat label={`${taxYearName(taxYear.taxYear)} tax year`} value={formatRand(year.paid_cents)} note={plural(year.paid_count, "donation")} />
         <Stat label="Every month" value={formatRand(regular.runningCentsPerMonth)} note={`from ${plural(regular.runningCount, "monthly donor")}`} />
         <Stat label="Donors" value={String(all.donor_count)} note={`${formatRand(all.paid_cents)} given in all`} />
       </div>

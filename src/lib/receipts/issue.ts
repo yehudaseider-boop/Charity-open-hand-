@@ -7,7 +7,7 @@
  * charity and tax year, and a receipt whose PDF failed gets its PDF made on
  * the next run.
  */
-import { taxYearRange } from "@/lib/dates";
+import { taxYearName, taxYearRange } from "@/lib/dates";
 import type { EmailTransport } from "@/lib/email";
 import { buildReceiptEmail } from "./email";
 import { buildReceiptDetails, missingForSars, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
@@ -84,7 +84,7 @@ export async function runReceiptsJob(args: {
   const { store, taxYear, charityId } = args;
   const { start, end } = taxYearRange(taxYear);
   if (!taxYearIsClosed(end, args.today)) {
-    throw new Error(`Tax year ${taxYear} ends on ${end.split("-").reverse().join("/")}. Receipts are issued after it closes.`);
+    throw new Error(`The ${taxYearName(taxYear)} tax year ends on ${end.split("-").reverse().join("/")}. Receipts are issued after it closes.`);
   }
 
   const donations = await store.listDonations(taxYear, charityId);

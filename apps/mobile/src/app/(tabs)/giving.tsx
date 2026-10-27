@@ -27,7 +27,7 @@ import { monthDetail } from "@/lib/month-detail";
 import { loadGoals, saveGoals, setAsideGoals } from "@/lib/goals-store";
 import { useJewishMode } from "@/lib/jewish-mode";
 import { JEWISH_LABELS } from "@shared/donations/labels";
-import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
+import { taxYearFor, taxYearName, taxYearRangeLabel } from "@/lib/tax-year";
 import { useAccount } from "@/lib/account";
 import { loadIncome, saveIncome, startNewIncomeLog } from "@/lib/income-store";
 import { isoToDate, type Elsewhere, type IncomeEntry } from "@/lib/ledger";
@@ -570,7 +570,7 @@ export default function Giving() {
             {myGifts.length > 0 ? (
               <View style={{ gap: 12 }} onLayout={(e) => setSectionY((s) => ({ ...s, year: e.nativeEvent.layout.y }))}>
                 <Text variant="h2" style={styles.heading}>
-                  {shownYear === "all" ? "All your giving" : shownYear === taxYear ? `Tax year ${shownYear} so far` : `Tax year ${shownYear} in numbers`}
+                  {shownYear === "all" ? "All your giving" : shownYear === taxYear ? `${taxYearName(shownYear)} tax year so far` : `${taxYearName(shownYear)} tax year in numbers`}
                 </Text>
                 {years.length > 1 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space.gutter }} contentContainerStyle={styles.yearChips} accessibilityRole="radiogroup" accessibilityLabel="Which tax year">
@@ -579,7 +579,7 @@ export default function Giving() {
                       return (
                         <Pressable key={y} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setPickedYear(y)} style={[styles.goalChip, selected && styles.yearChipOn]}>
                           <Text style={[styles.goalChipText, selected && { color: colors.onInk }]}>
-                            {y === "all" ? "All time" : y === taxYear ? `Tax year ${y} so far` : `Tax year ${y}`}
+                            {y === "all" ? "All time" : y === taxYear ? `${taxYearName(y)} tax year so far` : `${taxYearName(y)} tax year`}
                           </Text>
                         </Pressable>
                       );

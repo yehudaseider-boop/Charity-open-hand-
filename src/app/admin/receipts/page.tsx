@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { containsPattern, safeSearch } from "@/lib/charity/dashboard";
-import { formatDate, formatDateTime, taxYearLabel } from "@/lib/dates";
+import { formatDate, formatDateTime, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { receiptsEnabled } from "@/config/receipts";
@@ -118,7 +118,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
           <ul className="divide-y divide-border text-sm">
             {years.map((y) => (
               <li key={`${y.charityId}-${y.taxYear}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="min-w-0">{y.charityName}, tax year {y.taxYear} <span className="text-muted">({y.count} {y.count === 1 ? "receipt" : "receipts"})</span></span>
+                <span className="min-w-0">{y.charityName}, {taxYearName(y.taxYear)} tax year <span className="text-muted">({y.count} {y.count === 1 ? "receipt" : "receipts"})</span></span>
                 <span className="space-x-3">
                   <a href={`/admin/receipts/year-list?charity=${y.charityId}&year=${y.taxYear}`} className="text-brand underline">CSV</a>
                   <a href={`/admin/receipts/year-list?charity=${y.charityId}&year=${y.taxYear}&format=xlsx`} className="text-brand underline">Excel</a>

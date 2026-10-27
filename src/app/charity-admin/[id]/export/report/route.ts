@@ -3,6 +3,7 @@ import { annualReport, reportYears } from "@/lib/charity/annual-report";
 import { loadReportData } from "@/lib/charity/dashboard-queries";
 import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
 import { centsToPlain, toCsv } from "@/lib/csv";
+import { taxYearName } from "@/lib/dates";
 
 /** The annual report's figures for one tax year, as a CSV (no donor details). */
 export async function GET(request: Request, ctx: RouteContext<"/charity-admin/[id]/export/report">) {
@@ -36,5 +37,5 @@ export async function GET(request: Request, ctx: RouteContext<"/charity-admin/[i
     ...r.months.map((m) => [`${m.label} (R)`, centsToPlain(m.cents)]),
     ...r.campaigns.map((c) => [`Campaign: ${c.title} (R)`, centsToPlain(c.cents)]),
   ];
-  return csvResponse(toCsv([`Tax year ${year}${r.running ? " so far" : ""}`, "Value"], rows), `annual-report-${year}.csv`);
+  return csvResponse(toCsv([`${taxYearName(year)} tax year${r.running ? " so far" : ""}`, "Value"], rows), `annual-report-${year}.csv`);
 }

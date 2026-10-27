@@ -8,7 +8,7 @@
  * them (decided 15/10/2026).
  */
 import { centsToPlain } from "@/lib/csv";
-import { formatDate } from "@/lib/dates";
+import { formatDate, taxYearName } from "@/lib/dates";
 import type { ReceiptDetails } from "./details";
 
 export type YearListReceipt = { reference: string | null; issued_at: string; amount_cents: number; details: ReceiptDetails };
@@ -43,7 +43,7 @@ export function yearList(receipts: YearListReceipt[], version: "givezy" | "chari
       ? [d.donor.id_number_last4 ?? "", d.donor.tax_reference_last4 ?? ""]
       : [d.donor.id_number_last4 || d.donor.tax_reference_last4 ? "Yes" : "No"];
     return [
-      r.reference ?? "", formatDate(r.issued_at), String(d.tax_year), d.donor.name, d.donor.donor_type,
+      r.reference ?? "", formatDate(r.issued_at), taxYearName(Number(d.tax_year)), d.donor.name, d.donor.donor_type,
       ...digits,
       d.donor.registration_number ?? "", d.donor.address.join(", "), d.donations.length, centsToPlain(r.amount_cents),
       missing.length ? missing.join("; ") : "",

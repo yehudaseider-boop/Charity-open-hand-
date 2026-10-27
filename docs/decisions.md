@@ -2,6 +2,12 @@
 
 ## Decided
 
+- **Tax years are written "2026/27" (27/10/2026, Yehuda).** "Tax year 2027" read as next year to donors in 2026. Everywhere
+  people read it (app, website, dashboards, s18A receipt PDFs, exports, the dashboard's "what happened" lines) it is now
+  "2026/27 tax year" for 01/03/2026 to 28/02/2027, from one helper (`taxYearName` in `src/lib/dates.ts`, and the same in
+  `apps/mobile/src/lib/tax-year.ts`). The stored number is unchanged (2027, as SARS numbers it); the charity receipts
+  page still says "SARS calls it tax year 2027" so charities can match SARS's forms. Excel sheet names use "2026-27"
+  because a sheet name cannot contain "/". Receipts already issued keep what they say.
 - **Progress: tap a month (27/10/2026, Yehuda).** Tapping a month tile opens a panel under the tiles (this month is open
   to start with; tapping the open month closes it). Past month: "June 2026 · R720 of R1 000", a bar, one plain line
   ("R280 under June's share", "R200 over…", "June's share reached", "No gifts in June") and that month's gifts, with

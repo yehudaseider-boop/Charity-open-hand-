@@ -7,6 +7,11 @@ export function taxYearFor(d: Date): number {
   return d.getMonth() >= 2 ? d.getFullYear() + 1 : d.getFullYear();
 }
 
+/** "2026/27" for the tax year that ends in February 2027. Same as the website's taxYearName. */
+export function taxYearName(year: number): string {
+  return `${year - 1}/${String(year % 100).padStart(2, "0")}`;
+}
+
 export function taxYearRangeLabel(year: number): string {
   const leap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
   return `01/03/${year - 1} to ${leap(year) ? 29 : 28}/02/${year}`;

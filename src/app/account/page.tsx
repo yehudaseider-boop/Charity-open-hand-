@@ -4,7 +4,7 @@ import { Badge } from "@/components/badge";
 import { Splash } from "@/components/splash";
 import { BilingualName } from "@/components/bilingual-name";
 import { requireViewer } from "@/lib/auth";
-import { formatDate, taxYearFor, taxYearLabel } from "@/lib/dates";
+import { formatDate, taxYearFor, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyButton } from "./monthly-button";
@@ -86,7 +86,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       <section aria-labelledby="your-giving" className="space-y-4 rounded-card border-2 border-border bg-surface p-5 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 id="your-giving" className="font-display text-xl font-bold text-indigo">Your giving</h2>
-          <span className="text-sm text-muted">Tax year {thisYear} so far</span>
+          <span className="text-sm text-muted">{taxYearName(thisYear)} tax year so far</span>
         </div>
         {giving === "unavailable" ? (
           <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">
@@ -212,7 +212,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
             return (
               <li key={year}>
                 <Link href={`/account/tax-pack/${year}`} className="inline-flex min-h-11 items-center rounded-control border border-brand px-4 text-sm font-semibold text-brand">
-                  Tax year {year}{back === 0 ? " so far" : ""}
+                  {taxYearName(year)} tax year{back === 0 ? " so far" : ""}
                 </Link>
               </li>
             );

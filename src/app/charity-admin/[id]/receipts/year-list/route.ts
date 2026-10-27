@@ -4,6 +4,7 @@ import { toCsv } from "@/lib/csv";
 import { yearList } from "@/lib/receipts/year-list";
 import { loadYearReceipts } from "@/lib/receipts/year-list-store";
 import { toXlsx } from "@/lib/xlsx";
+import { taxYearName } from "@/lib/dates";
 
 /** The charity's draft yearly list of issued s18A receipts. Never any part of a donor's ID or tax number. */
 export async function GET(req: NextRequest, ctx: RouteContext<"/charity-admin/[id]/receipts/year-list">) {
@@ -16,5 +17,5 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/charity-admin/[i
   const xlsx = req.nextUrl.searchParams.get("format") === "xlsx";
   await audit({ actorUserId: who.userId, action: "charity.receipt_year_list_exported", entityType: "charity", entityId: id, details: { taxYear: year, receipts: list.count } });
   const name = `s18a-receipts-${year}-draft`;
-  return xlsx ? xlsxResponse(toXlsx(`Tax year ${year}`, list.header, list.rows, list.amountColumns), `${name}.xlsx`) : csvResponse(toCsv(list.header, list.rows), `${name}.csv`);
+  return xlsx ? xlsxResponse(toXlsx(`${taxYearName(year).replace("/", "-")} tax year`, list.header, list.rows, list.amountColumns), `${name}.xlsx`) : csvResponse(toCsv(list.header, list.rows), `${name}.csv`);
 }

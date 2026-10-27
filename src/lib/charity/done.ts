@@ -1,4 +1,8 @@
 import { plural } from "@/lib/text";
+import { taxYearName } from "@/lib/dates";
+
+/** "2026/27" from a stored tax year, or empty when it is missing. */
+const yearName = (y: unknown) => (Number.isInteger(Number(y)) && Number(y) > 2000 ? taxYearName(Number(y)) : "");
 /**
  * The charity dashboard's core flow (18/10/2026, Yehuda): after every action, say what just happened,
  * offer to take it back, and point to what to do next. All the words live here, so they can be
@@ -128,7 +132,7 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       };
     case "receipts_approved":
       return {
-        what: `You approved ${plural(Number(d.receipts ?? 0), "s18A receipt")} for tax year ${String(d.taxYear ?? "")}, ${String(d.total ?? "")} in all. Nothing is issued yet: Givezy checks the list and signs it off, then each donor gets their receipt by email.`,
+        what: `You approved ${plural(Number(d.receipts ?? 0), "s18A receipt")} for the ${yearName(d.taxYear)} tax year, ${String(d.total ?? "")} in all. Nothing is issued yet: Givezy checks the list and signs it off, then each donor gets their receipt by email.`,
         next: { label: "See your donors", href: `${c.base}/donors` },
       };
     case "gift_recorded":
@@ -193,7 +197,7 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "gift_recorded": return "Taken back. The gift is removed and no longer counts anywhere.";
     case "member_added": return `Taken back. ${String(d.email ?? "They")} no longer ${d.email ? "has" : "have"} access to your dashboard.`;
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;
-    case "receipts_approved": return `Taken back. Your approval for tax year ${String(d.taxYear ?? "")} is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
+    case "receipts_approved": return `Taken back. Your approval for the ${yearName(d.taxYear)} tax year is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
     case "application_submitted":
     case "thank_you_sent":
     case "donor_thanked":

@@ -25,7 +25,7 @@ describe("the yearly receipt list (draft for SARS)", () => {
     const rs = [receipt("GZ-2", 125_050, details({ id_number_last4: null })), receipt("GZ-1", 50_000, details({}))];
     const g = yearList(rs, "givezy");
     expect(g.header).toContain("ID number (last 4)");
-    expect(g.rows[0].slice(0, 7)).toEqual(["GZ-1", "05/03/2027", "2027", "Dana Levi", "individual", "9087", ""]);
+    expect(g.rows[0].slice(0, 7)).toEqual(["GZ-1", "05/03/2027", "2026/27", "Dana Levi", "individual", "9087", ""]);
     const c = yearList(rs, "charity");
     expect(c.header).not.toContain("ID number (last 4)");
     expect(JSON.stringify(c.rows)).not.toContain("9087");

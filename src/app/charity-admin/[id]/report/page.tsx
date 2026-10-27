@@ -6,7 +6,7 @@ import { annualReport, reportYears } from "@/lib/charity/annual-report";
 import { loadReportData } from "@/lib/charity/dashboard-queries";
 import { saDate } from "@/lib/charity/dashboard";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { formatDate, taxYearLabel } from "@/lib/dates";
+import { formatDate, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
 import { impactTotal, impactUnitFrom } from "@/lib/charity/impact";
@@ -72,7 +72,7 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
               aria-current={y === year ? "page" : undefined}
               className={`rounded-full border px-3.5 py-1.5 font-medium ${y === year ? "border-brand bg-brand text-brand-contrast" : "border-border bg-surface text-brand hover:bg-brand-soft"}`}
             >
-              {y === years[0] ? `Tax year ${y} so far` : `Tax year ${y}`}
+              {y === years[0] ? `${taxYearName(y)} tax year so far` : `${taxYearName(y)} tax year`}
             </Link>
           ))}
         </nav>
@@ -87,7 +87,7 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
 
       {r.donationCount === 0 ? (
         <p className="rounded-card bg-honey-soft p-5 text-sm">
-          No donations yet in tax year {year}. They appear here once a payment goes through.{r.refunded.count ? ` ${plural(r.refunded.count, "donation")} in this year ${r.refunded.count === 1 ? "was" : "were"} refunded.` : ""}
+          No donations yet in the {taxYearName(year)} tax year. They appear here once a payment goes through.{r.refunded.count ? ` ${plural(r.refunded.count, "donation")} in this year ${r.refunded.count === 1 ? "was" : "were"} refunded.` : ""}
         </p>
       ) : (
         <>

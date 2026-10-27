@@ -7,7 +7,7 @@ const goal = (over: Partial<Goal> = {}): Goal => ({ id: "g", name: "Giving goal"
 describe("giving goals", () => {
   it("a yearly goal follows the SARS tax year by default", () => {
     const w = goalWindow(goal(), d(2026, 10, 16));
-    expect(w.label).toBe("Tax year 2027");
+    expect(w.label).toBe("2026/27 tax year");
     expect(w.endLabel).toBe("28/02/2027");
     expect(w.monthsLeft).toBe(5);
   });

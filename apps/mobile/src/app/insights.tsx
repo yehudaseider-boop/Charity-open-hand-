@@ -17,7 +17,7 @@ import { taxYearsGiven } from "@/lib/giving";
 import { haptic } from "@/lib/haptics";
 import { biggestGift, inTaxYear, longestRun, monthsOfTaxYear, shares, splits, type Share } from "@/lib/insights";
 import { useScreenState } from "@/lib/screen-state";
-import { taxYearFor, taxYearRangeLabel } from "@/lib/tax-year";
+import { taxYearFor, taxYearName, taxYearRangeLabel } from "@/lib/tax-year";
 import { colors, fonts, radius, space, tabular } from "@/theme/tokens";
 
 /** Ring colours in a fixed order (never by rank of anything else); "Other" is always the quiet slate. */
@@ -83,7 +83,7 @@ export default function Insights() {
                   const on = y === year;
                   return (
                     <Pressable key={y} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setYear(y); }} style={[styles.chip, on && styles.chipOn]}>
-                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{y === current ? `Tax year ${y} so far` : `Tax year ${y}`}</Text>
+                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{y === current ? `${taxYearName(y)} tax year so far` : `${taxYearName(y)} tax year`}</Text>
                     </Pressable>
                   );
                 })}
@@ -91,7 +91,7 @@ export default function Insights() {
 
               {gifts.length === 0 ? (
                 <EmptyState
-                  title={year === current ? "No gifts yet this tax year" : `No gifts in tax year ${year}`}
+                  title={year === current ? "No gifts yet this tax year" : `No gifts in the ${taxYearName(year)} tax year`}
                   body={`Gifts you make through Givezy between ${taxYearRangeLabel(year).replace(" to ", " and ")} show here.`}
                   action={{ label: "Find a charity", onPress: () => router.navigate("/discover") }}
                 />
@@ -132,7 +132,7 @@ function MonthByMonth({ gifts, year, today }: { gifts: Gift[]; year: number; tod
     <View style={styles.card}>
       <Text variant="h2" accessibilityRole="header" style={styles.cardTitle}>Month by month</Text>
       <Text style={styles.hero}>{rand(total)}</Text>
-      <Text variant="bodyMuted">{count} {count === 1 ? "gift" : "gifts"} in tax year {year}</Text>
+      <Text variant="bodyMuted">{count} {count === 1 ? "gift" : "gifts"} in the {taxYearName(year)} tax year</Text>
 
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height: H + 26, marginTop: 8 }}>
         {width > 0 ? (

@@ -99,7 +99,7 @@ describe("the dashboard's words for an approval", () => {
     expect(isActionKind("receipts_approved")).toBe(true);
     expect(pageOf("receipts_approved")).toBe("receipts");
     const d = describeDone("receipts_approved", { taxYear: 2026, receipts: 12, total: "R18 400" }, ctx);
-    expect(d.what).toBe("You approved 12 s18A receipts for tax year 2026, R18 400 in all. Nothing is issued yet: Givezy checks the list and signs it off, then each donor gets their receipt by email.");
+    expect(d.what).toBe("You approved 12 s18A receipts for the 2025/26 tax year, R18 400 in all. Nothing is issued yet: Givezy checks the list and signs it off, then each donor gets their receipt by email.");
     expect(describeUndone("receipts_approved", { taxYear: 2026 })).toMatch(/withdrawn and nothing will be issued/);
     expect(d.what).not.toMatch(/[—!]/);
   });
