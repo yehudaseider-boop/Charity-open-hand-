@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LiveFilterForm } from "@/components/forms/live-filter-form";
 import { redirect } from "next/navigation";
 import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
@@ -92,7 +93,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
         <span className="self-center text-xs text-muted">For EFT, cash and other gifts that didn&apos;t come through Givezy.</span>
       </div>
 
-      <form action={base} className="space-y-2">
+      <LiveFilterForm action={base} className="space-y-2">
         {status !== "all" ? <input type="hidden" name="status" value={status} /> : null}
         <div className="flex flex-wrap gap-2">
           <label className="sr-only" htmlFor="period">Period</label>
@@ -135,7 +136,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
         />
         <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
         </div>
-      </form>
+      </LiveFilterForm>
 
       {/* Totals for everything the filters match, not just this page. */}
       <div className="rounded-card border border-border bg-surface p-4 text-sm">

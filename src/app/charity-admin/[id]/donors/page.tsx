@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LiveFilterForm } from "@/components/forms/live-filter-form";
 import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { lastThanked, optedOut } from "@/lib/charity/thank-you-send";
 import { thankOneDonor } from "./actions";
 import { ThankOneForm } from "./thank-form";
+import { DonorPeekLink } from "./donor-peek";
 import { requireViewer } from "@/lib/auth";
 import { ERASED_DONOR, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
 import { loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charity/dashboard-queries";
@@ -122,7 +124,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         </nav>
       ) : null}
 
-      <form action={base} className="flex gap-2">
+      <LiveFilterForm action={base} className="flex gap-2">
         {group ? <input type="hidden" name="group" value={group} /> : null}
         {tag ? <input type="hidden" name="tag" value={tag} /> : null}
         <input
@@ -133,7 +135,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
           className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
         />
         <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
-      </form>
+      </LiveFilterForm>
 
       {shown.length === 0 ? (
         <p className="text-sm text-muted">{q || group || tag ? <NoMatch what="donors" clearHref={base} /> : "No donors yet. People appear here once their first donation is paid."}</p>
@@ -143,7 +145,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
             <li key={d.donor_id} className="rounded-card border border-border bg-surface p-4 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <Link href={`${base}/${d.donor_id}`} className="block truncate font-medium text-brand underline">{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</Link>
+                  <DonorPeekLink charityId={id} donorId={d.donor_id} href={`${base}/${d.donor_id}`}>{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</DonorPeekLink>
                   {shownEmail(d.email) ? <p className="break-all text-muted">{d.email}</p> : null}
                   {d.phone ? <p className="text-muted">{d.phone}</p> : null}
                   <p className="mt-1 text-muted">

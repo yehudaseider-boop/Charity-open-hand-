@@ -2,6 +2,16 @@
 
 ## Decided
 
+- **Charity dashboard, interactive pass 1 (28/10/2026, Yehuda chose 1, 4 and 5 of ten mock-ups).** (1) Donations by
+  month on the overview can be touched: hover or tap a month for its total, number of donations and the monthly and
+  once-off split, and "See these N donations" opens that month's paid donations (`month-bars.tsx`). (4) The Donors
+  and Donations filters update as you go: typing narrows the list after a short pause, a changed menu applies at
+  once, date boxes only once a whole dd/mm/yyyy is typed; the page still filters, so the Search button and a plain
+  form keep working (`LiveFilterForm`). (5) A donor's name on the Donors list opens a side panel (first, latest and
+  largest gift, follow-ups, latest note, recent donations) behind the same check as the full page; Esc or Close
+  returns to the same place in the list, and Ctrl/Cmd-click still opens the full page. Still to choose from the
+  mock-ups: period switch, live new gifts, bulk actions, sortable columns, campaign ring, receipt statuses, payouts
+  in place.
 - **Clear names for the two work areas, and one address (27/10/2026, Yehuda).** Givezy's own area is "Givezy
   admin" and a charity's own area is "Charity dashboard", in the header (both show for Givezy staff who also run
   a charity; a phone shows "Admin" and "Dashboard"), on the area itself and on the account page. Before, a platform

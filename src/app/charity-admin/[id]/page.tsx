@@ -8,6 +8,7 @@ import { gettingStarted } from "@/lib/charity/checklist";
 import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
 import { ShareLinks } from "./share-links";
 import { MonthlyTrend } from "./monthly-trend";
+import { MonthBars } from "./month-bars";
 import { allTime, averageCents, ERASED_DONOR, isErasedEmail, lastMonth, monthlySummary, repeatPercent, saDate, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
 import { countDonorGroups, donorGroupsFor, endsWithinAWeek, giftsPerDonor, lapsedPeriodText, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
 import { dueReminders, lapsedDaysFor } from "@/lib/charity/donor-care";
@@ -125,7 +126,6 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   for (const c of endingSoon) todo.push({ key: `c-${c.id}`, text: `"${c.title}" ends on ${formatDate(c.endsAt as string)}${c.targetCents ? `, at ${progressPercent(c.raisedCents, c.targetCents)}% of its goal` : ""}`, href: `${base}/campaigns`, link: "Share it again" });
   if (all.refunded_count > 0) todo.push({ key: "refund", text: `${plural(all.refunded_count, "donation")} refunded (${formatRand(all.refunded_cents)})`, href: `${base}/donations?status=refunded`, link: "See them" });
   if (all.charged_back_count > 0) todo.push({ key: "cb", text: `${plural(all.charged_back_count, "donation")} charged back`, href: `${base}/donations?status=charged_back`, link: "See them" });
-  const max = Math.max(1, ...chart.map((m) => m.amountCents));
   const anyGifts = chart.some((m) => m.amountCents > 0);
 
   return (
@@ -298,31 +298,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
               <p className="text-sm text-muted">No paid donations in the last 12 months. They appear here once the first one comes in.</p>
             ) : (
               <>
-                <div className="mb-3 flex gap-4 text-xs text-muted" aria-hidden>
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand" />Monthly</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-honey" />Once-off</span>
-                </div>
-                {/* Bars for the eye; the list underneath is what screen readers read. */}
-                <div className="flex h-48 items-end gap-1.5" aria-hidden>
-                  {chart.map((m) => {
-                    const h = Math.round((m.amountCents / max) * 100);
-                    const monthlyShare = m.amountCents ? Math.round((m.monthlyCents / m.amountCents) * 100) : 0;
-                    const current = m.month.slice(0, 7) === today.slice(0, 7);
-                    return (
-                      <div key={m.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-                        <div
-                          title={`${formatRand(m.amountCents)}, ${plural(m.donationCount, "donation")}`}
-                          className={`flex w-full flex-col-reverse overflow-hidden rounded-t-lg ${current ? "ring-2 ring-coral ring-offset-1" : ""}`}
-                          style={{ height: m.amountCents ? `${Math.max(3, h)}%` : "2px" }}
-                        >
-                          <div className="w-full bg-brand" style={{ height: `${monthlyShare}%` }} />
-                          <div className={`w-full flex-1 ${m.amountCents ? "bg-honey" : "bg-border"}`} />
-                        </div>
-                        <span className={`text-[11px] ${current ? "font-semibold text-indigo" : "text-muted"}`}>{m.month.slice(5, 7)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <MonthBars months={chart} current={today.slice(0, 7)} donationsBase={`${base}/donations`} />
                 <ul className="mt-4 space-y-1 text-sm">
                   {[...chart].reverse().filter((m) => m.amountCents > 0).map((m) => {
                     const [y, mm] = m.month.split("-");
