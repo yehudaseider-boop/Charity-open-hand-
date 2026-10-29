@@ -2,6 +2,7 @@
 
 import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { useFormDraft } from "@/components/forms/use-form-draft";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
 import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
@@ -347,6 +348,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
   const org = donorType !== "individual";
   const idBoxesShown = org || !(account?.savedIdLast4 && useSavedId);
   const formRef = useRef<HTMLFormElement>(null);
+  // Coming back from the payment provider (declined, Try again, Back) finds the details still filled in.
+  useFormDraft(formRef, `donate:${slug}`);
   // The folded extras (label, dedication, message): open from the start when the app sent a label.
   const [extrasOpen, setExtrasOpen] = useState(Boolean(initialLabel));
   // How many things needed fixing at the last press of Pay (the count is refreshed on the next press).
@@ -369,6 +372,14 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
+          // The browser's Back from the payment provider's page returns here with the amount filled in.
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set("cents", String(shownQuote.amountCents));
+            window.history.replaceState(window.history.state, "", url);
+          } catch {
+            // Only a convenience.
+          }
           startTransition(() => dispatch(fd));
         }}
       >

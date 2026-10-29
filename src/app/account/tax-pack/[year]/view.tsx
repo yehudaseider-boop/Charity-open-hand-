@@ -1,7 +1,7 @@
 import { HebrewAware } from "@/components/hebrew-aware";
 import Link from "next/link";
 import { platformConfig } from "@/config/platform";
-import { formatDate, taxYearLabel } from "@/lib/dates";
+import { formatDate, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import type { TaxPack } from "@/lib/tax-pack/build";
 import { PrintButton } from "./print-button";
@@ -18,7 +18,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl">Tax pack {year}</h1>
+          <h1 className="text-2xl">Tax pack {taxYearName(year)}</h1>
           <p className="text-sm text-muted">{taxYearLabel(year).replace(/^\d{4}\/\d{2} tax year /, "").replace(/[()]/g, "")}</p>
           <p className="text-sm text-muted break-all">{email} · made on {formatDate(new Date())}</p>
         </div>
@@ -138,8 +138,8 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
       </p>
 
       <nav aria-label="Tax packs" className="flex flex-wrap gap-4 text-sm print:hidden">
-        {year > 2020 ? <Link href={`/account/tax-pack/${year - 1}`} className="text-brand underline">Tax pack {year - 1}</Link> : null}
-        {year < current ? <Link href={`/account/tax-pack/${year + 1}`} className="text-brand underline">Tax pack {year + 1}</Link> : null}
+        {year > 2020 ? <Link href={`/account/tax-pack/${year - 1}`} className="text-brand underline">Tax pack {taxYearName(year - 1)}</Link> : null}
+        {year < current ? <Link href={`/account/tax-pack/${year + 1}`} className="text-brand underline">Tax pack {taxYearName(year + 1)}</Link> : null}
         <Link href="/account" className="text-brand underline">Back to your account</Link>
       </nav>
     </div>

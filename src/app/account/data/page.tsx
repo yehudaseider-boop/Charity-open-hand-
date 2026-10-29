@@ -23,6 +23,7 @@ export default async function YourInformationPage() {
 
   return (
     <div className="space-y-4">
+      <Link href="/account" className="text-sm font-semibold text-muted hover:text-brand">← Your account</Link>
       <h1 className="font-display text-2xl text-indigo">Your information</h1>
       <p className="text-sm text-muted">
         What we keep and why is set out in our <Link href="/privacy" className="text-brand underline">Privacy Policy</Link>.
