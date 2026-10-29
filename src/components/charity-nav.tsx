@@ -42,9 +42,9 @@ const groups = [
  * The dashboard's pages: a grouped list down the side on a laptop, one scrolling row on a phone.
  * The page you're on is marked (aria-current) the same way in both.
  */
-export function CharityNav({ id }: { id: string }) {
+export function CharityNav({ id, base: baseOverride }: { id: string; base?: string }) {
   const pathname = usePathname();
-  const base = `/charity-admin/${id}`;
+  const base = baseOverride ?? `/charity-admin/${id}`;
   const isActive = (t: { href: string; exact?: boolean }) => {
     const href = `${base}${t.href}`;
     return t.exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);

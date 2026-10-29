@@ -2,6 +2,13 @@
 
 ## Decided
 
+- **Dashboard boxes light up, and the dashboard can be seen without signing in (29/10/2026, Yehuda).** Every box on the
+  Overview lights up under the pointer or the keyboard (a blue edge, a soft blue glow, a small lift; no lift when less
+  motion is asked for: `glow` in `components/card.tsx`), and each box opens its detail: the four figures (this month's
+  and this tax year's paid donations, Monthly donations, Donors), each source bar (that source's donations this tax
+  year), each recent donation (the whole row), each supporter, each campaign ring and each "Needs you" line.
+  `/demo/dashboard` shows the same Overview with made-up figures (`app/demo/dashboard/sample.ts`), no sign-in and no
+  database; its other pages say they are not in the demo yet. On the go-live list: keep it or switch it off.
 - **Charity dashboard redrawn, overview first (29/10/2026, Yehuda approved the mock-up built from a reference he chose).**
   Every dashboard page now sits in one shell (`components/dashboard-shell.tsx`): the charity's name and status, the
   pages grouped down the left (a scrolling row on a phone), a bar with search (it searches Donations by name or

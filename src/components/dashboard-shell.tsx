@@ -16,7 +16,25 @@ const statusChip = {
  * It runs wider than the site's reading column so tables and charts have room. Redrawn 29/10/2026.
  * Kept apart from the layout (which checks who is looking) so it can be drawn with sample figures too.
  */
-export function DashboardShell({ id, charity, asGivezy, children }: { id: string; charity: { name_en: string; slug: string; status: string }; asGivezy: boolean; children: React.ReactNode }) {
+export function DashboardShell({
+  id,
+  charity,
+  asGivezy,
+  base: baseOverride,
+  publicHref,
+  children,
+}: {
+  id: string;
+  charity: { name_en: string; slug: string; status: string };
+  asGivezy: boolean;
+  /** Where this dashboard's pages live; the demo uses its own address. */
+  base?: string;
+  /** The charity's public page; `null` leaves the link out (the demo has none). */
+  publicHref?: string | null;
+  children: React.ReactNode;
+}) {
+  const base = baseOverride ?? `/charity-admin/${id}`;
+  const publicLink = publicHref === undefined ? (charity.status === "approved" ? `/c/${charity.slug}` : null) : publicHref;
   const status = statusLabels[charity.status as CharityStatus] ?? statusLabels.draft;
   return (
     // full-bleed: the dashboard breaks out of the site's narrow column (see globals.css).
@@ -29,12 +47,12 @@ export function DashboardShell({ id, charity, asGivezy, children }: { id: string
             <span className={`mt-2 inline-block rounded-full border-2 px-2.5 py-0.5 text-xs font-semibold ${statusChip[status.tone]}`}>{status.label}</span>
           </div>
           <div className="lg:rounded-card lg:border-2 lg:border-border lg:bg-surface lg:p-3">
-            <CharityNav id={id} />
+            <CharityNav id={id} base={base} />
           </div>
         </aside>
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap items-center gap-3 print:hidden">
-            <form action={`/charity-admin/${id}/donations`} method="get" role="search" className="relative min-w-0 max-w-xl flex-1 basis-64">
+            <form action={`${base}/donations`} method="get" role="search" className="relative min-w-0 max-w-xl flex-1 basis-64">
               <label htmlFor="dash-search" className="sr-only">Search donations</label>
               <svg viewBox="0 0 24 24" aria-hidden className="pointer-events-none absolute left-3.5 top-3 h-5 w-5 fill-none stroke-muted" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
               <input
@@ -47,8 +65,8 @@ export function DashboardShell({ id, charity, asGivezy, children }: { id: string
               />
             </form>
             <span className="flex-1" />
-            {charity.status === "approved" ? (
-              <Link href={`/c/${charity.slug}`} className="inline-flex min-h-11 items-center rounded-control border-2 border-border bg-surface px-4 text-sm font-semibold text-brand hover:border-brand">
+            {publicLink ? (
+              <Link href={publicLink} className="inline-flex min-h-11 items-center rounded-control border-2 border-border bg-surface px-4 text-sm font-semibold text-brand hover:border-brand">
                 See your public page
               </Link>
             ) : null}

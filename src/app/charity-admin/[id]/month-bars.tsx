@@ -153,7 +153,7 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
                   onClick={() => setPicked(m.month)}
                   onMouseEnter={() => setPicked(m.month)}
                   onFocus={() => setPicked(m.month)}
-                  className="h-full min-w-0 flex-1 cursor-pointer rounded-lg outline-offset-[-3px]"
+                  className="h-full min-w-0 flex-1 cursor-pointer rounded-lg outline-offset-[-3px] transition-colors hover:bg-brand/5 focus-visible:bg-brand/5 aria-pressed:bg-brand/5"
                 />
               ))}
             </div>

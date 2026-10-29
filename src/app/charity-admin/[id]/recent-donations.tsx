@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/badge";
 
@@ -34,6 +35,7 @@ const tints = ["bg-honey", "bg-peach", "bg-brand-soft", "bg-success-soft"];
  * when a filter finds nothing among them it says so and links to the full list for that status.
  */
 export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; donationsHref: string }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const shown = filter === "all" ? rows : rows.filter((r) => r.status === filter);
   return (
@@ -71,11 +73,11 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
             </thead>
             <tbody>
               {shown.map((r, i) => (
-                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-honey-soft/60">
+                <tr key={r.id} onClick={() => router.push(r.href)} className="group cursor-pointer border-b border-border transition last:border-0 hover:bg-honey-soft focus-within:bg-honey-soft">
                   <td className="whitespace-nowrap py-2.5 pr-3"><Badge tone={r.tone}>{r.statusLabel}</Badge></td>
                   <td className="py-2.5 pr-3">
-                    <Link href={r.href} className="flex min-w-0 items-center gap-2.5 font-semibold text-indigo hover:underline">
-                      <span aria-hidden className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold text-navy ${tints[i % tints.length]}`}>{r.initials}</span>
+                    <Link href={r.href} className="flex min-w-0 items-center gap-2.5 font-semibold text-indigo group-hover:text-brand group-hover:underline">
+                      <span aria-hidden className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold text-navy transition-transform motion-safe:group-hover:scale-110 ${tints[i % tints.length]}`}>{r.initials}</span>
                       <span className="min-w-0 truncate">{r.donor}</span>
                     </Link>
                   </td>
