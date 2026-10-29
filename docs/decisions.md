@@ -2,6 +2,15 @@
 
 ## Decided
 
+- **The public dashboard demo is the whole dashboard (29/10/2026, Yehuda).** `/demo/dashboard` now opens every page
+  of the menu without signing in: Overview, Donations (filters, search, paging, each donation), Donors (groups, search,
+  each donor with their gifts), Monthly donations (running, paused, ended), Campaigns, s18A receipts and the Annual
+  report, drawn with the real dashboard's pieces. The pages that send or save things (thank and email donors, team,
+  profile, updates, application, poster, website button, record, import, deposits) describe what they do. All of it
+  comes from one set of made-up records (`app/demo/dashboard/data.ts`: 126 placeholder donors, a year of gifts, 16
+  monthly donations, two campaigns, fixed seed, months counted back from today), so every figure agrees from page
+  to page. Checked by visiting 400 demo pages and following every link: none broken, no errors, and the only links
+  out are the site's own header and footer.
 - **Every charity dashboard page redrawn to match the Overview (29/10/2026, Yehuda: "make this the real dashboard").**
   Donations (list, one donation, record, import, deposits), Donors (list, one donor, side panel), Thank donors, Email
   donors, Monthly donations, Campaigns (goal rings), s18A receipts, Annual report, Team, Public profile, Photos and
