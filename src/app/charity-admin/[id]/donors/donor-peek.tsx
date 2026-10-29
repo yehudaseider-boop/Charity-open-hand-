@@ -11,8 +11,9 @@ type State = { kind: "loading" } | { kind: "error" } | { kind: "ready"; donor: D
  * A donor's name on the Donors list. A plain click opens their details in a panel from the side, so the
  * list, its filters and the scroll position stay where they were (decided 28/10/2026). Ctrl-, Cmd- or
  * middle-click still opens the full page in a new tab, and without JavaScript it is an ordinary link.
+ * With `stretch` the link covers its whole line (the nearest positioned box), so the line is the link.
  */
-export function DonorPeekLink({ charityId, donorId, href, children }: { charityId: string; donorId: string; href: string; children: React.ReactNode }) {
+export function DonorPeekLink({ charityId, donorId, href, children, stretch = false }: { charityId: string; donorId: string; href: string; children: React.ReactNode; stretch?: boolean }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<State>({ kind: "loading" });
   const opener = useRef<HTMLAnchorElement>(null);
@@ -43,7 +44,7 @@ export function DonorPeekLink({ charityId, donorId, href, children }: { charityI
       <Link
         ref={opener}
         href={href}
-        className="block truncate font-medium text-brand underline"
+        className={`block truncate font-display text-base font-bold text-brand underline underline-offset-2 hover:decoration-2 focus-visible:decoration-2 ${stretch ? "after:absolute after:inset-0 after:rounded-control after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand" : ""}`}
         onClick={(e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
           e.preventDefault();
@@ -65,7 +66,7 @@ export function DonorPeekLink({ charityId, donorId, href, children }: { charityI
           >
             <div className="sticky top-0 flex items-center justify-between gap-3 border-b-2 border-border bg-surface px-5 py-3">
               <p className="text-sm font-semibold text-muted">Donor</p>
-              <button ref={closer} type="button" onClick={close} className="inline-flex min-h-11 items-center rounded-full border-2 border-border px-4 text-sm font-semibold text-brand hover:border-brand">
+              <button ref={closer} type="button" onClick={close} className="inline-flex min-h-11 items-center rounded-full border-2 border-border px-4 text-sm font-semibold text-brand transition hover:border-brand focus-visible:border-brand">
                 Close
               </button>
             </div>
@@ -83,7 +84,7 @@ export function DonorPeekLink({ charityId, donorId, href, children }: { charityI
                   <p className="text-muted">Nothing was changed. Check your connection and try again, or open their full page.</p>
                   <div className="flex flex-wrap gap-3">
                     <button type="button" onClick={load} className="pressable min-h-11 rounded-control bg-brand px-4 font-semibold text-brand-contrast">Try again</button>
-                    <Link href={href} className="inline-flex min-h-11 items-center font-semibold text-brand underline">Open the full page</Link>
+                    <Link href={href} className="inline-flex min-h-11 items-center font-semibold text-brand underline hover:decoration-2 focus-visible:decoration-2">Open the full page</Link>
                   </div>
                 </div>
               ) : (
@@ -120,7 +121,7 @@ function Peek({ donor, href }: { donor: DonorPeek; href: string }) {
       </dl>
       {donor.followUps.length ? (
         <section className="space-y-1.5">
-          <h3 className="font-semibold text-navy">Follow-ups</h3>
+          <h3 className="font-display text-base font-bold text-indigo">Follow-ups</h3>
           <ul className="space-y-1">
             {donor.followUps.map((f, i) => (
               <li key={i} className="flex justify-between gap-3">
@@ -133,13 +134,13 @@ function Peek({ donor, href }: { donor: DonorPeek; href: string }) {
       ) : null}
       {donor.latestNote ? (
         <section className="space-y-1.5">
-          <h3 className="font-semibold text-navy">Latest note</h3>
+          <h3 className="font-display text-base font-bold text-indigo">Latest note</h3>
           <p className="line-clamp-4 whitespace-pre-line rounded-control bg-honey-soft p-3 [overflow-wrap:anywhere]">{donor.latestNote}</p>
         </section>
       ) : null}
       {donor.recent.length ? (
         <section className="space-y-1.5">
-          <h3 className="font-semibold text-navy">Recent donations</h3>
+          <h3 className="font-display text-base font-bold text-indigo">Recent donations</h3>
           <ul className="divide-y divide-border rounded-control border-2 border-border">
             {donor.recent.map((g, i) => (
               <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 tabular-nums">
@@ -151,7 +152,7 @@ function Peek({ donor, href }: { donor: DonorPeek; href: string }) {
           </ul>
         </section>
       ) : null}
-      <Link href={href} className="pressable flex min-h-12 items-center justify-center rounded-control bg-brand px-4 font-semibold text-brand-contrast">
+      <Link href={href} className="pressable flex min-h-12 items-center justify-center rounded-control bg-brand px-4 text-center font-semibold text-brand-contrast">
         Open the full page: notes, tags and follow-ups
       </Link>
     </>
@@ -160,7 +161,7 @@ function Peek({ donor, href }: { donor: DonorPeek; href: string }) {
 
 function Fact({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="rounded-control bg-honey-soft p-3">
+    <div className="rounded-control border-2 border-border bg-surface p-3">
       <dt className="text-xs text-muted">{label}</dt>
       <dd className={`tabular-nums ${strong ? "font-display text-lg font-bold text-indigo" : "font-semibold"}`}>{value}</dd>
     </div>

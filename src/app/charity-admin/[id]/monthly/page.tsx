@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
+import { blueAction, field, MiniStat, PageHeader, secondaryAction, Tabs } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { chargeDayLabel, ERASED_DONOR, isErasedEmail, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, shownEmail, type MonthlyState } from "@/lib/charity/dashboard";
 import { loadMonthlyDonations } from "@/lib/charity/dashboard-queries";
@@ -54,39 +55,20 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="font-display text-2xl text-indigo">Monthly donations</h1>
-      <p className="text-sm text-muted">
-        Donors who give the same amount every month. Givezy collects it on the day they chose. Donors pause, restart or cancel it themselves; you can&apos;t change it from here.
-      </p>
+    <div className="space-y-5">
+      <PageHeader
+        title="Monthly donations"
+        intro={<>Donors who give the same amount every month. Givezy collects it on the day they chose. Donors pause, restart or cancel it themselves; you can&apos;t change it from here.</>}
+      />
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-card border border-border bg-surface p-4">
-          <p className="text-xs text-muted">Running</p>
-          <p className="mt-1 text-xl font-semibold">{formatRand(summary.runningCentsPerMonth)}</p>
-          <p className="mt-0.5 text-xs text-muted">a month from {plural(summary.runningCount, "donor")}</p>
-        </div>
-        <div className="rounded-card border border-border bg-surface p-4">
-          <p className="text-xs text-muted">Paused or ended</p>
-          <p className="mt-1 text-xl font-semibold">{summary.pausedCount + summary.endedCount}</p>
-          <p className="mt-0.5 text-xs text-muted">{summary.pausedCount} paused, {summary.endedCount} ended</p>
-        </div>
+      <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+        <MiniStat strong label="Running" value={formatRand(summary.runningCentsPerMonth)} note={`a month from ${plural(summary.runningCount, "donor")}`} />
+        <MiniStat label="Paused or ended" value={summary.pausedCount + summary.endedCount} note={`${summary.pausedCount} paused, ${summary.endedCount} ended`} />
       </div>
       <p className="text-xs text-muted">Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included.</p>
       <MonthlyTrend rows={all} now={new Date()} />
 
-      <nav aria-label="Show" className="flex flex-wrap gap-2 text-sm">
-        {filters.map((f) => (
-          <Link
-            key={f.key || "all"}
-            href={href({ show: f.key })}
-            aria-current={show === f.key ? "page" : undefined}
-            className={`rounded-full border px-3 py-1.5 ${show === f.key ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </nav>
+      <Tabs label="Show" items={filters.map((f) => ({ href: href({ show: f.key }), label: f.label, active: show === f.key }))} />
 
       <form action={base} className="flex gap-2">
         {show ? <input type="hidden" name="show" value={show} /> : null}
@@ -95,13 +77,13 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
           defaultValue={q}
           placeholder="Search name or email"
           aria-label="Search by donor name or email"
-          className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
+          className={`${field} min-w-0 flex-1`}
         />
-        <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
+        <button className={blueAction}>Search</button>
       </form>
 
       {shown.length === 0 ? (
-        <p className="text-sm text-muted">
+        <p className="rounded-card border-2 border-dashed border-honey bg-honey-soft/60 p-6 text-center text-sm text-muted">
           {all.length === 0
             ? "No monthly donations yet. One appears here once its first payment has gone through."
             : <NoMatch what="monthly donations" clearHref={base} />}
@@ -114,20 +96,20 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
             const dedication = dedicationFrom(r.dedication_kind, r.dedication_name);
             const day = chargeDayLabel(r.charge_day);
             return (
-              <li key={r.recurring_id} className="rounded-card border border-border bg-surface p-4 text-sm">
+              <li key={r.recurring_id} className="rounded-card border-2 border-border bg-surface p-4 text-sm sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     {!isErasedEmail(r.email) && r.display_name && isHebrew(r.display_name) ? (
-                      <p className="truncate font-hebrew font-medium" lang="he" dir="rtl">{r.display_name}</p>
+                      <p className="truncate font-hebrew font-semibold text-indigo" lang="he" dir="rtl">{r.display_name}</p>
                     ) : (
-                      <p className="truncate font-medium" dir="auto">{isErasedEmail(r.email) || !r.display_name ? ERASED_DONOR : r.display_name}</p>
+                      <p className="truncate font-semibold text-indigo" dir="auto">{isErasedEmail(r.email) || !r.display_name ? ERASED_DONOR : r.display_name}</p>
                     )}
                     {shownEmail(r.email) ? <p className="break-all text-muted">{r.email}</p> : null}
                     {r.phone ? <p className="text-muted">{r.phone}</p> : null}
                   </div>
-                  <p className="shrink-0 text-right font-semibold">
+                  <p className="shrink-0 text-right font-display text-lg font-extrabold tabular-nums text-indigo">
                     {formatRand(r.amount_cents)}
-                    <span className="block text-xs font-normal text-muted">a month</span>
+                    <span className="block font-sans text-xs font-normal text-muted">a month</span>
                   </p>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -154,10 +136,10 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
       )}
 
       {pages > 1 ? (
-        <div className="flex items-center justify-between text-sm">
-          {page > 1 ? <Link href={href({ page: page - 1 })} className="text-brand underline">← Previous</Link> : <span />}
+        <div className="flex items-center justify-between gap-2 text-sm">
+          {page > 1 ? <Link href={href({ page: page - 1 })} className={secondaryAction}>← Previous</Link> : <span />}
           <span className="text-muted">Page {page} of {pages}</span>
-          {page < pages ? <Link href={href({ page: page + 1 })} className="text-brand underline">Next →</Link> : <span />}
+          {page < pages ? <Link href={href({ page: page + 1 })} className={secondaryAction}>Next →</Link> : <span />}
         </div>
       ) : null}
     </div>

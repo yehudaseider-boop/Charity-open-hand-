@@ -13,7 +13,7 @@ export function BackLink({ href, children }: { href: string; children: React.Rea
   return (
     <Link
       href={href}
-      className="text-sm text-muted"
+      className="text-sm font-semibold text-muted transition hover:text-brand focus-visible:text-brand"
       onClick={(e) => {
         let from: URL | null = null;
         try { from = document.referrer ? new URL(document.referrer) : null; } catch { from = null; }

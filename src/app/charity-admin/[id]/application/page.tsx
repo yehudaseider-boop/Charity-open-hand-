@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
+import { blueAction, PageHeader, secondaryAction } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/charity-summary";
 import { requireViewer } from "@/lib/auth";
@@ -40,12 +41,12 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
   const href = (key: string) => `/charity-admin/${id}/application?step=${key}`;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Link href="/charity-admin" className="text-sm text-muted">← Your charities</Link>
-        <h1 className="mt-1 font-display text-2xl text-indigo">Application</h1>
-        <div className="mt-2"><Badge tone={status.tone}>{status.label}</Badge></div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        back={<Link href="/charity-admin" className="text-muted hover:text-brand hover:underline">← Your charities</Link>}
+        title="Application"
+        intro={<Badge tone={status.tone}>{status.label}</Badge>}
+      />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/application?step=${step.key}`} />
 
@@ -67,28 +68,28 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
       {charity.status === "approved" ? (
         <Notice tone="success">
           Approved. You can update your public profile any time.{" "}
-          <Link href={`/charity-admin/${id}/profile`} className="underline">Public profile</Link>
+          <Link href={`/charity-admin/${id}/profile`} className="font-semibold underline">Public profile</Link>
         </Notice>
       ) : null}
 
       {editable ? (
         <>
           {/* Guided: one step at a time, with a progress bar and the steps as a row of links. */}
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="font-medium">{doneCount} of {dataSteps} steps done</span>
+          <div className="space-y-3 rounded-card border-2 border-border bg-surface p-5 sm:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+              <span className="font-display text-lg font-bold text-indigo">{doneCount} of {dataSteps} steps done</span>
               <span className="text-muted">You can stop and come back any time. Everything saves as you go.</span>
             </div>
             <div className="h-2 rounded-full bg-honey-soft" role="progressbar" aria-valuenow={doneCount} aria-valuemin={0} aria-valuemax={dataSteps} aria-label="Application progress">
               <div className="h-2 rounded-full bg-sage" style={{ width: `${Math.round((doneCount / dataSteps) * 100)}%` }} />
             </div>
-            <nav aria-label="Application steps" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
+            <nav aria-label="Application steps" className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 text-sm sm:-mx-6 sm:px-6">
               {steps.map((s, i) => (
                 <Link
                   key={s.key}
                   href={href(s.key)}
                   aria-current={s.key === step.key ? "step" : undefined}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 ${s.key === step.key ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
+                  className={`inline-flex min-h-9 shrink-0 items-center rounded-full border-2 px-3.5 font-semibold transition ${s.key === step.key ? "border-brand bg-brand text-white" : s.done ? "border-border bg-surface text-navy hover:border-brand hover:text-brand" : "border-border bg-surface text-muted hover:border-brand hover:text-brand"}`}
                 >
                   <span aria-hidden>{s.done ? "✓ " : `${i + 1}. `}</span>
                   {s.label}
@@ -156,7 +157,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
                   <p className="text-muted">A few steps still need finishing before you can submit:</p>
                   <ul className="space-y-1">
                     {steps.filter((s) => s.key !== "submit" && !s.done).map((s) => (
-                      <li key={s.key}><Link href={href(s.key)} className="text-brand underline">{s.label}</Link></li>
+                      <li key={s.key}><Link href={href(s.key)} className="font-semibold text-brand underline hover:text-indigo">{s.label}</Link></li>
                     ))}
                   </ul>
                 </div>
@@ -164,10 +165,10 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
             ) : null}
           </Card>
 
-          <div className="flex justify-between text-sm">
-            {at > 0 ? <Link href={href(steps[at - 1].key)} className="rounded-control border border-border px-4 py-2">Back</Link> : <span />}
+          <div className="flex justify-between gap-2">
+            {at > 0 ? <Link href={href(steps[at - 1].key)} className={secondaryAction}>Back</Link> : <span />}
             {at < steps.length - 1 ? (
-              <Link href={href(steps[at + 1].key)} className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">
+              <Link href={href(steps[at + 1].key)} className={blueAction}>
                 {step.done ? "Next" : "Skip for now"}
               </Link>
             ) : null}

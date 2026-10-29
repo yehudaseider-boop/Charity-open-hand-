@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { ActionForm } from "@/components/forms/action-form";
+import { blueAction, field } from "@/components/dash";
 import { APPEAL_BODY_MAX, APPEAL_SUBJECT_MAX, APPEALS_PER_MONTH } from "@/lib/charity/appeals-rules";
 import type { FormState } from "@/lib/form";
 import type { AppealCheck } from "./actions";
@@ -64,8 +65,8 @@ export function AppealForm({
           }}
         >
           <div className="space-y-1">
-            <label htmlFor="audience" className="block text-sm font-medium">Who it goes to</label>
-            <select id="audience" value={audience} onChange={(e) => setAudience(e.currentTarget.value)} className="w-full rounded-control border border-border bg-surface px-3 py-2.5">
+            <label htmlFor="audience" className="block text-sm font-semibold text-navy">Who it goes to</label>
+            <select id="audience" value={audience} onChange={(e) => setAudience(e.currentTarget.value)} className={`${field} w-full`}>
               {audiences.map((g) => (
                 <optgroup key={g.group} label={g.group}>
                   {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -75,13 +76,13 @@ export function AppealForm({
             {errors.audience ? <p role="alert" className="text-xs text-danger">{errors.audience}</p> : null}
           </div>
           <div className="space-y-1">
-            <label htmlFor="subject" className="block text-sm font-medium">Subject</label>
-            <input id="subject" value={subject} onChange={(e) => setSubject(e.currentTarget.value)} maxLength={APPEAL_SUBJECT_MAX} aria-invalid={errors.subject ? true : undefined} className="w-full rounded-control border border-border bg-surface px-3 py-2.5 aria-invalid:border-danger" />
+            <label htmlFor="subject" className="block text-sm font-semibold text-navy">Subject</label>
+            <input id="subject" value={subject} onChange={(e) => setSubject(e.currentTarget.value)} maxLength={APPEAL_SUBJECT_MAX} aria-invalid={errors.subject ? true : undefined} className={`${field} w-full aria-invalid:border-danger`} />
             {errors.subject ? <p role="alert" className="text-xs text-danger">{errors.subject}</p> : <p className="text-xs text-muted">What donors see in their inbox. For example: Winter parcels, how you helped.</p>}
           </div>
           <div className="space-y-1">
-            <label htmlFor="body" className="block text-sm font-medium">Your message</label>
-            <textarea id="body" rows={10} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={APPEAL_BODY_MAX} aria-invalid={errors.body ? true : undefined} className="w-full rounded-control border border-border bg-surface px-3 py-2.5 aria-invalid:border-danger" />
+            <label htmlFor="body" className="block text-sm font-semibold text-navy">Your message</label>
+            <textarea id="body" rows={10} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={APPEAL_BODY_MAX} aria-invalid={errors.body ? true : undefined} className={`${field} w-full py-2.5 aria-invalid:border-danger`} />
             {errors.body ? (
               <p role="alert" className="text-xs text-danger">{errors.body}</p>
             ) : (
@@ -89,7 +90,7 @@ export function AppealForm({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button disabled={checking} className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60">
+            <button disabled={checking} className={`${blueAction} disabled:opacity-60`}>
               {checking ? "Checking…" : "Check who it goes to"}
             </button>
             {checking ? <p role="status" className="text-sm text-muted">Checking, please wait… Nothing is sent.</p> : null}
@@ -99,12 +100,12 @@ export function AppealForm({
       {preview.state === "refused" ? <p role="alert" className="rounded-card bg-danger-soft p-3 text-sm text-danger">{preview.message}</p> : null}
 
       {preview.state === "checked" ? (
-        <section aria-label="Who it goes to" className="space-y-3 rounded-card border border-border bg-surface p-4 text-sm">
+        <section aria-label="Who it goes to" className="space-y-3 rounded-card border-2 border-brand/40 bg-honey-soft p-4 text-sm sm:p-5">
           {stale ? (
             <p role="status" className="rounded-card bg-warning-soft p-3 text-warning">You changed something since you checked. Press Check who it goes to again before sending.</p>
           ) : (
             <>
-              <p className="font-semibold text-navy">
+              <p className="font-display text-lg font-bold text-indigo [overflow-wrap:anywhere]">
                 {preview.count ? `${preview.label}: ${preview.count} ${preview.count === 1 ? "donor" : "donors"}.` : `${preview.label}: nobody to send it to.`}
               </p>
               {preview.stopped ? <p className="text-muted">{preview.stopped} more {preview.stopped === 1 ? "is" : "are"} left out because they asked not to get emails.</p> : null}

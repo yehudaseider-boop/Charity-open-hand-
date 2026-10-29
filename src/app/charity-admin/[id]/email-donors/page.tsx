@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Card, Notice } from "@/components/card";
 import { DonePanel } from "@/components/done-panel";
+import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { appealsThisMonth, listAppeals } from "@/lib/charity/appeals";
 import { audienceValue, parseAudience } from "@/lib/charity/appeals-rules";
@@ -53,14 +54,16 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
   const initialSubject = update ? `News from ${charity.name_en}`.slice(0, 120) : "";
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-2xl text-indigo">Email donors</h1>
-        <p className="text-sm text-muted">
-          Send your donors news or an appeal. Givezy sends it for you, so you never handle their addresses.
-          {priv?.contact_email ? ` Replies go to ${priv.contact_email}.` : ""} Donors who asked not to get emails are always left out, and nobody gets more than 4 from you in a month.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Email donors"
+        intro={
+          <span className="[overflow-wrap:anywhere]">
+            Send your donors news or an appeal. Givezy sends it for you, so you never handle their addresses.
+            {priv?.contact_email ? ` Replies go to ${priv.contact_email}.` : ""} Donors who asked not to get emails are always left out, and nobody gets more than 4 from you in a month.
+          </span>
+        }
+      />
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/email-donors`} />
 
       {charity.status !== "approved" ? (
@@ -84,14 +87,14 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
 
       <Card title="Sent">
         {appeals.length === 0 ? (
-          <p className="text-sm text-muted">Nothing sent yet. Your emails appear here, with how many went out.</p>
+          <p className="rounded-control border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm text-muted">Nothing sent yet. Your emails appear here, with how many went out.</p>
         ) : (
-          <ul className="divide-y divide-border text-sm">
+          <ul className="-my-3 divide-y divide-border text-sm">
             {appeals.map((a) => (
               <li key={a.id} className="space-y-1 py-3">
-                <p className="break-words font-medium">{a.subject}</p>
-                <p className="text-xs text-muted">{formatDate(a.created_at)} · {a.audience_label}</p>
-                <p className="text-xs">
+                <p className="font-display text-base font-bold text-indigo [overflow-wrap:anywhere]">{a.subject}</p>
+                <p className="text-xs text-muted [overflow-wrap:anywhere]">{formatDate(a.created_at)} · {a.audience_label}</p>
+                <p className="text-xs font-semibold tabular-nums text-navy">
                   {a.progress.sent} sent
                   {a.progress.skipped ? `, ${a.progress.skipped} left out` : ""}
                   {a.progress.failed ? `, ${a.progress.failed} not sent` : ""}
@@ -102,7 +105,7 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
             ))}
           </ul>
         )}
-        <p className="mt-3 text-xs text-muted">&quot;Left out&quot; means they asked not to get emails since, already had 4 from you this month, or email isn&apos;t switched on here.</p>
+        <p className="mt-4 border-t border-border pt-3 text-xs text-muted">&quot;Left out&quot; means they asked not to get emails since, already had 4 from you this month, or email isn&apos;t switched on here.</p>
       </Card>
     </div>
   );

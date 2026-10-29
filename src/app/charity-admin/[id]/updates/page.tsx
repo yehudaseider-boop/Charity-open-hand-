@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/card";
+import { EmptyState, PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
@@ -24,15 +25,17 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
   const canEmail = role === "owner" && charity.status === "approved";
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-2xl text-indigo">Photos and updates</h1>
-        <p className="text-sm text-muted">
-          Show donors the real work. These appear on your page on the website and in the Givezy app
-          {charity.status === "approved" ? "." : " once your application is approved."} Only post photos you have permission to share, and
-          never show a family who receives help without their consent.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Photos and updates"
+        intro={
+          <>
+            Show donors the real work. These appear on your page on the website and in the Givezy app
+            {charity.status === "approved" ? "." : " once your application is approved."} Only post photos you have permission to share, and
+            never show a family who receives help without their consent.
+          </>
+        }
+      />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/updates`} />
 
@@ -46,13 +49,13 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
             {updates.map((u) => {
               const photo = publicImageUrl(u.photo_path);
               return (
-                <li key={u.id} className="space-y-2 py-3">
-                  <p className="text-xs text-muted">{formatDate(u.created_at)}</p>
-                  <p className="whitespace-pre-line text-[0.95rem]">{u.body_en}</p>
+                <li key={u.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                  <p className="text-xs font-semibold text-muted">{formatDate(u.created_at)}</p>
+                  <p className="whitespace-pre-line text-[0.95rem] text-navy [overflow-wrap:anywhere]">{u.body_en}</p>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border border-border object-cover" /> : null}
+                  {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border-2 border-border object-cover" /> : null}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    {canEmail ? <Link href={`/charity-admin/${id}/email-donors?update=${u.id}`} className="text-sm text-brand underline">Email this to your donors</Link> : null}
+                    {canEmail ? <Link href={`/charity-admin/${id}/email-donors?update=${u.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline hover:text-indigo">Email this to your donors</Link> : null}
                     <form action={removeUpdate.bind(null, id, u.id)}>
                       <RemoveButton what={`the update from ${formatDate(u.created_at)}`} ask={false} />
                     </form>
@@ -70,8 +73,8 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
             {photos.map((p) => (
               <li key={p.id} className="space-y-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} className="aspect-square w-full rounded-card border border-border object-cover" />
-                {p.caption_en ? <p className="text-xs text-muted">{p.caption_en}</p> : null}
+                <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} className="aspect-square w-full rounded-card border-2 border-border object-cover" />
+                {p.caption_en ? <p className="text-xs text-muted [overflow-wrap:anywhere]">{p.caption_en}</p> : null}
                 <form action={removePhoto.bind(null, id, p.id)}>
                   <RemoveButton what={p.caption_en ? `the photo "${p.caption_en}"` : "this photo"} ask={false} />
                 </form>
@@ -79,7 +82,9 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
             ))}
           </ul>
         ) : (
-          <p className="mb-3 text-sm text-muted">No photos yet. Photos of the work itself (parcels, a class, your building) mean the most to donors.</p>
+          <div className="mb-4">
+            <EmptyState title="No photos yet">Photos of the work itself (parcels, a class, your building) mean the most to donors.</EmptyState>
+          </div>
         )}
         {photos.length < MAX_PHOTOS ? <PhotoForm key={k} action={addPhoto.bind(null, id)} /> : <p className="text-sm text-muted">Remove a photo to add another.</p>}
       </Card>

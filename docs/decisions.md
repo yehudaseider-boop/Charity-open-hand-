@@ -2,6 +2,16 @@
 
 ## Decided
 
+- **Every charity dashboard page redrawn to match the Overview (29/10/2026, Yehuda: "make this the real dashboard").**
+  Donations (list, one donation, record, import, deposits), Donors (list, one donor, side panel), Thank donors, Email
+  donors, Monthly donations, Campaigns (goal rings), s18A receipts, Annual report, Team, Public profile, Photos and
+  updates, Application, QR poster, Website button, the charity list and the error page all use the shared blocks in
+  `components/dash.tsx` (page header, buttons, pill tabs, fields, tables, rows that light up, figure boxes, empty
+  states). Presentation only: no query, server action, figure, s18A or SARS wording changed. At most one orange
+  button per page (Record a gift on Donations, Print poster, Copy code). Form buttons everywhere now use the same blue
+  button (`ActionForm`). Rule learnt: never put a box that lifts on hover around something that opens a fixed panel
+  (the lift traps the panel inside the box), so the Donors list lights up row by row. Every dashboard link was
+  checked against the routes that exist: none broken.
 - **Dashboard boxes light up, and the dashboard can be seen without signing in (29/10/2026, Yehuda).** Every box on the
   Overview lights up under the pointer or the keyboard (a blue edge, a soft blue glow, a small lift; no lift when less
   motion is asked for: `glow` in `components/card.tsx`), and each box opens its detail: the four figures (this month's

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { blueAction, field as fieldClass, primaryAction } from "@/components/dash";
 import { BUTTON_LABELS, BUTTON_STYLES, buttonHtml, buttonTarget, type ButtonLabel, type ButtonStyle } from "@/lib/charity/website-button";
 
 type Campaign = { id: string; title: string };
@@ -22,7 +23,7 @@ export function ButtonBuilder({ site, slug, charityName, campaigns }: { site: st
       {campaigns.length ? (
         <label className="block space-y-1.5">
           <span className="text-sm font-semibold text-navy">Where it goes</span>
-          <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className="block w-full max-w-md rounded-control border-2 border-border bg-surface px-3 py-2.5">
+          <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className={`${fieldClass} block w-full max-w-md`}>
             <option value="">Your Givezy page</option>
             {campaigns.map((c) => (
               <option key={c.id} value={c.id}>Give to the campaign: {c.title}</option>
@@ -42,7 +43,7 @@ export function ButtonBuilder({ site, slug, charityName, campaigns }: { site: st
         <p className="text-xs text-muted">Press it to try it: it opens your page in a new tab, the way your donors will see it.</p>
       </div>
 
-      <CopyBox title="1. Copy the button code" note="Paste it into your website (steps below)." text={html} button="Copy code" multiline />
+      <CopyBox title="1. Copy the button code" note="Paste it into your website (steps below)." text={html} button="Copy code" multiline primary />
       <CopyBox title="Or copy just the link" note="For your own button, an email, a newsletter or your CRM. It opens only your charity on Givezy." text={link} button="Copy link" />
     </div>
   );
@@ -54,7 +55,7 @@ function Choice<T extends string>({ legend, name, options, value, onChange }: { 
       <legend className="text-sm font-semibold text-navy">{legend}</legend>
       <div className="flex flex-wrap gap-2">
         {(Object.keys(options) as T[]).map((k) => (
-          <label key={k} className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 px-4 text-[15px] ${value === k ? "border-brand bg-honey-soft font-semibold text-brand" : "border-border bg-surface"}`}>
+          <label key={k} className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 px-4 text-[15px] transition focus-within:border-brand ${value === k ? "border-brand bg-honey-soft font-semibold text-brand" : "border-border bg-surface hover:border-brand hover:text-brand"}`}>
             <input type="radio" name={name} value={k} checked={value === k} onChange={() => onChange(k)} className="accent-[var(--brand)]" />
             {options[k]}
           </label>
@@ -64,7 +65,7 @@ function Choice<T extends string>({ legend, name, options, value, onChange }: { 
   );
 }
 
-function CopyBox({ title, note, text, button, multiline }: { title: string; note: string; text: string; button: string; multiline?: boolean }) {
+function CopyBox({ title, note, text, button, multiline, primary }: { title: string; note: string; text: string; button: string; multiline?: boolean; primary?: boolean }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const copy = async () => {
     try {
@@ -75,7 +76,7 @@ function CopyBox({ title, note, text, button, multiline }: { title: string; note
       setState("failed");
     }
   };
-  const field = "block w-full min-w-0 rounded-control border-2 border-border bg-surface px-3 py-2 font-mono text-xs text-navy";
+  const field = "block w-full min-w-0 rounded-control border-2 border-border bg-surface px-3 py-2 font-mono text-xs text-navy transition focus:border-brand";
   return (
     <div className="space-y-2">
       <div>
@@ -88,7 +89,7 @@ function CopyBox({ title, note, text, button, multiline }: { title: string; note
         <input readOnly value={text} onFocus={(e) => e.currentTarget.select()} aria-label={title} className={field} />
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={copy} className="pressable min-h-11 rounded-control bg-brand px-5 font-semibold text-brand-contrast">
+        <button type="button" onClick={copy} className={primary ? primaryAction : blueAction}>
           {state === "copied" ? "Copied" : button}
         </button>
         <p role="status" className="text-sm text-muted">

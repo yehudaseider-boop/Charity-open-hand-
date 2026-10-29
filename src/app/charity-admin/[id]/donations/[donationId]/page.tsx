@@ -18,14 +18,15 @@ import { giftSourceLabel } from "@/lib/donations/source";
 import { removeRecordedGifts } from "../record-actions";
 import { RemoveImportForm } from "../record-forms";
 import { BackLink } from "@/components/back-link";
+import { PageHeader } from "@/components/dash";
 
 export const metadata: Metadata = { title: "Donation" };
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-border py-2 text-sm last:border-0">
-      <dt className="text-muted">{label}</dt>
-      <dd className="text-right break-words">{children}</dd>
+    <div className="flex justify-between gap-4 border-b border-border py-2.5 text-sm last:border-0">
+      <dt className="shrink-0 font-semibold text-muted">{label}</dt>
+      <dd className="min-w-0 text-right font-medium text-navy [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
@@ -48,14 +49,20 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
   const receipts = (links ?? []).map((l) => ({ id: l.receipt_id as string, status: l.status as string, reference: l.reference as string }));
 
   return (
-    <div className="space-y-4">
-      <BackLink href={`/charity-admin/${id}/donations`}>← Donations</BackLink>
-      <div>
-        <p className="text-2xl font-semibold">{formatRand(d.amount_cents)}</p>
-        <div className="mt-1"><Badge tone={s.tone}>{s.label}</Badge></div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        back={<BackLink href={`/charity-admin/${id}/donations`}>← Donations</BackLink>}
+        title={<span className="tabular-nums">{formatRand(d.amount_cents)}</span>}
+        intro={
+          <span className="flex flex-wrap items-center gap-2">
+            <Badge tone={s.tone}>{s.label}</Badge>
+            <span>{donorName(d)}, {formatDate(d.paid_at ?? d.created_at)}</span>
+          </span>
+        }
+      />
 
-      <Card title="Donation" headingLevel={1}>
+      <div className="grid gap-4 lg:grid-cols-2">
+      <Card title="Donation">
         <dl>
           {d.recorded_method ? null : <Row label="Started">{formatDateTime(d.created_at)}</Row>}
           {d.paid_at ? <Row label={d.recorded_method ? "Came in" : "Paid"}>{d.recorded_method ? formatDate(d.paid_at) : formatDateTime(d.paid_at)}</Row> : null}
@@ -63,7 +70,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {d.recorded_method ? null : <Row label="Came from">{giftSourceLabel(d.came_from)}</Row>}
           {d.campaign_id ? (
             <Row label="Campaign">
-              <Link href={`/charity-admin/${id}/donations?campaign=${d.campaign_id}`} className="text-brand underline">{(campaign?.title as string | undefined) ?? "A campaign"}</Link>
+              <Link href={`/charity-admin/${id}/donations?campaign=${d.campaign_id}`} className="font-semibold text-brand underline hover:text-indigo">{(campaign?.title as string | undefined) ?? "A campaign"}</Link>
             </Row>
           ) : null}
           {d.external_ref ? <Row label="Your reference">{d.external_ref}</Row> : null}
@@ -86,6 +93,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {addressLine(d) ? <Row label="Address">{addressLine(d)}</Row> : null}
         </dl>
       </Card>
+      </div>
 
       {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
         <Card title="Dedication">
