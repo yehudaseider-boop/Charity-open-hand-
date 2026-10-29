@@ -2,6 +2,7 @@ import Link from "next/link";
 import { platformConfig } from "@/config/platform";
 import { getViewer } from "@/lib/auth";
 import { dashboardLinks } from "@/lib/dashboard-link";
+import { MobileMenu } from "@/components/mobile-menu";
 import { NavLink } from "@/components/nav-link";
 import { currentFocus } from "@/lib/focus-server";
 
@@ -35,19 +36,24 @@ export async function SiteHeader() {
           <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-9" />
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1 whitespace-nowrap text-[15px] sm:gap-2">
-          {/* On a phone someone with a work area sees it instead of Charities, so the header stays on one line. */}
-          <NavLink href="/charities" className={dashboards.length ? "max-sm:hidden" : ""}>Charities</NavLink>
-          {/* Phones: the home page and footer link here instead, so the header stays on one line. */}
+          {/* Phones: one Menu button holds every part of the site, so no page is a dead end (30/10/2026). */}
+          <MobileMenu
+            items={[
+              { href: "/", label: "Home" },
+              { href: "/charities", label: "Find a charity" },
+              { href: "/for-charities", label: "For charities" },
+              ...dashboards.map((d) => ({ href: d.href, label: d.label })),
+              ...(viewer ? [{ href: "/account", label: "Account" }] : []),
+            ]}
+          />
+          <NavLink href="/charities" className="max-sm:hidden">Charities</NavLink>
           <NavLink href="/for-charities" className="max-sm:hidden">For charities</NavLink>
           {/* A charity admin or Givezy staff can always get back to their area from any public page. */}
           {dashboards.map((d) => (
-            <NavLink key={d.href} href={d.href}>
-              <span className="sm:hidden">{d.short}</span>
-              <span className="max-sm:hidden">{d.label}</span>
-            </NavLink>
+            <NavLink key={d.href} href={d.href} className="max-sm:hidden">{d.label}</NavLink>
           ))}
           {viewer ? (
-            <NavLink href="/account">Account</NavLink>
+            <NavLink href="/account" className="max-sm:hidden">Account</NavLink>
           ) : (
             <Link href="/login" className="ml-1 inline-flex min-h-11 items-center rounded-full bg-brand px-4 font-semibold text-brand-contrast transition-colors hover:bg-navy">
               Sign in
