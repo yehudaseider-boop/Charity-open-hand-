@@ -6,6 +6,8 @@ import { sendLoginLink, verifyLoginCode } from "./actions";
 import { PendingButton } from "@/components/forms/pending-button";
 import { safeNextPath } from "@/lib/safe-path";
 import { Splash } from "@/components/splash";
+import { Illustration } from "@/components/illustration";
+import { Bubbles } from "@/components/marketing";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -26,8 +28,19 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const viewer = await getViewer();
 
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center pt-4 sm:pt-10">
-    <Splash className="relative z-10 -mb-6 h-auto w-28 sm:w-32" />
+    <div className="full-bleed relative overflow-x-clip pb-16">
+    <Bubbles
+      items={[
+        { c: "-left-24 top-10 h-72 w-72 bg-honey-soft" },
+        { c: "-right-20 top-40 h-64 w-64 bg-peach" },
+        { c: "left-[14%] top-[60%] h-6 w-6 bg-coral", anim: "bob" },
+        { c: "right-[16%] top-24 h-10 w-10 border-[4px] border-brand", anim: "bob-slow" },
+        { c: "right-[24%] bottom-24 h-4 w-4 bg-brand", anim: "bob" },
+      ]}
+    />
+    <div className="relative mx-auto flex max-w-md flex-col items-center px-4 pt-6 sm:pt-12">
+    <Illustration name={sent ? "mailSent" : "login"} sparkle={sent ? "hearts" : "stars"} className="absolute -left-72 top-24 hidden w-60 xl:block" />
+    <Splash className="pop-in relative z-10 -mb-6 h-auto w-28 sm:w-32" />
     <div className="w-full rounded-[1.75rem] border-2 border-border bg-surface p-6 shadow-[0_24px_48px_rgba(9,37,119,0.08)] sm:p-8">
       <h1 className="text-[2rem] leading-tight">{sent ? "Check your email" : "Sign in"}</h1>
       {viewer && !sent ? (
@@ -83,6 +96,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </p>
         </form>
       )}
+    </div>
     </div>
     </div>
   );

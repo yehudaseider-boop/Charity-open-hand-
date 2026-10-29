@@ -4,7 +4,9 @@ import { Badge } from "@/components/badge";
 import { BilingualName } from "@/components/bilingual-name";
 import { CharityBadges } from "@/components/charity-badges";
 import { Chevron } from "@/components/chevron";
-import { Splash } from "@/components/splash";
+import { CharitySearch } from "@/components/charity-search";
+import { Illustration } from "@/components/illustration";
+import { Bubbles } from "@/components/marketing";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -53,30 +55,21 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
     // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
     <div className="full-bleed overflow-x-clip">
       <section className="relative overflow-hidden bg-honey-soft">
-        {/* The logo's splash, whole, beside the search on a laptop; phones keep the band clear. */}
-        <Splash className="absolute right-[max(1.5rem,calc(50%-36rem))] top-12 hidden h-auto w-56 lg:block" />
+        <Bubbles
+          className="hidden md:block"
+          items={[
+            { c: "-right-24 -top-24 h-80 w-80 bg-peach" },
+            { c: "-left-16 bottom-6 h-28 w-28 bg-honey", anim: "bob-slow" },
+            { c: "right-[38%] top-10 h-5 w-5 bg-coral", anim: "bob" },
+            { c: "right-[30%] bottom-10 h-9 w-9 border-[4px] border-brand", anim: "bob-slow" },
+            { c: "left-[46%] top-16 h-3 w-3 bg-brand" },
+          ]}
+        />
+        <Illustration name="findingTheWay" sparkle="stars" className="absolute bottom-0 right-[max(1.5rem,calc(50%-36rem))] hidden w-52 lg:block" />
         <div className="relative mx-auto max-w-[75rem] space-y-5 px-4 pb-8 pt-10 sm:px-6 sm:pb-10 sm:pt-14">
           <h1 className="text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.02] text-balance">Find a charity</h1>
           <p className="max-w-[36rem] text-lg text-muted">Registered South African charities, checked by us before they can take a gift.</p>
-          <form role="search" className="flex max-w-[44rem] gap-2">
-            {category ? <input type="hidden" name="category" value={category.slug} /> : null}
-            <label htmlFor="q" className="sr-only">Search charities</label>
-            <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control border-2 border-border bg-surface px-4 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" aria-hidden className="shrink-0 stroke-muted">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-4-4" />
-              </svg>
-              <input
-                id="q"
-                name="q"
-                type="search"
-                defaultValue={q}
-                placeholder="Name, cause or area"
-                className="min-w-0 flex-1 bg-transparent py-3 text-base outline-none"
-              />
-            </div>
-            <button className="pressable rounded-control bg-brand px-5 py-3 font-bold text-brand-contrast">Search</button>
-          </form>
+          <CharitySearch initial={q} category={category?.slug ?? ""} />
           {categories.length > 0 ? (
             <nav aria-label="Causes" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:px-0">
               <Link href={q ? `/charities?q=${encodeURIComponent(q)}` : "/charities"} className={chip(!category)} aria-current={!category ? "page" : undefined}>All</Link>
@@ -116,7 +109,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
             const logo = publicImageUrl(c.logo_path);
             return (
               <li key={c.id}>
-                <Link href={`/c/${c.slug}`} className="group flex h-full gap-4 rounded-card border-2 border-border bg-surface p-5 transition-colors hover:border-brand">
+                <Link href={`/c/${c.slug}`} className="lift group flex h-full gap-4 rounded-card border-2 border-border bg-surface p-5 transition-colors hover:border-brand">
                   {logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={logo} alt="" className="h-16 w-16 shrink-0 rounded-control border border-border object-cover" />
@@ -136,7 +129,7 @@ export default async function CharitiesPage({ searchParams }: PageProps<"/charit
                       ))}
                     </div>
                   </div>
-                  <span className="self-center"><Chevron /></span>
+                  <span className="self-center transition-transform group-hover:translate-x-1"><Chevron /></span>
                 </Link>
               </li>
             );

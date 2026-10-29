@@ -127,7 +127,8 @@ h1 {
 }
 
 /* A page that runs edge to edge (the home page) marks its top element full-bleed; the layout's narrow column steps aside. */
-main:has(> .full-bleed) {
+main:has(> .full-bleed),
+main:has(> .page-enter > .full-bleed) {
   max-width: none;
   padding: 0;
 }
@@ -232,5 +233,77 @@ input[type="radio"] {
   .twinkle {
     animation: none;
     opacity: 1;
+  }
+}
+
+
+/* Each page arrives with a short fade and rise (app/template.tsx), so moving between pages feels smooth. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.page-enter {
+  animation: page-enter 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* The header gains a soft shadow once the page scrolls under it (no script: a scroll timeline). */
+@supports (animation-timeline: scroll()) {
+  @keyframes header-lift {
+    from { box-shadow: 0 0 0 rgba(14, 27, 61, 0); }
+    to { box-shadow: 0 8px 24px rgba(14, 27, 61, 0.08); }
+  }
+  .site-header {
+    animation: header-lift linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 120px;
+  }
+}
+
+/* Placeholders while a page loads: soft lilac blocks with a gentle sheen. */
+@keyframes sheen {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--honey-soft) 25%, var(--brand-soft) 50%, var(--honey-soft) 75%);
+  background-size: 200% 100%;
+  animation: sheen 1.4s ease-in-out infinite;
+  border-radius: 0.875rem;
+}
+
+/* Cards answer a press with a small dip, so a tap feels felt. */
+.lift:active {
+  transform: translateY(-2px) scale(0.99);
+}
+
+/* The thank-you moment: the picture pops in and confetti falls once. */
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pop-in {
+  animation: pop-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate3d(var(--drift, 0px), 420px, 0) rotate(var(--spin, 360deg)); opacity: 0; }
+}
+.confetti-piece {
+  position: absolute;
+  top: 0;
+  animation: confetti-fall 2.2s cubic-bezier(0.25, 0.6, 0.4, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .site-header,
+  .skeleton,
+  .pop-in {
+    animation: none;
+  }
+  .confetti-piece {
+    display: none;
   }
 }
