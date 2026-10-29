@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, SampleNote, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
 import { Splash } from "@/components/splash";
+import { PersonWithBox, Volunteer } from "@/components/people";
 
 export const metadata: Metadata = {
   title: "For charities",
@@ -85,7 +86,7 @@ export default function ForCharitiesPage() {
           <Splash className="absolute -top-24 left-[6%] z-10 hidden h-auto w-32 md:block" />
           <div className="relative mx-auto max-w-[48rem]">
             <AppWindow nav={["Overview", "Donations", "Donors", "Monthly", "Campaigns", "s18A receipts"]} active={0}><DashboardScreen /></AppWindow>
-            <Floating className="-left-24 bottom-10 w-60">
+            <Floating className="-left-24 top-24 w-60">
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-success-soft"><Icon name="check" className="stroke-success" size={16} /></span>
                 <p className="text-[14px] font-bold">New donation</p>
@@ -98,6 +99,8 @@ export default function ForCharitiesPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border" aria-hidden><div className="h-2.5 w-[68%] rounded-full bg-sage" /></div>
               <p className="mt-2 flex justify-between text-[12px]"><span className="font-bold">R34 000</span><span className="text-muted">of R50 000</span></p>
             </Floating>
+            <Volunteer look="c" className="absolute -bottom-6 -left-52 z-20 hidden h-auto w-44 lg:block" />
+            <PersonWithBox look="a" className="absolute -bottom-6 -right-52 z-20 hidden h-auto w-44 lg:block" />
             <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
           </div>
         </div>

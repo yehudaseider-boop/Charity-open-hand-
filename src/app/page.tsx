@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Info } from "@/components/info";
 import { platformConfig } from "@/config/platform";
 import { Splash } from "@/components/splash";
+import { GiverWithPhone, PersonWithBox } from "@/components/people";
+import { TryGiving } from "@/components/try-giving";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
@@ -107,7 +109,7 @@ export default async function Home() {
           <div className="relative mx-auto max-w-[48rem]">
             <AppWindow nav={["Home", "Giving", "Receipts", "Charities", "Account"]} active={1}><HeroScreen /></AppWindow>
             {/* Left: the goal ring */}
-            <Floating className="-left-24 bottom-6 w-60">
+            <Floating className="-left-24 top-24 w-60">
               <p className="text-[12px] font-semibold text-muted">Your goal this tax year</p>
               <div className="mt-2 flex items-center gap-3">
                 <svg width="64" height="64" viewBox="0 0 124 124" aria-hidden className="shrink-0">
@@ -126,6 +128,8 @@ export default async function Home() {
               <p className="mt-2 text-[13px] text-muted">R500 to a food parcel charity</p>
               <div className="mt-3 flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2 text-[12px]"><span className="text-muted">s18A receipt</span><span className="font-bold text-brand">Requested</span></div>
             </Floating>
+            <GiverWithPhone look="a" className="absolute -bottom-6 -left-52 z-20 hidden h-auto w-44 lg:block" />
+            <PersonWithBox look="b" className="absolute -bottom-6 -right-52 z-20 hidden h-auto w-44 lg:block" />
             <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
           </div>
         </div>
@@ -150,15 +154,9 @@ export default async function Home() {
       <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6">
         <h2 className={`max-w-[34rem] ${h2Class}`}>One account for all your giving, ready at <Key>tax time</Key>.</h2>
         <div className="grid gap-5 md:grid-cols-2">
-          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation and pause or stop it yourself whenever you like.">
+          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation and pause or stop it yourself whenever you like. Try it below.">
             <Screen>
-              <p className="text-[13px] font-semibold text-muted">Choose an amount</p>
-              <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[15px] font-bold">
-                <span className="rounded-lg border-[1.5px] border-border py-2">R180</span>
-                <span className="rounded-lg border-2 border-brand bg-brand-soft py-2 text-brand">R360</span>
-                <span className="rounded-lg border-[1.5px] border-border py-2">R500</span>
-              </div>
-              <div className="mt-4 flex items-center justify-between text-[14px]"><span className="font-semibold">Give every month</span><span aria-hidden className="flex h-6 w-11 items-center rounded-full bg-brand p-0.5"><span className="ml-auto h-5 w-5 rounded-full bg-white" /></span></div>
+              <TryGiving minCents={platformConfig.minDonationCents} />
             </Screen>
           </PastelCard>
           <PastelCard tone="sky" title="s18A receipts, done" body="If the charity issues them, you get one receipt per charity for the whole tax year, all in your account.">
@@ -313,13 +311,16 @@ export default async function Home() {
             href: "/for-charities",
             link: "How it works for charities",
             picture: (
-              <div className="rounded-[1.125rem] bg-white p-4 shadow-[0_12px_30px_rgba(14,27,61,0.08)]">
-                <p className="text-[12px] text-muted">This month</p>
-                <p className="font-display text-[1.5rem] font-bold">R4 920</p>
-                <div className="mt-3 flex h-16 items-end gap-1.5" aria-hidden>
-                  {[30, 55, 40, 70, 50, 85, 100].map((h, i) => <span key={i} className={`flex-1 rounded-t ${i === 6 ? "bg-brand" : "bg-honey"}`} style={{ height: `${h}%` }} />)}
+              <div className="flex items-end justify-center gap-2">
+                <GiverWithPhone look="c" className="h-auto w-28 shrink-0" />
+                <div className="mb-4 min-w-0 flex-1 rounded-[1.125rem] bg-white p-4 shadow-[0_12px_30px_rgba(14,27,61,0.08)]">
+                  <p className="text-[12px] text-muted">This month</p>
+                  <p className="font-display text-[1.375rem] font-bold">R4 920</p>
+                  <div className="mt-2 flex h-12 items-end gap-1" aria-hidden>
+                    {[30, 55, 40, 70, 50, 85, 100].map((h, i) => <span key={i} className={`flex-1 rounded-t ${i === 6 ? "bg-brand" : "bg-honey"}`} style={{ height: `${h}%` }} />)}
+                  </div>
+                  <SampleNote />
                 </div>
-                <SampleNote />
               </div>
             ),
           }}

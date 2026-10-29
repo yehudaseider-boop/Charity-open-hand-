@@ -63,7 +63,7 @@ function Arrow() {
 /** Centred section heading with a short line under it. */
 export function SectionHead({ title, children }: { title: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-3 text-center">
+    <div className="reveal mx-auto flex max-w-[44rem] flex-col items-center gap-3 text-center">
       <h2 className={H2}>{title}</h2>
       {children ? <p className="text-[17px] leading-relaxed text-muted">{children}</p> : null}
     </div>
@@ -145,9 +145,9 @@ export function Floating({ className, children }: { className: string; children:
 /** Three solid blue cards, each with a white round icon and a link. */
 export function BlueCards({ items }: { items: { icon: IconName; title: string; body: string; href: string; link: string }[] }) {
   return (
-    <ul className="grid gap-5 md:grid-cols-3">
+    <ul className="reveal grid gap-5 md:grid-cols-3">
       {items.map((it) => (
-        <li key={it.title} className="relative flex flex-col items-start gap-4 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white">
+        <li key={it.title} className="lift relative flex flex-col items-start gap-4 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white">
           <Bubbles items={["-right-10 -top-10 h-32 w-32 bg-white/10", "right-6 top-20 h-4 w-4 bg-coral", "-bottom-8 right-10 h-20 w-20 border-[10px] border-honey/40"]} />
           <IconCircle name={it.icon} />
           <h3 className="relative mt-2 font-display text-[1.375rem] font-bold leading-tight text-white!">{it.title}</h3>
@@ -163,7 +163,7 @@ export function BlueCards({ items }: { items: { icon: IconName; title: string; b
 export function PastelCard({ tone, title, body, children }: { tone: "peach" | "lilac" | "sky"; title: string; body: string; children: React.ReactNode }) {
   const bg = { peach: "bg-peach", lilac: "bg-honey-soft", sky: "bg-brand-soft" }[tone];
   return (
-    <div className={`relative flex flex-col items-center gap-3 overflow-hidden rounded-[1.25rem] px-6 pt-9 text-center sm:px-10 ${bg}`}>
+    <div className={`lift reveal relative flex flex-col items-center gap-3 overflow-hidden rounded-[1.25rem] px-6 pt-9 text-center sm:px-10 ${bg}`}>
       <Bubbles items={tone === "peach"
         ? ["-left-8 -top-8 h-24 w-24 bg-coral/25", "right-8 top-10 h-5 w-5 bg-coral", "-right-6 bottom-16 h-16 w-16 border-[6px] border-coral/40"]
         : ["-right-8 -top-8 h-24 w-24 bg-brand/15", "left-8 top-12 h-5 w-5 bg-brand", "-left-6 bottom-16 h-16 w-16 border-[6px] border-honey"]} />
@@ -182,7 +182,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
 /** A white feature card with a round icon, for the stacked list. */
 export function FeatureCard({ icon, title, body }: { icon: IconName; title: string; body: string }) {
   return (
-    <li className="flex gap-4 rounded-[1.25rem] bg-white p-5 shadow-[0_12px_30px_rgba(14,27,61,0.06)]">
+    <li className="lift reveal flex gap-4 rounded-[1.25rem] bg-white p-5 shadow-[0_12px_30px_rgba(14,27,61,0.06)]">
       <IconCircle name={icon} tone="soft" />
       <div className="flex flex-col gap-1">
         <h3 className="text-[17px] font-bold">{title}</h3>
@@ -211,7 +211,7 @@ const stepTones = [
 ];
 export function Steps({ steps }: { steps: { icon: IconName; title: string; body: string }[] }) {
   return (
-    <ol className="grid gap-10 md:grid-cols-3 md:gap-6">
+    <ol className="reveal grid gap-10 md:grid-cols-3 md:gap-6">
       {steps.map((s, i) => (
         <li key={s.title} className="relative flex flex-col items-center gap-3 text-center">
           {i < steps.length - 1 ? <span aria-hidden className="absolute left-[calc(50%+3rem)] right-[calc(-50%+3rem)] top-8 hidden border-t-[3px] border-dotted border-coral md:block" /> : null}
@@ -238,7 +238,7 @@ export function Ready({
   wide: { icon: IconName; title: string; body: string; href: string; link: string; picture: React.ReactNode };
 }) {
   return (
-    <div className="flex flex-col gap-8">
+    <div className="reveal flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h2 className="font-display text-[clamp(1.75rem,2.6vw,2.25rem)] font-bold">Ready to get started?</h2>
@@ -247,7 +247,7 @@ export function Ready({
         <Link href={button.href} className="pressable rounded-control bg-brand px-6 py-3.5 font-bold text-white">{button.label}</Link>
       </div>
       <div className="grid gap-5 md:grid-cols-[1fr_2fr]">
-        <div className="relative flex flex-col items-start gap-3 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white">
+        <div className="lift relative flex flex-col items-start gap-3 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white">
           <Bubbles items={["-right-12 -bottom-12 h-40 w-40 bg-coral", "right-16 top-8 h-6 w-6 border-[3px] border-honey", "-right-4 top-24 h-10 w-10 bg-white/15"]} />
           <IconCircle name={small.icon} />
           <h3 className="relative mt-2 text-[1.25rem] font-bold text-white!">{small.title}</h3>
