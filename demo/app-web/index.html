@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Givezy app demo</title>
+<style>
+  :root { --ink:#0E1B3D; --blue:#1749B5; --lilac:#F4F1FF; --slate:#4A5878; --line:#ECE8F6; --orange:#FF8A3D; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--lilac); color: var(--ink); font: 16px/1.5 "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; align-items: center; justify-content: center; gap: 56px; padding: 20px max(16px, env(safe-area-inset-left)); }
+  .side { max-width: 300px; }
+  h1 { font-size: 1.9rem; line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.01em; }
+  p { margin: 0 0 12px; color: var(--slate); }
+  .tag { display: inline-block; background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: .85rem; font-weight: 600; color: var(--ink); margin-bottom: 16px; }
+  button { font: inherit; font-weight: 700; color: #fff; background: var(--blue); border: 0; border-radius: 18px; padding: 12px 20px; box-shadow: 0 4px 0 #0F3485; cursor: pointer; }
+  button:active { transform: translateY(2px); box-shadow: 0 2px 0 #0F3485; }
+  .phone { --h: min(844px, calc(100vh - 56px)); --s: calc(var(--h) / 844px); width: calc(390px * var(--s)); height: var(--h); flex: none; position: relative; }
+  .frame { position: absolute; top: 0; left: 0; width: 390px; height: 844px; transform: scale(var(--s)); transform-origin: top left; border-radius: 54px; border: 10px solid var(--ink); box-shadow: 0 30px 60px rgba(14,27,61,.25); overflow: hidden; background: #fff; box-sizing: content-box; margin: -10px; }
+  iframe { width: 390px; height: 844px; border: 0; display: block; }
+  @media (max-width: 760px) {
+    body { display: block; padding: 0; background: #fff; }
+    .side { display: none; }
+    .phone { width: 100%; height: 100%; --s: 1; }
+    .frame { position: static; width: 100%; height: 100%; transform: none; border: 0; border-radius: 0; box-shadow: none; margin: 0; }
+    iframe { width: 100%; height: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="side">
+  <span class="tag">Sample data</span>
+  <h1>What a donor sees in the Givezy app</h1>
+  <p>Tap through it like a donor would: pick causes, open a charity, start a gift, look at giving and receipts.</p>
+  <p>Everything here is made up. No payment is taken and nothing is saved on a server.</p>
+  <button id="again" type="button">Start again</button>
+</div>
+<div class="phone"><div class="frame"><iframe id="app" title="Givezy app" src="/a/?preview=iphone"></iframe></div></div>
+<script>
+  document.getElementById('again').addEventListener('click', function () {
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+    document.getElementById('app').src = '/a/?preview=iphone&t=' + Date.now();
+  });
+</script>
+</body>
+</html>
