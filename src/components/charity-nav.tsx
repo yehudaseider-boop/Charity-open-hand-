@@ -72,7 +72,7 @@ export function CharityNav({ id }: { id: string }) {
       <div className="hidden space-y-6 lg:block">
         {groups.map((g) => (
           <div key={g.title} className="space-y-1.5">
-            <p className="px-3 text-xs font-bold text-muted">{g.title}</p>
+            <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted">{g.title}</p>
             <ul className="space-y-0.5">
               {g.tabs.map((t) => {
                 const active = isActive(t);

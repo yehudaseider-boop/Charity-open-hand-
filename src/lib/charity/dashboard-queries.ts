@@ -190,6 +190,25 @@ export function loadDonorPaidGifts(charityId: string, donorId: string) {
   ).then((rows) => rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents) })).sort((a, b) => String(a.paid_at).localeCompare(String(b.paid_at))));
 }
 
+/** The latest donations that went through (paid, refunded or charged back), newest first, for the Overview. */
+export async function loadRecentDonations(charityId: string, limit = 7): Promise<DonationRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("charity_donations")
+    .select(DONATION_FIELDS)
+    .eq("charity_id", charityId)
+    .order("paid_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as DonationRow[];
+}
+
+/** Where the paid gifts of a period came from (website, app, shared link and so on): one row per gift. */
+export function loadGiftSources(charityId: string, period: Period) {
+  return allCharityDonations<{ came_from: string | null }>(charityId, "came_from", (q) => q.eq("status", "paid").gte("paid_at", period.from).lt("paid_at", period.to));
+}
+
 /** The charity's campaigns by id, for naming them on gifts and in downloads. */
 export async function loadCampaignTitles(charityId: string): Promise<Map<string, string>> {
   const supabase = await createClient();

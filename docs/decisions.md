@@ -2,6 +2,22 @@
 
 ## Decided
 
+- **Charity dashboard redrawn, overview first (29/10/2026, Yehuda approved the mock-up built from a reference he chose).**
+  Every dashboard page now sits in one shell (`components/dashboard-shell.tsx`): the charity's name and status, the
+  pages grouped down the left (a scrolling row on a phone), a bar with search (it searches Donations by name or
+  email) and the link to the public page. The Overview (`overview-view.tsx`, drawn from figures the page works out,
+  so it can also be drawn from sample figures) has: four big figures with trend lines; Donations by month as a line
+  with a 12 months / 6 months / Tax year switch and a figures bubble on hover, tap or Tab; Where gifts come from (the
+  sources we already record, this tax year); Recent donations with an on-the-spot filter; Needs you this week; Your
+  biggest supporters; Campaigns as goal rings; Your donors; s18A receipts; Monthly giving over time. One orange
+  button, "Record a gift". Decisions: (1) the "This month so far" figure shows no percentage against last month, because a
+  part-month against a whole one would read as a fall (last month's total is shown beside it); the only percentage is
+  the change in what monthly donors give each month, against the end of last month. (2) Recent donations shows only
+  paid, refunded and charged-back gifts, as the Donations page does (abandoned and failed checkouts stay private).
+  (3) A trend line is drawn only with two or more points, and "Donors" has none because we do not keep its history.
+  (4) The reference design is a bought UI kit: used for ideas only, nothing copied. New queries: `loadRecentDonations`
+  and `loadGiftSources`; helpers in `lib/charity/overview.ts`. Still to redraw in the same shell: Donations, Donors,
+  Monthly donations, Campaigns and the rest keep their current inner layout until their turn.
 - **Charity dashboard, interactive pass 1 (28/10/2026, Yehuda chose 1, 4 and 5 of ten mock-ups).** (1) Donations by
   month on the overview can be touched: hover or tap a month for its total, number of donations and the monthly and
   once-off split, and "See these N donations" opens that month's paid donations (`month-bars.tsx`). (4) The Donors
