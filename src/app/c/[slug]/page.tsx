@@ -15,6 +15,7 @@ import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { Splash } from "@/components/splash";
+import { Bubbles } from "@/components/marketing";
 import { StickyGive } from "@/components/sticky-give";
 import { impactUnitFrom } from "@/lib/charity/impact";
 import { formatRand } from "@/lib/money";
@@ -73,9 +74,18 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt="" className="aspect-[16/9] w-full rounded-[2rem] object-cover sm:aspect-[3/1]" />
         ) : (
-          // No cover photo yet: a soft lilac band with the logo's splash, whole, on the right.
-          <div aria-hidden className="relative flex h-36 w-full items-center justify-end overflow-hidden rounded-[2rem] bg-honey-soft pr-6 sm:h-52 sm:pr-14">
-            <Splash className="h-auto w-36 sm:w-56" />
+          // No cover photo yet: a blue colour block with bubbles and the logo's splash, whole, on the right.
+          <div aria-hidden className="relative flex h-36 w-full items-center justify-end overflow-hidden rounded-[2rem] bg-brand pr-6 sm:h-52 sm:pr-14">
+            <Bubbles
+              items={[
+                { c: "-left-12 -top-16 h-32 w-32 bg-coral sm:-left-16 sm:-top-20 sm:h-56 sm:w-56", anim: "bob-slow" },
+                { c: "left-[30%] -bottom-24 h-48 w-48 border-[18px] border-white/10" },
+                { c: "left-[22%] top-8 h-4 w-4 bg-honey", anim: "bob" },
+                { c: "right-[34%] top-10 h-8 w-8 border-[4px] border-honey", anim: "bob-slow" },
+                { c: "right-[40%] bottom-8 h-3 w-3 bg-white/70" },
+              ]}
+            />
+            <span className="relative rounded-[1.75rem] bg-white/95 px-5 py-4 sm:px-7 sm:py-5"><Splash className="h-auto w-24 sm:w-36" /></span>
           </div>
         )}
         <header className="flex flex-wrap items-end gap-x-5 gap-y-3 px-4 sm:px-8">
@@ -101,7 +111,8 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
       <div className={`mx-auto grid max-w-[75rem] grid-cols-1 gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12 pb-20`}>
         {/* Giving comes first on a phone, and stays beside the story on a laptop. */}
         <div className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
-          <div className="space-y-4 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6">
+          <div className="relative isolate space-y-4 overflow-hidden rounded-[1.75rem] border-2 border-border bg-surface p-5 shadow-[0_24px_48px_rgba(23,73,181,0.08)] sm:p-6">
+            <span aria-hidden className="pointer-events-none absolute -right-10 -top-10 -z-10 h-28 w-28 rounded-full bg-honey-soft" />
             {charity.impact_en || unit ? (
               <div className="rounded-control bg-[#fff4ec] p-4">
                 <p className="text-sm font-bold text-[#b4501a]">What your gift does</p>
@@ -164,11 +175,12 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
 
           {updates.length ? (
             <Section title="Latest from them">
-              <ul className="space-y-4">
-                {updates.map((u) => {
+              <ul className="relative space-y-4 pl-7 before:absolute before:bottom-4 before:left-[7px] before:top-4 before:w-0.5 before:rounded-full before:bg-honey">
+                {updates.map((u, i) => {
                   const photo = publicImageUrl(u.photo_path);
                   return (
-                    <li key={u.id} className="space-y-3 rounded-card bg-honey-soft p-5">
+                    <li key={u.id} className="relative space-y-3 rounded-card bg-honey-soft p-5">
+                      <span aria-hidden className={`absolute -left-7 top-6 h-4 w-4 rounded-full border-[3px] border-white ${i === 0 ? "bg-coral" : "bg-brand"}`} />
                       <p className="text-sm font-semibold text-muted">{formatDate(u.created_at)}</p>
                       <p className="whitespace-pre-line leading-relaxed">{u.body_en}</p>
                       {/* eslint-disable-next-line @next/next/no-img-element */}

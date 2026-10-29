@@ -32,7 +32,7 @@ export function SiteFooter() {
   return (
     <footer className="relative mt-auto overflow-hidden bg-navy text-white print:hidden">
       <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand" />
-      <span aria-hidden className="pointer-events-none absolute right-40 top-10 h-5 w-5 rounded-full bg-coral" />
+      <span aria-hidden className="pointer-events-none absolute right-[15rem] top-4 h-4 w-4 rounded-full bg-coral" />
       <span aria-hidden className="pointer-events-none absolute -bottom-10 left-[40%] h-28 w-28 rounded-full border-[10px] border-white/5" />
       <div className="relative mx-auto grid max-w-[75rem] grid-cols-2 gap-x-6 gap-y-9 px-4 pb-8 pt-12 sm:grid-cols-3 sm:px-6 md:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
         <div className="col-span-2 flex flex-col items-start gap-3 sm:col-span-3 md:col-span-1">

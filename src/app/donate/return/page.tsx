@@ -20,6 +20,7 @@ import { getViewer } from "@/lib/auth";
 import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
 import { cardUpdateFor, newCardPath } from "@/lib/donations/new-card";
 import { Splash } from "@/components/splash";
+import { ConfettiBurst } from "@/components/confetti-burst";
 import { currentFocus } from "@/lib/focus-server";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
@@ -256,9 +257,10 @@ function HelpLine() {
  */
 function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wait" | "neutral"; title: string; lead?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="relative mx-auto mt-2 max-w-xl rounded-[2rem] border-2 border-border bg-surface p-6 shadow-[0_24px_48px_rgba(9,37,119,0.08)] sm:mt-6 sm:p-9">
+    <section className="relative mx-auto mt-2 max-w-xl overflow-hidden rounded-[2rem] border-2 border-border bg-surface p-6 shadow-[0_24px_48px_rgba(9,37,119,0.08)] sm:mt-6 sm:p-9">
+      {tone === "paid" ? <ConfettiBurst /> : null}
       {tone === "paid" ? (
-        <Splash className="mb-4 h-auto w-28 sm:w-32" />
+        <Splash className="pop-in relative mb-4 h-auto w-28 sm:w-32" />
       ) : tone === "wait" ? (
         <span aria-hidden className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-honey-soft">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="stroke-brand">
@@ -274,9 +276,9 @@ function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wa
           </svg>
         </span>
       ) : null}
-      <h1 className="text-[clamp(1.875rem,5vw,2.5rem)] leading-[1.05]">{title}</h1>
+      <h1 className="relative text-[clamp(1.875rem,5vw,2.5rem)] leading-[1.05]">{title}</h1>
       {lead ? <p className="mt-1 font-display text-[clamp(1.375rem,4vw,1.75rem)] font-bold leading-snug text-navy">{lead}</p> : null}
-      <div className="mt-4 space-y-1 [&>p]:leading-relaxed">{children}</div>
+      <div className="relative mt-4 space-y-1 [&>p]:leading-relaxed">{children}</div>
     </section>
   );
 }

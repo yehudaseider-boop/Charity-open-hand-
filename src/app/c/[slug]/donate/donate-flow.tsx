@@ -133,7 +133,7 @@ export function DonateFlow({ slug, charityName, receiptsAvailable, minimumLabel,
                   setEditingAmount(true);
                 }}
                 aria-pressed={picked === c}
-                className={`rounded-2xl border-2 px-2 py-3 text-[17px] font-bold tabular-nums transition ${picked === c ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand"}`}
+                className={`rounded-2xl border-2 px-2 py-3 text-[17px] font-bold tabular-nums transition active:scale-95 ${picked === c ? "border-brand bg-brand text-white shadow-[0_8px_20px_rgba(23,73,181,0.25)]" : "border-border bg-surface text-navy hover:-translate-y-0.5 hover:border-brand"}`}
               >
                 {formatRand(c)}
               </button>

@@ -28,7 +28,7 @@ export async function SiteHeader() {
   const dashboards = dashboardLinks(viewer);
   return (
     // Stays at the top while the page scrolls, so Charities and Sign in are always one tap away.
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur-md print:hidden">
+    <header className="site-header sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur-md print:hidden">
       <div className="mx-auto flex h-16 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-[4.5rem] sm:px-6">
         <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
