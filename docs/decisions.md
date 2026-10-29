@@ -1455,3 +1455,15 @@ PSFA asked on the intro call to explore the product themselves. The first demo w
 - **Sign-in, agree to the terms, the second step**: one soft card each, title in the product's heading style, thicker field borders, and the one orange pressable button per screen (navy text). What each page does is unchanged, including the "Not now, sign me out" way out on the agreement page.
 - **Your information and the tax pack** use the same card and title style.
 - **Checked** at 375px and laptop width for content cut off: none. The design plan's six phases are now done (style guide, home, donor pages, dashboard, admin, account and sign-in).
+
+## Home and For charities pages, direction B (29/10/2026)
+
+Yehuda shared the "Deupload" landing pages (Figma community) as the feel he wants: "I like these vibes", then "need more effort", then "where are the bubbles and the blue and orange", then animated people. Approved: "Perfect".
+
+- **Layout, after Deupload:** centred hero over a product window with floating cards; three solid blue cards with links; two pastel cards and a wide lilac card; a soft section with stacked feature cards; a blue band with two price cards hanging over its edge; icon steps on a dotted line; "Ready to get started?" with a small and a wide card; a navy footer (all pages). Shared parts in `src/components/marketing.tsx`.
+- **Colour and life:** bubbles in blue, orange and lavender (orange only as shapes, never text); a few drift slowly. Cards lift under the pointer; sections slide in on scroll (browsers without scroll timelines simply show them).
+- **People:** unDraw illustrations (via the `undraw-svg` package, MIT; unDraw's own licence allows commercial use with no credit, but no reselling or competing libraries), recoloured to the Givezy palette with CSS variables in `src/components/illustration-art.ts` (generated). Chosen for modest dress: the crop-top and high-five pictures were swapped out. Some women still wear trousers; Yehuda may want skirts throughout. Each floats, with hearts rising or stars twinkling beside it.
+- **"Try it" calculator** on the home page: type any amount, see the year's total for a monthly gift. It never suggests an amount (rule of 16/10/2026: Givezy suggests no figures). Nothing is sent.
+- **Motion** stops for anyone who asks their device to reduce motion.
+- **New copy to confirm:** "Quick. Checked. Free.", "Your details, kept private" (charities never see the ID number or the maaser choice: both true), "Simple. Fair to every charity.", "No hidden fees and no subscriptions."
+- **Hosting:** stays on Vercel (Yehuda, 29/10/2026), not Netlify. The Netlify copy is only the PSFA demo.
