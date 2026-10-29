@@ -1,37 +1,56 @@
 import Link from "next/link";
 import { Info } from "@/components/info";
 import { platformConfig } from "@/config/platform";
+import { Splash } from "@/components/splash";
+import { Illustration } from "@/components/illustration";
+import { TryGiving } from "@/components/try-giving";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { Chevron } from "@/components/chevron";
-import { Splash } from "@/components/splash";
+import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 
-// Home page, design direction A "Splash" (chosen 22/10/2026). The logo's splash (all three drops together, cut from
-// the logo and never redrawn) appears once, whole, behind the hero picture; the rest of the page stays quiet.
+// Home page, direction B (preview, 29/10/2026), laid out after the Deupload landing page Yehuda liked: see
+// components/marketing.tsx. Every figure in a picture is a labelled sample; every claim is one we can back today.
 
 const min = formatRand(platformConfig.minDonationCents);
-
-const steps = [
-  { title: "Pick a charity", body: "Search by name, cause or area. A person checks every charity's registration and bank details before it can take a gift.", rule: "border-brand", num: "text-brand" },
-  { title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page, so we never see your card.", rule: "border-coral", num: "text-[#b4501a]" },
-  { title: "Keep track, without trying", body: `Every gift sits in your ${platformConfig.appName} account. When the tax year ends, your s18A receipts are ready in one place.`, rule: "border-honey", num: "text-[#5b3fb0]" },
-];
-
-const promises = [
-  { title: "Checked by a person", body: "We look at each charity's registration documents and bank details before it can take a gift." },
-  { title: "Your card stays with the bank", body: `You pay on the payment provider's page. ${platformConfig.appName} never sees or stores card details.` },
-  { title: `No ${platformConfig.appName} fee on your gift`, body: "We don't take a cut. The card provider's fee comes off before the gift reaches the charity." },
-  { title: "s18A receipts, once a year", body: "If you ask for one, and the charity is approved to issue them: one receipt per charity for the whole tax year." },
-];
+const minContribution = formatRand(platformConfig.minContributionCents);
 
 function Tick({ className = "stroke-sage" }: { className?: string }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`shrink-0 ${className}`}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`mt-0.5 shrink-0 ${className}`}>
       <path d="M5 12l5 5L20 7" />
     </svg>
+  );
+}
+
+const gifts = [
+  { date: "02/10/2026", name: "A food parcel charity", tag: "s18A receipt", amount: "R500", tone: "bg-peach" },
+  { date: "28/09/2026", name: "A school charity", tag: "Once-off", amount: "R250", tone: "bg-brand-soft" },
+  { date: "19/09/2026", name: "An old-age home", tag: "Monthly", amount: "R180", tone: "bg-honey-soft" },
+  { date: "05/09/2026", name: "A medical support charity", tag: "s18A receipt", amount: "R360", tone: "bg-peach" },
+  { date: "19/08/2026", name: "An old-age home", tag: "Monthly", amount: "R180", tone: "bg-honey-soft" },
+];
+
+/** The hero picture: the donor's giving history, as a sample. */
+function HeroScreen() {
+  return (
+    <div className="flex flex-col gap-4 text-left">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-display text-[1.25rem] font-bold">Giving history</p>
+      </div>
+      <ul className="flex flex-col">
+        {gifts.map((g, i) => (
+          <li key={i} className="flex items-center gap-3 border-b border-border py-2.5 last:border-0">
+            <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-[13px] font-bold text-brand ${g.tone}`}>{initials(g.name.replace(/^An? /, ""))}</span>
+            <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[14px] font-semibold">{g.name}</span><span className="text-[12px] text-muted">{g.date} · {g.tag}</span></span>
+            <span className="shrink-0 text-[14px] font-bold">{g.amount}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -59,206 +78,241 @@ export default async function Home() {
   return (
     // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
     <div className="full-bleed overflow-x-clip">
-      {/* Hero */}
-      <section className="mx-auto flex max-w-[75rem] flex-wrap items-center gap-12 px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-12">
-        <div className="relative z-10 flex min-w-0 flex-[1_1_34rem] flex-col items-start gap-6">
-          <h1 className="text-[clamp(3rem,6.2vw,5.25rem)] leading-[0.96] text-balance">Give in a minute. We keep the paperwork.</h1>
-          <p className="max-w-[33rem] text-lg leading-normal text-muted sm:text-xl">
-            Find a registered South African charity, give from {min}, and see every gift in one place. If the charity issues s18A
-            receipts, you can get one a year for everything you gave it.
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-5">
-            <Link href="/charities" className="pressable rounded-control bg-coral px-7 py-4 text-lg font-bold text-navy">
-              Find a charity
-            </Link>
-            <Link href="#how" className="inline-flex min-h-12 items-center text-[17px] font-bold text-brand underline underline-offset-[5px]">How it works</Link>
-          </div>
-          <ul className="mt-1 flex flex-wrap gap-x-6 gap-y-2.5 text-[15px] font-semibold">
-            <li className="flex items-center gap-2"><Tick />Every charity checked by a person</li>
-            <li className="flex items-center gap-2"><Tick />No Givezy fee on your gift</li>
-            <li className="flex items-center gap-2"><Tick />Your card stays with the bank</li>
-          </ul>
+      {/* Hero: centred words, then the product window with floating cards */}
+      <section className="relative">
+        <Bubbles
+          items={[
+            { c: "-left-40 -top-40 h-[26rem] w-[26rem] bg-honey-soft" },
+            { c: "-right-32 top-24 h-80 w-80 bg-peach" },
+            { c: "left-[12%] top-28 h-6 w-6 bg-coral", anim: "bob" },
+            { c: "left-[8%] top-64 h-10 w-10 border-[4px] border-brand", anim: "bob-slow" },
+            { c: "right-[14%] top-16 h-8 w-8 bg-brand", anim: "bob-slow" },
+            { c: "right-[9%] top-56 h-4 w-4 bg-coral", anim: "bob" },
+            { c: "right-[20%] top-80 h-12 w-12 border-[5px] border-honey", anim: "bob" },
+          ]}
+        />
+      <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
+        <h1 className="max-w-[46rem] text-[clamp(2.375rem,4.6vw,3.5rem)] font-bold! leading-[1.12] text-balance">
+          Give in a minute. We keep the <Key>paperwork</Key>.
+        </h1>
+        <p className="max-w-[36rem] text-[17px] leading-relaxed text-muted">
+          Find a charity, give from {min} once or every month, and see every gift in one place. We check every charity before it can take a gift.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/charities" className="pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Find a charity</Link>
+          <Link href="#how" className="rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand">How it works</Link>
         </div>
 
-        {/* The donor's giving page as the hero picture: the product, not stock photos. */}
-        <div className="relative flex min-w-0 flex-[1_1_22rem] justify-center pb-5 pt-36 sm:pt-40">
-          {/* The splash sits whole above the card's top corner, inside the page. */}
-          <Splash className="absolute right-[max(0px,calc(50%-12.5rem))] top-0 h-auto w-44 sm:w-52" />
-          <div className="relative z-10 flex w-full max-w-[25rem] flex-col gap-3.5">
-            <div className="flex items-center gap-5 rounded-[1.875rem] bg-brand p-6 text-white shadow-[0_30px_60px_rgba(23,73,181,0.25)]">
-              <svg width="128" height="128" viewBox="0 0 124 124" role="img" aria-label="Sample: 71 percent of a R6 000 goal" className="shrink-0">
-                <circle cx="62" cy="62" r="52" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="14" />
-                <circle cx="62" cy="62" r="52" fill="none" stroke="var(--coral)" strokeWidth="14" strokeLinecap="round" strokeDasharray="232 327" transform="rotate(-90 62 62)" />
-                <text x="62" y="68" textAnchor="middle" fontFamily="var(--font-bricolage), sans-serif" fontWeight="700" fontSize="22" fill="#fff">71%</text>
-              </svg>
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-[13px] font-semibold text-honey-soft/80">Your giving this tax year</span>
-                <span className="font-display text-[2.5rem] font-extrabold leading-none tabular-nums">R4 250</span>
-                <span className="text-sm text-honey-soft/90">of a R6 000 goal</span>
+        <div className="relative mt-14 w-full max-w-[60rem]">
+          <Confetti />
+          <Splash className="absolute -top-24 left-[6%] z-10 hidden h-auto w-32 md:block" />
+          <div className="relative mx-auto max-w-[48rem]">
+            <AppWindow nav={["Home", "Giving", "Receipts", "Charities", "Account"]} active={1}><HeroScreen /></AppWindow>
+            {/* Left: the goal ring */}
+            <Floating className="-left-24 top-24 w-60">
+              <p className="text-[12px] font-semibold text-muted">Your goal this tax year</p>
+              <div className="mt-2 flex items-center gap-3">
+                <svg width="64" height="64" viewBox="0 0 124 124" aria-hidden className="shrink-0">
+                  <circle cx="62" cy="62" r="50" fill="none" stroke="var(--border)" strokeWidth="16" />
+                  <circle cx="62" cy="62" r="50" fill="none" stroke="var(--coral)" strokeWidth="16" strokeLinecap="round" strokeDasharray="223 314" transform="rotate(-90 62 62)" />
+                </svg>
+                <div><p className="font-display text-[1.5rem] font-bold leading-none">R4 250</p><p className="mt-1 text-[12px] text-muted">71% of R6 000</p></div>
               </div>
-            </div>
-            <div className="ml-8 flex items-center gap-3.5 rounded-3xl border-[1.5px] border-border bg-surface px-[18px] py-4 shadow-[0_20px_40px_rgba(14,27,61,0.08)]">
-              <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.875rem] bg-peach font-display font-bold text-brand">NM</span>
-              <span className="flex min-w-0 flex-1 flex-col"><span className="text-[15px] font-bold">A food parcel charity</span><span className="text-[13px] text-muted">02/10/2026 · s18A receipt</span></span>
-              <span className="font-display font-extrabold tabular-nums">R500</span>
-            </div>
-            <p className="self-center text-xs text-muted">Sample figures</p>
+            </Floating>
+            {/* Right: a gift just made */}
+            <Floating className="-right-24 -top-10 w-64">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-success-soft"><Icon name="check" className="stroke-success" size={16} /></span>
+                <p className="text-[14px] font-bold">Thank you, Sarah</p>
+              </div>
+              <p className="mt-2 text-[13px] text-muted">R500 to a food parcel charity</p>
+              <div className="mt-3 flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2 text-[12px]"><span className="text-muted">s18A receipt</span><span className="font-bold text-brand">Requested</span></div>
+            </Floating>
+            <Illustration name="loveIt" className="absolute -left-56 bottom-0 z-20 hidden w-40 xl:-left-64 xl:w-44 lg:block" />
+            <Illustration name="dreamGift" sparkle="stars" float="bob" className="absolute -right-64 bottom-0 z-20 hidden w-60 xl:-right-80 xl:w-72 lg:block" />
+            <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
           </div>
         </div>
+      </div>
       </section>
 
-      {/* Discover: one big story, then a short list. Real charities only. */}
-      <section id="discover" className="bg-honey-soft py-16 sm:py-22">
-        <div className="mx-auto flex max-w-[75rem] flex-col gap-9 px-4 sm:px-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <h2 className="max-w-[40rem] font-display text-[clamp(2.125rem,4vw,3.25rem)] font-bold leading-[1.05] text-balance">Find a cause that feels close to home.</h2>
-            <Link href="/charities" className="inline-flex min-h-12 items-center text-[17px] font-bold text-brand underline underline-offset-4">See all charities</Link>
-          </div>
+      {/* Three blue cards */}
+      <section className="mx-auto flex max-w-[75rem] flex-col gap-12 px-4 pb-24 sm:px-6">
+        <SectionHead title={<>Quick. Checked. <Key>Free.</Key></>}>
+          Everything you need to give with confidence, and nothing taken off your gift by us.
+        </SectionHead>
+        <BlueCards
+          items={[
+            { icon: "bolt", title: "Give in a minute", body: `Choose an amount from ${min}, once or every month, and pay on the payment provider's secure page.`, href: "/charities", link: "Find a charity" },
+            { icon: "shield", title: "Every charity checked", body: "A person looks at each charity's registration documents and bank details before it can take a gift.", href: "/for-charities", link: "How charities join" },
+            { icon: "heart", title: "No Givezy fee", body: "We don't take a cut. The card provider's fee comes off before the gift reaches the charity.", href: "#pricing", link: "What it costs" },
+          ]}
+        />
+      </section>
 
-          {categories.length > 0 ? (
-            <ul className="flex flex-wrap gap-3" aria-label="Causes">
-              {categories.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/charities?category=${c.slug}`}
-                    className="inline-block rounded-full border-2 border-border bg-surface px-4.5 py-2.5 font-semibold text-navy transition-colors hover:border-brand"
-                  >
-                    {c.name_en}
+      {/* Two pastel cards and a wide lilac card */}
+      <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6">
+        <h2 className={`max-w-[34rem] ${h2Class}`}>One account for all your giving, ready at <Key>tax time</Key>.</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation and pause or stop it yourself whenever you like. Try it below.">
+            <Screen>
+              <TryGiving minCents={platformConfig.minDonationCents} />
+            </Screen>
+          </PastelCard>
+          <PastelCard tone="sky" title="s18A receipts, done" body="If the charity issues them, you get one receipt per charity for the whole tax year, all in your account.">
+            <Screen>
+              <p className="text-[13px] font-semibold text-muted">Your s18A receipts</p>
+              <ul className="mt-2 flex flex-col gap-2 text-[14px]">
+                <li className="flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2"><span>Food parcel charity</span><span className="font-bold">R2 160</span></li>
+                <li className="flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2"><span>Medical support</span><span className="font-bold">R1 590</span></li>
+              </ul>
+              <p className="mt-3 text-[13px] font-bold text-brand">Download tax pack</p>
+            </Screen>
+          </PastelCard>
+        </div>
+        <div id="discover" className="grid items-center gap-8 rounded-[1.25rem] bg-honey-soft p-7 sm:p-10 md:grid-cols-2">
+          <div className="flex flex-col items-start gap-4">
+            <h3 className="font-display text-[clamp(1.625rem,2.6vw,2.125rem)] font-bold leading-tight"><Key>Find a cause</Key> that feels close to home.</h3>
+            <p className="text-[16px] leading-relaxed text-muted">Food parcels, schools, shuls, medical help and more. Every charity on {platformConfig.appName} is registered and checked.</p>
+            {categories.length > 0 ? (
+              <ul className="flex flex-wrap gap-2" aria-label="Causes">
+                {categories.map((c) => (
+                  <li key={c.id}><Link href={`/charities?category=${c.slug}`} className="inline-block rounded-full border-[1.5px] border-honey bg-white px-3.5 py-1.5 text-[14px] font-semibold text-navy hover:border-brand">{c.name_en}</Link></li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-3">
+              <Link href="/charities" className="pressable rounded-control bg-brand px-5 py-3 font-bold text-white">See all charities</Link>
+            </div>
+          </div>
+          {featured || others.length > 0 ? (
+            <ul className="flex flex-col gap-3">
+              {featured ? (
+                <li>
+                  <Link href={`/c/${featured.slug}`} className="relative flex min-h-[9rem] flex-col justify-end gap-1 overflow-hidden rounded-[1.125rem] bg-brand p-5 text-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {cover ? <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                    {cover ? <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-navy/90 to-navy/10" /> : null}
+                    <span className="relative text-[13px] font-bold text-honey">Cause of the week</span>
+                    <span className="relative font-display text-[1.375rem] font-bold">{featured.name_en}</span>
                   </Link>
                 </li>
-              ))}
+              ) : null}
+              {others.map((c, i) => {
+                const logo = publicImageUrl(c.logo_path);
+                const place = [c.suburb, c.city].filter(Boolean).join(", ");
+                return (
+                  <li key={c.id}>
+                    <Link href={`/c/${c.slug}`} className="flex items-center gap-4 rounded-[1.125rem] bg-white p-4 shadow-[0_12px_30px_rgba(14,27,61,0.06)] hover:ring-2 hover:ring-brand">
+                      {logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={logo} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                      ) : (
+                        <span aria-hidden className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl font-display font-bold text-brand ${i % 2 ? "bg-brand-soft" : "bg-peach"}`}>{initials(c.name_en)}</span>
+                      )}
+                      <span className="flex min-w-0 flex-1 flex-col"><span className="font-bold text-navy">{c.name_en}</span>{place ? <span className="text-sm text-muted">{place}</span> : null}</span>
+                      <Chevron />
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
-          ) : null}
-
-          {featured || others.length > 0 ? (
-            <div className="flex flex-wrap gap-6">
-              {featured ? (
-                <Link
-                  href={`/c/${featured.slug}`}
-                  aria-label={`Cause of the week: ${featured.name_en}`}
-                  className="relative flex min-h-[18rem] min-w-0 flex-[2_1_30rem] flex-col justify-end gap-2.5 overflow-hidden rounded-[2rem] bg-brand p-7 text-white sm:min-h-[21rem] sm:p-9"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {cover ? <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
-                  {cover ? <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/50 to-navy/10" /> : null}
-                  <span className="relative text-sm font-bold text-honey">Cause of the week</span>
-                  <span className="relative font-display text-[clamp(1.875rem,3.4vw,2.75rem)] font-bold leading-[1.05]">{featured.name_en}</span>
-                  {featured.description_en ? <span className="relative line-clamp-3 max-w-[29rem] text-[17px] leading-normal text-honey-soft">{featured.description_en}</span> : null}
-                  <span className="relative mt-2 inline-flex items-center gap-1 self-start font-bold text-white underline underline-offset-4">See their work</span>
-                </Link>
-              ) : null}
-              {others.length > 0 ? (
-                <ul className={`flex min-w-0 flex-col gap-4 ${featured ? "flex-[1_1_18rem]" : "flex-1 sm:grid sm:grid-cols-3"}`}>
-                  {others.map((c, i) => {
-                    const logo = publicImageUrl(c.logo_path);
-                    const place = [c.suburb, c.city].filter(Boolean).join(", ");
-                    return (
-                      <li key={c.id}>
-                        <Link href={`/c/${c.slug}`} className="group flex h-full items-center gap-4 rounded-card border-2 border-border bg-surface p-5 transition-colors hover:border-brand">
-                          {logo ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={logo} alt="" className="h-14 w-14 shrink-0 rounded-control border border-border object-cover" />
-                          ) : (
-                            <span aria-hidden className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-control font-display text-xl font-bold text-brand ${i % 2 ? "bg-brand-soft" : "bg-peach"}`}>
-                              {initials(c.name_en)}
-                            </span>
-                          )}
-                          <span className="flex min-w-0 flex-1 flex-col gap-1">
-                            <span className="text-[17px] font-bold text-navy">{c.name_en}</span>
-                            {place ? <span className="text-sm text-muted">{place}</span> : null}
-                          </span>
-                          <Chevron />
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-            </div>
           ) : (
-            <div className="flex flex-col items-start gap-2 rounded-card border-2 border-border bg-surface p-6">
+            <div className="flex flex-col items-start gap-2 rounded-[1.125rem] bg-white p-6">
               <p className="font-display text-xl font-bold text-brand">The first charities are joining now</p>
               <p className="text-muted">Check back soon, or tell a charity you love about {platformConfig.appName}.</p>
-              <Link href="/for-charities" className="font-bold text-brand underline underline-offset-4">How charities join</Link>
             </div>
           )}
         </div>
       </section>
 
-      {/* How it works: a path, not three identical boxes */}
-      <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-12 px-4 py-20 sm:px-6 sm:py-24">
-        <h2 className="font-display text-[clamp(2.125rem,4.4vw,3.5rem)] font-extrabold leading-none text-balance">Three steps, then it&apos;s done</h2>
-        <ol className="flex flex-wrap gap-8">
-          {steps.map((st, i) => (
-            <li key={st.title} className={`flex min-w-0 flex-[1_1_16rem] flex-col gap-3 border-t-[3px] pt-5 ${st.rule}`}>
-              <span className={`font-display text-lg font-extrabold tabular-nums ${st.num}`}>{i + 1}</span>
-              <h3 className="font-display text-[1.625rem] font-bold text-navy">{st.title}</h3>
-              <p className="text-[17px] leading-relaxed text-muted">{st.body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* Your year of giving (a sample of the donor's account) */}
-      <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6 sm:pb-24">
-        <div className="relative flex flex-wrap items-center gap-12 overflow-hidden rounded-[2.5rem] bg-navy p-[clamp(1.75rem,5vw,4rem)]">
-          <div className="relative flex min-w-0 flex-[1_1_22rem] flex-col gap-4.5">
-            <h2 className="font-display text-[clamp(2rem,3.8vw,3rem)] font-bold leading-[1.05] text-white! text-balance">Your year of giving, on one page.</h2>
-            <p className="text-lg leading-relaxed text-brand-soft">
-              See what you gave, to whom and when. Set a goal if you like. When the tax year ends, download your tax pack with your
-              s18A receipts in it.
-            </p>
-            <ul className="flex flex-col gap-2.5 text-[17px] text-white">
-              <li className="flex items-center gap-2.5"><Tick className="stroke-coral" />Every gift, every charity, one list</li>
-              <li className="flex items-center gap-2.5"><Tick className="stroke-coral" />Monthly donations you can pause or stop yourself</li>
-              <li className="flex items-center gap-2.5"><Tick className="stroke-coral" />A yearly tax pack, ready for your return</li>
-            </ul>
-          </div>
-          <div className="relative flex min-w-0 flex-[1_1_24rem] flex-col gap-3.5 rounded-[1.75rem] bg-surface p-5 sm:p-6">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-display text-[1.375rem] font-bold text-brand">Giving history</span>
-              <span className="text-[13px] text-muted">Sample</span>
+      {/* Soft section: words on the left, stacked white cards on the right */}
+      <section className="relative overflow-hidden bg-honey-soft">
+        <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, { c: "right-[40%] top-10 h-6 w-6 bg-coral", anim: "bob" }, "-right-24 -top-24 h-72 w-72 bg-honey", "left-[30%] bottom-8 h-10 w-10 border-[4px] border-brand/40"]} />
+        <div className="relative mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2">
+          <div className="flex flex-col gap-5">
+            <h2 className={h2Class}>Your details, kept <Key>private</Key>.</h2>
+            <p className="text-[17px] leading-relaxed text-muted">The charity sees what it needs to thank you and record your gift. The rest stays between you and {platformConfig.appName}.</p>
+            <div className="mt-4 grid gap-6 sm:grid-cols-2">
+              <MiniPoint icon="eye" tone="sage" title="Anonymous in public" body="Tick a box and your name stays off the charity's public page." />
+              <MiniPoint icon="download" tone="peach" title="Your information, your call" body="Download everything we hold about you, or ask us to erase it." />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-control bg-honey-soft p-3.5"><p className="text-[13px] text-muted">Given this year</p><p className="mt-1 font-display text-[1.75rem] font-bold">R4 250</p></div>
-              <div className="rounded-control bg-honey-soft p-3.5"><p className="text-[13px] text-muted">Charities</p><p className="mt-1 font-display text-[1.75rem] font-bold">3</p></div>
-            </div>
-            <ul className="text-[15px]">
-              <li className="flex justify-between gap-3 border-b border-border py-3"><span>02/10/2026 · A food parcel charity</span><span className="shrink-0 whitespace-nowrap font-bold">R500</span></li>
-              <li className="flex justify-between gap-3 border-b border-border py-3"><span>15/09/2026 · A school charity</span><span className="shrink-0 whitespace-nowrap font-bold">R250</span></li>
-              <li className="flex justify-between gap-3 py-3"><span>01/09/2026 · An old-age home (monthly)</span><span className="shrink-0 whitespace-nowrap font-bold">R180</span></li>
-            </ul>
           </div>
+          <ul className="flex flex-col gap-4">
+            <FeatureCard icon="lock" title="Your card stays with the bank" body={`You pay on the payment provider's page. ${platformConfig.appName} never sees or stores card details.`} />
+            <FeatureCard icon="user" title="No ID numbers for charities" body="Charities never see any part of your ID or tax number. It goes only on your s18A receipt." />
+            <FeatureCard icon="heart" title="Your maaser stays yours" body="Whether a gift is maaser, chomesh or general tzedaka is private to you. Charities don't see it." />
+          </ul>
         </div>
       </section>
 
-      {/* What we check and promise: plain facts, nothing we can't back */}
-      <section className="mx-auto flex max-w-[75rem] flex-wrap gap-10 px-4 pb-20 sm:px-6 sm:pb-24">
-        <h2 className="min-w-0 flex-[1_1_18rem] font-display text-[clamp(2rem,3.8vw,2.875rem)] font-bold leading-[1.05] text-balance">What we check, and what we promise.</h2>
-        <div className="min-w-0 flex-[2_1_30rem] space-y-6">
-          <dl className="grid gap-x-9 gap-y-7 sm:grid-cols-2">
-            {promises.map((p) => (
-              <div key={p.title} className="flex flex-col gap-1.5">
-                <dt className="text-lg font-bold">{p.title}</dt>
-                <dd className="leading-relaxed text-muted">{p.body}</dd>
-              </div>
-            ))}
-          </dl>
+      {/* Coloured band with cards hanging over its edge */}
+      <section id="pricing" className="pb-24">
+        <BlueBand className="pb-48 pt-20">
+          <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-3 px-4 text-center sm:px-6">
+            <h2 className="font-display text-[clamp(1.875rem,3.2vw,2.75rem)] font-bold leading-[1.12] text-white!">Simple. <span className="text-honey">Fair</span> to every charity.</h2>
+            <p className="text-[17px] leading-relaxed text-honey-soft">{platformConfig.appName} costs donors and charities nothing to use.</p>
+          </div>
+        </BlueBand>
+        <div className="relative z-10 mx-auto -mt-36 grid max-w-[56rem] gap-0 px-4 sm:px-6 md:grid-cols-2">
+          <div className="flex flex-col items-center gap-3 rounded-[1.25rem] bg-white p-8 text-center shadow-[0_30px_60px_rgba(14,27,61,0.12)] md:rounded-r-none">
+            <p className="text-[18px] font-bold">For donors</p>
+            <p className="text-[14px] text-muted">Give to any listed charity</p>
+            <p className="mt-2 font-display text-[3rem] font-bold leading-none">R0</p>
+            <p className="text-[13px] text-muted">{platformConfig.appName} fee on your gift</p>
+            <Link href="/charities" className="pressable mt-3 w-full rounded-control bg-brand px-5 py-3 font-bold text-white">Find a charity</Link>
+            <ul className="mt-3 flex flex-col gap-2 self-stretch text-left text-[14px]">
+              <li className="flex gap-2"><Tick />Give from {min}, once or monthly</li>
+              <li className="flex gap-2"><Tick />Every gift and receipt in one account</li>
+              <li className="flex gap-2"><Tick />Add a contribution to {platformConfig.appName} only if you choose, from {minContribution}</li>
+            </ul>
+          </div>
+          <div className="flex flex-col gap-5 rounded-[1.25rem] bg-navy p-8 text-white shadow-[0_30px_60px_rgba(14,27,61,0.25)] md:mt-8 md:rounded-l-none">
+            <p className="text-[18px] font-bold">For charities</p>
+            <p className="text-[14px] text-honey-soft">Everything you need to receive gifts online</p>
+            <div className="border-t border-white/20 pt-4">
+              <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">Listing</span>
+              <p className="mt-2 font-display text-[2.25rem] font-bold leading-none">R0 <span className="text-[14px] font-normal text-honey-soft">sign-up and monthly</span></p>
+            </div>
+            <div className="border-t border-white/20 pt-4">
+              <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">Card fee</span>
+              <p className="mt-2 text-[15px] leading-relaxed text-honey-soft">The card provider&apos;s fee comes off each donation. The rest goes straight to your bank account.</p>
+            </div>
+            <Link href="/for-charities" className="mt-auto inline-flex items-center gap-1 font-bold text-white hover:underline">How it works for charities</Link>
+          </div>
+        </div>
+        <div className="mx-auto mt-10 flex max-w-[40rem] flex-col items-center gap-4 px-4 text-center">
+          <p className="text-[16px] leading-relaxed text-muted">No hidden fees and no subscriptions. You only ever pay what you choose to give.</p>
           <Info terms={["s18a"]} label="an s18A receipt" />
         </div>
       </section>
 
-      {/* For charities: the other half of the product, in one band */}
-      <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6 sm:pb-24">
-        <div className="relative flex flex-wrap items-center justify-between gap-7 overflow-hidden rounded-[2.5rem] bg-brand px-[clamp(1.75rem,5vw,4rem)] py-[clamp(2.5rem,6vw,4.5rem)]">
-          <div className="relative flex min-w-0 flex-[1_1_24rem] flex-col gap-3.5">
-            <h2 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-extrabold leading-none text-white! text-balance">Run a charity? Join for free.</h2>
-            <p className="max-w-[34rem] text-lg leading-relaxed text-honey-soft">No sign-up fee and no monthly fee. Gifts go straight to your own bank account, and your donors&apos; s18A receipts are made for you once a year.</p>
-          </div>
-          <Link href="/for-charities" className="relative rounded-[1.125rem] bg-white px-7 py-4 text-lg font-bold text-navy transition-colors hover:bg-honey-soft">
-            See how it works for charities
-          </Link>
-        </div>
+      {/* How it works */}
+      <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6">
+        <SectionHead title="How it works">Three steps, then it&apos;s done. You can come back to your account any time.</SectionHead>
+        <Steps
+          steps={[
+            { icon: "search", title: "Pick a charity", body: "Search by name, cause or area. Every charity is checked before it can take a gift." },
+            { icon: "heart", title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page." },
+            { icon: "receipt", title: "Keep track", body: "Every gift sits in your account, with your s18A receipts when the tax year ends." },
+          ]}
+        />
+      </section>
+
+      {/* Ready to get started? */}
+      <section className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6">
+        <Ready
+          button={{ href: "/charities", label: "Find a charity" }}
+          small={{ icon: "user", title: "Giving as a person?", body: "Find a registered charity and give once or every month. Every gift lands in one list.", href: "/charities", link: "Start giving" }}
+          wide={{
+            icon: "building",
+            title: "Run a charity?",
+            body: "Listing is free. Donations go straight to your own bank account, and your donors' s18A receipts are made for you.",
+            href: "/for-charities",
+            link: "How it works for charities",
+            picture: <Illustration name="mobilePay" sparkle="stars" className="mx-auto w-full max-w-[18rem]" />,
+          }}
+        />
       </section>
     </div>
   );
