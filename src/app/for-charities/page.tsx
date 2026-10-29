@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AppWindow, BlueCards, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, SampleNote, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
+import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, SampleNote, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
+import { Splash } from "@/components/splash";
 
 export const metadata: Metadata = {
   title: "For charities",
@@ -54,7 +55,19 @@ export default function ForCharitiesPage() {
   return (
     <div className="full-bleed overflow-x-clip">
       {/* Hero */}
-      <section className="mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
+      <section className="relative">
+        <Bubbles
+          items={[
+            { c: "-left-40 -top-40 h-[26rem] w-[26rem] bg-honey-soft" },
+            { c: "-right-32 top-24 h-80 w-80 bg-peach" },
+            { c: "left-[12%] top-28 h-6 w-6 bg-coral", anim: "bob" },
+            { c: "left-[8%] top-64 h-10 w-10 border-[4px] border-brand", anim: "bob-slow" },
+            { c: "right-[14%] top-16 h-8 w-8 bg-brand", anim: "bob-slow" },
+            { c: "right-[9%] top-56 h-4 w-4 bg-coral", anim: "bob" },
+            { c: "right-[20%] top-80 h-12 w-12 border-[5px] border-honey", anim: "bob" },
+          ]}
+        />
+      <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
         <p className="rounded-full bg-honey-soft px-4 py-1.5 text-[14px] font-bold text-brand">For charities</p>
         <h1 className="max-w-[46rem] text-[clamp(2.375rem,4.6vw,3.5rem)] font-bold! leading-[1.12] text-balance">
           Let your supporters give to you in <Key>a few taps</Key>
@@ -69,6 +82,7 @@ export default function ForCharitiesPage() {
 
         <div className="relative mt-14 w-full max-w-[60rem]">
           <Confetti />
+          <Splash className="absolute -top-24 left-[6%] z-10 hidden h-auto w-32 md:block" />
           <div className="relative mx-auto max-w-[48rem]">
             <AppWindow nav={["Overview", "Donations", "Donors", "Monthly", "Campaigns", "s18A receipts"]} active={0}><DashboardScreen /></AppWindow>
             <Floating className="-left-24 bottom-10 w-60">
@@ -87,6 +101,7 @@ export default function ForCharitiesPage() {
             <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
           </div>
         </div>
+      </div>
       </section>
 
       {/* Three blue cards */}
@@ -149,8 +164,9 @@ export default function ForCharitiesPage() {
       </section>
 
       {/* Soft section */}
-      <section className="bg-honey-soft">
-        <div className="mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2">
+      <section className="relative overflow-hidden bg-honey-soft">
+        <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, { c: "right-[40%] top-10 h-6 w-6 bg-coral", anim: "bob" }, "-right-24 -top-24 h-72 w-72 bg-honey", "left-[30%] bottom-8 h-10 w-10 border-[4px] border-brand/40"]} />
+        <div className="relative mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2">
           <div className="flex flex-col gap-5">
             <h2 className={h2Class}>Your own dashboard, built for <Key>busy volunteers</Key>.</h2>
             <p className="text-[17px] leading-relaxed text-muted">See every donation and donor in one place, thank new donors, and hand your bookkeeper what they need.</p>
@@ -169,14 +185,13 @@ export default function ForCharitiesPage() {
 
       {/* Coloured band with cards over its edge */}
       <section id="pricing" className="pb-24">
-        <div className="bg-honey pb-48 pt-20">
-          <div className="mx-auto max-w-[75rem] px-4 sm:px-6">
-            <SectionHead title={<>Simple. <Key>Free</Key> to list.</>}>
-              <span className="text-navy">No sign-up fee, no monthly fee. The card provider&apos;s fee comes off each donation.</span>
-            </SectionHead>
+        <BlueBand className="pb-48 pt-20">
+          <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-3 px-4 text-center sm:px-6">
+            <h2 className="font-display text-[clamp(1.875rem,3.2vw,2.75rem)] font-bold leading-[1.12] text-white!">Simple. <span className="text-honey">Free</span> to list.</h2>
+            <p className="text-[17px] leading-relaxed text-honey-soft">No sign-up fee, no monthly fee. The card provider&apos;s fee comes off each donation.</p>
           </div>
-        </div>
-        <div id="needs" className="mx-auto -mt-36 grid max-w-[56rem] gap-0 px-4 sm:px-6 md:grid-cols-2">
+        </BlueBand>
+        <div id="needs" className="relative z-10 mx-auto -mt-36 grid max-w-[56rem] gap-0 px-4 sm:px-6 md:grid-cols-2">
           <div className="flex flex-col gap-3 rounded-[1.25rem] bg-white p-8 shadow-[0_30px_60px_rgba(14,27,61,0.12)] md:rounded-r-none">
             <p className="text-center text-[18px] font-bold">What you&apos;ll need</p>
             <p className="text-center font-display text-[3rem] font-bold leading-none">R0</p>
@@ -186,7 +201,7 @@ export default function ForCharitiesPage() {
               {needs.map((n) => <li key={n} className="flex gap-2"><Tick />{n}</li>)}
             </ul>
           </div>
-          <div className="flex flex-col gap-5 rounded-[1.25rem] bg-brand p-8 text-white md:mt-8 md:rounded-l-none">
+          <div className="flex flex-col gap-5 rounded-[1.25rem] bg-navy p-8 text-white shadow-[0_30px_60px_rgba(14,27,61,0.25)] md:mt-8 md:rounded-l-none">
             <p className="text-[18px] font-bold">Two ways to join</p>
             <div className="border-t border-white/20 pt-4">
               <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">With s18A approval</span>

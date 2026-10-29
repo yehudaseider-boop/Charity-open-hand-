@@ -146,3 +146,21 @@ input[type="radio"] {
   outline: 3px solid var(--coral);
   outline-offset: 3px;
 }
+
+/* Bubbles on the marketing pages drift gently up and down (decoration only; still for reduced motion). */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.bob {
+  animation: bob 6s ease-in-out infinite;
+}
+.bob-slow {
+  animation: bob 9s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bob,
+  .bob-slow {
+    animation: none;
+  }
+}

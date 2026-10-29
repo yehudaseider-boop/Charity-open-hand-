@@ -30,8 +30,11 @@ const footerGroups = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto bg-navy text-white print:hidden">
-      <div className="mx-auto grid max-w-[75rem] grid-cols-2 gap-x-6 gap-y-9 px-4 pb-8 pt-12 sm:grid-cols-3 sm:px-6 md:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
+    <footer className="relative mt-auto overflow-hidden bg-navy text-white print:hidden">
+      <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand" />
+      <span aria-hidden className="pointer-events-none absolute right-40 top-10 h-5 w-5 rounded-full bg-coral" />
+      <span aria-hidden className="pointer-events-none absolute -bottom-10 left-[40%] h-28 w-28 rounded-full border-[10px] border-white/5" />
+      <div className="relative mx-auto grid max-w-[75rem] grid-cols-2 gap-x-6 gap-y-9 px-4 pb-8 pt-12 sm:grid-cols-3 sm:px-6 md:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
         <div className="col-span-2 flex flex-col items-start gap-3 sm:col-span-3 md:col-span-1">
           <Link href="/" aria-label="Givezy home" className="rounded-xl bg-white px-3 py-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -52,7 +55,7 @@ export function SiteFooter() {
           </nav>
         ))}
       </div>
-      <div className="mx-auto max-w-[75rem] px-4 sm:px-6">
+      <div className="relative mx-auto max-w-[75rem] px-4 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-white/15 py-5 text-[13px] text-white/70">
         <p className="flex items-center gap-2">
           <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-honey">

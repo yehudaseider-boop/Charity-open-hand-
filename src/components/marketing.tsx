@@ -70,24 +70,42 @@ export function SectionHead({ title, children }: { title: React.ReactNode; child
   );
 }
 
+/**
+ * Bubbles: soft circles and rings in Givezy blue, orange and lavender, placed absolutely by the caller.
+ * Decoration only (hidden from screen readers); orange only ever as a shape, never as text.
+ */
+export type BubbleSpec = { c: string; anim?: "bob" | "bob-slow" };
+export function Bubbles({ items, className = "" }: { items: (string | BubbleSpec)[]; className?: string }) {
+  return (
+    <div aria-hidden className={`pointer-events-none absolute inset-0 ${className}`}>
+      {items.map((it, i) => {
+        const b = typeof it === "string" ? { c: it } : it;
+        return <span key={i} className={`absolute rounded-full ${b.c} ${b.anim ?? ""}`} />;
+      })}
+    </div>
+  );
+}
+
 /** Scattered dots, rings and small shapes around the hero picture (decoration only). */
 export function Confetti() {
-  const bits = [
-    "left-[4%] top-[18%] h-3 w-3 rounded-full bg-brand",
-    "left-[9%] top-[62%] h-5 w-5 rounded-full border-2 border-honey",
-    "left-[1%] top-[40%] h-2 w-2 rounded-full bg-coral",
-    "right-[3%] top-[8%] h-6 w-6 rounded-full border-2 border-navy/30",
-    "right-[8%] top-[70%] h-3 w-3 rounded-full bg-brand",
-    "right-[1%] top-[45%] h-2.5 w-2.5 rotate-45 bg-honey",
-    "left-[22%] -top-[4%] h-2 w-2 rounded-full bg-brand",
-    "left-[45%] -bottom-[5%] h-4 w-4 rounded-full border-2 border-navy/30",
-    "right-[28%] -top-[3%] h-2.5 w-2.5 rounded-full bg-coral",
-    "right-[20%] -bottom-[3%] h-2 w-2 rounded-full bg-honey",
-  ];
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 hidden md:block">
-      {bits.map((b) => <span key={b} className={`absolute ${b}`} />)}
-    </div>
+    <>
+      <Bubbles
+        className="hidden md:block"
+        items={[
+          { c: "-left-6 top-[8%] h-20 w-20 bg-coral", anim: "bob" },
+          { c: "left-[6%] top-[52%] h-8 w-8 border-[3px] border-brand" },
+          { c: "left-[2%] top-[78%] h-4 w-4 bg-brand", anim: "bob-slow" },
+          { c: "left-[16%] -top-[6%] h-5 w-5 bg-honey", anim: "bob-slow" },
+          { c: "-right-4 top-[30%] h-28 w-28 bg-brand", anim: "bob-slow" },
+          { c: "right-[4%] top-[6%] h-6 w-6 border-[3px] border-coral", anim: "bob" },
+          { c: "right-[2%] top-[72%] h-12 w-12 bg-honey", anim: "bob" },
+          { c: "right-[18%] -bottom-[4%] h-4 w-4 bg-coral" },
+          { c: "left-[40%] -bottom-[6%] h-6 w-6 border-[3px] border-honey" },
+          { c: "right-[34%] -top-[5%] h-3 w-3 bg-brand" },
+        ]}
+      />
+    </>
   );
 }
 
@@ -129,11 +147,12 @@ export function BlueCards({ items }: { items: { icon: IconName; title: string; b
   return (
     <ul className="grid gap-5 md:grid-cols-3">
       {items.map((it) => (
-        <li key={it.title} className="flex flex-col items-start gap-4 rounded-[1.25rem] bg-brand p-7 text-white">
+        <li key={it.title} className="relative flex flex-col items-start gap-4 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white">
+          <Bubbles items={["-right-10 -top-10 h-32 w-32 bg-white/10", "right-6 top-20 h-4 w-4 bg-coral", "-bottom-8 right-10 h-20 w-20 border-[10px] border-honey/40"]} />
           <IconCircle name={it.icon} />
-          <h3 className="mt-2 font-display text-[1.375rem] font-bold leading-tight text-white!">{it.title}</h3>
-          <p className="text-[15px] leading-relaxed text-honey-soft">{it.body}</p>
-          <Link href={it.href} className="mt-auto inline-flex items-center gap-1 pt-2 text-[15px] font-bold text-white hover:underline">{it.link}<Arrow /></Link>
+          <h3 className="relative mt-2 font-display text-[1.375rem] font-bold leading-tight text-white!">{it.title}</h3>
+          <p className="relative text-[15px] leading-relaxed text-honey-soft">{it.body}</p>
+          <Link href={it.href} className="relative mt-auto inline-flex items-center gap-1 pt-2 text-[15px] font-bold text-white hover:underline">{it.link}<Arrow /></Link>
         </li>
       ))}
     </ul>
@@ -144,10 +163,13 @@ export function BlueCards({ items }: { items: { icon: IconName; title: string; b
 export function PastelCard({ tone, title, body, children }: { tone: "peach" | "lilac" | "sky"; title: string; body: string; children: React.ReactNode }) {
   const bg = { peach: "bg-peach", lilac: "bg-honey-soft", sky: "bg-brand-soft" }[tone];
   return (
-    <div className={`flex flex-col items-center gap-3 overflow-hidden rounded-[1.25rem] px-6 pt-9 text-center sm:px-10 ${bg}`}>
-      <h3 className="font-display text-[1.625rem] font-bold text-brand">{title}</h3>
-      <p className="max-w-[24rem] text-[15px] leading-relaxed text-muted">{body}</p>
-      <div className="mt-6 w-full max-w-[22rem] text-left">{children}</div>
+    <div className={`relative flex flex-col items-center gap-3 overflow-hidden rounded-[1.25rem] px-6 pt-9 text-center sm:px-10 ${bg}`}>
+      <Bubbles items={tone === "peach"
+        ? ["-left-8 -top-8 h-24 w-24 bg-coral/25", "right-8 top-10 h-5 w-5 bg-coral", "-right-6 bottom-16 h-16 w-16 border-[6px] border-coral/40"]
+        : ["-right-8 -top-8 h-24 w-24 bg-brand/15", "left-8 top-12 h-5 w-5 bg-brand", "-left-6 bottom-16 h-16 w-16 border-[6px] border-honey"]} />
+      <h3 className="relative font-display text-[1.625rem] font-bold text-brand">{title}</h3>
+      <p className="relative max-w-[24rem] text-[15px] leading-relaxed text-muted">{body}</p>
+      <div className="relative mt-6 w-full max-w-[22rem] text-left">{children}</div>
     </div>
   );
 }
@@ -182,14 +204,19 @@ export function MiniPoint({ icon, tone, title, body }: { icon: IconName; tone: "
 }
 
 /** Icon steps on one dotted line. */
+const stepTones = [
+  { bg: "bg-brand", stroke: "stroke-white", ring: "shadow-[0_0_0_8px_var(--honey-soft)]" },
+  { bg: "bg-coral", stroke: "stroke-navy", ring: "shadow-[0_0_0_8px_var(--peach)]" },
+  { bg: "bg-honey", stroke: "stroke-navy", ring: "shadow-[0_0_0_8px_var(--honey-soft)]" },
+];
 export function Steps({ steps }: { steps: { icon: IconName; title: string; body: string }[] }) {
   return (
     <ol className="grid gap-10 md:grid-cols-3 md:gap-6">
       {steps.map((s, i) => (
         <li key={s.title} className="relative flex flex-col items-center gap-3 text-center">
-          {i < steps.length - 1 ? <span aria-hidden className="absolute left-[calc(50%+3rem)] right-[calc(-50%+3rem)] top-8 hidden border-t-2 border-dotted border-honey md:block" /> : null}
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand shadow-[0_0_0_8px_var(--honey-soft)]">
-            <Icon name={s.icon} className="stroke-white" size={26} />
+          {i < steps.length - 1 ? <span aria-hidden className="absolute left-[calc(50%+3rem)] right-[calc(-50%+3rem)] top-8 hidden border-t-[3px] border-dotted border-coral md:block" /> : null}
+          <span className={`flex h-16 w-16 items-center justify-center rounded-full ${stepTones[i % 3].bg} ${stepTones[i % 3].ring}`}>
+            <Icon name={s.icon} className={stepTones[i % 3].stroke} size={26} />
           </span>
           <span className="sr-only">Step {i + 1}: </span>
           <h3 className="mt-2 text-[18px] font-bold">{s.title}</h3>
@@ -220,22 +247,43 @@ export function Ready({
         <Link href={button.href} className="pressable rounded-control bg-brand px-6 py-3.5 font-bold text-white">{button.label}</Link>
       </div>
       <div className="grid gap-5 md:grid-cols-[1fr_2fr]">
-        <div className="flex flex-col items-start gap-3 rounded-[1.25rem] bg-brand p-7 text-white">
+        <div className="relative flex flex-col items-start gap-3 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white">
+          <Bubbles items={["-right-12 -bottom-12 h-40 w-40 bg-coral", "right-16 top-8 h-6 w-6 border-[3px] border-honey", "-right-4 top-24 h-10 w-10 bg-white/15"]} />
           <IconCircle name={small.icon} />
-          <h3 className="mt-2 text-[1.25rem] font-bold text-white!">{small.title}</h3>
-          <p className="text-[15px] leading-relaxed text-honey-soft">{small.body}</p>
-          <Link href={small.href} className="mt-auto inline-flex items-center gap-1 pt-2 font-bold text-white hover:underline">{small.link}<Arrow /></Link>
+          <h3 className="relative mt-2 text-[1.25rem] font-bold text-white!">{small.title}</h3>
+          <p className="relative max-w-[16rem] text-[15px] leading-relaxed text-honey-soft">{small.body}</p>
+          <Link href={small.href} className="relative mt-auto inline-flex items-center gap-1 pt-2 font-bold text-white hover:underline">{small.link}<Arrow /></Link>
         </div>
-        <div className="grid items-center gap-6 overflow-hidden rounded-[1.25rem] bg-honey-soft p-7 sm:grid-cols-[1fr_1fr]">
-          <div className="flex flex-col items-start gap-3">
+        <div className="relative grid items-center gap-6 overflow-hidden rounded-[1.25rem] bg-honey-soft p-7 sm:grid-cols-[1fr_1fr]">
+          <Bubbles items={["-right-16 -top-16 h-48 w-48 bg-honey", "right-1/3 bottom-6 h-5 w-5 bg-coral", "left-1/2 -top-6 h-12 w-12 border-[6px] border-brand/20"]} />
+          <div className="relative flex flex-col items-start gap-3">
             <IconCircle name={wide.icon} tone="blue" />
             <h3 className="mt-2 text-[1.25rem] font-bold">{wide.title}</h3>
             <p className="text-[15px] leading-relaxed text-muted">{wide.body}</p>
             <Link href={wide.href} className="inline-flex items-center gap-1 pt-2 font-bold text-brand hover:underline">{wide.link}<Arrow /></Link>
           </div>
-          <div className="min-w-0">{wide.picture}</div>
+          <div className="relative min-w-0">{wide.picture}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A full-width blue colour block with orange and lavender bubbles bleeding off its edges. */
+export function BlueBand({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`relative overflow-hidden bg-brand ${className}`}>
+      <Bubbles
+        items={[
+          { c: "-left-24 -top-24 h-72 w-72 bg-coral", anim: "bob-slow" },
+          { c: "-right-20 top-10 h-56 w-56 bg-honey", anim: "bob" },
+          "left-[18%] bottom-10 h-8 w-8 border-[4px] border-honey",
+          "right-[22%] top-8 h-5 w-5 bg-coral",
+          "left-[45%] top-6 h-3 w-3 bg-white/60",
+          "-bottom-20 right-[30%] h-40 w-40 border-[14px] border-white/10",
+        ]}
+      />
+      <div className="relative">{children}</div>
     </div>
   );
 }
