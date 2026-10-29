@@ -40,7 +40,7 @@ export function DashboardShell({
     // full-bleed: the dashboard breaks out of the site's narrow column (see globals.css).
     <div className="full-bleed overflow-x-clip bg-honey-soft/60 print:bg-transparent">
       <div className="mx-auto grid max-w-[90rem] grid-cols-[minmax(0,1fr)] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[14.5rem_minmax(0,1fr)] lg:gap-8 lg:py-8">
-        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start print:hidden">
+        <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain print:hidden">
           <div className="rounded-card border-2 border-border bg-surface p-4">
             <p className="text-xs font-bold text-muted">Charity dashboard</p>
             <p className="mt-0.5 font-display text-lg font-bold leading-snug text-indigo [overflow-wrap:anywhere]">{charity.name_en}</p>

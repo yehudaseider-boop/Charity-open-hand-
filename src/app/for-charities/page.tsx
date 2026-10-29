@@ -80,6 +80,7 @@ export default function ForCharitiesPage() {
           <Link href="/apply" className="pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy">List your charity</Link>
           <Link href="/charities" className="rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand">See who&apos;s on {platformConfig.appName}</Link>
         </div>
+        <Link href="/demo/dashboard" className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4 hover:text-navy">Try the dashboard with sample data</Link>
 
         <div className="relative mt-14 w-full max-w-[60rem]">
           <Confetti />

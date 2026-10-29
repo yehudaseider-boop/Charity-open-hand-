@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { previousPath } from "@/components/route-memory";
 
 /**
  * "← Donors" on a detail page. When the person came from that list (same site, same path), going back
@@ -15,9 +16,8 @@ export function BackLink({ href, children }: { href: string; children: React.Rea
       href={href}
       className="text-sm font-semibold text-muted transition hover:text-brand focus-visible:text-brand"
       onClick={(e) => {
-        let from: URL | null = null;
-        try { from = document.referrer ? new URL(document.referrer) : null; } catch { from = null; }
-        if (from && from.origin === location.origin && from.pathname === href.split("?")[0] && history.length > 1) {
+        // Only when the page just before this one really was that list (see RouteMemory).
+        if (previousPath() === href.split("?")[0] && history.length > 1) {
           e.preventDefault();
           router.back();
         }

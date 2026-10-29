@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCurrentTabInView } from "@/components/use-current-tab-in-view";
 
 /** The admin area's pages, grouped the way the work comes: review, content, people. */
 const groups = [
@@ -25,11 +26,12 @@ const groups = [
  */
 export function AdminNav() {
   const pathname = usePathname();
+  const row = useCurrentTabInView<HTMLUListElement>(pathname);
   const isActive = (t: { href: string; exact?: boolean }) => (t.exact ? pathname === t.href : pathname === t.href || pathname.startsWith(`${t.href}/`));
   return (
     <nav aria-label="Admin" className="print:hidden">
       {/* Phone and tablet: one row that scrolls sideways inside itself. */}
-      <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
+      <ul ref={row} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
         {groups.flatMap((g) => g.tabs).map((t) => {
           const active = isActive(t);
           return (

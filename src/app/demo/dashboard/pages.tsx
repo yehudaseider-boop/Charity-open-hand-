@@ -106,8 +106,8 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
           <label htmlFor="demo-q" className="sr-only">Search name or email</label>
           <input id="demo-q" name="q" defaultValue={one(sp.q)} placeholder="Search name or email" className={`${field} min-w-0 flex-1 basis-56`} />
           <label htmlFor="demo-period" className="sr-only">Period</label>
-          <select id="demo-period" name="period" defaultValue={period === "custom" ? "all" : period} className={field}>
-            {Object.entries(PERIODS).filter(([k]) => k !== "custom").map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          <select id="demo-period" name="period" defaultValue={period} className={field}>
+            {Object.entries(PERIODS).filter(([k]) => k !== "custom" || period === "custom").map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
           <label htmlFor="demo-source" className="sr-only">Came from</label>
           <select id="demo-source" name="source" defaultValue={source} className={field}>
@@ -121,6 +121,9 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
             {data.campaigns.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
           {status !== "all" ? <input type="hidden" name="status" value={status} /> : null}
+          {/* A month picked from the chart or report stays picked while other filters change. */}
+          {period === "custom" && from ? <input type="hidden" name="from" value={from} /> : null}
+          {period === "custom" && to ? <input type="hidden" name="to" value={to} /> : null}
           <button className={blueAction}>Search</button>
         </form>
       </Card>
@@ -486,7 +489,12 @@ export function DemoAbout({ path }: { path: string }) {
   const about = Object.hasOwn(ABOUT, path) ? ABOUT[path] : undefined;
   return (
     <div className="space-y-5">
-      <PageHeader title={about?.title ?? "Not in the demo"} back={<Link href={base} className="font-semibold text-muted hover:text-brand">← Overview</Link>} />
+      <PageHeader
+        title={about?.title ?? "Not in the demo"}
+        back={path.startsWith("donations/")
+          ? <Link href={`${base}/donations`} className="font-semibold text-muted hover:text-brand">← Donations</Link>
+          : <Link href={base} className="font-semibold text-muted hover:text-brand">← Overview</Link>}
+      />
       <Card title="What this page does">
         {about ? (
           <ul className="list-disc space-y-1.5 pl-5 text-sm">{about.lines.map((l) => <li key={l}>{l}</li>)}</ul>
@@ -504,5 +512,10 @@ export function DemoAbout({ path }: { path: string }) {
 }
 
 export function DemoMissing({ what, back, backLabel }: { what: string; back: string; backLabel: string }) {
-  return <EmptyState title={`No such ${what} in the demo`} action={<ActionLink href={back}>Back to {backLabel}</ActionLink>}>It may have been an old link. Everything in the demo is made up.</EmptyState>;
+  return (
+    <div className="space-y-5">
+      <PageHeader title={`No such ${what}`} back={<Link href={back} className="font-semibold text-muted hover:text-brand">← {backLabel}</Link>} />
+      <EmptyState title={`No such ${what} in the demo`} action={<ActionLink href={back}>Back to {backLabel}</ActionLink>}>It may have been an old link. Everything in the demo is made up.</EmptyState>
+    </div>
+  );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCurrentTabInView } from "@/components/use-current-tab-in-view";
 
 /** The dashboard's pages, grouped the way a charity thinks about them. */
 const groups = [
@@ -44,6 +45,7 @@ const groups = [
  */
 export function CharityNav({ id, base: baseOverride }: { id: string; base?: string }) {
   const pathname = usePathname();
+  const row = useCurrentTabInView<HTMLUListElement>(pathname);
   const base = baseOverride ?? `/charity-admin/${id}`;
   const isActive = (t: { href: string; exact?: boolean }) => {
     const href = `${base}${t.href}`;
@@ -52,7 +54,7 @@ export function CharityNav({ id, base: baseOverride }: { id: string; base?: stri
   return (
     <nav aria-label="Charity dashboard" className="print:hidden">
       {/* Phone and tablet: one row that scrolls sideways inside itself. */}
-      <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
+      <ul ref={row} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
         {groups.flatMap((g) => g.tabs).map((t) => {
           const active = isActive(t);
           return (
