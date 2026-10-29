@@ -60,6 +60,12 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
   const shown = period === "12" ? months : period === "6" ? months.slice(-6) : monthsFrom(months, taxYearFrom);
   const [picked, setPicked] = useState(() => months.find((m) => m.month.startsWith(current))?.month ?? months[months.length - 1]?.month);
   const active = shown.find((m) => m.month === picked) ?? shown[shown.length - 1];
+  // What a screen reader hears: only when a month is chosen by tap or keyboard, never as the pointer passes over.
+  const [said, setSaid] = useState("");
+  const choose = (m: MonthBar) => {
+    setPicked(m.month);
+    setSaid(`${monthName(m.month)}${m.month.startsWith(current) ? " so far" : ""}: ${formatRand(m.amountCents)}, ${gifts(m.donationCount)}`);
+  };
 
   const n = shown.length;
   const { top, ticks } = chartScale(Math.max(0, ...shown.map((m) => m.amountCents)));
@@ -150,9 +156,9 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
                   type="button"
                   aria-pressed={m.month === active?.month}
                   aria-label={`${monthName(m.month)}: ${formatRand(m.amountCents)}, ${gifts(m.donationCount)}`}
-                  onClick={() => setPicked(m.month)}
+                  onClick={() => choose(m)}
                   onMouseEnter={() => setPicked(m.month)}
-                  onFocus={() => setPicked(m.month)}
+                  onFocus={() => choose(m)}
                   className="h-full min-w-0 flex-1 cursor-pointer rounded-lg outline-offset-[-3px] transition-colors hover:bg-brand/5 focus-visible:bg-brand/5 aria-pressed:bg-brand/5"
                 />
               ))}
@@ -169,7 +175,7 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
       )}
 
       {anything ? (
-        <div aria-live="polite" className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-control border-2 border-border bg-surface px-4 py-3 text-sm">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-control border-2 border-border bg-surface px-4 py-3 text-sm">
           {active ? (
             <>
               <p>
@@ -188,6 +194,7 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
           ) : null}
         </div>
       ) : null}
+      <p aria-live="polite" className="sr-only">{said}</p>
     </div>
   );
 }

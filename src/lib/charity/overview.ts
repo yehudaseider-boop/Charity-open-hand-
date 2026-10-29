@@ -32,7 +32,8 @@ export function giftSourceCounts(rows: { came_from: string | null }[]): SourceCo
 export function changeSince(current: number, before: number): { percent: number; up: boolean } | null {
   if (!(before > 0)) return null;
   const percent = Math.round(((current - before) / before) * 100);
-  return { percent: Math.abs(percent), up: percent >= 0 };
+  // The direction comes from the amounts, not the rounded percentage, so a small fall never shows as a rise.
+  return { percent: Math.abs(percent), up: current >= before };
 }
 
 /** The months from `startIso` (yyyy-mm-dd, the first day of the tax year) onwards, for the chart's "Tax year" view. */
@@ -41,13 +42,14 @@ export function monthsFrom<T extends { month: string }>(months: T[], startIso: s
 }
 
 /**
- * The chart's y-axis: four equal steps up to a round number just above the highest month (R100, R200,
- * R500, R1 000, R2 000, R5 000 and so on, in cents), so the line fills the chart whatever the charity's size.
+ * The chart's y-axis: four equal steps of a round size (1, 2, 2.5 or 5 times a power of ten, in Rand) up to
+ * just above the highest month, so every label is a round number and the line fills the chart whatever the
+ * charity's size. For example R300 gives R0, R100, R200, R300, R400.
  */
 export function chartScale(maxCents: number): { top: number; ticks: number[] } {
-  const rands = Math.max(1, maxCents / 100);
-  const magnitude = 10 ** Math.floor(Math.log10(rands));
-  const step = [1, 2, 5, 10].map((m) => m * magnitude).find((s) => s >= rands) ?? 10 * magnitude;
-  const top = Math.round(step * 100);
-  return { top, ticks: [0, 1, 2, 3, 4].map((i) => (top / 4) * i) };
+  const quarter = Math.max(100, maxCents / 100) / 4; // never below R100, so small months still get whole-Rand labels
+  const magnitude = 10 ** Math.floor(Math.log10(quarter));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s >= quarter) ?? 10 * magnitude;
+  const stepCents = Math.round(step * 100);
+  return { top: stepCents * 4, ticks: [0, 1, 2, 3, 4].map((i) => stepCents * i) };
 }

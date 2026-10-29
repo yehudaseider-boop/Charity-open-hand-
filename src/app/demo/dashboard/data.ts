@@ -91,7 +91,12 @@ export function demoData(now: Date = new Date()): DemoData {
     const d = new Date(Date.UTC(ty, tm - 1 - (11 - i), 1));
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
   });
-  const at = (month: string, day: number, hour: number) => new Date(`${month}-${pad(day)}T${pad(hour)}:${pad(Math.floor(rand() * 60))}:00+02:00`).toISOString();
+  const monthStart = new Date(`${months[11]}-01T00:00:00+02:00`).getTime();
+  // A gift is never later than now: one that would land later today moves to just before now (and never before the month began).
+  const at = (month: string, day: number, hour: number) => {
+    const t = new Date(`${month}-${pad(day)}T${pad(hour)}:${pad(Math.floor(rand() * 60))}:00+02:00`).getTime();
+    return new Date(t <= now.getTime() ? t : Math.max(monthStart, now.getTime() - 60_000)).toISOString();
+  };
   const daysIn = (month: string) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
 
   const donors: DemoDonor[] = Array.from({ length: DEMO_DONOR_COUNT }, (_, i) => {

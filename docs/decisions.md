@@ -2,6 +2,15 @@
 
 ## Decided
 
+- **Dashboard review fixes (29/10/2026, Yehuda: "Yes").** From a two-reviewer check of the new dashboard and demo:
+  the public demo no longer errors on odd addresses (`/demo/dashboard/constructor`, `?period=constructor`) or
+  impossible dates (`from=2026-13-45`); demo gifts are never later than now; a Recent donations row ignores
+  Ctrl/Cmd-click, clicks on its link and text selection; the change badge takes its direction from the amounts, and
+  under half a percent shows "0%" with no arrow or colour; the chart's side labels step in 1, 2, 2.5 or 5 times a
+  power of ten (R300 gives R0 to R400 in R100 steps) and never go below R100; screen readers hear a month only when it
+  is chosen, not as the pointer passes. Open: "Where gifts come from" reads every gift of the tax year to count them,
+  which slows down at tens of thousands of gifts; the fix is a counting database function, which needs a migration
+  and Yehuda's yes.
 - **The public dashboard demo is the whole dashboard (29/10/2026, Yehuda).** `/demo/dashboard` now opens every page
   of the menu without signing in: Overview, Donations (filters, search, paging, each donation), Donors (groups, search,
   each donor with their gifts), Monthly donations (running, paused, ended), Campaigns, s18A receipts and the Annual

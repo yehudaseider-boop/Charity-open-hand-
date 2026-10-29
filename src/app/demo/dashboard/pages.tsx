@@ -11,6 +11,7 @@ import { RECORDED_METHODS, type RecordedMethod } from "@/lib/charity/recorded-gi
 import { GIFT_SOURCES, giftSourceLabel } from "@/lib/donations/source";
 import { formatDate, taxYearFor, taxYearName, taxYearRange } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { typedDay } from "@/lib/typed-date";
 import { plural } from "@/lib/text";
 import { donorFacts, type DemoData, type DemoGift } from "./data";
 import { DEMO_BASE as base, DEMO_LAPSED_DAYS, monthOf, saDay } from "./sample";
@@ -59,9 +60,10 @@ function inPeriod(data: DemoData, g: DemoGift, period: Period, from: string, to:
 
 export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
   const status = (STATUSES as readonly string[]).includes(one(sp.status)) ? one(sp.status) : "all";
-  const period: Period = one(sp.period) in PERIODS ? (one(sp.period) as Period) : "all";
-  const from = /^\d{4}-\d{2}-\d{2}$/.test(one(sp.from)) ? one(sp.from) : "";
-  const to = /^\d{4}-\d{2}-\d{2}$/.test(one(sp.to)) ? one(sp.to) : "";
+  const period: Period = Object.hasOwn(PERIODS, one(sp.period)) ? (one(sp.period) as Period) : "all";
+  // Only a real yyyy-mm-dd day: anything else (13th month, 45th day, other words) is ignored, never shown.
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(one(sp.from)) ? (typedDay(one(sp.from)) ?? "") : "";
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(one(sp.to)) ? (typedDay(one(sp.to)) ?? "") : "";
   const source = one(sp.source);
   const campaign = one(sp.campaign);
   const q = one(sp.q).trim().toLowerCase().slice(0, 60);
@@ -481,7 +483,7 @@ const ABOUT: Record<string, { title: string; lines: string[] }> = {
 };
 
 export function DemoAbout({ path }: { path: string }) {
-  const about = ABOUT[path];
+  const about = Object.hasOwn(ABOUT, path) ? ABOUT[path] : undefined;
   return (
     <div className="space-y-5">
       <PageHeader title={about?.title ?? "Not in the demo"} back={<Link href={base} className="font-semibold text-muted hover:text-brand">← Overview</Link>} />

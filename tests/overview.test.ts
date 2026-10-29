@@ -33,6 +33,7 @@ describe("how a figure moved", () => {
     expect(changeSince(11_400, 10_000)).toEqual({ percent: 14, up: true });
     expect(changeSince(8_000, 10_000)).toEqual({ percent: 20, up: false });
     expect(changeSince(10_000, 10_000)).toEqual({ percent: 0, up: true });
+    expect(changeSince(9_960, 10_000)).toEqual({ percent: 0, up: false }); // a small fall is never shown as a rise
   });
   it("shows nothing when there was nothing before to compare with", () => {
     expect(changeSince(5_000, 0)).toBeNull();
@@ -54,9 +55,21 @@ describe("the tax-year view of the chart", () => {
 describe("the chart's amounts", () => {
   it("tops out at a round number just above the highest month, in four equal steps", () => {
     expect(chartScale(1_845_000)).toEqual({ top: 2_000_000, ticks: [0, 500_000, 1_000_000, 1_500_000, 2_000_000] }); // R18 450 -> R20 000
-    expect(chartScale(30_000).top).toBe(50_000); // R300 -> R500
+    expect(chartScale(30_000)).toEqual({ top: 40_000, ticks: [0, 10_000, 20_000, 30_000, 40_000] }); // R300 -> R100 steps
     expect(chartScale(2_000_000).top).toBe(2_000_000); // exactly R20 000 stays R20 000
-    expect(chartScale(2_000_001).top).toBe(5_000_000);
+    expect(chartScale(2_000_001).top).toBe(4_000_000);
+    expect(chartScale(900_000).ticks).toEqual([0, 250_000, 500_000, 750_000, 1_000_000]); // R9 000 -> R2 500 steps
+  });
+  it("labels every step with a round number of whole Rand", () => {
+    for (const cents of [1, 99, 4_321, 30_000, 123_456, 999_999, 7_777_777, 123_456_789]) {
+      const { top, ticks } = chartScale(cents);
+      expect(top).toBeGreaterThanOrEqual(cents);
+      const step = ticks[1];
+      expect(step % 100).toBe(0);
+      const lead = step / 100 / 10 ** Math.floor(Math.log10(step / 100));
+      expect([1, 2, 2.5, 5]).toContain(lead);
+      expect(ticks).toEqual([0, step, step * 2, step * 3, step * 4]);
+    }
   });
   it("has a sensible chart when nothing has been given", () => {
     const s = chartScale(0);

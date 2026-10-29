@@ -135,7 +135,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         q || group || tag ? (
           <Card><p className="text-sm text-muted"><NoMatch what="donors" clearHref={base} /></p></Card>
         ) : (
-          <EmptyState title="No donors yet.">People appear here once their first donation is paid.</EmptyState>
+          <EmptyState title="No donors yet">People appear here once their first donation is paid.</EmptyState>
         )
       ) : (
         <Card>

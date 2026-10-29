@@ -85,7 +85,7 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
 
       {sentRows?.length ? (
         <Card title="Sent">
-          <ul className="-my-3 divide-y divide-border text-sm">
+          <ul className="-mb-3 divide-y divide-border text-sm">
             {sentRows.map((r) => (
               <li key={r.id} className="space-y-1 py-3">
                 <p className="font-semibold text-navy">

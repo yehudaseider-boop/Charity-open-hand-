@@ -36,6 +36,14 @@ const tints = ["bg-honey", "bg-peach", "bg-brand-soft", "bg-success-soft"];
  */
 export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; donationsHref: string }) {
   const router = useRouter();
+  // The whole row opens the gift, except where the click means something else: the donor link itself (which
+  // also handles Ctrl/Cmd-click for a new tab), a modifier key, or selecting the row's text to copy it.
+  const openRow = (e: React.MouseEvent, href: string) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if ((e.target as HTMLElement).closest("a, button")) return;
+    if (window.getSelection()?.toString()) return;
+    router.push(href);
+  };
   const [filter, setFilter] = useState<Filter>("all");
   const shown = filter === "all" ? rows : rows.filter((r) => r.status === filter);
   return (
@@ -73,7 +81,7 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
             </thead>
             <tbody>
               {shown.map((r, i) => (
-                <tr key={r.id} onClick={() => router.push(r.href)} className="group cursor-pointer border-b border-border transition last:border-0 hover:bg-honey-soft focus-within:bg-honey-soft">
+                <tr key={r.id} onClick={(e) => openRow(e, r.href)} className="group cursor-pointer border-b border-border transition last:border-0 hover:bg-honey-soft focus-within:bg-honey-soft">
                   <td className="whitespace-nowrap py-2.5 pr-3"><Badge tone={r.tone}>{r.statusLabel}</Badge></td>
                   <td className="py-2.5 pr-3">
                     <Link href={r.href} className="flex min-w-0 items-center gap-2.5 font-semibold text-indigo group-hover:text-brand group-hover:underline">

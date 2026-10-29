@@ -89,9 +89,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
           <Stat label="First gift" value={formatDate(donor.first_paid_at)} />
           <Stat label="Latest gift" value={formatDate(donor.last_paid_at)} />
           {giving.largest ? (
-            <div className="sm:col-span-2 xl:col-span-4">
-              <Stat label="Largest gift" value={formatRand(giving.largest.amount_cents)} note={giving.largest.paid_at ? `on ${formatDate(giving.largest.paid_at)}` : undefined} />
-            </div>
+            <Stat className="sm:col-span-2 xl:col-span-4" label="Largest gift" value={formatRand(giving.largest.amount_cents)} note={giving.largest.paid_at ? `on ${formatDate(giving.largest.paid_at)}` : undefined} />
           ) : null}
         </dl>
         {giving.byCampaign.some((l) => l.key !== "none") ? <GivingLines title="By campaign" lines={giving.byCampaign} /> : null}
@@ -220,9 +218,9 @@ function GivingLines({ title, lines }: { title: string; lines: GivingLine[] }) {
 }
 
 /** One figure in "Giving to you": the dashboard's figure box, kept as a term and its value for screen readers. */
-function Stat({ label, value, note, strong = false }: { label: string; value: string; note?: string; strong?: boolean }) {
+function Stat({ label, value, note, strong = false, className = "" }: { label: string; value: string; note?: string; strong?: boolean; className?: string }) {
   return (
-    <div className={`rounded-card border-2 p-4 ${strong ? "border-brand bg-brand text-white" : "border-border bg-surface"}`}>
+    <div className={`rounded-card border-2 p-4 ${strong ? "border-brand bg-brand text-white" : "border-border bg-surface"} ${className}`}>
       <dt className={`text-sm font-semibold ${strong ? "text-white/85" : "text-muted"}`}>{label}</dt>
       <dd className="mt-1 whitespace-nowrap font-display text-2xl font-extrabold leading-tight tabular-nums">
         {value}

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
-import { blueAction, field, MiniStat, PageHeader, secondaryAction, Tabs } from "@/components/dash";
+import { blueAction, EmptyState, field, MiniStat, PageHeader, secondaryAction, Tabs } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { chargeDayLabel, ERASED_DONOR, isErasedEmail, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, shownEmail, type MonthlyState } from "@/lib/charity/dashboard";
 import { loadMonthlyDonations } from "@/lib/charity/dashboard-queries";
@@ -83,11 +83,13 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
       </form>
 
       {shown.length === 0 ? (
-        <p className="rounded-card border-2 border-dashed border-honey bg-honey-soft/60 p-6 text-center text-sm text-muted">
-          {all.length === 0
-            ? "No monthly donations yet. One appears here once its first payment has gone through."
-            : <NoMatch what="monthly donations" clearHref={base} />}
-        </p>
+        all.length === 0 ? (
+          <EmptyState title="No monthly donations yet">One appears here once its first payment has gone through.</EmptyState>
+        ) : (
+          <p className="rounded-card border-2 border-dashed border-honey bg-honey-soft/60 p-6 text-center text-sm text-muted">
+            <NoMatch what="monthly donations" clearHref={base} />
+          </p>
+        )
       ) : (
         <ul className="space-y-2">
           {shown.map((r) => {

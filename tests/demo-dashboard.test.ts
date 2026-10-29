@@ -24,6 +24,16 @@ describe("the public dashboard demo", () => {
     expect(demoData(new Date("2027-03-02T08:00:00Z")).months[11]).toBe("2027-03");
   });
 
+  it("never shows a gift later than now, whatever the time of day, and keeps each in its month", () => {
+    // Early morning on the 1st (Johannesburg), early morning mid-month, late evening, and the last minute of a month.
+    for (const iso of ["2026-09-30T22:05:00Z", "2026-10-01T03:00:00Z", "2026-11-03T03:00:00Z", "2026-10-29T19:30:00Z", "2026-10-31T21:59:00Z"]) {
+      const at = new Date(iso);
+      const d = demoData(at);
+      expect(d.gifts.every((g) => g.paidAt <= at.toISOString()), iso).toBe(true);
+      expect(d.gifts.every((g) => d.months.includes(monthOf(g.paidAt))), iso).toBe(true);
+    }
+  });
+
   it("agrees with itself: chart, this month, the tax year, sources and donors come from the same gifts", () => {
     expect(o.chart.reduce((t, m) => t + m.amountCents, 0)).toBe(sum(paid));
     expect(o.month.paid_cents).toBe(sum(paid.filter((g) => monthOf(g.paidAt) === "2026-10")));

@@ -59,10 +59,11 @@ export function Kpi({
           {note ? <p className={`text-sm ${strong ? "text-white/85" : "text-muted"}`}>{note}</p> : null}
           {change ? (
             <p
-              className={`rounded-full px-2 py-0.5 text-sm font-bold ${strong ? "bg-white/20 text-white" : change.up ? "bg-success-soft text-success" : "bg-danger-soft text-danger"}`}
+              className={`rounded-full px-2 py-0.5 text-sm font-bold ${strong ? "bg-white/20 text-white" : change.percent === 0 ? "bg-honey-soft text-muted" : change.up ? "bg-success-soft text-success" : "bg-danger-soft text-danger"}`}
             >
-              <span aria-hidden>{change.up ? "↑" : "↓"} </span>
-              {change.percent}%<span className="sr-only"> {change.up ? "up" : "down"}{changeNote ? ` ${changeNote}` : ""}</span>
+              {/* Under half a percent either way reads as no change: no arrow, no colour. */}
+              {change.percent === 0 ? null : <span aria-hidden>{change.up ? "↑" : "↓"} </span>}
+              {change.percent}%<span className="sr-only"> {change.percent === 0 ? "no change" : change.up ? "up" : "down"}{changeNote ? ` ${changeNote}` : ""}</span>
             </p>
           ) : null}
         </div>

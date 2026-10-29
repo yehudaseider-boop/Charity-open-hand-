@@ -65,7 +65,7 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
             </thead>
             <tbody>
               {dep.rows.map((r, i) => (
-                <tr key={i} className={`${table.row} ${r.problem ? "bg-warning-soft" : ""}`}>
+                <tr key={i} className={r.problem ? "border-b border-border bg-warning-soft last:border-0" : table.row /* a problem line keeps its warning colour under the pointer */}>
                   <td className={`${table.td} max-w-[12rem] truncate`}>
                     {r.donationId ? <Link href={`${base}/${r.donationId}`} className="font-semibold text-brand underline hover:text-indigo">{r.donorName}</Link> : r.donorName}
                   </td>

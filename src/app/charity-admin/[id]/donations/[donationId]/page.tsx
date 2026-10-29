@@ -56,7 +56,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
         intro={
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={s.tone}>{s.label}</Badge>
-            <span>{donorName(d)}, {formatDate(d.paid_at ?? d.created_at)}</span>
+            <span><bdi>{donorName(d)}</bdi>, {formatDate(d.paid_at ?? d.created_at)}</span>
           </span>
         }
       />

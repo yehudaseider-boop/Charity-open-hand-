@@ -89,7 +89,7 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
         {appeals.length === 0 ? (
           <p className="rounded-control border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm text-muted">Nothing sent yet. Your emails appear here, with how many went out.</p>
         ) : (
-          <ul className="-my-3 divide-y divide-border text-sm">
+          <ul className="-mb-3 divide-y divide-border text-sm">
             {appeals.map((a) => (
               <li key={a.id} className="space-y-1 py-3">
                 <p className="font-display text-base font-bold text-indigo [overflow-wrap:anywhere]">{a.subject}</p>
