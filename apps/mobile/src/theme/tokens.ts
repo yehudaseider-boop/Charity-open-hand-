@@ -39,10 +39,10 @@ export const colors = {
 } as const;
 
 export const fonts = {
-  /** Headlines: Fredoka 600, rounded and friendly like the Givezy wordmark. */
-  display: "Fredoka_600SemiBold",
-  /** Big numbers and amounts of delight: Fredoka 700. */
-  displayBold: "Fredoka_700Bold",
+  /** Headlines: Bricolage Grotesque 700, the website's headline font (v2.1, app font pass 30/10/2026). */
+  display: "BricolageGrotesque_700Bold",
+  /** Big numbers and amounts of delight: Bricolage Grotesque 800. */
+  displayBold: "BricolageGrotesque_800ExtraBold",
   /** Everything else: DM Sans 400, 500, 600, 700. */
   body: "DMSans_400Regular",
   bodyMedium: "DMSans_500Medium",

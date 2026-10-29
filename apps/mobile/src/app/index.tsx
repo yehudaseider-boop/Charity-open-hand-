@@ -1,13 +1,13 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop } from "@/components/backdrop";
-import { Blob } from "@/components/blob";
 import { Button, TextLink } from "@/components/button";
 import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
+import { Bubbles, People } from "@/components/people";
 import { SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { saveCausePrefs } from "@/lib/cause-prefs";
@@ -29,6 +29,7 @@ const STEPS = 2;
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const directory = useDirectory();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
   const forced = p.welcome === "1";
@@ -51,7 +52,7 @@ export default function Welcome() {
     return () => sub.remove();
   }, [step]);
 
-  if (seen === null) return <View style={styles.blueScreen} />;
+  if (seen === null) return <View style={styles.whiteScreen} />;
   if (seen) return <Redirect href="/home" />;
 
   // Straight to the charities, the donor's causes first.
@@ -65,17 +66,32 @@ export default function Welcome() {
 
   if (step === 0) {
     return (
-      <View style={[styles.blueScreen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-        <Blob size={260} color={colors.orange} rotate={25} style={{ right: -110, top: insets.top + 90 }} />
-        <Blob size={200} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -110, top: insets.top + 150 }} />
-        <View style={styles.gutter}><Logo width={150} white /></View>
-        <View style={{ flex: 1 }} />
+      // The For charities page's look (30/10/2026): white, people giving, dots and rings drifting round them,
+      // the key words in blue and one orange button.
+      <View style={[styles.whiteScreen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+        <Bubbles
+          items={[
+            { size: 300, color: colors.lilacSoft, at: { left: -140, top: insets.top - 60 } },
+            { size: 240, color: colors.peach, at: { right: -110, top: insets.top + 200 } },
+            { size: 18, color: colors.orange, float: true, at: { left: 40, top: insets.top + 120 } },
+            { size: 34, color: colors.blue, ring: true, float: true, at: { left: 26, top: insets.top + 300 } },
+            { size: 26, color: colors.blue, float: true, at: { right: 46, top: insets.top + 90 } },
+            { size: 12, color: colors.orange, float: true, at: { right: 34, top: insets.top + 360 } },
+            { size: 44, color: colors.lilac, ring: true, float: true, at: { right: -12, top: insets.top + 470 } },
+          ]}
+        />
+        <View style={styles.gutter}><Logo width={130} /></View>
+        <View style={styles.welcomeArt}>
+          <People name="mobilePay" width={Math.min(280, width - 80)} />
+        </View>
         <FadeUp style={[styles.gutter, { gap: 14 }]}>
-          <Text style={styles.welcomeTitle} accessibilityRole="header">Give in a few taps.</Text>
+          <Text style={styles.welcomeTitle} accessibilityRole="header">
+            Give in a <Text style={[styles.welcomeTitle, { color: colors.blue }]}>few taps</Text>.
+          </Text>
           <Text style={styles.welcomeLine}>All your giving, finally in one place. Every charity checked by us.</Text>
         </FadeUp>
         <View style={[styles.gutter, { gap: 6, marginTop: 28 }]}>
-          <Button variant="white" label="Get started" onPress={next} />
+          <Button variant="cta" label="Get started" onPress={next} />
           <Pressable onPress={() => { markWelcomed(); router.replace("/account"); }} accessibilityRole="link" style={styles.alreadyLink}>
             <Text style={styles.alreadyText}>I already have an account</Text>
           </Pressable>
@@ -202,12 +218,13 @@ export default function Welcome() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
-  blueScreen: { flex: 1, backgroundColor: colors.blue, overflow: "hidden" },
+  whiteScreen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
+  welcomeArt: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
   gutter: { paddingHorizontal: space.gutter },
-  welcomeTitle: { fontFamily: fonts.display, fontSize: 52, lineHeight: 56, color: colors.onInk },
-  welcomeLine: { fontFamily: fonts.bodyMedium, fontSize: 19, lineHeight: 27, color: colors.lilacSoft },
+  welcomeTitle: { fontFamily: fonts.displayBold, fontSize: 46, lineHeight: 50, letterSpacing: -0.5, color: colors.navy },
+  welcomeLine: { fontFamily: fonts.bodyMedium, fontSize: 19, lineHeight: 27, color: colors.muted },
   alreadyLink: { minHeight: touch, alignItems: "center", justifyContent: "center" },
-  alreadyText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.onInk, textDecorationLine: "underline" },
+  alreadyText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue, textDecorationLine: "underline" },
   topRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   bar: { flex: 1, flexDirection: "row", gap: 6 },
   segment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.lightPurple },

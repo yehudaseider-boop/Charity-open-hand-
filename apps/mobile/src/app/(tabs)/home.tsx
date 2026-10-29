@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "re
 import { bigAmountSize } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Blob } from "@/components/blob";
+import { Bubbles, People } from "@/components/people";
 import { Button } from "@/components/button";
 import { CharityPhotoCard } from "@/components/charity-photo-card";
 import { GoalRing } from "@/components/goal-ring";
@@ -104,9 +105,26 @@ export default function Home() {
           </Pressable>
         </View>
 
-        <View style={[styles.gutter, { gap: 6 }]}>
-          <DayLine />
-          <Text variant="h1" accessibilityRole="header">{firstGift ? "Welcome in. Ready for your first gift?" : "Ready to do some good?"}</Text>
+        {/* The hello, in the For charities page's look (30/10/2026): a soft card, the key word in blue,
+            people giving, and dots and rings drifting round them. */}
+        <View style={styles.gutter}>
+          <View style={styles.hero}>
+            <Bubbles
+              items={[
+                { size: 150, color: colors.peach, at: { right: -50, top: -40 } },
+                { size: 14, color: colors.orange, float: true, at: { right: 34, top: 26 } },
+                { size: 26, color: colors.blue, ring: true, float: true, at: { left: 18, bottom: 28 } },
+                { size: 10, color: colors.blue, float: true, at: { right: 120, bottom: 54 } },
+              ]}
+            />
+            <View style={{ gap: 6 }}>
+              <DayLine />
+              <Text variant="h1" accessibilityRole="header">
+                {firstGift ? <>Welcome in. Ready for your <Text variant="h1" style={styles.key}>first gift</Text>?</> : <>Ready to do some <Text variant="h1" style={styles.key}>good</Text>?</>}
+              </Text>
+            </View>
+            <People name="workingTogether" width={Math.min(300, width - space.gutter * 2 - 40)} style={styles.heroArt} />
+          </View>
         </View>
 
         {/* The main goal, as a ring on blue. Without a goal it is a soft invitation that can be dismissed. */}
@@ -208,11 +226,20 @@ export default function Home() {
           )}
         </View>
 
+        {/* The website's blue colour-block card, with a ring and a dot bleeding off its edges. */}
         <View style={styles.gutter}>
-          <View style={styles.strip}>
-            <ReceiptsIcon color={colors.blue} />
-            <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>Ask for an s18A receipt when you give, and it arrives on its own at tax time.</Text>
-          </View>
+          <Pressable onPress={() => router.push("/receipts")} accessibilityRole="button" accessibilityLabel="s18A receipts, done for you. Ask for one when you give, and it arrives on its own at tax time. See your receipts" style={({ pressed }) => [styles.receiptsCard, pressed && { opacity: 0.92 }]}>
+            <Bubbles
+              items={[
+                { size: 90, color: colors.lilac, ring: true, at: { right: -30, bottom: -34 } },
+                { size: 14, color: colors.orange, float: true, at: { right: 26, top: 22 } },
+              ]}
+            />
+            <View style={styles.receiptsIcon}><ReceiptsIcon color={colors.blue} /></View>
+            <Text style={styles.receiptsTitle}>s18A receipts, done for you</Text>
+            <Text style={styles.receiptsBody}>Ask for an s18A receipt when you give, and it arrives on its own at tax time.</Text>
+            <Text style={styles.receiptsLink}>See your receipts ›</Text>
+          </Pressable>
         </View>
       </ScrollView>
       {status.cover}
@@ -243,7 +270,14 @@ const styles = StyleSheet.create({
   goalSub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   seeAll: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue },
-  strip: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  hero: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, paddingTop: 22, paddingHorizontal: 20, overflow: "hidden", gap: 8 },
+  heroArt: { alignSelf: "center", marginTop: 4, marginBottom: -2 },
+  key: { color: colors.blue },
+  receiptsCard: { backgroundColor: colors.blue, borderRadius: radius.card, padding: 22, overflow: "hidden", gap: 8 },
+  receiptsIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  receiptsTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: colors.onInk },
+  receiptsBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.lilacSoft },
+  receiptsLink: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.onInk, marginTop: 6 },
 });
 
 /** A failure while drawing shows "Try again" and the error, not a blank page. */

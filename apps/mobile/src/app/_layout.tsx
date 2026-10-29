@@ -1,7 +1,5 @@
 // One file per weight, never the package index: the index pulls in every weight and italic
 // (about 7 MB), which made the app slow to download and open.
-import { Fredoka_600SemiBold } from "@expo-google-fonts/fredoka/600SemiBold";
-import { Fredoka_700Bold } from "@expo-google-fonts/fredoka/700Bold";
 import { Heebo_400Regular } from "@expo-google-fonts/heebo/400Regular";
 import { Heebo_600SemiBold } from "@expo-google-fonts/heebo/600SemiBold";
 import { DMSans_400Regular } from "@expo-google-fonts/dm-sans/400Regular";
@@ -23,8 +21,10 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    Fredoka_600SemiBold,
-    Fredoka_700Bold,
+    // Headlines and amounts: Bricolage Grotesque, as on the website (v2.1, the app's font pass of 30/10/2026).
+    // Two weights only, shipped with the app (assets/fonts, Open Font Licence) rather than another package.
+    BricolageGrotesque_700Bold: require("../../assets/fonts/BricolageGrotesque-Bold.ttf"),
+    BricolageGrotesque_800ExtraBold: require("../../assets/fonts/BricolageGrotesque-ExtraBold.ttf"),
     DMSans_400Regular,
     DMSans_500Medium,
     DMSans_600SemiBold,
