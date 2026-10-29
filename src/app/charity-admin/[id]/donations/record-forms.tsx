@@ -7,6 +7,7 @@ import { RECORDED_METHODS, MAX_IMPORT_BYTES } from "@/lib/charity/recorded-gifts
 import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
 import type { ImportPreview } from "./record-actions";
+import { blueAction, field } from "@/components/dash";
 
 const methods = Object.entries(RECORDED_METHODS).map(([value, label]) => ({ value, label }));
 
@@ -27,7 +28,7 @@ export function RecordGiftForm({
   return (
     <ActionForm action={action} submitLabel="Record this gift" pendingLabel="Recording…">
       <fieldset className="space-y-3">
-        <legend className="font-semibold text-navy">The gift</legend>
+        <legend className="font-display text-lg font-bold text-indigo">The gift</legend>
         <DateField name="date" label="Date it came in" required defaultValue={today} />
         <TextField name="amount" label="Amount (R)" required inputMode="decimal" hint="For example 1250 or 1250.00" maxLength={20} />
         <SelectField name="method" label="How it came in" required options={methods} defaultValue="eft" />
@@ -35,10 +36,10 @@ export function RecordGiftForm({
         <TextField name="reference" label="Reference" hint="The bank reference or your own. It stops the same gift being recorded twice." maxLength={100} />
       </fieldset>
       <fieldset className="space-y-3">
-        <legend className="font-semibold text-navy">Who gave it</legend>
+        <legend className="font-display text-lg font-bold text-indigo">Who gave it</legend>
         <div className="space-y-1">
-          <label htmlFor="donor_type" className="block text-sm font-medium">Donor</label>
-          <select id="donor_type" name="donor_type" value={donorType} onChange={(e) => setDonorType(e.currentTarget.value)} className="w-full rounded-control border border-border bg-surface px-3 py-2.5">
+          <label htmlFor="donor_type" className="block text-sm font-semibold">Donor</label>
+          <select id="donor_type" name="donor_type" value={donorType} onChange={(e) => setDonorType(e.currentTarget.value)} className={`${field} w-full`}>
             <option value="individual">A person</option>
             <option value="company">A company</option>
             <option value="trust">A trust</option>
@@ -59,7 +60,7 @@ export function RecordGiftForm({
         <TextField name="phone" label="Phone" type="tel" maxLength={20} />
       </fieldset>
       <fieldset className="space-y-3">
-        <legend className="font-semibold text-navy">s18A receipt</legend>
+        <legend className="font-display text-lg font-bold text-indigo">s18A receipt</legend>
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="wants_18a" checked={wants} onChange={(e) => setWants(e.currentTarget.checked)} className="mt-1" />
           <span>They want an s18A receipt for this gift. It goes on their one receipt for the tax year, with their other gifts to you.</span>
@@ -137,19 +138,19 @@ export function ImportGiftsForm({
         }}
       >
         <div className="space-y-1">
-          <label htmlFor="file" className="block text-sm font-medium">CSV file</label>
+          <label htmlFor="file" className="block text-sm font-semibold">CSV file</label>
           <input id="file" type="file" accept=".csv,text/csv,.txt" onChange={(e) => choose(e.currentTarget.files?.[0])} className="block w-full text-sm file:mr-3 file:rounded-control file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:text-indigo" />
           {readError ? <p role="alert" className="text-sm text-danger">{readError}</p> : null}
         </div>
         <div className="space-y-1">
-          <label htmlFor="method" className="block text-sm font-medium">How these gifts came in</label>
-          <select id="method" value={method} onChange={(e) => setMethod(e.currentTarget.value)} className="w-full rounded-control border border-border bg-surface px-3 py-2.5">
+          <label htmlFor="method" className="block text-sm font-semibold">How these gifts came in</label>
+          <select id="method" value={method} onChange={(e) => setMethod(e.currentTarget.value)} className={`${field} w-full`}>
             {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
           <p className="text-xs text-muted">Used where a row has no Method column of its own.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button disabled={!text || checking} className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60">
+          <button disabled={!text || checking} className={`${blueAction} disabled:opacity-60`}>
             {checking ? "Checking…" : "Check the file"}
           </button>
           {checking ? <p role="status" className="text-sm text-muted">Checking, please wait… Nothing is recorded yet.</p> : null}
@@ -159,8 +160,8 @@ export function ImportGiftsForm({
       {preview.state === "refused" ? <p role="alert" className="rounded-card bg-danger-soft p-3 text-sm text-danger">{preview.message}</p> : null}
 
       {preview.state === "checked" ? (
-        <section aria-label="What would be recorded" className="space-y-3 rounded-card border border-border bg-surface p-4 text-sm">
-          <p className="font-semibold text-navy">
+        <section aria-label="What would be recorded" className="space-y-3 rounded-card border-2 border-border bg-honey-soft/40 p-4 text-sm sm:p-5">
+          <p className="font-display text-lg font-bold text-indigo">
             {preview.good ? `${preview.good} ${preview.good === 1 ? "gift" : "gifts"} ready to record, ${formatRand(preview.totalCents)} in all.` : "No gift in this file can be recorded yet."}
             {preview.bad ? ` ${preview.bad} ${preview.bad === 1 ? "row needs" : "rows need"} fixing and will be left out.` : ""}
           </p>
@@ -168,7 +169,7 @@ export function ImportGiftsForm({
           {preview.unknownColumns.length ? <p className="text-muted">Columns we didn&apos;t use: {preview.unknownColumns.join(", ")}.</p> : null}
           {preview.problems.length ? (
             <details open={preview.good === 0}>
-              <summary className="cursor-pointer text-brand">Rows to fix ({preview.bad})</summary>
+              <summary className="cursor-pointer font-semibold text-brand hover:underline">Rows to fix ({preview.bad})</summary>
               <ul className="mt-2 space-y-1">
                 {preview.problems.map((p) => (
                   <li key={p.line}><span className="font-medium">Row {p.line}:</span> {p.messages.map((m) => m.replace(/\.$/, "")).join(". ")}.</li>

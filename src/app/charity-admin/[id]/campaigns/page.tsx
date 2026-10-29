@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, Notice } from "@/components/card";
+import { PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
@@ -30,14 +31,16 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
   const whoGave = (campaignId: string) => `/charity-admin/${id}/donations?campaign=${campaignId}`;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-2xl text-indigo">Campaigns</h1>
-        <p className="text-sm text-muted">
-          Raise for one thing at a time, like winter food parcels or a new roof. Donors give to it in the Givezy app or on your Givezy page, and see how close you are to the goal.
-          The money comes to you like any other donation. You can run up to 3 at a time.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Campaigns"
+        intro={
+          <>
+            Raise for one thing at a time, like winter food parcels or a new roof. Donors give to it in the Givezy app or on your Givezy page, and see how close you are to the goal.
+            The money comes to you like any other donation. You can run up to 3 at a time.
+          </>
+        }
+      />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/campaigns`} />
 
@@ -50,21 +53,21 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
       ) : null}
 
       {active.length ? (
-        <Card title="Running now">
+        <Card lights title="Running now">
           <ul className="divide-y divide-border">
             {active.map((c) => (
-              <li key={c.id} className="space-y-2 py-3">
-                <div className="flex justify-between gap-3">
-                  <p className="font-medium">{c.title}</p>
+              <li key={c.id} className="space-y-3 py-4 first:pt-0 last:pb-0">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 font-semibold text-indigo [overflow-wrap:anywhere]">{c.title}</p>
                   <form action={endCampaign.bind(null, id, c.id)}>
                     <RemoveButton label="End" what={c.title} ask={false} />
                   </form>
                 </div>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={c.endsAt} />
-                {c.giftCount ? <Link href={whoGave(c.id)} className="inline-block text-sm text-brand underline">See who gave</Link> : null}
+                {c.giftCount ? <Link href={whoGave(c.id)} className={link}>See who gave</Link> : null}
                 {charity.status === "approved" ? (
                   <details className="text-sm">
-                    <summary className="cursor-pointer text-brand">Share this campaign</summary>
+                    <summary className="inline-flex min-h-9 cursor-pointer items-center rounded-control font-semibold text-brand underline hover:no-underline focus-visible:no-underline">Share this campaign</summary>
                     <div className="mt-2">
                       <ShareLinks url={giveUrl(c.id)} message={`${charity.name_en} is raising for ${c.title}. Give here:`} />
                     </div>
@@ -77,17 +80,17 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
       ) : null}
 
       {past.length ? (
-        <Card title="Ended">
+        <Card lights title="Ended">
           <ul className="divide-y divide-border">
             {past.map((c) => (
-              <li key={c.id} className="space-y-2 py-3">
-                <p className="font-medium">{c.title}</p>
+              <li key={c.id} className="space-y-3 py-4 first:pt-0 last:pb-0">
+                <p className="font-semibold text-indigo [overflow-wrap:anywhere]">{c.title}</p>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={null} />
                 {c.status === "active" && c.endsAt ? <p className="text-xs text-muted">Ended on {formatDate(c.endsAt)}</p> : null}
                 {c.giftCount ? (
-                  <div className="flex flex-wrap gap-x-4">
-                    <Link href={whoGave(c.id)} className="text-sm text-brand underline">See who gave</Link>
-                    <Link href={`/charity-admin/${id}/email-donors?to=campaign:${c.id}`} className="text-sm text-brand underline">Tell them how it went</Link>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <Link href={whoGave(c.id)} className={link}>See who gave</Link>
+                    <Link href={`/charity-admin/${id}/email-donors?to=campaign:${c.id}`} className={link}>Tell them how it went</Link>
                   </div>
                 ) : null}
               </li>
@@ -99,18 +102,31 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
   );
 }
 
+/** A text link as on the Overview: blue and underlined, the underline drops on hover and keyboard focus. */
+const link = "inline-flex min-h-9 items-center gap-1 rounded-control text-sm font-semibold text-brand underline hover:no-underline focus-visible:no-underline";
+
+/** Progress towards the goal as a ring, as on the Overview: orange on a light-purple track. */
 function CampaignBar({ raised, target, gifts, endsAt }: { raised: number; target: number | null; gifts: number; endsAt: string | null }) {
   const pct = progressPercent(raised, target);
+  const p = Math.max(0, Math.min(100, pct));
+  const c = 2 * Math.PI * 15.5;
   return (
-    <div className="space-y-1 text-sm">
-      <p>
-        {formatRand(raised)} raised{target ? ` of ${formatRand(target)}` : ""} <span className="text-muted">({gifts} {gifts === 1 ? "donation" : "donations"}{endsAt ? `, until ${formatDate(endsAt)}` : ""})</span>
-      </p>
+    <div className="flex items-center gap-4 text-sm">
       {target ? (
-        <div className="h-2 rounded-full bg-honey-soft" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${pct}% of the goal`}>
-          <div className="h-2 rounded-full bg-honey" style={{ width: `${Math.max(2, pct)}%` }} />
+        <div className="shrink-0" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${pct}% of the goal`}>
+          <svg viewBox="0 0 36 36" aria-hidden className="h-16 w-16 -rotate-90">
+            <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4.5" className="stroke-border" />
+            <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4.5" strokeLinecap="round" className="stroke-coral" strokeDasharray={`${(c * Math.max(2, p)) / 100} ${c}`} />
+          </svg>
         </div>
       ) : null}
+      <div className="min-w-0 space-y-0.5">
+        <p>
+          <span className="font-display text-lg font-extrabold tabular-nums text-indigo">{formatRand(raised)}</span> raised{target ? ` of ${formatRand(target)}` : ""}
+        </p>
+        <p className="text-muted">({gifts} {gifts === 1 ? "donation" : "donations"}{endsAt ? `, until ${formatDate(endsAt)}` : ""})</p>
+        {target ? <p className="text-muted" aria-hidden>{p}% of the goal</p> : null}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
+import { ActionLink, PageHeader, table } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { SupportContact } from "@/components/legal";
@@ -62,9 +63,9 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
     : [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/receipts`} />
-      <h1 className="font-display text-2xl text-indigo">s18A receipts</h1>
+      <PageHeader title="s18A receipts" />
       {canIssue18a(charity) ? (
         <Notice>
           One receipt is issued for each donor, once a year, after the tax year ends. The current tax year runs from {formatDate(taxYear.from)} to {formatDate(taxYear.end)} (SARS calls it tax year {taxYear.taxYear}).
@@ -81,13 +82,12 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
       ))}
 
       {progress.length > 0 ? (
-        <Card>
-          <h2 className="font-display text-lg text-indigo">Who has a receipt</h2>
-          <ul className="mt-2 divide-y divide-border text-sm">
+        <Card title="Who has a receipt">
+          <ul className="divide-y divide-border text-sm">
             {progress.map((y) => (
-              <li key={y.taxYear} className="flex items-start justify-between gap-3 py-2">
+              <li key={y.taxYear} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0">
-                  <p className="font-medium">{y.current ? `${taxYearName(y.taxYear)} tax year so far` : taxYearLabel(y.taxYear)}</p>
+                  <p className="font-semibold text-indigo">{y.current ? `${taxYearName(y.taxYear)} tax year so far` : taxYearLabel(y.taxYear)}</p>
                   <p className="text-muted">
                     {y.donors} {y.donors === 1 ? "donor" : "donors"} asked for an s18A receipt
                     {y.current
@@ -99,7 +99,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
                 </div>
                 {y.waitingCents > 0 ? (
                   <div className="shrink-0 text-right">
-                    <p className="font-semibold">{formatRand(y.waitingCents)}</p>
+                    <p className="font-display text-lg font-extrabold tabular-nums text-indigo">{formatRand(y.waitingCents)}</p>
                     <p className="text-xs text-muted">{y.current ? "to be receipted" : "not receipted yet"}</p>
                   </div>
                 ) : (
@@ -112,18 +112,18 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
       ) : null}
 
       {issuedYears.length ? (
-        <Card title="Yearly list (draft)">
+        <Card lights title="Yearly list (draft)">
           <p className="mb-2 text-sm text-muted">
             Every s18A receipt issued for a tax year, with what SARS will want that is missing (an address, or an ID or tax number).
             For your records and to check before the year&apos;s SARS submission. It shows whether an ID or tax number is on file, never the number.
           </p>
           <ul className="divide-y divide-border text-sm">
             {issuedYears.map((y) => (
-              <li key={y} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span>{taxYearLabel(y)}</span>
-                <span className="space-x-3">
-                  <a href={`/charity-admin/${id}/receipts/year-list?year=${y}`} className="text-brand underline">CSV</a>
-                  <a href={`/charity-admin/${id}/receipts/year-list?year=${y}&format=xlsx`} className="text-brand underline">Excel</a>
+              <li key={y} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
+                <span className="font-semibold text-indigo">{taxYearLabel(y)}</span>
+                <span className="flex flex-wrap gap-2">
+                  <ActionLink download href={`/charity-admin/${id}/receipts/year-list?year=${y}`}>CSV</ActionLink>
+                  <ActionLink download href={`/charity-admin/${id}/receipts/year-list?year=${y}&format=xlsx`}>Excel</ActionLink>
                 </span>
               </li>
             ))}
@@ -132,25 +132,25 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
       ) : null}
 
       {receipts && receipts.length > 0 ? (
-        <ul className="space-y-2">
-          {receipts.map((r) => (
-            <li key={r.id} className="rounded-card border border-border bg-surface p-4 text-sm">
-              <div className="flex items-start justify-between gap-3">
+        <Card>
+          <ul className="divide-y divide-border text-sm">
+            {receipts.map((r) => (
+              <li key={r.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0">
-                  <p className="font-medium">{r.reference}</p>
+                  <p className="font-semibold text-indigo [overflow-wrap:anywhere]">{r.reference}</p>
                   <p className="truncate text-muted">{r.donor_name}</p>
                   <p className="text-muted">{taxYearLabel(r.tax_year)}</p>
                   <p className="text-muted">Issued {formatDate(r.issued_at)}</p>
                 </div>
-                <div className="shrink-0 space-y-1 text-right">
-                  <p className="font-semibold">{formatRand(r.amount_cents)}</p>
+                <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+                  <p className="font-display text-lg font-extrabold tabular-nums text-indigo">{formatRand(r.amount_cents)}</p>
                   {r.status === "void" ? <Badge tone="warning">Withdrawn</Badge> : <Badge tone="success">Issued</Badge>}
                   {r.status !== "void" ? <div>{r.emailed_at ? <Badge tone="success">Emailed</Badge> : <Badge>Not emailed</Badge>}</div> : null}
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : (
         <Card>
           <p className="text-sm text-muted">No receipts have been issued yet. They appear here once the tax year has ended and receipts have been issued.</p>
@@ -212,30 +212,30 @@ function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityI
             If {pending === 1 ? "it goes" : "they go"} through after you approve, that donor&apos;s receipt has to be withdrawn and issued again, so you may want to wait a day or two.
           </Notice>
         ) : null}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="text-xs text-muted">
-              <tr>
-                <th className="py-1 pr-3 font-medium">Donor</th>
-                <th className="py-1 pr-3 font-medium">Donations</th>
-                <th className="py-1 text-right font-medium">Amount</th>
+        <div className={table.wrap}>
+          <table className={table.table}>
+            <thead>
+              <tr className={table.headRow}>
+                <th className={table.th}>Donor</th>
+                <th className={table.th}>Donations</th>
+                <th className={`${table.th} pr-0 text-right`}>Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {plan.lines.map((l, i) => (
-                <tr key={i}>
-                  <td className="max-w-[16rem] truncate py-1.5 pr-3">{l.donorName}</td>
-                  <td className="py-1.5 pr-3">{l.gifts}</td>
-                  <td className="py-1.5 text-right font-medium">{formatRand(l.totalCents)}</td>
+                <tr key={i} className="border-b border-border last:border-0">
+                  <td className={`${table.td} max-w-[16rem] truncate`}>{l.donorName}</td>
+                  <td className={`${table.td} tabular-nums`}>{l.gifts}</td>
+                  <td className={table.num}>{formatRand(l.totalCents)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-border font-semibold">
-                <td className="py-1.5 pr-3" colSpan={2}>
+              <tr className="border-t-2 border-border font-bold text-indigo">
+                <td className="py-2.5 pr-3" colSpan={2}>
                   {plan.lines.length} {plan.lines.length === 1 ? "receipt" : "receipts"}
                 </td>
-                <td className="py-1.5 text-right">{total}</td>
+                <td className="py-2.5 text-right tabular-nums">{total}</td>
               </tr>
             </tfoot>
           </table>

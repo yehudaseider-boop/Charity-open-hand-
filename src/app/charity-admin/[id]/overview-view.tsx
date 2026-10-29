@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card } from "@/components/card";
+import { Card, glow } from "@/components/card";
 import { ShareLinks } from "./share-links";
 import { MonthlyTrend } from "./monthly-trend";
 import { DonationsChart } from "./month-bars";
@@ -124,9 +124,10 @@ export function OverviewView(p: OverviewProps) {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi strong label="This month so far" value={formatRand(month.paid_cents)} note={`${plural(month.paid_count, "donation")} · last month ${formatRand(prev.paid_cents)}`} trend={chart.slice(-6).map((m) => m.amountCents)} />
-        <Kpi label={`${taxYearName(taxYear.taxYear)} tax year`} value={formatRand(year.paid_cents)} note={plural(year.paid_count, "donation")} trend={monthsFrom(chart, taxStart).map((m) => m.amountCents)} />
+        <Kpi strong href={`${base}/donations?status=paid&period=this-month`} label="This month so far" value={formatRand(month.paid_cents)} note={`${plural(month.paid_count, "donation")} · last month ${formatRand(prev.paid_cents)}`} trend={chart.slice(-6).map((m) => m.amountCents)} />
+        <Kpi href={`${base}/donations?status=paid&period=this-tax-year`} label={`${taxYearName(taxYear.taxYear)} tax year`} value={formatRand(year.paid_cents)} note={plural(year.paid_count, "donation")} trend={monthsFrom(chart, taxStart).map((m) => m.amountCents)} />
         <Kpi
+          href={`${base}/monthly`}
           label="Every month"
           value={formatRand(regular.runningCentsPerMonth)}
           note={`from ${plural(regular.runningCount, "monthly donor")}`}
@@ -134,7 +135,7 @@ export function OverviewView(p: OverviewProps) {
           changeNote="on the end of last month"
           trend={trend.slice(-6).map((p) => p.runningCents)}
         />
-        <Kpi label="Donors" value={String(all.donor_count)} note={`${formatRand(all.paid_cents)} given in all`} />
+        <Kpi href={`${base}/donors`} label="Donors" value={String(all.donor_count)} note={`${formatRand(all.paid_cents)} given in all`} />
       </div>
       <p className="text-xs text-muted">
         Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included. The payment provider&apos;s card fee comes off each donation before it reaches your bank.
@@ -159,16 +160,16 @@ export function OverviewView(p: OverviewProps) {
 
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <Card title="Donations by month">
+          <Card lights title="Donations by month">
             <DonationsChart months={chart} current={today.slice(0, 7)} donationsBase={`${base}/donations`} taxYearFrom={taxStart} taxYearName={taxYearName(taxYear.taxYear)} />
           </Card>
         </div>
         <div className="lg:col-span-4">
-          <Card title="Where gifts come from">
+          <Card lights title="Where gifts come from">
             {sourceRows.length ? (
               <>
                 <p className="-mt-2 mb-4 text-sm text-muted">Donations in the {taxYearName(taxYear.taxYear)} tax year</p>
-                <SourceBars rows={sourceRows} />
+                <SourceBars rows={sourceRows} hrefFor={(key) => `${base}/donations?status=paid&period=this-tax-year&source=${key}`} />
               </>
             ) : (
               <p className="text-sm text-muted">This fills in once donations start coming in: from your page, a shared link, the QR poster, the app or your website button.</p>
@@ -179,7 +180,7 @@ export function OverviewView(p: OverviewProps) {
 
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <Card title="Recent donations" aside={<Link href={`${base}/donations`} className="text-sm font-semibold text-brand underline">See all donations</Link>}>
+          <Card lights title="Recent donations" aside={<Link href={`${base}/donations`} className="text-sm font-semibold text-brand underline">See all donations</Link>}>
             {recentRows.length ? (
               <RecentDonations rows={recentRows} donationsHref={`${base}/donations`} />
             ) : (
@@ -189,15 +190,17 @@ export function OverviewView(p: OverviewProps) {
         </div>
         <div className="space-y-4 lg:col-span-4">
           {all.paid_count > 0 ? (
-            <Card title="Needs you this week">
+            <Card lights title="Needs you this week">
               {todo.length === 0 ? (
                 <p className="text-sm text-muted">Nothing needs you right now. New donors, declined monthly donations and campaigns about to end show up here.</p>
               ) : (
                 <ul className="divide-y divide-border text-sm">
                   {todo.map((t) => (
-                    <li key={t.key} className="space-y-1 py-2.5 first:pt-0 last:pb-0">
-                      <p>{t.text}</p>
-                      <Link href={t.href} className="font-semibold text-brand underline">{t.link}</Link>
+                    <li key={t.key} className="py-1 first:pt-0 last:pb-0">
+                      <Link href={t.href} className="group -mx-2 block space-y-1 rounded-control px-2 py-1.5 transition hover:bg-honey-soft focus-visible:bg-honey-soft">
+                        <p className="text-navy">{t.text}</p>
+                        <span className="font-semibold text-brand underline group-hover:no-underline">{t.link} <span aria-hidden className="inline-block transition-transform motion-safe:group-hover:translate-x-1">→</span></span>
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -205,20 +208,22 @@ export function OverviewView(p: OverviewProps) {
             </Card>
           ) : null}
           {top.length > 0 ? (
-            <Card title="Your biggest supporters">
-              <ol className="space-y-3 text-sm">
+            <Card lights title="Your biggest supporters">
+              <ol className="space-y-1 text-sm">
                 {top.map((d, i) => (
-                  <li key={d.donor_id} className="flex items-center justify-between gap-3">
+                  <li key={d.donor_id}>
+                    <Link href={`${base}/donors/${d.donor_id}`} className="group -mx-2 flex items-center justify-between gap-3 rounded-control px-2 py-1.5 transition hover:bg-honey-soft focus-visible:bg-honey-soft">
                     <span className="flex min-w-0 items-center gap-2.5">
                       <span aria-hidden className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold text-navy ${["bg-honey", "bg-peach", "bg-brand-soft", "bg-success-soft"][i % 4]}`}>
                         {isErasedEmail(d.email) ? "?" : initials(d.display_name) || "D"}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate font-semibold">{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</span>
+                        <span className="block truncate font-semibold group-hover:text-brand">{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</span>
                         <span className="block text-xs text-muted">{plural(d.donation_count, "donation")}</span>
                       </span>
                     </span>
                     <span className="shrink-0 font-semibold tabular-nums">{formatRand(d.total_cents)}</span>
+                    </Link>
                   </li>
                 ))}
               </ol>
@@ -230,7 +235,7 @@ export function OverviewView(p: OverviewProps) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Campaigns">
+        <Card lights title="Campaigns">
           {activeCampaigns.length ? (
             <ul className="space-y-4">
               {activeCampaigns.map((c) => {
@@ -252,7 +257,7 @@ export function OverviewView(p: OverviewProps) {
           <Link href={`${base}/campaigns`} className="mt-4 inline-block text-sm font-semibold text-brand underline">{activeCampaigns.length ? "Manage campaigns" : "Start a campaign"}</Link>
         </Card>
 
-        <Card title="Your donors">
+        <Card lights title="Your donors">
           {all.paid_count === 0 ? (
             <p className="text-sm text-muted">These fill in once donations start coming in.</p>
           ) : (
@@ -260,7 +265,7 @@ export function OverviewView(p: OverviewProps) {
               <ul className="grid grid-cols-2 gap-2">
                 {donorGroups.map((g) => (
                   <li key={g.key}>
-                    <Link href={`${base}/donors?group=${g.key}`} className="block h-full rounded-control border-2 border-border p-3 transition hover:border-brand">
+                    <Link href={`${base}/donors?group=${g.key}`} className={`block h-full rounded-control border-2 border-border bg-surface p-3 ${glow}`}>
                       <span className="block font-display text-2xl font-extrabold text-indigo">{groups[g.key]}</span>
                       <span className="block text-sm font-semibold">{g.label}</span>
                       <span className="block text-xs leading-snug text-muted">{g.hint}</span>
@@ -294,7 +299,7 @@ export function OverviewView(p: OverviewProps) {
           )}
         </Card>
 
-        <Card title="s18A receipts">
+        <Card lights title="s18A receipts">
           {receipts ? (
             <p className="text-sm">
               {formatRand(year.receipt_requested_cents)} of this tax year&apos;s paid donations asked for an s18A receipt.

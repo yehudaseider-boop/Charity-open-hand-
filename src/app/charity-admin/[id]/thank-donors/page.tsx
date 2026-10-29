@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Card, Notice } from "@/components/card";
 import { DonePanel } from "@/components/done-panel";
+import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
@@ -42,14 +43,16 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
     : [];
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-2xl text-indigo">Thank donors</h1>
-        <p className="text-sm text-muted">
-          A short thank-you is the biggest reason people give again. Write it once and we email it to everyone who gave that month,
-          with their first name. You don&apos;t need their addresses, and they can stop these emails at any time. One thank-you per month.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Thank donors"
+        intro={
+          <>
+            A short thank-you is the biggest reason people give again. Write it once and we email it to everyone who gave that month,
+            with their first name. You don&apos;t need their addresses, and they can stop these emails at any time. One thank-you per month.
+          </>
+        }
+      />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/thank-donors`} />
 
@@ -75,20 +78,20 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
               confirm={`Email this thank-you to ${count} ${count === 1 ? "donor" : "donors"} who gave in ${monthLabel(month)}? Once sent it can't be taken back, and you can only send one for this month${month === months[0] ? ". The month isn't over: people who give later this month won't get it" : ""}.`}
             />
           ) : (
-            <p className="text-sm text-muted">Nobody to thank for this month yet.</p>
+            <p className="rounded-control border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm text-muted">Nobody to thank for this month yet.</p>
           )}
         </Card>
       ))}
 
       {sentRows?.length ? (
         <Card title="Sent">
-          <ul className="divide-y divide-border text-sm">
+          <ul className="-my-3 divide-y divide-border text-sm">
             {sentRows.map((r) => (
               <li key={r.id} className="space-y-1 py-3">
-                <p className="font-medium">
-                  {monthLabel(r.period_month as string)} <span className="font-normal text-muted">· {!r.finished_at ? `started ${formatDate(r.sent_at as string)}, not finished: ${r.recipient_count} sent so far` : `sent ${formatDate(r.sent_at as string)} to ${r.recipient_count} ${r.recipient_count === 1 ? "donor" : "donors"}`}</span>
+                <p className="font-semibold text-navy">
+                  <span className="font-display text-base font-bold text-indigo">{monthLabel(r.period_month as string)}</span> <span className="font-normal text-muted">· {!r.finished_at ? `started ${formatDate(r.sent_at as string)}, not finished: ${r.recipient_count} sent so far` : `sent ${formatDate(r.sent_at as string)} to ${r.recipient_count} ${r.recipient_count === 1 ? "donor" : "donors"}`}</span>
                 </p>
-                <p className="whitespace-pre-line text-muted">{r.body}</p>
+                <p className="whitespace-pre-line rounded-control bg-honey-soft p-3 text-muted [overflow-wrap:anywhere]">{r.body}</p>
               </li>
             ))}
           </ul>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Notice } from "@/components/card";
+import { PageHeader, secondaryAction } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { loadCharityForManager } from "@/lib/charity/queries";
@@ -19,10 +20,10 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
   const { charity } = await loadCharityForManager(id);
   if (charity.status !== "approved") {
     return (
-      <div className="space-y-4">
-        <h1 className="font-display text-2xl text-indigo">QR poster</h1>
+      <div className="space-y-5">
+        <PageHeader title="QR poster" />
         <Notice tone="warning">Your QR poster is ready once your charity is approved and listed.</Notice>
-        <Link href={`/charity-admin/${id}`} className="inline-block text-sm text-brand underline">Back to your overview</Link>
+        <Link href={`/charity-admin/${id}`} className={secondaryAction}>Back to your overview</Link>
       </div>
     );
   }
@@ -33,19 +34,20 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
   const download = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="space-y-2 print:hidden">
-        <h1 className="font-display text-2xl text-indigo">QR poster</h1>
-        <p className="text-sm text-muted">
-          Put this up where your community sees it: a notice board, your front desk, a table at an event. People point
-          their phone camera at the code and land on your Givezy page, ready to give.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <PrintButton />
-          <a href={download} download={`givezy-qr-${charity.slug}.svg`} className="rounded-control border border-border px-4 py-2.5">
-            Download the QR code only
-          </a>
-        </div>
+        <PageHeader
+          title="QR poster"
+          intro="Put this up where your community sees it: a notice board, your front desk, a table at an event. People point their phone camera at the code and land on your Givezy page, ready to give."
+          actions={
+            <>
+              <PrintButton primary />
+              <a href={download} download={`givezy-qr-${charity.slug}.svg`} className={secondaryAction}>
+                Download the QR code only
+              </a>
+            </>
+          }
+        />
         <p className="text-xs text-muted">Tip: in the print window, choose &quot;Save as PDF&quot; to email it or send it to a print shop.</p>
       </div>
 
@@ -67,7 +69,7 @@ export default async function PosterPage({ params }: PageProps<"/charity-admin/[
       </section>
 
       <p className="text-sm print:hidden">
-        <Link href={`/charity-admin/${id}`} className="text-brand underline">Back to your overview</Link>
+        <Link href={`/charity-admin/${id}`} className="font-semibold text-brand underline hover:text-indigo">Back to your overview</Link>
       </p>
     </div>
   );

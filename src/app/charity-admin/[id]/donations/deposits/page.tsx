@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
+import { ActionLink, EmptyState, PageHeader, rowLink } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { listDeposits } from "@/lib/charity/deposit-queries";
 import type { Deposit } from "@/lib/charity/deposits";
@@ -22,30 +23,30 @@ export default async function DepositsPage({ params }: PageProps<"/charity-admin
   const deposits = await listDeposits(id);
   const base = `/charity-admin/${id}/donations/deposits`;
   return (
-    <div className="space-y-4">
-      <Link href={`/charity-admin/${id}/donations`} className="text-sm text-muted">← Donations</Link>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl text-indigo">Deposits</h1>
-          <p className="text-sm text-muted">
+    <div className="space-y-5">
+      <PageHeader
+        back={<Link href={`/charity-admin/${id}/donations`} className="text-muted hover:text-brand">← Donations</Link>}
+        title="Deposits"
+        intro={
+          <>
             The payment provider pays your gifts into your bank account in one deposit a day, with its fees taken off. Each deposit here shows the gifts it is made of,
             each fee, and what reached your bank, so it matches your bank statement line for line. s18A receipts are always for the full gift.
-          </p>
-        </div>
-        {deposits.length ? (
-          <div className="shrink-0 space-y-1 text-right text-sm">
-            <p className="text-muted">Download all</p>
-            <p className="space-x-3">
-              <a href={`${base}/csv`} className="text-brand underline">CSV</a>
-              <a href={`${base}/csv?format=xlsx`} className="text-brand underline">Excel</a>
-              <a href={`${base}/csv?format=xero`} className="text-brand underline">For Xero</a>
-            </p>
-          </div>
-        ) : null}
-      </div>
+          </>
+        }
+        actions={
+          deposits.length ? (
+            <div role="group" aria-label="Download all" className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-muted">Download all</span>
+              <ActionLink href={`${base}/csv`} download>CSV</ActionLink>
+              <ActionLink href={`${base}/csv?format=xlsx`} download>Excel</ActionLink>
+              <ActionLink href={`${base}/csv?format=xero`} download>For Xero</ActionLink>
+            </div>
+          ) : null
+        }
+      />
       {deposits.length ? (
         <details className="text-sm">
-          <summary className="cursor-pointer text-brand">Using Xero?</summary>
+          <summary className="cursor-pointer font-semibold text-brand hover:underline">Using Xero?</summary>
           <p className="mt-2 text-muted">
             &quot;For Xero&quot; is a bank statement file for a clearing account in Xero (for example &quot;Givezy donations&quot;). Each deposit becomes the donations in,
             the card fees out and the deposit out to your bank, so the clearing account comes back to zero and the deposit matches the line on your real bank feed.
@@ -55,17 +56,15 @@ export default async function DepositsPage({ params }: PageProps<"/charity-admin
       ) : null}
       <Notice>Not in deposits: gifts you recorded yourself (EFT, cash), which never pass through the payment provider, and donors&apos; contributions to Givezy, which go to Givezy.</Notice>
       {deposits.length === 0 ? (
-        <Card>
-          <p className="text-sm text-muted">No deposits yet. They appear here a day or two after the payment provider pays your bank account, once gifts start coming in through Givezy.</p>
-        </Card>
+        <EmptyState title="No deposits yet">They appear here a day or two after the payment provider pays your bank account, once gifts start coming in through Givezy.</EmptyState>
       ) : (
-        <ul className="space-y-2">
+        <Card lights>
+        <ul className="divide-y divide-border">
           {deposits.map((d) => (
-            <li key={d.id}>
-              <Link href={`${base}/${d.id}`} className="block rounded-card border border-border bg-surface p-4 text-sm">
-                <div className="flex items-start justify-between gap-3">
+            <li key={d.id} className="py-1 first:pt-0 last:pb-0">
+              <Link href={`${base}/${d.id}`} className={`${rowLink} items-start text-sm`}>
                   <div className="min-w-0">
-                    <p className="font-medium">{formatDate(`${d.paidOutOn}T12:00:00+02:00`)}</p>
+                    <p className="font-semibold text-indigo group-hover:text-brand group-hover:underline">{formatDate(`${d.paidOutOn}T12:00:00+02:00`)}</p>
                     <p className="text-muted">
                       {summaryLine(d.deposit)}
                     </p>
@@ -75,14 +74,14 @@ export default async function DepositsPage({ params }: PageProps<"/charity-admin
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="font-semibold">{formatRand(d.amountCents)}</p>
+                    <p className="font-display text-lg font-bold text-indigo tabular-nums">{formatRand(d.amountCents)}</p>
                     <p className="text-xs text-muted">to your bank</p>
                   </div>
-                </div>
               </Link>
             </li>
           ))}
         </ul>
+        </Card>
       )}
     </div>
   );

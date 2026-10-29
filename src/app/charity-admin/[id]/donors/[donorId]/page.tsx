@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { addDonorNote, addDonorReminder, addDonorTag, deleteDonorNote, deleteDonorReminder, editDonorNote, markReminder, removeDonorTag } from "../care-actions";
 import { ButtonForm, NoteForm, ReminderForm, TagForm } from "../care-forms";
 import { BackLink } from "@/components/back-link";
+import { PageHeader, rowLink } from "@/components/dash";
 
 export const metadata: Metadata = { title: "Donor" };
 
@@ -60,34 +61,36 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
   const base = `/charity-admin/${id}`;
 
   return (
-    <div className="space-y-4">
-      <BackLink href={`${base}/donors`}>← Donors</BackLink>
+    <div className="space-y-5">
+      <PageHeader
+        back={<BackLink href={`${base}/donors`}>← Donors</BackLink>}
+        title={name}
+        intro={
+          <>
+            {shownEmail(donor.email) ? <p className="break-all">{donor.email}</p> : null}
+            {donor.phone ? <p>{donor.phone}</p> : null}
+            {group || myTags.length ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {group ? <Badge tone="brand">{group.label}</Badge> : null}
+                {myTags.map((t) => <Badge key={t.id}>{t.name}</Badge>)}
+              </div>
+            ) : null}
+          </>
+        }
+      />
       {typeof sp.did === "string" && CARE_DONE[sp.did] ? (
         <p role="status" className="rounded-card bg-success-soft p-3 text-sm text-success">{CARE_DONE[sp.did]}</p>
       ) : null}
-      <div>
-        <h1 className="font-display text-2xl text-indigo">{name}</h1>
-        {shownEmail(donor.email) ? <p className="break-all text-sm text-muted">{donor.email}</p> : null}
-        {donor.phone ? <p className="text-sm text-muted">{donor.phone}</p> : null}
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {group ? <Badge tone="brand">{group.label}</Badge> : null}
-          {myTags.map((t) => <Badge key={t.id}>{t.name}</Badge>)}
-        </div>
-      </div>
 
       <Card title="Giving to you">
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div><dt className="text-muted">Given in all</dt><dd className="font-semibold">{formatRand(donor.total_cents)}</dd></div>
-          <div><dt className="text-muted">Gifts</dt><dd className="font-semibold">{donor.donation_count}</dd></div>
-          <div><dt className="text-muted">First gift</dt><dd>{formatDate(donor.first_paid_at)}</dd></div>
-          <div><dt className="text-muted">Latest gift</dt><dd>{formatDate(donor.last_paid_at)}</dd></div>
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat strong label="Given in all" value={formatRand(donor.total_cents)} />
+          <Stat label="Gifts" value={String(donor.donation_count)} />
+          <Stat label="First gift" value={formatDate(donor.first_paid_at)} />
+          <Stat label="Latest gift" value={formatDate(donor.last_paid_at)} />
           {giving.largest ? (
-            <div className="col-span-2">
-              <dt className="text-muted">Largest gift</dt>
-              <dd>
-                <span className="font-semibold">{formatRand(giving.largest.amount_cents)}</span>
-                {giving.largest.paid_at ? <span className="text-muted"> on {formatDate(giving.largest.paid_at)}</span> : null}
-              </dd>
+            <div className="sm:col-span-2 xl:col-span-4">
+              <Stat label="Largest gift" value={formatRand(giving.largest.amount_cents)} note={giving.largest.paid_at ? `on ${formatDate(giving.largest.paid_at)}` : undefined} />
             </div>
           ) : null}
         </dl>
@@ -100,7 +103,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
           {open.length === 0 ? <p className="text-muted">Nothing to follow up. Add one below, for example a call to say thank you.</p> : null}
           <ul className="space-y-2">
             {open.map((r) => (
-              <li key={r.id} className={`rounded-control border p-3 ${r.due_on <= today ? "border-warning bg-warning-soft" : "border-border"}`}>
+              <li key={r.id} className={`rounded-control border-2 p-3 ${r.due_on <= today ? "border-warning bg-warning-soft" : "border-border"}`}>
                 <p className="font-medium">{r.what}</p>
                 <p className="text-xs text-muted">{r.due_on < today ? "Was due" : r.due_on === today ? "Due today" : "Due"} {formatDate(`${r.due_on}T12:00:00+02:00`)}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -112,10 +115,10 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
           </ul>
           {done.length ? (
             <details>
-              <summary className="cursor-pointer text-brand">Done recently ({done.length})</summary>
+              <summary className="min-h-11 cursor-pointer content-center font-semibold text-brand hover:underline">Done recently ({done.length})</summary>
               <ul className="mt-2 space-y-2">
                 {done.map((r) => (
-                  <li key={r.id} className="rounded-control border border-border p-3 text-muted">
+                  <li key={r.id} className="rounded-control border-2 border-border p-3 text-muted">
                     <p className="line-through">{r.what}</p>
                     <p className="text-xs">Done {formatDateTime(r.done_at!)}</p>
                     <ButtonForm action={markReminder.bind(null, id, donorId, r.id, false)} label="Undo" pending="Putting it back…" />
@@ -133,8 +136,8 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
           {myTags.length ? (
             <ul className="flex flex-wrap gap-2">
               {myTags.map((t) => (
-                <li key={t.id} className="flex items-center gap-1 rounded-full border border-border px-3 py-1">
-                  <span>{t.name}</span>
+                <li key={t.id} className="flex max-w-full items-center gap-1 rounded-full border-2 border-border bg-honey-soft py-1 pl-3 pr-1">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{t.name}</span>
                   <ButtonForm action={removeDonorTag.bind(null, id, donorId, t.id)} label="Take off" pending="Taking off…" />
                 </li>
               ))}
@@ -151,13 +154,13 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
           <NoteForm action={addDonorNote.bind(null, id, donorId)} />
           <ul className="space-y-3">
             {notes.map((n) => (
-              <li key={n.id} className="rounded-control border border-border p-3">
+              <li key={n.id} className="rounded-control border-2 border-border p-3">
                 <p className="whitespace-pre-wrap break-words">{n.body}</p>
                 <p className="mt-1 text-xs text-muted">
                   {n.author ? `${n.author}, ` : ""}{formatDateTime(n.created_at)}{n.edited_at ? ` (edited ${formatDateTime(n.edited_at)})` : ""}
                 </p>
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-brand">Edit or remove</summary>
+                  <summary className="min-h-11 cursor-pointer content-center font-semibold text-brand hover:underline">Edit or remove</summary>
                   <div className="mt-2 space-y-2">
                     <NoteForm action={editDonorNote.bind(null, id, donorId, n.id)} defaultBody={n.body} label="Edit the note" submit="Save changes" />
                     <ButtonForm action={deleteDonorNote.bind(null, id, donorId, n.id)} label="Remove note" pending="Removing…" confirm="Remove this note? It can't be undone." confirmLabel="Yes, remove" />
@@ -169,21 +172,21 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
         </div>
       </Card>
 
-      <Card title="Gifts">
+      <Card lights title="Gifts">
         {(gifts ?? []).length === 0 ? (
           <p className="text-sm text-muted">No gifts to show.</p>
         ) : (
           <ul className="divide-y divide-border text-sm">
             {(gifts ?? []).map((g) => (
-              <li key={g.id as string}>
-                <Link href={`${base}/donations/${g.id}`} className="flex items-center justify-between gap-3 py-2">
+              <li key={g.id as string} className="py-0.5">
+                <Link href={`${base}/donations/${g.id}`} className={rowLink}>
                   <span className="min-w-0">
                     {formatDate((g.paid_at ?? g.created_at) as string)}
                     {g.campaign_id ? <span className="text-muted"> · {campaignTitles.get(g.campaign_id as string) ?? "A campaign"}</span> : null}
                     {g.recorded_method ? <span className="text-muted"> · {RECORDED_METHODS[g.recorded_method as RecordedMethod] ?? "Recorded"}</span> : null}
                     {g.status !== "paid" ? <span className="text-muted"> · {donationStatus[g.status as keyof typeof donationStatus]?.label}</span> : null}
                   </span>
-                  <span className="shrink-0 font-medium">{formatRand(Number(g.amount_cents))}</span>
+                  <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-navy group-hover:text-brand">{formatRand(Number(g.amount_cents))}</span>
                 </Link>
               </li>
             ))}
@@ -203,15 +206,28 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
 function GivingLines({ title, lines }: { title: string; lines: GivingLine[] }) {
   return (
     <div className="mt-4 border-t border-border pt-3 text-sm">
-      <h3 className="mb-1 font-semibold text-navy">{title}</h3>
+      <h3 className="mb-1 font-display text-base font-bold text-indigo">{title}</h3>
       <ul className="space-y-1">
         {lines.map((l) => (
           <li key={l.key} className="flex justify-between gap-3">
             <span className="min-w-0 break-words">{l.label} <span className="text-muted">({l.count} {l.count === 1 ? "gift" : "gifts"})</span></span>
-            <span className="shrink-0 font-medium">{formatRand(l.cents)}</span>
+            <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums">{formatRand(l.cents)}</span>
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** One figure in "Giving to you": the dashboard's figure box, kept as a term and its value for screen readers. */
+function Stat({ label, value, note, strong = false }: { label: string; value: string; note?: string; strong?: boolean }) {
+  return (
+    <div className={`rounded-card border-2 p-4 ${strong ? "border-brand bg-brand text-white" : "border-border bg-surface"}`}>
+      <dt className={`text-sm font-semibold ${strong ? "text-white/85" : "text-muted"}`}>{label}</dt>
+      <dd className="mt-1 whitespace-nowrap font-display text-2xl font-extrabold leading-tight tabular-nums">
+        {value}
+        {note ? <span className="ml-2 font-sans text-sm font-normal text-muted">{note}</span> : null}
+      </dd>
     </div>
   );
 }

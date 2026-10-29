@@ -89,7 +89,7 @@ export function ActionForm({
       >
         {children}
         {asking ? (
-          <div role="alertdialog" aria-label="Please confirm" className="space-y-3 rounded-card border border-border bg-honey-soft p-4 text-sm">
+          <div role="alertdialog" aria-label="Please confirm" className="space-y-3 rounded-card border-2 border-honey bg-honey-soft p-4 text-sm">
             <p className="font-medium text-navy">{confirm}</p>
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -101,7 +101,7 @@ export function ActionForm({
                   setAsking(null);
                   startTransition(() => dispatch(held));
                 }}
-                className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast"
+                className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast"
               >
                 {confirmLabel ?? `Yes, ${submitLabel.charAt(0).toLowerCase()}${submitLabel.slice(1)}`}
               </button>
@@ -115,7 +115,7 @@ export function ActionForm({
           <button
             disabled={pending}
             hidden={Boolean(asking)}
-            className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast disabled:opacity-60"
+            className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast disabled:opacity-60"
           >
             {pending ? pendingLabel : submitLabel}
           </button>

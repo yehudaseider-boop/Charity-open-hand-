@@ -14,6 +14,8 @@ import { formatDate } from "@/lib/dates";
 import { DonePanel } from "@/components/done-panel";
 import { RECORDED_METHODS, type RecordedMethod } from "@/lib/charity/recorded-gifts";
 import { formatRand } from "@/lib/money";
+import { Card } from "@/components/card";
+import { ActionLink, blueAction, EmptyState, field, PageHeader, rowLink, secondaryAction, Tabs } from "@/components/dash";
 import { showDay } from "@/lib/typed-date";
 import { createClient } from "@/lib/supabase/server";
 
@@ -70,117 +72,124 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   const narrowed = Boolean(q || status !== "all" || filters.period !== "all" || filters.campaign || filters.source);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <DonePanel charity={charity} sp={sp} here={base} />
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="font-display text-2xl text-indigo">Donations</h1>
-        {/* Paid only by default, so the bookkeeper's total is income received. */}
-        <div className="text-right text-sm">
-          <a href={csvHref} className="text-brand underline">
-            {status === "all" || status === "paid" ? "Download paid donations (CSV)" : "Download CSV"}
-          </a>
-          <a href={`${csvHref}&format=xlsx`} className="mt-1 block text-brand underline">Same in Excel</a>
-          {status === "all" ? (
-            <a href={csvAllHref} className="mt-1 block text-xs text-muted underline">Every status</a>
-          ) : null}
-        </div>
-      </div>
+      <PageHeader
+        title="Donations"
+        intro="Record a gift or import a file for EFT, cash and other gifts that didn't come through Givezy."
+        actions={
+          <>
+            <ActionLink href={`${base}/deposits`}>Deposits</ActionLink>
+            <ActionLink href={`${base}/import`}>Import from a file</ActionLink>
+            <ActionLink href={`${base}/record`} primary>Record a gift</ActionLink>
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap gap-2 text-sm">
-        <Link href={`${base}/record`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Record a gift</Link>
-        <Link href={`${base}/import`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Import from a file</Link>
-        <Link href={`${base}/deposits`} className="pressable rounded-control border border-border bg-surface px-3 py-2 font-medium text-navy">Deposits</Link>
-        <span className="self-center text-xs text-muted">For EFT, cash and other gifts that didn&apos;t come through Givezy.</span>
-      </div>
-
-      <LiveFilterForm action={base} className="space-y-2">
-        {status !== "all" ? <input type="hidden" name="status" value={status} /> : null}
-        <div className="flex flex-wrap gap-2">
-          <label className="sr-only" htmlFor="period">Period</label>
-          <select id="period" name="period" defaultValue={filters.period} className="rounded-control border border-border bg-surface px-3 py-2.5">
-            {Object.entries(periodOptions).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-          </select>
-          <label className="flex items-center gap-1 text-sm">From <input type="text" name="from" placeholder="dd/mm/yyyy" autoComplete="off" maxLength={10} defaultValue={filters.period === "custom" ? showDay(filters.fromDate) : datesUnread ? typedFrom : ""} className="w-32 rounded-control border border-border bg-surface px-2 py-2 tabular-nums" /></label>
-          <label className="flex items-center gap-1 text-sm">To <input type="text" name="to" placeholder="dd/mm/yyyy" autoComplete="off" maxLength={10} defaultValue={filters.period === "custom" ? showDay(filters.toDate) : datesUnread ? typedTo : ""} className="w-32 rounded-control border border-border bg-surface px-2 py-2 tabular-nums" /></label>
-        </div>
-        {datesUnread ? (
-          <p role="alert" className="rounded-control bg-danger-soft p-2 text-sm text-danger">We couldn&apos;t read those dates, so this shows all donations. Write both as dd/mm/yyyy, for example 01/03/2026, and search again.</p>
-        ) : (
-          <p className="text-xs text-muted">For your own dates, choose &quot;Choose dates&quot; and fill in both, as dd/mm/yyyy.</p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          {campaigns.size ? (
-            <>
-              <label className="sr-only" htmlFor="campaign">Campaign</label>
-              <select id="campaign" name="campaign" defaultValue={filters.campaign} className="min-w-0 max-w-full rounded-control border border-border bg-surface px-3 py-2.5">
-                <option value="">Every campaign</option>
-                <option value="none">No campaign</option>
-                {[...campaigns].sort((a, b) => a[1].localeCompare(b[1])).map(([cid, title]) => <option key={cid} value={cid}>{title}</option>)}
-              </select>
-            </>
-          ) : null}
-          <label className="sr-only" htmlFor="source">Came from</label>
-          <select id="source" name="source" defaultValue={filters.source} className="min-w-0 max-w-full rounded-control border border-border bg-surface px-3 py-2.5">
-            <option value="">From anywhere</option>
-            {Object.entries(GIFT_SOURCES).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-            <option value="unknown">Not known (before 21/10/2026)</option>
-          </select>
-        </div>
-        <div className="flex gap-2">
-        <input
-          name="q"
-          defaultValue={q}
-          placeholder="Search name or email"
-          aria-label="Search by donor name or email"
-          className="min-w-0 flex-1 rounded-control border border-border bg-surface px-3 py-2.5"
-        />
-        <button className="pressable rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Search</button>
-        </div>
-      </LiveFilterForm>
+      <Card>
+        <LiveFilterForm action={base} className="space-y-3">
+          {status !== "all" ? <input type="hidden" name="status" value={status} /> : null}
+          <div className="flex min-w-0 gap-2">
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Search name or email"
+              aria-label="Search by donor name or email"
+              className={`${field} min-w-0 flex-1`}
+            />
+            <button className={blueAction}>Search</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <label className="sr-only" htmlFor="period">Period</label>
+            <select id="period" name="period" defaultValue={filters.period} className={`${field} min-w-0 max-w-full`}>
+              {Object.entries(periodOptions).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </select>
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-muted">From <input type="text" name="from" placeholder="dd/mm/yyyy" autoComplete="off" maxLength={10} defaultValue={filters.period === "custom" ? showDay(filters.fromDate) : datesUnread ? typedFrom : ""} className={`${field} w-32 tabular-nums`} /></label>
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-muted">To <input type="text" name="to" placeholder="dd/mm/yyyy" autoComplete="off" maxLength={10} defaultValue={filters.period === "custom" ? showDay(filters.toDate) : datesUnread ? typedTo : ""} className={`${field} w-32 tabular-nums`} /></label>
+          </div>
+          {datesUnread ? (
+            <p role="alert" className="rounded-control bg-danger-soft p-3 text-sm text-danger">We couldn&apos;t read those dates, so this shows all donations. Write both as dd/mm/yyyy, for example 01/03/2026, and search again.</p>
+          ) : (
+            <p className="text-xs text-muted">For your own dates, choose &quot;Choose dates&quot; and fill in both, as dd/mm/yyyy.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {campaigns.size ? (
+              <>
+                <label className="sr-only" htmlFor="campaign">Campaign</label>
+                <select id="campaign" name="campaign" defaultValue={filters.campaign} className={`${field} min-w-0 max-w-full`}>
+                  <option value="">Every campaign</option>
+                  <option value="none">No campaign</option>
+                  {[...campaigns].sort((a, b) => a[1].localeCompare(b[1])).map(([cid, title]) => <option key={cid} value={cid}>{title}</option>)}
+                </select>
+              </>
+            ) : null}
+            <label className="sr-only" htmlFor="source">Came from</label>
+            <select id="source" name="source" defaultValue={filters.source} className={`${field} min-w-0 max-w-full`}>
+              <option value="">From anywhere</option>
+              {Object.entries(GIFT_SOURCES).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              <option value="unknown">Not known (before 21/10/2026)</option>
+            </select>
+          </div>
+        </LiveFilterForm>
+      </Card>
 
       {/* Totals for everything the filters match, not just this page. */}
-      <div className="rounded-card border border-border bg-surface p-4 text-sm">
-        <p>
-          <span className="font-semibold">{formatRand(totals.paidCents)}</span> received from {totals.paidCount} {totals.paidCount === 1 ? "donation" : "donations"}
-          {range ? <span className="text-muted">, {range}</span> : null}
-          {q ? <span className="text-muted">, matching &quot;{q}&quot;</span> : null}
-          {campaignName ? <span className="text-muted">, for {filters.campaign === "none" ? campaignName : <>&quot;{campaignName}&quot;</>}</span> : null}
-          {filters.source ? <span className="text-muted">, from {filters.source === "unknown" ? "an unknown source" : GIFT_SOURCES[filters.source]}</span> : null}.
-        </p>
-        {narrowed && totals.paidCount ? (
-          <p className="mt-1 text-muted">From {totals.donorCount} {totals.donorCount === 1 ? "donor" : "donors"}.</p>
-        ) : null}
-        {totals.reversedCount ? (
-          <p className="mt-1 text-muted">
-            Not counted: {formatRand(totals.reversedCents)} refunded or charged back ({totals.reversedCount}).
-          </p>
-        ) : null}
+      <div className="rounded-card border-2 border-border bg-surface p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0 text-sm">
+            <p className="font-display text-3xl font-extrabold leading-tight text-indigo tabular-nums">{formatRand(totals.paidCents)}</p>
+            <p className="mt-1 [overflow-wrap:anywhere]">
+              Received from {totals.paidCount} {totals.paidCount === 1 ? "donation" : "donations"}
+              {range ? <span className="text-muted">, {range}</span> : null}
+              {q ? <span className="text-muted">, matching &quot;{q}&quot;</span> : null}
+              {campaignName ? <span className="text-muted">, for {filters.campaign === "none" ? campaignName : <>&quot;{campaignName}&quot;</>}</span> : null}
+              {filters.source ? <span className="text-muted">, from {filters.source === "unknown" ? "an unknown source" : GIFT_SOURCES[filters.source]}</span> : null}.
+            </p>
+            {narrowed && totals.paidCount ? (
+              <p className="mt-1 text-muted">From {totals.donorCount} {totals.donorCount === 1 ? "donor" : "donors"}.</p>
+            ) : null}
+            {totals.reversedCount ? (
+              <p className="mt-1 text-muted">
+                Not counted: {formatRand(totals.reversedCents)} refunded or charged back ({totals.reversedCount}).
+              </p>
+            ) : null}
+          </div>
+          {/* Paid only by default, so the bookkeeper's total is income received. */}
+          <div className="flex flex-wrap gap-2">
+            <a href={csvHref} className={secondaryAction}>
+              {status === "all" || status === "paid" ? "Download paid donations (CSV)" : "Download CSV"}
+            </a>
+            <a href={`${csvHref}&format=xlsx`} className={secondaryAction}>Same in Excel</a>
+            {status === "all" ? (
+              <a href={csvAllHref} className={secondaryAction}>Every status</a>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      <nav aria-label="Show donations" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm">
-        {statusTabs.map((f) => (
-          <Link
-            key={f}
-            href={href({ status: f })}
-            className={`shrink-0 rounded-full border px-3 py-1.5 ${f === status ? "border-brand bg-brand-soft text-indigo" : "border-border"}`}
-          >
-            {f === "all" ? "All" : donationStatus[f].label}
-          </Link>
-        ))}
-      </nav>
+      <Tabs
+        label="Show donations"
+        items={statusTabs.map((f) => ({ href: href({ status: f }), label: f === "all" ? "All" : donationStatus[f].label, active: f === status }))}
+      />
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted">{narrowed ? <NoMatch what="donations" clearHref={base} /> : "No donations yet. They appear here once a payment goes through."}</p>
+        narrowed ? (
+          <EmptyState title="No matches">
+            <NoMatch what="donations" clearHref={base} />
+          </EmptyState>
+        ) : (
+          <EmptyState title="No donations yet">They appear here once a payment goes through.</EmptyState>
+        )
       ) : (
-        <ul className="space-y-2">
-          {rows.map((d) => {
-            const s = donationStatus[d.status];
-            return (
-              <li key={d.id}>
-                <Link href={`${base}/${d.id}`} className="block rounded-card border border-border bg-surface p-4 text-sm">
-                  <div className="flex items-start justify-between gap-3">
+        <Card lights>
+          <ul className="divide-y divide-border">
+            {rows.map((d) => {
+              const s = donationStatus[d.status];
+              return (
+                <li key={d.id} className="py-1 first:pt-0 last:pb-0">
+                  <Link href={`${base}/${d.id}`} className={`${rowLink} items-start text-sm`}>
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{donorName(d)}</p>
+                      <p className="truncate font-semibold text-indigo group-hover:text-brand group-hover:underline">{donorName(d)}</p>
                       <p className="text-muted">{formatDate(d.paid_at ?? d.created_at)}</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         <Badge tone={s.tone}>{s.label}</Badge>
@@ -191,21 +200,21 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
                         {d.came_from && d.came_from !== "recorded" ? <Badge>{giftSourceLabel(d.came_from)}</Badge> : null}
                       </div>
                     </div>
-                    <p className="shrink-0 font-semibold">{formatRand(d.amount_cents)}</p>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                    <p className="shrink-0 font-display text-lg font-bold text-indigo tabular-nums">{formatRand(d.amount_cents)}</p>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
 
       {pages > 1 ? (
-        <div className="flex items-center justify-between text-sm">
-          {page > 1 ? <Link href={href({ page: page - 1 })} className="text-brand underline">← Previous</Link> : <span />}
+        <nav aria-label="Pages" className="flex items-center justify-between gap-2 text-sm">
+          {page > 1 ? <Link href={href({ page: page - 1 })} className={secondaryAction}>← Previous</Link> : <span />}
           <span className="text-muted">Page {page} of {pages}</span>
-          {page < pages ? <Link href={href({ page: page + 1 })} className="text-brand underline">Next →</Link> : <span />}
-        </div>
+          {page < pages ? <Link href={href({ page: page + 1 })} className={secondaryAction}>Next →</Link> : <span />}
+        </nav>
       ) : null}
     </div>
   );

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
+import { ActionLink, PageHeader, table } from "@/components/dash";
 import { SupportContact } from "@/components/legal";
 import { requireViewer } from "@/lib/auth";
 import { loadDeposit } from "@/lib/charity/deposit-queries";
@@ -23,22 +24,24 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
   const dep = d.deposit;
   const base = `/charity-admin/${id}/donations`;
   return (
-    <div className="space-y-4">
-      <Link href={`${base}/deposits`} className="text-sm text-muted">← Deposits</Link>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl text-indigo">Deposit of {formatDate(`${d.paidOutOn}T12:00:00+02:00`)}</h1>
-          <p className="text-2xl font-semibold">{formatRand(d.amountCents)}</p>
-          <div className="mt-1 flex flex-wrap gap-1.5">
+    <div className="space-y-5">
+      <PageHeader
+        back={<Link href={`${base}/deposits`} className="text-muted hover:text-brand">← Deposits</Link>}
+        title={`Deposit of ${formatDate(`${d.paidOutOn}T12:00:00+02:00`)}`}
+        intro={
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-display text-2xl font-extrabold text-indigo tabular-nums">{formatRand(d.amountCents)}</span>
             {d.status === "pending" ? <Badge>On its way to your bank</Badge> : d.status === "failed" ? <Badge tone="danger">Payout failed</Badge> : <Badge tone="success">Paid to your bank</Badge>}
-          </div>
-        </div>
-        <p className="shrink-0 space-x-3 text-sm">
-          <a href={`${base}/deposits/${d.id}/csv`} className="text-brand underline">CSV</a>
-          <a href={`${base}/deposits/${d.id}/csv?format=xlsx`} className="text-brand underline">Excel</a>
-          {d.status === "paid" ? <a href={`${base}/deposits/${d.id}/csv?format=xero`} className="text-brand underline">For Xero</a> : null}
-        </p>
-      </div>
+          </span>
+        }
+        actions={
+          <>
+            <ActionLink href={`${base}/deposits/${d.id}/csv`} download>CSV</ActionLink>
+            <ActionLink href={`${base}/deposits/${d.id}/csv?format=xlsx`} download>Excel</ActionLink>
+            {d.status === "paid" ? <ActionLink href={`${base}/deposits/${d.id}/csv?format=xero`} download>For Xero</ActionLink> : null}
+          </>
+        }
+      />
       {dep.balances ? (
         <Notice tone="success">Every line adds up, and the lines add up to the deposit of {formatRand(d.amountCents)}.</Notice>
       ) : (
@@ -49,36 +52,36 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
         </Notice>
       )}
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[32rem] text-left text-sm">
-            <thead className="text-xs text-muted">
-              <tr>
-                <th className="py-1 pr-3 font-medium">Donor</th>
-                <th className="py-1 pr-3 font-medium">What</th>
-                <th className="py-1 pr-3 text-right font-medium">Gift</th>
-                <th className="py-1 pr-3 text-right font-medium">Fee</th>
-                <th className="py-1 text-right font-medium">Reached the bank</th>
+        <div className={table.wrap}>
+          <table className={`${table.table} min-w-[32rem]`}>
+            <thead>
+              <tr className={table.headRow}>
+                <th className={table.th}>Donor</th>
+                <th className={table.th}>What</th>
+                <th className={`${table.th} text-right`}>Gift</th>
+                <th className={`${table.th} text-right`}>Fee</th>
+                <th className="pb-2 text-right font-bold">Reached the bank</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {dep.rows.map((r, i) => (
-                <tr key={i} className={r.problem ? "bg-warning-soft" : undefined}>
-                  <td className="max-w-[12rem] truncate py-1.5 pr-3">
-                    {r.donationId ? <Link href={`${base}/${r.donationId}`} className="text-brand underline">{r.donorName}</Link> : r.donorName}
+                <tr key={i} className={`${table.row} ${r.problem ? "bg-warning-soft" : ""}`}>
+                  <td className={`${table.td} max-w-[12rem] truncate`}>
+                    {r.donationId ? <Link href={`${base}/${r.donationId}`} className="font-semibold text-brand underline hover:text-indigo">{r.donorName}</Link> : r.donorName}
                   </td>
-                  <td className="py-1.5 pr-3">{kindWord(r.kind)}</td>
-                  <td className="py-1.5 pr-3 text-right">{r.giftCents === null ? "?" : formatRand(r.giftCents)}</td>
-                  <td className="py-1.5 pr-3 text-right">{formatRand(r.feeCents)}</td>
-                  <td className="py-1.5 text-right font-medium">{formatRand(r.netCents)}</td>
+                  <td className={table.td}>{kindWord(r.kind)}</td>
+                  <td className={`${table.td} text-right tabular-nums`}>{r.giftCents === null ? "?" : formatRand(r.giftCents)}</td>
+                  <td className={`${table.td} text-right tabular-nums`}>{formatRand(r.feeCents)}</td>
+                  <td className={table.num}>{formatRand(r.netCents)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-border font-semibold">
-                <td className="py-1.5 pr-3" colSpan={2}>Deposit total</td>
-                <td className="py-1.5 pr-3 text-right">{formatRand(dep.giftsCents)}</td>
-                <td className="py-1.5 pr-3 text-right">{formatRand(dep.feesCents)}</td>
-                <td className="py-1.5 text-right">{formatRand(dep.netCents)}</td>
+              <tr className="border-t-2 border-border font-bold text-indigo">
+                <td className={table.td} colSpan={2}>Deposit total</td>
+                <td className={`${table.td} text-right tabular-nums`}>{formatRand(dep.giftsCents)}</td>
+                <td className={`${table.td} text-right tabular-nums`}>{formatRand(dep.feesCents)}</td>
+                <td className={table.num}>{formatRand(dep.netCents)}</td>
               </tr>
             </tfoot>
           </table>
