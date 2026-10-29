@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Info } from "@/components/info";
 import { platformConfig } from "@/config/platform";
 import { Splash } from "@/components/splash";
-import { GiverWithPhone, PersonWithBox } from "@/components/people";
+import { Illustration } from "@/components/illustration";
 import { TryGiving } from "@/components/try-giving";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
@@ -10,7 +10,7 @@ import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { Chevron } from "@/components/chevron";
-import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, SampleNote, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
+import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 
 // Home page, direction B (preview, 29/10/2026), laid out after the Deupload landing page Yehuda liked: see
 // components/marketing.tsx. Every figure in a picture is a labelled sample; every claim is one we can back today.
@@ -128,8 +128,8 @@ export default async function Home() {
               <p className="mt-2 text-[13px] text-muted">R500 to a food parcel charity</p>
               <div className="mt-3 flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2 text-[12px]"><span className="text-muted">s18A receipt</span><span className="font-bold text-brand">Requested</span></div>
             </Floating>
-            <GiverWithPhone look="a" className="absolute -bottom-6 -left-52 z-20 hidden h-auto w-44 lg:block" />
-            <PersonWithBox look="b" className="absolute -bottom-6 -right-52 z-20 hidden h-auto w-44 lg:block" />
+            <Illustration name="loveIt" className="absolute -left-56 bottom-0 z-20 hidden w-40 xl:-left-64 xl:w-44 lg:block" />
+            <Illustration name="dreamGift" sparkle="stars" float="bob" className="absolute -right-64 bottom-0 z-20 hidden w-60 xl:-right-80 xl:w-72 lg:block" />
             <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
           </div>
         </div>
@@ -310,19 +310,7 @@ export default async function Home() {
             body: "Listing is free. Donations go straight to your own bank account, and your donors' s18A receipts are made for you.",
             href: "/for-charities",
             link: "How it works for charities",
-            picture: (
-              <div className="flex items-end justify-center gap-2">
-                <GiverWithPhone look="c" className="h-auto w-28 shrink-0" />
-                <div className="mb-4 min-w-0 flex-1 rounded-[1.125rem] bg-white p-4 shadow-[0_12px_30px_rgba(14,27,61,0.08)]">
-                  <p className="text-[12px] text-muted">This month</p>
-                  <p className="font-display text-[1.375rem] font-bold">R4 920</p>
-                  <div className="mt-2 flex h-12 items-end gap-1" aria-hidden>
-                    {[30, 55, 40, 70, 50, 85, 100].map((h, i) => <span key={i} className={`flex-1 rounded-t ${i === 6 ? "bg-brand" : "bg-honey"}`} style={{ height: `${h}%` }} />)}
-                  </div>
-                  <SampleNote />
-                </div>
-              </div>
-            ),
+            picture: <Illustration name="mobilePay" sparkle="stars" className="mx-auto w-full max-w-[18rem]" />,
           }}
         />
       </section>

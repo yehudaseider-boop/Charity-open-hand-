@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, SampleNote, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
 import { Splash } from "@/components/splash";
-import { PersonWithBox, Volunteer } from "@/components/people";
+import { Illustration } from "@/components/illustration";
 
 export const metadata: Metadata = {
   title: "For charities",
@@ -99,8 +99,8 @@ export default function ForCharitiesPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border" aria-hidden><div className="h-2.5 w-[68%] rounded-full bg-sage" /></div>
               <p className="mt-2 flex justify-between text-[12px]"><span className="font-bold">R34 000</span><span className="text-muted">of R50 000</span></p>
             </Floating>
-            <Volunteer look="c" className="absolute -bottom-6 -left-52 z-20 hidden h-auto w-44 lg:block" />
-            <PersonWithBox look="a" className="absolute -bottom-6 -right-52 z-20 hidden h-auto w-44 lg:block" />
+            <Illustration name="checklist" sparkle="stars" className="absolute -left-60 bottom-0 z-20 hidden w-52 xl:-left-72 xl:w-60 lg:block" />
+            <Illustration name="boxes" float="bob" className="absolute -right-60 bottom-0 z-20 hidden w-52 xl:-right-72 xl:w-60 lg:block" />
             <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
           </div>
         </div>
@@ -153,6 +153,7 @@ export default function ForCharitiesPage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
+            <Illustration name="shareOnline" sparkle="hearts" className="col-span-2 mx-auto w-full max-w-[16rem]" />
             <div className="flex flex-col items-center gap-3 rounded-[1.125rem] bg-white p-5 text-center shadow-[0_12px_30px_rgba(14,27,61,0.06)]">
               <p className="text-[12px] text-muted">On your website</p>
               <span className="pressable rounded-control bg-brand px-4 py-2.5 text-[14px] font-bold text-white">Give with Givezy</span>
@@ -240,17 +241,7 @@ export default function ForCharitiesPage() {
             body: "Apply in one sitting or save and come back. We check every application by hand and email you the outcome.",
             href: "/apply",
             link: "Start your application",
-            picture: (
-              <div className="rounded-[1.125rem] bg-white p-4 shadow-[0_12px_30px_rgba(14,27,61,0.08)]">
-                <p className="text-[12px] text-muted">Application</p>
-                <ul className="mt-2 flex flex-col gap-1.5 text-[13px]">
-                  <li className="flex gap-2"><Tick />Registration details</li>
-                  <li className="flex gap-2"><Tick />Bank account</li>
-                  <li className="flex gap-2 text-muted"><span aria-hidden className="mt-1 h-3 w-3 shrink-0 rounded-full border-2 border-honey" />Documents</li>
-                </ul>
-                <SampleNote />
-              </div>
-            ),
+            picture: <Illustration name="workingTogether" sparkle="stars" className="mx-auto w-full max-w-[18rem]" />,
           }}
         />
       </section>

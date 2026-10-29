@@ -219,3 +219,18 @@ input[type="radio"] {
     opacity: 1;
   }
 }
+
+/* Sparkles beside the illustrations grow and fade in turn. */
+@keyframes twinkle {
+  0%, 100% { transform: scale(0.4) rotate(0deg); opacity: 0; }
+  50% { transform: scale(1) rotate(45deg); opacity: 1; }
+}
+.twinkle {
+  animation: twinkle 2.7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .twinkle {
+    animation: none;
+    opacity: 1;
+  }
+}
