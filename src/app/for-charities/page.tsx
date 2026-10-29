@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BlueCards, ClosingPair, Eyebrow, Key, Row, Steps, Window } from "@/components/marketing";
-import { Splash } from "@/components/splash";
+import { AppWindow, BlueCards, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, SampleNote, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
 
 export const metadata: Metadata = {
@@ -9,15 +8,9 @@ export const metadata: Metadata = {
   description: "List your charity on Givezy for free. Donations go straight to your bank account, and we issue s18A receipts for you.",
 };
 
-// For charities, direction B "Bands" (preview, 29/10/2026). DRAFT WORDING for Yehuda to approve. Every claim here must
-// stay true: no fee figures until the payment provider's rates are confirmed (see docs/go-live-checklist.md).
-// Pictures are sample screens of the charity dashboard, labelled "Sample".
-
-const steps = [
-  { title: "Apply online", body: "Your registration details, bank account and a bank confirmation letter. Save and come back any time." },
-  { title: "We check it", body: "We review every application by hand, then email you when it's approved or if something needs fixing." },
-  { title: "Start receiving", body: "Add a photo and a few words about your work, share your page, and donations start coming in." },
-];
+// For charities, direction B (preview, 29/10/2026), laid out after the Deupload landing page (see components/marketing.tsx).
+// DRAFT WORDING for Yehuda to approve. Every claim must stay true: no fee figures until the payment provider's rates are
+// confirmed (see docs/go-live-checklist.md). Pictures are sample screens of the charity dashboard.
 
 const needs = [
   "Your registered name, and NPO or PBO reference number",
@@ -35,60 +28,24 @@ function Tick({ className = "stroke-sage" }: { className?: string }) {
   );
 }
 
-/** The dashboard overview, as a sample. */
-function DashboardSample() {
-  const bars = [18, 40, 22, 35, 28, 52, 46, 70];
+/** The hero picture: the charity's overview, as a sample. */
+function DashboardScreen() {
+  const bars = [32, 48, 40, 62, 50, 74, 58, 90];
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-control bg-brand p-4 text-white"><p className="text-[13px] text-honey-soft">This month</p><p className="mt-1 font-display text-[1.75rem] font-bold">R4 920</p></div>
-        <div className="rounded-control bg-honey-soft p-4"><p className="text-[13px] text-muted">Every month</p><p className="mt-1 font-display text-[1.75rem] font-bold">R970</p></div>
+    <div className="flex flex-col gap-4 text-left">
+      <p className="font-display text-[1.25rem] font-bold">Overview</p>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-brand p-3 text-white"><p className="text-[12px] text-honey-soft">This month</p><p className="font-display text-[1.25rem] font-bold">R4 920</p></div>
+        <div className="rounded-xl bg-honey-soft p-3"><p className="text-[12px] text-muted">Every month</p><p className="font-display text-[1.25rem] font-bold">R970</p></div>
+        <div className="rounded-xl bg-honey-soft p-3"><p className="text-[12px] text-muted">Donors</p><p className="font-display text-[1.25rem] font-bold">9</p></div>
       </div>
-      <div className="flex h-28 items-end gap-2 rounded-control bg-honey-soft p-4" aria-hidden>
-        {bars.map((h, i) => (
-          <span key={i} className={`flex-1 rounded-t-md ${i === bars.length - 1 ? "bg-coral" : "bg-honey"}`} style={{ height: `${h}%` }} />
-        ))}
+      <div className="flex h-28 items-end gap-2 rounded-xl border-[1.5px] border-border p-3" aria-hidden>
+        {bars.map((h, i) => <span key={i} className={`flex-1 rounded-t-md ${i === bars.length - 1 ? "bg-brand" : "bg-honey"}`} style={{ height: `${h}%` }} />)}
       </div>
-      <p className="flex items-center justify-between rounded-control border-[1.5px] border-border px-4 py-3 text-[15px]"><span>3 new donors this month</span><span className="font-bold text-brand">Say thank you</span></p>
-    </div>
-  );
-}
-
-/** Monthly donors, as a sample. */
-function MonthlySample() {
-  const rows = [
-    { name: "Sarah L.", amount: "R360", state: "Running", tone: "bg-success-soft text-success" },
-    { name: "Rivka K.", amount: "R180", state: "Running", tone: "bg-success-soft text-success" },
-    { name: "Moshe A.", amount: "R250", state: "Card declined, trying again", tone: "bg-warning-soft text-warning" },
-  ];
-  return (
-    <ul className="flex flex-col gap-3">
-      {rows.map((r) => (
-        <li key={r.name} className="flex items-center justify-between gap-3 rounded-control border-[1.5px] border-border p-4">
-          <span className="flex min-w-0 flex-col gap-1.5">
-            <span className="font-bold">{r.name}</span>
-            <span className={`self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.tone}`}>{r.state}</span>
-          </span>
-          <span className="shrink-0 text-right font-display text-xl font-bold">{r.amount}<span className="block text-xs font-normal text-muted">a month</span></span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** A campaign and the website button, as a sample. */
-function CampaignSample() {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-control bg-honey-soft p-5">
-        <p className="font-bold">Winter food parcels</p>
-        <div className="h-3 overflow-hidden rounded-full bg-white" aria-hidden><div className="h-3 w-[68%] rounded-full bg-sage" /></div>
-        <p className="flex justify-between text-[15px]"><span className="font-bold">R34 000 raised</span><span className="text-muted">of R50 000</span></p>
-      </div>
-      <div className="flex flex-col items-start gap-3 rounded-control border-[1.5px] border-border p-5">
-        <p className="text-[13px] text-muted">Your website</p>
-        <span className="pressable rounded-control bg-brand px-5 py-3 font-bold text-white">Give with Givezy</span>
-      </div>
+      <ul className="flex flex-col text-[14px]">
+        <li className="flex justify-between border-b border-border py-2"><span>Sarah L. · monthly</span><span className="font-bold">R360</span></li>
+        <li className="flex justify-between py-2"><span>Daniel C. · in memory of Chaim Cohen</span><span className="font-bold">R500</span></li>
+      </ul>
     </div>
   );
 }
@@ -96,85 +53,188 @@ function CampaignSample() {
 export default function ForCharitiesPage() {
   return (
     <div className="full-bleed overflow-x-clip">
-      {/* Hero: words on the left, the dashboard on the right */}
-      <section className="bg-gradient-to-b from-honey-soft to-white">
-        <div className="mx-auto max-w-[75rem] px-4 pb-20 pt-14 sm:px-6 sm:pt-20">
-          <Row
-            picture={
-              <div className="relative">
-                <Splash className="absolute -right-4 -top-20 hidden h-auto w-36 md:block" />
-                <div className="relative"><Window label="Sample dashboard"><DashboardSample /></Window></div>
+      {/* Hero */}
+      <section className="mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
+        <p className="rounded-full bg-honey-soft px-4 py-1.5 text-[14px] font-bold text-brand">For charities</p>
+        <h1 className="max-w-[46rem] text-[clamp(2.375rem,4.6vw,3.5rem)] font-bold! leading-[1.12] text-balance">
+          Let your supporters give to you in <Key>a few taps</Key>
+        </h1>
+        <p className="max-w-[36rem] text-[17px] leading-relaxed text-muted">
+          {platformConfig.appName} helps donors find local charities, give from their phone, and keep track of their giving. Listing your organisation is free.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/apply" className="pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy">List your charity</Link>
+          <Link href="/charities" className="rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand">See who&apos;s on {platformConfig.appName}</Link>
+        </div>
+
+        <div className="relative mt-14 w-full max-w-[60rem]">
+          <Confetti />
+          <div className="relative mx-auto max-w-[48rem]">
+            <AppWindow nav={["Overview", "Donations", "Donors", "Monthly", "Campaigns", "s18A receipts"]} active={0}><DashboardScreen /></AppWindow>
+            <Floating className="-left-24 bottom-10 w-60">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-success-soft"><Icon name="check" className="stroke-success" size={16} /></span>
+                <p className="text-[14px] font-bold">New donation</p>
               </div>
-            }
-          >
-            <Eyebrow>For charities</Eyebrow>
-            <h1 className="text-[clamp(2.5rem,5vw,4.25rem)] leading-[1] text-balance">Let your supporters give to you in <Key>a few taps</Key>.</h1>
-            <p className="max-w-[34rem] text-lg leading-normal text-muted sm:text-xl">
-              {platformConfig.appName} helps donors find local charities, give from their phone, and keep track of their giving. Listing your organisation is free.
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-4">
-              <Link href="/apply" className="pressable rounded-control bg-coral px-7 py-4 text-lg font-bold text-navy">List your charity</Link>
-              <Link href="/charities" className="rounded-control border-2 border-brand bg-white px-7 py-[14px] text-lg font-bold text-brand hover:bg-honey-soft">See who&apos;s on {platformConfig.appName}</Link>
-            </div>
-          </Row>
+              <p className="mt-2 font-display text-[1.5rem] font-bold leading-none">R1 200</p>
+              <p className="mt-1 text-[12px] text-muted">Michael B. · s18A receipt requested</p>
+            </Floating>
+            <Floating className="-right-24 -top-8 w-60">
+              <p className="text-[13px] font-bold">Winter food parcels</p>
+              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border" aria-hidden><div className="h-2.5 w-[68%] rounded-full bg-sage" /></div>
+              <p className="mt-2 flex justify-between text-[12px]"><span className="font-bold">R34 000</span><span className="text-muted">of R50 000</span></p>
+            </Floating>
+            <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
+          </div>
         </div>
       </section>
 
       {/* Three blue cards */}
-      <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-20 sm:px-6">
-        <div className="flex max-w-[44rem] flex-col gap-3">
-          <Eyebrow>Why charities join</Eyebrow>
-          <h2 className="font-display text-[clamp(2.125rem,4vw,3.25rem)] font-bold leading-[1.05] text-balance">More giving, <Key>less paperwork</Key>.</h2>
-        </div>
+      <section className="mx-auto flex max-w-[75rem] flex-col gap-12 px-4 pb-24 sm:px-6">
+        <SectionHead title={<>Free to list. Paid to you. <Key>Receipts done.</Key></>}>
+          What every charity on {platformConfig.appName} gets, from the first day.
+        </SectionHead>
         <BlueCards
           items={[
-            { icon: "heart", title: "Free to list", body: "There is no sign-up fee and no monthly fee to be on Givezy." },
-            { icon: "bank", title: "Straight to your bank", body: "Each donation is paid into your own bank account by our payment provider. The provider's card fee comes off each donation." },
-            { icon: "receipt", title: "s18A receipts, done for you", body: "With s18A approval and our signed receipting mandate, we issue your donors' receipts in your name once a year." },
+            { icon: "heart", title: "Free to list", body: "There is no sign-up fee and no monthly fee to be on Givezy.", href: "/apply", link: "Start your application" },
+            { icon: "bank", title: "Straight to your bank", body: "Each donation is paid into your own bank account by our payment provider. The provider's card fee comes off each donation.", href: "#pricing", link: "What it costs" },
+            { icon: "receipt", title: "s18A receipts, done for you", body: "With s18A approval and our signed receipting mandate, we issue your donors' receipts in your name once a year.", href: "#needs", link: "What you'll need" },
           ]}
         />
       </section>
 
-      {/* Alternating rows */}
-      <section className="mx-auto flex max-w-[75rem] flex-col gap-24 px-4 pb-24 sm:px-6">
-        <Row flip picture={<Window><MonthlySample /></Window>}>
-          <Eyebrow>Monthly donors</Eyebrow>
-          <h2 className="font-display text-[clamp(2rem,3.6vw,3rem)] font-bold leading-[1.05] text-balance">Know who gives <Key>every month</Key>.</h2>
-          <p className="text-lg leading-relaxed text-muted">Donors can give the same amount every month until they cancel. You see who gives monthly, how much comes in, and when a card is declined.</p>
-        </Row>
-        <Row picture={<Window><CampaignSample /></Window>}>
-          <Eyebrow>Campaigns and your website</Eyebrow>
-          <h2 className="font-display text-[clamp(2rem,3.6vw,3rem)] font-bold leading-[1.05] text-balance">Raise for something <Key>specific</Key>.</h2>
-          <p className="text-lg leading-relaxed text-muted">Raising for winter food parcels or a new roof? Start a campaign with a goal and donors watch it fill up. Put a &ldquo;Give with Givezy&rdquo; button on your own website, or print a QR poster for your notice board.</p>
-        </Row>
+      {/* Two pastel cards and a wide lilac card */}
+      <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6">
+        <h2 className={`max-w-[36rem] ${h2Class}`}>Tools that help you raise more, <Key>month after month</Key>.</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          <PastelCard tone="peach" title="Monthly donors" body="Donors can give the same amount every month until they cancel. See who gives monthly, and when a card is declined.">
+            <Screen>
+              <ul className="flex flex-col gap-2 text-[14px]">
+                <li className="flex items-center justify-between"><span className="font-semibold">Sarah L.</span><span className="rounded-full bg-success-soft px-2 py-0.5 text-[12px] font-semibold text-success">Running</span><span className="font-bold">R360</span></li>
+                <li className="flex items-center justify-between"><span className="font-semibold">Rivka K.</span><span className="rounded-full bg-success-soft px-2 py-0.5 text-[12px] font-semibold text-success">Running</span><span className="font-bold">R180</span></li>
+                <li className="flex items-center justify-between"><span className="font-semibold">Moshe A.</span><span className="rounded-full bg-warning-soft px-2 py-0.5 text-[12px] font-semibold text-warning">Retrying</span><span className="font-bold">R250</span></li>
+              </ul>
+            </Screen>
+          </PastelCard>
+          <PastelCard tone="sky" title="Campaigns with a goal" body="Raising for winter food parcels or a new roof? Start a campaign and donors watch it fill up.">
+            <Screen>
+              <p className="text-[14px] font-bold">New roof for the hall</p>
+              <div className="mt-3 h-3 overflow-hidden rounded-full bg-border" aria-hidden><div className="h-3 w-[42%] rounded-full bg-sage" /></div>
+              <p className="mt-2 flex justify-between text-[13px]"><span className="font-bold">R63 000 raised</span><span className="text-muted">of R150 000</span></p>
+              <p className="mt-3 text-[13px] font-bold text-brand">Share the campaign</p>
+            </Screen>
+          </PastelCard>
+        </div>
+        <div className="grid items-center gap-8 rounded-[1.25rem] bg-honey-soft p-7 sm:p-10 md:grid-cols-2">
+          <div className="flex flex-col items-start gap-4">
+            <h3 className="font-display text-[clamp(1.625rem,2.6vw,2.125rem)] font-bold leading-tight"><Key>Your website</Key>, your notice board, your WhatsApp groups.</h3>
+            <p className="text-[16px] leading-relaxed text-muted">Put a &ldquo;Give with Givezy&rdquo; button on your own website, share your page link, or print a QR poster. People who arrive this way see only your charity.</p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <Link href="/apply" className="pressable rounded-control bg-brand px-5 py-3 font-bold text-white">List your charity</Link>
+              <Link href="/charities" className="rounded-control border-2 border-navy/15 bg-white px-5 py-[10px] font-bold text-navy hover:border-brand">See an example page</Link>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col items-center gap-3 rounded-[1.125rem] bg-white p-5 text-center shadow-[0_12px_30px_rgba(14,27,61,0.06)]">
+              <p className="text-[12px] text-muted">On your website</p>
+              <span className="pressable rounded-control bg-brand px-4 py-2.5 text-[14px] font-bold text-white">Give with Givezy</span>
+            </div>
+            <div className="flex flex-col items-center gap-3 rounded-[1.125rem] bg-white p-5 text-center shadow-[0_12px_30px_rgba(14,27,61,0.06)]">
+              <p className="text-[12px] text-muted">On your notice board</p>
+              <Icon name="qr" className="stroke-navy" size={56} />
+            </div>
+            <div className="col-span-2"><SampleNote /></div>
+          </div>
+        </div>
       </section>
 
-      {/* Lavender band: what you'll need */}
-      <section className="bg-honey">
-        <div className="mx-auto grid max-w-[75rem] items-center gap-10 px-4 py-20 sm:px-6 md:grid-cols-[1fr_1.2fr]">
-          <div className="flex flex-col gap-3">
-            <h2 className="font-display text-[clamp(2rem,3.6vw,3rem)] font-bold leading-[1.05]">What you&apos;ll need</h2>
-            <p className="text-lg leading-relaxed text-navy">No s18A approval? You&apos;re still welcome. Donors can give; they just don&apos;t get a tax receipt.</p>
+      {/* Soft section */}
+      <section className="bg-honey-soft">
+        <div className="mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2">
+          <div className="flex flex-col gap-5">
+            <h2 className={h2Class}>Your own dashboard, built for <Key>busy volunteers</Key>.</h2>
+            <p className="text-[17px] leading-relaxed text-muted">See every donation and donor in one place, thank new donors, and hand your bookkeeper what they need.</p>
+            <div className="mt-4 grid gap-6 sm:grid-cols-2">
+              <MiniPoint icon="lock" tone="sage" title="Two-step sign-in" body="An authenticator code keeps your donors' details safe." />
+              <MiniPoint icon="mail" tone="peach" title="Thank your donors" body="See who is new this month and send a thank-you." />
+            </div>
           </div>
-          <ul className="flex flex-col gap-3 rounded-[1.75rem] bg-white p-7">
-            {needs.map((n) => (
-              <li key={n} className="flex gap-3 text-[16px]"><Tick />{n}</li>
-            ))}
+          <ul className="flex flex-col gap-4">
+            <FeatureCard icon="chart" title="Donations and donors" body="Every donation, your donors, monthly totals and how your campaigns are doing." />
+            <FeatureCard icon="download" title="Downloads for your bookkeeper" body="Download donations and donors as CSV whenever you need them." />
+            <FeatureCard icon="receipt" title="s18A receipts in one list" body="See every receipt issued in your name. We send them to your donors for you." />
           </ul>
         </div>
       </section>
 
-      {/* How to join */}
-      <section className="mx-auto flex max-w-[75rem] flex-col items-center gap-12 px-4 py-20 text-center sm:px-6">
-        <div className="flex flex-col gap-3">
-          <Eyebrow>How to join</Eyebrow>
-          <h2 className="font-display text-[clamp(2.125rem,4.4vw,3.25rem)] font-bold leading-none text-balance">Three steps to <Key>your first gift</Key>.</h2>
+      {/* Coloured band with cards over its edge */}
+      <section id="pricing" className="pb-24">
+        <div className="bg-honey pb-48 pt-20">
+          <div className="mx-auto max-w-[75rem] px-4 sm:px-6">
+            <SectionHead title={<>Simple. <Key>Free</Key> to list.</>}>
+              <span className="text-navy">No sign-up fee, no monthly fee. The card provider&apos;s fee comes off each donation.</span>
+            </SectionHead>
+          </div>
         </div>
-        <div className="w-full text-left"><Steps steps={steps} /></div>
+        <div id="needs" className="mx-auto -mt-36 grid max-w-[56rem] gap-0 px-4 sm:px-6 md:grid-cols-2">
+          <div className="flex flex-col gap-3 rounded-[1.25rem] bg-white p-8 shadow-[0_30px_60px_rgba(14,27,61,0.12)] md:rounded-r-none">
+            <p className="text-center text-[18px] font-bold">What you&apos;ll need</p>
+            <p className="text-center font-display text-[3rem] font-bold leading-none">R0</p>
+            <p className="text-center text-[13px] text-muted">to list your charity</p>
+            <Link href="/apply" className="pressable mt-3 rounded-control bg-brand px-5 py-3 text-center font-bold text-white">Start your application</Link>
+            <ul className="mt-3 flex flex-col gap-2 text-[14px]">
+              {needs.map((n) => <li key={n} className="flex gap-2"><Tick />{n}</li>)}
+            </ul>
+          </div>
+          <div className="flex flex-col gap-5 rounded-[1.25rem] bg-brand p-8 text-white md:mt-8 md:rounded-l-none">
+            <p className="text-[18px] font-bold">Two ways to join</p>
+            <div className="border-t border-white/20 pt-4">
+              <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">With s18A approval</span>
+              <p className="mt-2 text-[15px] leading-relaxed text-honey-soft">Sign our receipting mandate and we issue your donors&apos; s18A receipts in your name, once a year.</p>
+            </div>
+            <div className="border-t border-white/20 pt-4">
+              <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">Without s18A approval</span>
+              <p className="mt-2 text-[15px] leading-relaxed text-honey-soft">You&apos;re still welcome. Donors can give; they just don&apos;t get a tax receipt.</p>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section className="mx-auto max-w-[75rem] px-4 pb-20 sm:px-6">
-        <ClosingPair primary="charity" />
+      {/* How to join */}
+      <section className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6">
+        <SectionHead title="How to join">Three steps to your first donation. Save your application and come back any time.</SectionHead>
+        <Steps
+          steps={[
+            { icon: "building", title: "Apply online", body: "Your registration details, bank account and a bank confirmation letter." },
+            { icon: "shield", title: "We check it", body: "We review every application by hand, then email you when it's approved or if something needs fixing." },
+            { icon: "heart", title: "Start receiving", body: "Add a photo and a few words about your work, share your page, and donations start coming in." },
+          ]}
+        />
+      </section>
+
+      <section className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6">
+        <Ready
+          button={{ href: "/apply", label: "List your charity" }}
+          small={{ icon: "user", title: "Giving yourself?", body: "Find a registered charity and give once or every month.", href: "/charities", link: "Find a charity" }}
+          wide={{
+            icon: "building",
+            title: "Run a charity?",
+            body: "Apply in one sitting or save and come back. We check every application by hand and email you the outcome.",
+            href: "/apply",
+            link: "Start your application",
+            picture: (
+              <div className="rounded-[1.125rem] bg-white p-4 shadow-[0_12px_30px_rgba(14,27,61,0.08)]">
+                <p className="text-[12px] text-muted">Application</p>
+                <ul className="mt-2 flex flex-col gap-1.5 text-[13px]">
+                  <li className="flex gap-2"><Tick />Registration details</li>
+                  <li className="flex gap-2"><Tick />Bank account</li>
+                  <li className="flex gap-2 text-muted"><span aria-hidden className="mt-1 h-3 w-3 shrink-0 rounded-full border-2 border-honey" />Documents</li>
+                </ul>
+                <SampleNote />
+              </div>
+            ),
+          }}
+        />
       </section>
     </div>
   );
