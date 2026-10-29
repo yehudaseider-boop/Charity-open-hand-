@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Animated, Keyboard, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { reduceMotion } from "@/lib/motion";
-import { colors, radius, space } from "@/theme/tokens";
+import { colors, fonts, radius, space } from "@/theme/tokens";
 import { TextLink } from "./button";
 import { Text } from "./text";
 
@@ -143,6 +143,10 @@ export function Sheet({ visible, onClose, guard = null, children }: { visible: b
             <View {...handlePan.panHandlers} style={styles.handleZone} accessible accessibilityRole="adjustable" accessibilityLabel="Swipe down to close" accessibilityActions={[{ name: "dismiss", label: "Close" }]} onAccessibilityAction={tryClose}>
               <View style={styles.grabber} />
             </View>
+            {/* A visible way out too, not only the swipe and the tap above (30/10/2026). */}
+            <Pressable onPress={tryClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={styles.close}>
+              <Text style={styles.closeText}>Close</Text>
+            </Pressable>
             {asking ? (
               <View style={styles.ask} accessibilityLiveRegion="polite">
                 <Text style={styles.askText}>Close and lose what you typed?</Text>
@@ -176,6 +180,8 @@ const styles = StyleSheet.create({
   // A tall, full-width strip so the swipe is easy to start with a thumb.
   handleZone: { height: 44, marginHorizontal: -space.gutter, alignItems: "center", justifyContent: "center" },
   grabber: { width: 48, height: 5, borderRadius: 3, backgroundColor: colors.lilac },
+  close: { position: "absolute", top: 0, right: space.gutter - 8, height: 44, paddingHorizontal: 8, justifyContent: "center" },
+  closeText: { color: colors.blue, fontSize: 15, fontFamily: fonts.bodySemibold },
   ask: { backgroundColor: colors.blueSoft, borderRadius: radius.control, padding: space.md, gap: 8, marginBottom: space.md },
   askText: { color: colors.ink },
   askRow: { flexDirection: "row", justifyContent: "space-between" },

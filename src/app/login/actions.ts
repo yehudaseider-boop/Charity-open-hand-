@@ -19,9 +19,15 @@ export async function sendLoginLink(formData: FormData) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect(back("email"));
   const requestHeaders = await headers();
   // Per address as well as per email, so one visitor cannot send sign-in links to many addresses.
-  if ((await hitRateLimit("login-link", [`email:${email.toLowerCase()}`], 5, 60)) || (await hitRateLimit("login-link", ipKeys(clientIp(requestHeaders)), 20, 60))) {
-    redirect(back("busy"));
+  // If the check itself fails (a database hiccup), send them back with what they typed, not to an error page.
+  let limited: boolean;
+  try {
+    limited = (await hitRateLimit("login-link", [`email:${email.toLowerCase()}`], 5, 60)) || (await hitRateLimit("login-link", ipKeys(clientIp(requestHeaders)), 20, 60));
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e);
+    redirect(back("send"));
   }
+  if (limited) redirect(back("busy"));
 
   const origin = siteOrigin(requestHeaders.get("origin") ?? "");
   const supabase = await createClient();
@@ -43,7 +49,14 @@ export async function verifyLoginCode(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const back = `/login?sent=1&error=code&next=${encodeURIComponent(next)}&email=${encodeURIComponent(email.slice(0, 200))}`;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6,10}$/.test(code)) redirect(back);
-  if (await hitRateLimit("login-code", [`email:${email.toLowerCase()}`, ...ipKeys(clientIp(await headers()))], 10, 60)) redirect(back);
+  let limited: boolean;
+  try {
+    limited = await hitRateLimit("login-code", [`email:${email.toLowerCase()}`, ...ipKeys(clientIp(await headers()))], 10, 60);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e);
+    redirect(back);
+  }
+  if (limited) redirect(back);
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
   if (error || !data.user) redirect(back);

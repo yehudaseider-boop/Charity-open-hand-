@@ -6,7 +6,7 @@ import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
@@ -40,7 +40,7 @@ import { charityShareText } from "@/lib/share";
 import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow";
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
-import { openSite, openUrl } from "@/lib/open-site";
+import { confirmThen, openSite, openUrl } from "@/lib/open-site";
 import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
 import { donateUrl, SITE_URL } from "@/lib/website";
@@ -192,9 +192,9 @@ export default function Give() {
   // when we are still checking a payment, or when a saved-card charge is waiting for its reply.
   usePreventRemove(!isDone && (typedSomething || busy !== false || heldOne), ({ repeat }) => {
     if (busy === "checking") {
-      Alert.alert("We're still checking your payment", "Leaving now may lose the result. It takes a few seconds.", [{ text: "Wait" }, { text: "Leave anyway", style: "destructive", onPress: repeat }]);
+      confirmThen("We're still checking your payment", "Leaving now may lose the result. It takes a few seconds.", "Leave anyway", repeat, "Wait");
     } else {
-      Alert.alert("Leave and lose what you typed?", undefined, [{ text: "Keep editing", style: "cancel" }, { text: "Leave", style: "destructive", onPress: repeat }]);
+      confirmThen("Leave and lose what you typed?", "", "Leave", repeat, "Keep editing");
     }
   });
   // Preview of the after-gift screen for design review: ?demo=sent.

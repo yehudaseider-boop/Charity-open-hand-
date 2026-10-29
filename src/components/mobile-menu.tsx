@@ -15,6 +15,8 @@ export function MobileMenu({ items }: { items: MenuItem[] }) {
   const path = usePathname();
   // The menu is open on the page it was opened on, so moving to a new page closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
+  // Left the page it was opened on (a choice, or the browser's Back): forget it, so coming back finds it closed.
+  if (openOn !== null && openOn !== path) setOpenOn(null);
   const open = openOn === path;
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -53,6 +55,7 @@ export function MobileMenu({ items }: { items: MenuItem[] }) {
                 <Link
                   href={i.href}
                   aria-current={here(i.href) ? "page" : undefined}
+                  onClick={() => setOpenOn(null)}
                   className={`flex min-h-11 items-center rounded-control px-3 font-semibold transition-colors hover:bg-honey-soft ${here(i.href) ? "bg-honey-soft text-brand" : "text-navy"}`}
                 >
                   {i.label}

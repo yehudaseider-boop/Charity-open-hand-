@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Account", robots: { index: false, fo
 
 export default async function AccountPage({ searchParams }: PageProps<"/account">) {
   const viewer = await requireViewer();
-  const { denied, monthly: monthlyResult } = await searchParams;
+  const { denied, monthly: monthlyResult, receipt: receiptResult } = await searchParams;
 
   // Only the receipts that belong to this person as a donor (not every receipt
   // of a charity they manage).
@@ -74,6 +74,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       </header>
       <div className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
       {monthlyResult === "done" ? <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success">Your monthly donation has been updated.</p> : null}
+      {receiptResult === "unavailable" ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">That s18A receipt isn&apos;t available. It may have been withdrawn or not be ready yet. Your receipts are listed below.</p> : null}
       {monthlyResult === "error" ? <p role="status" className="rounded-control bg-danger-soft p-3 text-sm text-danger">We couldn&apos;t change that monthly donation. Please try again.</p> : null}
       {denied ? (
         <div className="space-y-2 rounded-control bg-danger-soft p-3 text-sm text-danger">

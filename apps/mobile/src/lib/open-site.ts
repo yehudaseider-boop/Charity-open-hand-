@@ -8,13 +8,14 @@ export function notify(title: string, message: string) {
 }
 
 /** Ask before doing something that can't be undone. */
-export function confirmThen(title: string, message: string, okLabel: string, onOk: () => void) {
+export function confirmThen(title: string, message: string, okLabel: string, onOk: () => void, cancelLabel = "Keep it") {
+  // Alert does nothing on the web build, so the browser's own question stands in for it there.
   if (Platform.OS === "web") {
-    if (globalThis.confirm?.(`${title}\n\n${message}`)) onOk();
+    if (globalThis.confirm?.(message ? `${title}\n\n${message}` : title)) onOk();
     return;
   }
-  Alert.alert(title, message, [
-    { text: "Keep it", style: "cancel" },
+  Alert.alert(title, message || undefined, [
+    { text: cancelLabel, style: "cancel" },
     { text: okLabel, style: "destructive", onPress: onOk },
   ]);
 }

@@ -2,18 +2,24 @@ import Link from "next/link";
 import { platformConfig } from "@/config/platform";
 import { getViewer } from "@/lib/auth";
 import { dashboardLinks } from "@/lib/dashboard-link";
+import { FocusSync } from "@/components/focus-sync";
 import { MobileMenu } from "@/components/mobile-menu";
 import { NavLink } from "@/components/nav-link";
 import { currentFocus } from "@/lib/focus-server";
 
 export async function SiteHeader() {
   // Arrived from a charity's own link: only that charity, so no way off to other charities from here.
-  if (await currentFocus()) {
+  const focus = await currentFocus();
+  if (focus) {
     return (
       <header className="border-b border-border bg-surface print:hidden">
+        <FocusSync slug={focus} />
         <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:px-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
+          {/* The one quiet way out to the rest of Givezy (30/10/2026): the logo goes home, which ends the focus. */}
+          <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
+          </Link>
           <p className="flex items-center gap-1.5 text-sm text-muted">
             <svg aria-hidden viewBox="0 0 24 24" width="15" height="15" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-sage">
               <rect x="5" y="11" width="14" height="9" rx="2" />

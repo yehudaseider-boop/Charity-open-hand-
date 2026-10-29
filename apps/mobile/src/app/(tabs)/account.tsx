@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { InsightsLink } from "@/components/insights-link";
@@ -18,7 +18,7 @@ import { startAgainAsNewDonor } from "@/lib/first-run";
 import { setJewishMode, useJewishMode } from "@/lib/jewish-mode";
 import { SavedCardRow } from "@/components/saved-card-row";
 import { SwitchRow } from "@/components/switch-row";
-import { notify, openSite } from "@/lib/open-site";
+import { confirmThen, notify, openSite } from "@/lib/open-site";
 import { helpLine, helpMailto } from "@/lib/help";
 import { TEST_BUILD } from "@/lib/test-build";
 import { colors, fonts, radius, space } from "@/theme/tokens";
@@ -30,18 +30,12 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
 
 /** Asks first, then resets this phone's first-open choices and shows the welcome again. */
 function confirmStartAgain() {
-  Alert.alert(
+  confirmThen(
     "Start again as a new donor?",
     "For testing. This phone forgets its first-open answers (kind of giver, causes) and the goal invitation, then shows the welcome again. Your goals, gifts and account are not touched. To get the goal invitation after a gift, be signed out and have no goal.",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Start again",
-        onPress: () => {
-          void startAgainAsNewDonor().then(() => router.replace("/"));
-        },
-      },
-    ],
+    "Start again",
+    () => void startAgainAsNewDonor().then(() => router.replace("/")),
+    "Cancel",
   );
 }
 

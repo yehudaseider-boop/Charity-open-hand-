@@ -10,21 +10,23 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function GET(_request: NextRequest, ctx: RouteContext<"/receipts/[id]">) {
   const { id } = await ctx.params;
+  // A receipt that can't be handed out goes back to the account page with a plain message, not a bare "Not found".
+  const unavailable = () => NextResponse.redirect(new URL("/account?receipt=unavailable", _request.url), { status: 303 });
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not found", { status: 404 });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return unavailable();
   // An expired session gets the sign-in page, not a bare line of text.
-  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent("/account")}`, _request.url), { status: 303 });
+  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(`/receipts/${id}`)}`, _request.url), { status: 303 });
 
   const { data: receipt } = await supabase
     .from("s18a_receipts")
     .select("id, charity_id, status, pdf_path")
     .eq("id", id)
     .maybeSingle();
-  if (!receipt || receipt.status !== "issued" || !receipt.pdf_path) return new NextResponse("Not found", { status: 404 });
+  if (!receipt || receipt.status !== "issued" || !receipt.pdf_path) return unavailable();
 
   const { data, error } = await createAdminClient().storage.from("receipts").createSignedUrl(receipt.pdf_path, 60, { download: true });
-  if (error || !data) return new NextResponse("Not found", { status: 404 });
+  if (error || !data) return unavailable();
 
   await logAudit({
     actorUserId: user.id,
