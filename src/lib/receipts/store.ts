@@ -81,20 +81,20 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
     },
 
     async donorDetailsFor(donationIds) {
-      const out: { paidAt: string; amountCents: number; donor: DonorRow }[] = [];
+      const out: { id: string; paidAt: string; amountCents: number; recordedMethod: string | null; donor: DonorRow }[] = [];
       for (let i = 0; i < donationIds.length; i += 200) {
         const chunk = donationIds.slice(i, i + 200);
         const { data, error } = await db
           .from("donations")
           .select(
-            "id, paid_at, amount_cents, donation_checkout_details(donor_type, first_name, last_name, organisation_name, registration_number, address_line1, address_line2, suburb, city, postal_code, id_number_last4, tax_reference_last4)",
+            "id, paid_at, amount_cents, recorded_method, donation_checkout_details(donor_type, first_name, last_name, organisation_name, registration_number, address_line1, address_line2, suburb, city, postal_code, id_number_last4, tax_reference_last4)",
           )
           .in("id", chunk);
         if (error) throw new Error(error.message);
         for (const d of data ?? []) {
           const details = (Array.isArray(d.donation_checkout_details) ? d.donation_checkout_details[0] : d.donation_checkout_details) as DonorRow | undefined;
           if (!details) throw new Error(`Donation ${d.id} has no donor details`);
-          out.push({ paidAt: d.paid_at as string, amountCents: Number(d.amount_cents), donor: details });
+          out.push({ id: d.id as string, paidAt: d.paid_at as string, amountCents: Number(d.amount_cents), recordedMethod: (d.recorded_method as string | null) ?? null, donor: details });
         }
       }
       return out;

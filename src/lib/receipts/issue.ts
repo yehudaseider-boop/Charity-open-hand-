@@ -21,7 +21,7 @@ export interface ReceiptStore {
   listCharities(ids: string[]): Promise<(PlanCharity & CharityRow)[]>;
   receiptedDonationIds(taxYear: number): Promise<Set<string>>;
   /** The donor details typed with a donation, plus when it was paid. */
-  donorDetailsFor(donationIds: string[]): Promise<{ paidAt: string; amountCents: number; donor: DonorRow }[]>;
+  donorDetailsFor(donationIds: string[]): Promise<{ id: string; paidAt: string; amountCents: number; recordedMethod: string | null; donor: DonorRow }[]>;
   issue(receipt: PlannedReceipt, charity: CharityRow, details: ReceiptDetails): Promise<IssuedReceipt>;
   listIssuedWithoutPdf(taxYear: number, charityId?: string): Promise<IssuedReceipt[]>;
   savePdf(receipt: IssuedReceipt, pdf: Buffer): Promise<void>;

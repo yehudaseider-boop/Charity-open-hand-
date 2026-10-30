@@ -5,6 +5,8 @@
  */
 import { receiptConfig } from "@/config/receipts";
 import { formatDate } from "@/lib/dates";
+import { donationReference } from "@/lib/donations/reference";
+import { RECORDED_METHODS } from "@/lib/charity/recorded-gifts";
 
 export type CharityRow = {
   legal_name_en: string;
@@ -57,7 +59,8 @@ export type ReceiptDetails = {
     tax_reference_last4: string | null;
     address: string[];
   };
-  donations: { date: string; amount_cents: number }[];
+  /** reference and nature were added 30/10/2026; receipts issued before then have neither. */
+  donations: { date: string; amount_cents: number; reference?: string; nature?: string }[];
   tax_year: number;
   period: string;
   wording: { title: string; statement: string };
@@ -65,6 +68,15 @@ export type ReceiptDetails = {
 };
 
 const lines = (...parts: (string | null | undefined)[]) => parts.map((p) => p?.trim()).filter((p): p is string => Boolean(p));
+
+/**
+ * The nature of a donation as printed on a receipt: how the money came in. Online gifts are card payments
+ * (the only way to pay online); gifts a charity recorded by hand say how they came in.
+ */
+export function donationNature(recordedMethod: string | null | undefined): string {
+  if (!recordedMethod) return "Card (online)";
+  return Object.hasOwn(RECORDED_METHODS, recordedMethod) ? RECORDED_METHODS[recordedMethod as keyof typeof RECORDED_METHODS] : "Other";
+}
 
 /**
  * What SARS needs on an s18A receipt that this one lacks (section 18A(2)): the donor's and the
@@ -81,7 +93,7 @@ export function missingForSars(d: ReceiptDetails): string[] {
 export function buildReceiptDetails(args: {
   charity: CharityRow;
   donor: DonorRow;
-  donations: { paidAt: string; amountCents: number }[];
+  donations: { paidAt: string; amountCents: number; id?: string; recordedMethod?: string | null }[];
   taxYear: number;
   periodStart: string; // yyyy-mm-dd
   periodEnd: string; // yyyy-mm-dd
@@ -109,7 +121,12 @@ export function buildReceiptDetails(args: {
       tax_reference_last4: d.tax_reference_last4,
       address: lines(d.address_line1, d.address_line2, d.suburb, d.city, d.postal_code),
     },
-    donations: sorted.map((x) => ({ date: formatDate(x.paidAt), amount_cents: x.amountCents })),
+    donations: sorted.map((x) => ({
+      date: formatDate(x.paidAt),
+      amount_cents: x.amountCents,
+      ...(x.id ? { reference: donationReference(x.id) } : {}),
+      nature: donationNature(x.recordedMethod),
+    })),
     tax_year: args.taxYear,
     period,
     wording: {

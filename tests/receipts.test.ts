@@ -96,12 +96,18 @@ describe("who gets a receipt", () => {
 describe("receipt contents", () => {
   const details = buildReceiptDetails({
     charity, donor,
-    donations: [{ paidAt: "2026-10-01T10:00:00Z", amountCents: 50_000 }, { paidAt: "2026-09-15T10:00:00Z", amountCents: 18_000 }],
+    donations: [
+      { paidAt: "2026-10-01T10:00:00Z", amountCents: 50_000, id: "3f9a2c71-0000-4000-8000-000000000001", recordedMethod: null },
+      { paidAt: "2026-09-15T10:00:00Z", amountCents: 18_000, id: "a1b2c3d4-0000-4000-8000-000000000002", recordedMethod: "eft" },
+    ],
     taxYear: 2027, periodStart: "2026-03-01", periodEnd: "2027-02-28", issuedAt: new Date("2027-03-02T08:00:00Z"),
   });
 
-  it("lists the donations in date order, in dd/mm/yyyy, with the gift amounts only", () => {
-    expect(details.donations).toEqual([{ date: "15/09/2026", amount_cents: 18_000 }, { date: "01/10/2026", amount_cents: 50_000 }]);
+  it("lists the donations in date order, in dd/mm/yyyy, with the gift amounts only, each with its reference and how it came in", () => {
+    expect(details.donations).toEqual([
+      { date: "15/09/2026", amount_cents: 18_000, reference: "GZ-A1B2C3D4", nature: "EFT (bank transfer)" },
+      { date: "01/10/2026", amount_cents: 50_000, reference: "GZ-3F9A2C71", nature: "Card (online)" },
+    ]);
     expect(details.period).toBe("01/03/2026 to 28/02/2027");
     expect(details.issued_on).toBe("02/03/2027");
   });
@@ -152,7 +158,7 @@ describe("the yearly job", () => {
       listDonations: async () => donations,
       listCharities: async () => [charity],
       receiptedDonationIds: async () => new Set(issued.flatMap(() => [] as string[])),
-      donorDetailsFor: async (ids) => ids.map((id) => ({ paidAt: donations.find((d) => d.id === id)!.paidAt!, amountCents: donations.find((d) => d.id === id)!.amountCents, donor })),
+      donorDetailsFor: async (ids) => ids.map((id) => ({ id, paidAt: donations.find((d) => d.id === id)!.paidAt!, amountCents: donations.find((d) => d.id === id)!.amountCents, recordedMethod: null, donor })),
       issue: async (r, c, details) => {
         const receipt = { id: `r${++seq}`, reference: `${c.quickgive_code}-${r.taxYear}-000${seq}`, charityId: r.charityId, details, pdfPath: null };
         issued.push(receipt);
@@ -271,7 +277,7 @@ describe("emailing receipts", () => {
       listDonations: async () => donations,
       listCharities: async () => [charity],
       receiptedDonationIds: async () => receipted,
-      donorDetailsFor: async (ids) => ids.map((id) => ({ paidAt: donations.find((d) => d.id === id)!.paidAt!, amountCents: donations.find((d) => d.id === id)!.amountCents, donor })),
+      donorDetailsFor: async (ids) => ids.map((id) => ({ id, paidAt: donations.find((d) => d.id === id)!.paidAt!, amountCents: donations.find((d) => d.id === id)!.amountCents, recordedMethod: null, donor })),
       issue: async (r, c, details) => {
         r.donationIds.forEach((id) => receipted.add(id));
         const receipt = { id: `r${++seq}`, reference: `${c.quickgive_code}-${r.taxYear}-000${seq}`, charityId: r.charityId, details, pdfPath: null };

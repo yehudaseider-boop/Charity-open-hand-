@@ -21,9 +21,9 @@ export type RecordedMethod = keyof typeof RECORDED_METHODS;
 
 /** How a gift came in, in words: "EFT (recorded by you)" for one the charity recorded, else "Givezy". */
 export function cameInBy(recordedMethod: string | null | undefined): string {
-  return recordedMethod && recordedMethod in RECORDED_METHODS ? `${RECORDED_METHODS[recordedMethod as RecordedMethod]} (recorded by you)` : "Givezy";
+  return recordedMethod && Object.hasOwn(RECORDED_METHODS, recordedMethod) ? `${RECORDED_METHODS[recordedMethod as RecordedMethod]} (recorded by you)` : "Givezy";
 }
-export const isRecordedMethod = (s: unknown): s is RecordedMethod => typeof s === "string" && s in RECORDED_METHODS;
+export const isRecordedMethod = (s: unknown): s is RecordedMethod => typeof s === "string" && Object.hasOwn(RECORDED_METHODS, s);
 
 /** The most rows one file may hold, and its largest size: a bigger file is split in two. */
 export const MAX_IMPORT_ROWS = 1000;

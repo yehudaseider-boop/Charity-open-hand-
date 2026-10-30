@@ -72,7 +72,7 @@ describe("finishing never issues a receipt nobody approved", () => {
       listDonations: async (_y, c) => (asked.push(c), [gift]),
       listCharities: async () => [charity],
       receiptedDonationIds: async () => new Set(),
-      donorDetailsFor: async () => [{ paidAt: gift.paidAt!, amountCents: gift.amountCents, donor }],
+      donorDetailsFor: async () => [{ id: gift.id, paidAt: gift.paidAt!, amountCents: gift.amountCents, recordedMethod: null, donor }],
       issue,
       listIssuedWithoutPdf: async (_y, c) => (asked.push(c), pdfs.has("r1") ? [] : [already]),
       savePdf: async (x) => void pdfs.add(x.id),
