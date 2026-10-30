@@ -2,6 +2,7 @@
 
 ## Decided
 
+- **The donor app in the For charities look (30/10/2026, Yehuda: "I like the design for the charities ... more bubbly ... a little bit more sophisticated"; approved the Welcome and Home preview with "Push").** Every app screen now uses the website's For charities ingredients: soft lilac and peach cards, blue colour-block cards with a lavender ring and an orange dot bleeding off the edges, key words in blue, the same unDraw people (copied into the app in app colours by `scripts/make-app-people.mjs`), and Bricolage Grotesque for headlines and amounts (two font files in `apps/mobile/assets/fonts`, Open Font Licence; Fredoka is no longer used). The welcome screen is white with one orange "Get started". Presentation only: no data, money logic, guard or wording changed. The sample charity's placeholder impact line is removed; a bracketed placeholder is never shown to a donor (`realImpactLine`). The app demo at givezy-app-demo.vercel.app is rebuilt from it.
 - **Dashboard review fixes (29/10/2026, Yehuda: "Yes").** From a two-reviewer check of the new dashboard and demo:
   the public demo no longer errors on odd addresses (`/demo/dashboard/constructor`, `?period=constructor`) or
   impossible dates (`from=2026-13-45`); demo gifts are never later than now; a Recent donations row ignores
