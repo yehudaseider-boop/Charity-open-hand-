@@ -18,13 +18,12 @@ import { campaignShareText, charityShareText } from "@/lib/share";
 import { ShareButton } from "@/components/share-button";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
-import { HebrewText, Text } from "@/components/text";
+import { Text } from "@/components/text";
 import { ddmmyyyy, rand } from "@/lib/format";
 import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
 import { useSaved } from "@/lib/saved";
-import { useJewishMode } from "@/lib/jewish-mode";
 import { campaignPercent } from "@/lib/live-charities";
 import { realImpactLine } from "@/lib/impact-line";
 import { colors, fonts, photoCorners, radius, space, touch } from "@/theme/tokens";
@@ -49,7 +48,6 @@ export default function CharityDetail() {
   const { live, charity, failed, retry } = useCharity(params.slug);
   const [sheetOpen, setSheetOpen] = useState(params.sheet === "give");
   const savedList = useSaved();
-  const jewish = useJewishMode();
   const [pop] = useState(() => new Animated.Value(1));
   const [scrollY] = useState(() => new Animated.Value(0));
 
@@ -101,7 +99,6 @@ export default function CharityDetail() {
         <View style={styles.sheet}>
           {kicker ? <View style={styles.kickerPill}><Text style={styles.kickerCaps} numberOfLines={1}>{kicker}</Text></View> : null}
           <Text accessibilityRole="header" style={styles.name}>{charity.nameEn}</Text>
-          {jewish && charity.nameHe ? <HebrewText style={styles.hebrew}>{charity.nameHe}</HebrewText> : null}
           {charity.about[0] ? <Text style={styles.lead}>{charity.about[0]}</Text> : null}
 
           {/* What a gift does, in the charity's own words, and how this month's campaign is going. */}
@@ -272,7 +269,6 @@ const styles = StyleSheet.create({
   kickerPill: { alignSelf: "flex-start", maxWidth: "100%", marginBottom: 12, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.lilacSoft },
   kickerCaps: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.blue },
   name: { fontFamily: fonts.displayBold, fontSize: 36, lineHeight: 40, letterSpacing: -0.7, color: colors.navy },
-  hebrew: { fontSize: 19, color: colors.muted, marginTop: 4, textAlign: "right" },
   lead: { fontSize: 18, lineHeight: 27, color: colors.ink, marginTop: 14 },
   impactCard: { marginTop: space.block, padding: 22, gap: 6, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
   impactKicker: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.lilac },

@@ -4,6 +4,8 @@
  * have been sent, with no personal details) or "resend".
  */
 
+import { textEmailHtml } from "./html";
+
 export type EmailMessage = {
   to: string;
   subject: string;
@@ -72,6 +74,16 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
   };
 }
 
+/** Every email leaves with an HTML version in the Givezy look, laid out from its own text, unless it brings its own. */
+function withHtml(inner: EmailTransport, siteUrl: string | undefined): EmailTransport {
+  return {
+    name: inner.name,
+    async send(m) {
+      return inner.send(m.html ? m : { ...m, html: textEmailHtml({ subject: m.subject, text: m.text, siteUrl }) });
+    },
+  };
+}
+
 /** An address left behind by an erasure (see erase_donor_data). Nothing is ever sent to it. */
 export function isErasedAddress(address: string): boolean {
   return address.trim().toLowerCase().endsWith("@erased.invalid");
@@ -117,5 +129,5 @@ export function getEmailTransport(env: Record<string, string | undefined> = proc
   const name = env.EMAIL_TRANSPORT ?? "console";
   const inner = name === "console" ? consoleTransport : name === "resend" ? resendTransport(env) : null;
   if (!inner) throw new EmailError(`Unknown EMAIL_TRANSPORT "${name}".`);
-  return skippingErased(onlyAllowed(inner, env.EMAIL_ALLOWLIST));
+  return skippingErased(onlyAllowed(withHtml(inner, env.SITE_URL), env.EMAIL_ALLOWLIST));
 }

@@ -24,7 +24,7 @@ export default async function AdminCharitiesPage({ searchParams }: PageProps<"/a
   const supabase = await createClient();
   const { data: charities, error } = await supabase
     .from("charities")
-    .select("id, name_en, name_he, s18a_reference, updated_at")
+    .select("id, name_en, s18a_reference, updated_at")
     .eq("status", status)
     .order("updated_at", { ascending: status !== "pending_review" ? false : true });
   if (error) throw error;
@@ -71,7 +71,7 @@ export default async function AdminCharitiesPage({ searchParams }: PageProps<"/a
         {charities.map((c) => (
           <li key={c.id}>
             <Link href={`/admin/charities/${c.id}`} className="block rounded-card border border-border bg-surface p-4">
-              <BilingualName en={c.name_en} he={c.name_he} className="font-medium" />
+              <BilingualName en={c.name_en} className="font-medium" />
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                 {c.s18a_reference ? <Badge>Applying as s18A</Badge> : <Badge>No s18A</Badge>}
                 <span>Updated {formatDate(c.updated_at)}</span>

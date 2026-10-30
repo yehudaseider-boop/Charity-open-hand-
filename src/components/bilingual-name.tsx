@@ -1,14 +1,10 @@
-/**
- * A charity's name. The platform is English only (Yehuda, 08/10/2026), so a
- * Hebrew name, if one was stored earlier, is not shown.
- */
+/** A charity's name, as donors see it (English only; any older second-language name is not shown). */
 export function BilingualName({
   en,
   as: Tag = "span",
   className = "",
 }: {
   en: string;
-  he?: string | null;
   as?: "span" | "h1" | "h2" | "h3";
   className?: string;
 }) {

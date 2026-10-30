@@ -6,9 +6,8 @@ import { Field } from "./field";
 import { Text } from "./text";
 
 /**
- * The donor's own label for a gift, optional and only theirs: one tap on a label they used before
- * (or Maaser, Chomesh, Tzedaka with the Jewish switch on), or type a new one. Tap the chosen one
- * again for no label.
+ * The donor's own label for a gift, optional and only theirs: one tap on a label they used before,
+ * or type a new one. Tap the chosen one again for no label.
  */
 export function LabelPicker({ value, onChange, suggestions, title = "Label (optional, only you see it)" }: { value: string | null; onChange: (v: string | null) => void; suggestions: string[]; title?: string }) {
   const shown = suggestions.slice(0, 6);

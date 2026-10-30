@@ -1,7 +1,6 @@
 import { formatRand } from "@/lib/money";
 import type { ReceiptDetails } from "./details";
-import { esc } from "./html";
-import { brandColors as colours } from "@/lib/brand-colors";
+import { buttonHtml, cardHtml, emailLayout, escHtml, paragraphHtml } from "@/lib/email/html";
 
 /** The email that carries a donor's s18A receipt. The PDF is attached by the sender. */
 export function buildReceiptEmail(args: { details: ReceiptDetails; reference: string; siteUrl: string; platformName: string }) {
@@ -23,15 +22,18 @@ export function buildReceiptEmail(args: { details: ReceiptDetails; reference: st
     "",
     `${args.platformName}, on behalf of ${charity}`,
   ].join("\n");
-  const site = args.siteUrl.replace(/\/$/, "");
-  // White background, navy text, the Givezy logo at the top and one blue pill button (colours from brand-colors.ts).
-  const html = `<div style="background:${colours.surface};color:${colours.ink};font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
-<p style="margin:0 0 24px"><img src="${esc(site)}/logo.png" alt="${esc(args.platformName)}" width="150" style="display:block;height:auto;border:0"></p>
-<p style="margin:0 0 16px">Dear ${esc(greeting)},</p>
-<p style="margin:0 0 16px">Thank you for your donations to <strong>${esc(charity)}</strong>. Your s18A receipt for ${esc(d.period)} is attached.</p>
-<p style="margin:0 0 24px">Receipt number: <strong>${esc(reference)}</strong><br>Total donated: <strong>${esc(formatRand(total))}</strong> (the donations only)</p>
-<p style="margin:0 0 24px"><a href="${esc(account)}" style="display:inline-block;background:${colours.blue};color:${colours.surface};text-decoration:none;font-weight:600;padding:12px 24px;border-radius:999px">Download it from your account</a></p>
-<p style="margin:0;color:${colours.muted};font-size:14px">${esc(args.platformName)}, on behalf of ${esc(charity)}</p>
-</div>`;
+  // The Givezy email look (src/lib/email/html.ts): the logo, a headline, the receipt number and total on a
+  // pale lilac card, one blue button. Same words as the text version.
+  const html = emailLayout({
+    title: subject,
+    siteUrl: args.siteUrl,
+    bodyHtml: [
+      paragraphHtml(`Dear ${escHtml(greeting)},`),
+      paragraphHtml(`Thank you for your donations to <strong>${escHtml(charity)}</strong>. Your s18A receipt for ${escHtml(d.period)} is attached.`),
+      cardHtml([{ label: "Receipt number", value: reference }, { label: "Total donated", value: `${formatRand(total)} (the donations only)` }]),
+      buttonHtml("Download it from your account", account),
+      paragraphHtml(`${escHtml(args.platformName)}, on behalf of ${escHtml(charity)}`, { muted: true }),
+    ].join("\n"),
+  });
   return { subject, text, html };
 }

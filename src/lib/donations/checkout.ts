@@ -165,7 +165,7 @@ export async function startDonation(args: {
   }
 
   // Only attempts that would reach the payment page count. One email gets 5 tries in 10 minutes;
-  // one address gets more, because a shul's Wi-Fi or a mobile network puts many donors behind it.
+  // one address gets more, because an office's Wi-Fi or a mobile network puts many donors behind it.
   const limited =
     (await hitRateLimit("checkout", [`email:${input.email.toLowerCase()}`], 5, 10)) ||
     (await hitRateLimit("checkout-ip", ipKeys(args.ip), 30, 10));

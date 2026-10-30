@@ -5,7 +5,7 @@ import { secureStorage } from "./secure-storage";
 /**
  * The app talks to the same database as the website, with the public
  * (publishable) key only. Row-level security decides what a signed-in donor
- * may read: their own donations, receipts and maaser records, nothing else.
+ * may read: their own donations, receipts and giving records, nothing else.
  *
  * Until EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY are
  * set (once the live project exists), this is null and the app shows sample data.

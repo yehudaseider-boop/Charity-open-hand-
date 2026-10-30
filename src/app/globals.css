@@ -66,7 +66,6 @@
   --radius-control: var(--radius-sm);
   --font-sans: var(--font-dm-sans), system-ui, sans-serif;
   --font-display: var(--font-bricolage), var(--font-dm-sans), system-ui, sans-serif;
-  --font-hebrew: var(--font-heebo), var(--font-dm-sans), system-ui, sans-serif;
 }
 
 /* In-page links (#how) land below the sticky header, not under it. */
@@ -99,11 +98,6 @@ h3 {
 h1 {
   font-weight: 800;
   letter-spacing: -0.025em;
-}
-
-/* Hebrew text is set in Heebo. */
-:lang(he) {
-  font-family: var(--font-hebrew);
 }
 
 /* Organic splash shapes for blue colour-block headers (decorative only). */

@@ -10,7 +10,7 @@ type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 export function OrganisationForm({ action, charity }: {
   action: Action;
   charity: {
-    name_en: string; name_he: string | null; legal_name_en: string; legal_name_he: string | null;
+    name_en: string; legal_name_en: string;
     npo_number: string | null; pbo_number: string | null; s18a_reference: string | null;
   };
 }) {

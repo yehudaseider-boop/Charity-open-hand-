@@ -10,7 +10,7 @@ describe("payments overview", () => {
       [
         { id: "3f9a2c71-0b1d-4e5f-9a8b-123456789abc", created_at: ago(95), total_charged_cents: "18000", charity: "Meals" },
         { id: "aaaaaaaa-0b1d-4e5f-9a8b-123456789abc", created_at: ago(5), total_charged_cents: 5000, charity: "Meals" },
-        { id: "bbbbbbbb-0b1d-4e5f-9a8b-123456789abc", created_at: ago(31), total_charged_cents: 3000, charity: "Shul" },
+        { id: "bbbbbbbb-0b1d-4e5f-9a8b-123456789abc", created_at: ago(31), total_charged_cents: 3000, charity: "Hall" },
       ],
       NOW,
     );
@@ -34,9 +34,9 @@ describe("payments overview", () => {
     const t = totalsByCharity([
       { charity_id: "a", charity: "Meals", amount_cents: "18000", contribution_cents: "2000" },
       { charity_id: "a", charity: "Meals", amount_cents: 5000, contribution_cents: 0 },
-      { charity_id: "b", charity: "Shul", amount_cents: "100000", contribution_cents: "1000" },
+      { charity_id: "b", charity: "Hall", amount_cents: "100000", contribution_cents: "1000" },
     ]);
-    expect(t.list.map((x) => [x.charity, x.count, x.donationCents, x.contributionCents])).toEqual([["Shul", 1, 100_000, 1_000], ["Meals", 2, 23_000, 2_000]]);
+    expect(t.list.map((x) => [x.charity, x.count, x.donationCents, x.contributionCents])).toEqual([["Hall", 1, 100_000, 1_000], ["Meals", 2, 23_000, 2_000]]);
     expect(t).toMatchObject({ count: 3, donationCents: 123_000, contributionCents: 3_000 });
   });
 
@@ -45,13 +45,13 @@ describe("payments overview", () => {
       [
         { id: "1", status: "active", next_charge_at: ago(60 * 30), last_attempt_at: ago(60 * 40), charity: "Meals", amount_cents: 18000, contribution_cents: 2000 },
         { id: "2", status: "active", next_charge_at: ago(60 * 2), last_attempt_at: null, charity: "Meals", amount_cents: 100, contribution_cents: 0 },
-        { id: "3", status: "paused", next_charge_at: null, last_attempt_at: null, charity: "Shul", amount_cents: 100, contribution_cents: 0 },
-        { id: "4", status: "failed", next_charge_at: null, last_attempt_at: ago(10), charity: "Shul", amount_cents: "5000", contribution_cents: "500" },
+        { id: "3", status: "paused", next_charge_at: null, last_attempt_at: null, charity: "Hall", amount_cents: 100, contribution_cents: 0 },
+        { id: "4", status: "failed", next_charge_at: null, last_attempt_at: ago(10), charity: "Hall", amount_cents: "5000", contribution_cents: "500" },
       ],
       NOW,
     );
     expect(h).toMatchObject({ active: 2, paused: 1, overdue: 1, lastAttemptAt: ago(10) });
-    expect(h.failed).toEqual([{ id: "4", charity: "Shul", monthlyCents: 5_500 }]);
+    expect(h.failed).toEqual([{ id: "4", charity: "Hall", monthlyCents: 5_500 }]);
   });
 
   it("nothing at all is fine", () => {

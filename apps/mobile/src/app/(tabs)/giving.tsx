@@ -11,7 +11,7 @@ import { InsightsLink } from "@/components/insights-link";
 import { FadeUp } from "@/components/fade-up";
 import { Bubbles, People } from "@/components/people";
 import { ChevronIcon } from "@/components/icons";
-import { MaaserProgress } from "@/components/maaser-progress";
+import { GoalProgressLine } from "@/components/goal-progress-line";
 import { Sheet, type SheetGuard } from "@/components/sheet";
 import { EmptyState, ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { UndoToast, type UndoMessage } from "@/components/undo-toast";
@@ -26,8 +26,6 @@ import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving"
 import { goalProgress, knownLabels, MAX_GOALS, monthTiles, type Goal } from "@/lib/goals";
 import { monthDetail } from "@/lib/month-detail";
 import { loadGoals, saveGoals, setAsideGoals } from "@/lib/goals-store";
-import { useJewishMode } from "@/lib/jewish-mode";
-import { JEWISH_LABELS } from "@shared/donations/labels";
 import { taxYearFor, taxYearName, taxYearRangeLabel } from "@/lib/tax-year";
 import { useAccount } from "@/lib/account";
 import { loadIncome, saveIncome, startNewIncomeLog } from "@/lib/income-store";
@@ -72,7 +70,6 @@ export default function Giving() {
   const jumped = useRef<string | null>(null);
   const newDonor = preview ? demoState === "empty" : !signedIn;
   const previewGoals = !preview || newDonor || p.demo === "first" ? noGoals : sampleGoals;
-  const jewish = useJewishMode();
   // Goals are personal and stay on this phone (in its secure storage), never on our servers.
   // Each person has their own goals and income log on the phone; wait until we know who it is.
   const owner = signedIn ? account.userId : null;
@@ -181,7 +178,7 @@ export default function Giving() {
   const with18a = yearGifts.filter((g) => g.with18a).reduce((t, g) => t + g.cents, 0);
   // Everything that can count towards a goal: donations through Givezy and giving logged elsewhere.
   const goalRows = [...myGifts, ...elsewhere];
-  const labels = knownLabels(goalRows, jewish ? JEWISH_LABELS : []);
+  const labels = knownLabels(goalRows);
   const byLabel = labelTotals(yearGifts);
   const [openGift, setOpenGift] = useState<Gift | null>(null);
   // A different person on the phone: nothing from the last person's session (an Undo, an open sheet) carries over.
@@ -429,7 +426,6 @@ export default function Giving() {
               <GoalEditor
                 initial={goals.find((g) => g.id === editing) ?? null}
                 labels={labels}
-                jewish={jewish}
                 onSave={(g) => putGoals(goals.some((x) => x.id === g.id) ? goals.map((x) => (x.id === g.id ? g : x)) : [...goals, g].slice(0, MAX_GOALS))}
                 onCancel={() => setEditing(null)}
                 onRemove={goals.some((g) => g.id === editing) ? () => {
@@ -478,7 +474,7 @@ export default function Giving() {
                           <Text variant="bodyMuted">This goal is a share of your income. Log your income below and we work out the amount.</Text>
                         </View>
                       ) : (
-                        <MaaserProgress title={g.name} givenCents={pr.givenCents} targetCents={pr.targetCents} period={g.period} periodLabel={pr.window.label} endLabel={pr.window.endLabel} compact />
+                        <GoalProgressLine title={g.name} givenCents={pr.givenCents} targetCents={pr.targetCents} period={g.period} periodLabel={pr.window.label} endLabel={pr.window.endLabel} compact />
                       )}
                       {i === 0 && pr.targetCents === null ? (
                         <Text variant="bodyMuted">{g.name} is a share of your income. Log your income below and we work out the amount.</Text>
@@ -948,7 +944,6 @@ const styles = StyleSheet.create({
   stripKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue },
   divider: { borderTopWidth: 1, borderTopColor: colors.hairline },
   cancel: { minHeight: touch, alignItems: "center", justifyContent: "center" },
-  tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
   softCard: { gap: 8, padding: 22, borderRadius: radius.card, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lightPurple, overflow: "hidden" },
   cardTitle: { fontSize: 24, lineHeight: 30 },
   blueCard: { gap: 8, padding: 22, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },

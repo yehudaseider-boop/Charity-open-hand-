@@ -173,7 +173,7 @@ export default async function Home() {
         <div id="discover" className="grid items-center gap-8 rounded-[1.25rem] bg-honey-soft p-7 sm:p-10 md:grid-cols-2">
           <div className="flex flex-col items-start gap-4">
             <h3 className="font-display text-[clamp(1.625rem,2.6vw,2.125rem)] font-bold leading-tight"><Key>Find a cause</Key> that feels close to home.</h3>
-            <p className="text-[16px] leading-relaxed text-muted">Food parcels, schools, shuls, medical help and more. Every charity on {platformConfig.appName} is registered and checked.</p>
+            <p className="text-[16px] leading-relaxed text-muted">Food parcels, schools, animal care, medical help and more. Every charity on {platformConfig.appName} is registered and checked.</p>
             {categories.length > 0 ? (
               <ul className="flex flex-wrap gap-2" aria-label="Causes">
                 {categories.map((c) => (
@@ -241,7 +241,7 @@ export default async function Home() {
           <ul className="flex flex-col gap-4">
             <FeatureCard icon="lock" title="Your card stays with the bank" body={`You pay on the payment provider's page. ${platformConfig.appName} never sees or stores card details.`} />
             <FeatureCard icon="user" title="No ID numbers for charities" body="Charities never see any part of your ID or tax number. It goes only on your s18A receipt." />
-            <FeatureCard icon="heart" title="Your maaser stays yours" body="Whether a gift is maaser, chomesh or general tzedaka is private to you. Charities don't see it." />
+            <FeatureCard icon="heart" title="Your notes stay yours" body="Any label or note you add to a gift, like Work giving or Family, is private to you. Charities don't see it." />
           </ul>
         </div>
       </section>

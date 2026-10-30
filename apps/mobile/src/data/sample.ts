@@ -11,7 +11,7 @@ export const causes: Cause[] = [
   { id: "education", label: "Education" },
   { id: "health", label: "Health" },
   { id: "animals", label: "Animals" },
-  { id: "faith", label: "Faith communities" },
+  { id: "community", label: "Community" },
 ];
 
 export type Charity = {
@@ -19,6 +19,7 @@ export type Charity = {
   id?: string;
   slug: string;
   nameEn: string;
+  /** Kept in the data for the website; the app never shows it. */
   nameHe: string;
   cause: string; // one line
   causeId: string;
@@ -56,9 +57,7 @@ export type CharityUpdate = { id: string; date: Date; body: string; photoUrl: st
 const photo = (file: string) => `https://d8j0ntlcm91z4.cloudfront.net/user_3JMbY89afWySU23FksuSQhKkNXQ/${file}.png`;
 const dummy = {
   meals: [photo("hf_20261011_002939_f36bd191-cf6e-4347-a046-ffb5def7c7af"), photo("hf_20261011_002939_9ce51b70-d481-40a2-9fce-7e0cdef4d455"), photo("hf_20261011_002939_dd537826-017f-4a64-9d4a-e60b81154878")],
-  torah: [photo("hf_20261011_002938_88dd6881-670a-4e28-a662-11820e95899d"), photo("hf_20261011_002939_99389e3d-0f2c-41a5-aa8b-051c3e53d069"), photo("hf_20261011_002939_d8475a72-978e-4025-9173-93db0dc6afac")],
-  shul: [photo("hf_20261011_002938_e5a9e68f-7b9d-4d0c-a7ae-9604f1c8ff31"), photo("hf_20261011_002940_11c2d9f2-7530-494b-9a60-9ab39a23969c"), photo("hf_20261011_003001_37eaa619-19e7-48fa-aaa7-74d048065550")],
-  cholim: [photo("hf_20261011_003001_241ed450-eab3-4f98-ab62-cd5dc930bf49"), photo("hf_20261011_003002_378081f3-914c-4b04-96e8-d2314e88ea3e"), photo("hf_20261011_003001_5ec0d37f-d2e5-4240-b819-a3efd8cb76b1")],
+  care: [photo("hf_20261011_003001_241ed450-eab3-4f98-ab62-cd5dc930bf49"), photo("hf_20261011_003002_378081f3-914c-4b04-96e8-d2314e88ea3e"), photo("hf_20261011_003001_5ec0d37f-d2e5-4240-b819-a3efd8cb76b1")],
 };
 const gallery = (urls: string[], captions: string[]) => urls.slice(1).map((url, i) => ({ id: `p${i}`, url, caption: captions[i] }));
 
@@ -67,7 +66,7 @@ export const charities: Charity[] = [
     slug: "northcliff-meals-fund",
     impact: null, // no invented impact line: only ever the charity's own words
     nameEn: "Northcliff Meals Fund",
-    nameHe: "קרן ארוחות נורת'קליף",
+    nameHe: "",
     cause: "Weekly food parcels for families in need",
     causeId: "food",
     area: "Northcliff",
@@ -78,7 +77,7 @@ export const charities: Charity[] = [
     photos: gallery(dummy.meals, ["Fresh bread in every parcel", "Sorting fruit and vegetables on a Thursday night"]),
     // Sample figures for the design preview only.
     campaigns: [
-      { id: "c-pesach", title: "Winter food parcels", description: "A full winter parcel, with blankets, for every family on our list.", targetCents: 5_000_000, raisedCents: 3_140_000, giftCount: 86, endsAt: new Date(2027, 6, 31) },
+      { id: "c-winter", title: "Winter food parcels", description: "A full winter parcel, with blankets, for every family on our list.", targetCents: 5_000_000, raisedCents: 3_140_000, giftCount: 86, endsAt: new Date(2027, 6, 31) },
     ],
     updates: [
       { id: "u1", date: new Date(2026, 9, 2), body: "Thursday night packing went late this week. Thank you to everyone who came to help.", photoUrl: dummy.meals[2] },
@@ -98,27 +97,23 @@ export const charities: Charity[] = [
     area: "Linksfield",
     photo: "a lit study hall",
     issues18a: true,
-    coverUrl: dummy.torah[0],
-    photos: gallery(dummy.torah, ["The library", "Evening class seating"]),
     about: [
       "Evening classes five nights a week for adults who want to keep learning after work.",
       "Donations cover the teachers, the building and the library.",
     ],
   },
   {
-    slug: "glenhazel-shul-fund",
-    nameEn: "Glenhazel Community Shul Fund",
-    nameHe: "קרן בית הכנסת גלנהייזל",
-    cause: "Upkeep of the shul building and grounds",
-    causeId: "faith",
-    area: "Glenhazel",
-    photo: "a shul entrance",
+    slug: "melville-community-hall",
+    nameEn: "Melville Community Hall Trust",
+    nameHe: "",
+    cause: "Upkeep of a hall used by local groups",
+    causeId: "community",
+    area: "Melville",
+    photo: "a community hall entrance",
     issues18a: false,
-    coverUrl: dummy.shul[0],
-    photos: gallery(dummy.shul, ["A community lunch in the hall", "The entrance on a Sunday morning"]),
     about: [
-      "Keeps the shul building safe, warm and open, from the roof to the security at the gate.",
-      "Members and visitors give towards repairs, cleaning and the yearly insurance.",
+      "Keeps the hall safe, warm and open for local clubs, classes and meetings, from the roof to the security at the gate.",
+      "The groups who use it and their neighbours give towards repairs, cleaning and the yearly insurance.",
     ],
   },
   {
@@ -130,8 +125,8 @@ export const charities: Charity[] = [
     area: "Sandton",
     photo: "a hospital corridor",
     issues18a: true,
-    coverUrl: dummy.cholim[0],
-    photos: gallery(dummy.cholim, ["A care package ready to go", "Meal delivery on the ward"]),
+    coverUrl: dummy.care[0],
+    photos: gallery(dummy.care, ["A care package ready to go", "Meal delivery on the ward"]),
     about: [
       "Volunteers bring meals to patients in Sandton hospitals and sit with families in long waits.",
       "The fund also covers transport to appointments for elderly people in the area.",

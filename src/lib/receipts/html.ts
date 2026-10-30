@@ -1,9 +1,9 @@
 /**
- * The receipt as a printable web page (A4). It is turned into a PDF by
- * headless Chrome, because that handles Hebrew (right to left) correctly.
- * Layout follows the Givezy look: logo top left on white, Fredoka for the
- * title, DM Sans for every field. Colours come from brand-colors.ts. The wording and fields come from the charity's
- * advisers (config/receipts.ts), not from the design.
+ * The receipt as a printable web page (A4). It is turned into a PDF by headless Chrome.
+ * Layout follows the Givezy look (v2.1): logo top left on white, Bricolage Grotesque for the
+ * title and the total, DM Sans for every field, ink text, the receipt number on a pale lilac card.
+ * Colours come from brand-colors.ts. The wording and fields come from the charity's
+ * advisers (config/receipts.ts), not from the design. English only: no Hebrew names (decided 30/10/2026).
  * Pure: everything it prints comes from the stored snapshot.
  */
 import { formatRand } from "@/lib/money";
@@ -50,21 +50,21 @@ export function buildReceiptHtml(args: {
 ${args.fontCss ?? ""}
 @page { size: A4; margin: 18mm 16mm; }
 * { box-sizing: border-box; }
-body { font-family: "DM Sans", "Heebo", sans-serif; font-size: 10.5pt; line-height: 1.45; color: ${colours.ink}; background: ${colours.surface}; margin: 0; font-variant-numeric: tabular-nums; }
+body { font-family: "DM Sans", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: ${colours.ink}; background: ${colours.surface}; margin: 0; font-variant-numeric: tabular-nums; }
 .brand { margin: 0 0 8mm; }
 .brand img { height: 10mm; width: auto; display: block; }
-.brand .name { font-weight: 600; font-size: 14pt; color: ${colours.blue}; }
-h1 { font-family: "Fredoka", "DM Sans", sans-serif; font-weight: 600; font-size: 22pt; color: ${colours.blue}; margin: 0 0 2mm; }
-h2 { font-size: 10.5pt; font-weight: 600; color: ${colours.blue}; margin: 7mm 0 1.5mm; }
-.he { font-family: "Heebo", "DM Sans", sans-serif; }
-.head { border-bottom: 1px solid ${colours.hairline}; padding-bottom: 4mm; display: flex; justify-content: space-between; gap: 8mm; }
+.brand .name { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 16pt; color: ${colours.blue}; }
+h1 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 22pt; line-height: 1.15; color: ${colours.ink}; margin: 0 0 3mm; }
+h2 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-size: 12pt; font-weight: 700; color: ${colours.ink}; margin: 8mm 0 2mm; }
+.head { border-bottom: 1px solid ${colours.hairline}; padding-bottom: 5mm; display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }
 .muted { color: ${colours.muted}; }
-.ref { text-align: right; }
+.ref { flex: none; min-width: 52mm; background: ${colours.lilacSoft}; border: 1px solid ${colours.hairline}; border-radius: 18px; padding: 4mm 5mm; }
+.ref strong { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 12pt; }
 table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
 th, td { padding: 2mm 0; border-bottom: 1px solid ${colours.hairlineSoft}; text-align: left; }
 th { font-size: 9pt; color: ${colours.muted}; font-weight: 600; }
 .r { text-align: right; }
-.total td { font-weight: 600; border-top: 1px solid ${colours.blue}; border-bottom: 0; }
+.total td { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 12pt; border-top: 1.5px solid ${colours.blue}; border-bottom: 0; padding-top: 3mm; }
 .statement { margin-top: 7mm; }
 .foot { position: fixed; bottom: 0; left: 0; right: 0; font-size: 8.5pt; color: ${colours.muted}; }
 ${args.draft ? `.draft { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 46pt; font-weight: 600; color: ${colours.danger}2E; transform: rotate(-24deg); }` : ""}
@@ -75,7 +75,6 @@ ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
   <div>
     <h1>${esc(d.wording.title)}</h1>
     <div><strong>${esc(d.charity.legal_name_en)}</strong></div>
-    ${d.charity.legal_name_he ? `<div class="he" lang="he" dir="rtl" style="text-align:left">${esc(d.charity.legal_name_he)}</div>` : ""}
     ${ids.map((x) => `<div class="muted">${x}</div>`).join("")}
     ${d.charity.address.map((x) => `<div class="muted">${esc(x)}</div>`).join("")}
   </div>

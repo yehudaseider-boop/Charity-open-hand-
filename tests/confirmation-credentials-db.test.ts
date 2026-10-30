@@ -19,7 +19,7 @@ beforeAll(async () => {
     donorUser: await one("select id from auth.users where email = $1", ["donor@nedivlev.test"]),
     donor: await one("select id from public.donors where email = $1", ["donor@nedivlev.test"]),
     mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
-    shulAdmin: await one("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    hallAdmin: await one("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
     meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
   };
 });
@@ -63,7 +63,7 @@ describe("confirmation credentials and private choice", () => {
   it("nobody but the server can read the credentials table", async () => {
     await tx(async () => {
       await paidDonationWithCredential();
-      for (const who of ["anon", ids.donorUser, ids.mealsAdmin, ids.shulAdmin]) {
+      for (const who of ["anon", ids.donorUser, ids.mealsAdmin, ids.hallAdmin]) {
         await as(who);
         await run("savepoint p");
         await expect(run("select * from public.donation_confirmations")).rejects.toThrow(/permission denied/);
@@ -105,7 +105,7 @@ describe("confirmation credentials and private choice", () => {
   it("an unrelated signed-in user and an anonymous visitor cannot read them either", async () => {
     await tx(async () => {
       const id = await paidDonationWithCredential();
-      await as(ids.shulAdmin);
+      await as(ids.hallAdmin);
       expect((await run("select * from public.donation_giving_kinds where donation_id = $1", [id])).rows).toHaveLength(0);
       expect((await run("select * from public.donations where id = $1", [id])).rows).toHaveLength(0);
       await as("anon");

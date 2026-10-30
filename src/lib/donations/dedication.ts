@@ -12,7 +12,7 @@ export const DEDICATION_NAME_MAX = 80;
 
 /**
  * Trims, joins runs of spaces and drops control characters, including the invisible ones that change
- * text direction (a Hebrew name still shows right to left: the page marks it `dir="auto"`).
+ * text direction (a right-to-left name still shows correctly: the page marks it `dir="auto"`).
  */
 export function cleanDedicationName(raw: string | null | undefined): string {
   return (raw ?? "")
@@ -40,17 +40,7 @@ export function dedicationFrom(kind: string | null | undefined, name: string | n
   return (kind === "honour" || kind === "memory") && clean ? { kind, name: clean } : null;
 }
 
-/** Where the Hebrew starts (the first character in the Hebrew block), or -1 when there is none. */
-export function hebrewStart(text: string): number {
-  return text.search(/[\u0590-\u05ff]/);
-}
-
-/** True when the text has Hebrew in it, so a page can mark it `lang="he" dir="rtl"` and set it in Heebo. */
-export function isHebrew(text: string): boolean {
-  return hebrewStart(text) >= 0;
-}
-
-/** "In honour of Rivka Levin" / "In memory of Chaim Cohen". */
+/** "In honour of Thandi Mokoena" / "In memory of John Smith". */
 export function dedicationLine(d: Dedication): string {
   return `${d.kind === "honour" ? "In honour of" : "In memory of"} ${d.name}`;
 }

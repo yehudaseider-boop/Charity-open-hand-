@@ -17,10 +17,10 @@ beforeAll(async () => {
   ids = {
     admin: await q("select id from auth.users where email = $1", ["admin@nedivlev.test"]),
     mealsAdmin: await q("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
-    shulAdmin: await q("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    hallAdmin: await q("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
     donorUser: await q("select id from auth.users where email = $1", ["donor@nedivlev.test"]),
     meals: await q("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
-    shul: await q("select id from public.charities where slug = $1", ["glenhazel-shul-fund"]),
+    hall: await q("select id from public.charities where slug = $1", ["glenhazel-community-hall"]),
     donor: await q("select id from public.donors where email = $1", ["donor@nedivlev.test"]),
     company: await q("select id from public.donors where email = $1", ["accounts@testtrading.test"]),
   };
@@ -94,7 +94,7 @@ describe("public visitor", () => {
   it("does not see a charity that is not approved", async () => {
     await client.query("begin");
     try {
-      await client.query("update public.charities set status = 'suspended' where id = $1", [ids.shul]);
+      await client.query("update public.charities set status = 'suspended' where id = $1", [ids.hall]);
       await client.query("set local role anon");
       expect(await rows("select id from public.charities")).toHaveLength(2);
     } finally {
@@ -155,7 +155,7 @@ describe("charity admin", () => {
 
   it("cannot edit another charity", async () => {
     await as(ids.mealsAdmin, async () => {
-      const r = await client.query("update public.charities set description_en = 'x' where id = $1", [ids.shul]);
+      const r = await client.query("update public.charities set description_en = 'x' where id = $1", [ids.hall]);
       expect(r.rowCount).toBe(0);
     });
   });
@@ -184,7 +184,7 @@ describe("charity admin", () => {
       }
 
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated", aal: "aal2" }),
+        JSON.stringify({ sub: ids.hallAdmin, role: "authenticated", aal: "aal2" }),
       ]);
       expect(await rows("select id from public.charity_donations")).toHaveLength(0);
     } finally {
@@ -319,7 +319,7 @@ describe("s18A receipts", () => {
       );
       await client.query("set local role authenticated");
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: ids.shulAdmin, role: "authenticated", aal: "aal2" }),
+        JSON.stringify({ sub: ids.hallAdmin, role: "authenticated", aal: "aal2" }),
       ]);
       expect(await rows("select id from public.s18a_receipts")).toHaveLength(0);
       await client.query("select set_config('request.jwt.claims', $1, true)", [

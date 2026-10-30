@@ -9,7 +9,7 @@ import { impactUnitFrom } from "@/lib/charity/impact";
 export async function loadDonatableCharity(slug: string) {
   const { data } = await createAdminClient()
     .from("charities")
-    .select("id, slug, name_en, name_he, status, is_verified, is_s18a, mandate_signed_at, gateway, gateway_subaccount_ref, suggested_amounts_cents, impact_unit_cents, impact_unit_one, impact_unit_many")
+    .select("id, slug, name_en, status, is_verified, is_s18a, mandate_signed_at, gateway, gateway_subaccount_ref, suggested_amounts_cents, impact_unit_cents, impact_unit_one, impact_unit_many")
     .eq("slug", slug)
     .eq("status", "approved")
     .maybeSingle();

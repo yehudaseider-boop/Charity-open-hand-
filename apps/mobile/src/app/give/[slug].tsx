@@ -22,7 +22,7 @@ import { TopBar } from "@/components/top-bar";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleGoals } from "@/data/giving";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
-import { cleanLabel, JEWISH_LABELS, LEGACY_KIND_LABELS } from "@shared/donations/labels";
+import { cleanLabel, LEGACY_KIND_LABELS } from "@shared/donations/labels";
 import { useAccount } from "@/lib/account";
 import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
@@ -30,7 +30,6 @@ import { jhbToday, rand } from "@/lib/format";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals, saveGoals } from "@/lib/goals-store";
 import { goalInvited, isFirstGift, isNewDonor, markGoalInvited, shouldInviteGoal } from "@/lib/first-run";
-import { useJewishMode } from "@/lib/jewish-mode";
 import { loadIncome } from "@/lib/income-store";
 import type { IncomeEntry } from "@/lib/ledger";
 import { monthsInARow } from "@/lib/streak";
@@ -97,7 +96,6 @@ export default function Give() {
   const goal = goals.value[0] ?? null;
   // Income logged on the Progress tab, so a goal set as a share of income has its real target.
   const income = useStoredRecord<IncomeEntry[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadIncome, initial: noIncome });
-  const jewish = useJewishMode();
   // Whether this phone has already been invited to set a goal. Assumed yes until the answer is read, so it can never show twice.
   const [invited, setInvited] = useState(true);
   const [newDonor, setNewDonor] = useState(false);
@@ -367,8 +365,7 @@ export default function Give() {
     const inviteNow = (demo === "invite" && !site) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift, confirming });
     const invite: GoalInvite | null = inviteNow
       ? {
-          jewish,
-          labels: jewish ? [...JEWISH_LABELS] : [],
+          labels: [],
           signedIn: account.status === "signed-in",
           // With this first gift counted, so "your first gift already counts" is true on screen.
           progressFor: (g) => {

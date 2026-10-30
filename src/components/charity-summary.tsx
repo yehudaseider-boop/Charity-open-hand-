@@ -20,7 +20,7 @@ function Rows({ rows }: { rows: Row[] }) {
 
 export function OrganisationSummary({ c }: {
   c: {
-    name_en: string; name_he: string | null; legal_name_en: string; legal_name_he: string | null;
+    name_en: string; legal_name_en: string;
     npo_number: string | null; pbo_number: string | null; s18a_reference: string | null;
     address_line1: string | null; address_line2: string | null; suburb: string | null; city: string | null; postal_code: string | null;
   };

@@ -226,7 +226,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           <h2 className="font-display text-xl font-bold text-indigo">Manage</h2>
           {viewer.charities.map((c) => (
             <Link key={c.id} href={`/charity-admin/${c.id}`} className="block rounded-control border-2 border-border p-3">
-              <BilingualName en={c.name_en} he={c.name_he} />
+              <BilingualName en={c.name_en} />
             </Link>
           ))}
           {viewer.managedCharityIds.length > 0 && viewer.charities.length === 0 ? (

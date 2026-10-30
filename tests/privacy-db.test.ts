@@ -19,7 +19,7 @@ beforeAll(async () => {
     donorUser: await one("select id from auth.users where email = $1", ["donor@nedivlev.test"]),
     donor: await one("select id from public.donors where email = $1", ["donor@nedivlev.test"]),
     mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
-    shulAdmin: await one("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    hallAdmin: await one("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
     meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
   };
 });
@@ -148,7 +148,7 @@ describe("a charity admin", () => {
   it("sees nothing of another charity", async () => {
     await tx(async () => {
       const id = await paidDonation();
-      await as(ids.shulAdmin);
+      await as(ids.hallAdmin);
       expect((await run("select * from public.charity_donations where id = $1", [id])).rowCount).toBe(0);
       expect((await run("select * from public.charity_private where charity_id = $1", [ids.meals])).rowCount).toBe(0);
       expect((await run("select * from public.charity_documents where charity_id = $1", [ids.meals])).rowCount).toBe(0);
@@ -346,7 +346,7 @@ describe("giving made elsewhere", () => {
   it("is private to the person who logged it, and needs a valid choice and amount", async () => {
     await tx(async () => {
       await as(ids.donorUser);
-      await run("insert into public.external_giving_entries (user_id, amount_cents, entry_date, recipient_text, kind) values ($1, 72000, '2026-06-10', 'Shul appeal (cash)', 'maaser')", [ids.donorUser]);
+      await run("insert into public.external_giving_entries (user_id, amount_cents, entry_date, recipient_text, kind) values ($1, 72000, '2026-06-10', 'Community appeal (cash)', 'maaser')", [ids.donorUser]);
       expect((await run("select kind from public.external_giving_entries")).rows.map((r) => r.kind)).toEqual(["maaser"]);
 
       await as(ids.mealsAdmin);

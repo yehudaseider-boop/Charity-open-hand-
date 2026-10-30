@@ -27,7 +27,7 @@ export default async function CharityAdminPage() {
                 href={`/charity-admin/${c.id}`}
                 className="block min-w-0 rounded-control after:absolute after:inset-0 after:rounded-card after:content-[''] focus-visible:outline-none"
               >
-                <BilingualName en={c.name_en} he={c.name_he} as="h2" className="font-display text-xl font-bold text-indigo [overflow-wrap:anywhere] group-hover:text-brand" />
+                <BilingualName en={c.name_en} as="h2" className="font-display text-xl font-bold text-indigo [overflow-wrap:anywhere] group-hover:text-brand" />
                 <span className="sr-only">: open the dashboard</span>
               </Link>
               <div className="mt-2"><Badge tone={status.tone}>{status.label}</Badge></div>

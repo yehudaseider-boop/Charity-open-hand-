@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     return new NextResponse("Too many downloads. Please try again in an hour.", { status: 429 });
   }
 
-  const [profile, donors, kinds, consents, requests, favourites, maaserSettings, income, external, notes] = await Promise.all([
+  const [profile, donors, kinds, consents, requests, favourites, givingTarget, income, external, notes] = await Promise.all([
     supabase.from("profiles").select("email, full_name, giver_type, created_at").eq("id", user.id).maybeSingle(),
     supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, age_confirmed_18_at, popia_consent_at, created_at").eq("user_id", user.id),
     supabase.from("donation_giving_kinds").select("donation_id, kind, label"),
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   ]);
 
   // A download with a missing part would look complete, so any read that fails stops it.
-  const failed = [profile, donors, kinds, consents, requests, favourites, maaserSettings, income, external, notes].find((r) => r.error);
+  const failed = [profile, donors, kinds, consents, requests, favourites, givingTarget, income, external, notes].find((r) => r.error);
   if (failed) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
 
   // Filter by this person's own donor records: a platform admin's access to
@@ -122,8 +122,8 @@ export async function GET(request: Request) {
     thank_you_notes_from_charities: thanks.data ?? [],
     requests: requests.data ?? [],
     saved_charities: favourites.data ?? [],
-    maaser_settings: maaserSettings.data ?? [],
-    maaser_income: (income.data ?? []).map((r) => ({
+    giving_target_settings: givingTarget.data ?? [],
+    income_entries: (income.data ?? []).map((r) => ({
       entry_date: r.entry_date,
       amount: open(r.amount_encrypted as string | null),
       note: open(r.note_encrypted as string | null),

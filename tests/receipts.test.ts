@@ -12,7 +12,7 @@ import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } fr
 
 const charity: PlanCharity & CharityRow = {
   id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", quickgive_code: "LTC",
-  legal_name_en: "Linksfield Torah Learning Centre NPC", legal_name_he: "מרכז לימוד תורה",
+  legal_name_en: "Linksfield Learning Centre NPC", legal_name_he: "מרכז לימוד תורה",
   npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "18A/2026/1",
   address_line1: "1 Test Road", address_line2: null, suburb: "Linksfield", city: "Johannesburg", postal_code: "2192",
 };
@@ -131,7 +131,10 @@ describe("receipt contents", () => {
     expect(html).toContain("DRAFT, NOT A TAX RECEIPT");
     // Every colour and value is filled in: no template placeholder is left in the page.
     expect(html).not.toContain("${");
-    expect(html).toContain('lang="he" dir="rtl"');
+    // English only (30/10/2026): the charity's Hebrew name is kept in the data but never printed.
+    expect(html).not.toContain('dir="rtl"');
+    expect(html).not.toContain("מרכז לימוד תורה");
+    expect(html).toContain("Linksfield Learning Centre NPC");
     expect(html).toContain("•••• 9085");
     expect(buildReceiptHtml({ details, reference: "LTC-2027-0001", platformName: "Givezy" })).not.toContain("DRAFT");
     expect(esc(`a&b"c'`)).toBe("a&amp;b&quot;c&#39;");
@@ -293,7 +296,7 @@ describe("emailing receipts", () => {
     expect(first).toMatchObject({ issued: 2, emailed: 2, emailFailed: 0 });
     expect(sent).toHaveLength(2);
     expect(sent[0].attachments?.[0]).toMatchObject({ filename: "LTC-2027-0001.pdf", contentType: "application/pdf" });
-    expect(sent[0].subject).toBe("Your s18A receipt LTC-2027-0001 from Linksfield Torah Learning Centre NPC");
+    expect(sent[0].subject).toBe("Your s18A receipt LTC-2027-0001 from Linksfield Learning Centre NPC");
     expect(emailed.size).toBe(2);
     // Running it again sends nothing more.
     const again = await runReceiptsJob({ store, render, ...base, mailer });
@@ -342,6 +345,11 @@ describe("emailing receipts", () => {
     expect(m.text).toContain("https://example.co.za/account");
     expect(m.html).not.toContain("<b>Sarah</b>");
     expect(m.html).toContain("&lt;b&gt;Sarah");
+    // The Givezy email look: the logo, the receipt number on a card, one blue button to the account.
+    expect(m.html).toContain('src="https://example.co.za/logo.png"');
+    expect(m.html).toContain('href="https://example.co.za/account"');
+    expect(m.html).toContain("Download it from your account");
+    expect(m.html).not.toContain("${");
   });
 });
 

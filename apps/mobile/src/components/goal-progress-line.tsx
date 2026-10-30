@@ -4,10 +4,10 @@ import { colors, fonts, radius } from "@/theme/tokens";
 import { Text } from "./text";
 
 /**
- * Maaser (or chomesh) progress for the month or the year. Not a box: it sits straight on the page,
- * like the first lines of a pocket ledger. `compact` is the smaller second line (chomesh).
+ * A giving goal's progress for the month or the year. Not a box: it sits straight on the page,
+ * like the first lines of a pocket ledger. `compact` is the smaller line for a second goal.
  */
-export function MaaserProgress({
+export function GoalProgressLine({
   title,
   givenCents,
   targetCents,
@@ -16,7 +16,7 @@ export function MaaserProgress({
   endLabel,
   compact = false,
 }: {
-  /** "Maaser" or "Chomesh". */
+  /** The goal's name. */
   title: string;
   givenCents: number;
   targetCents: number;

@@ -48,9 +48,6 @@ export const fonts = {
   bodyMedium: "DMSans_500Medium",
   bodySemibold: "DMSans_600SemiBold",
   bodyBold: "DMSans_700Bold",
-  /** Hebrew text, set beside DM Sans. */
-  hebrew: "Heebo_400Regular",
-  hebrewBold: "Heebo_600SemiBold",
 } as const;
 
 /** Amounts: DM Sans 600 with tabular figures, so columns of Rand line up. */

@@ -1,4 +1,3 @@
-import { HebrewAware } from "@/components/hebrew-aware";
 import Link from "next/link";
 import { platformConfig } from "@/config/platform";
 import { formatDate, taxYearLabel, taxYearName } from "@/lib/dates";
@@ -121,7 +120,7 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
                     <p>{l.charityName}</p>
                     <p className="text-xs text-muted">
                       <span className="tabular-nums">{formatDate(l.paidAt)}</span> · {l.label ? <bdi>{l.label}</bdi> : "No label"}{l.monthly ? " · monthly" : ""} · {l.receipted ? "on an s18A receipt" : l.s18a ? (yearOpen || pack.receipts.length === 0 ? "s18A receipt asked for" : "asked for, not on a receipt") : "no s18A receipt"}
-                      {l.dedication ? <span className="block" dir="auto"><HebrewAware text={l.dedication} /></span> : null}
+                      {l.dedication ? <span className="block" dir="auto">{l.dedication}</span> : null}
                     </p>
                   </div>
                   <p className="whitespace-nowrap font-medium tabular-nums">{formatRand(l.cents)}</p>

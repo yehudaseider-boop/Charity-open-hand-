@@ -1,7 +1,5 @@
 // One file per weight, never the package index: the index pulls in every weight and italic
 // (about 7 MB), which made the app slow to download and open.
-import { Heebo_400Regular } from "@expo-google-fonts/heebo/400Regular";
-import { Heebo_600SemiBold } from "@expo-google-fonts/heebo/600SemiBold";
 import { DMSans_400Regular } from "@expo-google-fonts/dm-sans/400Regular";
 import { DMSans_500Medium } from "@expo-google-fonts/dm-sans/500Medium";
 import { DMSans_600SemiBold } from "@expo-google-fonts/dm-sans/600SemiBold";
@@ -15,9 +13,14 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PreviewChrome } from "@/components/preview-chrome";
 import { AccountProvider } from "@/lib/account";
 import { SavedProvider } from "@/lib/saved";
+import { secureStorage } from "@/lib/secure-storage";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync();
+
+// A preference from an older version that no longer exists (removed 30/10/2026). It said something
+// personal about the person, so it is cleared from the phone rather than left behind. Best effort.
+void secureStorage.removeItem("nediv-lev.jewish-mode").catch(() => undefined);
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -29,9 +32,6 @@ export default function RootLayout() {
     DMSans_500Medium,
     DMSans_600SemiBold,
     DMSans_700Bold,
-    // Hebrew text (e.g. a charity's Hebrew name) is set in Heebo, beside DM Sans.
-    Heebo_400Regular,
-    Heebo_600SemiBold,
   });
 
 

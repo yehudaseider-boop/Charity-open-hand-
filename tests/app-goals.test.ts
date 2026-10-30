@@ -39,16 +39,22 @@ describe("giving goals", () => {
     expect(cleanGoals("nope")).toEqual([]);
     expect(cleanGoals([{ ...good, counts: [" Maaser ", ""] }])[0].counts).toEqual(["Maaser"]);
   });
-  it("old maaser and chomesh targets become goals", () => {
+  it("a much older version's targets become goals, keeping their own names, now on the tax year", () => {
     expect(goalsFromOldTarget({ period: "month", maaserCents: 60_000, chomeshCents: 60_000 }).map((g) => [g.name, g.fixedCents, g.counts, g.year])).toEqual([
-      ["Maaser", 60_000, ["Maaser"], "hebrew"],
-      ["Chomesh", 60_000, ["Chomesh"], "hebrew"],
+      ["Maaser", 60_000, ["Maaser"], "tax"],
+      ["Chomesh", 60_000, ["Chomesh"], "tax"],
     ]);
     expect(goalsFromOldTarget(null)).toEqual([]);
+  });
+  it("a goal saved with the old Hebrew-year option is kept, and now counts the tax year", () => {
+    const old = { ...goal({ name: "Maaser", basis: "income", percentPpm: 100_000, fixedCents: null, counts: ["Maaser"] }), year: "hebrew" };
+    const [g] = cleanGoals([old]);
+    expect(g).toEqual({ ...old, year: "tax" });
+    expect(goalWindow(g, d(2026, 10, 16)).label).toBe("2026/27 tax year");
   });
   it("shows percentages and the donor's labels simply", () => {
     expect(ppmToPercentText(100_000)).toBe("10%");
     expect(ppmToPercentText(125_000)).toBe("12.5%");
-    expect(knownLabels([{ label: "Family" }, { label: "family" }, { label: "Work" }, { label: null }], ["Maaser"])).toEqual(["Family", "Work", "Maaser"]);
+    expect(knownLabels([{ label: "Family" }, { label: "family" }, { label: "Work" }, { label: null }], ["Gifts"])).toEqual(["Family", "Work", "Gifts"]);
   });
 });

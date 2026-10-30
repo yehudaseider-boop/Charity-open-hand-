@@ -27,7 +27,7 @@ describe("app tax year (SARS)", () => {
   });
 });
 
-import { groupByMonth, maaserTargetCents, taxYearsGiven, totalInTaxYear } from "../apps/mobile/src/lib/giving";
+import { groupByMonth, taxYearsGiven, totalInTaxYear } from "../apps/mobile/src/lib/giving";
 
 describe("app giving helpers", () => {
   const rows = [
@@ -41,10 +41,6 @@ describe("app giving helpers", () => {
   });
   it("groups by month, newest first", () => {
     expect(groupByMonth(rows).map((g) => g.label)).toEqual(["October 2026", "March 2026", "February 2026"]);
-  });
-  it("maaser target is the percentage of income", () => {
-    expect(maaserTargetCents(4_800_000, 100_000)).toBe(480_000); // 10% of R48 000
-    expect(maaserTargetCents(4_800_000, 200_000)).toBe(960_000); // 20% (chomesh)
   });
 });
 

@@ -44,9 +44,8 @@ const securityHeaders = [
 
 const receiptFiles = [
   "./node_modules/@sparticuz/chromium/bin/**",
-  "./node_modules/@fontsource/fredoka/files/fredoka-latin-600-normal.woff2",
+  "./src/lib/receipts/fonts/BricolageGrotesque-Bold.ttf",
   "./node_modules/@fontsource/dm-sans/files/dm-sans-latin-{400,500,600}-normal.woff2",
-  "./node_modules/@fontsource/heebo/files/heebo-hebrew-{400,600}-normal.woff2",
   "./public/logo.png",
 ];
 

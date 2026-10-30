@@ -1,8 +1,8 @@
 import { glossary, type GlossaryTerm } from "@/lib/glossary";
 
 /**
- * A small "i" that opens a plain-English explanation of a term (maaser,
- * chomesh, s18A...). Built on <details>, so it works without JavaScript and
+ * A small "i" that opens a plain-English explanation of a term (s18A,
+ * tax pack...). Built on <details>, so it works without JavaScript and
  * with screen readers.
  */
 export function Info({ terms, label }: { terms: GlossaryTerm[]; label?: string }) {

@@ -30,7 +30,7 @@ export default async function YourInformationPage() {
       </p>
 
       <Card title="Download everything we hold about you">
-        <p className="text-sm text-muted">Your account, donations, receipts, maaser records and agreements, in one file.</p>
+        <p className="text-sm text-muted">Your account, donations, receipts, giving records and agreements, in one file.</p>
         <a href="/account/data/export" className="mt-3 inline-block rounded-control bg-brand px-4 py-2.5 text-sm font-medium text-brand-contrast">
           Download my information
         </a>

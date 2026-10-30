@@ -32,4 +32,10 @@ describe("checkout: the donor's own label", () => {
     expect(sameLabel("maaser", "Maaser ")).toBe(true);
     expect(sameLabel(null, "Maaser")).toBe(false);
   });
+  it("every old stored kind still reads, never crashes, and nothing else is guessed", () => {
+    expect([labelOf({ kind: "maaser" }), labelOf({ kind: "chomesh" }), labelOf({ kind: "tzedaka" })]).toEqual(["Maaser", "Chomesh", "Tzedaka"]);
+    expect(labelOf({ kind: "gift" })).toBeNull();
+    expect(labelOf({ kind: "constructor" })).toBeNull();
+    expect(labelOf({ kind: "toString", label: "  " })).toBeNull();
+  });
 });

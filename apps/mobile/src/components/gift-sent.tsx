@@ -18,7 +18,6 @@ import { Text } from "./text";
  * counted. Only given on a first confirmed gift, to someone with no goal, and only once ever.
  */
 export type GoalInvite = {
-  jewish: boolean;
   labels: string[];
   signedIn: boolean;
   /** Where a goal stands with this gift counted. `targetCents` is null for a share of income not yet logged. */
@@ -170,7 +169,6 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
             <GoalEditor
               initial={null}
               labels={invite.labels}
-              jewish={invite.jewish}
               title="Set your goal"
               cancelLabel="Back"
               onCancel={() => setPhase("invite")}

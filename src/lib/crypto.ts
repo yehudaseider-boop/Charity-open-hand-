@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "node:
 
 /**
  * Field encryption for sensitive values (bank account numbers, ID numbers,
- * tax reference numbers, maaser income). AES-256-GCM with a key held only in
+ * tax reference numbers, income entries). AES-256-GCM with a key held only in
  * the ENCRYPTION_KEY environment variable, never in the database.
  *
  * Stored format: "v1.<iv>.<auth tag>.<ciphertext>", each part base64url.

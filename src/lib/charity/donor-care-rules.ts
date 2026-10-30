@@ -24,7 +24,7 @@ export function checkNote(raw: unknown): Checked<string> {
 export function checkReminder(what: unknown, dueOn: unknown, today: string): { ok: true; what: string; dueOn: string } | { ok: false; errors: Record<string, string> } {
   const e: Record<string, string> = {};
   const w = clean(String(what ?? ""), false);
-  if (!w) e.what = "Say what to do, for example \"Phone to thank for the Pesach gift\"";
+  if (!w) e.what = "Say what to do, for example \"Phone to thank for the year-end gift\"";
   else if (w.length > 300) e.what = "Keep it to 300 characters";
   const typed = String(dueOn ?? "").trim();
   const d = typedDay(typed) ?? typed;

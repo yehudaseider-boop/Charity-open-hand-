@@ -15,9 +15,7 @@ import { Text } from "@/components/text";
 import { sampleDonor } from "@/data/giving";
 import { useAccount } from "@/lib/account";
 import { startAgainAsNewDonor } from "@/lib/first-run";
-import { setJewishMode, useJewishMode } from "@/lib/jewish-mode";
 import { SavedCardRow } from "@/components/saved-card-row";
-import { SwitchRow } from "@/components/switch-row";
 import { confirmThen, notify, openSite } from "@/lib/open-site";
 import { helpLine, helpMailto } from "@/lib/help";
 import { TEST_BUILD } from "@/lib/test-build";
@@ -52,21 +50,6 @@ export default function Account() {
   // Legal pages live on the website (one source of truth). Apple requires a
   // privacy policy link in the app, and a way to start deleting your account.
   const open = (path: string) => () => openSite(path);
-  const jewish = useJewishMode();
-  // Available signed in or not: it lives on this phone only.
-  const preferences = (
-    <View style={{ gap: 8 }}>
-      <Text style={styles.groupTitle}>Preferences</Text>
-      <View style={styles.prefs}>
-        <SwitchRow
-          label="Jewish calendar and maaser"
-          description="The Hebrew date, Shabbos and Yom Tov touches, and maaser and chomesh in your giving. Saved on this phone only."
-          value={jewish}
-          onChange={setJewishMode}
-        />
-      </View>
-    </View>
-  );
   // A person to talk to: the support email once there is one, else reply to any email from us.
   const getHelp = () => {
     const mail = helpMailto();
@@ -140,7 +123,7 @@ export default function Account() {
           <>
             {/* The two places people come back to, as big tiles rather than list rows. */}
             <View style={styles.tiles}>
-              <Tile label={jewish ? "Progress and maaser" : "Your progress"} icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
+              <Tile label="Your progress" icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
               <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.peach} onPress={() => router.push("/receipts")} />
             </View>
             <InsightsLink />
@@ -149,7 +132,6 @@ export default function Account() {
             ) : null}
 
             <SavedCardRow />
-            {preferences}
             <SettingsGroup title="App" cells={support} />
             <SettingsGroup
               title="Your information"
@@ -182,7 +164,6 @@ export default function Account() {
             ) : (
               <SignIn />
             )}
-            {preferences}
             <SettingsGroup title="App" cells={support} />
           </>
         )}
@@ -212,8 +193,6 @@ const styles = StyleSheet.create({
   hero: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, paddingTop: 24, paddingHorizontal: 22, paddingBottom: 22, overflow: "hidden", gap: 12 },
   heroArt: { alignSelf: "center", marginTop: 4, marginBottom: -22 },
   key: { color: colors.blue },
-  groupTitle: { fontFamily: fonts.display, fontSize: 18, lineHeight: 24, color: colors.navy, paddingHorizontal: 4 },
-  prefs: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
   profile: { flexDirection: "row", alignItems: "center", gap: 16, paddingRight: 30 },
   avatar: { width: 68, height: 68, borderRadius: 34, backgroundColor: colors.blue, borderWidth: 4, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: fonts.displayBold, fontSize: 26, color: colors.onInk },

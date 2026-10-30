@@ -18,7 +18,7 @@ beforeAll(async () => {
   ids = {
     donorUser: await one("select id from auth.users where email = $1", ["donor@nedivlev.test"]),
     mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
-    shulAdmin: await one("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    hallAdmin: await one("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
     meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
   };
 });
@@ -71,7 +71,7 @@ describe("charity photos and updates", () => {
 
   it("another charity, a donor, the public, or an admin without the second step cannot post or remove", async () => {
     await tx(async () => {
-      for (const [who, aal] of [[ids.shulAdmin, "aal2"], [ids.donorUser, "aal1"], [ids.mealsAdmin, "aal1"]]) {
+      for (const [who, aal] of [[ids.hallAdmin, "aal2"], [ids.donorUser, "aal1"], [ids.mealsAdmin, "aal1"]]) {
         await as(who, aal);
         await refused("insert into public.charity_updates (charity_id, body_en) values ($1, 'x')", [ids.meals], /row-level security/);
         await refused("insert into public.charity_photos (charity_id, storage_path) values ($1, $2)", [ids.meals, `${ids.meals}/photos/x.jpg`], /row-level security/);
@@ -81,7 +81,7 @@ describe("charity photos and updates", () => {
 
       await as(ids.mealsAdmin);
       const { rows } = await addUpdate();
-      await as(ids.shulAdmin);
+      await as(ids.hallAdmin);
       await run("delete from public.charity_updates where id = $1", [rows[0].id]);
       await as(ids.mealsAdmin);
       expect((await run("select count(*)::int as n from public.charity_updates where id = $1", [rows[0].id])).rows[0].n).toBe(1);
@@ -95,7 +95,7 @@ describe("charity photos and updates", () => {
       await as(ids.mealsAdmin);
       const { rows } = await addUpdate();
       await refused("update public.charity_updates set body_en = 'changed' where id = $1", [rows[0].id], /permission denied/);
-      await refused("insert into public.charity_updates (charity_id, body_en, posted_by) values ($1, 'x', $2)", [ids.meals, ids.shulAdmin], /permission denied/);
+      await refused("insert into public.charity_updates (charity_id, body_en, posted_by) values ($1, 'x', $2)", [ids.meals, ids.hallAdmin], /permission denied/);
     });
   });
 
@@ -137,9 +137,9 @@ describe("saved charities (favourites)", () => {
       await as(ids.donorUser, "aal1");
       await run("insert into public.favourites (user_id, charity_id) values ($1, $2)", [ids.donorUser, ids.meals]);
       expect((await run("select count(*)::int as n from public.favourites")).rows[0].n).toBe(1);
-      await refused("insert into public.favourites (user_id, charity_id) values ($1, $2)", [ids.shulAdmin, ids.meals], /row-level security/);
+      await refused("insert into public.favourites (user_id, charity_id) values ($1, $2)", [ids.hallAdmin, ids.meals], /row-level security/);
 
-      await as(ids.shulAdmin);
+      await as(ids.hallAdmin);
       expect((await run("select count(*)::int as n from public.favourites")).rows[0].n).toBe(0);
       await run("delete from public.favourites where user_id = $1", [ids.donorUser]);
       await as("anon");

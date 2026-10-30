@@ -46,7 +46,7 @@ const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ?
 /**
  * Paid donations only: they are what counts towards the donor's goals.
  * (Refunded or charged-back donations drop out; pending ones aren't money yet.)
- * Each carries the donor's own label, if they gave one (old maaser/chomesh/tzedaka choices read as labels).
+ * Each carries the donor's own label, if they gave one (old fixed choices read as labels).
  */
 export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
   const labelFor = new Map(kinds.map((k) => [k.donation_id, labelOf(k)]));

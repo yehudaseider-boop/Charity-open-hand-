@@ -74,7 +74,7 @@ describe("typed dates", () => {
   });
 });
 
-describe("income and maaser owed", () => {
+describe("income", () => {
   it("drops damaged entries and sorts newest first", () => {
     const out = cleanIncome([
       { id: "a", date: "2026-09-01", cents: 2_500_000, note: "Sept" },

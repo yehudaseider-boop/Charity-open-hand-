@@ -6,7 +6,7 @@ import { loadTarget } from "./targets";
 
 /**
  * The donor's giving goals, on this phone only (one set per person, see owned-storage). Someone
- * who set maaser targets in an earlier version sees them here as goals; the old record is kept.
+ * who set targets in a much older version sees them here as goals; the old record is kept.
  * A failed read is a failure, never "no goals": the screen must not save over what it can't read.
  */
 const KEY = "nediv-lev.giving-goals";

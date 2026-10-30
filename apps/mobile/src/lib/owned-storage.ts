@@ -1,7 +1,7 @@
 import { secureStorage } from "./secure-storage";
 
 /**
- * Personal records kept on the phone (income log, maaser targets) belong to
+ * Personal records kept on the phone (income log, giving goals) belong to
  * the person, not the phone: each signed-in person has their own copy, so on
  * a shared phone nobody sees anyone else's.
  *

@@ -6,7 +6,7 @@ const row = (o: Partial<CharityRow> = {}): CharityRow => ({
   id: "c1",
   slug: "meals",
   name_en: "Meals Fund",
-  description_en: "Weekly Shabbos parcels for families. We started in 2010.",
+  description_en: "Weekly food parcels for families. We started in 2010.",
   funds_use_en: "Food.",
   cover_path: "c1/cover-a.jpg",
   suburb: "Northcliff",
@@ -20,7 +20,7 @@ const row = (o: Partial<CharityRow> = {}): CharityRow => ({
 describe("live charity directory in the app", () => {
   it("maps a charity row, with the website's s18A rule", () => {
     const c = toCharity(row(), base);
-    expect(c).toMatchObject({ slug: "meals", area: "Northcliff, Johannesburg", cause: "Weekly Shabbos parcels for families.", issues18a: true, causeIds: ["food", "medical"] });
+    expect(c).toMatchObject({ slug: "meals", area: "Northcliff, Johannesburg", cause: "Weekly food parcels for families.", issues18a: true, causeIds: ["food", "medical"] });
     expect(c.coverUrl).toBe(`${base}/storage/v1/object/public/charity-public/c1/cover-a.jpg`);
     expect(toCharity(row({ mandate_signed_at: null }), base).issues18a).toBe(false);
     expect(toCharity(row({ cover_path: null, suburb: null }), base)).toMatchObject({ coverUrl: null, area: "Johannesburg" });
@@ -39,9 +39,9 @@ describe("live charity directory in the app", () => {
 
   it("only shows causes that have a charity, and filters by any of a charity's causes", () => {
     const list = [toCharity(row(), base)];
-    expect(toCauses([{ id: "food", name_en: "Food" }, { id: "shuls", name_en: "Shuls" }, { id: "medical", name_en: "Medical" }], list).map((c) => c.id)).toEqual(["all", "food", "medical"]);
+    expect(toCauses([{ id: "food", name_en: "Food" }, { id: "sport", name_en: "Sport" }, { id: "medical", name_en: "Medical" }], list).map((c) => c.id)).toEqual(["all", "food", "medical"]);
     expect(inCause(list[0], "medical")).toBe(true);
-    expect(inCause(list[0], "shuls")).toBe(false);
+    expect(inCause(list[0], "sport")).toBe(false);
     expect(inCause(list[0], "all")).toBe(true);
   });
 

@@ -7,7 +7,7 @@ import { InfoIcon } from "./icons";
 import { Text } from "./text";
 
 /**
- * A small "i" button that explains a term (maaser, chomesh, s18A...) in plain
+ * A small "i" button that explains a term (such as s18A) in plain
  * English, for donors who don't know it. Opens a card over whatever screen or
  * sheet it sits in.
  */

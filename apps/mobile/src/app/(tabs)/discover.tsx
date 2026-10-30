@@ -20,7 +20,6 @@ import { haptic } from "@/lib/haptics";
 import { loadCausePrefs } from "@/lib/cause-prefs";
 import { causesFirst, inCause } from "@/lib/live-charities";
 import { useScreenState } from "@/lib/screen-state";
-import { SeasonalCard } from "@/components/day-greeting";
 import { Bubbles, People } from "@/components/people";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
@@ -109,7 +108,6 @@ export default function Discover() {
             </View>
           </View>
           {directory.offlineSince ? <OfflineNote savedAt={directory.offlineSince} /> : null}
-          <SeasonalCard />
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityRole="radiogroup">

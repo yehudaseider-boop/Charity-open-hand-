@@ -4,7 +4,7 @@
  */
 import type { Goal } from "../lib/goals";
 
-export type Gift = { id: string; /** The Johannesburg calendar day it was paid. */ date: Date; /** The exact moment it was paid (live donations), for "new since you last looked". */ at?: Date; charitySlug: string; charityName: string; cents: number; monthly: boolean; with18a: boolean; /** The donor's own label for it ("Work giving", "Maaser"), if they gave one. */ label: string | null; /** The charity's own thank-you note, if it wrote one. */ thankYou?: string };
+export type Gift = { id: string; /** The Johannesburg calendar day it was paid. */ date: Date; /** The exact moment it was paid (live donations), for "new since you last looked". */ at?: Date; charitySlug: string; charityName: string; cents: number; monthly: boolean; with18a: boolean; /** The donor's own label for it ("Work giving", "Family"), if they gave one. */ label: string | null; /** The charity's own thank-you note, if it wrote one. */ thankYou?: string };
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 
@@ -13,7 +13,7 @@ export const gifts: Gift[] = [
   { id: "g7", date: d(2026, 10, 1), charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 50_000, monthly: true, with18a: true, label: "Work giving" },
   { id: "g6", date: d(2026, 9, 15), charitySlug: "sandton-patient-care", charityName: "Sandton Patient Care Volunteers", cents: 18_000, monthly: true, with18a: true, label: null },
   { id: "g5", date: d(2026, 9, 1), charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 50_000, monthly: true, with18a: true, label: "Work giving" },
-  { id: "g4", date: d(2026, 8, 28), charitySlug: "glenhazel-shul-fund", charityName: "Glenhazel Community Shul Fund", cents: 18_000, monthly: false, with18a: false, label: null },
+  { id: "g4", date: d(2026, 8, 28), charitySlug: "melville-community-hall", charityName: "Melville Community Hall Trust", cents: 18_000, monthly: false, with18a: false, label: null },
   { id: "g3", date: d(2026, 8, 1), charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 50_000, monthly: true, with18a: true, label: "Work giving" },
   { id: "g2", date: d(2026, 1, 20), charitySlug: "northcliff-meals-fund", charityName: "Northcliff Meals Fund", cents: 100_000, monthly: false, with18a: true, label: "Family" },
   { id: "g1", date: d(2025, 11, 3), charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 180_000, monthly: false, with18a: true, label: "Work giving" },
@@ -44,4 +44,4 @@ export const receipts: Receipt[] = [
   { id: "x2", taxYear: 2026, charityName: "Northcliff Meals Fund", number: "NMF-2026-0118", cents: 100_000, issued: d(2026, 3, 9) },
 ];
 
-export const sampleDonor = { name: "Sarah Levin", email: "sarah@example.co.za" };
+export const sampleDonor = { name: "Sarah Dube", email: "sarah@example.co.za" };

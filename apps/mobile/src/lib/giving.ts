@@ -22,11 +22,6 @@ export function groupByMonth<T extends { date: Date }>(rows: T[]): { label: stri
   return groups;
 }
 
-/** Maaser target from income and a percentage in ppm (10% = 100000), rounded to the nearest cent. */
-export function maaserTargetCents(incomeCents: number, percentPpm: number): number {
-  return Math.round((incomeCents * percentPpm) / 1_000_000);
-}
-
 /** Whole-number percent of a part in a total, rounded; 0 when the total is 0. */
 export function percentOf(partCents: number, totalCents: number): number {
   return totalCents > 0 ? Math.round((partCents * 100) / totalCents) : 0;

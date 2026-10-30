@@ -47,7 +47,7 @@ function DashboardScreen() {
       </div>
       <ul className="flex flex-col text-[14px]">
         <li className="flex justify-between border-b border-border py-2"><span>Sarah L. · monthly</span><span className="font-bold">R360</span></li>
-        <li className="flex justify-between py-2"><span>Daniel C. · in memory of Chaim Cohen</span><span className="font-bold">R500</span></li>
+        <li className="flex justify-between py-2"><span>Daniel C. · in memory of Grace Dlamini</span><span className="font-bold">R500</span></li>
       </ul>
     </div>
   );
@@ -131,8 +131,8 @@ export default function ForCharitiesPage() {
             <Screen>
               <ul className="flex flex-col gap-2 text-[14px]">
                 <li className="flex items-center justify-between"><span className="font-semibold">Sarah L.</span><span className="rounded-full bg-success-soft px-2 py-0.5 text-[12px] font-semibold text-success">Running</span><span className="font-bold">R360</span></li>
-                <li className="flex items-center justify-between"><span className="font-semibold">Rivka K.</span><span className="rounded-full bg-success-soft px-2 py-0.5 text-[12px] font-semibold text-success">Running</span><span className="font-bold">R180</span></li>
-                <li className="flex items-center justify-between"><span className="font-semibold">Moshe A.</span><span className="rounded-full bg-warning-soft px-2 py-0.5 text-[12px] font-semibold text-warning">Retrying</span><span className="font-bold">R250</span></li>
+                <li className="flex items-center justify-between"><span className="font-semibold">Lindiwe K.</span><span className="rounded-full bg-success-soft px-2 py-0.5 text-[12px] font-semibold text-success">Running</span><span className="font-bold">R180</span></li>
+                <li className="flex items-center justify-between"><span className="font-semibold">Johan A.</span><span className="rounded-full bg-warning-soft px-2 py-0.5 text-[12px] font-semibold text-warning">Retrying</span><span className="font-bold">R250</span></li>
               </ul>
             </Screen>
           </PastelCard>

@@ -55,7 +55,7 @@ describe("the Payments page", () => {
       audit_log: [{ id: 1, action: "donation.amount_mismatch", created_at: ago(500), entity_id: "x" }],
       recurring_donations: [
         { id: "r1", status: "failed", next_charge_at: null, last_attempt_at: ago(30), amount_cents: 18000, contribution_cents: 2000, charities: [{ name_en: "Meals Fund" }] },
-        { id: "r2", status: "active", next_charge_at: ago(60 * 30), last_attempt_at: null, amount_cents: 100, contribution_cents: 0, charities: { name_en: "Shul Fund" } },
+        { id: "r2", status: "active", next_charge_at: ago(60 * 30), last_attempt_at: null, amount_cents: 100, contribution_cents: 0, charities: { name_en: "Hall Fund" } },
       ],
     };
     const html = await page();

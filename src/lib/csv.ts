@@ -29,7 +29,7 @@ export function csvPhone(phone: string | null | undefined): string {
   return phone;
 }
 
-/** Header and rows to CSV text, with a byte order mark so Excel reads accents and Hebrew correctly. */
+/** Header and rows to CSV text, with a byte order mark so Excel reads accents and other scripts correctly. */
 export function toCsv(header: string[], rows: (string | number | null | undefined)[][]): string {
   return "﻿" + [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

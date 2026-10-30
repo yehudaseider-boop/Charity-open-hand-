@@ -8,20 +8,10 @@ const required = (label: string, max = 200) =>
     .min(1, `Enter the ${label.toLowerCase()}`)
     .max(max, tooLong(max));
 
-/** Hebrew fields must contain Hebrew letters (stops English pasted in by mistake). */
-const hebrew = (max = 200) =>
-  z
-    .string()
-    .max(max)
-    .refine((v) => /[֐-׿]/.test(v), "Use Hebrew letters here, or leave it empty")
-    .optional();
-
 export const organisationSchema = z
   .object({
     name_en: required("Display name", 120),
-    name_he: hebrew(120),
     legal_name_en: required("Registered legal name", 200),
-    legal_name_he: hebrew(200),
     npo_number: optional(40),
     pbo_number: optional(40),
     s18a_reference: optional(40),

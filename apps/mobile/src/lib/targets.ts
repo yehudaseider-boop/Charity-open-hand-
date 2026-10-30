@@ -2,7 +2,7 @@ import type { Target } from "./target-type";
 import { loadOwned, saveOwned } from "./owned-storage";
 import type { LoadResult, SaveResult } from "./stored-result";
 
-/** The donor's maaser and chomesh targets, kept on this phone only, one set per person. */
+/** The donor's targets from a much older version, kept on this phone only, one set per person. The key is unchanged so they still read. */
 const KEY = "nediv-lev.maaser-target";
 const BACKUP_KEY = `${KEY}.set-aside`;
 

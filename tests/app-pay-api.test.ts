@@ -8,9 +8,9 @@ describe("app pay api", () => {
       seen.push({ url, body });
       return { status: 200, json: { ok: true, quote: { amountCents: 1800, contributionCents: 0, totalCents: 1800 } } };
     };
-    const r = await requestQuote("https://x.test/", "kollel", 1800, 0, post);
+    const r = await requestQuote("https://x.test/", "learning-centre", 1800, 0, post);
     expect(r.ok && r.quote.totalCents).toBe(1800);
-    expect(seen[0]).toEqual({ url: "https://x.test/api/app/quote", body: { slug: "kollel", giftCents: 1800, contributionCents: 0 } });
+    expect(seen[0]).toEqual({ url: "https://x.test/api/app/quote", body: { slug: "learning-centre", giftCents: 1800, contributionCents: 0 } });
   });
 
   it("turns a network failure or a garbled reply into a plain message", async () => {

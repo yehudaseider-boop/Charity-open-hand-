@@ -501,7 +501,7 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
               maxLength={80}
               defaultValue={initialLabel}
               autoDirection
-              hint="Only you see it, in your giving records. For example: Work giving, Family, or Maaser."
+              hint="Only you see it, in your giving records. For example: Work giving, Family, or Birthday."
             />
 
             <Dedicate error={state.fieldErrors?.dedication_name} />

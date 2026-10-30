@@ -7,7 +7,7 @@ import pg from "pg";
 const client = new pg.Client({
   connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 });
-let donor: string, meals: string, mealsAdmin: string, shulAdmin: string;
+let donor: string, meals: string, mealsAdmin: string, hallAdmin: string;
 
 beforeAll(async () => {
   await client.connect();
@@ -15,7 +15,7 @@ beforeAll(async () => {
   donor = await one("select id from public.donors where email = 'donor@nedivlev.test'");
   meals = await one("select id from public.charities where slug = 'northcliff-meals-fund'");
   mealsAdmin = await one("select id from auth.users where email = 'meals.admin@nedivlev.test'");
-  shulAdmin = await one("select id from auth.users where email = 'shul.admin@nedivlev.test'");
+  hallAdmin = await one("select id from auth.users where email = 'hall.admin@nedivlev.test'");
 });
 afterAll(() => client.end());
 
@@ -107,7 +107,7 @@ describe("checkout details", () => {
       // Only the paid donation: people who abandoned checkout stay private.
       expect((await run("select id from public.charity_donations")).rows.map((r) => r.id)).toEqual([id]);
       expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(0); // raw table is closed to charities
-      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: shulAdmin, role: "authenticated", aal: "aal2" })]);
+      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: hallAdmin, role: "authenticated", aal: "aal2" })]);
       expect((await run("select * from public.charity_donations")).rowCount).toBe(0);
     });
   });

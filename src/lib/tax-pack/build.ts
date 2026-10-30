@@ -86,7 +86,7 @@ export function buildTaxPack(taxYear: number, donations: PackDonationRow[], rece
     if (l.s18a) c.s18aCents += l.cents;
     charities.set(l.charityName, c);
   }
-  // Labels are grouped whatever their case ("maaser" with "Maaser"), shown as first written.
+  // Labels are grouped whatever their case ("family" with "Family"), shown as first written.
   const labels = new Map<string, { label: string; cents: number }>();
   for (const l of lines) {
     const name = l.label ?? "No label";

@@ -133,7 +133,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
               <OrganisationForm
                 action={saveOrganisation.bind(null, id)}
                 charity={{
-                  name_en: charity.name_en, name_he: charity.name_he, legal_name_en: charity.legal_name_en, legal_name_he: charity.legal_name_he,
+                  name_en: charity.name_en, legal_name_en: charity.legal_name_en,
                   npo_number: charity.npo_number, pbo_number: charity.pbo_number, s18a_reference: charity.s18a_reference,
                 }}
               />

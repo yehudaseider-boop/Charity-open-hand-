@@ -23,7 +23,7 @@ describe("the annual tax pack", () => {
   it("splits the total into s18A and other donations, in whole cents", () => {
     const pack = buildTaxPack(2027, [
       row({ id: "a", amountCents: 33_333 }),
-      row({ id: "b", amountCents: "18000", wants18a: false, charityName: "Glenhazel Shul Fund" }),
+      row({ id: "b", amountCents: "18000", wants18a: false, charityName: "Glenhazel Hall Trust" }),
       row({ id: "c", amountCents: 1, paidAt: "2026-09-01T08:00:00Z" }),
     ], []);
     expect(pack.totalCents).toBe(51_334);
@@ -31,7 +31,7 @@ describe("the annual tax pack", () => {
     expect(pack.otherCents).toBe(18_000);
     expect(pack.byCharity).toEqual([
       { name: "Northcliff Meals Fund", cents: 33_334, count: 2, s18aCents: 33_334 },
-      { name: "Glenhazel Shul Fund", cents: 18_000, count: 1, s18aCents: 0 },
+      { name: "Glenhazel Hall Trust", cents: 18_000, count: 1, s18aCents: 0 },
     ]);
   });
 

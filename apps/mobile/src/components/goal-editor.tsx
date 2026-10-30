@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { parseRandToCents, percentToPpm } from "@shared/money";
 import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
-import { CHOMESH_PRESET, MAASER_PRESET, ppmToPercentText, type Goal, type GoalPeriod, type GoalYear } from "@/lib/goals";
+import { ppmToPercentText, type Goal, type GoalPeriod } from "@/lib/goals";
 import { haptic } from "@/lib/haptics";
 import { centsToInput } from "@/lib/pay-api";
 import { colors, fonts, radius } from "@/theme/tokens";
@@ -26,14 +26,12 @@ function percentFrom(text: string): number | null {
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
- * Set or change a giving goal: a share of income (10% is maaser) or a set amount, per month or per
- * year, counting all giving or only gifts with certain labels. With the Jewish switch on, Maaser and
- * Chomesh are one tap away, and a year can run Rosh Hashana to Rosh Hashana.
+ * Set or change a giving goal: a share of income or a set amount, per month or per tax year,
+ * counting all giving or only gifts with certain labels.
  */
 export function GoalEditor({
   initial,
   labels,
-  jewish,
   onSave,
   onCancel,
   onRemove,
@@ -43,7 +41,6 @@ export function GoalEditor({
   initial: Goal | null;
   /** Labels the donor has used, for "only gifts labelled". */
   labels: string[];
-  jewish: boolean;
   /** May return a promise: the button then says "Saving…" and can't be tapped twice until it settles. */
   onSave: (g: Goal) => void | Promise<unknown>;
   onCancel?: () => void;
@@ -56,7 +53,6 @@ export function GoalEditor({
   const [percent, setPercent] = useState(initial?.percentPpm ? ppmToPercentText(initial.percentPpm).replace("%", "") : "10");
   const [amount, setAmount] = useState(initial?.fixedCents ? centsToInput(initial.fixedCents) : "");
   const [period, setPeriod] = useState<GoalPeriod>(initial?.period ?? "year");
-  const [year, setYear] = useState<GoalYear>(initial?.year ?? "tax");
   const [some, setSome] = useState(Boolean(initial?.counts));
   const [chosen, setChosen] = useState<string[]>(initial?.counts ?? []);
   const [newLabel, setNewLabel] = useState("");
@@ -67,17 +63,6 @@ export function GoalEditor({
   for (const c of chosen) if (!offered.some((o) => o.toLowerCase() === c.toLowerCase())) offered.push(c);
   const isChosen = (l: string) => chosen.some((c) => c.toLowerCase() === l.toLowerCase());
   const toggle = (l: string) => setChosen((cs) => (isChosen(l) ? cs.filter((c) => c.toLowerCase() !== l.toLowerCase()) : [...cs, l]));
-
-  const preset = (p: Omit<Goal, "id">) => {
-    haptic.tap();
-    setName(p.name);
-    setBasis(p.basis);
-    setPercent(p.percentPpm ? ppmToPercentText(p.percentPpm).replace("%", "") : "10");
-    setPeriod(p.period);
-    setYear(p.year);
-    setSome(Boolean(p.counts));
-    setChosen(p.counts ?? []);
-  };
 
   const save = () => {
     const e: Record<string, string> = {};
@@ -96,7 +81,7 @@ export function GoalEditor({
       percentPpm: basis === "income" ? ppm : null,
       fixedCents: basis === "fixed" ? cents : null,
       period,
-      year: jewish ? year : initial?.year === "hebrew" ? "hebrew" : "tax",
+      year: "tax",
       counts: some ? chosen : null,
     });
     if (result instanceof Promise) {
@@ -111,19 +96,6 @@ export function GoalEditor({
         <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>{title ?? (initial ? "Change your goal" : "Set a giving goal")}</Text>
         <Text variant="bodyMuted">How much you&apos;d like to give, so you can see how you&apos;re doing. Only you see it, and it stays on this phone.</Text>
       </View>
-
-      {jewish && !initial ? (
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <Pressable accessibilityRole="button" onPress={() => preset(MAASER_PRESET)} style={styles.preset}>
-            <Text style={styles.presetTitle}>Maaser</Text>
-            <Text variant="label">10% of income</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => preset(CHOMESH_PRESET)} style={styles.preset}>
-            <Text style={styles.presetTitle}>Chomesh</Text>
-            <Text variant="label">A further 10%</Text>
-          </Pressable>
-        </View>
-      ) : null}
 
       <Field label="Name" value={name} onChangeText={setName} maxLength={40} error={errors.name} />
 
@@ -158,18 +130,6 @@ export function GoalEditor({
           { value: "year", label: "Year" },
         ]}
       />
-      {period === "year" && jewish ? (
-        <Segmented
-          label="Year runs"
-          value={year}
-          onChange={setYear}
-          options={[
-            { value: "tax", label: "Tax year (March)" },
-            { value: "hebrew", label: "Rosh Hashana" },
-          ]}
-        />
-      ) : null}
-
       <Segmented
         label="What counts"
         value={some ? "some" : "all"}
@@ -218,8 +178,6 @@ export function GoalEditor({
 
 const styles = StyleSheet.create({
   card: { gap: 18, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  preset: { flex: 1, minHeight: 64, padding: 12, gap: 2, borderRadius: radius.control, borderWidth: 1.5, borderColor: colors.blue, backgroundColor: colors.blueSoft, justifyContent: "center" },
-  presetTitle: { fontFamily: fonts.bodySemibold, fontSize: 17, color: colors.blue },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.blue, justifyContent: "center", backgroundColor: colors.surface },
   chipOn: { backgroundColor: colors.blue },

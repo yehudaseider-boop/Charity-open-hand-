@@ -11,7 +11,7 @@ export type Viewer = {
   email: string;
   isPlatformAdmin: boolean;
   /** Charities this person administers (readable only after the second step). */
-  charities: { id: string; name_en: string; name_he: string | null; status: string }[];
+  charities: { id: string; name_en: string; status: string }[];
   /** Ids of the charities this person administers, known even before the second step. */
   managedCharityIds: string[];
   /** Has agreed to the current Terms and Privacy Policy (POPIA). */
@@ -38,7 +38,7 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer | null
     supabase.from("profiles").select("role").eq("id", user.id).single(),
     supabase
       .from("charity_admins")
-      .select("charity_id, charities(id, name_en, name_he, status)")
+      .select("charity_id, charities(id, name_en, status)")
       .eq("user_id", user.id),
     supabase
       .from("consents")

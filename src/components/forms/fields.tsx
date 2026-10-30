@@ -43,7 +43,6 @@ function Wrapper({ id, name, label, hint, required, children }: Base & { id: str
 export function TextField({
   defaultValue,
   type = "text",
-  hebrew,
   autoDirection,
   inputMode,
   autoComplete,
@@ -52,9 +51,7 @@ export function TextField({
 }: Base & {
   defaultValue?: string | null;
   type?: "text" | "email" | "tel" | "url";
-  /** Hebrew input: right-to-left. */
-  hebrew?: boolean;
-  /** English or Hebrew: the box follows the direction of what is typed. */
+  /** The box follows the direction of what is typed (left to right or right to left). */
   autoDirection?: boolean;
   inputMode?: "numeric" | "decimal" | "tel" | "email" | "url";
   autoComplete?: string;
@@ -76,7 +73,7 @@ export function TextField({
         inputMode={inputMode}
         autoComplete={autoComplete}
         maxLength={maxLength}
-        {...(hebrew ? { lang: "he", dir: "rtl" } : autoDirection ? { dir: "auto" } : {})}
+        {...(autoDirection ? { dir: "auto" } : {})}
         className={inputClass}
       />
     </Wrapper>
@@ -101,11 +98,10 @@ export function DateField({ defaultValue, hint, ...base }: Base & { defaultValue
 
 export function TextArea({
   defaultValue,
-  hebrew,
   rows = 5,
   maxLength,
   ...base
-}: Base & { defaultValue?: string | null; hebrew?: boolean; rows?: number; maxLength?: number }) {
+}: Base & { defaultValue?: string | null; rows?: number; maxLength?: number }) {
   const error = useFieldError(base.name);
   const id = useFieldId(base.name);
   return (
@@ -119,7 +115,6 @@ export function TextArea({
         required={base.required}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : base.hint ? `${id}-hint` : undefined}
-        {...(hebrew ? { lang: "he", dir: "rtl" } : {})}
         className={inputClass}
       />
     </Wrapper>

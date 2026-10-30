@@ -16,7 +16,7 @@ beforeAll(async () => {
   const one = async (sql: string, a: unknown[]) => (await run(sql, a)).rows[0].id as string;
   ids = {
     mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
-    shulAdmin: await one("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    hallAdmin: await one("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
     meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
   };
 });
@@ -56,7 +56,7 @@ describe("a charity's own impact figure", () => {
 
   it("another charity's admin cannot change it", () =>
     tx(async () => {
-      await as(ids.shulAdmin);
+      await as(ids.hallAdmin);
       const r = await run(SET + " returning id", [ids.meals, 100, "x", "y"]);
       expect(r.rowCount).toBe(0);
     }));

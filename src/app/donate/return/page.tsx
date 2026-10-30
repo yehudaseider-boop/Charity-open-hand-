@@ -14,7 +14,6 @@ import { headers } from "next/headers";
 import { clientIp } from "@/lib/client-ip";
 import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
-import { HebrewAware } from "@/components/hebrew-aware";
 import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
 import { getViewer } from "@/lib/auth";
 import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
@@ -52,7 +51,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // provider: donation ids are not secret, and the webhook settles every payment anyway. Anyone
   // else sees the saved state only.
   const holdsToken = ref ? await confirmationTokenMatches(ref, t) : false;
-  // Per donation: donors behind one shared address (a shul's Wi-Fi) must not block each other.
+  // Per donation: donors behind one shared address (a school's or an office's Wi-Fi) must not block each other.
   const limited = holdsToken ? await hitRateLimit("return-check", [`ref:${ref}`, ...ipKeys(clientIp(await headers()))], 40, 10).catch(() => false) : false;
   const outcome = !holdsToken
     ? await savedOutcome(ref)
@@ -131,7 +130,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
             <div className="flex justify-between gap-3">
               <dt>Dedication</dt>
-              <dd className="text-right" dir="auto"><HebrewAware text={dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)} /></dd>
+              <dd className="text-right" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd>
             </div>
           ) : null}
         </dl>

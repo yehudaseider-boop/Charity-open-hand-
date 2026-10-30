@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /**
  * The rate-limit key for a visitor's address. No address (the hosting header is missing) gives no key,
  * so everyone is not counted together under one "unknown" address; the other keys still apply.
- * Many donors share one address (a shul hall, an office), so an address gets a wider allowance.
+ * Many donors share one address (a school hall, an office), so an address gets a wider allowance.
  */
 export function ipKeys(ip: string): string[] {
   return ip && ip !== "unknown" ? [`ip:${ip}`] : [];

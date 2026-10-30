@@ -1,20 +1,23 @@
 /**
- * Giving goals: for everyone, with maaser as one example. A goal is either a share of income
- * ("10% of what I earn", which is maaser) or a set amount ("R12 000 a year"), per month or per
- * year. It counts all the donor's giving, or only gifts with certain labels (a maaser goal counts
- * gifts labelled "Maaser"). Kept on the phone only. Pure (no React Native): the website's tests
- * check it. Money is whole cents; percentages are parts per million (10% = 100 000).
+ * Giving goals. A goal is either a share of income ("10% of what I earn") or a set amount
+ * ("R12 000 a year"), per month or per tax year. It counts all the donor's giving, or only gifts
+ * with certain labels (a "Work giving" goal counts gifts labelled "Work giving"). Kept on the phone
+ * only. Pure (no React Native): the website's tests check it. Money is whole cents; percentages are
+ * parts per million (10% = 100 000).
  */
-import { givingYearRange, hebrewYearFor, monthsLeftInGivingYear } from "./hebrew-year";
+import { LEGACY_KIND_LABELS } from "@shared/donations/labels";
 import { taxYearFor, taxYearName } from "./tax-year";
 
 export type GoalPeriod = "month" | "year";
-/** "tax": SARS tax year, 1 March to end February. "hebrew": Rosh Hashana to Rosh Hashana. */
-export type GoalYear = "tax" | "hebrew";
+/**
+ * The SARS tax year, 1 March to end February. Goals saved by older versions with another kind of
+ * year are read back as tax-year goals (nothing else about them changes).
+ */
+export type GoalYear = "tax";
 
 export type Goal = {
   id: string;
-  /** What the donor calls it: "Giving goal", "Maaser", "Chomesh". */
+  /** What the donor calls it: "Giving goal", "Family". */
   name: string;
   basis: "income" | "fixed";
   /** basis "income": the share of income, in ppm. */
@@ -42,7 +45,7 @@ export function cleanGoals(raw: unknown): Goal[] {
     const o = g as Record<string, unknown>;
     const basis = o.basis === "income" || o.basis === "fixed" ? o.basis : null;
     const period = o.period === "month" || o.period === "year" ? o.period : null;
-    const year = o.year === "hebrew" ? "hebrew" : "tax";
+    const year: GoalYear = "tax";
     const name = typeof o.name === "string" ? o.name.trim().slice(0, 40) : "";
     if (!basis || !period || !name || typeof o.id !== "string") continue;
     if (basis === "income" && !okPpm(o.percentPpm)) continue;
@@ -65,11 +68,17 @@ export function cleanGoals(raw: unknown): Goal[] {
   return out;
 }
 
-/** The old maaser / chomesh targets (fixed amounts per month or Hebrew year) as goals. */
+/**
+ * Targets saved by a much older version (a first and an optional second amount, per month or per
+ * year) as goals, so nobody's numbers are lost. They keep the names and labels the donor's gifts
+ * were marked with back then, and now count the tax year; the donor can rename or remove them.
+ */
 export function goalsFromOldTarget(t: { period: GoalPeriod; maaserCents: number; chomeshCents: number | null } | null): Goal[] {
   if (!t) return [];
-  const goals: Goal[] = [{ id: "maaser", name: "Maaser", basis: "fixed", percentPpm: null, fixedCents: t.maaserCents, period: t.period, year: "hebrew", counts: ["Maaser"] }];
-  if (t.chomeshCents) goals.push({ id: "chomesh", name: "Chomesh", basis: "fixed", percentPpm: null, fixedCents: t.chomeshCents, period: t.period, year: "hebrew", counts: ["Chomesh"] });
+  const first = LEGACY_KIND_LABELS.maaser;
+  const second = LEGACY_KIND_LABELS.chomesh;
+  const goals: Goal[] = [{ id: "earlier-1", name: first, basis: "fixed", percentPpm: null, fixedCents: t.maaserCents, period: t.period, year: "tax", counts: [first] }];
+  if (t.chomeshCents) goals.push({ id: "earlier-2", name: second, basis: "fixed", percentPpm: null, fixedCents: t.chomeshCents, period: t.period, year: "tax", counts: [second] });
   return goals;
 }
 
@@ -93,11 +102,6 @@ export function goalWindow(goal: Pick<Goal, "period" | "year">, today: Date): Go
     const start = new Date(today.getFullYear(), today.getMonth(), 1);
     const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     return { start, end, label: `${MONTHS[today.getMonth()]} ${today.getFullYear()}`, endLabel: dmy(end), monthsLeft: 1 };
-  }
-  if (goal.year === "hebrew") {
-    const hYear = hebrewYearFor(today);
-    const { start, end } = givingYearRange(hYear);
-    return { start, end, label: `Rosh Hashana ${hYear}`, endLabel: dmy(end), monthsLeft: monthsLeftInGivingYear(today, hYear) };
   }
   const ty = taxYearFor(today);
   const start = new Date(ty - 1, 2, 1);
@@ -134,10 +138,6 @@ export function goalProgress(goal: Goal, rows: Row[], income: Income[], today: D
   const perMonthCents = goal.period === "year" && leftCents > 0 ? Math.ceil(leftCents / w.monthsLeft / 100) * 100 : 0;
   return { window: w, targetCents, incomeCents, givenCents, leftCents, perMonthCents };
 }
-
-/** Ready-made goals for people with "Jewish calendar and maaser" switched on. */
-export const MAASER_PRESET: Omit<Goal, "id"> = { name: "Maaser", basis: "income", percentPpm: 100_000, fixedCents: null, period: "year", year: "hebrew", counts: ["Maaser"] };
-export const CHOMESH_PRESET: Omit<Goal, "id"> = { name: "Chomesh", basis: "income", percentPpm: 100_000, fixedCents: null, period: "year", year: "hebrew", counts: ["Chomesh"] };
 
 /** "10%" from ppm, with up to two decimals ("12.5%"). */
 export function ppmToPercentText(ppm: number): string {

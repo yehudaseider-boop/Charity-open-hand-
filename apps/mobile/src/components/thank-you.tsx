@@ -28,7 +28,7 @@ export function ThankYou() {
     setLastDemo(demo);
     setDemoOpen(demo);
   }
-  const demoGift: Gift = { ...sampleGifts[0], thankYou: "Your gift fills a Shabbos table this week. From all of us at Northcliff Meals Fund, thank you." };
+  const demoGift: Gift = { ...sampleGifts[0], thankYou: "Your gift fills a family's table this week. From all of us at Northcliff Meals Fund, thank you." };
   const list = demoOpen ? [demoGift] : account.arrived;
   const visible = list.length > 0;
 

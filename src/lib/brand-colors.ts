@@ -7,7 +7,8 @@ export const brandColors = {
   cream: "#FFFFFF", // page background (white in v2)
   surface: "#FFFFFF",
   ink: "#0E1B3D", // deep ink: body text and headlines
-  blue: "#1749B5", // headlines, buttons, links
+  blue: "#1749B5", // buttons, links
+  blueEdge: "#0B2A73", // the solid edge under blue buttons (the website's .pressable --edge)
   blueSoft: "#E5D9FF",
   muted: "#4A5878", // slate (7.1:1 on white)
   hairline: "#ECE8F6", // light purple

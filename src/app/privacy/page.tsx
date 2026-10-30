@@ -34,18 +34,18 @@ export default function PrivacyPage() {
 
       <Section title="What we collect">
         <p><strong>When you donate:</strong> your name (or your organisation&apos;s name and contact person), email address, and optionally your phone number and a message to the charity. If you ask for an s18A receipt, your SA ID number or income tax number (or your organisation&apos;s registration number).</p>
-        <p><strong>Your giving records:</strong> each donation&apos;s amount, date and charity, any contribution to {name}, and whether you counted it as maaser, chomesh or general tzedaka.</p>
+        <p><strong>Your giving records:</strong> each donation&apos;s amount, date and charity, any contribution to {name}, and any private label you gave it for your own records (for example Work giving or Family).</p>
         <p><strong>When you sign in:</strong> your email address. Admins of charities and of {name} also set up an authenticator app.</p>
         <p><strong>When a charity applies:</strong> the organisation&apos;s registration details, contact person, bank account and supporting documents.</p>
         <p><strong>Technical:</strong> a sign-in cookie to keep you signed in, and, for about a day, your IP address to stop fraud. We use no advertising or tracking cookies and no analytics.</p>
         <p>We never see or store your card details: you enter them on our payment provider&apos;s secure page.</p>
       </Section>
 
-      <Section title="Information about your religious practice">
+      <Section title="Information about your beliefs">
         <p>
-          Whether you count a donation as maaser, chomesh or general tzedaka may show your religious practice, which POPIA treats
-          as special personal information. We keep it only because you give it to us for your own records, with your consent. Only
-          you can see it: not the charity, and not other donors.
+          A private label you give a donation may show your religious or philosophical beliefs, which POPIA treats as special
+          personal information. We keep it only because you give it to us for your own records, with your consent. Only you can
+          see it: not the charity, and not other donors.
         </p>
       </Section>
 
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>To process your donation and send you a confirmation (to carry out what you asked for).</li>
           <li>To issue your annual s18A receipt on the charity&apos;s behalf, and keep the tax records the law requires.</li>
-          <li>To show you your giving history and your maaser and chomesh in the app (with your consent).</li>
+          <li>To show you your giving history, your labels and your giving goals in the app (with your consent).</li>
           <li>To pass on a thank-you from a charity you gave to, at most once a month for each charity. It shows your first name only. Every one has a link to stop them, and stopping them doesn&apos;t affect your confirmations or receipts.</li>
           <li>To check charities before they are listed, and to stop fraud and misuse (our legitimate interest, and the law).</li>
         </ul>
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
 
       <Section title="Who we share it with">
         <ul className="list-disc space-y-1 pl-5">
-          <li><strong>The charity you give to:</strong> your name, contact details, the amount, your message and whether you asked for an s18A receipt, so it can record your donation. It does not see your ID or tax number, your maaser or chomesh choice, or any contribution to {name}. Choosing &quot;anonymous&quot; hides your name from public pages, not from the charity.</li>
+          <li><strong>The charity you give to:</strong> your name, contact details, the amount, your message and whether you asked for an s18A receipt, so it can record your donation. It does not see your ID or tax number, your private labels, or any contribution to {name}. Choosing &quot;anonymous&quot; hides your name from public pages, not from the charity.</li>
           <li><strong>Our payment provider:</strong> what it needs to take your payment. {show(null)} (to be named once chosen).</li>
           <li><strong>Our service providers</strong> who host our database and send our emails, under contracts that require them to protect it. {show(null)} (list to be confirmed).</li>
           <li><strong>The South African Revenue Service</strong>, or others, only where the law requires it.</li>

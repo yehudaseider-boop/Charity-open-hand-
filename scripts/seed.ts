@@ -47,11 +47,11 @@ async function main() {
 
   const categories = await must(
     db.from("categories").insert([
-      { slug: "food-welfare", name_en: "Food and welfare", name_he: "מזון ורווחה", sort_order: 1 },
-      { slug: "torah-education", name_en: "Torah education", name_he: "חינוך תורני", sort_order: 2 },
-      { slug: "shuls", name_en: "Shuls", name_he: "בתי כנסת", sort_order: 3 },
-      { slug: "medical", name_en: "Medical support", name_he: "עזרה רפואית", sort_order: 4 },
-      { slug: "chesed", name_en: "Chesed", name_he: "חסד", sort_order: 5 },
+      { slug: "food-welfare", name_en: "Food and welfare", sort_order: 1 },
+      { slug: "education", name_en: "Education", sort_order: 2 },
+      { slug: "community", name_en: "Community", sort_order: 3 },
+      { slug: "medical", name_en: "Medical support", sort_order: 4 },
+      { slug: "animal-care", name_en: "Animal care", sort_order: 5 },
     ]).select("id, slug"),
   );
   const cat = (slug: string) => categories.find((c) => c.slug === slug)!.id;
@@ -63,11 +63,8 @@ async function main() {
         slug: "northcliff-meals-fund",
         quickgive_code: "meals",
         name_en: "Northcliff Meals Fund (Test)",
-        name_he: "קרן ארוחות נורת'קליף",
         legal_name_en: "Northcliff Meals Fund NPC (Test)",
-        legal_name_he: "קרן ארוחות נורת'קליף",
-        description_en: "Weekly Shabbos food parcels for families in need. Fictional test charity.",
-        description_he: "חבילות מזון לשבת למשפחות נזקקות. ארגון בדיוני לבדיקה.",
+        description_en: "Weekly food parcels for families in need. Fictional test charity.",
         npo_number: "TEST-NPO-0001",
         pbo_number: "TEST-PBO-0001",
         s18a_reference: "TEST-PBO-0001",
@@ -84,13 +81,11 @@ async function main() {
         approved_at: now,
       },
       {
-        slug: "linksfield-torah-centre",
-        quickgive_code: "torah",
-        name_en: "Linksfield Torah Learning Centre (Test)",
-        name_he: "מרכז לימוד תורה לינקספילד",
-        legal_name_en: "Linksfield Torah Learning Centre NPC (Test)",
-        legal_name_he: "מרכז לימוד תורה לינקספילד",
-        description_en: "Evening shiurim and a kollel for working men. Fictional test charity.",
+        slug: "linksfield-learning-centre",
+        quickgive_code: "learn",
+        name_en: "Linksfield Learning Centre (Test)",
+        legal_name_en: "Linksfield Learning Centre NPC (Test)",
+        description_en: "Evening classes in maths, reading and computer skills for adults. Fictional test charity.",
         npo_number: "TEST-NPO-0002",
         pbo_number: "TEST-PBO-0002",
         s18a_reference: "TEST-PBO-0002",
@@ -107,12 +102,11 @@ async function main() {
         approved_at: now,
       },
       {
-        slug: "glenhazel-shul-fund",
-        quickgive_code: "shul",
-        name_en: "Glenhazel Community Shul Fund (Test)",
-        name_he: "קרן בית הכנסת גלנהייזל",
-        legal_name_en: "Glenhazel Community Shul Fund (Test)",
-        description_en: "Upkeep of the shul building. Not s18A-approved. Fictional test charity.",
+        slug: "glenhazel-community-hall",
+        quickgive_code: "hall",
+        name_en: "Glenhazel Community Hall Trust (Test)",
+        legal_name_en: "Glenhazel Community Hall Trust (Test)",
+        description_en: "Upkeep of the community hall used by local groups. Not s18A-approved. Fictional test charity.",
         npo_number: "TEST-NPO-0003",
         address_line1: "3 Test Road",
         suburb: "Glenhazel",
@@ -138,9 +132,9 @@ async function main() {
   await must(
     db.from("charity_categories").insert([
       { charity_id: charity("northcliff-meals-fund"), category_id: cat("food-welfare") },
-      { charity_id: charity("northcliff-meals-fund"), category_id: cat("chesed") },
-      { charity_id: charity("linksfield-torah-centre"), category_id: cat("torah-education") },
-      { charity_id: charity("glenhazel-shul-fund"), category_id: cat("shuls") },
+      { charity_id: charity("northcliff-meals-fund"), category_id: cat("food-welfare") },
+      { charity_id: charity("linksfield-learning-centre"), category_id: cat("education") },
+      { charity_id: charity("glenhazel-community-hall"), category_id: cat("community") },
     ]),
   );
 
@@ -159,11 +153,11 @@ async function main() {
   await must(db.from("profiles").update({ role: "platform_admin" }).eq("id", adminId));
 
   const mealsAdmin = await createUser("meals.admin@nedivlev.test", "Test Meals Admin");
-  const shulAdmin = await createUser("shul.admin@nedivlev.test", "Test Shul Admin");
+  const hallAdmin = await createUser("hall.admin@nedivlev.test", "Test Hall Admin");
   await must(
     db.from("charity_admins").insert([
       { charity_id: charity("northcliff-meals-fund"), user_id: mealsAdmin, role: "owner" },
-      { charity_id: charity("glenhazel-shul-fund"), user_id: shulAdmin, role: "owner" },
+      { charity_id: charity("glenhazel-community-hall"), user_id: hallAdmin, role: "owner" },
     ]),
   );
 

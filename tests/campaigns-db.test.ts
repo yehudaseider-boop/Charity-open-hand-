@@ -18,9 +18,9 @@ beforeAll(async () => {
   ids = {
     donor: await one("select id from public.donors where email = $1", ["donor@nedivlev.test"]),
     mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
-    shulAdmin: await one("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    hallAdmin: await one("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
     meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
-    shul: await one("select id from public.charities where slug = $1", ["glenhazel-shul-fund"]),
+    hall: await one("select id from public.charities where slug = $1", ["glenhazel-community-hall"]),
   };
 });
 afterAll(() => client.end());
@@ -82,7 +82,7 @@ describe("campaigns", () => {
       expect((await run("select id from public.campaigns where id = $1", [draft])).rows).toHaveLength(0);
       expect((await run("select * from public.campaign_progress($1)", [[draft]])).rows).toHaveLength(0);
       await refused("insert into public.campaigns (charity_id, slug, title) values ($1, 'x', 'Not mine')", [ids.meals], /permission denied|row-level security/);
-      await as(ids.shulAdmin);
+      await as(ids.hallAdmin);
       await refused("insert into public.campaigns (charity_id, slug, title) values ($1, 'x', 'Not mine')", [ids.meals], /row-level security/);
       expect((await run("update public.campaigns set status = 'ended' where id = $1 returning id", [draft])).rows).toHaveLength(0);
     });
@@ -92,7 +92,7 @@ describe("campaigns", () => {
     await tx(async () => {
       const c = (await start(ids.meals, "pesach")).rows[0].id as string;
       await run("savepoint p");
-      await expect(gift(ids.shul, c, 18_000)).rejects.toThrow(/donations_campaign_same_charity/);
+      await expect(gift(ids.hall, c, 18_000)).rejects.toThrow(/donations_campaign_same_charity/);
       await run("rollback to savepoint p");
     });
   });

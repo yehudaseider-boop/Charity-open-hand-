@@ -18,7 +18,7 @@ beforeAll(async () => {
     donorUser: await one("select id from auth.users where email = $1", ["donor@nedivlev.test"]),
     donor: await one("select id from public.donors where email = $1", ["donor@nedivlev.test"]),
     mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
-    shulAdmin: await one("select id from auth.users where email = $1", ["shul.admin@nedivlev.test"]),
+    hallAdmin: await one("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
     meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
   };
 });
@@ -62,8 +62,8 @@ describe("review fixes in the database", () => {
   it("a private note only goes on your own donation, and can't block the owner's", async () => {
     await tx(async () => {
       const d = await paidDonation();
-      await as(ids.shulAdmin);
-      await refused("insert into public.donation_private_notes (donation_id, user_id, note) values ($1, $2, 'x')", [d, ids.shulAdmin], /row-level security/);
+      await as(ids.hallAdmin);
+      await refused("insert into public.donation_private_notes (donation_id, user_id, note) values ($1, $2, 'x')", [d, ids.hallAdmin], /row-level security/);
       await as(ids.donorUser);
       await run("insert into public.donation_private_notes (donation_id, user_id, note) values ($1, $2, 'mine')", [d, ids.donorUser]);
     });
@@ -109,7 +109,7 @@ describe("review fixes in the database", () => {
       await as(ids.mealsAdmin);
       await refused(
         "insert into public.charity_documents (charity_id, document_type, storage_path, file_name, uploaded_by) values ($1, 'npo_certificate', $2, 'a.pdf', $3)",
-        [ids.meals, `${ids.meals}/a.pdf`, ids.shulAdmin],
+        [ids.meals, `${ids.meals}/a.pdf`, ids.hallAdmin],
         /signed in/,
       );
     });
