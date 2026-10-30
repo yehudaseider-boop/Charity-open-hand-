@@ -4,6 +4,7 @@
  */
 import { getEmailTransport, type EmailMessage } from "@/lib/email";
 import { formatRand } from "@/lib/money";
+import { reviewWithin } from "@/lib/charity/review-time";
 
 const sign = ["", "The Givezy team"];
 const site = (env: Record<string, string | undefined> = process.env) => (env.SITE_URL ?? "").replace(/\/+$/, "");
@@ -15,7 +16,7 @@ export function applicationReceivedEmail(to: string, charityName: string, base =
     text: [
       `Thank you for applying to list ${charityName} on Givezy.`,
       "",
-      "We check every application by hand: your registration, your bank confirmation letter and, if you issue s18A receipts, your approval and mandate. This usually takes a few working days. We will email you as soon as it has been reviewed.",
+      `We check every application by hand: your registration, your bank confirmation letter and, if you issue s18A receipts, your approval and mandate. We review it within ${reviewWithin()} and email you as soon as it has been reviewed.`,
       "",
       `You can see your application at any time: ${base}/charity-admin`,
       ...sign,

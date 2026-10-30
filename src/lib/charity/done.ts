@@ -1,4 +1,5 @@
 import { plural } from "@/lib/text";
+import { reviewWithin } from "@/lib/charity/review-time";
 import { taxYearName } from "@/lib/dates";
 
 /** "2026/27" from a stored tax year, or empty when it is missing. */
@@ -105,7 +106,7 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       return { what: `${quote(d.fileName)} is removed.`, next: { label: "Upload the right file", href: app("documents") } };
     case "application_submitted":
       return {
-        what: "Your application is with us. We check every application by hand and email you once it's reviewed. Your details are locked until then.",
+        what: `Your application is with us. We check every application by hand and review it within ${reviewWithin()}, then email you. Your details are locked until then.`,
         next: { label: "While you wait: write your public profile", href: `${c.base}/profile` },
       };
     case "thank_you_sent": {

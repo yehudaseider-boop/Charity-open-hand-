@@ -1,4 +1,5 @@
 import type { DocumentType } from "./validation";
+import { reviewWithin } from "./review-time";
 
 type ChecklistInput = {
   charity: {
@@ -73,13 +74,13 @@ const STEP_ITEMS: Record<Exclude<ApplicationStep["key"], "submit">, string[]> = 
 export function applicationSteps(items: ChecklistItem[]): ApplicationStep[] {
   const done = (keys: string[]) => items.filter((i) => keys.includes(i.key)).every((i) => i.done);
   const steps: ApplicationStep[] = [
-    { key: "organisation", label: "Your organisation", hint: "Its registered name and NPO or PBO number.", done: done(STEP_ITEMS.organisation) },
-    { key: "address", label: "Registered address", hint: "Where the organisation is registered.", done: done(STEP_ITEMS.address) },
-    { key: "contact", label: "Contact person", hint: "Who we speak to about the account.", done: done(STEP_ITEMS.contact) },
-    { key: "bank", label: "Bank account", hint: "Where donations are paid. Stored encrypted.", done: done(STEP_ITEMS.bank) },
-    { key: "documents", label: "Documents", hint: "Your bank confirmation letter, and approvals if you have them.", done: done(STEP_ITEMS.documents) },
+    { key: "organisation", label: "Your organisation", hint: "The name donors will see, your registered legal name, and your NPO or PBO number. About two minutes.", done: done(STEP_ITEMS.organisation) },
+    { key: "address", label: "Registered address", hint: "The address on your registration documents. It appears on s18A receipts.", done: done(STEP_ITEMS.address) },
+    { key: "contact", label: "Contact person", hint: "Who we email about your application and your page. You can change it later.", done: done(STEP_ITEMS.contact) },
+    { key: "bank", label: "Bank account", hint: "Where donations are paid. It must be in the organisation's name. Stored encrypted; only the last four digits are ever shown.", done: done(STEP_ITEMS.bank) },
+    { key: "documents", label: "Documents", hint: "PDFs or clear photos, up to 4 MB each. You can upload straight from your phone.", done: done(STEP_ITEMS.documents) },
   ];
-  return [...steps, { key: "submit", label: "Submit", hint: "Check the declarations and send it to us.", done: false }];
+  return [...steps, { key: "submit", label: "Submit", hint: `Check the declarations and send it to us. We review it within ${reviewWithin()}.`, done: false }];
 }
 
 /** Where to land: the step asked for if it exists, otherwise the first one not yet done. */

@@ -13,7 +13,14 @@ const safeNext = (next: FormDataEntryValue | null) => safeNextPath(next);
 
 export async function sendLoginLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
-  const next = safeNext(formData.get("next"));
+  let next = safeNext(formData.get("next"));
+  // Started from the apply page (name and email in one form): the organisation name comes back filled in.
+  const applyName = String(formData.get("apply_name") ?? "").trim().slice(0, 120);
+  if (applyName && next.split("?")[0] === "/apply") {
+    const url = new URL(next, "https://givezy.invalid");
+    url.searchParams.set("name", applyName);
+    next = `${url.pathname}${url.search}`;
+  }
   // Keep what they typed if we send them back with a message.
   const back = (error: string) => `/login?error=${error}&next=${encodeURIComponent(next)}&email=${encodeURIComponent(email.slice(0, 200))}`;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect(back("email"));

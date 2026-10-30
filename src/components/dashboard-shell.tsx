@@ -52,18 +52,21 @@ export function DashboardShell({
         </aside>
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap items-center gap-3 print:hidden">
-            <form action={`${base}/donations`} method="get" role="search" className="relative min-w-0 max-w-xl flex-1 basis-64">
-              <label htmlFor="dash-search" className="sr-only">Search donations</label>
-              <svg viewBox="0 0 24 24" aria-hidden className="pointer-events-none absolute left-3.5 top-3 h-5 w-5 fill-none stroke-muted" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-              <input
-                id="dash-search"
-                name="q"
-                type="search"
-                maxLength={60}
-                placeholder="Search donations by name or email"
-                className="h-11 w-full rounded-control border-2 border-border bg-surface pl-11 pr-3 text-sm text-navy placeholder:text-muted focus:border-brand"
-              />
-            </form>
+            {/* Before approval there are no donations to search: the application is the one thing on the page. */}
+            {charity.status === "approved" || charity.status === "suspended" ? (
+              <form action={`${base}/donations`} method="get" role="search" className="relative min-w-0 max-w-xl flex-1 basis-64">
+                <label htmlFor="dash-search" className="sr-only">Search donations</label>
+                <svg viewBox="0 0 24 24" aria-hidden className="pointer-events-none absolute left-3.5 top-3 h-5 w-5 fill-none stroke-muted" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+                <input
+                  id="dash-search"
+                  name="q"
+                  type="search"
+                  maxLength={60}
+                  placeholder="Search donations by name or email"
+                  className="h-11 w-full rounded-control border-2 border-border bg-surface pl-11 pr-3 text-sm text-navy placeholder:text-muted focus:border-brand"
+                />
+              </form>
+            ) : null}
             <span className="flex-1" />
             {publicLink ? (
               <Link href={publicLink} className="inline-flex min-h-11 items-center rounded-control border-2 border-border bg-surface px-4 text-sm font-semibold text-brand hover:border-brand">

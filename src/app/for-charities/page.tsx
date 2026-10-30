@@ -4,6 +4,7 @@ import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floatin
 import { platformConfig } from "@/config/platform";
 import { Splash } from "@/components/splash";
 import { Illustration } from "@/components/illustration";
+import { reviewWithin } from "@/lib/charity/review-time";
 
 export const metadata: Metadata = {
   title: "For charities",
@@ -226,7 +227,7 @@ export default function ForCharitiesPage() {
         <Steps
           steps={[
             { icon: "building", title: "Apply online", body: "Your registration details, bank account and a bank confirmation letter." },
-            { icon: "shield", title: "We check it", body: "We review every application by hand, then email you when it's approved or if something needs fixing." },
+            { icon: "shield", title: "We check it", body: `We review every application by hand within ${reviewWithin()}, then email you when it's approved or if something needs fixing.` },
             { icon: "heart", title: "Start receiving", body: "Add a photo and a few words about your work, share your page, and donations start coming in." },
           ]}
         />

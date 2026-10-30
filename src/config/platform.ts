@@ -36,6 +36,12 @@ export const platformConfig = {
   /** Minimum donation to a charity. Confirmed: R30. */
   minDonationCents: 3_000,
 
+  /**
+   * How quickly we promise to review a charity's application once it is submitted (Yehuda, 30/10/2026:
+   * "within 2 working days"). Shown on the apply page, after submitting and in the email; one place to change.
+   */
+  applicationReviewWorkingDays: 2,
+
   /** Largest single gift we accept online: R1 000 000. Above that, a typo is far more likely than a gift. */
   maxDonationCents: 100_000_000,
 

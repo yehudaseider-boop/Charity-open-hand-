@@ -10,6 +10,7 @@ import { applicationChecklist, applicationSteps, currentStep, isComplete } from 
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { isOwner } from "@/lib/charity/team";
 import { statusLabels } from "@/lib/charity/status";
+import { reviewWithin } from "@/lib/charity/review-time";
 import {
   removeDocument,
   saveAddress,
@@ -22,6 +23,14 @@ import {
 import { AddressForm, BankForm, ContactForm, OrganisationForm, SubmitForm, UploadForm } from "./forms";
 
 export const metadata: Metadata = { title: "Application" };
+
+/** What each document must show (the same words as the apply page). DRAFT WORDING for Yehuda to approve. */
+const documentHelp: Record<string, string> = {
+  bank_confirmation: "A letter from your bank showing the account is in the organisation's name, with the account number and branch code.",
+  pbo_approval: "The SARS letter confirming your PBO status.",
+  s18a_approval: "The SARS letter that lets you issue s18A receipts.",
+  receipting_mandate: "Our receipting mandate, signed. It lets us issue s18A receipts in your name.",
+};
 
 export default async function ApplicationPage({ params, searchParams }: PageProps<"/charity-admin/[id]/application">) {
   const { id } = await params;
@@ -63,7 +72,24 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
         </Notice>
       ) : null}
       {charity.status === "pending_review" ? (
-        <Notice>Thanks. Your application is with us for review. Your details are locked while we check them.</Notice>
+        // What happens next, in the same three steps as the apply page (30/10/2026).
+        <section aria-labelledby="whats-next" className="rounded-card border-2 border-brand bg-brand p-5 text-white sm:p-6">
+          <h2 id="whats-next" className="font-display text-xl font-bold text-white!">Your application is with us</h2>
+          <p className="mt-1 text-sm text-white/85">Your details are locked while we check them. Nothing else is needed from you right now.</p>
+          <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+            {[
+              { title: "Submitted", body: "We have everything we asked for.", done: true },
+              { title: `We check it within ${reviewWithin()}`, body: "A person checks your registration, bank letter and approvals, then emails your contact person." },
+              { title: "You go live", body: "Once approved, your page opens to donors. If something needs fixing, we say exactly what." },
+            ].map((s, i) => (
+              <li key={s.title} className="rounded-control bg-white/10 p-3 text-sm">
+                <p className="font-bold text-white">{s.done ? "✓ " : `${i + 1}. `}{s.title}</p>
+                <p className="mt-1 text-white/85">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+          <Link href={`/charity-admin/${id}/profile`} className="pressable mt-4 inline-flex min-h-11 items-center rounded-control bg-coral px-5 font-bold text-navy">While you wait: write your public profile</Link>
+        </section>
       ) : null}
       {charity.status === "approved" ? (
         <Notice tone="success">
@@ -91,7 +117,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
                   aria-current={s.key === step.key ? "step" : undefined}
                   className={`inline-flex min-h-9 shrink-0 items-center rounded-full border-2 px-3.5 font-semibold transition ${s.key === step.key ? "border-brand bg-brand text-white" : s.done ? "border-border bg-surface text-navy hover:border-brand hover:text-brand" : "border-border bg-surface text-muted hover:border-brand hover:text-brand"}`}
                 >
-                  <span aria-hidden>{s.done ? "✓ " : `${i + 1}. `}</span>
+                  <span aria-hidden className="mr-1">{s.done ? "✓" : `${i + 1}.`}</span>
                   {s.label}
                   {s.done ? <span className="sr-only"> (done)</span> : null}
                 </Link>
@@ -131,9 +157,13 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
               <>
                 <ul className="mb-3 space-y-1 text-sm">
                   {checklist.filter((i) => ["bank_confirmation", "pbo_approval", "s18a_approval", "receipting_mandate"].includes(i.key)).map((i) => (
-                    <li key={i.key} className="flex items-center gap-2">
-                      <span aria-hidden className={i.done ? "text-success" : "text-muted"}>{i.done ? "✓" : "○"}</span>
-                      <span className={i.done ? "" : "text-muted"}>{i.label}</span>
+                    <li key={i.key} className="flex items-start gap-2">
+                      <span aria-hidden className={`mt-0.5 ${i.done ? "text-success" : "text-muted"}`}>{i.done ? "✓" : "○"}</span>
+                      <span>
+                        <span className={i.done ? "font-semibold" : "font-semibold text-muted"}>{i.label}</span>
+                        {/* What each paper must show, in plain words, so nobody uploads the wrong one. */}
+                        {documentHelp[i.key] && !i.done ? <span className="block text-muted">{documentHelp[i.key]}</span> : null}
+                      </span>
                     </li>
                   ))}
                 </ul>
