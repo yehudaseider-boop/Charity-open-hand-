@@ -72,9 +72,9 @@ export default function Insights() {
           ) : state === "error" ? (
             <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => account.refresh()} />
           ) : account.status === "agreeing" ? (
-            <EmptyState title="One more step" body="Agree to the Terms and Privacy Policy on the Account tab, and your giving appears here." action={{ label: "Go to Account", onPress: () => router.navigate("/account") }} />
+            <EmptyState art="checklist" title="One more step" body="Agree to the Terms and Privacy Policy on the Account tab, and your giving appears here." action={{ label: "Go to Account", onPress: () => router.navigate("/account") }} />
           ) : !preview && !signedIn ? (
-            <EmptyState title="See your giving here" body="Sign in with the email you give with, and your gifts show up here with your insights." action={{ label: "Sign in", onPress: () => router.navigate("/account") }} />
+            <EmptyState art="loveIt" title="See your giving here" body="Sign in with the email you give with, and your gifts show up here with your insights." action={{ label: "Sign in", onPress: () => router.navigate("/account") }} />
           ) : (
             <>
               {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
@@ -91,6 +91,7 @@ export default function Insights() {
 
               {gifts.length === 0 ? (
                 <EmptyState
+                  art="dreamGift"
                   title={year === current ? "No gifts yet this tax year" : `No gifts in the ${taxYearName(year)} tax year`}
                   body={`Gifts you make through Givezy between ${taxYearRangeLabel(year).replace(" to ", " and ")} show here.`}
                   action={{ label: "Find a charity", onPress: () => router.navigate("/discover") }}
@@ -302,14 +303,14 @@ function Habits({ gifts }: { gifts: Gift[] }) {
           <SplitBar parts={[{ cents: s.with18a, colour: colors.blue }, { cents: s.without18a, colour: colors.chartOther }]} />
           <Text variant="label">{pct(s.with18a)}% of your giving · {rand(s.without18a)} without</Text>
         </View>
-        <View style={styles.tile}>
+        <View style={[styles.tile, styles.tilePeach]}>
           <Text variant="label">Monthly giving</Text>
           <Text style={styles.tileValue}>{rand(s.monthly)}</Text>
           <SplitBar parts={[{ cents: s.monthly, colour: colors.orange }, { cents: s.onceOff, colour: colors.chartPurple }]} />
           <Text variant="label">{pct(s.monthly)}% of your giving · {rand(s.onceOff)} once-off</Text>
         </View>
         {big ? (
-          <View style={styles.tile}>
+          <View style={[styles.tile, styles.tilePeach]}>
             <Text variant="label">Your biggest gift</Text>
             <Text style={styles.tileValue}>{rand(big.cents)}</Text>
             <Text variant="label">{big.charityName}, {ddmmyyyy(big.date)}</Text>
@@ -339,15 +340,15 @@ function SplitBar({ parts }: { parts: { cents: number; colour: string }[] }) {
 
 const styles = StyleSheet.create({
   back: { width: 44, height: 44, marginLeft: -10, alignItems: "center", justifyContent: "center" },
-  headTitle: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
-  headLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft },
+  headTitle: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 37, letterSpacing: -0.4, color: colors.onInk, paddingRight: 30 },
+  headLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft, paddingRight: 40 },
   chips: { gap: 8, paddingHorizontal: space.gutter },
   chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
-  card: { gap: 10, padding: 18, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.hairline, backgroundColor: colors.surface },
+  card: { gap: 12, padding: 20, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
   cardTitle: { fontSize: 22, lineHeight: 28 },
-  hero: { ...tabular, fontFamily: fonts.displayBold, fontSize: 36, lineHeight: 42, color: colors.ink },
+  hero: { ...tabular, fontFamily: fonts.displayBold, fontSize: 40, lineHeight: 46, letterSpacing: -0.5, color: colors.blue },
   baseline: { position: "absolute", left: 0, right: 0, height: 1, backgroundColor: colors.hairline },
   monthLetter: { position: "absolute", fontFamily: fonts.bodySemibold, fontSize: 11, color: colors.muted, textAlign: "center" },
   detail: { gap: 6, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
@@ -357,12 +358,13 @@ const styles = StyleSheet.create({
   giftRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 6 },
   giftAmount: { ...tabular, fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.ink },
   ringCentre: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 34 },
-  ringAmount: { ...tabular, fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 30, color: colors.ink },
+  ringAmount: { ...tabular, fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 30, color: colors.navy },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 48, paddingHorizontal: 6, borderRadius: 10 },
   divider: { borderTopWidth: 1, borderTopColor: colors.hairline },
   dot: { width: 12, height: 12, borderRadius: 6 },
   tiles: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  tile: { flexGrow: 1, flexBasis: "45%", minWidth: 140, gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
-  tileValue: { ...tabular, fontFamily: fonts.bodyBold, fontSize: 22, lineHeight: 28, color: colors.ink },
-  split: { flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: colors.hairline, marginVertical: 2 },
+  tile: { flexGrow: 1, flexBasis: "45%", minWidth: 140, gap: 4, padding: 16, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
+  tilePeach: { backgroundColor: colors.peach },
+  tileValue: { ...tabular, fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 30, color: colors.navy },
+  split: { flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: colors.surface, marginVertical: 2 },
 });

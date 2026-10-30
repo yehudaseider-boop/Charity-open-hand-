@@ -2,7 +2,6 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Backdrop } from "@/components/backdrop";
 import { Button, TextLink } from "@/components/button";
 import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
@@ -100,21 +99,31 @@ export default function Welcome() {
     );
   }
 
+  // The questions, in the same look as the welcome (30/10/2026): white, soft bubbles drifting at the
+  // edges, a small picture, the key word in blue, and answers on soft lilac cards.
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <Backdrop variant="page" />
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter, paddingTop: insets.top + 16, paddingBottom: insets.bottom + space.md, gap: space.block }}>
+    <KeyboardAvoidingView style={styles.questionScreen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <Bubbles
+        items={[
+          { size: 260, color: colors.lilacSoft, at: { right: -130, top: insets.top + 40 } },
+          { size: 220, color: colors.peach, at: { left: -130, bottom: insets.bottom + 40 } },
+          { size: 14, color: colors.orange, float: true, at: { left: 30, top: insets.top + 96 } },
+          { size: 26, color: colors.blue, ring: true, float: true, at: { right: 24, top: insets.top + 120 } },
+          { size: 36, color: colors.lilac, ring: true, float: true, at: { left: -14, bottom: insets.bottom + 110 } },
+        ]}
+      />
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24, gap: 20 }}>
         <View style={styles.topRow}>
           {/* A way back on every phone, not only Android's hardware button. */}
           {step > 0 ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={() => setStep(step - 1)}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={() => setStep(step - 1)} style={styles.backTap}>
               <Text style={styles.skipText}>Back</Text>
             </Pressable>
           ) : null}
           {/* Three segments: where you are in the setup. */}
           <View style={styles.bar} accessible accessibilityLabel={`Step ${step} of ${STEPS}`}>
             {Array.from({ length: STEPS }, (_, i) => (
-              <View key={i} style={[styles.segment, i < step && styles.segmentOn]} />
+              <View key={i} style={[styles.segment, styles.segmentSoft, i < step && styles.segmentOn]} />
             ))}
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Skip this question" hitSlop={8} onPress={next} style={styles.skip}>
@@ -123,10 +132,13 @@ export default function Welcome() {
         </View>
 
         {step === 1 ? (
-          <FadeUp key="giver" style={{ flex: 1, gap: space.block }}>
-            <View style={{ gap: 8 }}>
-              <Text variant="h1" accessibilityRole="header">What kind of giver are you?</Text>
-              <Text variant="bodyMuted">There&apos;s no right answer. It just helps us get to know you.</Text>
+          <FadeUp key="giver" style={{ flex: 1, gap: 20 }}>
+            <People name="dreamGift" width={Math.min(200, width - 140)} style={styles.questionArt} />
+            <View style={{ gap: 10 }}>
+              <Text style={styles.questionTitle} accessibilityRole="header">
+                What kind of <Text style={[styles.questionTitle, styles.questionKey]}>giver</Text> are you?
+              </Text>
+              <Text style={styles.questionLine}>There&apos;s no right answer. It just helps us get to know you.</Text>
             </View>
             <View style={{ gap: 12 }} accessibilityRole="radiogroup">
               {GIVER_TYPES.map((g) => {
@@ -140,13 +152,15 @@ export default function Welcome() {
                       haptic.tap();
                       setGiver(g.id);
                     }}
-                    style={[styles.choice, on && styles.choiceOn]}
+                    style={({ pressed }) => [styles.answer, on && styles.answerOn, pressed && !on && styles.answerPressed]}
                   >
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 18, color: colors.navy }}>{g.label}</Text>
-                      <Text variant="bodyMuted">{g.line}</Text>
+                      <Text style={[styles.answerTitle, on && { color: colors.onInk }]}>{g.label}</Text>
+                      <Text style={[styles.answerLine, on && { color: colors.lilacSoft }]}>{g.line}</Text>
                     </View>
-                    {on ? <CheckIcon size={20} color={colors.blue} /> : null}
+                    <View style={[styles.answerMark, on && styles.answerMarkOn]}>
+                      {on ? <CheckIcon size={16} color={colors.blue} /> : null}
+                    </View>
                   </Pressable>
                 );
               })}
@@ -162,10 +176,13 @@ export default function Welcome() {
             />
           </FadeUp>
         ) : (
-          <FadeUp key="causes" style={{ flex: 1, gap: space.block }}>
-            <View style={{ gap: 8 }}>
-              <Text variant="h1" accessibilityRole="header">Which causes matter to you?</Text>
-              <Text variant="bodyMuted">Pick as many as you like. We show these charities first.</Text>
+          <FadeUp key="causes" style={{ flex: 1, gap: 20 }}>
+            <People name="checklist" width={Math.min(170, width - 160)} style={styles.questionArt} />
+            <View style={{ gap: 10 }}>
+              <Text style={styles.questionTitle} accessibilityRole="header">
+                Which <Text style={[styles.questionTitle, styles.questionKey]}>causes</Text> matter to you?
+              </Text>
+              <Text style={styles.questionLine}>Pick as many as you like. We show these charities first.</Text>
             </View>
             {!directory.data && !directory.failed ? (
               <View style={{ gap: 10 }}>
@@ -174,8 +191,8 @@ export default function Welcome() {
                 <SkeletonBlock height={46} width="80%" />
               </View>
             ) : directory.failed && !directory.data ? (
-              <View style={{ gap: 8 }} accessibilityRole="alert">
-                <Text variant="bodyMuted">We couldn&apos;t load the causes. Check your connection and try again, or skip this and see all charities.</Text>
+              <View style={styles.questionProblem} accessibilityRole="alert">
+                <Text style={styles.answerLine}>We couldn&apos;t load the causes. Check your connection and try again, or skip this and see all charities.</Text>
                 <TextLink label="Try again" onPress={directory.retry} />
               </View>
             ) : (
@@ -191,7 +208,7 @@ export default function Welcome() {
                         haptic.tap();
                         setPicked((ps) => (on ? ps.filter((x) => x !== c.id) : [...ps, c.id]));
                       }}
-                      style={[styles.chip, on && styles.chipOn]}
+                      style={[styles.chip, styles.causeChip, on && styles.chipOn]}
                     >
                       {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                       <Text style={[styles.chipText, on && { color: colors.onInk }]}>{c.label}</Text>
@@ -237,4 +254,21 @@ const styles = StyleSheet.create({
   choice: { flexDirection: "row", alignItems: "center", gap: 12, padding: 18, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
   choiceOn: { borderColor: colors.blue, backgroundColor: colors.lilacSoft },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
+  // The question steps (30/10/2026), in the welcome's look.
+  questionScreen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
+  backTap: { minHeight: touch, justifyContent: "center" },
+  segmentSoft: { height: 6, borderRadius: 3 },
+  questionArt: { alignSelf: "center" },
+  questionTitle: { fontFamily: fonts.displayBold, fontSize: 34, lineHeight: 39, letterSpacing: -0.3, color: colors.navy },
+  questionKey: { color: colors.blue },
+  questionLine: { fontFamily: fonts.bodyMedium, fontSize: 17, lineHeight: 25, color: colors.muted },
+  answer: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 72, paddingVertical: 14, paddingHorizontal: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lilacSoft },
+  answerOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  answerPressed: { borderColor: colors.lilac },
+  answerTitle: { fontFamily: fonts.display, fontSize: 20, lineHeight: 25, color: colors.navy },
+  answerLine: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.muted },
+  answerMark: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.lilac, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  answerMarkOn: { borderColor: colors.surface },
+  causeChip: { minHeight: 48, backgroundColor: colors.lilacSoft, borderColor: colors.lilacSoft },
+  questionProblem: { gap: 8, padding: 18, borderRadius: radius.card, backgroundColor: colors.peach },
 });

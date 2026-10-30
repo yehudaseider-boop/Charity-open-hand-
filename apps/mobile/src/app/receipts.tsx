@@ -3,9 +3,11 @@ import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, View } from "
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop, BlueHeader } from "@/components/backdrop";
 import { FadeUp } from "@/components/fade-up";
+import { Bubbles, People } from "@/components/people";
 import { BackIcon, InfoIcon } from "@/components/icons";
 import { ReceiptSlip } from "@/components/receipt-slip";
 import { ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
+import { useStatusCover } from "@/components/status-cover";
 import { Text } from "@/components/text";
 import { charities } from "@/data/sample";
 import { gifts, receipts } from "@/data/giving";
@@ -22,6 +24,8 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
 /** Screen 8: Receipts. Annual s18A receipts, grouped by tax year. A page opened from Home and Account, not a tab. */
 export default function Receipts() {
   const insets = useSafeAreaInsets();
+  // A white strip behind the phone's clock once the page scrolls under it, as on the other pages.
+  const status = useStatusCover();
   const account = useAccount();
   const preview = account.status === "preview";
   const signedIn = account.status === "signed-in";
@@ -58,7 +62,7 @@ export default function Receipts() {
   return (
     <View style={{ flex: 1 }}>
       <Backdrop variant="receipts" />
-      <ScrollView style={styles.screen} refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined} contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
+      <ScrollView style={styles.screen} onScroll={status.onScroll} scrollEventThrottle={16} refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined} contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
         <BlueHeader paddingTop={insets.top + 12}>
           {/* Back to wherever Receipts was opened from (Account, or the Home tile). */}
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.navigate("/account"))} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
@@ -83,11 +87,18 @@ export default function Receipts() {
             {/* Signed out (live), there is nothing of theirs to total, so no card. */}
             {preview || signedIn ? (
             <View style={styles.summary}>
+              <Bubbles
+                items={[
+                  { size: 130, color: colors.surface, at: { right: -46, top: -54 } },
+                  { size: 12, color: colors.orange, float: true, at: { right: 30, top: 24 } },
+                  { size: 24, color: colors.blue, ring: true, float: true, at: { right: 22, bottom: 22 } },
+                ]}
+              />
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                 <Text style={styles.summaryKicker}>{taxYearName(current)} tax year so far</Text>
                 <InfoButton terms={["s18a"]} />
               </View>
-              <Text variant="amount" style={{ fontSize: 44, lineHeight: 50 }}>{rand(thisYearCents)}</Text>
+              <Text variant="amount" style={{ fontSize: 46, lineHeight: 52, letterSpacing: -0.6 }}>{rand(thisYearCents)}</Text>
               <Text style={styles.summaryBody}>
                 {thisYearCents
                   ? `Counts towards your s18A receipts from ${thisYearCharities} ${thisYearCharities === 1 ? "charity" : "charities"}. They come after ${currentEnd}, one per charity.`
@@ -97,19 +108,22 @@ export default function Receipts() {
             ) : null}
   
             {account.status === "agreeing" ? (
-              <View style={{ gap: 12, alignItems: "center", paddingVertical: 24 }}>
-                <Text variant="h2" style={{ textAlign: "center" }}>One more step</Text>
+              <View style={styles.emptyBox}>
+                <People name="checklist" width={170} float={false} />
+                <Text variant="h2" style={styles.emptyTitle}>One more step</Text>
                 <Text variant="bodyMuted" style={{ textAlign: "center" }}>Agree to the Terms and Privacy Policy on the Account tab, and your receipts appear here.</Text>
                 <Button label="Go to Account" onPress={() => router.push("/account")} />
               </View>
             ) : !preview && !signedIn ? (
-              <View style={{ gap: 12, alignItems: "center", paddingVertical: 24 }}>
-                <Text variant="h2" style={{ textAlign: "center" }}>Sign in to see your receipts</Text>
+              <View style={styles.emptyBox}>
+                <People name="mailSent" width={150} float={false} />
+                <Text variant="h2" style={styles.emptyTitle}>Sign in to see your receipts</Text>
                 <Button label="Sign in" onPress={() => router.push("/account")} />
               </View>
             ) : years.length === 0 ? (
-              <View style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
-                <Text variant="h2" style={{ textAlign: "center" }}>No receipts yet</Text>
+              <View style={styles.emptyBox}>
+                <People name="mailSent" width={150} float={false} />
+                <Text variant="h2" style={styles.emptyTitle}>No receipts yet</Text>
                 <Text variant="bodyMuted" style={{ textAlign: "center" }}>
                   When you give with an s18A receipt, your first one appears here after the tax year closes.
                 </Text>
@@ -118,10 +132,10 @@ export default function Receipts() {
               years.map((y, yi) => {
                 const rows = myReceipts.filter((r) => r.taxYear === y);
                 return (
-                  <FadeUp key={y} index={yi} style={{ gap: 8 }}>
-                    <View style={{ gap: 2 }}>
-                      <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }} accessibilityRole="header">{taxYearName(y)} tax year</Text>
-                      <Text variant="label">{taxYearRangeLabel(y)}</Text>
+                  <FadeUp key={y} index={yi} style={{ gap: 12 }}>
+                    <View style={styles.yearHead}>
+                      <Text variant="h2" style={styles.yearTitle} accessibilityRole="header">{taxYearName(y)} tax year</Text>
+                      <View style={styles.yearPill}><Text style={styles.yearPillText}>{taxYearRangeLabel(y)}</Text></View>
                     </View>
                     <View style={{ gap: 14 }}>
                       {rows.map((r) => (
@@ -149,8 +163,14 @@ export default function Receipts() {
             {/* The tax pack lives on the website (signed in there), as a page to save as a PDF or a spreadsheet. */}
             {preview || signedIn ? (
               <View style={styles.pack}>
-                <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 17 }}>Tax pack</Text>
-                <Text variant="bodyMuted" style={{ fontSize: 16 }}>Every donation in a tax year, what goes on s18A receipts, and the totals. Opens on our website.</Text>
+                <Bubbles
+                  items={[
+                    { size: 80, color: colors.surface, ring: true, at: { right: -26, top: -26 } },
+                    { size: 10, color: colors.orange, float: true, at: { right: 64, top: 20 } },
+                  ]}
+                />
+                <Text style={styles.packTitle}>Tax pack</Text>
+                <Text style={styles.packBody}>Every donation in a tax year, what goes on s18A receipts, and the totals. Opens on our website.</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
                   {[current, current - 1].map((y) => (
                     <Button
@@ -167,7 +187,7 @@ export default function Receipts() {
   
             {no18a.length ? (
               <View style={styles.infoRow}>
-                <InfoIcon />
+                <View style={{ marginTop: 2 }}><InfoIcon /></View>
                 <Text variant="bodyMuted" style={{ flex: 1, fontSize: 16 }}>
                   {no18a.join(", ")} {no18a.length === 1 ? "doesn't" : "don't"} issue s18A receipts, so donations to {no18a.length === 1 ? "it" : "them"} won&apos;t appear here.
                 </Text>
@@ -178,6 +198,7 @@ export default function Receipts() {
         )}
         </View>
       </ScrollView>
+      {status.cover}
     </View>
   );
 }
@@ -185,13 +206,21 @@ export default function Receipts() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
   back: { width: 44, height: 44, marginLeft: -10, alignItems: "center", justifyContent: "center" },
-  headTitle: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
-  headLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft },
-  summary: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  headTitle: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 37, letterSpacing: -0.4, color: colors.onInk, paddingRight: 30 },
+  headLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft, paddingRight: 40 },
+  summary: { gap: 6, padding: 22, borderRadius: radius.card, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lightPurple, overflow: "hidden" },
   summaryKicker: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
-  pack: { gap: 4, padding: 20, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  summaryBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.ink },
-  infoRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  summaryBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.ink, paddingRight: 30 },
+  yearHead: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", columnGap: 10, rowGap: 6 },
+  yearTitle: { fontSize: 22, lineHeight: 28 },
+  yearPill: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.lilacSoft },
+  yearPillText: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 20, color: colors.blue },
+  pack: { gap: 6, padding: 22, borderRadius: radius.card, backgroundColor: colors.peach, borderWidth: 1.5, borderColor: colors.lightPurple, overflow: "hidden" },
+  packTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: colors.navy },
+  packBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.ink },
+  emptyBox: { gap: 10, alignItems: "center", paddingVertical: 16 },
+  emptyTitle: { textAlign: "center", fontSize: 24, lineHeight: 30 },
+  infoRow: { flexDirection: "row", gap: 10, alignItems: "flex-start", padding: 16, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
 });
 
 /** A failure while drawing shows "Try again" and the error, not a blank page. */

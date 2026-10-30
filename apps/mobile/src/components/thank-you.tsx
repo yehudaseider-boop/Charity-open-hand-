@@ -6,9 +6,10 @@ import { useAccount } from "@/lib/account";
 import { ddmmyyyy, rand } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
-import { colors, radius, space } from "@/theme/tokens";
+import { colors, fonts, radius, space } from "@/theme/tokens";
 import { Button } from "./button";
 import { CheckIcon } from "./icons";
+import { Bubbles, People } from "./people";
 import { Text } from "./text";
 
 /**
@@ -49,10 +50,22 @@ export function ThankYou() {
     <Modal visible transparent animationType="fade" onRequestClose={close}>
       <View style={styles.backdrop}>
         <View style={styles.card} accessibilityViewIsModal accessibilityLiveRegion="polite">
-          <Animated.View style={[styles.badge, { transform: [{ scale }] }]}>
-            <CheckIcon size={34} color={colors.onInk} />
-          </Animated.View>
-          <Text variant="h1" style={{ fontSize: 30, lineHeight: 36, textAlign: "center" }}>Thank you</Text>
+          {/* The thank-you, in the For charities page's look (30/10/2026): people giving, soft bubbles, a sage tick. */}
+          <Bubbles
+            items={[
+              { size: 180, color: colors.lilacSoft, at: { left: -70, top: -70 } },
+              { size: 140, color: colors.peach, at: { right: -60, top: 40 } },
+              { size: 12, color: colors.orange, float: true, at: { right: 30, top: 24 } },
+              { size: 24, color: colors.blue, ring: true, float: true, at: { left: 22, top: 130 } },
+            ]}
+          />
+          <View style={styles.art}>
+            <People name="dreamGift" width={220} />
+            <Animated.View style={[styles.badge, { transform: [{ scale }] }]}>
+              <CheckIcon size={26} color={colors.onInk} />
+            </Animated.View>
+          </View>
+          <Text style={styles.title} accessibilityRole="header">Thank you</Text>
           {one ? (
             <Text style={styles.body}>
               Your {rand(one.cents)} to {one.charityName} arrived on {ddmmyyyy(one.date)}.{one.label ? ` Labelled "${one.label}".` : ""}
@@ -75,8 +88,10 @@ export function ThankYou() {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: colors.scrim, justifyContent: "center", padding: space.gutter },
-  card: { gap: 16, padding: 24, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center", alignItems: "stretch" },
-  badge: { alignSelf: "center", width: 72, height: 72, borderRadius: 36, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },
+  card: { gap: 16, padding: 24, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center", alignItems: "stretch", overflow: "hidden" },
+  art: { alignItems: "center", paddingTop: 8 },
+  badge: { position: "absolute", bottom: -10, width: 52, height: 52, borderRadius: 26, borderWidth: 4, borderColor: colors.surface, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },
+  title: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 38, textAlign: "center", color: colors.blue, marginTop: 8 },
   body: { fontSize: 17, lineHeight: 25, textAlign: "center", color: colors.ink },
-  note: { gap: 4, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
+  note: { gap: 4, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
 });

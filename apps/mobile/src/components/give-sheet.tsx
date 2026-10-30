@@ -1,12 +1,13 @@
 import { useState } from "react";
 import * as WebBrowser from "expo-web-browser";
-import { Linking, View } from "react-native";
+import { Linking, StyleSheet, View } from "react-native";
 import { useAccount } from "@/lib/account";
 import { IN_APP_GIVING, openGivingPage, refreshAfterGiving } from "@/lib/give-flow";
 import { useLabelSuggestions } from "@/lib/use-labels";
 import { donateUrl, SITE_URL } from "@/lib/website";
-import { colors } from "@/theme/tokens";
+import { colors, fonts, radius } from "@/theme/tokens";
 import { Button } from "./button";
+import { Bubbles } from "./people";
 import { LabelPicker } from "./label-picker";
 import { Text } from "./text";
 
@@ -25,9 +26,12 @@ export function GiveSheet({ charityName, slug, onDone, initialLabel = null, camp
   const url = donateUrl(SITE_URL, slug, label, campaign);
 
   return (
-    <View style={{ gap: 18 }}>
-      <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Give to {charityName}</Text>
-      <LabelPicker value={label} onChange={setLabel} suggestions={suggestions} />
+    <View style={{ gap: 20 }}>
+      <Text style={styles.title} accessibilityRole="header">Give to <Text style={[styles.title, styles.key]}>{charityName}</Text></Text>
+      <View style={styles.soft}>
+        <Bubbles items={[{ size: 90, color: colors.peach, at: { right: -34, top: -40 } }, { size: 10, color: colors.orange, float: true, at: { right: 24, top: 18 } }]} />
+        <LabelPicker value={label} onChange={setLabel} suggestions={suggestions} />
+      </View>
 
       <View style={{ gap: 8 }}>
         <Button
@@ -54,7 +58,7 @@ export function GiveSheet({ charityName, slug, onDone, initialLabel = null, camp
             }
           }}
         />
-        <Text variant="label" style={{ textAlign: "center" }}>
+        <Text variant="label" style={styles.line}>
           {!SITE_URL ? "The website isn't live yet, so this button is off in the preview." : IN_APP_GIVING ? "Opens a secure payment page inside the app. You choose the amount and pay there." : "Opens in your browser. You choose the amount and pay there."}
         </Text>
         {error ? <Text accessibilityRole="alert" style={{ color: colors.danger, textAlign: "center" }}>{error}</Text> : null}
@@ -62,3 +66,10 @@ export function GiveSheet({ charityName, slug, onDone, initialLabel = null, camp
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  title: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: colors.navy },
+  key: { color: colors.blue },
+  soft: { padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft, overflow: "hidden" },
+  line: { textAlign: "center", lineHeight: 20 },
+});

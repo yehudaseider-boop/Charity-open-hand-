@@ -1,6 +1,7 @@
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import { colors } from "@/theme/tokens";
 import { Blob } from "./blob";
+import { Bubbles } from "./people";
 
 type Spot = { color: string; size: number; rotate: number; stretch?: number; at: ViewStyle };
 
@@ -56,18 +57,22 @@ export function Backdrop({ variant }: { variant: BackdropVariant }) {
 }
 
 /**
- * A blue colour-block header with full-strength orange and lavender splashes bleeding off its
- * edges, and rounded bottom corners. Put white text in it. It scrolls with the page; a blue block
- * above it fills the gap when pulling down to refresh.
+ * A blue colour-block header in the For charities page's look (30/10/2026): a lavender ring and an
+ * orange dot bleeding off its edges, two small dots drifting, and big rounded bottom corners. Put white
+ * text in it. It scrolls with the page; a blue block above it fills the gap when pulling down to refresh.
  */
 export function BlueHeader({ children, paddingTop, style }: { children: React.ReactNode; paddingTop: number; style?: ViewStyle }) {
   return (
     <View style={[styles.header, { paddingTop }, style]}>
       <View style={styles.above} />
-      <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Blob size={130} color={colors.orange} rotate={25} style={{ right: -60, top: -50 }} />
-        <Blob size={110} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -70, bottom: -80 }} />
-      </View>
+      <Bubbles
+        items={[
+          { size: 128, color: colors.lilac, ring: true, at: { right: -52, bottom: -64 } },
+          { size: 64, color: colors.orange, at: { right: -22, top: paddingTop - 34 } },
+          { size: 12, color: colors.lilac, float: true, at: { right: 62, top: paddingTop + 44 } },
+          { size: 9, color: colors.orange, float: true, at: { left: 20, bottom: 12 } },
+        ]}
+      />
       {children}
     </View>
   );
@@ -75,6 +80,6 @@ export function BlueHeader({ children, paddingTop, style }: { children: React.Re
 
 const styles = StyleSheet.create({
   base: { backgroundColor: colors.cream, overflow: "hidden" },
-  header: { backgroundColor: colors.blue, borderBottomLeftRadius: 36, borderBottomRightRadius: 36, overflow: "hidden", paddingHorizontal: 24, paddingBottom: 28, gap: 8 },
+  header: { backgroundColor: colors.blue, borderBottomLeftRadius: 40, borderBottomRightRadius: 40, overflow: "hidden", paddingHorizontal: 24, paddingBottom: 32, gap: 10 },
   above: { position: "absolute", left: 0, right: 0, top: -800, height: 800, backgroundColor: colors.blue },
 });

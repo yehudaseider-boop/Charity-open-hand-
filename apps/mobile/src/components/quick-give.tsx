@@ -57,7 +57,9 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
 
   return (
     <View style={{ gap: 18 }}>
-      <Text variant="h2" style={{ fontSize: 24, lineHeight: 30 }} accessibilityRole="header">Who would you like to give to?</Text>
+      <Text style={styles.title} accessibilityRole="header">
+        Who would you like to <Text style={[styles.title, styles.key]}>give</Text> to?
+      </Text>
       <View style={styles.search}>
         <SearchIcon />
         <TextInput value={query} onChangeText={setQuery} placeholder="Search charities" placeholderTextColor={colors.muted} accessibilityLabel="Search charities" style={styles.searchInput} returnKeyType="search" />
@@ -73,7 +75,7 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
         <>
           {again.length ? <Faces title="Give again" charities={again} live={directory.live} onPick={pick} /> : null}
           {savedOnly.length ? <Faces title="Your charities" charities={savedOnly} live={directory.live} onPick={pick} /> : null}
-          <View style={{ gap: 4 }}>
+          <View style={{ gap: 6 }}>
             <Text style={styles.head}>All charities</Text>
             {all.map((c, i) => <Row key={c.slug} charity={c} live={directory.live} last={i === all.length - 1} onPress={() => pick(c)} />)}
             {!all.length && directory.failed ? (
@@ -112,23 +114,26 @@ function Row({ charity, live, last, onPress }: { charity: Charity; live: boolean
         <Text style={styles.rowName} numberOfLines={1}>{charity.nameEn}</Text>
         {charity.area ? <Text variant="label" numberOfLines={1}>{charity.area}</Text> : null}
       </View>
-      <Text style={styles.rowGive}>Give</Text>
+      <View style={styles.rowGivePill}><Text style={styles.rowGive}>Give</Text></View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  search: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 50, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lilac, backgroundColor: colors.surface },
+  title: { fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: colors.navy },
+  key: { color: colors.blue },
+  search: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lilacSoft, backgroundColor: colors.lilacSoft },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 10, outlineStyle: "none" } as object,
-  head: { fontFamily: fonts.bodySemibold, fontSize: 14, letterSpacing: 0.3, color: colors.muted },
-  face: { width: 84, gap: 6, alignItems: "center" },
-  faceImage: { width: 68, height: 68, borderRadius: 34, borderWidth: 3, borderColor: colors.lilac },
+  head: { fontFamily: fonts.display, fontSize: 18, lineHeight: 23, color: colors.navy },
+  face: { width: 88, gap: 8, alignItems: "center", paddingVertical: 4 },
+  faceImage: { width: 70, height: 70, borderRadius: 35, borderWidth: 3, borderColor: colors.lilac },
   faceName: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 18, color: colors.ink, textAlign: "center" },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 60, paddingVertical: 8 },
+  row: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 64, paddingVertical: 10 },
   rule: { borderBottomWidth: 1, borderBottomColor: colors.hairline },
-  rowImage: { width: 44, height: 44, borderRadius: 14 },
+  rowImage: { width: 46, height: 46, borderRadius: 16 },
   rowName: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.ink },
-  rowGive: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", minHeight: 36 },
+  rowGivePill: { minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.lilacSoft, justifyContent: "center" },
+  rowGive: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.blue },
+  back: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", minHeight: 44 },
   backText: { fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.blue },
 });

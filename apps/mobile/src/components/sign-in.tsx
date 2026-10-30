@@ -58,6 +58,7 @@ export function SignIn() {
   if (!sentTo) {
     return (
       <View style={styles.card}>
+      <CornerRing />
         {SOCIAL_SIGN_IN ? (
           <>
             <Button variant="white" label="Continue with Google" disabled={busy} onPress={() => social("google")} />
@@ -88,6 +89,7 @@ export function SignIn() {
 
   return (
     <View style={styles.card}>
+      <CornerRing />
       <Text variant="h2" style={styles.title}>Check your email</Text>
       <Text variant="bodyMuted">
         {resent ? `We sent a new code to ${sentTo}. Use the newest one: older codes no longer work.` : `We sent a 6-digit code to ${sentTo}. It works once and expires soon.`}
@@ -127,6 +129,7 @@ export function Agree() {
 
   return (
     <View style={styles.card}>
+      <CornerRing />
       <Text variant="h2" style={styles.title}>Before you continue</Text>
       <Text variant="bodyMuted">
         We keep your email and your giving records so you can see them here. Only you see your giving goal and the labels you give your donations. We never sell your
@@ -150,6 +153,16 @@ export function Agree() {
   );
 }
 
+/** The lavender ring and orange dot in a card's corner (decoration only). */
+function CornerRing() {
+  return (
+    <View style={styles.corner} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={styles.cornerRing} />
+      <View style={styles.cornerDot} />
+    </View>
+  );
+}
+
 function Check({ checked, onPress, label }: { checked: boolean; onPress: () => void; label: string }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="checkbox" accessibilityState={{ checked }} style={styles.check}>
@@ -160,11 +173,15 @@ function Check({ checked, onPress, label }: { checked: boolean; onPress: () => v
 }
 
 const styles = StyleSheet.create({
-  card: { gap: 14, padding: 20, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
+  // A white card with the soft lilac border, a quiet lavender ring tucked into its corner.
+  card: { gap: 14, padding: 22, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, overflow: "hidden" },
+  corner: { position: "absolute", right: -34, top: -34, width: 100, height: 100 },
+  cornerRing: { position: "absolute", right: 0, top: 0, width: 72, height: 72, borderRadius: 36, borderWidth: 8, borderColor: colors.lilacSoft },
+  cornerDot: { position: "absolute", right: 76, top: 30, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.orange },
   or: { flexDirection: "row", alignItems: "center", gap: 10 },
   rule: { flex: 1, height: 1.5, backgroundColor: colors.lightPurple },
-  title: { fontSize: 22, lineHeight: 28 },
+  title: { fontSize: 24, lineHeight: 30 },
   check: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44 },
-  box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.lilac, alignItems: "center", justifyContent: "center", marginTop: 2 },
+  box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: colors.lilac, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginTop: 1 },
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
 });

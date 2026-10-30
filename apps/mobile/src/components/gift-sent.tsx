@@ -1,14 +1,14 @@
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { rand } from "@/lib/format";
 import { colors, fonts, radius, space } from "@/theme/tokens";
-import { Blob } from "./blob";
 import type { Goal } from "@/lib/goals";
 import { Button, TextLink } from "./button";
 import { GoalEditor } from "./goal-editor";
 import { GoalRing } from "./goal-ring";
+import { Bubbles, People } from "./people";
 import { CheckIcon } from "./icons";
 import { ShareButton } from "./share-button";
 import { Text } from "./text";
@@ -57,6 +57,7 @@ const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
  */
 export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gift: SentGift; charityName: string; impact: string | null; shareText: string | null; onDone: () => void }) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const invite = gift.confirming ? null : (gift.invite ?? null);
   const [phase, setPhase] = useState<"invite" | "editing" | "set">("invite");
   const [made, setMade] = useState<Goal | null>(null);
@@ -72,12 +73,22 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
   const progress = made && invite ? invite.progressFor(made) : null;
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.cream }} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-      <View style={[styles.top, { paddingTop: insets.top + 28 }]}>
-        <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <Blob size={170} color={colors.orange} rotate={25} style={{ right: -95, top: insets.top - 110 }} />
-          <Blob size={130} color={colors.lilac} rotate={-20} stretch={1.2} style={{ left: -100, bottom: -60 }} />
+      {/* The thank-you moment, in the For charities page's look (30/10/2026): white, people giving,
+          soft bubbles drifting round them, the words in deep ink with the amount line in blue. */}
+      <View style={[styles.top, { paddingTop: insets.top + 20 }]}>
+        <Bubbles
+          items={[
+            { size: 280, color: colors.lilacSoft, at: { left: -140, top: insets.top - 80 } },
+            { size: 220, color: colors.peach, at: { right: -110, top: insets.top + 120 } },
+            { size: 16, color: colors.orange, float: true, at: { left: 34, top: insets.top + 150 } },
+            { size: 30, color: colors.blue, ring: true, float: true, at: { right: 30, top: insets.top + 40 } },
+            { size: 10, color: colors.blue, float: true, at: { right: 70, top: insets.top + 230 } },
+          ]}
+        />
+        <View style={styles.art}>
+          <People name={gift.confirming ? "mailSent" : "loveIt"} width={gift.confirming ? Math.min(190, width - 140) : Math.min(120, width - 200)} />
+          {gift.confirming ? null : <View style={styles.tick}><CheckIcon size={24} color={colors.onInk} /></View>}
         </View>
-        {gift.confirming ? null : <View style={styles.tick}><CheckIcon size={28} color={colors.blue} /></View>}
         <Text style={styles.kicker} accessibilityRole="header">
           {gift.monthly
             ? gift.confirming
@@ -108,12 +119,18 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
         ) : null}
 
         {!gift.confirming && gift.goal ? (
-          <View style={styles.card}>
-            <GoalRing percent={gift.goal.percent} size={96} stroke={10} />
+          <View style={styles.blueCard}>
+            <Bubbles
+              items={[
+                { size: 90, color: colors.lilac, ring: true, at: { right: -30, bottom: -34 } },
+                { size: 14, color: colors.orange, float: true, at: { right: 26, top: 20 } },
+              ]}
+            />
+            <GoalRing percent={gift.goal.percent} size={96} stroke={10} onBlue />
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.cardKicker}>{gift.goal.name}</Text>
-              <Text style={styles.cardAmount}>{rand(gift.goal.givenCents)}</Text>
-              <Text variant="bodyMuted" style={{ fontSize: 15 }}>of {rand(gift.goal.targetCents)}</Text>
+              <Text style={styles.blueKicker} numberOfLines={2}>{gift.goal.name}</Text>
+              <Text style={styles.blueAmount}>{rand(gift.goal.givenCents)}</Text>
+              <Text style={styles.blueSub}>of {rand(gift.goal.targetCents)}</Text>
             </View>
           </View>
         ) : null}
@@ -135,7 +152,8 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
 
         {invite && phase === "invite" ? (
           <View style={styles.invite}>
-            <Text variant="h2" accessibilityRole="header">Make it a habit</Text>
+            <Bubbles items={[{ size: 120, color: colors.peach, at: { right: -44, top: -50 } }, { size: 12, color: colors.orange, float: true, at: { right: 30, top: 24 } }]} />
+            <Text variant="h2" accessibilityRole="header">Make it a <Text variant="h2" style={styles.key}>habit</Text></Text>
             <Text variant="bodyMuted">Set a giving goal for this tax year, and watch it fill up as you give.</Text>
             <Button variant="cta" label="Set my goal" onPress={() => setPhase("editing")} />
             <TextLink label="Maybe later" onPress={invite.goHome} />
@@ -193,7 +211,7 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
           </View>
         ) : null}
 
-        <View style={{ gap: 8, alignItems: "center" }}>
+        <View style={styles.shareSpot}>
           <ShareButton text={shareText} label={`Share ${charityName} on WhatsApp`} />
           <Text variant="label">Share the cause. Your amount stays private.</Text>
         </View>
@@ -207,19 +225,26 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
 }
 
 const styles = StyleSheet.create({
-  top: { backgroundColor: colors.blue, paddingHorizontal: space.gutter, paddingBottom: 64, gap: 10, overflow: "hidden" },
-  tick: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 6 },
-  kicker: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lilac },
-  big: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
-  sub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
-  body: { paddingHorizontal: space.gutter, marginTop: -40, gap: space.block },
-  card: { flexDirection: "row", alignItems: "center", gap: 18, padding: 18, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.lightPurple },
+  top: { paddingHorizontal: space.gutter, paddingBottom: 28, gap: 10, overflow: "hidden" },
+  art: { alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  tick: { position: "absolute", left: "50%", bottom: 0, marginLeft: 38, width: 44, height: 44, borderRadius: 22, backgroundColor: colors.sage, borderWidth: 4, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  kicker: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 22, color: colors.blue },
+  big: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, color: colors.navy },
+  sub: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.muted },
+  body: { paddingHorizontal: space.gutter, gap: 20 },
+  card: { flexDirection: "row", alignItems: "center", gap: 18, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   cardKicker: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.blue },
-  cardAmount: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, color: colors.navy },
-  streak: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  cardAmount: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 36, color: colors.navy },
+  blueCard: { flexDirection: "row", alignItems: "center", gap: 18, padding: 20, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
+  blueKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 19, color: colors.lilacSoft },
+  blueAmount: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 36, color: colors.onInk },
+  blueSub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
+  streak: { flexDirection: "row", alignItems: "center", gap: 12, padding: 18, borderRadius: radius.card, backgroundColor: colors.peach },
   streakDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.orange },
-  invite: { gap: 10, padding: 18, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.lightPurple },
+  invite: { gap: 12, padding: 22, borderRadius: radius.card, backgroundColor: colors.lilacSoft, overflow: "hidden" },
+  key: { color: colors.blue },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  badge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.lightPurple },
+  badge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lightPurple },
   badgeText: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.navy },
+  shareSpot: { gap: 8, alignItems: "center", paddingVertical: 4 },
 });

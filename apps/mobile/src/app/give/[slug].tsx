@@ -6,7 +6,7 @@ import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
@@ -14,7 +14,7 @@ import { Field } from "@/components/field";
 import { GiftSent, type GoalInvite, type SentGift } from "@/components/gift-sent";
 import { CheckIcon, ChevronIcon } from "@/components/icons";
 import { Segmented } from "@/components/segmented";
-import { Blob } from "@/components/blob";
+import { Bubbles, People } from "@/components/people";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
@@ -79,6 +79,7 @@ type Snapshot = { cents: number; contributionCents: number; email: string; month
 
 export default function Give() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { slug, kind: kindParam, label: labelParam, campaign: rawCampaign, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
   // A link with a broken campaign id gives to the charity itself, rather than failing every check.
   const campaignParam = typeof rawCampaign === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawCampaign) ? rawCampaign : undefined;
@@ -243,11 +244,17 @@ export default function Give() {
     return (
       <View style={styles.screen}>
         <TopBar title="Give" />
-        <View style={{ padding: space.gutter, gap: 12 }}>
-          <Text variant="h2">Give on our website</Text>
-          <Text variant="bodyMuted">You give on our secure website. It takes about a minute, and the gift shows here once it&apos;s paid.</Text>
-          <Button label="Give on our website" onPress={() => openUrl(websiteUrl)} />
-          <Button label="Back" variant="secondary" onPress={leave} />
+        <View style={{ padding: space.gutter, gap: 20 }}>
+          <View style={styles.stateCard}>
+            <Bubbles items={[{ size: 120, color: colors.peach, at: { right: -40, top: -40 } }, { size: 22, color: colors.blue, ring: true, float: true, at: { left: 18, top: 18 } }, { size: 10, color: colors.orange, float: true, at: { right: 40, bottom: 30 } }]} />
+            <People name="mobilePay" width={Math.min(200, width - space.gutter * 2 - 80)} style={{ alignSelf: "center" }} />
+            <Text style={styles.stateTitle} accessibilityRole="header">Give on our <Text style={[styles.stateTitle, styles.key]}>website</Text></Text>
+            <Text variant="bodyMuted">You give on our secure website. It takes about a minute, and the gift shows here once it&apos;s paid.</Text>
+          </View>
+          <View style={{ gap: 10 }}>
+            <Button label="Give on our website" onPress={() => openUrl(websiteUrl)} />
+            <Button label="Back" variant="secondary" onPress={leave} />
+          </View>
         </View>
       </View>
     );
@@ -268,8 +275,10 @@ export default function Give() {
         <View style={{ padding: space.gutter, gap: space.md }}>
           {serverFailed && !failed ? (
             <View style={{ gap: 12 }} accessibilityRole="alert">
-              <Text variant="h2">We can&apos;t open giving in the app right now</Text>
-              <Text variant="bodyMuted">Nothing has been charged. Check your connection and try again, or give on our website instead.</Text>
+              <View style={[styles.stateCard, { backgroundColor: colors.peach }]}>
+                <Text style={styles.stateTitle}>We can&apos;t open giving in the app right now</Text>
+                <Text variant="bodyMuted">Nothing has been charged. Check your connection and try again, or give on our website instead.</Text>
+              </View>
               <Button label="Try again" onPress={retryAll} />
               <Button label="Give on our website" variant="secondary" onPress={() => openUrl(websiteUrl)} />
               <Text variant="label">{helpLine()}</Text>
@@ -658,7 +667,7 @@ export default function Give() {
     <View style={styles.screen}>
       <TopBar title={`Giving to ${charity.nameEn}`} fallback="/discover" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: space.gutter, gap: 18, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: 8, gap: 20, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
           {campaign ? <CampaignCard campaign={campaign} compact /> : null}
           {campaignEnded ? (
             <View style={styles.note} accessibilityRole="alert">
@@ -667,8 +676,14 @@ export default function Give() {
           ) : null}
           {/* The amount, big, on blue, with what a gift does in the charity's own words. */}
           <View style={styles.amountCard} onLayout={at("amount")}>
-            <Blob size={120} color={colors.orange} rotate={20} style={{ right: -48, top: -52 }} />
-            <Blob size={90} color={colors.lilac} rotate={-15} stretch={1.2} style={{ left: -50, bottom: -64 }} />
+            {/* The website's blue colour-block card: a lavender ring and an orange dot bleeding off its edges. */}
+            <Bubbles
+              items={[
+                { size: 110, color: colors.lilac, ring: true, at: { right: -36, bottom: -40 } },
+                { size: 16, color: colors.orange, float: true, at: { right: 26, top: 24 } },
+                { size: 8, color: colors.lilac, float: true, at: { right: 64, top: 52 } },
+              ]}
+            />
             <Text style={styles.amountKicker}>Your gift</Text>
             <View style={styles.amountRow}>
               <Text style={styles.amountR}>R</Text>
@@ -689,7 +704,7 @@ export default function Give() {
             {amountImpact && charity.impactUnit ? (
               <>
                 <Text style={styles.amountImpact} accessibilityLiveRegion="polite">{amountImpact}.</Text>
-                <Text variant="label" style={{ textAlign: "center" }}>{impactSource(charity.nameEn, charity.impactUnit)}</Text>
+                <Text variant="label" style={styles.amountSource}>{impactSource(charity.nameEn, charity.impactUnit)}</Text>
               </>
             ) : charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
           </View>
@@ -766,6 +781,7 @@ export default function Give() {
           ) : goal ? (
             <Text variant="bodyMuted">Every gift counts towards {goal.name}.</Text>
           ) : null}
+          <View style={styles.softCard} onLayout={at("extra")}>
           {rates ? (
             <SwitchRow
               label="Cover the card charge"
@@ -785,11 +801,12 @@ export default function Give() {
             value={extra}
             onChange={setExtra}
           />
-          {extra ? <View onLayout={at("extra")}><Field label="Contribution" prefix="R" keyboardType="decimal-pad" editable={!locked} value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `At least ${rand(minExtra)}.` : undefined} /></View> : null}
+          {extra ? <View><Field label="Contribution" prefix="R" keyboardType="decimal-pad" editable={!locked} value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `At least ${rand(minExtra)}.` : undefined} /></View> : null}
+          </View>
 
           {showDetailFields ? (
-            <View style={{ gap: 14 }} onLayout={at("details")}>
-              <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>About you</Text>
+            <View style={[styles.softCard, { gap: 14 }]} onLayout={at("details")}>
+              <Text style={styles.sectionTitle} accessibilityRole="header">About you</Text>
               <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
               <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
               <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={err("email")} helper="Your confirmation is sent here." />
@@ -798,17 +815,17 @@ export default function Give() {
             <View style={styles.giver} onLayout={at("details")}>
               <View style={{ flex: 1 }}>
                 <Text variant="label">Giving as</Text>
-                <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 16 }} numberOfLines={1}>{first} {last}</Text>
+                <Text style={styles.giverName} numberOfLines={1}>{first} {last}</Text>
                 <Text variant="label" numberOfLines={1}>{email}</Text>
               </View>
-              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" hitSlop={14}>
-                <Text style={{ fontFamily: fonts.bodySemibold, color: colors.blue }}>Change</Text>
+              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" hitSlop={14} style={styles.changeTap}>
+                <Text style={styles.changeText}>Change</Text>
               </Pressable>
             </View>
           )}
 
           {s18aAvailable ? (
-            <View style={{ gap: 18 }} onLayout={at("s18a")}>
+            <View style={[styles.softCard, { gap: 18 }]} onLayout={at("s18a")}>
               <SwitchRow label="I want an s18A receipt" description="For your tax return. This charity can issue them." value={want18a} onChange={setWant18a} />
               {want18a && savedLast4 ? (
                 <View style={{ gap: 8 }}>
@@ -869,13 +886,13 @@ export default function Give() {
               style={styles.moreHead}
             >
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy }}>More options</Text>
+                <Text style={styles.moreTitle}>More options</Text>
                 <Text variant="label" numberOfLines={2}>{moreSummary}</Text>
               </View>
-              <View style={{ transform: [{ rotate: more ? "90deg" : "0deg" }] }}><ChevronIcon color={colors.navy} /></View>
+              <View style={[styles.moreChevron, { transform: [{ rotate: more ? "90deg" : "0deg" }] }]}><ChevronIcon color={colors.blue} /></View>
             </Pressable>
             {more ? (
-              <View style={{ gap: 18, paddingTop: 6 }}>
+              <View style={{ gap: 18, paddingTop: 10, paddingBottom: 4 }}>
             
             <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
 
@@ -984,7 +1001,8 @@ export default function Give() {
           {/* The first gift: one line on how it is kept safe, at the one moment it matters. */}
           {firstGift ? (
             <View style={styles.safeBox}>
-              <Text variant="bodyMuted" style={{ fontSize: 15 }}>
+              <View style={styles.safeDot}><CheckIcon size={16} color={colors.onInk} /></View>
+              <Text variant="bodyMuted" style={{ flex: 1, fontSize: 15, lineHeight: 22 }}>
                 <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.navy }}>Kept safe. </Text>
                 You enter your card on our payment partner&apos;s own secure page. Givezy never sees it, and never holds the money: it goes straight to the charity.
               </Text>
@@ -994,8 +1012,8 @@ export default function Give() {
         {/* Pinned: what happened (if anything), the exact total and the Give button. */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
           {message ? (
-            <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={message.tone === "error" ? undefined : styles.waitNote}>
-              <Text style={{ color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
+            <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={message.tone === "error" ? styles.errorNote : styles.waitNote}>
+              <Text style={{ fontSize: 16, lineHeight: 23, color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
               {message.help ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
             </View>
           ) : null}
@@ -1010,7 +1028,7 @@ export default function Give() {
             ) : (
               <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
             )}
-            <Text variant="label" style={{ textAlign: "center" }}>
+            <Text variant="label" style={styles.footerLine}>
               {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. ` : ""}
               {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
             </Text>
@@ -1023,27 +1041,41 @@ export default function Give() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
-  safeBox: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
+  safeBox: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.peach },
+  safeDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center", marginTop: 1 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, justifyContent: "center", backgroundColor: colors.surface },
+  chip: { minHeight: 46, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lilacSoft, justifyContent: "center", backgroundColor: colors.lilacSoft },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   chipOff: { opacity: 0.4 },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
-  footer: { paddingHorizontal: space.gutter, paddingTop: 12, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1.5, borderTopColor: colors.lightPurple },
-  amountCard: { padding: 20, gap: 4, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
-  amountKicker: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.lilac },
+  footer: { paddingHorizontal: space.gutter, paddingTop: 14, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1.5, borderTopColor: colors.hairline },
+  footerLine: { textAlign: "center", fontSize: 14, lineHeight: 20 },
+  amountCard: { paddingTop: 20, paddingBottom: 22, paddingHorizontal: 22, gap: 4, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
+  amountKicker: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.lilac },
   amountRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  amountR: { fontFamily: fonts.display, fontSize: 44, lineHeight: 56, color: colors.onInk },
-  amountInput: { flex: 1, fontFamily: fonts.display, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
-  amountImpact: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft },
-  question: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.navy },
-  more: { gap: 4, padding: 14, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
-  moreHead: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
-  giver: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
-  note: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
-  waitNote: { padding: 12, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
+  amountR: { fontFamily: fonts.displayBold, fontSize: 44, lineHeight: 56, color: colors.onInk },
+  amountInput: { flex: 1, fontFamily: fonts.displayBold, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
+  amountImpact: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft, paddingRight: 40 },
+  amountSource: { color: colors.lilac, paddingRight: 40 },
+  question: { fontFamily: fonts.display, fontSize: 19, lineHeight: 24, color: colors.navy },
+  softCard: { gap: 6, paddingVertical: 14, paddingHorizontal: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  sectionTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: colors.navy },
+  more: { gap: 4, paddingVertical: 10, paddingHorizontal: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  moreHead: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52 },
+  moreTitle: { fontFamily: fonts.display, fontSize: 19, lineHeight: 24, color: colors.navy },
+  moreChevron: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  giver: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 16, paddingHorizontal: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  giverName: { fontFamily: fonts.display, fontSize: 18, lineHeight: 24, color: colors.navy },
+  changeTap: { minHeight: 44, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.surface, justifyContent: "center" },
+  changeText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.blue },
+  note: { padding: 16, borderRadius: radius.card, backgroundColor: colors.peach },
+  waitNote: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft },
+  errorNote: { padding: 14, borderRadius: radius.control, backgroundColor: colors.peach },
   links: { flexDirection: "row", gap: 18, marginLeft: 36, flexWrap: "wrap" },
   linkTap: { minHeight: 44, justifyContent: "center" },
   link: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue, textDecorationLine: "underline" },
+  stateCard: { gap: 10, padding: 22, borderRadius: radius.card, backgroundColor: colors.lilacSoft, overflow: "hidden" },
+  stateTitle: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: colors.navy },
+  key: { color: colors.blue },
 });

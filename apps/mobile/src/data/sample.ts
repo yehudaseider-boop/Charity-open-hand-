@@ -65,7 +65,7 @@ const gallery = (urls: string[], captions: string[]) => urls.slice(1).map((url, 
 export const charities: Charity[] = [
   {
     slug: "northcliff-meals-fund",
-    impact: "[Impact line from the charity, for example what R180 pays for]",
+    impact: null, // no invented impact line: only ever the charity's own words
     nameEn: "Northcliff Meals Fund",
     nameHe: "קרן ארוחות נורת'קליף",
     cause: "Weekly food parcels for families in need",

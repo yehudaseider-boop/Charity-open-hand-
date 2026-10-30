@@ -9,6 +9,7 @@ import { BlueHeader } from "@/components/backdrop";
 import { GoalRing } from "@/components/goal-ring";
 import { InsightsLink } from "@/components/insights-link";
 import { FadeUp } from "@/components/fade-up";
+import { Bubbles, People } from "@/components/people";
 import { ChevronIcon } from "@/components/icons";
 import { MaaserProgress } from "@/components/maaser-progress";
 import { Sheet, type SheetGuard } from "@/components/sheet";
@@ -384,10 +385,16 @@ export default function Giving() {
             {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
             {preview || signedIn ? <InsightsLink /> : null}
             {account.status === "signed-out" ? (
-              <View style={styles.card}>
-                <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>See your giving here</Text>
-                <Text variant="bodyMuted">Sign in with the email you give with. Every donation shows up here, and counts towards your giving goal.</Text>
-                <Button label="Sign in" onPress={() => router.push("/account")} />
+              <View style={styles.blueCard}>
+                <Bubbles
+                  items={[
+                    { size: 96, color: colors.lilac, ring: true, at: { right: -34, bottom: -38 } },
+                    { size: 14, color: colors.orange, float: true, at: { right: 26, top: 22 } },
+                  ]}
+                />
+                <Text style={styles.blueCardTitle}>See your giving here</Text>
+                <Text style={styles.blueCardBody}>Sign in with the email you give with. Every donation shows up here, and counts towards your giving goal.</Text>
+                <Button variant="white" label="Sign in" onPress={() => router.push("/account")} style={{ marginTop: 6 }} />
               </View>
             ) : null}
             {goalsSaveFailed ? (
@@ -411,8 +418,8 @@ export default function Giving() {
                 onSecondary={() => confirmThen("Start new goals?", "The old goals are kept aside on this phone, and you can set new ones.", "Start again", () => void startAgain(() => setAsideGoals(owner), goalsRecord.retry, "goals"))}
               />
             ) : account.status === "agreeing" ? (
-              <View style={styles.card}>
-                <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>One more step</Text>
+              <View style={styles.softCard}>
+                <Text variant="h2" style={styles.cardTitle}>One more step</Text>
                 <Text variant="bodyMuted">Agree to the Terms and Privacy Policy on the Account tab, and your giving and goals appear here.</Text>
                 <Button label="Go to Account" onPress={() => router.push("/account")} />
               </View>
@@ -432,10 +439,18 @@ export default function Giving() {
                 } : undefined}
               />
             ) : goals.length === 0 ? (
-              <View style={styles.card}>
-                <Text variant="h2" style={{ fontSize: 22, lineHeight: 28 }}>Set a giving goal</Text>
+              <View style={styles.softCard}>
+                <Bubbles
+                  items={[
+                    { size: 140, color: colors.peach, at: { right: -50, top: -50 } },
+                    { size: 12, color: colors.orange, float: true, at: { right: 34, top: 26 } },
+                    { size: 24, color: colors.blue, ring: true, float: true, at: { left: 20, top: 22 } },
+                  ]}
+                />
+                <People name="dreamGift" width={Math.min(220, width - space.gutter * 2 - 80)} style={{ alignSelf: "center", marginBottom: 6 }} />
+                <Text variant="h2" style={styles.cardTitle}>Set a <Text variant="h2" style={[styles.cardTitle, { color: colors.blue }]}>giving goal</Text></Text>
                 <Text variant="bodyMuted">A set amount, like R12 000 a year, or a share of your income, like 10%. See how you&apos;re doing as you give. Only you see it.</Text>
-                <Button label="Set a goal" onPress={() => { setSaved(null); setEditing("new"); }} />
+                <Button label="Set a goal" onPress={() => { setSaved(null); setEditing("new"); }} style={{ marginTop: 8 }} />
               </View>
             ) : (
               <View style={{ gap: 26 }}>
@@ -590,11 +605,20 @@ export default function Giving() {
                 {yearGifts.length === 0 ? (
                   <Text variant="bodyMuted">No donations yet this tax year.</Text>
                 ) : (
-                  <Text style={styles.summary}>
-                    You gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}.
-                  </Text>
+                  <View style={styles.strip}>
+                    <Bubbles
+                      items={[
+                        { size: 110, color: colors.surface, at: { right: -40, top: -44 } },
+                        { size: 10, color: colors.orange, float: true, at: { right: 28, top: 20 } },
+                      ]}
+                    />
+                    <Text style={styles.summary}>
+                      You gave <Text style={styles.summaryFigure}>{rand(giftsTotal)}</Text> in {yearGifts.length} {yearGifts.length === 1 ? "donation" : "donations"} to {charities.length} {charities.length === 1 ? "charity" : "charities"}.
+                    </Text>
+                    {shownYear === taxYear && monthTotal > 0 ? <Text variant="bodyMuted">This month so far: {rand(monthTotal)}.</Text> : null}
+                  </View>
                 )}
-                {shownYear === taxYear && monthTotal > 0 ? <Text variant="bodyMuted">This month so far: {rand(monthTotal)}.</Text> : null}
+                {yearGifts.length === 0 && shownYear === taxYear && monthTotal > 0 ? <Text variant="bodyMuted">This month so far: {rand(monthTotal)}.</Text> : null}
                 {charities.length > 0 ? (
                   <View style={styles.list}>
                     {charities.map((c, i) => (
@@ -880,10 +904,10 @@ const newEntryId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
-  headTitle: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: colors.onInk },
+  headTitle: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 37, letterSpacing: -0.4, color: colors.onInk },
   headKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilac },
   headWindow: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.lilacSoft, marginBottom: 2 },
-  headAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
+  headAmount: { fontFamily: fonts.displayBold, fontSize: 34, lineHeight: 40, letterSpacing: -0.4, color: colors.onInk },
   headLine: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
   ringRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   tiles: { flexDirection: "row", gap: 4 },
@@ -910,22 +934,26 @@ const styles = StyleSheet.create({
   goalChipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   yearChips: { gap: 8, paddingHorizontal: space.gutter },
   yearChipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
-  heading: { fontSize: 22, lineHeight: 28 },
-  // Lists are ruled like a ledger: lines above and below, no box.
-  list: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
+  heading: { fontSize: 24, lineHeight: 30 },
+  // Lists sit in a soft white card with the light purple border, rows ruled inside it like a ledger.
+  list: { borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, paddingHorizontal: 16, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, minHeight: touch + 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   share: { gap: 8, paddingVertical: 12, paddingHorizontal: 2 },
   shareTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.lilacSoft, overflow: "hidden" },
   shareFill: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.blue },
-  summary: { fontFamily: fonts.display, fontSize: 24, lineHeight: 32, color: colors.ink },
-  summaryFigure: { fontFamily: fonts.display, fontSize: 24, lineHeight: 32, color: colors.blue },
-  strip: { gap: 4, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  summary: { fontFamily: fonts.display, fontSize: 24, lineHeight: 32, color: colors.navy, paddingRight: 24 },
+  summaryFigure: { fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 32, color: colors.blue },
+  strip: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lightPurple, overflow: "hidden" },
   stripKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue },
   divider: { borderTopWidth: 1, borderTopColor: colors.hairline },
   cancel: { minHeight: touch, alignItems: "center", justifyContent: "center" },
   tzedakaRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairline },
-  card: { gap: 6, padding: 20, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
+  softCard: { gap: 8, padding: 22, borderRadius: radius.card, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lightPurple, overflow: "hidden" },
+  cardTitle: { fontSize: 24, lineHeight: 30 },
+  blueCard: { gap: 8, padding: 22, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
+  blueCardTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: colors.onInk, paddingRight: 24 },
+  blueCardBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.lilacSoft },
 });
 
 /** A failure while drawing shows "Try again" and the error, not a blank page. */

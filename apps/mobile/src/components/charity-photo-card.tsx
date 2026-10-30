@@ -21,9 +21,10 @@ export function CheckedBadge({ issues18a, style }: { issues18a: boolean; style?:
 }
 
 /**
- * A charity as a photo story card: its cover photo with the checked badge, the cause and area as a
- * small blue label, the name, its one-line description, and (when it is raising for a campaign) an
- * orange progress bar, with a small Give button. `width` for the sideways row on Home; full width on Discover.
+ * A charity as a photo story card, in the For charities page's soft look (30/10/2026): a pale lilac card
+ * holding its cover photo (inset, with the checked badge), the cause and area as a small blue label, the
+ * name, its one-line description, and (when it is raising for a campaign) an orange progress bar, with a
+ * small Give button. `width` for the sideways row on Home; full width on Discover.
  */
 export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Charity; live: boolean; width?: number; onGive?: (c: Charity) => void }) {
   const campaign = charity.campaigns?.[0];
@@ -49,16 +50,16 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
       style={width ? { ...styles.card, width } : styles.card}
       to={0.98}
     >
-      <View>
+      <View style={styles.photoWrap}>
         <CharityImage charity={charity} live={live} rounded={false} bare style={styles.photo} />
         <CheckedBadge issues18a={charity.issues18a} style={styles.badgeOnPhoto} />
       </View>
       <View style={styles.body}>
         {kicker ? <Text style={styles.kicker} numberOfLines={1}>{kicker}</Text> : null}
         <Text style={styles.name} numberOfLines={2}>{charity.nameEn}</Text>
-        <Text variant="bodyMuted" numberOfLines={2} style={{ fontSize: 15, lineHeight: 21 }}>{charity.cause}</Text>
+        <Text variant="bodyMuted" numberOfLines={2} style={styles.line}>{charity.cause}</Text>
         {pct !== null ? (
-          <View style={{ gap: 6, marginTop: 4 }}>
+          <View style={styles.progress}>
             <View style={styles.track}><View style={[styles.fill, { width: `${Math.max(pct, 3)}%` }]} /></View>
             <View style={styles.footer}>
               <Text style={styles.progressText} numberOfLines={1}>{campaign!.title} · {pct}% of goal</Text>
@@ -66,7 +67,7 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
             </View>
           </View>
         ) : give ? (
-          <View style={[styles.footer, { marginTop: 4 }]}>
+          <View style={[styles.footer, { marginTop: 8 }]}>
             <View />
             <SmallGive charity={charity} onGive={give} />
           </View>
@@ -90,18 +91,21 @@ function SmallGive({ charity, onGive }: { charity: Charity; onGive: () => void }
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, overflow: "hidden" },
-  photo: { height: 130, width: "100%", borderRadius: 0 },
-  badgeOnPhoto: { position: "absolute", left: 12, top: 12 },
+  card: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, padding: 8, overflow: "hidden" },
+  photoWrap: { borderRadius: radius.card - 6, overflow: "hidden" },
+  photo: { height: 150, width: "100%", borderRadius: 0 },
+  badgeOnPhoto: { position: "absolute", left: 10, top: 10 },
   badge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.navy },
-  body: { padding: 16, gap: 4 },
+  body: { paddingHorizontal: 10, paddingTop: 14, paddingBottom: 10, gap: 4 },
   kicker: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.blue },
-  name: { fontFamily: fonts.display, fontSize: 21, lineHeight: 26, color: colors.navy },
-  track: { height: 8, borderRadius: 4, backgroundColor: colors.lightPurple, overflow: "hidden" },
+  name: { fontFamily: fonts.display, fontSize: 22, lineHeight: 26, letterSpacing: -0.3, color: colors.navy },
+  line: { fontSize: 15, lineHeight: 21 },
+  progress: { gap: 8, marginTop: 10 },
+  track: { height: 8, borderRadius: 4, backgroundColor: colors.surface, overflow: "hidden" },
   fill: { height: 8, borderRadius: 4, backgroundColor: colors.orange },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
   progressText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.muted },
-  give: { minHeight: 44, paddingHorizontal: 18, borderRadius: 14, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", borderBottomWidth: 3, borderBottomColor: colors.navy },
+  give: { minHeight: 44, paddingHorizontal: 20, borderRadius: radius.control, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", borderBottomWidth: 3, borderBottomColor: colors.navy },
   giveText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.onInk },
 });

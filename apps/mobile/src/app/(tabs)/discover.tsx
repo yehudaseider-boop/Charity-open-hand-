@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStatusCover } from "@/components/status-cover";
 import { RaisingNowRow } from "@/components/raising-now";
@@ -21,11 +21,17 @@ import { loadCausePrefs } from "@/lib/cause-prefs";
 import { causesFirst, inCause } from "@/lib/live-charities";
 import { useScreenState } from "@/lib/screen-state";
 import { SeasonalCard } from "@/components/day-greeting";
+import { Bubbles, People } from "@/components/people";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
-/** Discover: search on lilac, cause chips, the cause of the week, then every charity as a photo card. */
+/**
+ * Discover, in the For charities page's look (30/10/2026): a soft lilac header with the key word in blue,
+ * someone giving and the search, then cause chips, campaigns raising now, the cause of the week as a blue
+ * colour block, and every charity as a soft photo card.
+ */
 export default function Discover() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const status = useStatusCover();
   const demoState = useScreenState();
   const directory = useDirectory();
@@ -74,8 +80,21 @@ export default function Discover() {
         refreshControl={live ? <RefreshControl refreshing={directory.refreshing} onRefresh={directory.refresh} /> : undefined}
       >
         <View style={[styles.gutter, { gap: 14 }]}>
-          <Text variant="h1" accessibilityRole="header">Find a cause</Text>
-          <View style={styles.searchBlock}>
+          <View style={styles.hero}>
+            <Bubbles
+              items={[
+                { size: 170, color: colors.peach, at: { right: -60, top: -70 } },
+                { size: 14, color: colors.orange, float: true, at: { right: 30, top: 24 } },
+                { size: 26, color: colors.blue, ring: true, float: true, at: { left: width < 360 ? 150 : 170, top: 70 } },
+                { size: 9, color: colors.blue, float: true, at: { right: 118, top: 44 } },
+              ]}
+            />
+            <View style={styles.heroTop}>
+              <Text style={styles.title} accessibilityRole="header">
+                Find a <Text style={[styles.title, { color: colors.blue }]}>cause</Text>
+              </Text>
+              <People name="loveIt" width={64} style={styles.heroArt} />
+            </View>
             <View style={styles.search}>
               <SearchIcon />
               <TextInput
@@ -113,9 +132,10 @@ export default function Discover() {
           ) : state === "error" ? (
             <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => (live ? directory.retry() : router.replace("/discover"))} />
           ) : noneYet ? (
-            <EmptyState title="Charities are on their way" body="The first charities are joining Givezy. Check back soon." />
+            <EmptyState art="dreamGift" title="Charities are on their way" body="The first charities are joining Givezy. Check back soon." />
           ) : results.length === 0 ? (
             <EmptyState
+              art="checklist"
               title="No charities found"
               body={query.trim() ? `Nothing matches "${query.trim()}". Try another name or a different cause.` : "No charities in this cause yet. Try another one."}
               action={{ label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } }}
@@ -132,8 +152,8 @@ export default function Discover() {
                   <CauseOfTheWeek charity={featured} live={live} />
                 </FadeUp>
               ) : null}
-              <View style={{ gap: 16 }}>
-                {rest.length ? <Text style={styles.listHead}>{cause === "all" && !searching ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
+              <View style={{ gap: 14 }}>
+                {rest.length ? <Text style={styles.listHead} accessibilityRole="header">{cause === "all" && !searching ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
                 {rest.map((c, i) => (
                   <FadeUp key={c.slug} index={i + 1}>
                     <CharityPhotoCard charity={c} live={live} onGive={onGive} />
@@ -154,21 +174,31 @@ export default function Discover() {
 }
 
 /**
- * The featured charity as a big photo with a navy overlay and its name in white, framed in orange with the
- * pressable orange edge and an orange "Cause of the week" tag, so it stands apart from the cards below.
+ * The featured charity as the website's blue colour-block card: its photo inset at the top with the checked
+ * badge, a "Cause of the week" tag, and its name in white, with a lavender ring and an orange dot bleeding off
+ * the edges, so it stands apart from the soft cards below.
  */
 function CauseOfTheWeek({ charity, live }: { charity: Charity; live: boolean }) {
   return (
     <PressableScale onPress={() => router.push(`/charity/${charity.slug}`)} accessibilityRole="button" accessibilityLabel={`Cause of the week: ${charity.nameEn}. ${charity.cause}`} style={styles.week} to={0.98}>
-      <CharityImage charity={charity} live={live} rounded={false} bare veil style={StyleSheet.absoluteFill} />
-      <CheckedBadge issues18a={charity.issues18a} style={{ alignSelf: "flex-start" }} />
-      <View style={{ flex: 1 }} />
-      <View style={styles.weekTag}>
-        <StarIcon size={16} color={colors.navy} />
-        <Text style={styles.weekTagText}>Cause of the week</Text>
+      <Bubbles
+        items={[
+          { size: 90, color: colors.lilac, ring: true, at: { right: -40, bottom: -44 } },
+          { size: 16, color: colors.orange, float: true, at: { right: 26, bottom: 84 } },
+        ]}
+      />
+      <View style={styles.weekPhoto}>
+        <CharityImage charity={charity} live={live} rounded={false} bare style={StyleSheet.absoluteFill} />
+        <CheckedBadge issues18a={charity.issues18a} style={styles.weekBadge} />
       </View>
-      <Text style={styles.weekName} numberOfLines={2}>{charity.nameEn}</Text>
-      <Text style={styles.weekLine} numberOfLines={2}>{charity.cause}</Text>
+      <View style={styles.weekBody}>
+        <View style={styles.weekTag}>
+          <StarIcon size={15} color={colors.navy} />
+          <Text style={styles.weekTagText}>Cause of the week</Text>
+        </View>
+        <Text style={styles.weekName} numberOfLines={3}>{charity.nameEn}</Text>
+        <Text style={styles.weekLine} numberOfLines={2}>{charity.cause}</Text>
+      </View>
     </PressableScale>
   );
 }
@@ -176,20 +206,27 @@ function CauseOfTheWeek({ charity, live }: { charity: Charity; live: boolean }) 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
   gutter: { paddingHorizontal: space.gutter },
-  searchBlock: { padding: 12, borderRadius: radius.card, backgroundColor: colors.lilac },
-  search: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: touch + 4, paddingHorizontal: 14, borderRadius: radius.control, backgroundColor: colors.surface },
+  hero: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, padding: 16, paddingTop: 20, gap: 14, overflow: "hidden" },
+  heroTop: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12, paddingHorizontal: 4 },
+  heroArt: { marginBottom: -6 },
+  title: { fontFamily: fonts.displayBold, fontSize: 38, lineHeight: 42, letterSpacing: -0.6, color: colors.navy, flexShrink: 1 },
+  search: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: touch + 6, paddingHorizontal: 16, borderRadius: radius.control, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.lightPurple },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 12, outlineStyle: "none" } as object,
-  chips: { gap: 8, paddingHorizontal: space.gutter, paddingVertical: space.block },
+  chips: { gap: 8, paddingHorizontal: space.gutter, paddingTop: 20, paddingBottom: space.block },
   chip: { minHeight: 44, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
-  listHead: { fontFamily: fonts.bodyBold, fontSize: 14, letterSpacing: 0.3, color: colors.muted },
-  week: { minHeight: 300, borderRadius: radius.card, overflow: "hidden", padding: 18, gap: 4, borderWidth: 4, borderColor: colors.orange, borderBottomWidth: 8, borderBottomColor: colors.orangeEdge },
-  weekTag: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 6, paddingVertical: 5, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: colors.orange },
+  listHead: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, letterSpacing: -0.3, color: colors.navy },
+  week: { borderRadius: radius.card, overflow: "hidden", padding: 10, backgroundColor: colors.blue },
+  weekPhoto: { height: 190, borderRadius: radius.card - 6, overflow: "hidden", backgroundColor: colors.lilacSoft, borderWidth: 2, borderColor: colors.blueTrack },
+  weekBadge: { position: "absolute", left: 10, top: 10 },
+  weekBody: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 14, gap: 4 },
+  weekTag: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 8, paddingVertical: 5, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: colors.lilac },
   weekTagText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.navy },
-  weekName: { fontFamily: fonts.display, fontSize: 30, lineHeight: 35, color: colors.onInk },
-  weekLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft },
+  weekName: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.5, color: colors.onInk, paddingRight: 24 },
+  weekLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft, paddingRight: 40 },
 });
+
 
 /** A failure while drawing shows "Try again" and the error, not a blank page. */
 export { ScreenError as ErrorBoundary } from "@/components/screen-error";
