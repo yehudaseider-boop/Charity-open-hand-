@@ -132,7 +132,7 @@ async function main() {
   await must(
     db.from("charity_categories").insert([
       { charity_id: charity("northcliff-meals-fund"), category_id: cat("food-welfare") },
-      { charity_id: charity("northcliff-meals-fund"), category_id: cat("food-welfare") },
+      { charity_id: charity("northcliff-meals-fund"), category_id: cat("community") },
       { charity_id: charity("linksfield-learning-centre"), category_id: cat("education") },
       { charity_id: charity("glenhazel-community-hall"), category_id: cat("community") },
     ]),
