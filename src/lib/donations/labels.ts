@@ -1,15 +1,9 @@
 /**
  * A donor's own label for a gift ("Work giving", "Family"): optional and private to them.
- * Replaces an old fixed choice of giving kind; gifts stored with one of those still read as a label,
- * so nothing anyone saved is lost. Dependency-free: the phone app uses this file too.
+ * Replaces an old fixed choice of giving kind. Gifts stored with one of those kinds keep it in the database,
+ * but it is never shown (02/11/2026, Yehuda: no religious wording anywhere). Dependency-free: the phone app uses this file too.
  */
 export const LABEL_MAX = 40;
-
-/**
- * What the old fixed choices, still stored on older gifts, read as now: the stored word in sentence
- * case. Givezy never offers these; they are only read back. Any other stored kind reads as no label.
- */
-export const LEGACY_KIND_LABELS: Record<string, string> = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "Tzedaka" };
 
 /** Trimmed, single-spaced, no control characters, at most 40 characters; null when empty. */
 export function cleanLabel(raw: unknown): string | null {
@@ -18,10 +12,10 @@ export function cleanLabel(raw: unknown): string | null {
   return s || null;
 }
 
-/** A stored row's label: the label itself, or what an old fixed choice reads as. */
+/** A stored row's label: the donor's own label, or none. An old stored kind reads as no label. */
 export function labelOf(row: { label?: string | null; kind?: string | null } | null | undefined): string | null {
   if (!row) return null;
-  return cleanLabel(row.label) ?? (row.kind && Object.hasOwn(LEGACY_KIND_LABELS, row.kind) ? LEGACY_KIND_LABELS[row.kind] : null);
+  return cleanLabel(row.label);
 }
 
 /** Labels match whatever the case ("family" and "Family" are the same label). */

@@ -8,13 +8,13 @@ const row = (o: Partial<DonationRow>): DonationRow => ({
 });
 
 describe("toGifts", () => {
-  it("counts paid donations only, with the donor's own label (old fixed choices read as labels)", () => {
+  it("counts paid donations only, with the donor's own label (old fixed choices show no label)", () => {
     const gifts = toGifts(
       [row({ id: "a" }), row({ id: "b", status: "refunded" }), row({ id: "c", status: "pending", paid_at: null }), row({ id: "d", amount_cents: 5000, recurring_id: "r1", charities: [charity] }), row({ id: "e" })],
       [{ donation_id: "a", kind: "chomesh", label: null }, { donation_id: "e", kind: null, label: "Work giving" }],
     );
     expect(gifts.map((g) => g.id).sort()).toEqual(["a", "d", "e"]);
-    expect(gifts.find((g) => g.id === "a")).toMatchObject({ cents: 18_000, label: "Chomesh", charityName: "Meals Fund", charitySlug: "meals", monthly: false, with18a: true });
+    expect(gifts.find((g) => g.id === "a")).toMatchObject({ cents: 18_000, label: null, charityName: "Meals Fund", charitySlug: "meals", monthly: false, with18a: true });
     expect(gifts.find((g) => g.id === "e")?.label).toBe("Work giving");
     // No label: none is made up.
     expect(gifts.find((g) => g.id === "d")).toMatchObject({ label: null, monthly: true, cents: 5_000 });
@@ -101,13 +101,13 @@ describe("income", () => {
 });
 
 describe("giving made elsewhere", () => {
-  it("keeps the donor's own label; old fixed choices read as labels, anything else as none", () => {
+  it("keeps the donor's own label; old fixed choices and anything else show none", () => {
     const out = toElsewhere([
       { id: "a", entry_date: "2026-06-10", recipient_text: "School fun run (cash)", amount_cents: "72000", kind: "maaser" },
       { id: "b", entry_date: "2026-07-01", recipient_text: "Other", amount_cents: 5000, kind: "gift" },
       { id: "c", entry_date: "2026-08-01", recipient_text: "Collection box", amount_cents: 1800, label: "Family" },
     ]);
-    expect(out.map((e) => [e.id, e.label])).toEqual([["c", "Family"], ["b", null], ["a", "Maaser"]]);
+    expect(out.map((e) => [e.id, e.label])).toEqual([["c", "Family"], ["b", null], ["a", null]]);
     expect(out[2]).toMatchObject({ cents: 72_000, recipient: "School fun run (cash)" });
     expect(out[2].date.getFullYear()).toBe(2026);
     expect(out[2].date.getDate()).toBe(10);

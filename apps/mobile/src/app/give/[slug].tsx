@@ -22,7 +22,7 @@ import { TopBar } from "@/components/top-bar";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleGoals } from "@/data/giving";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
-import { cleanLabel, LEGACY_KIND_LABELS } from "@shared/donations/labels";
+import { cleanLabel } from "@shared/donations/labels";
 import { useAccount } from "@/lib/account";
 import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
@@ -79,7 +79,7 @@ type Snapshot = { cents: number; contributionCents: number; email: string; month
 export default function Give() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { slug, kind: kindParam, label: labelParam, campaign: rawCampaign, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
+  const { slug, label: labelParam, campaign: rawCampaign, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
   // A link with a broken campaign id gives to the charity itself, rather than failing every check.
   const campaignParam = typeof rawCampaign === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawCampaign) ? rawCampaign : undefined;
   const { charity, failed, retry } = useCharity(slug);
@@ -115,9 +115,8 @@ export default function Give() {
   const quick = tapAmounts(pastAmounts, ready?.ok ? ready.suggestedCents : []);
   const [readyAttempt, setReadyAttempt] = useState(0);
   const [amount, setAmount] = useState("");
-  // Starts from the label passed in (older links pass ?kind=), else the one used last time at this charity.
-  const legacy = kindParam && Object.hasOwn(LEGACY_KIND_LABELS, kindParam) ? LEGACY_KIND_LABELS[kindParam] : null;
-  const startLabel = cleanLabel(labelParam) || legacy || (slug ? lastLabel(history, slug) : null);
+  // Starts from the label passed in, else the one used last time at this charity (an older link's ?kind= is ignored).
+  const startLabel = cleanLabel(labelParam) || (slug ? lastLabel(history, slug) : null);
   const [label, setLabel] = useState<string | null>(startLabel);
   // The optional extras (monthly, label, phone, anonymous, message, dedication, save card), closed unless something is already chosen.
   const [more, setMore] = useState(Boolean(startLabel));

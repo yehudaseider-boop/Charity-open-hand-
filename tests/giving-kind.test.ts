@@ -21,19 +21,19 @@ describe("checkout: the donor's own label", () => {
     expect(cleanLabel("a\u0000b")).toBe("a b");
     expect(cleanLabel("   ")).toBeNull();
   });
-  it("an older app's fixed choice becomes a label; anything else is refused", () => {
-    expect(givingLabelOf(checkoutSchema.parse({ ...base, giving_kind: "maaser" }))).toBe("Maaser");
+  it("an older app's fixed choice is accepted but never kept as a label; anything else is refused", () => {
+    expect(givingLabelOf(checkoutSchema.parse({ ...base, giving_kind: "maaser" }))).toBeNull();
     expect(checkoutSchema.safeParse({ ...base, giving_kind: "other" }).success).toBe(false);
   });
-  it("old rows read as labels, and labels match whatever the case", () => {
-    expect(labelOf({ kind: "chomesh", label: null })).toBe("Chomesh");
+  it("old stored kinds show no label, and labels match whatever the case", () => {
+    expect(labelOf({ kind: "chomesh", label: null })).toBeNull();
     expect(labelOf({ kind: "maaser", label: "Family" })).toBe("Family");
     expect(labelOf(null)).toBeNull();
     expect(sameLabel("maaser", "Maaser ")).toBe(true);
     expect(sameLabel(null, "Maaser")).toBe(false);
   });
   it("every old stored kind still reads, never crashes, and nothing else is guessed", () => {
-    expect([labelOf({ kind: "maaser" }), labelOf({ kind: "chomesh" }), labelOf({ kind: "tzedaka" })]).toEqual(["Maaser", "Chomesh", "Tzedaka"]);
+    expect([labelOf({ kind: "maaser" }), labelOf({ kind: "chomesh" }), labelOf({ kind: "tzedaka" })]).toEqual([null, null, null]);
     expect(labelOf({ kind: "gift" })).toBeNull();
     expect(labelOf({ kind: "constructor" })).toBeNull();
     expect(labelOf({ kind: "toString", label: "  " })).toBeNull();

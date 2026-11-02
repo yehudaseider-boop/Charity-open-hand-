@@ -50,4 +50,26 @@ describe("donor care tables", () => {
       await run("rollback");
     }
   });
+  it("a charity's tag can only go on that charity's donors, even by a direct write (02/11/2026)", async () => {
+    await run("begin");
+    try {
+      const other = (await run("select id from public.charities where slug = $1", ["glenhazel-community-hall"])).rows[0].id;
+      const donor = (await run("insert into public.donors (email, donor_type) values ('cross@x.test', 'individual') returning id")).rows[0].id;
+      const tag = (await run("insert into public.charity_tags (charity_id, name) values ($1, 'Cross probe') returning id", [charity])).rows[0].id;
+      await expect(run("insert into public.charity_donor_tags (tag_id, charity_id, donor_id) values ($1, $2, $3)", [tag, other, donor])).rejects.toThrow(/charity_donor_tags_same_charity/);
+    } finally {
+      await run("rollback");
+    }
+  });
+
+  it("an email change at sign-in is copied to the profile, so team look-ups find the person", async () => {
+    await run("begin");
+    try {
+      const u = (await run("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"])).rows[0].id;
+      await run("update auth.users set email = 'hall.admin.new@nedivlev.test' where id = $1", [u]);
+      expect((await run("select email from public.profiles where id = $1", [u])).rows[0].email).toBe("hall.admin.new@nedivlev.test");
+    } finally {
+      await run("rollback");
+    }
+  });
 });

@@ -39,10 +39,10 @@ describe("giving goals", () => {
     expect(cleanGoals("nope")).toEqual([]);
     expect(cleanGoals([{ ...good, counts: [" Maaser ", ""] }])[0].counts).toEqual(["Maaser"]);
   });
-  it("a much older version's targets become goals, keeping their own names, now on the tax year", () => {
+  it("a much older version's targets become goals with neutral names, counting all giving in the tax year", () => {
     expect(goalsFromOldTarget({ period: "month", maaserCents: 60_000, chomeshCents: 60_000 }).map((g) => [g.name, g.fixedCents, g.counts, g.year])).toEqual([
-      ["Maaser", 60_000, ["Maaser"], "tax"],
-      ["Chomesh", 60_000, ["Chomesh"], "tax"],
+      ["Giving goal", 60_000, null, "tax"],
+      ["Second giving goal", 60_000, null, "tax"],
     ]);
     expect(goalsFromOldTarget(null)).toEqual([]);
   });

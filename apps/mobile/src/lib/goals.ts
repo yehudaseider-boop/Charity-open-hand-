@@ -5,7 +5,6 @@
  * only. Pure (no React Native): the website's tests check it. Money is whole cents; percentages are
  * parts per million (10% = 100 000).
  */
-import { LEGACY_KIND_LABELS } from "@shared/donations/labels";
 import { taxYearFor, taxYearName } from "./tax-year";
 
 export type GoalPeriod = "month" | "year";
@@ -70,15 +69,14 @@ export function cleanGoals(raw: unknown): Goal[] {
 
 /**
  * Targets saved by a much older version (a first and an optional second amount, per month or per
- * year) as goals, so nobody's numbers are lost. They keep the names and labels the donor's gifts
- * were marked with back then, and now count the tax year; the donor can rename or remove them.
+ * year) as goals, so nobody's numbers are lost. They get neutral names, count all giving in the tax
+ * year, and the donor can rename or remove them.
  */
 export function goalsFromOldTarget(t: { period: GoalPeriod; maaserCents: number; chomeshCents: number | null } | null): Goal[] {
   if (!t) return [];
-  const first = LEGACY_KIND_LABELS.maaser;
-  const second = LEGACY_KIND_LABELS.chomesh;
-  const goals: Goal[] = [{ id: "earlier-1", name: first, basis: "fixed", percentPpm: null, fixedCents: t.maaserCents, period: t.period, year: "tax", counts: [first] }];
-  if (t.chomeshCents) goals.push({ id: "earlier-2", name: second, basis: "fixed", percentPpm: null, fixedCents: t.chomeshCents, period: t.period, year: "tax", counts: [second] });
+  // Neutral names, counting all giving (02/11/2026: no religious wording); the donor can rename them.
+  const goals: Goal[] = [{ id: "earlier-1", name: "Giving goal", basis: "fixed", percentPpm: null, fixedCents: t.maaserCents, period: t.period, year: "tax", counts: null }];
+  if (t.chomeshCents) goals.push({ id: "earlier-2", name: "Second giving goal", basis: "fixed", percentPpm: null, fixedCents: t.chomeshCents, period: t.period, year: "tax", counts: null });
   return goals;
 }
 

@@ -7,7 +7,6 @@ import { Card } from "@/components/card";
 import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
-import { givingKinds } from "@/lib/donations/validation";
 import { cleanLabel } from "@/lib/donations/labels";
 import { formatRand, parseRandToCents } from "@/lib/money";
 import { getViewer } from "@/lib/auth";
@@ -32,11 +31,10 @@ export async function generateMetadata({ params, searchParams }: PageProps<"/c/[
 
 export default async function DonatePage({ params, searchParams }: PageProps<"/c/[slug]/donate">) {
   const { slug } = await params;
-  // The phone app sends the donor here with their label already chosen (older versions send ?kind=).
+  // The phone app sends the donor here with their label already chosen (an older version's ?kind= is ignored).
   const sp = await searchParams;
   const fromApp = sp.from === "app";
-  const kind = typeof sp.kind === "string" && Object.hasOwn(givingKinds, sp.kind) ? givingKinds[sp.kind as keyof typeof givingKinds] : null;
-  const initialLabel = cleanLabel(sp.label) ?? kind ?? undefined;
+  const initialLabel = cleanLabel(sp.label) ?? undefined;
   // Trying again after a declined card keeps the amount the donor chose (our links carry it in cents). A
   // phone that sends the amount box before the page has finished loading sends what was typed, in Rand.
   const again =

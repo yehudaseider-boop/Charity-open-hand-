@@ -13,7 +13,6 @@ const line = (max: number, what: string) => str(max, what).transform((v) => (v =
 const yes = z.literal("on").optional();
 
 /** The old fixed choice, still accepted from older app versions and links (read as a label). */
-export const givingKinds = { maaser: "Maaser", chomesh: "Chomesh", tzedaka: "Tzedaka" } as const;
 
 /** Checkout form, as sent. Cross-field rules are applied in checkDonorDetails. */
 export const checkoutSchema = z.object({
@@ -95,7 +94,7 @@ export function cleanPhone(v: string | undefined) {
   return v?.replace(/[\s()-]/g, "") || undefined;
 }
 
-/** The label to keep with a gift: what the donor typed, else an older app's fixed choice. */
+/** The label to keep with a gift: what the donor typed. An older app's fixed choice (giving_kind) is accepted but never kept as a label. */
 export function givingLabelOf(v: Pick<CheckoutInput, "giving_label" | "giving_kind">): string | null {
-  return cleanLabel(v.giving_label) ?? (v.giving_kind ? givingKinds[v.giving_kind] : null);
+  return cleanLabel(v.giving_label);
 }
