@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
+let role: "owner" | "admin" | null = "owner";
+vi.mock("@/lib/charity/team", () => ({ memberRole: async () => role }));
 
 type Row = Record<string, unknown>;
 let tables: Record<string, Row[]>;
@@ -55,6 +57,7 @@ const now = new Date();
 const action = (undo: unknown, kind = "profile_saved") => ({ id: A, charity_id: C, kind, details: {}, undo, undone_at: null, created_at: now.toISOString() });
 
 beforeEach(() => {
+  role = "owner";
   removedFiles = [];
   tables = { charities: [{ id: C, name_en: "New name", impact_en: "R50 feeds a family" }], charity_categories: [], donations: [], campaigns: [], charity_updates: [] };
 });
@@ -118,6 +121,13 @@ describe("undo", () => {
     expect(await undoAction(C, A, "u1", "approved", now)).toMatchObject({ ok: false, why: "gone" });
     tables.charity_actions = [{ ...action({ type: "restore", table: "charities", before: {}, after: {} }), created_at: new Date(now.getTime() - 31 * 60_000).toISOString() }];
     expect(await undoAction(C, A, "u1", "approved", now)).toMatchObject({ ok: false, why: "late" });
+  });
+
+  it("taking back a donor-list import is the owner's alone: an admin is refused and the import stays", async () => {
+    role = "admin";
+    tables.charity_actions = [action({ type: "remove_contacts", importId: "0f9a2c71-0b1d-4e5f-9a8b-123456789abc" }, "contacts_imported")];
+    expect(await undoAction(C, A, "u1", "approved", now)).toMatchObject({ ok: false, why: "owner" });
+    expect(tables.charity_actions[0].undone_at).toBeNull();
   });
 
   it("registration changes can't be taken back once the application is submitted", async () => {

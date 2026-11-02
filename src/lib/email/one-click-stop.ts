@@ -20,6 +20,9 @@ export async function oneClickStop(request: NextRequest, stop: (token: string) =
   if (limited === null) return plain("Something went wrong. Nothing was changed. Please try again later.", 503);
   if (limited) return plain("Too many tries. Nothing was changed. Please try again later.", 429);
   const token = request.nextUrl.searchParams.get("t") ?? "";
+  // RFC 8058: a real one-click stop carries the body List-Unsubscribe=One-Click. A POST without it (a scanner,
+  // a form guessed from the address) stops nobody, and gets the same answer as a bad token.
+  if (!(await hasOneClickBody(request))) return plain("That link didn't work. Nothing was changed.", 400);
   let ok: boolean;
   try {
     ok = await stop(token);
@@ -30,6 +33,17 @@ export async function oneClickStop(request: NextRequest, stop: (token: string) =
   // The same answer for a link that was never ours and one that is malformed.
   if (!ok) return plain("That link didn't work. Nothing was changed.", 400);
   return plain("Done. You won't get these emails any more.", 200);
+}
+
+/** The POST body, read as a form (mail apps send it URL-encoded or as multipart), has List-Unsubscribe=One-Click. */
+async function hasOneClickBody(request: NextRequest): Promise<boolean> {
+  try {
+    const type = request.headers.get("content-type") ?? "";
+    const form = type.startsWith("multipart/form-data") ? await request.formData() : new URLSearchParams(await request.text());
+    return form.get("List-Unsubscribe") === "One-Click";
+  } catch {
+    return false;
+  }
 }
 
 /** Opening the address in a browser: the page that asks first, with the same token. */

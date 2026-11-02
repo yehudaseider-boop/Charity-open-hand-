@@ -77,6 +77,67 @@ describe("checking a charity's bank account", () => {
     err.mockRestore();
   });
 
+  it("the provider is slow: the page gets 'not checked yet', and the answer is still kept when it arrives", async () => {
+    vi.useFakeTimers();
+    let answer: (a: unknown) => void = () => {};
+    check = () => new Promise((r) => (answer = r));
+    try {
+      const pending = checkCharityBank("c1", "u1");
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(await pending).toMatchObject({ outcome: "not_checked" });
+      expect(saved).toMatchObject({ outcome: "not_checked", account_last4: "1234" });
+      answer({ verified: true, accountOpen: true, acceptsCredits: true, holderMatches: true, openMoreThanThreeMonths: true, message: null });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(saved).toMatchObject({ outcome: "checked", verified: true, account_last4: "1234" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe("the charity saving its own details (each check costs money)", () => {
+    const recent = () => ({ account_last4: "1234", checked_at: new Date(Date.now() - 60_000).toISOString(), outcome: "checked", verified: true });
+    const sameAccount = { charitySave: { previousBankName: "FNB", previousLast4: "1234" } };
+    const newAccount = { charitySave: { previousBankName: "FNB", previousLast4: "9999" } };
+    let asked = 0;
+    beforeEach(() => {
+      asked = 0;
+      check = async () => (asked++, { verified: true, accountOpen: true, acceptsCredits: true, holderMatches: true, openMoreThanThreeMonths: true, message: null });
+    });
+
+    it("the same bank and account, already checked: the provider isn't asked and the earlier answer is returned", async () => {
+      stored = { ...recent(), checked_at: "2026-01-01T00:00:00Z" };
+      expect(await checkCharityBank("c1", "u1", sameAccount)).toMatchObject({ outcome: "checked", verified: true });
+      expect(asked).toBe(0);
+      expect(saved).toBeNull();
+    });
+
+    it("a new account within a day of the last check: not asked yet", async () => {
+      stored = recent();
+      await checkCharityBank("c1", "u1", newAccount);
+      expect(asked).toBe(0);
+      expect(saved).toBeNull();
+    });
+
+    it("a new account, last checked more than a day ago: asked", async () => {
+      stored = { ...recent(), checked_at: new Date(Date.now() - 25 * 60 * 60_000).toISOString() };
+      expect(await checkCharityBank("c1", "u1", newAccount)).toMatchObject({ outcome: "checked" });
+      expect(asked).toBe(1);
+      expect(saved).toMatchObject({ outcome: "checked", account_last4: "1234" });
+    });
+
+    it("never checked before: asked", async () => {
+      stored = null;
+      await checkCharityBank("c1", "u1", sameAccount);
+      expect(asked).toBe(1);
+    });
+
+    it("the admin's Check again always asks", async () => {
+      stored = recent();
+      await checkCharityBank("c1", "u1");
+      expect(asked).toBe(1);
+    });
+  });
+
   it("a gateway with no check: 'not checked'", async () => {
     expect(await checkCharityBank("c1", null)).toMatchObject({ outcome: "not_checked" });
   });

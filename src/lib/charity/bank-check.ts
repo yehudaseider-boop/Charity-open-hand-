@@ -24,9 +24,22 @@ export type BankCheckRow = {
 
 /** How long a save waits for the answer before it carries on (the check is then recorded as not checked). */
 const WAIT_MS = 8_000;
+/** From the charity's side, the provider is asked at most this often (each check costs money in live mode). */
+const CHARITY_CHECK_GAP_MS = 24 * 60 * 60_000;
+
+const CHECK_COLUMNS = "account_last4, checked_at, outcome, verified, account_open, accepts_credits, holder_matches, open_three_months, message";
+
+/**
+ * The charity saving its own bank details: `previous` is what was saved before. The provider is not asked again when
+ * the bank and the account's last four digits are unchanged and a check for that account already exists, nor more
+ * than once a day for the charity. The admin's "Check again" passes nothing and always asks.
+ */
+export type BankCheckOptions = { charitySave?: { previousBankName: string | null; previousLast4: string | null } };
+
+type Answer = { verified: boolean; accountOpen: boolean; acceptsCredits: boolean; holderMatches: boolean; openMoreThanThreeMonths: boolean; message: string | null };
 
 /** Ask the payment provider about this charity's bank account and keep the answer. Never throws. */
-export async function checkCharityBank(charityId: string, actorUserId: string | null): Promise<BankCheckRow | null> {
+export async function checkCharityBank(charityId: string, actorUserId: string | null, options: BankCheckOptions = {}): Promise<BankCheckRow | null> {
   try {
     const db = createAdminClient();
     const { data: priv, error } = await db
@@ -37,44 +50,59 @@ export async function checkCharityBank(charityId: string, actorUserId: string | 
     if (error || !priv?.bank_account_number_encrypted || !priv.bank_name || !priv.bank_account_holder) return null;
     const accountNumber = decrypt(priv.bank_account_number_encrypted as string);
     const row: BankCheckRow = { account_last4: last4(accountNumber), checked_at: new Date().toISOString(), outcome: "not_checked", verified: null, account_open: null, accepts_credits: null, holder_matches: null, open_three_months: null, message: null };
+    const { data: earlierData } = await db.from("charity_bank_checks").select(CHECK_COLUMNS).eq("charity_id", charityId).maybeSingle();
+    const earlier = (earlierData as BankCheckRow | null) ?? null;
+
+    if (options.charitySave && earlier) {
+      const { previousBankName, previousLast4 } = options.charitySave;
+      const sameAccount = previousBankName === priv.bank_name && previousLast4 === row.account_last4;
+      if (sameAccount && earlier.account_last4 === row.account_last4) return earlier;
+      if (Date.now() - new Date(earlier.checked_at).getTime() < CHARITY_CHECK_GAP_MS) return earlier;
+    }
+
+    const save = async (r: BankCheckRow): Promise<boolean> => {
+      const { error: saveError } = await db.from("charity_bank_checks").upsert({ charity_id: charityId, ...r }, { onConflict: "charity_id" });
+      if (saveError) {
+        console.error("[bank-check] not saved", saveError.message);
+        return false;
+      }
+      await logAudit({ actorUserId, action: "charity.bank_checked", entityType: "charity", entityId: charityId, details: { outcome: r.outcome, verified: r.verified, last4: r.account_last4 } });
+      return true;
+    };
+    const withAnswer = (a: Answer): BankCheckRow => ({ ...row, outcome: "checked", verified: a.verified, account_open: a.accountOpen, accepts_credits: a.acceptsCredits, holder_matches: a.holderMatches, open_three_months: a.openMoreThanThreeMonths, message: a.message });
+
     const gateway = getGateway();
     if (gateway.checkBankAccount) {
-      const answer = await Promise.race([
-        gateway.checkBankAccount({ bankName: priv.bank_name as string, accountNumber, accountHolder: priv.bank_account_holder as string }).catch((e) => {
-          // The provider answered and turned the account down (for example, no such account): that is an answer,
-          // "not verified", never "not checked". An outage or an unsupported bank stays "not checked".
-          if (isGatewayRefusal(e)) {
-            return { verified: false, accountOpen: false, acceptsCredits: false, holderMatches: false, openMoreThanThreeMonths: false, message: "The check was turned down: the bank details may be wrong." };
-          }
-          console.error("[bank-check] not checked", e instanceof Error ? e.message : e);
-          return null;
-        }),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), WAIT_MS)),
-      ]);
-      if (answer) {
-        Object.assign(row, {
-          outcome: "checked",
-          verified: answer.verified,
-          account_open: answer.accountOpen,
-          accepts_credits: answer.acceptsCredits,
-          holder_matches: answer.holderMatches,
-          open_three_months: answer.openMoreThanThreeMonths,
-          message: answer.message,
-        });
+      const asked: Promise<Answer | null> = gateway.checkBankAccount({ bankName: priv.bank_name as string, accountNumber, accountHolder: priv.bank_account_holder as string }).catch((e) => {
+        // The provider answered and turned the account down (for example, no such account): that is an answer,
+        // "not verified", never "not checked". An outage or an unsupported bank stays "not checked".
+        if (isGatewayRefusal(e)) {
+          return { verified: false, accountOpen: false, acceptsCredits: false, holderMatches: false, openMoreThanThreeMonths: false, message: "The check was turned down: the bank details may be wrong." };
+        }
+        console.error("[bank-check] not checked", e instanceof Error ? e.message : e);
+        return null;
+      });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = Symbol("timed out");
+      const first = await Promise.race([asked, new Promise<typeof timedOut>((resolve) => (timer = setTimeout(() => resolve(timedOut), WAIT_MS)))]);
+      clearTimeout(timer);
+      if (first !== timedOut) {
+        if (first) {
+          const checked = withAnswer(first);
+          return (await save(checked)) ? checked : null;
+        }
+      } else {
+        // The page carries on as "not checked yet", but the provider's answer still costs money: keep it when it arrives.
+        void asked
+          .then(async (late) => {
+            if (late) await save(withAnswer(late));
+          })
+          .catch((e) => console.error("[bank-check] late answer not kept", e instanceof Error ? e.message : e));
       }
     }
     // Couldn't ask this time: an earlier answer about this same account stays, rather than being wiped.
-    if (row.outcome === "not_checked") {
-      const { data: earlier } = await db.from("charity_bank_checks").select("account_last4, outcome").eq("charity_id", charityId).maybeSingle();
-      if (earlier?.outcome === "checked" && earlier.account_last4 === row.account_last4) return row;
-    }
-    const { error: saveError } = await db.from("charity_bank_checks").upsert({ charity_id: charityId, ...row }, { onConflict: "charity_id" });
-    if (saveError) {
-      console.error("[bank-check] not saved", saveError.message);
-      return null;
-    }
-    await logAudit({ actorUserId, action: "charity.bank_checked", entityType: "charity", entityId: charityId, details: { outcome: row.outcome, verified: row.verified, last4: row.account_last4 } });
-    return row;
+    if (earlier?.outcome === "checked" && earlier.account_last4 === row.account_last4) return row;
+    return (await save(row)) ? row : null;
   } catch (e) {
     console.error("[bank-check] failed", e instanceof Error ? e.message : e);
     return null;

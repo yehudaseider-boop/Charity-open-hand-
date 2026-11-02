@@ -16,7 +16,7 @@ const S = process.env.SITE ?? "http://localhost:3005";
 const SLUG = process.env.CHARITY ?? "northcliff-meals-fund";
 const RUN = `${Date.now()}`;
 const post = async (p, b) => { const r = await fetch(S + p, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }); return [r.status, await r.json().catch(() => null)]; };
-const details = (extra = {}) => ({ donor_type: "individual", email: `e2e${RUN}@example.test`, first_name: "Thandi", last_name: "Mokoena", age_confirmed: true, popia_consent: true, giving_kind: "tzedaka", ...extra });
+const details = (extra = {}) => ({ donor_type: "individual", email: `e2e${RUN}@example.test`, first_name: "Thandi", last_name: "Mokoena", age_confirmed: true, popia_consent: true, ...extra });
 const out = [];
 const log = (name, ok, info = "") => { out.push(`${ok ? "PASS" : "FAIL"}  ${name}${info ? "  (" + info + ")" : ""}`); };
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium" });

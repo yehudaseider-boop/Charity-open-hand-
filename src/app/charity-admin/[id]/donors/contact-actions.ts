@@ -90,7 +90,8 @@ export async function importContacts(charityId: string, _prev: FormState, formDa
   if (file.bad) return { ok: false, message: `${file.bad} ${file.bad === 1 ? "row needs" : "rows need"} fixing first, so nothing was imported. Fix ${file.bad === 1 ? "it" : "them"} and check the file again.` };
   if (tooManyTags) return { ok: false, message: "This file would take you over 100 tags, so nothing was imported." };
   const contacts = file.rows.flatMap((r) => (r.check.ok ? [r.check.contact] : []));
-  const fileName = String(formData.get("file_name") ?? "file.csv").replace(/[\u0000-\u001f]/g, "").slice(0, 200) || "file.csv";
+  // Cut by characters, not code units, so a surrogate pair is never split.
+  const fileName = Array.from(String(formData.get("file_name") ?? "file.csv").replace(/[\u0000-\u001f]/g, "")).slice(0, 200).join("") || "file.csv";
   const r = await importContactsFile({ charityId, userId: viewer.userId, contacts, fileName, fingerprint: fileFingerprint(text) });
   if (!r.ok) return { ok: false, message: r.message };
   revalidatePath(`/charity-admin/${charityId}/donors`);

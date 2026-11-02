@@ -9,6 +9,9 @@ import { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, parseCsv } from "./recorded-gifts";
 
 export { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS };
 
+/** Which wording the import was confirmed under; changes whenever the confirmation checkbox text in contact-forms.tsx changes. */
+export const CONTACT_CONFIRMATION_VERSION = "contacts-2026-11-02";
+
 export type ContactField =
   | "first_name" | "last_name" | "organisation_name" | "email" | "phone" | "address_line1" | "address_line2" | "suburb" | "city"
   | "postal_code" | "note" | "tags";

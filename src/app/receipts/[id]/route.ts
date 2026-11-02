@@ -1,28 +1,37 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { logAudit } from "@/lib/audit";
+import { requestOrigin } from "@/lib/request-origin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
+/** The pages that show the "receipt unavailable" notice: a donor's account, the admin list, a charity's list. */
+const LIST_PAGES = [/^\/account$/, /^\/admin\/receipts$/, /^\/charity-admin\/[0-9a-f-]{36}\/receipts$/i];
+
+/**
+ * Where a receipt that can't be handed out sends the person: back to the list they opened it from, if the
+ * Referer names one of the three pages that show the notice; otherwise the account page. Only the path is
+ * taken from the Referer, never the address, so a forged header can't send anyone elsewhere.
+ */
+function unavailableBackPath(referer: string | null): string {
+  try {
+    const path = referer ? new URL(referer).pathname : "";
+    return LIST_PAGES.some((p) => p.test(path)) ? path : "/account";
+  } catch {
+    return "/account";
+  }
+}
 
 /**
  * Opens an s18A receipt PDF through a 60-second signed link. Row-level
  * security decides who may see the receipt: its donor, that charity's admins
  * and platform admins. Withdrawn (void) receipts are not handed out.
  */
-export async function GET(_request: NextRequest, ctx: RouteContext<"/receipts/[id]">) {
+export async function GET(request: NextRequest, ctx: RouteContext<"/receipts/[id]">) {
   const { id } = await ctx.params;
-  // A receipt that can't be handed out goes back to the account page with a plain message, not a bare "Not found".
-  // Admins open receipts from their own lists, so a failure sends them back there (a same-site address only).
-  const from = _request.headers.get("referer");
-  const back = (() => {
-    try {
-      const r = from ? new URL(from) : null;
-      return r && r.origin === new URL(_request.url).origin && !r.pathname.startsWith("/receipts/") ? `${r.pathname}${r.search}` : null;
-    } catch {
-      return null;
-    }
-  })();
+  // A receipt that can't be handed out goes back to a list page with a plain message, not a bare "Not found".
+  const origin = requestOrigin(request);
   const unavailable = () => {
-    const to = new URL(back ?? "/account", _request.url);
+    const to = new URL(unavailableBackPath(request.headers.get("referer")), origin);
     to.searchParams.set("receipt", "unavailable");
     return NextResponse.redirect(to, { status: 303 });
   };
@@ -30,7 +39,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/receipts/[i
   const { data: { user } } = await supabase.auth.getUser();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return unavailable();
   // An expired session gets the sign-in page, not a bare line of text.
-  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(`/receipts/${id}`)}`, _request.url), { status: 303 });
+  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(`/receipts/${id}`)}`, origin), { status: 303 });
 
   const { data: receipt } = await supabase
     .from("s18a_receipts")

@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.lightPurple },
   actions: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
   btn: { flex: 1, minHeight: touch, borderRadius: radius.control, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  btnMain: { backgroundColor: colors.blue, borderBottomWidth: 4, borderBottomColor: colors.navy },
+  btnMain: { backgroundColor: colors.blue, borderBottomWidth: 4, borderBottomColor: colors.blueEdge },
   btnQuiet: { borderWidth: 1.5, borderColor: colors.lightPurple, borderBottomWidth: 4, borderBottomColor: colors.lilac, backgroundColor: colors.surface },
   btnText: { fontFamily: fonts.bodyBold, fontSize: 16 },
 });

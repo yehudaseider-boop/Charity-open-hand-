@@ -7,8 +7,8 @@ type Variant = "primary" | "cta" | "secondary" | "white" | "dark";
 
 /** Face colour, text colour and the solid edge under each kind of button. */
 const look: Record<Variant, { bg: string; text: string; edge: string; border?: string }> = {
-  /** Blue, white text, navy edge: the usual button. */
-  primary: { bg: colors.blue, text: colors.onInk, edge: colors.navy },
+  /** Blue, white text, deep blue edge: the usual button. */
+  primary: { bg: colors.blue, text: colors.onInk, edge: colors.blueEdge },
   /** Orange, navy text, navy edge: the one call to action on a screen. */
   cta: { bg: colors.orange, text: colors.navy, edge: colors.navy },
   /** White, blue text, lavender edge: for actions that should not shout, and on blue grounds. */

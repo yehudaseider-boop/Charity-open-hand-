@@ -492,5 +492,6 @@ function connectProblem(e: GatewayError): string {
     const why = e.said ? ` It said: "${e.said}".` : "";
     return `The payment provider didn't accept this charity's bank details, so it isn't connected yet.${why} Check the details against the charity's bank confirmation letter, change them if needed, then try again.`;
   }
-  return e.message;
+  // A wrong or changed key, or the provider failing: never its own message, which names the gateway.
+  return "The payment provider answered with an error, so the charity isn't connected yet. Nothing was changed. Try again in a minute; if it keeps happening, check the payment settings on the Settings check page.";
 }

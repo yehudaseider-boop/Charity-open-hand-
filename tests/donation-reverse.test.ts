@@ -8,7 +8,7 @@ vi.mock("server-only", () => ({}));
 
 type Donation = { id: string; gateway_ref: string; status: string; total_charged_cents: number; recurring_id?: string | null };
 let donations: Donation[];
-let recurring: { id: string; status: string; authorization_encrypted: string | null; ended_reason?: string | null; held_reason?: string | null }[];
+let recurring: { id: string; status: string; authorization_encrypted: string | null; ended_reason?: string | null; held_reason?: string | null; paused_at?: string | null }[];
 let voided: string[];
 let receiptLinks: { receipt_id: string; donation_id: string }[];
 const audits: { action: string; entityId?: string | null; details?: Record<string, unknown> }[] = [];
@@ -139,16 +139,20 @@ describe("monthly donations behind a reversed payment", () => {
     await handleDispute("ref-1", "opened", null, "ev1");
     expect(recurring[0].status).toBe("paused");
     expect(recurring[0].held_reason).toBe("a payment was disputed");
+    expect(typeof recurring[0].paused_at).toBe("string");
     expect(donations[0].status).toBe("paid");
     recurring[0].status = "active";
     await handleDispute("ref-1", "resolved", "won", "ev2");
     expect(recurring[0].status).toBe("active");
   });
 
-  it("a dispute holds a donation the donor had paused too; a person releases the hold once it is won", async () => {
+  it("a dispute holds a donation the donor had paused too (keeping when they paused it); a person releases the hold once it is won", async () => {
     recurring[0].status = "paused";
+    recurring[0].paused_at = "2026-09-01T08:00:00.000Z";
     await handleDispute("ref-1", "opened", null, "ev1");
     expect(recurring[0].held_reason).toBe("a payment was disputed");
+    expect(recurring[0].paused_at).toBe("2026-09-01T08:00:00.000Z");
+    expect(audits.map((a) => a.action)).toContain("recurring.paused");
     expect(await releaseDisputeHold("d1", "admin-1")).toBe(true);
     expect(recurring[0]).toMatchObject({ status: "paused", held_reason: null });
     expect(await releaseDisputeHold("d1", "admin-1")).toBe(false);

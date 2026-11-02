@@ -80,6 +80,21 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 - [ ] **Before saved cards are switched on (22/10 review):** keep the "never charge twice" attempt on the phone across screens, and settle a saved-card attempt that never reached the provider (today it can show "couldn't check" for ever). Also: the "use my ID ending 1234" should come only from gifts made while signed in.
 - [ ] **Before in-app giving on Android:** test the payment return on a real Android phone (the router fix of 22/10 could only be checked in code).
 
+### Code review of 02/11/2026 (three fresh-eyes reviews of everything since 22/10: nothing blocking)
+
+Decisions for Yehuda:
+- [ ] **Monthly amount when card-charge rates change.** A monthly donor agrees to "R196 a month" (gift plus the card charge of the day), but the charge is recomputed from today's rates every month and the account page shows the gift without the charge. With rates blank nothing is affected. Before supplying the rates, decide: store the charge at consent time and ask again if the rate changes (recommended), or word every screen as "plus the card charge of the day". Also decide whether one rate covers international cards (Paystack publishes a higher one) or the charity carries the difference.
+- [ ] **A Givezy platform admin counts as owner of every charity**, so can import a donor list into any charity and tick "these people gave our charity their details" on its behalf. Decide whether import and remove should need a real owner on the charity's team (recommended) or stay as is.
+- [ ] **POPIA: erasure and imported contacts.** "Erase my data" clears the shared donor record but not a charity's own imported contact rows (name, phone, address, note). Defensible, because the charity is the responsible party for its list and Givezy the operator, but it has to be written down: either Givezy also removes matching contact rows on erasure, or the Privacy Policy and the charity terms say the charity must. Ask Yosef.
+- [ ] **Old giving labels on the test database.** The 16/10 migration wrote "Maaser", "Chomesh" and "Tzedaka" as the stored label on older test gifts, so they still show as the donor's own words. Test data only, no live donors. Decide: clear them (one migration, with your yes), or leave as a donor's own words.
+- [ ] **Receipt "nature of donation".** Every online gift is printed as "Card (online)" and frozen in the receipt. True while the provider takes cards only; wrong for life if instant EFT or debit orders are added. Add to the Yosef list; the fix is to store the method on the donation at confirm time.
+
+Done 02/11/2026 from the same review (no decision needed): sign-in email backfill for profiles; the contact-import confirmation is versioned; one-click unsubscribe requires the RFC 8058 body; tests for the import and remove gates; the bank check is skipped when the account is unchanged and limited to one a day from the charity side, and a late answer is kept where the host lets the function finish; the donation form draft is cleared after a confirmed gift (shared computers); the "receipt unavailable" return goes only to our three receipt pages; plain words when the provider answers with an error on connect; a paused monthly donation keeps its original pause date; app blue-button edge colour matches the website.
+
+Deferred, low risk (listed so they are not forgotten): a stuck monthly attempt is resent with today's total rather than the attempt's (parks in review, never double-charges); a new-card update that fails half-way waits for the daily check instead of the provider's retry; a saved donor list can point at a tag removed with an import (same gap as deleting a tag).
+
+- [ ] **Migration `20261102000003_profile_email_backfill_and_contact_confirmation.sql`**: on local; run on the TEST project with Yehuda's yes, then on live with the others.
+
 ## A2. Ask when you reach them (added 21/10/2026, from the Angel Network and Feed a Child meetings)
 
 Questions only the charities or their advisers can answer. Bring these up whenever Yehuda says he has spoken to them.

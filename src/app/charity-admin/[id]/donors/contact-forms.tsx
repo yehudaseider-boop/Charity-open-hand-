@@ -121,7 +121,7 @@ export function RemoveContactsForm({ action, contacts }: { action: (s: FormState
       action={action}
       submitLabel={contacts === 1 ? "Remove this donor" : `Remove these ${contacts} donors`}
       pendingLabel="Removing…"
-      confirm={`Remove ${contacts === 1 ? "this imported donor" : `all ${contacts} imported donors from this file`} from your list, with their notes and tags? This can't be undone, but you can import the file again.`}
+      confirm={`Remove ${contacts === 1 ? "this imported donor" : `all ${contacts} imported donors from this file`} from your list, with their note and tags? This can't be undone, but you can import the file again.`}
       confirmLabel="Yes, remove"
     />
   );

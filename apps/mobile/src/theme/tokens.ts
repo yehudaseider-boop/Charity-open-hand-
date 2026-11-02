@@ -12,8 +12,9 @@ export const colors = {
   cream: "#FFFFFF", // page background (white in v2; the name stays so every screen follows)
   surface: "#FFFFFF", // cards and forms
   ink: "#0E1B3D", // deep ink: body text and headlines on light grounds
-  navy: "#0E1B3D", // deep ink: text on orange and lilac, the edge under buttons
+  navy: "#0E1B3D", // deep ink: text on orange and lilac, the edge under orange and white-faced buttons
   blue: "#1749B5", // confirmed logo blue: headlines, buttons, tabs, colour-block sections (white on it 7.0:1)
+  blueEdge: "#0B2A73", // deep blue: the solid edge under blue buttons (the same as the website's and the receipt's)
   blueSoft: "#E5D9FF", // selected chips and quiet tints (light purple)
   muted: "#4A5878", // slate: secondary text (7.1:1 on white)
   hairline: "#ECE8F6", // light purple: card borders and dividers

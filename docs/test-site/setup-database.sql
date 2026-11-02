@@ -1,5 +1,5 @@
 -- Givezy: all database setup steps in order, for a NEW EMPTY test project only.
--- Built by scripts/build-setup-sql.sh from supabase/migrations, up to and including 20261022000009_new_card_resume.sql.
+-- Built by scripts/build-setup-sql.sh from supabase/migrations, up to and including 20261102000003_profile_email_backfill_and_contact_confirmation.sql.
 -- An existing project runs only the sections it does not have yet, in order.
 
 -- ===== 20261006000001_core_schema.sql =====
@@ -4500,3 +4500,498 @@ alter table public.charities add constraint impact_unit_names_start_with_letter
 -- A donor who closes the new-card payment page and comes back within half an hour is sent to the same page, not
 -- given a second one (23/10/2026 review): one page means one payment, so a month can't be paid twice that way.
 alter table public.monthly_card_updates add column checkout_url text;
+
+-- ===== 20261025000001_cover_card_charge.sql =====
+-- "Cover the card charge" (Yehuda, 25/10/2026): a donor may add the payment provider's charge so the charity gets the
+-- full gift. On a monthly donation the choice carries on every month; each month's cover is worked out from the rates
+-- of the day. The amount itself is kept per payment, in donations.processing_charge_cents (already part of the total).
+-- The s18A receipt shows the gift only (amount_cents), never the cover, until the tax adviser says otherwise.
+alter table public.recurring_donations add column covers_card_charge boolean not null default false;
+
+-- ===== 20261026000001_dispute_hold.sql =====
+-- Givezy: a monthly donation paused because a payment on it was disputed (a chargeback opened) stays
+-- paused until a person has looked (26/10/2026, code check).
+--
+-- Until now the pause looked exactly like the donor's own pause, so the donor could press Resume and the
+-- next collection would charge the disputed card again (inviting a second chargeback). The hold is set by
+-- the server when a dispute opens and released by a platform admin once the dispute is won; a lost dispute
+-- marks the payment charged back, which stops the monthly donation for good. The donor can still cancel.
+
+alter table public.recurring_donations add column held_reason text;
+
+comment on column public.recurring_donations.held_reason is
+  'Set by the server while a person looks into a disputed payment. While set, the donor cannot resume it.';
+
+CREATE OR REPLACE FUNCTION public.set_my_recurring_status(p_id uuid, p_status text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  cur public.recurring_status;
+  r_day int;
+  r_paid text;
+  has_card boolean;
+  r_held text;
+  this_month timestamp := date_trunc('month', now() at time zone 'Africa/Johannesburg');
+  this_charge timestamptz;
+  new_next timestamptz;
+begin
+  if uid is null then raise exception 'Not signed in'; end if;
+  if not public.signed_in_without_password() then raise exception 'Please sign in with the emailed code'; end if;
+  if p_status not in ('active', 'paused', 'cancelled') then raise exception 'Unknown status'; end if;
+
+  select r.status, r.charge_day, r.last_paid_period, r.authorization_encrypted is not null, r.held_reason
+    into cur, r_day, r_paid, has_card, r_held
+  from public.recurring_donations r
+  join public.donors d on d.id = r.donor_id
+  where r.id = p_id and d.user_id = uid
+  for update of r;
+  if not found then raise exception 'Monthly donation not found'; end if;
+
+  if cur::text = p_status then return; end if;
+  if not (
+       (cur = 'active' and p_status in ('paused', 'cancelled'))
+    or (cur = 'failed' and p_status = 'cancelled')
+    or (cur = 'paused' and p_status in ('active', 'cancelled'))
+    or (cur = 'pending' and p_status = 'cancelled')
+  ) then
+    raise exception 'A % monthly donation cannot be set to %', cur, p_status;
+  end if;
+  if p_status = 'active' and r_held is not null then
+    raise exception 'This monthly donation is paused while a payment on it is looked into. Givezy will be in touch.';
+  end if;
+  if p_status = 'active' and not has_card then
+    raise exception 'This monthly donation has no card to charge. Start a new monthly donation instead.';
+  end if;
+
+  if p_status = 'active' then
+    this_charge := public.monthly_charge_time(this_month, r_day);
+    new_next := case
+      when r_paid is distinct from to_char(this_month, 'YYYY-MM') and this_charge > now() then this_charge
+      else public.monthly_charge_time(this_month + interval '1 month', r_day)
+    end;
+  end if;
+
+  update public.recurring_donations
+     set status = p_status::public.recurring_status,
+         paused_at = case p_status when 'paused' then now() when 'active' then null else paused_at end,
+         cancelled_at = case p_status when 'cancelled' then now() else cancelled_at end,
+         authorization_encrypted = case p_status when 'cancelled' then null else authorization_encrypted end,
+         -- Removing a stopped one keeps the real reason ("the card was declined ...") for the record.
+         ended_reason = case when p_status = 'cancelled' and cur <> 'failed' then 'cancelled by the donor' else ended_reason end,
+         next_charge_at = case when p_status = 'active' then new_next else next_charge_at end,
+         -- A resumed donation gets the full number of tries again.
+         attempt_period = case when p_status = 'active' then null else attempt_period end,
+         failed_attempts = case when p_status = 'active' then 0 else failed_attempts end,
+         needs_gateway_sync = false
+   where id = p_id;
+end $function$
+;
+
+revoke execute on function public.set_my_recurring_status(uuid, text) from public, anon;
+grant execute on function public.set_my_recurring_status(uuid, text) to authenticated;
+
+-- The donor's own pages read it, to say why Resume is not offered.
+grant select (held_reason) on public.recurring_donations to authenticated;
+
+-- ===== 20261026000002_lock_charity_address.sql =====
+-- Givezy: a charity's address is locked once its application is submitted (26/10/2026, code check).
+--
+-- The address is printed on every s18A receipt. The website already refused address edits after submitting,
+-- but the database still let a charity admin change it directly. Now the database refuses too; a platform admin
+-- (or the server) can still correct it. The rest of the guard is unchanged.
+
+create or replace function public.guard_charity_admin_fields() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  -- Server-side code (service role) and migrations/seeds (postgres) are trusted.
+  if current_user in ('service_role', 'postgres', 'supabase_admin') or public.is_platform_admin() then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.status not in ('draft', 'pending_review') or new.is_verified or new.is_s18a
+       or new.mandate_signed_at is not null or new.gateway_subaccount_ref is not null then
+      raise exception 'Only a platform admin can set approval, badge or gateway fields';
+    end if;
+    return new;
+  end if;
+  if new.is_verified is distinct from old.is_verified
+     or new.verified_at is distinct from old.verified_at
+     or new.is_s18a is distinct from old.is_s18a
+     or new.s18a_confirmed_at is distinct from old.s18a_confirmed_at
+     or new.mandate_signed_at is distinct from old.mandate_signed_at
+     or new.mandate_document_path is distinct from old.mandate_document_path
+     or new.gateway is distinct from old.gateway
+     or new.gateway_subaccount_ref is distinct from old.gateway_subaccount_ref
+     or new.approved_at is distinct from old.approved_at
+     or new.rejection_reason is distinct from old.rejection_reason
+     or new.slug is distinct from old.slug
+     or new.quickgive_code is distinct from old.quickgive_code then
+    raise exception 'Only a platform admin can change approval, badge or gateway fields';
+  end if;
+  if old.status in ('approved', 'suspended') and (
+       new.legal_name_en is distinct from old.legal_name_en
+       or new.legal_name_he is distinct from old.legal_name_he
+       or new.npo_number is distinct from old.npo_number
+       or new.pbo_number is distinct from old.pbo_number
+       or new.s18a_reference is distinct from old.s18a_reference) then
+    raise exception 'Legal details of an approved charity can only be changed by a platform admin';
+  end if;
+  -- The address is printed on every s18A receipt. Once the application is submitted (and while it is approved
+  -- or suspended) only a platform admin may change it, as the website already says.
+  if old.status in ('pending_review', 'approved', 'suspended') and (
+       new.address_line1 is distinct from old.address_line1
+       or new.address_line2 is distinct from old.address_line2
+       or new.suburb is distinct from old.suburb
+       or new.city is distinct from old.city
+       or new.postal_code is distinct from old.postal_code) then
+    raise exception 'The address of a submitted or approved charity can only be changed by a platform admin';
+  end if;
+  -- A charity admin may only move draft/rejected -> pending_review (submit).
+  if new.status is distinct from old.status
+     and not (old.status in ('draft', 'rejected') and new.status = 'pending_review') then
+    raise exception 'Only a platform admin can change charity status';
+  end if;
+  return new;
+end $$;
+
+-- ===== 20261026000003_thank_you_resume.sql =====
+-- Givezy: a monthly thank-you that stops part way can be finished (26/10/2026, code check).
+--
+-- A thank-you to a few hundred donors could run out of time part way. The month stayed claimed, so the rest of
+-- the donors were never thanked and pressing again said "already thanked". Now each donor's address is claimed
+-- (as a hash, never the address) before their email goes, so "Send the rest" carries on where it stopped and
+-- never emails anyone twice. finished_at marks a thank-you that reached everyone.
+
+alter table public.charity_thank_yous add column finished_at timestamptz;
+-- Thank-yous sent before this change are treated as finished, as they were shown before.
+update public.charity_thank_yous set finished_at = sent_at where finished_at is null;
+
+create table public.charity_thank_you_recipients (
+  thank_you_id uuid not null references public.charity_thank_yous (id) on delete cascade,
+  email_hash text not null constraint thank_you_recipient_hash check (email_hash ~ '^[0-9a-f]{64}$'),
+  status text not null default 'sending' constraint thank_you_recipient_status check (status in ('sending', 'sent', 'failed')),
+  claimed_at timestamptz not null default now(),
+  primary key (thank_you_id, email_hash)
+);
+-- Server only, like the appeal recipients.
+alter table public.charity_thank_you_recipients enable row level security;
+revoke all on public.charity_thank_you_recipients from anon, authenticated;
+
+-- ===== 20261026000004_bank_account_checks.sql =====
+-- Givezy: the payment provider's check of a charity's bank account (26/10/2026).
+--
+-- When a charity's bank details are saved or changed, Givezy asks the payment provider whether the account is open,
+-- takes payments in and is in the charity's name. The answer is shown to the Givezy admin on the charity's page. It
+-- is information only: it never approves anything, and a charity is never held up because the check couldn't run.
+-- One row per charity: the latest check, with the last four digits of the account it was for (so an old answer is
+-- never shown against a new account). Server only.
+
+create table public.charity_bank_checks (
+  charity_id uuid primary key references public.charities (id) on delete cascade,
+  account_last4 text not null constraint bank_check_last4 check (account_last4 ~ '^[0-9]{4}$'),
+  checked_at timestamptz not null default now(),
+  -- 'checked': the provider answered. 'not_checked': it couldn't be asked (unreachable, bank not supported, no check
+  -- with this provider). The five answers are filled only when checked.
+  outcome text not null constraint bank_check_outcome check (outcome in ('checked', 'not_checked')),
+  verified boolean,
+  account_open boolean,
+  accepts_credits boolean,
+  holder_matches boolean,
+  open_three_months boolean,
+  message text constraint bank_check_message check (message is null or char_length(message) <= 300)
+);
+alter table public.charity_bank_checks enable row level security;
+revoke all on public.charity_bank_checks from anon, authenticated;
+
+-- ===== 20261027000001_website_button_source.sql =====
+-- A gift can come from the "Give with Givezy" button on a charity's own website (?src=button).
+alter table public.donations drop constraint donation_came_from;
+alter table public.donations add constraint donation_came_from
+  check (came_from in ('website', 'app', 'whatsapp', 'share_link', 'qr', 'website_button', 'recorded'));
+
+-- ===== 20261102000001_crm_safeguards.sql =====
+-- CRM safeguards from the CRM check of 02/11/2026 (Yehuda: yes).
+--
+-- 1. A tag can only be put on a donor for the charity that owns the tag. The website already checks this;
+--    the database now refuses it too, so a direct write can never cross two charities.
+-- 2. When someone changes their email at sign-in, their profile follows. Adding a person to a charity's team
+--    looks them up by profile email, and failed with "couldn't set up a sign-in" when the two differed.
+
+-- 1 ---------------------------------------------------------------------------------------------------------
+alter table public.charity_tags add constraint charity_tags_id_charity unique (id, charity_id);
+
+-- Any row that already crosses two charities would block the new rule; there should be none, but remove it
+-- rather than fail (the tag never belonged on that charity's donor).
+delete from public.charity_donor_tags dt
+using public.charity_tags t
+where t.id = dt.tag_id and t.charity_id <> dt.charity_id;
+
+alter table public.charity_donor_tags
+  add constraint charity_donor_tags_same_charity
+  foreign key (tag_id, charity_id) references public.charity_tags (id, charity_id) on delete cascade;
+
+-- 2 ---------------------------------------------------------------------------------------------------------
+create or replace function public.sync_profile_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.email is not null and new.email is distinct from old.email then
+    update public.profiles set email = new.email where id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.sync_profile_email() from public, anon, authenticated;
+
+drop trigger if exists on_auth_user_email_changed on auth.users;
+create trigger on_auth_user_email_changed
+  after update of email on auth.users
+  for each row execute function public.sync_profile_email();
+
+-- ===== 20261102000002_charity_contacts.sql =====
+-- A charity's own donor list, brought in from a CSV file (02/11/2026). These people have not given through
+-- Givezy, so they are the charity's contacts, not Givezy donors: they are never added to public.donors,
+-- never seen by another charity, and Givezy never emails them (no appeals, no thank-yous, no Email donors).
+-- If someone on the list later gives through Givezy, the gift-based donor and the contact both show on the
+-- charity's donors list; they are not merged.
+--
+-- One import is one file, all or nothing, and can be removed as a whole (Undo for 30 minutes, then
+-- "Remove" on the import page). Tags use the charity's own tags (charity_tags), so filtering by a tag
+-- shows donors and contacts alike; tags an import made are removed with it when nothing else uses them.
+--
+-- Charity admins of that charity (with their second step) can read these rows; only the server writes them.
+
+create table public.charity_contact_imports (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  file_name text not null constraint contact_import_file check (char_length(file_name) between 1 and 200),
+  file_fingerprint text not null constraint contact_import_fingerprint check (file_fingerprint ~ '^[0-9a-f]{32}$'),
+  contacts int not null constraint contact_import_contacts check (contacts between 1 and 1000),
+  -- Tags this import made, removed again with it when no donor or contact uses them any more.
+  created_tag_ids uuid[] not null default '{}',
+  created_by uuid references auth.users (id) on delete set null,
+  -- The person importing confirmed these people gave the charity their details.
+  confirmed_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint charity_contact_imports_once unique (charity_id, file_fingerprint),
+  constraint charity_contact_imports_id_charity unique (id, charity_id)
+);
+create index charity_contact_imports_charity on public.charity_contact_imports (charity_id, created_at desc);
+
+create table public.charity_contacts (
+  id uuid primary key default gen_random_uuid(),
+  charity_id uuid not null references public.charities (id) on delete cascade,
+  import_id uuid not null,
+  first_name text constraint contact_first_name check (char_length(first_name) between 1 and 80),
+  last_name text constraint contact_last_name check (char_length(last_name) between 1 and 80),
+  organisation_name text constraint contact_organisation check (char_length(organisation_name) between 1 and 200),
+  email text constraint contact_email check (email = lower(email) and email ~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' and char_length(email) <= 254),
+  phone text constraint contact_phone check (phone ~ '^(\+27|0)\d{9}$'),
+  address_line1 text constraint contact_address1 check (char_length(address_line1) between 1 and 200),
+  address_line2 text constraint contact_address2 check (char_length(address_line2) between 1 and 200),
+  suburb text constraint contact_suburb check (char_length(suburb) between 1 and 80),
+  city text constraint contact_city check (char_length(city) between 1 and 80),
+  postal_code text constraint contact_postal_code check (postal_code ~ '^\d{4}$'),
+  note text constraint contact_note check (char_length(note) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  constraint contact_has_name check (coalesce(first_name, last_name, organisation_name) is not null),
+  constraint charity_contacts_id_charity unique (id, charity_id),
+  -- The import belongs to the same charity: a row can never cross two charities.
+  constraint charity_contacts_import foreign key (import_id, charity_id) references public.charity_contact_imports (id, charity_id) on delete cascade
+);
+create index charity_contacts_charity on public.charity_contacts (charity_id, created_at desc);
+create index charity_contacts_import on public.charity_contacts (import_id);
+-- One contact per email per charity, so the same person isn't imported twice.
+create unique index charity_contacts_email on public.charity_contacts (charity_id, email) where email is not null;
+
+create table public.charity_contact_tags (
+  tag_id uuid not null references public.charity_tags (id) on delete cascade,
+  charity_id uuid not null,
+  contact_id uuid not null,
+  created_at timestamptz not null default now(),
+  primary key (tag_id, contact_id),
+  constraint charity_contact_tags_contact foreign key (contact_id, charity_id) references public.charity_contacts (id, charity_id) on delete cascade
+);
+create index charity_contact_tags_contact on public.charity_contact_tags (charity_id, contact_id);
+
+-- The tag must be the same charity's.
+create or replace function public.contact_tag_same_charity() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if not exists (select 1 from public.charity_tags t where t.id = new.tag_id and t.charity_id = new.charity_id) then
+    raise exception 'That tag belongs to another charity';
+  end if;
+  return new;
+end $$;
+revoke all on function public.contact_tag_same_charity() from public, anon, authenticated;
+create trigger contact_tag_same_charity before insert or update on public.charity_contact_tags
+  for each row execute function public.contact_tag_same_charity();
+
+-- Row-level security: the charity's own admins read; nobody writes from a browser.
+do $$
+declare t text;
+begin
+  foreach t in array array['charity_contact_imports', 'charity_contacts', 'charity_contact_tags'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon, authenticated', t);
+    execute format('grant select on public.%I to authenticated', t);
+    execute format('create policy charity_admins_read on public.%I for select to authenticated using (public.is_charity_admin(charity_id))', t);
+    execute format('create policy no_password_sessions on public.%I as restrictive for all to authenticated using (public.signed_in_without_password()) with check (public.signed_in_without_password())', t);
+  end loop;
+end $$;
+
+-- Import one file in one transaction: the import, its contacts and their tags, or nothing at all.
+-- p_contacts: [{first_name, last_name, organisation_name, email, phone, address_line1, address_line2, suburb,
+-- city, postal_code, note, tags: [name, ...]}], already checked by the website.
+create or replace function public.import_charity_contacts(p_charity_id uuid, p_user_id uuid, p_import jsonb, p_contacts jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  c jsonb;
+  v_import uuid;
+  v_contact uuid;
+  v_tag uuid;
+  v_name text;
+  v_created uuid[] := '{}';
+  v_count int := 0;
+begin
+  if not exists (select 1 from public.charities where id = p_charity_id and status = 'approved') then
+    raise exception 'Only an approved charity can import donors';
+  end if;
+  if jsonb_typeof(p_contacts) <> 'array' or jsonb_array_length(p_contacts) = 0 then
+    raise exception 'No contacts to import';
+  end if;
+  insert into public.charity_contact_imports (charity_id, file_name, file_fingerprint, contacts, created_by, confirmed_at)
+  values (p_charity_id, p_import->>'file_name', p_import->>'file_fingerprint', jsonb_array_length(p_contacts), p_user_id, (p_import->>'confirmed_at')::timestamptz)
+  returning id into v_import;
+
+  for c in select * from jsonb_array_elements(p_contacts) loop
+    insert into public.charity_contacts (charity_id, import_id, first_name, last_name, organisation_name, email, phone,
+                                         address_line1, address_line2, suburb, city, postal_code, note)
+    values (p_charity_id, v_import, nullif(c->>'first_name', ''), nullif(c->>'last_name', ''), nullif(c->>'organisation_name', ''),
+            nullif(lower(c->>'email'), ''), nullif(c->>'phone', ''), nullif(c->>'address_line1', ''), nullif(c->>'address_line2', ''),
+            nullif(c->>'suburb', ''), nullif(c->>'city', ''), nullif(c->>'postal_code', ''), nullif(c->>'note', ''))
+    returning id into v_contact;
+    v_count := v_count + 1;
+
+    for v_name in select distinct on (lower(x)) x from jsonb_array_elements_text(coalesce(c->'tags', '[]'::jsonb)) x loop
+      select id into v_tag from public.charity_tags where charity_id = p_charity_id and lower(name) = lower(v_name);
+      if v_tag is null then
+        if (select count(*) from public.charity_tags where charity_id = p_charity_id) >= 100 then
+          raise exception 'A charity can have up to 100 tags';
+        end if;
+        insert into public.charity_tags (charity_id, name) values (p_charity_id, v_name) returning id into v_tag;
+        v_created := v_created || v_tag;
+      end if;
+      insert into public.charity_contact_tags (tag_id, charity_id, contact_id) values (v_tag, p_charity_id, v_contact) on conflict do nothing;
+      v_tag := null;
+    end loop;
+  end loop;
+
+  update public.charity_contact_imports set created_tag_ids = v_created where id = v_import;
+  return jsonb_build_object('import_id', v_import, 'contacts', v_count);
+end $$;
+revoke execute on function public.import_charity_contacts(uuid, uuid, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.import_charity_contacts(uuid, uuid, jsonb, jsonb) to service_role;
+
+-- Remove a whole import: its contacts, their tags, and the tags it made that nothing else uses now.
+-- Returns how many contacts were removed (0 when it was already gone).
+create or replace function public.remove_charity_contact_import(p_charity_id uuid, p_import_id uuid)
+returns int language plpgsql security definer set search_path = '' as $$
+declare
+  v_tags uuid[];
+  v_count int;
+begin
+  select created_tag_ids into v_tags from public.charity_contact_imports where id = p_import_id and charity_id = p_charity_id for update;
+  if not found then return 0; end if;
+  select count(*) into v_count from public.charity_contacts where import_id = p_import_id and charity_id = p_charity_id;
+  delete from public.charity_contact_imports where id = p_import_id and charity_id = p_charity_id;
+  delete from public.charity_tags t
+  where t.charity_id = p_charity_id and t.id = any (v_tags)
+    and not exists (select 1 from public.charity_donor_tags dt where dt.tag_id = t.id)
+    and not exists (select 1 from public.charity_contact_tags ct where ct.tag_id = t.id);
+  return v_count;
+end $$;
+revoke execute on function public.remove_charity_contact_import(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.remove_charity_contact_import(uuid, uuid) to service_role;
+
+-- ===== 20261102000003_profile_email_backfill_and_contact_confirmation.sql =====
+-- Two follow-ups from the CRM check of 02/11/2026.
+--
+-- 1. Profile emails caught up. The trigger in 20261102000001 keeps a profile's email in step with the sign-in email
+--    from now on; anyone who changed their sign-in email before that still has the old one on their profile, so they
+--    can't be added to a charity's team. Copy today's sign-in email onto every profile that differs.
+-- 2. Which confirmation an import was made under. The person importing a donor list ticks a box saying these people
+--    gave the charity their details. The wording of that box may change; each import now records the version it was
+--    ticked under (`confirmation_version`, dated like 'contacts-2026-11-02'), so we can always say what was agreed.
+
+-- 1 ---------------------------------------------------------------------------------------------------------
+update public.profiles p
+set email = u.email
+from auth.users u
+where u.id = p.id and u.email is not null and p.email is distinct from u.email;
+
+-- 2 ---------------------------------------------------------------------------------------------------------
+-- Imports made before this change were all under the first wording, so they take its version.
+alter table public.charity_contact_imports
+  add column confirmation_version text not null default 'contacts-2026-11-02'
+  constraint contact_import_confirmation check (char_length(confirmation_version) between 1 and 40);
+alter table public.charity_contact_imports alter column confirmation_version drop default;
+
+-- Same as 20261102000002, plus the confirmation version from p_import.
+create or replace function public.import_charity_contacts(p_charity_id uuid, p_user_id uuid, p_import jsonb, p_contacts jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  c jsonb;
+  v_import uuid;
+  v_contact uuid;
+  v_tag uuid;
+  v_name text;
+  v_created uuid[] := '{}';
+  v_count int := 0;
+begin
+  if not exists (select 1 from public.charities where id = p_charity_id and status = 'approved') then
+    raise exception 'Only an approved charity can import donors';
+  end if;
+  if jsonb_typeof(p_contacts) <> 'array' or jsonb_array_length(p_contacts) = 0 then
+    raise exception 'No contacts to import';
+  end if;
+  insert into public.charity_contact_imports (charity_id, file_name, file_fingerprint, contacts, created_by, confirmed_at, confirmation_version)
+  values (p_charity_id, p_import->>'file_name', p_import->>'file_fingerprint', jsonb_array_length(p_contacts), p_user_id, (p_import->>'confirmed_at')::timestamptz, p_import->>'confirmation_version')
+  returning id into v_import;
+
+  for c in select * from jsonb_array_elements(p_contacts) loop
+    insert into public.charity_contacts (charity_id, import_id, first_name, last_name, organisation_name, email, phone,
+                                         address_line1, address_line2, suburb, city, postal_code, note)
+    values (p_charity_id, v_import, nullif(c->>'first_name', ''), nullif(c->>'last_name', ''), nullif(c->>'organisation_name', ''),
+            nullif(lower(c->>'email'), ''), nullif(c->>'phone', ''), nullif(c->>'address_line1', ''), nullif(c->>'address_line2', ''),
+            nullif(c->>'suburb', ''), nullif(c->>'city', ''), nullif(c->>'postal_code', ''), nullif(c->>'note', ''))
+    returning id into v_contact;
+    v_count := v_count + 1;
+
+    for v_name in select distinct on (lower(x)) x from jsonb_array_elements_text(coalesce(c->'tags', '[]'::jsonb)) x loop
+      select id into v_tag from public.charity_tags where charity_id = p_charity_id and lower(name) = lower(v_name);
+      if v_tag is null then
+        if (select count(*) from public.charity_tags where charity_id = p_charity_id) >= 100 then
+          raise exception 'A charity can have up to 100 tags';
+        end if;
+        insert into public.charity_tags (charity_id, name) values (p_charity_id, v_name) returning id into v_tag;
+        v_created := v_created || v_tag;
+      end if;
+      insert into public.charity_contact_tags (tag_id, charity_id, contact_id) values (v_tag, p_charity_id, v_contact) on conflict do nothing;
+      v_tag := null;
+    end loop;
+  end loop;
+
+  update public.charity_contact_imports set created_tag_ids = v_created where id = v_import;
+  return jsonb_build_object('import_id', v_import, 'contacts', v_count);
+end $$;
+revoke execute on function public.import_charity_contacts(uuid, uuid, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.import_charity_contacts(uuid, uuid, jsonb, jsonb) to service_role;

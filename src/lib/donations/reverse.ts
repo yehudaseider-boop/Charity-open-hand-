@@ -94,14 +94,22 @@ async function pauseMonthlyFor(donationId: string): Promise<void> {
   if (error) throw error;
   if (!d?.recurring_id) return;
   // Held, not just paused: the donor cannot resume it until a person has looked (releaseDisputeHold).
+  // One the donor had already paused keeps its own paused_at; only a running one is paused now.
   const { data: paused, error: pauseError } = await db
     .from("recurring_donations")
     .update({ status: "paused", paused_at: new Date().toISOString(), held_reason: "a payment was disputed" })
     .eq("id", d.recurring_id)
-    .in("status", ["active", "paused"])
+    .eq("status", "active")
     .select("id");
   if (pauseError) throw pauseError;
-  if (paused?.length) {
+  const { data: held, error: holdError } = await db
+    .from("recurring_donations")
+    .update({ held_reason: "a payment was disputed" })
+    .eq("id", d.recurring_id)
+    .eq("status", "paused")
+    .select("id");
+  if (holdError) throw holdError;
+  if (paused?.length || held?.length) {
     await logAudit({ actorUserId: null, action: "recurring.paused", entityType: "recurring_donation", entityId: d.recurring_id as string, details: { reason: "a payment was disputed", donationId } });
   }
 }

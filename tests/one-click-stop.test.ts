@@ -167,6 +167,19 @@ describe("the one-click stop", () => {
     expect(newsOptOuts).toEqual([]);
   });
 
+  it("a POST without the one-click body (RFC 8058) is refused like a bad token, and changes nothing", async () => {
+    const bare = new NextRequest(`https://g.test/api/stop/news?t=${token("a")}`, { method: "POST", headers: { "x-real-ip": "203.0.113.9" } });
+    const res = await news.POST(bare);
+    expect([res.status, await res.text()]).toEqual([400, "That link didn't work. Nothing was changed."]);
+    const wrong = new NextRequest(`https://g.test/api/stop/thanks?t=${token("b")}`, { method: "POST", headers: { "x-real-ip": "203.0.113.9", "content-type": "application/x-www-form-urlencoded" }, body: "List-Unsubscribe=Later" });
+    expect((await thanks.POST(wrong)).status).toBe(400);
+    expect(newsOptOuts).toEqual([]);
+    expect(thanksOptOuts).toEqual([]);
+    // With the body, as before.
+    expect((await news.POST(req("news", token("a")))).status).toBe(200);
+    expect(newsOptOuts).toHaveLength(1);
+  });
+
   it("is rate limited, and then changes nothing", async () => {
     limited = true;
     const res = await news.POST(req("news", token("a")));

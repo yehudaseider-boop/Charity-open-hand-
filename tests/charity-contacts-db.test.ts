@@ -26,7 +26,7 @@ const tx = async (fn: () => Promise<void>) => {
     await run("rollback");
   }
 };
-const imp = (fp = "c".repeat(32)) => ({ file_name: "donors.csv", file_fingerprint: fp, confirmed_at: new Date().toISOString() });
+const imp = (fp = "c".repeat(32)) => ({ file_name: "donors.csv", file_fingerprint: fp, confirmed_at: new Date().toISOString(), confirmation_version: "contacts-2026-11-02" });
 const person = (email: string | null, tags: string[] = []) => ({ first_name: "Anna", last_name: "Example", email, phone: "0821234567", tags });
 const importFile = async (contacts: unknown[], fp?: string) => (await run("select public.import_charity_contacts($1, $2, $3, $4) as r", [charity, admin, imp(fp), JSON.stringify(contacts)])).rows[0].r;
 const count = async (sql: string, args: unknown[] = []) => Number((await run(sql, args)).rows[0].count);

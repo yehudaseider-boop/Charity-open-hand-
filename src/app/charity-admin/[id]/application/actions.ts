@@ -172,7 +172,9 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
     details: { bank_name: v.bank_name, last4: last4(v.bank_account_number) },
   });
   // Ask the payment provider about the account, for Givezy's review. Information only; never holds anything up.
-  await checkCharityBank(charityId, viewer.userId);
+  // Each check costs money: not asked again for the same account, nor more than once a day from this side.
+  const previous = pick(was, ["bank_name", "bank_account_last4"]);
+  await checkCharityBank(charityId, viewer.userId, { charitySave: { previousBankName: previous.bank_name as string | null, previousLast4: previous.bank_account_last4 as string | null } });
   // Taking it back puts the previous details back; they are checked again before going live either way.
   const done = await recordAction(charityId, viewer.userId, "bank_saved", { last4: last4(v.bank_account_number) }, {
     type: "restore", table: "charity_private", before: pick(was, Object.keys(after)), after,

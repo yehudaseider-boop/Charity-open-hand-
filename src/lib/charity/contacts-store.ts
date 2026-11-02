@@ -2,7 +2,7 @@ import "server-only";
 import { logAudit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { CleanContact } from "./contacts";
+import { CONTACT_CONFIRMATION_VERSION, type CleanContact } from "./contacts";
 
 /**
  * A charity's imported donors (contacts): people who have not given through Givezy. Their own table, never
@@ -67,7 +67,7 @@ export async function importContactsFile(args: { charityId: string; userId: stri
   const { data, error } = await createAdminClient().rpc("import_charity_contacts", {
     p_charity_id: args.charityId,
     p_user_id: args.userId,
-    p_import: { file_name: args.fileName.slice(0, 200) || "file.csv", file_fingerprint: args.fingerprint, confirmed_at: new Date().toISOString() },
+    p_import: { file_name: args.fileName.slice(0, 200) || "file.csv", file_fingerprint: args.fingerprint, confirmed_at: new Date().toISOString(), confirmation_version: CONTACT_CONFIRMATION_VERSION },
     p_contacts: args.contacts.map((c) => ({
       first_name: c.firstName, last_name: c.lastName, organisation_name: c.organisationName, email: c.email, phone: c.phone,
       address_line1: c.addressLine1, address_line2: c.addressLine2, suburb: c.suburb, city: c.city, postal_code: c.postalCode,

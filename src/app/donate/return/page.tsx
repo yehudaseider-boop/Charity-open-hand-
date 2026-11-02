@@ -20,6 +20,7 @@ import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
 import { cardUpdateFor, newCardPath } from "@/lib/donations/new-card";
 import { Splash } from "@/components/splash";
 import { ConfettiBurst } from "@/components/confetti-burst";
+import { ClearFormDraft } from "@/components/forms/use-form-draft";
 import { currentFocus } from "@/lib/focus-server";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
@@ -108,6 +109,8 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         title="Thank you"
         lead={<>{formatRand(d.amount_cents)} to {charity.name_en}{d.recurring_id ? ", every month" : ""}</>}
       >
+        {/* The gift is confirmed: forget the kept form details, so the next person at this computer starts blank. */}
+        <ClearFormDraft formKey={`donate:${charity.slug}`} />
         {/* What the gift does, in the charity's own words (left out when it hasn't written one). */}
         {charity.impact_en?.trim() || paysFor ? (
           <div className="mb-5 rounded-control bg-honey-soft p-4">
