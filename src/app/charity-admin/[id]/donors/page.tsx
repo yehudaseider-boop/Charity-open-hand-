@@ -21,6 +21,15 @@ import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "@/lib/charit
 import { deleteCharityTag, deleteDonorList, saveDonorList, saveLapsedPeriod } from "./care-actions";
 import { ButtonForm, LapsedForm, SaveListForm } from "./care-forms";
 import { CARE_DONE } from "@/lib/charity/donor-care-rules";
+import { loadContacts, type ContactRow } from "@/lib/charity/contacts-store";
+import { contactName } from "@/lib/charity/contacts";
+import { DONOR_SORTS, parseDonorSort, sortDonors } from "@/lib/charity/donor-sort";
+import type { DonorRow } from "@/lib/charity/dashboard-queries";
+
+/** One line of the list: a donor who gave, or someone the charity imported who hasn't given through Givezy. */
+type Line =
+  | { kind: "donor"; id: string; name: string; totalCents: number; firstAt: string | null; lastAt: string | null; d: DonorRow }
+  | { kind: "contact"; id: string; name: string; totalCents: number; firstAt: string | null; lastAt: string | null; c: ContactRow };
 
 export const metadata: Metadata = { title: "Donors" };
 
@@ -35,9 +44,11 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const asked = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
 
   const group = isDonorGroup(sp.group) ? sp.group : null;
+  // An unknown ?sort= keeps the usual order (most given first).
+  const sort = parseDonorSort(sp.sort);
 
-  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays] = await Promise.all([
-    loadDonors(id), loadMonthlyGifts(id), loadMonthlyDonations(id), listTags(id), tagsByDonor(id), listSegments(id), lapsedDaysFor(id),
+  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays, contacts] = await Promise.all([
+    loadDonors(id), loadMonthlyGifts(id), loadMonthlyDonations(id), listTags(id), tagsByDonor(id), listSegments(id), lapsedDaysFor(id), loadContacts(id),
   ]);
   const donorGroups = donorGroupsFor(lapsedDays);
   const tagName = new Map(tags.map((t) => [t.id, t.name]));
@@ -45,25 +56,38 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const givesMonthly = monthlyByDonor(monthlyGifts, monthly);
   const now = new Date();
   const needle = q.toLowerCase();
-  const donors = all.filter(
-    (d) =>
-      (!group || donorGroup(d, now, lapsedDays) === group) &&
-      (!tag || (byDonor.get(d.donor_id) ?? []).includes(tag)) &&
-      (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
-  );
+  const donorLines: Line[] = all
+    .filter(
+      (d) =>
+        (!group || donorGroup(d, now, lapsedDays) === group) &&
+        (!tag || (byDonor.get(d.donor_id) ?? []).includes(tag)) &&
+        (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
+    )
+    .map((d) => ({ kind: "donor", id: d.donor_id, name: isErasedEmail(d.email) ? ERASED_DONOR : d.display_name, totalCents: d.total_cents, firstAt: d.first_paid_at, lastAt: d.last_paid_at, d }));
+  // Imported donors have no giving group, so a group shows only people who gave.
+  const contactLines: Line[] = group
+    ? []
+    : contacts
+        .filter((c) => (!tag || c.tag_ids.includes(tag)) && (!needle || contactName(c).toLowerCase().includes(needle) || (c.email ?? "").includes(needle)))
+        .map((c) => ({ kind: "contact", id: c.id, name: contactName(c), totalCents: 0, firstAt: null, lastAt: null, c }));
+  const donors = sortDonors([...donorLines, ...contactLines], sort);
+  const contactsShown = contactLines.length;
+  // Someone imported who has since given through Givezy (the same email): both lines show, not merged.
+  const gaveEmails = new Set(all.map((d) => d.email.trim().toLowerCase()));
   const pages = Math.max(1, Math.ceil(donors.length / PAGE));
   // A page past the end (an old link, a typed number) shows the last page, never "No donors yet".
   const page = Math.min(asked, pages);
   const shown = donors.slice((page - 1) * PAGE, page * PAGE);
   const base = `/charity-admin/${id}/donors`;
   const href = (p: number, g: string | null = group, t: string | null = tag) =>
-    `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(t ? { tag: t } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
+    `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(t ? { tag: t } : {}), ...(sort ? { sort } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
   const segmentHref = (f: { group?: string; tag?: string; q?: string }) =>
-    `${base}?${new URLSearchParams({ ...(f.q ? { q: f.q } : {}), ...(f.group ? { group: f.group } : {}), ...(f.tag ? { tag: f.tag } : {}) }).toString()}`.replace(/\?$/, "");
+    `${base}?${new URLSearchParams({ ...(f.q ? { q: f.q } : {}), ...(f.group ? { group: f.group } : {}), ...(f.tag ? { tag: f.tag } : {}), ...(sort ? { sort } : {}) }).toString()}`.replace(/\?$/, "");
   // "Say thank you": only once the page is live, never to erased donors or anyone who asked not to get them.
   const canThank = charity.status === "approved";
+  const shownDonors = shown.flatMap((l) => (l.kind === "donor" ? [l.d] : []));
   const [thanked, stopped] = canThank
-    ? await Promise.all([lastThanked(id, shown.map((d) => d.donor_id)), optedOut(shown.filter((d) => shownEmail(d.email)).map((d) => d.email))])
+    ? await Promise.all([lastThanked(id, shownDonors.map((d) => d.donor_id)), optedOut(shownDonors.filter((d) => shownEmail(d.email)).map((d) => d.email))])
     : [new Map<string, string>(), new Set<string>()];
   const here = href(page);
   const key = formKey(sp);
@@ -80,6 +104,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
             <ActionLink download href={`/charity-admin/${id}/export/donors`}>Download donors (CSV)</ActionLink>
             <ActionLink download href={`/charity-admin/${id}/export/donors?format=xlsx`}>Excel</ActionLink>
             <ActionLink download href={`/charity-admin/${id}/export/donors?format=salesforce`}>For Salesforce</ActionLink>
+            <ActionLink href={`/charity-admin/${id}/donors/import`}>Import donors (CSV)</ActionLink>
           </>
         }
       />
@@ -117,7 +142,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
           </nav>
         ) : null}
 
-        <LiveFilterForm action={base} className="flex gap-2">
+        <LiveFilterForm action={base} className="flex flex-wrap gap-2">
           {group ? <input type="hidden" name="group" value={group} /> : null}
           {tag ? <input type="hidden" name="tag" value={tag} /> : null}
           <input
@@ -125,23 +150,52 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
             defaultValue={q}
             placeholder="Search name or email"
             aria-label="Search by donor name or email"
-            className={`${field} min-w-0 flex-1`}
+            className={`${field} min-w-0 flex-[1_1_12rem]`}
           />
+          <label className="flex min-w-0 flex-[1_1_14rem] items-center gap-2 text-sm font-semibold text-navy">
+            <span className="shrink-0">Sort by</span>
+            <select key={sort ?? "usual"} name="sort" defaultValue={sort ?? ""} className={`${field} min-w-0 flex-1`}>
+              <option value="">Usual order (most given first)</option>
+              {Object.entries(DONOR_SORTS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
           <button className={blueAction}>Search</button>
         </LiveFilterForm>
       </div>
+
+      {contacts.length ? <p className="text-xs text-muted">Donors you imported are marked &quot;Imported, no gifts yet&quot;. Givezy never emails them.</p> : null}
 
       {shown.length === 0 ? (
         q || group || tag ? (
           <Card><p className="text-sm text-muted"><NoMatch what="donors" clearHref={base} /></p></Card>
         ) : (
-          <EmptyState title="No donors yet">People appear here once their first donation is paid.</EmptyState>
+          <EmptyState title="No donors yet" action={<ActionLink href={`${base}/import`}>Import donors (CSV)</ActionLink>}>
+            People appear here once their first donation is paid. You can also import the donor list you already keep.
+          </EmptyState>
         )
       ) : (
         <Card>
           {/* Each line opens the donor: the name's link covers the line, the thank-you and the email sit above it. */}
           <ul className="-my-2 divide-y divide-border">
-            {shown.map((d) => (
+            {shown.map((line) => {
+              if (line.kind === "contact") return (
+              <li key={`contact-${line.id}`} className="-mx-2 rounded-control px-2 py-3 text-sm">
+                <div className="min-w-0">
+                  <p dir="auto" className="w-fit max-w-full font-semibold text-indigo [overflow-wrap:anywhere]">{line.name}</p>
+                  {line.c.organisation_name && line.name !== line.c.organisation_name ? <p dir="auto" className="text-muted [overflow-wrap:anywhere]">{line.c.organisation_name}</p> : null}
+                  {line.c.email ? <p className="w-fit max-w-full break-all text-muted">{line.c.email}</p> : null}
+                  {line.c.phone ? <p className="w-fit text-muted">{line.c.phone}</p> : null}
+                  {line.c.note ? <p dir="auto" className="mt-1 line-clamp-2 whitespace-pre-line text-navy [overflow-wrap:anywhere]">{line.c.note}</p> : null}
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <Badge>Imported, no gifts yet</Badge>
+                    {line.c.email && gaveEmails.has(line.c.email) ? <Badge tone="success">Has now given</Badge> : null}
+                    {line.c.tag_ids.map((t) => (tagName.has(t) ? <Badge key={t}>{tagName.get(t)}</Badge> : null))}
+                  </div>
+                </div>
+              </li>
+              );
+              const d = line.d;
+              return (
               <li key={d.donor_id} className="relative -mx-2 rounded-control px-2 py-3 text-sm transition hover:bg-honey-soft focus-within:bg-honey-soft">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -173,7 +227,8 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                   )
                 ) : null}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </Card>
       )}
@@ -193,6 +248,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
           {(group && !tag && !q) || (tag && !group && !q) ? (
             <div className="mt-4 border-t border-border pt-4">
               <ActionLink href={`/charity-admin/${id}/email-donors?to=${group ? `group:${group}` : `tag:${tag}`}`}>Email these donors</ActionLink>
+              {contactsShown ? <p className="mt-2 text-xs text-muted">{contactsShown} imported {contactsShown === 1 ? "donor on this list isn't" : "donors on this list aren't"} emailed: Givezy never emails people you imported.</p> : null}
             </div>
           ) : null}
         </Card>

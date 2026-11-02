@@ -2,6 +2,7 @@ import "server-only";
 import { logAudit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dropEmptyImports } from "./recorded-gifts-store";
+import { removeContactImport } from "./contacts-store";
 import { memberRole } from "./team";
 import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 
@@ -25,6 +26,8 @@ export type Undo =
   | { type: "cancel_receipt_run"; id: string }
   /** Remove gifts the charity recorded (one, or a whole import), while none is on a receipt. */
   | { type: "remove_recorded"; donationIds?: string[]; importId?: string }
+  /** Remove a whole import of a charity's own donor list (contacts). Only an owner may. */
+  | { type: "remove_contacts"; importId: string }
   /** Take away access this action gave (an admin, never an owner). Only an owner may. */
   | { type: "remove_member"; userId: string };
 
@@ -89,7 +92,7 @@ export async function undoAction(charityId: string, id: string, userId: string, 
   if (!canUndo(row, now)) return { ok: false, why: row.undone_at ? "gone" : "late", row };
   if (APPLICATION_KINDS.includes(row.kind) && !editable(charityStatus)) return { ok: false, why: "locked", row };
   // Team changes are the owner's alone (Yehuda, 21/10/2026).
-  if ((row.undo.type === "remove_member" || row.kind === "bank_saved") && (await memberRole(charityId, userId)) !== "owner") return { ok: false, why: "owner", row };
+  if ((row.undo.type === "remove_member" || row.undo.type === "remove_contacts" || row.kind === "bank_saved") && (await memberRole(charityId, userId)) !== "owner") return { ok: false, why: "owner", row };
 
   const db = createAdminClient();
   // Claim it first, so two taps (or two admins) can't take it back twice.
@@ -207,6 +210,10 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       if (error) throw error;
       return data?.length ? null : "removed";
     }
+    case "remove_contacts": {
+      if (!/^[0-9a-f-]{36}$/i.test(undo.importId)) return "gone";
+      return (await removeContactImport(charityId, undo.importId, null)) ? null : "removed";
+    }
     case "remove_recorded": {
       const ids = undo.importId ? null : (undo.donationIds ?? []);
       let q = db.from("donations").select("id, import_id").eq("charity_id", charityId).eq("gateway", "recorded");
@@ -239,7 +246,7 @@ export function undoFailureText(why: UndoFailure): string {
     case "given": return "Donors have already given to it, so it can't be removed. You can end it instead.";
     case "full": return "There's no room for it: you're at the limit. Remove or end one first, then try again.";
     case "locked": return "Your application has been submitted, so your details are locked while we review them.";
-    case "owner": return "Only your charity's owner can change who has access or the bank account.";
+    case "owner": return "Only your charity's owner can do this: change who has access or the bank account, or take back an import of donors.";
     case "ended": return "Its last day has passed, so it can't run again. Start a new campaign instead.";
     case "issued": return "It's already on an s18A receipt Givezy has issued, so it can't be taken back here. If something is wrong, tell us: only we can withdraw and re-issue a receipt.";
     case "error": return "Something went wrong and nothing was changed. Please try again.";

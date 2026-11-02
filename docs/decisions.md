@@ -1490,3 +1490,11 @@ Yehuda shared the "Deupload" landing pages (Figma community) as the feel he want
 - **Motion** stops for anyone who asks their device to reduce motion.
 - **New copy, approved by Yehuda 29/10/2026:** "Quick. Checked. Free.", "Your details, kept private" (charities never see the ID number or the maaser choice: both true), "Simple. Fair to every charity.", "No hidden fees and no subscriptions."
 - **Hosting:** stays on Vercel (Yehuda, 29/10/2026), not Netlify. The Netlify copy is only the PSFA demo.
+
+## Donor list sorting and importing a charity's own donor list (02/11/2026)
+
+- **Sorting:** the Donors list sorts by name (A to Z), total given (highest first), latest gift (newest first) or first gift (oldest first). It goes in the address (`?sort=`) and works with search, groups, tags and saved lists; an unknown value keeps the usual order (most given first). Logic in `src/lib/charity/donor-sort.ts`.
+- **Importing donors without gifts (CSV):** owner of an approved charity only, at Donors, Import donors. Same look, CSV reading and limits as the gift import (1 MB, 1 000 rows), but all or nothing: if any row has a problem, nothing is imported. Two columns meaning the same thing, or a row with more values than headings, are refused rather than guessed. Undo for 30 minutes, then "Remove" under Earlier imports (asked first).
+- **Storage:** a per-charity `charity_contacts` table (migration `20261102000002_charity_contacts.sql`), never `donors`. That charity's admins read it with their second step; only the server writes.
+- **POPIA:** Givezy never emails imported people (no Email donors, appeals or monthly thank-you; those read donors only). They are not in the donors export. Someone who later gives with the same email shows twice, the contact marked "Has now given"; they are not merged.
+- **Notes and tags:** an import can carry one note and tags (the charity's own tags, so the tag filter shows contacts too). Adding notes or tags to a contact afterwards is not built: the note and tag tables are tied to donors who gave.

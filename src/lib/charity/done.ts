@@ -40,10 +40,12 @@ export type ActionKind =
   | "gifts_removed"
   | "member_added"
   | "member_removed"
-  | "appeal_sent";
+  | "appeal_sent"
+  | "contacts_imported"
+  | "contacts_removed";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
-export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent"];
+export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed"];
 
 export type Details = Record<string, string | number | boolean | null | undefined>;
 export type Context = { base: string; publicUrl: string | null; approved: boolean };
@@ -148,6 +150,13 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       };
     case "gifts_removed":
       return { what: `${plural(Number(d.removed ?? 0), "recorded gift")} removed. ${Number(d.removed ?? 0) === 1 ? "It no longer counts" : "They no longer count"} in your totals or on any s18A receipt.`, next: { label: "See your donations", href: `${c.base}/donations` } };
+    case "contacts_imported":
+      return {
+        what: `${plural(Number(d.contacts ?? 0), "donor")} from ${quote(d.file)} ${Number(d.contacts ?? 0) === 1 ? "is" : "are"} on your list, marked "Imported, no gifts yet". Givezy never emails them.`,
+        next: { label: "Import another file", href: `${c.base}/donors/import` },
+      };
+    case "contacts_removed":
+      return { what: `${plural(Number(d.removed ?? 0), "imported donor")} removed from your list.`, next: { label: "See your donors", href: `${c.base}/donors` } };
     case "member_added":
       return {
         what: d.already
@@ -199,8 +208,10 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "member_added": return `Taken back. ${String(d.email ?? "They")} no longer ${d.email ? "has" : "have"} access to your dashboard.`;
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;
     case "receipts_approved": return `Taken back. Your approval for the ${yearName(d.taxYear)} tax year is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
+    case "contacts_imported": return `Taken back. The ${plural(Number(d.contacts ?? 0), "donor")} from ${quote(d.file)} ${Number(d.contacts ?? 0) === 1 ? "is" : "are"} removed from your list.`;
     case "application_submitted":
     case "thank_you_sent":
+    case "contacts_removed":
     case "donor_thanked":
     case "gifts_removed":
     case "member_removed":
@@ -215,7 +226,7 @@ export function pageOf(kind: ActionKind): string {
   if (kind.startsWith("campaign_")) return "campaigns";
   if (kind.startsWith("update_") || kind.startsWith("photo_")) return "updates";
   if (kind === "thank_you_sent") return "thank-donors";
-  if (kind === "donor_thanked") return "donors";
+  if (kind === "donor_thanked" || kind === "contacts_imported" || kind === "contacts_removed") return "donors";
   if (kind === "receipts_approved") return "receipts";
   if (kind === "gift_recorded" || kind === "gifts_imported" || kind === "gifts_removed") return "donations";
   if (kind === "member_added" || kind === "member_removed") return "team";
@@ -234,6 +245,7 @@ const KINDS = new Set<ActionKind>([
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
   "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
   "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
+  "contacts_imported", "contacts_removed",
 ]);
 
 /** Undo is offered while it is recent, not yet taken back, and the action stored what it needs. */
