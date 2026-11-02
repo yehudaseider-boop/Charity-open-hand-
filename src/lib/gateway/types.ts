@@ -188,10 +188,16 @@ export class GatewayError extends Error {
    * will no longer charge). False for "never received", timeouts, network failures and outages.
    */
   readonly refused: boolean;
-  constructor(message: string, opts: { notFound?: boolean; refused?: boolean } = {}) {
+  /** The gateway's own words when it turned a request down (for showing a person why), if it gave any. */
+  readonly said: string | null;
+  /** True when the gateway could not be reached at all (network failure or timeout). */
+  readonly unreachable: boolean;
+  constructor(message: string, opts: { notFound?: boolean; refused?: boolean; said?: string | null; unreachable?: boolean } = {}) {
     super(message);
     this.notFound = opts.notFound ?? false;
     this.refused = opts.refused ?? false;
+    this.said = opts.said ?? null;
+    this.unreachable = opts.unreachable ?? false;
   }
 }
 

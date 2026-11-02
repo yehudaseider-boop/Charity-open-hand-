@@ -257,7 +257,7 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
       details: { gateway: gateway.name, account_ref: accountRef },
     });
   } catch (e) {
-    if (e instanceof GatewayError) return { ok: false, message: e.message };
+    if (e instanceof GatewayError) return { ok: false, message: connectProblem(e) };
     throw e;
   }
   if (contact?.contact_email) await notifyCharity(connectedEmail(contact.contact_email, charity.name_en, id));
@@ -483,4 +483,14 @@ export async function recheckBank(id: string): Promise<FormState> {
   revalidatePath(`/admin/charities/${id}`);
   if (!r) return { ok: false, message: "There's no bank account to check, or the check couldn't be saved. Try again in a minute." };
   return { ok: true, message: r.outcome === "checked" ? "Checked. The answer is shown above." : "The payment provider couldn't be asked just now. Nothing is held up by it; try again later." };
+}
+
+/** Why connecting a charity to the gateway failed, in plain words: what happened, what was kept, what to do. */
+function connectProblem(e: GatewayError): string {
+  if (e.unreachable) return "The payment provider couldn't be reached, so the charity isn't connected yet. Nothing was changed. Try again in a minute.";
+  if (e.refused) {
+    const why = e.said ? ` It said: "${e.said}".` : "";
+    return `The payment provider didn't accept this charity's bank details, so it isn't connected yet.${why} Check the details against the charity's bank confirmation letter, change them if needed, then try again.`;
+  }
+  return e.message;
 }

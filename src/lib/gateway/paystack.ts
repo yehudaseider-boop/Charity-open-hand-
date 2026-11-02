@@ -70,7 +70,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (e) {
     // Network failure or timeout: the outcome is unknown, so it is neither "not found" nor "refused".
-    throw new GatewayError(`Paystack ${path} could not be reached: ${e instanceof Error ? e.message : String(e)}`);
+    throw new GatewayError(`Paystack ${path} could not be reached: ${e instanceof Error ? e.message : String(e)}`, { unreachable: true });
   }
   const body = (await res.json().catch(() => null)) as { status?: boolean; message?: string; data?: T } | null;
   if (!res.ok || !body?.status) {
@@ -80,7 +80,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     // means our key is wrong or was changed, and a 5xx or 429 that Paystack is struggling: those are outages,
     // never a declined card, so monthly donors are not stopped and saved cards not dropped because of them.
     const refused = !notFound && ([400, 402, 422].includes(res.status) || (res.ok && body?.status === false));
-    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused });
+    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused, said: body?.message?.trim() || null });
   }
   return body.data as T;
 }

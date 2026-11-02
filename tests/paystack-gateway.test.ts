@@ -322,6 +322,8 @@ describe("how Paystack's errors are read", () => {
     expect(e).toBeInstanceOf(GatewayError);
     expect(e.refused).toBe(true);
     expect(e.notFound).toBe(false);
+    expect(e.said).toBe("Authorization is not active");
+    expect(e.unreachable).toBe(false);
   });
 
   it("'transaction not found' is never-received, not a refusal", async () => {
@@ -346,7 +348,7 @@ describe("how Paystack's errors are read", () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
     const e = await verifyError();
     expect(e).toBeInstanceOf(GatewayError);
-    expect(e).toMatchObject({ refused: false, notFound: false });
+    expect(e).toMatchObject({ refused: false, notFound: false, unreachable: true });
   });
 });
 
