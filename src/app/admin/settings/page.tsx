@@ -36,7 +36,7 @@ async function databaseChecks(): Promise<SettingCheck[]> {
 
 const mark = { ok: "✓", fix: "!", later: "–" } as const;
 const tone = { ok: "bg-success-soft text-success", fix: "bg-danger-soft text-danger", later: "bg-brand-soft text-indigo" } as const;
-const word = { ok: "Fine", fix: "Needs fixing", later: "Off for now" } as const;
+const word = { ok: "Fine", fix: "Needs fixing", later: "Check before going live" } as const;
 
 function List({ items, plain }: { items: SettingCheck[]; plain?: boolean }) {
   return (
@@ -80,7 +80,7 @@ export default async function SettingsCheckPage() {
         {toFix ? (
           <Notice tone="warning">{toFix === 1 ? "1 thing needs fixing" : `${toFix} things need fixing`}. Each one says what to do.</Notice>
         ) : (
-          <Notice tone="success">Everything needed is set. Items marked &quot;off for now&quot; are expected for launch.</Notice>
+          <Notice tone="success">Everything needed is set. Items marked with a dash are set this way on purpose for now: check each one before going live.</Notice>
         )}
       </div>
       <Card title="Settings">
