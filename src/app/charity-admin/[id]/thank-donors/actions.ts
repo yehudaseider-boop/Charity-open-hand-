@@ -5,14 +5,19 @@ import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/charity/charity-actions";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { isOwner } from "@/lib/charity/team";
 import { checkThankYou, monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { continueThankYou, sendThankYou } from "@/lib/charity/thank-you-send";
 import type { FormState } from "@/lib/form";
+
+/** Only the owner sends thank-yous (Yehuda, 02/11/2026), as for Email donors. */
+const NOT_OWNER = "Only your charity's owner can send thank-yous. Nothing was sent.";
 
 export async function sendThankDonors(charityId: string, month: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   // Throws unless the signed-in person (with their second step) manages this charity.
   const { charity, priv } = await loadCharityForManager(charityId);
+  if (!(await isOwner(charityId))) return { ok: false, message: NOT_OWNER };
   if (charity.status !== "approved") return { ok: false, message: "You can thank donors once your page is live." };
   if (!recentMonths(new Date()).includes(month)) return { ok: false, message: "Choose one of the last three months." };
   const checked = checkThankYou(String(formData.get("body") ?? ""));
@@ -29,6 +34,7 @@ export async function sendThankDonors(charityId: string, month: string, _prev: F
 export async function sendRestOfThankYou(charityId: string, month: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity, priv } = await loadCharityForManager(charityId);
+  if (!(await isOwner(charityId))) return { ok: false, message: NOT_OWNER };
   if (charity.status !== "approved") return { ok: false, message: "You can thank donors once your page is live." };
   const r = await continueThankYou({ charityId, charityName: charity.name_en, month, userId: viewer.userId, replyTo: priv?.contact_email ?? null });
   revalidatePath(`/charity-admin/${charityId}/thank-donors`);

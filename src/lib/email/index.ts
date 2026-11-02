@@ -14,6 +14,11 @@ export type EmailMessage = {
   /** Where a reply goes (for example the charity, on a thank-you sent in its name). */
   replyTo?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
+  /**
+   * Extra mail headers, only for charities' emails to donors: the one-click stop (List-Unsubscribe and
+   * List-Unsubscribe-Post, see ./headers). Never set on sign-in codes, receipts or confirmations.
+   */
+  headers?: Record<string, string>;
 };
 
 /** "sent" means a real email left; "skipped" means nothing was sent (console transport, erased or disallowed address). */
@@ -35,7 +40,7 @@ export function maskEmail(address: string): string {
 export const consoleTransport: EmailTransport = {
   name: "console",
   async send(m) {
-    console.info(`[email] would send "${m.subject}" to ${maskEmail(m.to)}${m.attachments?.length ? ` with ${m.attachments.length} attachment(s)` : ""}`);
+    console.info(`[email] would send "${m.subject}" to ${maskEmail(m.to)}${m.attachments?.length ? ` with ${m.attachments.length} attachment(s)` : ""}${m.headers ? ` with headers ${Object.keys(m.headers).join(", ")}` : ""}`);
     return "skipped";
   },
 };
@@ -43,7 +48,7 @@ export const consoleTransport: EmailTransport = {
 /**
  * Resend (https://resend.com). NOT YET RUN AGAINST RESEND: this session's
  * network blocks it. Written to Resend's published API (POST /emails with a
- * Bearer key; attachments as base64). Check in Resend's test mode before use.
+ * Bearer key; attachments as base64; extra headers as a "headers" object). Check in Resend's test mode before use.
  */
 export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: string }): EmailTransport {
   const key = env.RESEND_API_KEY;
@@ -63,6 +68,7 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
           text: m.text,
           ...(m.html ? { html: m.html } : {}),
           ...(m.replyTo ? { reply_to: m.replyTo } : {}),
+          ...(m.headers && Object.keys(m.headers).length ? { headers: cleanHeaders(m.headers) } : {}),
           ...(m.attachments?.length
             ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
             : {}),
@@ -72,6 +78,11 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
       return "sent";
     },
   };
+}
+
+/** A header is one line: a line break in a name or value could add headers of its own. */
+function cleanHeaders(h: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(h).map(([k, v]) => [k.replace(/[^A-Za-z0-9-]/g, ""), v.replace(/[\r\n]+/g, " ")]));
 }
 
 /** Every email leaves with an HTML version in the Givezy look, laid out from its own text, unless it brings its own. */

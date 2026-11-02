@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
 import { getEmailTransport } from "@/lib/email";
+import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { appealEmail, audienceValue, greetingName, type Audience } from "./appeals-rules";
 import { isErasedEmail } from "./dashboard";
@@ -205,7 +206,7 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
       }
       try {
         const outcome = await transport.send(
-          appealEmail(d.email.trim(), { charityName: args.charityName, firstName: greetingName(d), subject: appeal.subject as string, body: appeal.body as string, stopUrl: `${site}/news/stop?t=${token}`, replyTo: args.replyTo }),
+          appealEmail(d.email.trim(), { charityName: args.charityName, firstName: greetingName(d), subject: appeal.subject as string, body: appeal.body as string, stopUrl: `${site}/news/stop?t=${token}`, oneClickUrl: oneClickStopUrl(site, "news", token), replyTo: args.replyTo }),
         );
         // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
         await mark(outcome === "sent" ? "sent" : "skipped");

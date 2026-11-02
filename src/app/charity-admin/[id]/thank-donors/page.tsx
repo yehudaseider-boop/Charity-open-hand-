@@ -4,6 +4,7 @@ import { DonePanel } from "@/components/done-panel";
 import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { viewerRole } from "@/lib/charity/team";
 import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { thankYouRecipients } from "@/lib/charity/thank-you-send";
 import { formatDate } from "@/lib/dates";
@@ -25,6 +26,8 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
   const sp = await searchParams;
   await requireViewer(`/charity-admin/${id}/thank-donors`);
   const { charity } = await loadCharityForManager(id);
+  // Only the owner sends thank-yous (Yehuda, 02/11/2026), as for Email donors. Others see what was sent.
+  const owner = (await viewerRole(id)) === "owner";
   const supabase = await createClient();
   const { data: sentRows } = await supabase
     .from("charity_thank_yous")
@@ -35,10 +38,10 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
   const sent = new Map((sentRows ?? []).map((r) => [r.period_month as string, r]));
   const months = recentMonths(new Date());
   // A thank-you that stopped part way (it ran out of time) and how many donors it hasn't reached yet.
-  const unfinished = charity.status === "approved"
+  const unfinished = owner && charity.status === "approved"
     ? await Promise.all((sentRows ?? []).filter((r) => !r.finished_at).map(async (r) => ({ month: r.period_month as string, sent: Number(r.recipient_count ?? 0), total: (await thankYouRecipients(id, r.period_month as string)).length })))
     : [];
-  const open = charity.status === "approved"
+  const open = owner && charity.status === "approved"
     ? await Promise.all(months.filter((m) => !sent.has(m)).map(async (m) => ({ month: m, count: (await thankYouRecipients(id, m)).length })))
     : [];
 
@@ -56,7 +59,11 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/thank-donors`} />
 
-      {charity.status !== "approved" ? <Notice tone="warning">You can thank donors once your page is live.</Notice> : null}
+      {charity.status !== "approved" ? (
+        <Notice tone="warning">You can thank donors once your page is live.</Notice>
+      ) : !owner ? (
+        <Notice>Only your charity&apos;s owner can send thank-yous. You can see what was sent below.</Notice>
+      ) : null}
 
       {unfinished.map(({ month, sent: done, total }) => (
         <Card key={`rest-${month}`} title={`${monthLabel(month)}: not finished`}>

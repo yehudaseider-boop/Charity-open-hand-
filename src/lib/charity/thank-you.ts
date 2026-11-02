@@ -5,6 +5,7 @@
 import { cleanDedicationName } from "@/lib/donations/dedication";
 import { createHash } from "node:crypto";
 import type { EmailMessage } from "@/lib/email";
+import { oneClickStopHeaders } from "@/lib/email/headers";
 import { saDate } from "./dashboard";
 
 export const THANK_YOU_MAX = 1000;
@@ -61,7 +62,7 @@ export function weekStart(now: Date): string {
 /** A charity's personal thank-you to one donor. Their first name and the charity's words only. */
 export function oneDonorThankYouEmail(
   to: string,
-  v: { charityName: string; firstName: string | null; body: string; stopUrl: string; replyTo: string | null },
+  v: { charityName: string; firstName: string | null; body: string; stopUrl: string; replyTo: string | null; oneClickUrl?: string },
 ): EmailMessage {
   // One line only, even for names saved before checkout cleaned them.
   const name = cleanDedicationName(v.firstName);
@@ -69,6 +70,7 @@ export function oneDonorThankYouEmail(
     to,
     subject: `A thank-you from ${v.charityName}`,
     ...(v.replyTo ? { replyTo: v.replyTo } : {}),
+    ...(v.oneClickUrl ? { headers: oneClickStopHeaders(v.oneClickUrl) } : {}),
     text: [
       name ? `Dear ${name},` : "Hello,",
       "",
@@ -86,7 +88,7 @@ export function oneDonorThankYouEmail(
 /** One donor's thank-you. Their first name only: never amounts, other donors or anything else. */
 export function thankYouEmail(
   to: string,
-  v: { charityName: string; firstName: string | null; month: string; body: string; stopUrl: string; replyTo?: string | null },
+  v: { charityName: string; firstName: string | null; month: string; body: string; stopUrl: string; replyTo?: string | null; oneClickUrl?: string },
 ): EmailMessage {
   // One line only, even for names saved before checkout cleaned them.
   const name = cleanDedicationName(v.firstName);
@@ -94,6 +96,7 @@ export function thankYouEmail(
     to,
     subject: `A thank-you from ${v.charityName}`,
     ...(v.replyTo ? { replyTo: v.replyTo } : {}),
+    ...(v.oneClickUrl ? { headers: oneClickStopHeaders(v.oneClickUrl) } : {}),
     text: [
       name ? `Dear ${name},` : "Hello,",
       "",

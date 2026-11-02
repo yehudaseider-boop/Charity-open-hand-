@@ -4,6 +4,7 @@
  */
 import { cleanDedicationName } from "@/lib/donations/dedication";
 import type { EmailMessage } from "@/lib/email";
+import { oneClickStopHeaders } from "@/lib/email/headers";
 import { isDonorGroup, type DonorGroup } from "./insights";
 
 export const APPEAL_SUBJECT_MAX = 120;
@@ -70,15 +71,19 @@ export function greetingName(d: { donor_type: string; display_name: string }): s
   return cleanDedicationName(d.display_name.trim().split(/\s+/)[0] ?? null);
 }
 
-/** One donor's copy. Their first name and the charity's words only: never amounts or other donors. */
+/**
+ * One donor's copy. Their first name and the charity's words only: never amounts or other donors.
+ * oneClickUrl (a donor's real copy, not a test) adds the mail app's own one-click stop.
+ */
 export function appealEmail(
   to: string,
-  v: { charityName: string; firstName: string | null; subject: string; body: string; stopUrl: string; replyTo: string | null },
+  v: { charityName: string; firstName: string | null; subject: string; body: string; stopUrl: string; replyTo: string | null; oneClickUrl?: string },
 ): EmailMessage {
   return {
     to,
     subject: v.subject,
     ...(v.replyTo ? { replyTo: v.replyTo } : {}),
+    ...(v.oneClickUrl ? { headers: oneClickStopHeaders(v.oneClickUrl) } : {}),
     text: [
       v.firstName ? `Dear ${v.firstName},` : "Hello,",
       "",

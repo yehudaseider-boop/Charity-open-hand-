@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emailHash } from "@/lib/charity/thank-you";
 
 vi.mock("server-only", () => ({}));
-const sent: { to: string; text: string }[] = [];
+const sent: { to: string; text: string; headers?: Record<string, string> }[] = [];
 let donations: unknown[] = [];
 let optedOut: string[] = [];
 // The month's claim row, and the addresses claimed for it (hash -> status).
@@ -86,6 +86,9 @@ describe("sending a thank-you", () => {
     expect(r).toMatchObject({ ok: true, sent: 2, failed: 0, remaining: 0 });
     expect(sent.map((m) => m.to)).toEqual(["sarah@x.co", "david@x.co"]);
     expect(sent[0].text).toMatch(/https:\/\/g\.test\/thanks\/stop\?t=[A-Za-z0-9_-]{43}/);
+    // The mail app's one-click stop carries the same token as the link in the email.
+    const token = sent[0].text.match(/thanks\/stop\?t=([A-Za-z0-9_-]{43})/)![1];
+    expect(sent[0].headers).toEqual({ "List-Unsubscribe": `<https://g.test/api/stop/thanks?t=${token}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" });
     expect(tokens).toHaveLength(2);
     expect(tokens[0].email_hash).toBe(emailHash("sarah@x.co"));
     expect(month?.finished_at).not.toBeNull();

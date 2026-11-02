@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
 import { getEmailTransport } from "@/lib/email";
+import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
 import { emailHash, monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
@@ -131,7 +132,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
       continue;
     }
     try {
-      const outcome = await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }));
+      const outcome = await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, oneClickUrl: oneClickStopUrl(site, "thanks", token), replyTo: args.replyTo }));
       // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
       if (outcome === "sent") sentThisRun++;
       await mark(outcome === "sent" ? "sent" : "failed");
@@ -238,7 +239,7 @@ export async function sendDonorThankYou(args: {
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   try {
     const outcome = await getEmailTransport().send(
-      oneDonorThankYouEmail(d.email.trim(), { charityName: args.charityName, firstName: greeting, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, replyTo: args.replyTo }),
+      oneDonorThankYouEmail(d.email.trim(), { charityName: args.charityName, firstName: greeting, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, oneClickUrl: oneClickStopUrl(site, "thanks", token), replyTo: args.replyTo }),
     );
     if (outcome !== "sent") {
       await release();
