@@ -39,14 +39,14 @@ export async function editDonorNote(charityId: string, donorId: string, noteId: 
   if (!isId(noteId)) return NOT_FOUND;
   const note = checkNote(formData.get("body"));
   if (!note.ok) return { ok: false, fieldErrors: { body: note.error } };
-  if (!(await editNote(charityId, noteId, note.value))) return NOT_FOUND;
+  if (!(await editNote(charityId, donorId, noteId, note.value))) return NOT_FOUND;
   revalidatePath(donorPage(charityId, donorId));
   return { ok: true, message: "Note updated." };
 }
 
 export async function deleteDonorNote(charityId: string, donorId: string, noteId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   await forDonor(charityId, donorId);
-  if (!isId(noteId) || !(await deleteNote(charityId, noteId))) return NOT_FOUND;
+  if (!isId(noteId) || !(await deleteNote(charityId, donorId, noteId))) return NOT_FOUND;
   revalidatePath(donorPage(charityId, donorId));
   redirect(`${donorPage(charityId, donorId)}?did=note_removed`);
 }
@@ -63,7 +63,7 @@ export async function addDonorReminder(charityId: string, donorId: string, _prev
 
 export async function markReminder(charityId: string, donorId: string, reminderId: string, done: boolean, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await forDonor(charityId, donorId);
-  if (!isId(reminderId) || !(await setReminderDone(charityId, reminderId, done, viewer.userId))) return NOT_FOUND;
+  if (!isId(reminderId) || !(await setReminderDone(charityId, donorId, reminderId, done, viewer.userId))) return NOT_FOUND;
   revalidatePath(donorPage(charityId, donorId));
   revalidatePath(`/charity-admin/${charityId}`);
   redirect(`${donorPage(charityId, donorId)}?did=${done ? "followup_done" : "followup_back"}`);
@@ -71,7 +71,7 @@ export async function markReminder(charityId: string, donorId: string, reminderI
 
 export async function deleteDonorReminder(charityId: string, donorId: string, reminderId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   await forDonor(charityId, donorId);
-  if (!isId(reminderId) || !(await deleteReminder(charityId, reminderId))) return NOT_FOUND;
+  if (!isId(reminderId) || !(await deleteReminder(charityId, donorId, reminderId))) return NOT_FOUND;
   revalidatePath(donorPage(charityId, donorId));
   revalidatePath(`/charity-admin/${charityId}`);
   redirect(`${donorPage(charityId, donorId)}?did=followup_removed`);
@@ -81,16 +81,19 @@ export async function addDonorTag(charityId: string, donorId: string, _prev: For
   await forDonor(charityId, donorId);
   const name = checkTagName(formData.get("name"));
   if (!name.ok) return { ok: false, fieldErrors: { name: name.error } };
+  // The tag as the charity already spells it ("volunteer" typed finds "Volunteer"), so the message names it.
+  let tagName = name.value;
   try {
     const tag = await tagNamed(charityId, name.value);
     await tagDonor(charityId, donorId, tag.id);
+    tagName = tag.name;
   } catch (e) {
     if (e instanceof TooManyTags) return { ok: false, fieldErrors: { name: "You have 100 tags already. Use one of them, or remove one you no longer need on the Donors page." } };
     throw e;
   }
   revalidatePath(donorPage(charityId, donorId));
   revalidatePath(`/charity-admin/${charityId}/donors`);
-  return { ok: true, message: `Tagged "${name.value}".` };
+  return { ok: true, message: `Tagged "${tagName}".` };
 }
 
 export async function removeDonorTag(charityId: string, donorId: string, tagId: string, _prev: FormState, _formData: FormData): Promise<FormState> {

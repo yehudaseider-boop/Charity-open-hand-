@@ -6,6 +6,6 @@
 export function realImpactLine(line: string | null | undefined): string | null {
   const t = line?.trim();
   if (!t) return null;
-  if (/\[[^\]]*\]/.test(t)) return null;
+  if (/^\[[^\]]*\]\.?$/.test(t) || /\[(impact line|your|insert|todo|placeholder)\b[^\]]*\]/i.test(t)) return null;
   return t;
 }

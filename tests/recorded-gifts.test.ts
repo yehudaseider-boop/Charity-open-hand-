@@ -117,6 +117,21 @@ describe("files", () => {
     expect(r.totalCents).toBe(50_000 + 125_050);
     expect(r.rows.map((x) => [x.line, x.check.ok, Boolean(x.duplicateOf)])).toEqual([[2, true, false], [3, true, false], [4, false, false], [5, true, true], [6, true, true]]);
   });
+  it("refuses a row with more values than headings (an unquoted 1,250), instead of recording it shifted", () => {
+    const text = [
+      "Date,First name,Surname,Email,Amount",
+      "05/03/2026,Sarah,Levin,sarah@x.co.za,1,250",
+      "06/03/2026,David,Cohen,david@x.co.za,\"1,250.00\"",
+      "07/03/2026,Thandi,Mokoena,thandi@x.co.za,300,,",
+    ].join("\n");
+    const r = checkFile(text, { today, fallbackMethod: "eft" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rows.map((x) => [x.line, x.check.ok])).toEqual([[2, false], [3, true], [4, true]]);
+    const first = r.rows[0].check;
+    expect(!first.ok && first.errors.amount).toMatch(/more values than there are headings/);
+    expect(r.totalCents).toBe(125_000 + 30_000);
+  });
   it("holds back a gift that matches one whose donor was erased, unless it has a reference", () => {
     // The erased gift kept only its amount and date (no email, no name).
     const seen = new Set([erasedGiftKey({ amountCents: 50_000, date: "2026-03-05" })]);

@@ -10,7 +10,7 @@ import { RECORDED_METHODS } from "@/lib/charity/recorded-gifts";
 
 export type CharityRow = {
   legal_name_en: string;
-  legal_name_he: string | null;
+  legal_name_he?: string | null; // no longer read or printed (30/10/2026); old receipts may still carry it
   npo_number: string | null;
   pbo_number: string | null;
   s18a_reference: string | null;
@@ -45,7 +45,7 @@ export function receiptDonorName(d: Pick<DonorRow, "donor_type" | "first_name" |
 export type ReceiptDetails = {
   charity: {
     legal_name_en: string;
-    legal_name_he: string | null;
+    legal_name_he?: string | null;
     npo_number: string | null;
     pbo_number: string | null;
     s18a_reference: string | null;
@@ -107,7 +107,6 @@ export function buildReceiptDetails(args: {
   return {
     charity: {
       legal_name_en: c.legal_name_en,
-      legal_name_he: c.legal_name_he,
       npo_number: c.npo_number,
       pbo_number: c.pbo_number,
       s18a_reference: c.s18a_reference,

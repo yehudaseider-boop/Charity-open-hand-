@@ -50,14 +50,14 @@ export async function addNote(charityId: string, donorId: string, body: string, 
   return data.id as string;
 }
 
-export async function editNote(charityId: string, noteId: string, body: string): Promise<boolean> {
-  const { data, error } = await db().from("charity_donor_notes").update({ body, edited_at: new Date().toISOString() }).eq("id", noteId).eq("charity_id", charityId).select("id");
+export async function editNote(charityId: string, donorId: string, noteId: string, body: string): Promise<boolean> {
+  const { data, error } = await db().from("charity_donor_notes").update({ body, edited_at: new Date().toISOString() }).eq("id", noteId).eq("charity_id", charityId).eq("donor_id", donorId).select("id");
   if (error) throw error;
   return Boolean(data?.length);
 }
 
-export async function deleteNote(charityId: string, noteId: string): Promise<boolean> {
-  const { data, error } = await db().from("charity_donor_notes").delete().eq("id", noteId).eq("charity_id", charityId).select("id");
+export async function deleteNote(charityId: string, donorId: string, noteId: string): Promise<boolean> {
+  const { data, error } = await db().from("charity_donor_notes").delete().eq("id", noteId).eq("charity_id", charityId).eq("donor_id", donorId).select("id");
   if (error) throw error;
   return Boolean(data?.length);
 }
@@ -117,19 +117,20 @@ export async function addReminder(charityId: string, donorId: string, what: stri
 }
 
 /** Mark a follow-up done, or not done again ("Undo"). */
-export async function setReminderDone(charityId: string, reminderId: string, done: boolean, userId: string): Promise<boolean> {
+export async function setReminderDone(charityId: string, donorId: string, reminderId: string, done: boolean, userId: string): Promise<boolean> {
   const { data, error } = await db()
     .from("charity_donor_reminders")
     .update(done ? { done_at: new Date().toISOString(), done_by: userId } : { done_at: null, done_by: null })
     .eq("id", reminderId)
     .eq("charity_id", charityId)
+    .eq("donor_id", donorId)
     .select("id");
   if (error) throw error;
   return Boolean(data?.length);
 }
 
-export async function deleteReminder(charityId: string, reminderId: string): Promise<boolean> {
-  const { data, error } = await db().from("charity_donor_reminders").delete().eq("id", reminderId).eq("charity_id", charityId).select("id");
+export async function deleteReminder(charityId: string, donorId: string, reminderId: string): Promise<boolean> {
+  const { data, error } = await db().from("charity_donor_reminders").delete().eq("id", reminderId).eq("charity_id", charityId).eq("donor_id", donorId).select("id");
   if (error) throw error;
   return Boolean(data?.length);
 }

@@ -7,7 +7,12 @@ import { useEffect, useRef, useState, useTransition } from "react";
  * The charities search: results update as you type (after a short pause), with a small spinner while they load.
  * Without JavaScript it is still a plain form that searches on Enter or the button.
  */
-export function CharitySearch({ initial, category }: { initial: string; category: string }) {
+export function CharitySearch(props: { initial: string; category: string }) {
+  // Starting over when the page's own search or category changes (for example "See all charities") keeps the box in step with the list.
+  return <SearchBox key={`${props.initial}|${props.category}`} {...props} />;
+}
+
+function SearchBox({ initial, category }: { initial: string; category: string }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
   const [pending, startTransition] = useTransition();
@@ -21,13 +26,14 @@ export function CharitySearch({ initial, category }: { initial: string; category
     const t = setTimeout(() => {
       const p = new URLSearchParams();
       const q = value.trim();
+      if (q === initial.trim()) return;
       if (q) p.set("q", q);
       if (category) p.set("category", category);
       const qs = p.toString();
       startTransition(() => router.replace(qs ? `/charities?${qs}` : "/charities", { scroll: false }));
     }, 300);
     return () => clearTimeout(t);
-  }, [value, category, router]);
+  }, [value, category, initial, router]);
 
   return (
     <form role="search" action="/charities" className="flex max-w-[44rem] gap-2">

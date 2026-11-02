@@ -35,12 +35,17 @@ export function buildReceiptHtml(args: {
   const total = d.donations.reduce((t, x) => t + x.amount_cents, 0);
   const count = d.donations.length;
   // Page 2, the donation summary: one row per gift. Receipts issued before 30/10/2026 have no reference or nature.
+  const hasRefs = d.donations.some((x) => x.reference);
+  const hasNature = d.donations.some((x) => x.nature);
   const rows = d.donations
     .map(
       (x) =>
-        `<tr><td>${esc(x.reference ?? "")}</td><td>${esc(x.date)}</td><td>${esc(x.nature ?? "")}</td><td class="r">${esc(formatRand(x.amount_cents))}</td></tr>`,
+        `<tr>${hasRefs ? `<td>${esc(x.reference ?? "")}</td>` : ""}<td>${esc(x.date)}</td>${hasNature ? `<td>${esc(x.nature ?? "")}</td>` : ""}<td class="r">${esc(formatRand(x.amount_cents))}</td></tr>`,
     )
     .join("");
+  const cols = 2 + (hasRefs ? 1 : 0) + (hasNature ? 1 : 0);
+  // A receipt written before the list moved to page 2 says "listed above" in its stored statement.
+  const statement = d.wording.statement.replace("donations listed above", "donations listed on this receipt");
   const natures = [...new Set(d.donations.map((x) => x.nature).filter((n): n is string => Boolean(n)))];
   const first = d.donations[0]?.date ?? "";
   const last = d.donations[count - 1]?.date ?? "";
@@ -116,7 +121,7 @@ ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
     ${field("Tax year", `${esc(taxYearName(Number(d.tax_year)))} (${esc(d.period)})`)}
     ${field("Date issued", esc(d.issued_on))}
   </dl>
-  <p class="statement">${esc(d.wording.statement)}</p>
+  <p class="statement">${esc(statement)}</p>
   ${foot}
 </section>
 <section class="page">
@@ -129,8 +134,8 @@ ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
     <b>Tax year</b><span>${esc(taxYearName(Number(d.tax_year)))} (${esc(d.period)})</span>
   </div>
   <table>
-    <thead><tr><th>Reference</th><th>Date received</th><th>Nature of donation</th><th class="r">Amount</th></tr></thead>
-    <tbody>${rows}<tr class="total"><td colspan="3">Total (${count} ${count === 1 ? "donation" : "donations"})</td><td class="r">${esc(formatRand(total))}</td></tr></tbody>
+    <thead><tr>${hasRefs ? "<th>Reference</th>" : ""}<th>Date received</th>${hasNature ? "<th>Nature of donation</th>" : ""}<th class="r">Amount</th></tr></thead>
+    <tbody>${rows}<tr class="total"><td colspan="${cols - 1}">Total (${count} ${count === 1 ? "donation" : "donations"})</td><td class="r">${esc(formatRand(total))}</td></tr></tbody>
   </table>
   ${foot}
 </section>

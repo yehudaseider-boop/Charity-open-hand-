@@ -66,6 +66,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
     <div className="space-y-5">
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/receipts`} />
       <PageHeader title="s18A receipts" />
+      {sp.receipt === "unavailable" ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">That s18A receipt PDF isn&apos;t available. It may have been withdrawn, or its PDF is not ready yet.</p> : null}
       {canIssue18a(charity) ? (
         <Notice>
           One receipt is issued for each donor, once a year, after the tax year ends. The current tax year runs from {formatDate(taxYear.from)} to {formatDate(taxYear.end)} (SARS calls it tax year {taxYear.taxYear}).

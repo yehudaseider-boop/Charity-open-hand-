@@ -11,7 +11,21 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(_request: NextRequest, ctx: RouteContext<"/receipts/[id]">) {
   const { id } = await ctx.params;
   // A receipt that can't be handed out goes back to the account page with a plain message, not a bare "Not found".
-  const unavailable = () => NextResponse.redirect(new URL("/account?receipt=unavailable", _request.url), { status: 303 });
+  // Admins open receipts from their own lists, so a failure sends them back there (a same-site address only).
+  const from = _request.headers.get("referer");
+  const back = (() => {
+    try {
+      const r = from ? new URL(from) : null;
+      return r && r.origin === new URL(_request.url).origin && !r.pathname.startsWith("/receipts/") ? `${r.pathname}${r.search}` : null;
+    } catch {
+      return null;
+    }
+  })();
+  const unavailable = () => {
+    const to = new URL(back ?? "/account", _request.url);
+    to.searchParams.set("receipt", "unavailable");
+    return NextResponse.redirect(to, { status: 303 });
+  };
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return unavailable();

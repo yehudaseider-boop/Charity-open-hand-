@@ -23,7 +23,7 @@ const tabs = ["issued", "void"] as const;
 
 export default async function AdminReceiptsPage({ searchParams }: PageProps<"/admin/receipts">) {
   await requirePlatformAdmin();
-  const { status: raw, q: rawQ, run: rawRun } = await searchParams;
+  const { status: raw, q: rawQ, run: rawRun, receipt: rawReceipt } = await searchParams;
   const justRan = typeof rawRun === "string" ? await getRun(rawRun) : null;
   const status = tabs.includes(raw as (typeof tabs)[number]) ? (raw as (typeof tabs)[number]) : "issued";
   // Search by receipt number, donor or charity name: letters, digits, spaces and dashes only (it goes into a filter).
@@ -53,6 +53,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
     <div className="space-y-4">
       <Link href="/admin" className="text-sm text-muted">← Givezy admin</Link>
       <h1 className="font-display text-2xl text-indigo">s18A receipts</h1>
+      {rawReceipt === "unavailable" ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">That s18A receipt PDF isn&apos;t available. It may have been withdrawn, or its PDF is not ready yet.</p> : null}
 
       {justRan?.summary ? <RunDone run={justRan} /> : null}
       {justRan?.status === "cancelled" ? (

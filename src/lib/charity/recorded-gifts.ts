@@ -308,7 +308,12 @@ export function checkFile(text: string, opts: { today: string; fallbackMethod: R
   const rows: RowResult[] = all.slice(1).map((cells, i) => {
     const fields: GiftFields = {};
     for (const [f, col] of Object.entries(columns) as [GiftField, number][]) fields[f] = cells[col] ?? "";
-    const check = checkGift(fields, { today: opts.today, fallbackMethod: opts.fallbackMethod });
+    // More filled cells than headings: something unquoted (often an amount like 1,250) split a cell in
+    // two, so every value after it sits under the wrong heading. Refused rather than recorded shifted.
+    const spill = cells.slice(all[0].length).some((c) => c.trim());
+    const check: GiftCheck = spill
+      ? { ok: false, errors: { amount: "This row has more values than there are headings, so its details are in the wrong columns. An amount like 1,250 splits in two: write it as 1250, or put it in quotes" } }
+      : checkGift(fields, { today: opts.today, fallbackMethod: opts.fallbackMethod });
     const r: RowResult = { line: i + 2, fields, check };
     if (check.ok) {
       const key = giftKey(check.gift);

@@ -60,7 +60,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       const { data, error } = await db
         .from("charities")
         .select(
-          "id, is_s18a, mandate_signed_at, quickgive_code, legal_name_en, legal_name_he, npo_number, pbo_number, s18a_reference, address_line1, address_line2, suburb, city, postal_code",
+          "id, is_s18a, mandate_signed_at, quickgive_code, legal_name_en, npo_number, pbo_number, s18a_reference, address_line1, address_line2, suburb, city, postal_code",
         )
         .in("id", ids);
       if (error) throw new Error(error.message);

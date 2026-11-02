@@ -10,7 +10,7 @@ const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
 
 export function csvCell(value: string | number | null | undefined): string {
   let s = value === null || value === undefined ? "" : String(value);
-  if (/^[=+\-@\t\r]/.test(s) && !PLAIN_NUMBER.test(s)) s = `'${s}`;
+  if (/^[\s\u00a0]*[=+\-@\t\r]/.test(s) && !PLAIN_NUMBER.test(s.trim())) s = `'${s}`;
   s = s.replace(/([;,])(\s*)([=+\-@])/g, "$1$2'$3");
   if (/[",;\n\r]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
   return s;

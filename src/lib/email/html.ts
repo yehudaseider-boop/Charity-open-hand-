@@ -137,10 +137,15 @@ export function textEmailHtml(args: { subject: string; text: string; siteUrl?: s
       out.push(paragraphHtml(pending.map(linkify).join("<br>"), { muted }));
       pending = [];
     };
+    // Words a charity typed (a thank-you, an appeal) never become Givezy's button: only an address on our own site does.
+    const ours = (url: string) => {
+      if (!args.siteUrl) return false;
+      try { return new URL(url).origin === new URL(args.siteUrl).origin; } catch { return false; }
+    };
     lines.forEach((line, li) => {
       const lead = LEAD_LINK.exec(line);
       const leadLabel = lead ? buttonLabel(lead[2], lead[1]) : null;
-      if (!buttonUsed && lead && leadLabel) {
+      if (!buttonUsed && lead && leadLabel && ours(lead[2])) {
         // A long lead sentence stays as words above the button, so nothing is said twice or lost.
         if (leadLabel !== lead[1]) pending.push(`${lead[1]}:`);
         flush();
@@ -149,7 +154,7 @@ export function textEmailHtml(args: { subject: string; text: string; siteUrl?: s
         return;
       }
       const prev = li > 0 ? lines[li - 1] : "";
-      if (!buttonUsed && BARE_LINK.test(line) && prev.endsWith(":")) {
+      if (!buttonUsed && BARE_LINK.test(line) && ours(line) && prev.endsWith(":")) {
         // The link's own line, after "...put it in here. ... as before:": the sentence stays above, the button gets short words.
         const label = buttonLabel(line);
         if (label) {
