@@ -4,7 +4,7 @@ import { formatRand } from "@/lib/money";
 /**
  * The questions people ask about Givezy, answered from facts we can back today. One list for the
  * FAQ page, its structured data (what search engines and chatbots read) and llms.txt.
- * Wording approved by Yehuda, 03/11/2026. Change it only with his OK.
+ * Draft wording (03/11/2026): Yehuda to approve before it goes live.
  */
 export type Faq = { q: string; a: string };
 
