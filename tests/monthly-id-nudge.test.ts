@@ -1,0 +1,75 @@
+/** Adding an SA ID number to a monthly s18A gift set up with only a tax number (03/11/2026): who is asked, and which gifts change. */
+import { describe, expect, it } from "vitest";
+import { cleanSaIdNumber, giftsToUpdate, needsIdNudge, NUDGE_TEXT, SAVED_TEXT, CONFIRM_TEXT } from "@/lib/donations/monthly-id-nudge";
+
+const live = { status: "active", wants_18a: true, first_donation_id: "d-first" };
+const noId = { donor_type: "individual", id_number_encrypted: null, erased_at: null };
+
+describe("who is asked for an ID number", () => {
+  it("an active or paused s18A monthly donation of an individual with no ID number", () => {
+    expect(needsIdNudge(live, noId)).toBe(true);
+    expect(needsIdNudge({ ...live, status: "paused" }, noId)).toBe(true);
+  });
+  it("not when stopped, cancelled, without s18A, or without a first gift to copy from", () => {
+    expect(needsIdNudge({ ...live, status: "failed" }, noId)).toBe(false);
+    expect(needsIdNudge({ ...live, status: "cancelled" }, noId)).toBe(false);
+    expect(needsIdNudge({ ...live, wants_18a: false }, noId)).toBe(false);
+    expect(needsIdNudge({ ...live, wants_18a: null }, noId)).toBe(false);
+    expect(needsIdNudge({ ...live, first_donation_id: null }, noId)).toBe(false);
+  });
+  it("not for a company or trust, not when an ID number is already there, not when the details were erased", () => {
+    expect(needsIdNudge(live, { ...noId, donor_type: "company" })).toBe(false);
+    expect(needsIdNudge(live, { ...noId, id_number_encrypted: "v1.x.y.z" })).toBe(false);
+    expect(needsIdNudge(live, { ...noId, erased_at: "2026-11-01T00:00:00Z" })).toBe(false);
+    expect(needsIdNudge(live, null)).toBe(false);
+    expect(needsIdNudge(live, undefined)).toBe(false);
+  });
+});
+
+describe("the ID number typed", () => {
+  it("accepts a valid SA ID number with spaces, and keeps only the digits", () => {
+    expect(cleanSaIdNumber("8001 0150 09087")).toEqual({ ok: true, id: "8001015009087" });
+  });
+  it("refuses an empty, short, or wrong number in plain words, with no exclamation marks", () => {
+    for (const bad of ["", "   ", "1234", "8001015009088", "ABC", 42, null, undefined]) {
+      const r = cleanSaIdNumber(bad);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.message).not.toMatch(/!/);
+    }
+  });
+});
+
+describe("which gifts get the ID number", () => {
+  const scope = { recurringId: "r1", donorIds: new Set(["donor-a", "donor-b"]), taxYear: 2027, onIssuedReceipt: new Set(["g-issued"]) };
+  const gift = (id: string, over: Partial<{ recurring_id: string | null; donor_id: string; status: string; tax_year: number | null }> = {}) => ({
+    id, recurring_id: "r1", donor_id: "donor-a", status: "paid", tax_year: 2027, ...over,
+  });
+  it("this monthly donation's paid gifts of the current tax year, of the signed-in person, not on an issued receipt", () => {
+    const gifts = [
+      gift("g-ok"),
+      gift("g-ok-b", { donor_id: "donor-b" }),
+      gift("g-issued"),
+      gift("g-other-monthly", { recurring_id: "r2" }),
+      gift("g-once-off", { recurring_id: null }),
+      gift("g-someone-else", { donor_id: "donor-z" }),
+      gift("g-pending", { status: "pending" }),
+      gift("g-refunded", { status: "refunded" }),
+      gift("g-last-year", { tax_year: 2026 }),
+      gift("g-no-year", { tax_year: null }),
+    ];
+    expect(giftsToUpdate(gifts, scope)).toEqual(["g-ok", "g-ok-b"]);
+  });
+  it("nothing to update is an empty list, not an error", () => {
+    expect(giftsToUpdate([], scope)).toEqual([]);
+  });
+});
+
+describe("wording", () => {
+  it("is plain SA English: s18A receipt, no exclamation marks, no em dashes", () => {
+    for (const t of [NUDGE_TEXT, SAVED_TEXT, CONFIRM_TEXT]) {
+      expect(t).not.toMatch(/!/);
+      expect(t).not.toMatch(/—/);
+    }
+    expect(NUDGE_TEXT).toContain("s18A receipt");
+  });
+});

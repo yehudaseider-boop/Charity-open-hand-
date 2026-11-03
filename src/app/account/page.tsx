@@ -8,6 +8,9 @@ import { formatDate, taxYearFor, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyButton } from "./monthly-button";
+import { MonthlyIdForm } from "./monthly-id-form";
+import { needsIdNudge, type SourceDetails } from "@/lib/donations/monthly-id-nudge";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { loadTaxPack } from "@/lib/tax-pack/load";
 import type { TaxPack } from "@/lib/tax-pack/build";
 import { DECLINED_REASON, NEW_CARD_NOT_REUSABLE } from "@/lib/donations/monthly-reasons";
@@ -34,7 +37,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const { data: monthlyGifts, error: monthlyError } = donorIds.length
     ? await supabase
         .from("recurring_donations")
-        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, held_reason, charities(name_en, slug)")
+        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, held_reason, wants_18a, first_donation_id, charities(name_en, slug)")
         .in("donor_id", donorIds)
         .in("status", ["active", "paused", "failed"])
         .order("created_at", { ascending: false })
@@ -42,6 +45,16 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   // A section that could not be read says so, rather than looking empty (nothing changed; a refresh tries again).
   const receiptsFailed = Boolean(donorsError || receiptsError);
   const monthlyFailed = Boolean(donorsError || monthlyError);
+
+  // Which live s18A monthly donations still carry only an income tax number (set up before 03/11/2026), so
+  // the card can ask for the SA ID number. The details every new monthly gift is copied from are read on
+  // the server for this person's own monthly donations only; only whether an ID number is there is used.
+  const sourceIds = (monthlyGifts ?? []).filter((m) => m.wants_18a && (m.status === "active" || m.status === "paused")).map((m) => m.first_donation_id as string | null).filter((x): x is string => Boolean(x));
+  const sourceDetails = new Map<string, SourceDetails>();
+  if (sourceIds.length) {
+    const { data } = await createAdminClient().from("donation_checkout_details").select("donation_id, donor_type, id_number_encrypted, erased_at").in("donation_id", sourceIds);
+    for (const d of data ?? []) sourceDetails.set(d.donation_id as string, d);
+  }
 
   // This tax year's gifts, from the same reading as the tax pack (paid donations only, Johannesburg dates).
   const thisYear = taxYearFor(new Date());
@@ -160,6 +173,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                       <MonthlyButton id={m.id} status="cancelled" label="Cancel for good" danger confirmText="Cancel this monthly donation for good? We will forget your card and collect nothing more." />
                     )}
                   </div>
+                  {needsIdNudge(m, m.first_donation_id ? sourceDetails.get(m.first_donation_id) : null) ? <MonthlyIdForm id={m.id} /> : null}
                 </li>
               );
             })}

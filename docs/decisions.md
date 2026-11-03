@@ -1510,3 +1510,15 @@ Built from SARS's BRS v4.0.0D-10 (copied in `docs/sars/it3d-spec.md`); every cho
 - **Charity's SARS details** (income tax reference, legal form as SARS's Nature of Person, registration number) in `charity_private`, server-only writes (migration `20261103000001_it3d_charity_details.sql`), saved on the SARS page with Undo.
 - **Assumption:** company donors are reported as unlisted companies (PRIVATE_CO); the page says to change it for a listed company or close corporation.
 - **Privacy wording to change:** the home page and Privacy Policy say charities never see a donor's ID or tax number. The owner's SARS files hold them in full. On the page only the last 4 digits show. Wording for Yosef in the go-live checklist.
+
+## Monthly s18A gifts set up with only a tax number: ask for the SA ID on the account page (03/11/2026)
+
+Since 03/11/2026 an s18A receipt needs the donor's SA ID number (SARS's IT3(d) report does not accept a donor with only an income tax number). A monthly donation copies its first gift's checkout details onto every new monthly gift, so a monthly s18A gift set up before then with only a tax number kept producing gifts whose receipt could not be reported.
+
+- **Decision (Yehuda, 03/11/2026):** nudge those donors to add their SA ID number; keep s18A on their gifts. No gift loses its receipt.
+- **Where:** `/account`, inside the card of each active or paused s18A monthly donation of an individual whose source details have no ID number: a plain notice, an SA ID number field (checked like checkout: 13 digits, real date, citizenship digit, Luhn), Save, "Saving…" while it works, and "Saved. From now on your monthly gifts carry your ID number, and this tax year's gifts have been updated." A tax number that was given stays.
+- **Ask first, not Undo:** the donor account area has no undo pattern (the charity dashboard's panel is for charity actions), and the change writes onto gifts that the yearly receipt will be built from, so the form asks on the page ("This replaces the details on your monthly donation. Continue?") before saving.
+- **What is written (server-only, service role):** the encrypted ID number, its last four digits and the receipt identity fingerprint, exactly as checkout records them (an ID number takes over from a tax number in the fingerprint, so the person's gifts group onto one receipt), onto (a) the first gift's checkout details that `createMonthlyGift` copies from and (b) this tax year's paid gifts of that monthly donation that are not on an issued s18A receipt. A gift on an issued receipt is never changed. Only rows with no ID number, not erased, of an individual, are touched. Rate-limited (5 an hour per person) and audit-logged as `donor.monthly_id_added` with the last four digits only.
+- **Assumption:** the first gift's details row is updated even if that first gift (an earlier tax year) is on an issued receipt, because it is the row every new monthly gift is copied from; the issued receipt itself is not changed.
+- **Still open:** an email nudge to those donors once email sending is live (wording for Yosef). See the go-live checklist.
+
