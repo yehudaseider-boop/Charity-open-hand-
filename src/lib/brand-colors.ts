@@ -16,5 +16,9 @@ export const brandColors = {
   orange: "#FF8A3D", // graphics and calls to action, ink text on it
   lilac: "#C9B4FA",
   lilacSoft: "#F4F1FF",
+  peach: "#FFEBDD", // background splashes only (share images)
+  sage: "#2E9D6B", // the s18A tick, graphics only
+  successText: "#1F6B4A", // small success text
+  successSoft: "#E3F2EA", // behind the s18A tick
   danger: "#B3261E",
 } as const;

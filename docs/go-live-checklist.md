@@ -182,6 +182,8 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 - [ ] In-app payments (once-off): the app and server both stay off for store builds (`EXPO_PUBLIC_IN_APP_GIVING`, `APP_GIVING`). Before turning either on in production: get Apple's and Google's answer in writing, run `docs/paystack-test-script.md` through the app, once-off and monthly (give screen, then the Paystack page, return, confirmation), and decide who pays the provider's fee. Decision.
 - [ ] A new native build is needed for the store apps because `expo-web-browser` was added (Expo Go already has it).
 
+- [ ] **Search and chatbots (built 03/11/2026):** on the live site only, set `SITE_INDEXING=yes` in Vercel (Production), so Google may list it; the test site stays hidden. Then add givezy.co.za to Google Search Console and send it `https://givezy.co.za/sitemap.xml`. Check a shared link on WhatsApp shows the Givezy picture, and `https://givezy.co.za/llms.txt` opens. Yehuda to approve the FAQ wording (`src/lib/seo/faq.ts`) before it goes live.
+
 ## C. First live day
 
 - [ ] One small real donation with Yehuda's own card. Check: the thank-you page, the confirmation email, the donation shows as paid, the charity sees it without the donor's private choice, and the s18A flow behaves as agreed.
