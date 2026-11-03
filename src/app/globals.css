@@ -301,3 +301,7 @@ input[type="radio"] {
     display: none;
   }
 }
+
+/* A row that scrolls sideways without a visible scrollbar (the blue cards on a phone). */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

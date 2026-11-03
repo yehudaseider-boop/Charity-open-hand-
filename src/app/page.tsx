@@ -122,6 +122,15 @@ export default async function Home() {
           <Link href="/charities" className="pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Find a charity</Link>
           <Link href="#how" className="rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand">How it works</Link>
         </div>
+        <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px] font-semibold text-navy" aria-label="Why Givezy">
+          {["Every charity checked", "s18A receipts", `No ${platformConfig.appName} fee`].map((t) => (
+            <li key={t} className="flex items-center gap-1.5"><Tick />{t}</li>
+          ))}
+        </ul>
+        {/* Try it: type an amount and see what it adds up to. Nothing is sent anywhere. */}
+        <div className="mt-2 w-full max-w-[24rem] rounded-[1.25rem] border-2 border-honey bg-white p-5 text-left shadow-[0_10px_30px_rgba(23,73,181,0.10)]">
+          <TryGiving minCents={platformConfig.minDonationCents} />
+        </div>
 
         <div className="relative mt-14 w-full max-w-[60rem]">
           <Confetti />
@@ -174,9 +183,16 @@ export default async function Home() {
       <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6">
         <h2 className={`max-w-[34rem] ${h2Class}`}>One account for all your giving, ready at <Key>tax time</Key>.</h2>
         <div className="grid gap-5 md:grid-cols-2">
-          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation and pause or stop it yourself whenever you like. Try it below.">
+          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation and pause or stop it yourself whenever you like.">
             <Screen>
-              <TryGiving minCents={platformConfig.minDonationCents} />
+              <p className="text-[13px] font-semibold text-muted">Your monthly donations</p>
+              <ul className="mt-2 flex flex-col gap-2 text-[14px]">
+                <li className="flex items-center justify-between gap-3 rounded-lg bg-honey-soft px-3 py-2">
+                  <span className="min-w-0"><span className="block font-semibold">An old-age home</span><span className="block text-[12px] text-muted">R180 every month · next gift 19/11/2026</span></span>
+                  <span className="shrink-0 rounded-full border-[1.5px] border-honey bg-white px-3 py-1 text-[12px] font-bold text-brand">Pause</span>
+                </li>
+              </ul>
+              <p className="mt-3 text-[13px] font-bold text-brand">Stop any time, from your account</p>
             </Screen>
           </PastelCard>
           <PastelCard tone="sky" title="s18A receipts, done" body="If the charity issues them, you get one receipt per charity for the whole tax year, all in your account.">

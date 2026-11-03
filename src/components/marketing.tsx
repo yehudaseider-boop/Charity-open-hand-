@@ -145,9 +145,10 @@ export function Floating({ className, children }: { className: string; children:
 /** Three solid blue cards, each with a white round icon and a link. */
 export function BlueCards({ items }: { items: { icon: IconName; title: string; body: string; href: string; link: string }[] }) {
   return (
-    <ul className="reveal grid gap-5 md:grid-cols-3">
+    // On a phone the cards sit in a row you swipe sideways (the next one peeks in); from tablet width they sit three across.
+    <ul className="reveal no-scrollbar -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible md:px-0 md:pb-0">
       {items.map((it) => (
-        <li key={it.title} className="lift relative flex flex-col items-start gap-4 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white">
+        <li key={it.title} className="lift relative flex w-[82%] shrink-0 snap-center flex-col items-start gap-4 overflow-hidden rounded-[1.25rem] bg-brand p-7 text-white sm:w-[46%] md:w-auto">
           <Bubbles items={["-right-10 -top-10 h-32 w-32 bg-white/10", "right-6 top-20 h-4 w-4 bg-coral", "-bottom-8 right-10 h-20 w-20 border-[10px] border-honey/40"]} />
           <IconCircle name={it.icon} />
           <h3 className="relative mt-2 font-display text-[1.375rem] font-bold leading-tight text-white!">{it.title}</h3>
