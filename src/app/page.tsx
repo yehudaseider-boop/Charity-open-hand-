@@ -104,11 +104,11 @@ export default async function Home() {
           items={[
             { c: "-left-40 -top-40 h-[26rem] w-[26rem] bg-honey-soft" },
             { c: "-right-32 top-24 h-80 w-80 bg-peach" },
-            { c: "left-[12%] top-28 h-6 w-6 bg-coral", anim: "bob" },
-            { c: "left-[8%] top-64 h-10 w-10 border-[4px] border-brand", anim: "bob-slow" },
-            { c: "right-[14%] top-16 h-8 w-8 bg-brand", anim: "bob-slow" },
-            { c: "right-[9%] top-56 h-4 w-4 bg-coral", anim: "bob" },
-            { c: "right-[20%] top-80 h-12 w-12 border-[5px] border-honey", anim: "bob" },
+            { c: "max-md:hidden left-[12%] top-28 h-6 w-6 bg-coral", anim: "bob" },
+            { c: "max-md:hidden left-[8%] top-64 h-10 w-10 border-[4px] border-brand", anim: "bob-slow" },
+            { c: "max-md:hidden right-[14%] top-16 h-8 w-8 bg-brand", anim: "bob-slow" },
+            { c: "max-md:hidden right-[9%] top-56 h-4 w-4 bg-coral", anim: "bob" },
+            { c: "max-md:hidden right-[20%] top-80 h-12 w-12 border-[5px] border-honey", anim: "bob" },
           ]}
         />
       <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
@@ -248,7 +248,7 @@ export default async function Home() {
 
       {/* Soft section: words on the left, stacked white cards on the right */}
       <section className="relative overflow-hidden bg-honey-soft">
-        <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, { c: "right-[40%] top-10 h-6 w-6 bg-coral", anim: "bob" }, "-right-24 -top-24 h-72 w-72 bg-honey", "left-[30%] bottom-8 h-10 w-10 border-[4px] border-brand/40"]} />
+        <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, { c: "right-[40%] top-10 h-6 w-6 bg-coral", anim: "bob" }, "-right-12 -top-12 h-32 w-32 bg-honey md:-right-24 md:-top-24 md:h-72 md:w-72", "max-md:hidden left-[30%] bottom-8 h-10 w-10 border-[4px] border-brand/40"]} />
         <div className="relative mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2">
           <div className="flex flex-col gap-5">
             <h2 className={h2Class}>Your details, kept <Key>private</Key>.</h2>

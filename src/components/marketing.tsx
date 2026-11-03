@@ -275,8 +275,8 @@ export function BlueBand({ children, className = "" }: { children: React.ReactNo
     <div className={`relative overflow-hidden bg-brand ${className}`}>
       <Bubbles
         items={[
-          { c: "-left-24 -top-24 h-72 w-72 bg-coral", anim: "bob-slow" },
-          { c: "-right-20 top-10 h-56 w-56 bg-honey", anim: "bob" },
+          { c: "-left-12 -top-12 h-32 w-32 bg-coral md:-left-24 md:-top-24 md:h-72 md:w-72", anim: "bob-slow" },
+          { c: "-right-12 -top-12 h-28 w-28 bg-honey md:-right-20 md:top-10 md:h-56 md:w-56", anim: "bob" },
           "left-[18%] bottom-10 h-8 w-8 border-[4px] border-honey",
           "right-[22%] top-8 h-5 w-5 bg-coral",
           "left-[45%] top-6 h-3 w-3 bg-white/60",
