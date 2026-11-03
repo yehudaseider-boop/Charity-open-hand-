@@ -19,9 +19,6 @@ import { Bubbles } from "@/components/marketing";
 import { StickyGive } from "@/components/sticky-give";
 import { impactUnitFrom } from "@/lib/charity/impact";
 import { formatRand } from "@/lib/money";
-import { JsonLd } from "@/components/json-ld";
-import { siteOrigin } from "@/lib/request-origin";
-import { charityData } from "@/lib/seo/structured-data";
 
 const loadCharity = cache(async (slug: string) => {
   const supabase = await createClient();
@@ -39,13 +36,13 @@ const loadCharity = cache(async (slug: string) => {
 export async function generateMetadata({ params }: PageProps<"/c/[slug]">): Promise<Metadata> {
   const charity = await loadCharity((await params).slug);
   if (!charity) return {};
-  // What WhatsApp and other apps show when someone shares the page: name and a line about the work. The picture is
-  // this page's opengraph-image (the charity's cover in the Givezy share picture).
+  // What WhatsApp and other apps show when someone shares the page: name, a line about the work, the cover photo.
+  const image = publicImageUrl(charity.cover_path) ?? publicImageUrl(charity.logo_path);
   const description = charity.description_en?.slice(0, 200) ?? `Give to ${charity.name_en} on Givezy.`;
   return {
     title: charity.name_en,
     description,
-    openGraph: { title: `Give to ${charity.name_en}`, description, siteName: "Givezy", locale: "en_ZA", type: "website" },
+    openGraph: { title: `Give to ${charity.name_en}`, description, siteName: "Givezy", locale: "en_ZA", type: "website", images: [{ url: image ?? "/logo.png" }] },
   };
 }
 
@@ -68,34 +65,10 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
   const monogram = initials(charity.name_en);
 
   const give = accepting ? withSource(`/c/${charity.slug}/donate`, src) : null;
-  let site = "";
-  try {
-    site = siteOrigin("");
-  } catch {
-    // SITE_URL not set (local development): no structured data.
-  }
 
   return (
     // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
     <article className="full-bleed overflow-x-clip">
-      {site ? (
-        <JsonLd
-          data={charityData(site, {
-            slug: charity.slug,
-            name: charity.name_en,
-            legalName: charity.legal_name_en,
-            description: charity.description_en,
-            website: charity.website,
-            npoNumber: charity.npo_number,
-            pboNumber: charity.pbo_number,
-            suburb: charity.suburb,
-            city: charity.city,
-            logoUrl: logo,
-            coverUrl: cover,
-            acceptingGifts: accepting,
-          })}
-        />
-      ) : null}
       <div className="mx-auto max-w-[75rem] px-4 pt-4 sm:px-6 sm:pt-6">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element

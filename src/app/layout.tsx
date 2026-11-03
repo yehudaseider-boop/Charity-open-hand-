@@ -4,7 +4,6 @@ import { platformConfig } from "@/config/platform";
 import { PageFooter } from "@/components/page-footer";
 import { RouteMemory } from "@/components/route-memory";
 import { SiteHeader } from "@/components/site-header";
-import { siteIndexable } from "@/lib/seo/indexing";
 import "./globals.css";
 
 // The brand fonts: Bricolage Grotesque for headlines and amounts (from 25/10/2026), DM Sans for everything else.
@@ -16,11 +15,7 @@ export const metadata: Metadata = {
   description: platformConfig.appTagline,
   // Full addresses for link previews (the Givezy logo when a page has no picture of its own).
   ...(process.env.SITE_URL ? { metadataBase: new URL(process.env.SITE_URL) } : {}),
-  // The picture comes from each page's opengraph-image (the Givezy share picture), so none is set here.
-  openGraph: { siteName: platformConfig.appName, locale: "en_ZA", type: "website" },
-  twitter: { card: "summary_large_image" },
-  // Hidden from search engines everywhere except the live site (SITE_INDEXING=yes), so Google never lists the test site.
-  ...(siteIndexable() ? {} : { robots: { index: false, follow: false } }),
+  openGraph: { siteName: platformConfig.appName, locale: "en_ZA", type: "website", images: [{ url: "/logo.png" }] },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };

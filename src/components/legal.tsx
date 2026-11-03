@@ -23,7 +23,7 @@ export function TermsAndPrivacyLinks() {
 }
 
 const footerGroups = [
-  { title: "Give", links: [["Find a charity", "/charities"], ["How it works", "/#how"], ["Questions", "/faq"], ["Your account", "/account"]] },
+  { title: "Give", links: [["Find a charity", "/charities"], ["How it works", "/#how"], ["Your account", "/account"]] },
   { title: "Charities", links: [["For charities", "/for-charities"], ["List your charity", "/apply"], ["Charity sign in", "/login"]] },
   { title: "Your privacy", links: [["Privacy Policy", "/privacy"], ["Terms", "/terms"], ["Your information", "/account/data"]] },
 ] as const;

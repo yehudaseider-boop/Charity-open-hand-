@@ -1500,27 +1500,6 @@ Yehuda shared the "Deupload" landing pages (Figma community) as the feel he want
 - **Notes and tags:** an import can carry one note and tags (the charity's own tags, so the tag filter shows contacts too). Adding notes or tags to a contact afterwards is not built: the note and tag tables are tied to donors who gave.
 - **What the charity confirms (02/11/2026):** each import records which wording the box was ticked under (`charity_contact_imports.confirmation_version`, `CONTACT_CONFIRMATION_VERSION` in `src/lib/charity/contacts.ts`; migration `20261102000003_profile_email_backfill_and_contact_confirmation.sql`, which also copies today's sign-in email onto profiles that fell behind before the 20261102000001 trigger). Version `contacts-2026-11-02` is the checkbox in `contact-forms.tsx`: "These people gave our charity their details themselves, and we may keep them on our list in Givezy. Givezy won't email them." When that wording changes, the version changes with it and the new wording is recorded here.
 
-## 03/11/2026: What search engines, chatbots and link previews see
-
-Searching "Givezy" found nothing of ours, and two similar names abroad (Givzey, a "give now, pay later" company in
-Boston, and Givey, a UK fundraising site). Yehuda said yes to making the site explain itself:
-- **Titles and descriptions:** the home page reads "Givezy: give to South African charities online", tying the name to
-  what we are. Every page keeps its own title.
-- **Share pictures:** every main page and every charity page has its own picture when the link is shared (WhatsApp,
-  LinkedIn, Facebook, X, iMessage), in the Givezy look with the website's unDraw people. A charity's picture shows its
-  cover photo (or its initials) and the s18A tick when it can issue receipts. Built in `src/lib/seo/share-image.tsx`.
-- **Structured data:** Givezy as an organisation with the site's search, each charity as a non-profit with its
-  NPO/PBO numbers, area and give link, and the FAQ. Only facts we can back.
-- **FAQ page (`/faq`, "Questions" in the footer):** draft wording for Yehuda to approve. The answers live in
-  `src/lib/seo/faq.ts` and also feed the structured data and `llms.txt`, so people, search engines and chatbots read
-  the same words. Amounts come from `src/config/platform.ts`.
-- **llms.txt:** a plain guide for AI chatbots and assistants: what Givezy is, the key pages, the FAQ and the list of
-  charities. AI crawlers may read the public pages, like search engines.
-- **The test site is hidden from search engines** (a "noindex" tag on every page) unless `SITE_INDEXING=yes`, which is
-  set on the live site only, at launch (go-live checklist).
-- **Not done here:** pages and links on other sites (LinkedIn, charity websites, SA directories), which chatbots also
-  trust. A "Give with Givezy" button for charities' own websites is a next step.
-
 ## IT3(d) export for SARS (03/11/2026)
 
 Built from SARS's BRS v4.0.0D-10 (copied in `docs/sars/it3d-spec.md`); every choice where the BRS is unclear is in `docs/sars/it3d-decisions.md`.

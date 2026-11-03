@@ -1,8 +1,4 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { JsonLd } from "@/components/json-ld";
-import { siteOrigin } from "@/lib/request-origin";
-import { organisationData } from "@/lib/seo/structured-data";
 import { Info } from "@/components/info";
 import { platformConfig } from "@/config/platform";
 import { Splash } from "@/components/splash";
@@ -20,21 +16,6 @@ import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floatin
 // components/marketing.tsx. Every figure in a picture is a labelled sample; every claim is one we can back today.
 
 const min = formatRand(platformConfig.minDonationCents);
-
-// What Google shows for the home page: the name tied to what Givezy is, so "Givezy" isn't mistaken for a similar name abroad.
-export const metadata: Metadata = {
-  title: { absolute: `${platformConfig.appName}: give to South African charities online` },
-  description: `${platformConfig.appName} is a South African giving platform. Find a registered, checked charity, give from ${min} once or every month, and keep every s18A receipt in one place. No ${platformConfig.appName} fee.`,
-};
-
-/** The site's address for structured data, or nothing before SITE_URL is set (local development). */
-function origin(): string {
-  try {
-    return siteOrigin("");
-  } catch {
-    return "";
-  }
-}
 const minContribution = formatRand(platformConfig.minContributionCents);
 
 function Tick({ className = "stroke-sage" }: { className?: string }) {
@@ -97,7 +78,6 @@ export default async function Home() {
   return (
     // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
     <div className="full-bleed overflow-x-clip">
-      {origin() ? <JsonLd data={organisationData(origin())} /> : null}
       {/* Hero: centred words, then the product window with floating cards */}
       <section className="relative">
         <Bubbles
