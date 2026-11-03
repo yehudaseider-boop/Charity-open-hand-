@@ -15,6 +15,7 @@ const DATABASE_CHANGES: { label: string; table: string; column: string }[] = [
   { label: "Update my card (22/10/2026)", table: "monthly_card_updates", column: "donation_id" },
   { label: "Receipt emails sent once (22/10/2026)", table: "s18a_receipts", column: "email_claimed_at" },
   { label: "Update my card, same page again (22/10/2026)", table: "monthly_card_updates", column: "checkout_url" },
+  { label: "Charities' SARS details for IT3(d) (03/11/2026)", table: "charity_private", column: "tax_reference_number" },
 ];
 
 async function databaseChecks(): Promise<SettingCheck[]> {

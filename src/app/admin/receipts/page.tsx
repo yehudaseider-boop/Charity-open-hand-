@@ -114,7 +114,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
         <Card title="Yearly lists for SARS (draft)">
           <p className="mb-2 text-sm text-muted">
             Every issued receipt for a charity&apos;s tax year, with the last 4 digits of each ID and tax number and anything SARS will want that is missing.
-            A list to check before the IT3(d) submission, not the SARS file itself: that layout comes from SARS and isn&apos;t built yet.
+            A list to check, not the SARS file itself: each charity submits its own IT3(d) from its dashboard (s18A receipts, SARS submission), as an eFiling capture sheet or the SARS data file.
           </p>
           <ul className="divide-y divide-border text-sm">
             {years.map((y) => (

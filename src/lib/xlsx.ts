@@ -10,8 +10,10 @@ import { crc32, deflateRawSync } from "node:zlib";
 export type XlsxCell = string | number | null | undefined;
 
 /** Which columns hold amounts: their cells ("1250.00", from centsToPlain) are written as numbers. */
-export function toXlsx(sheetName: string, header: string[], rows: XlsxCell[][], amountColumns: number[] = []): Buffer {
+export function toXlsx(sheetName: string, header: string[], rows: XlsxCell[][], amountColumns: number[] = [], boldRows: number[] = []): Buffer {
   const amounts = new Set(amountColumns);
+  // Rows (0-based, after the header) shown bold like the header, for a second heading lower down the sheet.
+  const bold = new Set(boldRows.map((i) => i + 1));
   const widths = header.map((h, c) => Math.min(60, Math.max(h.length, ...rows.slice(0, 500).map((r) => String(r[c] ?? "").length)) + 2));
   const ref = (c: number, r: number) => `${colName(c)}${r}`;
   const cell = (v: XlsxCell, c: number, r: number, head: boolean) => {
@@ -21,7 +23,7 @@ export function toXlsx(sheetName: string, header: string[], rows: XlsxCell[][], 
     if (!head && amounts.has(c) && /^-?\d+(\.\d+)?$/.test(s)) return `<c r="${ref(c, r)}" s="2"><v>${s}</v></c>`;
     return `<c r="${ref(c, r)}" t="inlineStr"${head ? ' s="1"' : ""}><is><t xml:space="preserve">${xml(s)}</t></is></c>`;
   };
-  const sheetRows = [header, ...rows].map((row, i) => `<row r="${i + 1}">${row.map((v, c) => cell(v, c, i + 1, i === 0)).join("")}</row>`).join("");
+  const sheetRows = [header, ...rows].map((row, i) => `<row r="${i + 1}">${row.map((v, c) => cell(v, c, i + 1, i === 0 || bold.has(i))).join("")}</row>`).join("");
   const sheet =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +

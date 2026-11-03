@@ -57,12 +57,24 @@ describe("one gift", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.gift).toMatchObject({ date: "2026-03-05", amountCents: 50_000, method: "eft", email: "sarah@example.co.za", wants18a: false, idNumber: null });
   });
-  it("an s18A gift needs what SARS needs: address, and an ID or tax number", () => {
+  it("an s18A gift needs what SARS needs: address, and an SA ID number (the income tax number is optional)", () => {
     const r = checkGift({ ...base, wants_18a: "yes" }, { today });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["address_line1", "city", "id_number", "postal_code"]);
-    const ok = checkGift({ ...base, wants_18a: "Yes", tax_reference: "0123456789", address_line1: "5 Road", city: "Johannesburg", postal_code: "2192" }, { today });
-    expect(ok.ok).toBe(true);
+    const home = { address_line1: "5 Road", city: "Johannesburg", postal_code: "2192" };
+    const taxOnly = checkGift({ ...base, wants_18a: "Yes", tax_reference: "0001339050", ...home }, { today });
+    expect(!taxOnly.ok && taxOnly.errors.id_number).toBe("SA ID number missing (SARS needs it for the s18A receipt)");
+    expect(checkGift({ ...base, wants_18a: "Yes", id_number: "8001015009087", ...home }, { today }).ok).toBe(true);
+    expect(checkGift({ ...base, wants_18a: "Yes", id_number: "8001015009087", tax_reference: "0001339050", ...home }, { today }).ok).toBe(true);
+    const badTax = checkGift({ ...base, wants_18a: "Yes", id_number: "8001015009087", tax_reference: "0001339051", ...home }, { today });
+    expect(!badTax.ok && badTax.errors.tax_reference).toMatch(/doesn't look right/);
+  });
+  it("a company's registration number for a receipt must be a CIPC number (SARS Appendix K); a trust's just not empty", () => {
+    const org = { date: "05/03/2026", amount: "500", method: "eft", email: "a@b.co.za", wants_18a: "yes", organisation_name: "Acme", address_line1: "1 Rd", city: "Jhb", postal_code: "2000" };
+    const bad = checkGift({ ...org, donor_type: "company", registration_number: "K123" }, { today });
+    expect(!bad.ok && bad.errors.registration_number).toMatch(/CIPC/);
+    expect(checkGift({ ...org, donor_type: "company", registration_number: "2015/123456/07" }, { today }).ok).toBe(true);
+    expect(checkGift({ ...org, donor_type: "trust", registration_number: "IT1234/2015" }, { today }).ok).toBe(true);
   });
   it("a company needs its name, and its registration number for a receipt", () => {
     const r = checkGift({ date: "05/03/2026", amount: "500", method: "eft", donor_type: "company", email: "a@b.co.za", wants_18a: "yes", address_line1: "1 Rd", city: "Jhb", postal_code: "2000" }, { today });

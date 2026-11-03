@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidSaIdNumber } from "@/lib/sa-id";
+import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
 import { cleanDedicationName, parseDedication } from "./dedication";
 import { cleanLabel } from "./labels";
 
@@ -62,23 +63,30 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   } else {
     if (!v.organisation_name) e.organisation_name = "Enter the registered name";
     if (!v.contact_person) e.contact_person = "Enter a contact person";
-    if (want18a && !v.registration_number) e.registration_number = "Needed for an s18A receipt";
+    // SARS reports a company by its CIPC number (Appendix K) and a trust by its Master's number (decided 03/11/2026).
+    if (want18a && !v.registration_number?.trim()) e.registration_number = "Needed for an s18A receipt";
+    else if (want18a && v.donor_type === "company" && !isValidCompanyRegistration(v.registration_number!, new Date())) {
+      e.registration_number = "Use the company's CIPC number, for example 2015/123456/07";
+    }
   }
 
   if (v.phone && !/^(\+27|0)\d{9}$/.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
 
-  // s18A details: an ID or income tax number, and the donor's address (section 18A(2) asks for the
-  // donor's name and address on the receipt; the receipt job refuses one without it).
+  // s18A details: the donor's address (section 18A(2) asks for the donor's name and address on the receipt; the
+  // receipt job refuses one without it), and a person's SA ID number, which SARS needs to report the receipt
+  // (decided 03/11/2026: the ID number is required, the income tax number optional).
   if (want18a) {
     if (!v.address_line1) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
     if (!v.city) e.city = "Enter your city or town";
     if (!v.postal_code) e.postal_code = "Enter your postal code";
     else if (!/^\d{4}$/.test(v.postal_code)) e.postal_code = "Postal codes are 4 digits";
     if (v.donor_type === "individual") {
-      if (!v.id_number && !v.tax_reference) e.id_number = "Enter your SA ID number or income tax number";
-      if (v.id_number && !isValidSaIdNumber(v.id_number)) e.id_number = "That doesn't look like a valid SA ID number";
+      if (!v.id_number) e.id_number = "Enter your SA ID number. SARS needs it for an s18A receipt";
+      else if (!isValidSaIdNumber(v.id_number)) e.id_number = "That doesn't look like a valid SA ID number";
     }
-    if (v.tax_reference && !/^\d{10}$/.test(v.tax_reference)) e.tax_reference = "Income tax numbers are 10 digits";
+    const tax = v.tax_reference?.replace(/\s/g, "");
+    if (tax && !/^\d{10}$/.test(tax)) e.tax_reference = "Income tax numbers are 10 digits";
+    else if (tax && !passesModulus10(tax)) e.tax_reference = "That income tax number doesn't look right. Check the 10 digits, or leave it empty";
   }
 
   const dedication = parseDedication(v.dedication_kind, v.dedication_name);

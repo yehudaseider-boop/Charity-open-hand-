@@ -53,7 +53,8 @@ export function RecordGiftForm({
         ) : (
           <>
             <TextField name="organisation_name" label="Registered name" required maxLength={200} />
-            <TextField name="registration_number" label="Registration number" required={wants} maxLength={40} />
+            <TextField name="registration_number" label="Registration number" required={wants} maxLength={40}
+              hint={donorType === "trust" ? "The trust number, for example IT1234/2015." : "The CIPC number, for example 2015/123456/07."} />
           </>
         )}
         <TextField name="email" label="Email" type="email" required hint="Their s18A receipt is emailed here." maxLength={254} />
@@ -72,8 +73,8 @@ export function RecordGiftForm({
           <>
             {donorType === "individual" ? (
               <>
-                <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or the income tax number below." maxLength={20} />
-                <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={20} />
+                <TextField name="id_number" label="SA ID number" required inputMode="numeric" hint="13 digits. SARS needs it to report the s18A receipt." maxLength={20} />
+                <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={20} hint="10 digits, if they gave you one." />
               </>
             ) : null}
             <TextField name="address_line1" label="Street address" required maxLength={200} />

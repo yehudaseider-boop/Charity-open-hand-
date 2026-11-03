@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
 import { ActionLink, PageHeader, table } from "@/components/dash";
@@ -65,7 +66,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
   return (
     <div className="space-y-5">
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/receipts`} />
-      <PageHeader title="s18A receipts" />
+      <PageHeader title="s18A receipts" actions={issuedYears.length ? <ActionLink href={`/charity-admin/${id}/receipts/sars`}>SARS submission (IT3(d))</ActionLink> : undefined} />
       {sp.receipt === "unavailable" ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">That s18A receipt PDF isn&apos;t available. It may have been withdrawn, or its PDF is not ready yet.</p> : null}
       {canIssue18a(charity) ? (
         <Notice>
@@ -113,10 +114,11 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
       ) : null}
 
       {issuedYears.length ? (
-        <Card lights title="Yearly list (draft)">
+        <Card lights title="Yearly list">
           <p className="mb-2 text-sm text-muted">
-            Every s18A receipt issued for a tax year, with what SARS will want that is missing (an address, or an ID or tax number).
-            For your records and to check before the year&apos;s SARS submission. It shows whether an ID or tax number is on file, never the number.
+            Every s18A receipt issued for a tax year, with what SARS will want that is missing (an address, or an ID number).
+            For your records. It shows whether an ID or tax number is on file, never the number. The files for SARS itself are on{" "}
+            <Link href={`/charity-admin/${id}/receipts/sars`} className="text-brand underline">SARS submission (IT3(d))</Link>.
           </p>
           <ul className="divide-y divide-border text-sm">
             {issuedYears.map((y) => (

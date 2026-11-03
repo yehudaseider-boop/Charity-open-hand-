@@ -42,7 +42,8 @@ export type ActionKind =
   | "member_removed"
   | "appeal_sent"
   | "contacts_imported"
-  | "contacts_removed";
+  | "contacts_removed"
+  | "sars_details_saved";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
 export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed"];
@@ -96,6 +97,8 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       return { what: "Your organisation details are saved.", next: { label: "Next: your address", href: app("address") } };
     case "address_saved":
       return { what: "Your address is saved.", next: { label: "Next: your contact person", href: app("contact") } };
+    case "sars_details_saved":
+      return { what: "Your charity's SARS details are saved. They go in your IT3(d) files from now on.", next: { label: "Check your SARS submission again", href: `${c.base}/receipts/sars` } };
     case "contact_saved":
       return c.approved
         ? { what: `Your contact person is saved. We'll email ${d.email ? String(d.email) : "them"} about your charity.`, next: { label: "Back to your overview", href: c.base } }
@@ -201,6 +204,7 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "organisation_saved": return "Taken back. Your organisation details are as they were before.";
     case "address_saved": return "Taken back. Your address is as it was before.";
     case "contact_saved": return "Taken back. Your previous contact person is back.";
+    case "sars_details_saved": return "Taken back. Your charity's SARS details are as they were before.";
     case "bank_saved": return "Taken back. Your previous bank details are back. We still check them before you go live.";
     case "document_uploaded": return `Taken back. ${quote(d.fileName)} is removed.`;
     case "document_removed": return `Taken back. ${quote(d.fileName)} is back.`;
@@ -227,7 +231,7 @@ export function pageOf(kind: ActionKind): string {
   if (kind.startsWith("update_") || kind.startsWith("photo_")) return "updates";
   if (kind === "thank_you_sent") return "thank-donors";
   if (kind === "donor_thanked" || kind === "contacts_imported" || kind === "contacts_removed") return "donors";
-  if (kind === "receipts_approved") return "receipts";
+  if (kind === "receipts_approved" || kind === "sars_details_saved") return "receipts";
   if (kind === "gift_recorded" || kind === "gifts_imported" || kind === "gifts_removed") return "donations";
   if (kind === "member_added" || kind === "member_removed") return "team";
   if (kind === "appeal_sent") return "email-donors";
@@ -245,7 +249,7 @@ const KINDS = new Set<ActionKind>([
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
   "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
   "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
-  "contacts_imported", "contacts_removed",
+  "contacts_imported", "contacts_removed", "sars_details_saved",
 ]);
 
 /** Undo is offered while it is recent, not yet taken back, and the action stored what it needs. */
