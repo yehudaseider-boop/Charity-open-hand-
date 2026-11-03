@@ -34,7 +34,7 @@ export default async function ImportGiftsPage({ params }: PageProps<"/charity-ad
         <ul className="list-disc space-y-1 pl-5 text-sm">
           <li><span className="font-medium">Date</span> (dd/mm/yyyy), <span className="font-medium">Amount</span> (1250 or 1250.00) and <span className="font-medium">Email</span> on every row.</li>
           <li>The donor&apos;s first name and surname, or the organisation&apos;s name.</li>
-          <li>For an s18A receipt: <span className="font-medium">s18A</span> set to yes, their SA ID or income tax number, and their address.</li>
+          <li>For an s18A receipt: <span className="font-medium">s18A</span> set to yes, their SA ID number (a company&apos;s CIPC number or a trust&apos;s number), and their address. The income tax number is optional.</li>
           <li>Optional: method, campaign (its exact title), phone, and a reference (the bank reference stops the same gift being imported twice).</li>
         </ul>
         <div className="mt-4">

@@ -92,7 +92,7 @@ export async function undoAction(charityId: string, id: string, userId: string, 
   if (!canUndo(row, now)) return { ok: false, why: row.undone_at ? "gone" : "late", row };
   if (APPLICATION_KINDS.includes(row.kind) && !editable(charityStatus)) return { ok: false, why: "locked", row };
   // Team changes are the owner's alone (Yehuda, 21/10/2026).
-  if ((row.undo.type === "remove_member" || row.undo.type === "remove_contacts" || row.kind === "bank_saved") && (await memberRole(charityId, userId)) !== "owner") return { ok: false, why: "owner", row };
+  if ((row.undo.type === "remove_member" || row.undo.type === "remove_contacts" || row.kind === "bank_saved" || row.kind === "sars_details_saved") && (await memberRole(charityId, userId)) !== "owner") return { ok: false, why: "owner", row };
 
   const db = createAdminClient();
   // Claim it first, so two taps (or two admins) can't take it back twice.

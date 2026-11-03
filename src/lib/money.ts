@@ -59,3 +59,14 @@ export function formatPpmAsPercent(ppm: number): string {
   const frac = (ppm % 10_000).toString().padStart(4, "0").replace(/0+$/, "");
   return frac ? `${whole}.${frac}%` : `${whole}%`;
 }
+
+/**
+ * Cents as a plain Rand amount with exactly two decimals, as SARS's IT3(d) file wants it (field 510, BRS p.234):
+ * a full stop, no thousands separator, no currency sign, no leading zeros, and "0.50" below one Rand.
+ * 0 -> "0.00", 50 -> "0.50", 125000 -> "1250.00", 3457 -> "34.57". Whole cents only; never negative here.
+ */
+export function centsToRandDecimal(cents: number | bigint): string {
+  const value = BigInt(cents);
+  if (value < 0n) throw new Error("A Rand value for SARS can't be negative");
+  return `${value / 100n}.${(value % 100n).toString().padStart(2, "0")}`;
+}

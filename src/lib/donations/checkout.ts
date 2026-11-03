@@ -119,7 +119,7 @@ export async function startDonation(args: {
 
   let input = args.input;
   const saved = args.useSavedIdOf;
-  if (saved && input.wants_18a === "on" && input.donor_type === "individual" && !input.id_number && !input.tax_reference) {
+  if (saved && input.wants_18a === "on" && input.donor_type === "individual" && !input.id_number) {
     const mismatch = "Your saved ID number goes with your account's email address. Use that email, or type the number.";
     if (saved.email.trim().toLowerCase() !== input.email.trim().toLowerCase()) return { ok: false, message: mismatch, fieldErrors: { id_number: mismatch } };
     const id = await savedIdNumber(saved.userId);

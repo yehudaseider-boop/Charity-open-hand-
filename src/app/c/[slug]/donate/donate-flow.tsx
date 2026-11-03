@@ -405,7 +405,8 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
             "Myself" and a company or trust keeps what was typed in each. */}
         <fieldset hidden={!org} disabled={!org} className="space-y-5">
           <TextField name="organisation_name" label={donorType === "trust" ? "Trust name" : "Company name"} required autoComplete="organization" maxLength={200} />
-          <TextField name="registration_number" label="Registration number" required={want18a} maxLength={40} />
+          <TextField name="registration_number" label="Registration number" required={want18a} maxLength={40}
+            hint={donorType === "trust" ? "The trust number from the Master of the High Court, for example IT1234/2015." : "The CIPC number, for example 2015/123456/07."} />
           <TextField name="contact_person" label="Contact person" required autoComplete="name" maxLength={120} />
         </fieldset>
         <fieldset hidden={org} disabled={org} className="space-y-5">
@@ -454,9 +455,9 @@ function DetailsStep({ slug, charityName, receiptsAvailable, quote, stale, check
                 {/* Hidden and disabled rather than removed, so a number typed here survives switching back and forth. */}
                 <fieldset hidden={!idBoxesShown} disabled={!idBoxesShown} className="space-y-3">
                   <fieldset hidden={org} disabled={org}>
-                    <TextField name="id_number" label="SA ID number" inputMode="numeric" hint="Or give your income tax number below." maxLength={17} />
+                    <TextField name="id_number" label="SA ID number" required={want18a && !org} inputMode="numeric" hint="13 digits. SARS needs it to match your s18A receipt to you." maxLength={17} />
                   </fieldset>
-                  <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={10} hint={org ? "If you have one." : "10 digits. Needed if you don't give your ID number."} />
+                  <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={10} hint="10 digits, if you have one." />
                 </fieldset>
                 <fieldset className="space-y-3">
                   <legend className="text-sm font-semibold">{org ? "Registered address" : "Your address"}</legend>

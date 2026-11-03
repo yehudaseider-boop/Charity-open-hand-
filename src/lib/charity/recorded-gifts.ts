@@ -9,6 +9,7 @@ import { taxYearFor } from "@/lib/dates";
 import { typedDay } from "@/lib/typed-date";
 import { formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { isValidSaIdNumber } from "@/lib/sa-id";
+import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
 
 export const RECORDED_METHODS = {
   eft: "EFT (bank transfer)",
@@ -173,14 +174,19 @@ export function checkGift(f: GiftFields, opts: { today: string; fallbackMethod?:
   const postalCode = (f.postal_code ?? "").trim() || null;
   if (idNumber && !isValidSaIdNumber(idNumber)) e.id_number = "That isn't a valid SA ID number";
   if (taxReference && !/^\d{10}$/.test(taxReference)) e.tax_reference = "Income tax numbers are 10 digits";
+  else if (taxReference && !passesModulus10(taxReference)) e.tax_reference = "That income tax number doesn't look right. Check the 10 digits, or leave it empty";
   if (postalCode && !/^\d{4}$/.test(postalCode)) e.postal_code = "Postal codes are 4 digits";
   if (wants18a) {
     // What SARS needs on the receipt (section 18A(2)): the donor's name and address, and who they are.
     if (!addressLine1) e.address_line1 = "Street address missing (needed on the s18A receipt)";
     if (!city) e.city = "City or town missing (needed on the s18A receipt)";
     if (!postalCode) e.postal_code = "Postal code missing (needed on the s18A receipt)";
-    if (donorType === "individual" && !idNumber && !taxReference) e.id_number = "An SA ID number or income tax number is needed for the s18A receipt";
+    // SARS needs a person's SA ID number to report the receipt; the income tax number is optional (decided 03/11/2026).
+    if (donorType === "individual" && !idNumber) e.id_number = "SA ID number missing (SARS needs it for the s18A receipt)";
     if (donorType && donorType !== "individual" && !registrationNumber) e.registration_number = "Registration number missing (needed on the s18A receipt)";
+    else if (donorType === "company" && registrationNumber && !isValidCompanyRegistration(registrationNumber, new Date())) {
+      e.registration_number = "Use the company's CIPC number, for example 2015/123456/07";
+    }
   }
 
   if (Object.keys(e).length) return { ok: false, errors: e };

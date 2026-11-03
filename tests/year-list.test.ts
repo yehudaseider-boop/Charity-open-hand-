@@ -17,7 +17,8 @@ describe("the yearly receipt list (draft for SARS)", () => {
   it("flags what SARS will want that is missing", () => {
     expect(gaps(details({}))).toEqual([]);
     expect(gaps(details({ id_number_last4: null }))).toEqual(["no ID or income tax number"]);
-    expect(gaps(details({ id_number_last4: null, tax_reference_last4: "1234" }))).toEqual([]);
+    // An income tax number alone can't be reported in the IT3(d) file (decided 03/11/2026).
+    expect(gaps(details({ id_number_last4: null, tax_reference_last4: "1234" }))).toEqual(["no ID number (SARS needs it; only an income tax number)"]);
     expect(gaps(details({ donor_type: "company", name: "Acme", id_number_last4: null, registration_number: "2020/123456/07" }))).toEqual([]);
     expect(gaps(details({ donor_type: "trust", name: "", id_number_last4: null, address: [] }))).toEqual(["no donor name", "no donor address", "no registration or income tax number"]);
   });

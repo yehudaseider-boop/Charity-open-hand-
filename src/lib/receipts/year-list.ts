@@ -1,7 +1,7 @@
 /**
- * The yearly list of issued s18A receipts for one charity (22/10/2026): a DRAFT to check before the
- * SARS submission (IT3(d)), not the SARS file itself. That file's layout comes from SARS and is not
- * built yet. Pure (tested); whole cents only.
+ * The yearly list of issued s18A receipts for one charity (22/10/2026): a list to check, not the SARS file
+ * itself. The IT3(d) file and the eFiling capture sheet are built in it3d.ts (03/11/2026) and downloaded by
+ * the charity's owner from SARS submission. Pure (tested); whole cents only.
  *
  * Two versions: Givezy's (Admin) shows the last 4 digits of the donor's ID and tax numbers, as printed on
  * the receipt; the charity's shows only whether one is on file, because charities never see any part of
@@ -22,6 +22,8 @@ export function gaps(d: ReceiptDetails): string[] {
   const person = d.donor.donor_type === "individual";
   const identity = person ? d.donor.id_number_last4 || d.donor.tax_reference_last4 : d.donor.registration_number || d.donor.tax_reference_last4;
   if (!identity) out.push(person ? "no ID or income tax number" : "no registration or income tax number");
+  // SARS reports a person by their SA ID number (IT3(d) field 412): an income tax number alone can't be reported.
+  else if (person && !d.donor.id_number_last4) out.push("no ID number (SARS needs it; only an income tax number)");
   return out;
 }
 

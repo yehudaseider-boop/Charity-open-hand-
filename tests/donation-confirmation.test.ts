@@ -33,9 +33,10 @@ describe("s18A details", () => {
 
   const home = { address_line1: "12 Main Road", city: "Johannesburg", postal_code: "2195" };
 
-  it("needs an ID number or a tax number, and the donor's address (SARS asks for it), but not a phone", () => {
+  it("needs an SA ID number (an income tax number alone is not enough, decided 03/11/2026) and the donor's address, but not a phone", () => {
     expect(checkDonorDetails(person({ ...home }), true)).toHaveProperty("id_number");
-    expect(checkDonorDetails(person({ ...home, tax_reference: "0123456789" }), true)).toEqual({});
+    expect(checkDonorDetails(person({ ...home, tax_reference: "0001339050" }), true)).toEqual({ id_number: "Enter your SA ID number. SARS needs it for an s18A receipt" });
+    expect(checkDonorDetails(person({ ...home, id_number: "8001015009087", tax_reference: "0001339050" }), true)).toEqual({});
     expect(checkDonorDetails(person({ ...home, id_number: "8001015009087" }), true)).toEqual({});
     expect(Object.keys(checkDonorDetails(person({ id_number: "8001015009087" }), true)).sort()).toEqual(["address_line1", "city", "postal_code"]);
     expect(checkDonorDetails(person({ ...home, id_number: "8001015009087", postal_code: "21" }), true)).toEqual({ postal_code: "Postal codes are 4 digits" });
@@ -49,6 +50,22 @@ describe("s18A details", () => {
   it("still checks the numbers that are given", () => {
     expect(checkDonorDetails(person({ id_number: "8001015009080" }), true)).toHaveProperty("id_number");
     expect(checkDonorDetails(person({ tax_reference: "123" }), true)).toHaveProperty("tax_reference");
+  });
+
+  it("checks an income tax number with SARS's Modulus 10 when one is given", () => {
+    const ok = { ...home, id_number: "8001015009087" };
+    expect(checkDonorDetails(person({ ...ok, tax_reference: "0001339051" }), true)).toEqual({ tax_reference: "That income tax number doesn't look right. Check the 10 digits, or leave it empty" });
+    expect(checkDonorDetails(person({ ...ok, tax_reference: "000 133 9050" }), true)).toEqual({});
+  });
+
+  it("asks a company for its CIPC number and a trust for any registration number", () => {
+    const org = (type: "company" | "trust", reg?: string) =>
+      checkoutSchema.parse({ donor_type: type, email: "a@b.co.za", organisation_name: "Acme", contact_person: "A B", age_confirmed: "on", popia_consent: "on", wants_18a: "on", ...home, ...(reg ? { registration_number: reg } : {}) });
+    expect(checkDonorDetails(org("company"), true)).toEqual({ registration_number: "Needed for an s18A receipt" });
+    expect(checkDonorDetails(org("company", "12345"), true)).toEqual({ registration_number: "Use the company's CIPC number, for example 2015/123456/07" });
+    expect(checkDonorDetails(org("company", "2015/123456/07"), true)).toEqual({});
+    expect(checkDonorDetails(org("trust"), true)).toEqual({ registration_number: "Needed for an s18A receipt" });
+    expect(checkDonorDetails(org("trust", "IT1234/2015"), true)).toEqual({});
   });
 });
 
