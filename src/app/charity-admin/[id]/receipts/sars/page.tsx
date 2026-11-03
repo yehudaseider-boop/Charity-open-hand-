@@ -101,8 +101,9 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
 
       {result.nil ? (
         <EmptyState title="No s18A receipts in this period">
-          If SARS asks for a nil declaration, it is done on eFiling, not with this file. Receipts are issued once a year, after the tax year ends,
-          so the first six months of a tax year that hasn&apos;t ended has none yet.
+          SARS asks for two IT3(d) submissions a year: the first six months by 31 October and the full tax year by 31 May (check the dates with
+          your accountant). Receipts on Givezy are issued once a year, after the tax year ends, so the first six months usually has none: SARS then
+          wants a nil declaration, which is done on eFiling, not with this file.
         </EmptyState>
       ) : (
         <Card title="What goes to SARS">

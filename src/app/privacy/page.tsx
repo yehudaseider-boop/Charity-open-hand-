@@ -33,7 +33,7 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="What we collect">
-        <p><strong>When you donate:</strong> your name (or your organisation&apos;s name and contact person), email address, and optionally your phone number and a message to the charity. If you ask for an s18A receipt, your SA ID number or income tax number (or your organisation&apos;s registration number).</p>
+        <p><strong>When you donate:</strong> your name (or your organisation&apos;s name and contact person), email address, and optionally your phone number and a message to the charity. If you ask for an s18A receipt, your SA ID number and, if you give it, your income tax number (or your organisation&apos;s registration number), and your address.</p>
         <p><strong>Your giving records:</strong> each donation&apos;s amount, date and charity, any contribution to {name}, and any private label you gave it for your own records (for example Work giving or Family).</p>
         <p><strong>When you sign in:</strong> your email address. Admins of charities and of {name} also set up an authenticator app.</p>
         <p><strong>When a charity applies:</strong> the organisation&apos;s registration details, contact person, bank account and supporting documents.</p>
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
 
       <Section title="Who we share it with">
         <ul className="list-disc space-y-1 pl-5">
-          <li><strong>The charity you give to:</strong> your name, contact details, the amount, your message and whether you asked for an s18A receipt, so it can record your donation. It does not see your ID or tax number, your private labels, or any contribution to {name}. Choosing &quot;anonymous&quot; hides your name from public pages, not from the charity.</li>
+          <li><strong>The charity you give to:</strong> your name, contact details, the amount, your message and whether you asked for an s18A receipt, so it can record your donation. It does not see your ID or tax number on {name}, your private labels, or any contribution to {name}. The one exception is the law: a charity that issues s18A receipts must report each receipt to SARS (its IT3(d) return), with the donor&apos;s name, ID or registration number and address. The charity&apos;s owner can download that report from {name} for that purpose only. Choosing &quot;anonymous&quot; hides your name from public pages, not from the charity.</li>
           <li><strong>Our payment provider:</strong> what it needs to take your payment. {show(null)} (to be named once chosen).</li>
           <li><strong>Our service providers</strong> who host our database and send our emails, under contracts that require them to protect it. {show(null)} (list to be confirmed).</li>
           <li><strong>The South African Revenue Service</strong>, or others, only where the law requires it.</li>
