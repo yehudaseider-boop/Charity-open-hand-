@@ -1511,7 +1511,7 @@ Boston, and Givey, a UK fundraising site). Yehuda said yes to making the site ex
   cover photo (or its initials) and the s18A tick when it can issue receipts. Built in `src/lib/seo/share-image.tsx`.
 - **Structured data:** Givezy as an organisation with the site's search, each charity as a non-profit with its
   NPO/PBO numbers, area and give link, and the FAQ. Only facts we can back.
-- **FAQ page (`/faq`, "Questions" in the footer):** draft wording for Yehuda to approve. The answers live in
+- **FAQ page (`/faq`, "Questions" in the footer):** wording approved by Yehuda, 03/11/2026. The answers live in
   `src/lib/seo/faq.ts` and also feed the structured data and `llms.txt`, so people, search engines and chatbots read
   the same words. Amounts come from `src/config/platform.ts`.
 - **llms.txt:** a plain guide for AI chatbots and assistants: what Givezy is, the key pages, the FAQ and the list of

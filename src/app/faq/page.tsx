@@ -7,7 +7,7 @@ import { platformConfig } from "@/config/platform";
 import { allFaqs, charityFaqs, donorFaqs, type Faq } from "@/lib/seo/faq";
 import { faqData } from "@/lib/seo/structured-data";
 
-// Questions about Givezy (draft 03/11/2026, Yehuda to approve). The answers come from lib/seo/faq.ts, which also
+// Questions about Givezy (wording approved by Yehuda, 03/11/2026). The answers come from lib/seo/faq.ts, which also
 // feeds this page's structured data and llms.txt, so search engines, chatbots and people all read the same words.
 
 export const metadata: Metadata = {
