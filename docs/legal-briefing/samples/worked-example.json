@@ -1,0 +1,43 @@
+{
+  "cardChargeRates": null,
+  "noContribution": {
+    "amountCents": 50000,
+    "contributionCents": 0,
+    "cardChargeCents": 0,
+    "totalCents": 50000,
+    "shown": {
+      "amountCents": "R500",
+      "contributionCents": "R0",
+      "cardChargeCents": "R0",
+      "totalCents": "R500"
+    }
+  },
+  "withContribution": {
+    "amountCents": 50000,
+    "contributionCents": 5000,
+    "cardChargeCents": 0,
+    "totalCents": 55000,
+    "shown": {
+      "amountCents": "R500",
+      "contributionCents": "R50",
+      "cardChargeCents": "R0",
+      "totalCents": "R550"
+    }
+  },
+  "contributionBelowMinimum": "The contribution is below the minimum.",
+  "config": {
+    "minDonation": "R30",
+    "minContribution": "R10",
+    "maxDonation": "R1 000 000",
+    "vat": {
+      "enabled": false,
+      "ratePercent": "15"
+    },
+    "fees": {
+      "gatewayChargePaidBy": "charity",
+      "gatewayPercent": null,
+      "gatewayFixedCents": null,
+      "gatewayRatesIncludeVat": null
+    }
+  }
+}

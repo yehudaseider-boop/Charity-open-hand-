@@ -1,0 +1,54 @@
+{
+  "charity": {
+    "legal_name_en": "Sample Charity Trust (fictional)",
+    "npo_number": null,
+    "pbo_number": "SAMPLE-PBO-000",
+    "s18a_reference": "SAMPLE-18A-000",
+    "address": [
+      "1 Example Street",
+      "Sampleton",
+      "Johannesburg",
+      "2000"
+    ]
+  },
+  "donor": {
+    "donor_type": "individual",
+    "name": "Sample Donor",
+    "registration_number": null,
+    "id_number_last4": "3089",
+    "tax_reference_last4": null,
+    "address": [
+      "2 Example Road",
+      "Sampleton",
+      "Johannesburg",
+      "2000"
+    ]
+  },
+  "donations": [
+    {
+      "date": "14/06/2025",
+      "amount_cents": 50000,
+      "reference": "GZ-11111111",
+      "nature": "Card (online)"
+    },
+    {
+      "date": "20/11/2025",
+      "amount_cents": 123457,
+      "reference": "GZ-22222222",
+      "nature": "Card (online)"
+    },
+    {
+      "date": "10/02/2026",
+      "amount_cents": 30000,
+      "reference": "GZ-33333333",
+      "nature": "EFT (bank transfer)"
+    }
+  ],
+  "tax_year": 2026,
+  "period": "01/03/2025 to 28/02/2026",
+  "wording": {
+    "title": "Section 18A receipt",
+    "statement": "This receipt is issued by Sample Charity Trust (fictional) for the purposes of section 18A of the Income Tax Act, 1962, for the donations listed on this receipt, received during 01/03/2025 to 28/02/2026. Sample Charity Trust (fictional) confirms that these donations have been or will be used exclusively for the objects of the organisation in carrying on its public benefit activities."
+  },
+  "issued_on": "05/03/2026"
+}

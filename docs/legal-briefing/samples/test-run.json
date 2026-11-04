@@ -1,0 +1,1 @@
+{"files":111,"filesPassed":110,"failedFile":"tests/featured.test.ts","passed":964,"skipped":3,"totalFiles":136,"dbFiles":26,"dbCases":205,"fullRun":false,"command":"npm run test:no-db","date":"04/11/2026"}
