@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 /** The public pages that are always there. Sign-in, admin, confirmation and receipt pages stay out (see robots.ts). */
-const FIXED = ["", "/charities", "/for-charities", "/privacy", "/terms"];
+const FIXED = ["", "/charities", "/for-charities", "/faq", "/privacy", "/terms"];
 
 /** Every public page and every approved charity's page, for search engines. */
 export function sitemapEntries(origin: string, charities: { slug: string; updated_at: string | null }[]): MetadataRoute.Sitemap {

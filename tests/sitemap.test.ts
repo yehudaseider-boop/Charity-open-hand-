@@ -9,6 +9,7 @@ describe("the site map", () => {
       "https://givezy.test/",
       "https://givezy.test/charities",
       "https://givezy.test/for-charities",
+      "https://givezy.test/faq",
       "https://givezy.test/privacy",
       "https://givezy.test/terms",
       "https://givezy.test/c/meals-fund",
