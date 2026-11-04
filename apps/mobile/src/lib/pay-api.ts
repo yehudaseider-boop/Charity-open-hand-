@@ -25,6 +25,8 @@ export type DonorDetails = {
   last_name: string;
   phone?: string;
   wants_18a?: boolean;
+  /** "Add my details after paying": the gift goes ahead, and the SA ID number and address are added from the account. */
+  s18a_when?: "now" | "later";
   id_number?: string;
   tax_reference?: string;
   address_line1?: string;

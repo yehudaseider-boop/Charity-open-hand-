@@ -41,6 +41,8 @@ export const appCheckoutSchema = appQuoteSchema.extend({
     contact_person: z.string().max(120).optional(),
     phone: z.string().max(20).optional(),
     wants_18a: flag,
+    /** "Add my details after paying" (04/11/2026): the ID number and address are added later from the account. */
+    s18a_when: z.enum(["now", "later"]).optional(),
     id_number: z.string().max(20).optional(),
     tax_reference: z.string().max(20).optional(),
     address_line1: z.string().max(200).optional(),

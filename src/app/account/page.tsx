@@ -14,6 +14,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { loadTaxPack } from "@/lib/tax-pack/load";
 import type { TaxPack } from "@/lib/tax-pack/build";
 import { DECLINED_REASON, NEW_CARD_NOT_REUSABLE } from "@/lib/donations/monthly-reasons";
+import { listS18aToComplete, type GiftNeedingS18a } from "@/lib/donations/s18a-complete";
+import { missingWords } from "@/lib/donations/s18a-details";
+import { S18aDetailsForm } from "@/components/s18a-details-form";
 
 export const metadata: Metadata = { title: "Account", robots: { index: false, follow: false } };
 
@@ -52,7 +55,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const sourceIds = (monthlyGifts ?? []).filter((m) => m.wants_18a && (m.status === "active" || m.status === "paused")).map((m) => m.first_donation_id as string | null).filter((x): x is string => Boolean(x));
   const sourceDetails = new Map<string, SourceDetails>();
   if (sourceIds.length) {
-    const { data } = await createAdminClient().from("donation_checkout_details").select("donation_id, donor_type, id_number_encrypted, erased_at").in("donation_id", sourceIds);
+    const { data } = await createAdminClient().from("donation_checkout_details").select("donation_id, donor_type, id_number_encrypted, tax_reference_encrypted, address_line1, erased_at").in("donation_id", sourceIds);
     for (const d of data ?? []) sourceDetails.set(d.donation_id as string, d);
   }
 
@@ -66,6 +69,15 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
     giving = "unavailable";
   }
   const recent = giving && giving !== "unavailable" ? [...giving.lines].reverse().slice(0, 5) : [];
+
+  // Gifts paid with "Add my details after paying" whose s18A details are still to come (decided 04/11/2026).
+  let needS18a: GiftNeedingS18a[] | "unavailable" = [];
+  try {
+    needS18a = await listS18aToComplete(viewer.userId);
+  } catch (e) {
+    console.error(e);
+    needS18a = "unavailable";
+  }
 
   return (
     // full-bleed: the header band runs edge to edge, like a charity's dashboard (see globals.css).
@@ -137,6 +149,40 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           </div>
         )}
       </section>
+
+      {needS18a === "unavailable" ? (
+        <section className="space-y-2 rounded-card border-2 border-border bg-surface p-5 sm:p-6">
+          <h2 className="font-display text-xl font-bold text-indigo">s18A details still needed</h2>
+          <p className="text-sm text-muted" role="status">We couldn&apos;t check whether any of your gifts still need s18A details. Nothing has changed. Refresh the page to try again.</p>
+        </section>
+      ) : needS18a.length > 0 ? (
+        <section id="s18a-details" aria-labelledby="s18a-needed" className="space-y-3 rounded-card border-2 border-brand bg-surface p-5 sm:p-6">
+          <h2 id="s18a-needed" className="font-display text-xl font-bold text-indigo">s18A details still needed</h2>
+          <p className="text-sm text-muted">
+            You asked for an s18A receipt and chose to add your details after paying. Until you add them, {needS18a.length === 1 ? "this gift" : "these gifts"} can&apos;t go on your s18A receipt. Receipts are issued after the tax year ends on the last day of February.
+          </p>
+          <ul className="space-y-3">
+            {needS18a.map((g) => (
+              <li key={g.id} className="rounded-control border-2 border-border p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-semibold">{g.charityName}</span>
+                    <span className="text-muted">{formatDate(g.paidAt)}{g.recurringId ? " · Monthly" : ""}</span>
+                  </span>
+                  <span className="shrink-0 font-bold tabular-nums">{formatRand(g.amountCents)}</span>
+                </div>
+                <p className="mt-1 text-navy">Still needed: {missingWords(g.missing)}.{g.recurringId ? " Saving them covers this monthly donation's other gifts too." : ""}</p>
+                <details className="mt-2">
+                  <summary className="inline-flex min-h-11 cursor-pointer items-center font-bold text-brand underline underline-offset-4">Add my details</summary>
+                  <div className="mt-2">
+                    <S18aDetailsForm donationId={g.id} donorType={g.donorType} missing={g.missing} />
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {monthlyFailed ? (
         <section className="rounded-card border-2 border-border bg-surface p-5 sm:p-6 space-y-2">

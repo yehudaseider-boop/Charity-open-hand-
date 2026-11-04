@@ -118,7 +118,7 @@ export default function Give() {
   // Starts from the label passed in, else the one used last time at this charity (an older link's ?kind= is ignored).
   const startLabel = cleanLabel(labelParam) || (slug ? lastLabel(history, slug) : null);
   const [label, setLabel] = useState<string | null>(startLabel);
-  // The optional extras (monthly, label, phone, anonymous, message, dedication, save card), closed unless something is already chosen.
+  // The optional extras (monthly, label, anonymous, message, dedication, save card), closed unless something is already chosen.
   const [more, setMore] = useState(Boolean(startLabel));
   const labelSuggestions = useLabelSuggestions();
   const [monthly, setMonthly] = useState(false);
@@ -130,11 +130,12 @@ export default function Give() {
   // What was typed, else the account's address (which may arrive after this screen opened from a link).
   const [emailTyped, setEmail] = useState<string | null>(null);
   const email = emailTyped ?? account.email ?? "";
-  const [phone, setPhone] = useState("");
   const [remember, setRemember] = useState(false);
   const [remembered, setRemembered] = useState<RememberedDetails | null>(null);
   const [editingDetails, setEditingDetails] = useState(false);
   const [want18a, setWant18a] = useState(false);
+  // Take the gift first, the s18A details after (decided 04/11/2026): "After paying" unless a saved ID number makes "Now" one tap.
+  const [s18aWhen, setS18aWhen] = useState<"now" | "later" | null>(null);
   const [idNumber, setIdNumber] = useState("");
   // The donor's address, for the s18A receipt (SARS asks for it). With "my ID ending 1234" it can be left
   // empty: the server then uses the address from that same earlier gift.
@@ -183,7 +184,7 @@ export default function Give() {
   const attemptRef = useRef<string | null>(null);
   // Paid (or finished and being confirmed), shown here for donors whose giving history won't show it.
   const [done, setDone] = useState<SentGift | null>(null);
-  const typedSomething = Boolean(amount || first || last || emailTyped || phone || idNumber || street || suburb || town || postal || note || extraAmount);
+  const typedSomething = Boolean(amount || first || last || emailTyped || idNumber || street || suburb || town || postal || note || extraAmount);
   const heldOne = heldAttempt !== null;
   const isDone = done !== null;
   // Leaving by the back gesture or the hardware button: ask first when something typed would be lost,
@@ -213,7 +214,6 @@ export default function Give() {
       setFirst(d.first_name);
       setLast(d.last_name);
       setEmail(d.email);
-      setPhone(d.phone);
     });
     return () => {
       live = false;
@@ -234,7 +234,8 @@ export default function Give() {
     };
   }, [slug, campaignParam, readyAttempt, accessToken, site]);
 
-  const websiteUrl = slug ? donateUrl(SITE_URL, slug, label, campaignParam) : null;
+  // Giving on the website: the amount and monthly choice made here go along, so the website starts with them.
+  const websiteUrl = slug ? donateUrl(SITE_URL, slug, label, campaignParam, { amountCents: parseRandToCents(amount), monthly }) : null;
   // The preview and the demo always show the form (nothing is charged there); live, the switch decides.
   const closedHere = !preview && (!GIVE_IN_APP || (ready && !ready.ok && ready.closed));
   if (closedHere) {
@@ -338,7 +339,8 @@ export default function Give() {
   const authorised = isMonthly && total !== null && authorisedTotal === total;
   const s18aAvailable = server ? server.receiptsAvailable : charity.issues18a;
   const savedLast4 = server?.savedIdLast4 ?? null;
-  const usingSavedId = s18aAvailable && want18a && Boolean(savedLast4) && useSavedId;
+  const detailsLater = s18aAvailable && want18a && (s18aWhen ?? (savedLast4 ? "now" : "later")) === "later";
+  const usingSavedId = s18aAvailable && want18a && !detailsLater && Boolean(savedLast4) && useSavedId;
   const showDetailFields = !remembered || editingDetails;
   // Saved cards need a signed-in donor giving with their account's own email, and a once-off gift (monthly gifts are set up on the payment page).
   // Design review: ?demo=card shows the saved-card choices in the preview, which has no server.
@@ -358,7 +360,7 @@ export default function Give() {
     const badges = [
       firstEver ? "First gift on Givezy" : null,
       wasMonthly ? "Monthly giver" : null,
-      s18aAvailable && want18a ? "s18A receipt at tax time" : null,
+      s18aAvailable && want18a ? (detailsLater ? "s18A details still to add, from your account on our website" : "s18A receipt at tax time") : null,
       pr && goal ? `Counts towards ${goal.name}` : null,
     ].filter((b): b is string => Boolean(b));
     const inviteNow = (demo === "invite" && !site) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift, confirming });
@@ -404,9 +406,11 @@ export default function Give() {
     if (!first.trim()) e.first_name = "Enter your first name";
     if (!last.trim()) e.last_name = "Enter your surname";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
-    if (s18aAvailable && want18a && !usingSavedId && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
+    if (detailsLater) {
+      // Nothing to check now: the details are added after paying, from the account on our website.
+    } else if (s18aAvailable && want18a && !usingSavedId && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
     else if (s18aAvailable && want18a && !usingSavedId && !isValidSaIdNumber(idNumber)) e.id_number = "That doesn't look like a valid SA ID number. Check the 13 digits";
-    if (s18aAvailable && want18a && !usingSavedId) {
+    if (s18aAvailable && want18a && !usingSavedId && !detailsLater) {
       if (!street.trim()) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
       if (!town.trim()) e.city = "Enter your city or town";
       if (!/^\d{4}$/.test(postal.trim())) e.postal_code = "Enter your 4-digit postal code";
@@ -460,13 +464,13 @@ export default function Give() {
       email: email.trim(),
       first_name: first.trim(),
       last_name: last.trim(),
-      phone: phone.trim() || undefined,
       wants_18a: s18aAvailable && want18a,
-      id_number: s18aAvailable && want18a && !usingSavedId ? idNumber.trim() || undefined : undefined,
-      address_line1: s18aAvailable && want18a ? street.trim() || undefined : undefined,
-      suburb: s18aAvailable && want18a ? suburb.trim() || undefined : undefined,
-      city: s18aAvailable && want18a ? town.trim() || undefined : undefined,
-      postal_code: s18aAvailable && want18a ? postal.trim() || undefined : undefined,
+      s18a_when: detailsLater ? ("later" as const) : undefined,
+      id_number: s18aAvailable && want18a && !usingSavedId && !detailsLater ? idNumber.trim() || undefined : undefined,
+      address_line1: s18aAvailable && want18a && !detailsLater ? street.trim() || undefined : undefined,
+      suburb: s18aAvailable && want18a && !detailsLater ? suburb.trim() || undefined : undefined,
+      city: s18aAvailable && want18a && !detailsLater ? town.trim() || undefined : undefined,
+      postal_code: s18aAvailable && want18a && !detailsLater ? postal.trim() || undefined : undefined,
       message: note.trim() || undefined,
       giving_label: cleanLabel(label) ?? undefined,
       is_anonymous: anonymous,
@@ -563,7 +567,8 @@ export default function Give() {
       if (r.quote) setAuthorisedTotal(null);
       return;
     }
-    const mine = { first_name: details.first_name, last_name: details.last_name, email: details.email, phone: details.phone ?? "" };
+    // The phone number is no longer asked on the give screen (04/11/2026); a number remembered earlier is dropped.
+    const mine = { first_name: details.first_name, last_name: details.last_name, email: details.email, phone: "" };
     if (remember) await saveDetails(account.userId, mine);
     else if (remembered) await forgetDetails(account.userId);
 
@@ -646,14 +651,13 @@ export default function Give() {
   const locked = busy !== false || heldAttempt !== null;
   const chosenExtras = [
     label ? `Label: ${label}` : null,
-    phone.trim() ? "Phone" : null,
     anonymous ? "Anonymous" : null,
     noNews ? "No news" : null,
     note.trim() ? "Message" : null,
     dedicating ? "Dedication" : null,
     saveCard ? "Save card" : null,
   ].filter((x): x is string => Boolean(x));
-  const moreSummary = chosenExtras.length ? `On: ${chosenExtras.join(", ")}` : `label, phone, message, anonymous, dedication`;
+  const moreSummary = chosenExtras.length ? `On: ${chosenExtras.join(", ")}` : `label, message, anonymous, dedication`;
   const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card…" : "Opening the payment page…") : busy === "checking" ? "Checking your payment…" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
   // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
   const goalLabel = goal?.counts?.[0] ?? null;
@@ -822,8 +826,23 @@ export default function Give() {
 
           {s18aAvailable ? (
             <View style={[styles.softCard, { gap: 18 }]} onLayout={at("s18a")}>
-              <SwitchRow label="I want an s18A receipt" description="For your tax return. This charity can issue them." value={want18a} onChange={setWant18a} />
-              {want18a && savedLast4 ? (
+              <SwitchRow label="I'd like an s18A receipt" description="For your tax return. This charity can issue them." value={want18a} onChange={setWant18a} />
+              {want18a ? (
+                <View style={{ gap: 8 }}>
+                  <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="When to add your s18A details">
+                    {(["later", "now"] as const).map((when) => {
+                      const on = (when === "later") === detailsLater;
+                      return (
+                        <Pressable key={when} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setS18aWhen(when); }} style={[styles.chip, on && styles.chipOn]}>
+                          <Text style={[styles.chipText, on && { color: colors.onInk }]}>{when === "later" ? "Add my details after paying" : "Add them now"}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {detailsLater ? <Text variant="label">After paying, add your SA ID number and address from your Givezy account on our website. Until then this gift can&apos;t go on your s18A receipt.</Text> : null}
+                </View>
+              ) : null}
+              {want18a && !detailsLater && savedLast4 ? (
                 <View style={{ gap: 8 }}>
                   <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Your ID number">
                     {([true, false] as const).map((saved) => {
@@ -839,8 +858,8 @@ export default function Give() {
                   {useSavedId && err("id_number") ? <Text variant="label" style={{ color: colors.danger }}>{err("id_number")}</Text> : null}
                 </View>
               ) : null}
-              {want18a && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" maxLength={13} error={err("id_number")} helper="13 digits. Kept safely on our server for your receipt, never on this phone." /> : null}
-              {want18a ? (
+              {want18a && !detailsLater && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" maxLength={13} error={err("id_number")} helper="13 digits. Kept safely on our server for your receipt, never on this phone." /> : null}
+              {want18a && !detailsLater ? (
                 <View style={{ gap: 10 }}>
                   <Text variant="label">
                     Your address. SARS needs it on the receipt.{usingSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
@@ -895,8 +914,7 @@ export default function Give() {
 
                 {showDetailFields ? (
                   <>
-                    <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" error={err("phone")} />
-                    <SwitchRow label="Remember my details on this phone" description="Your name, email and phone, so next time you don't type them. Never your ID number." value={remember} onChange={setRemember} />
+                    <SwitchRow label="Remember my details on this phone" description="Your name and email, so next time you don't type them. Never your ID number." value={remember} onChange={setRemember} />
                   </>
                 ) : null}
             <SwitchRow

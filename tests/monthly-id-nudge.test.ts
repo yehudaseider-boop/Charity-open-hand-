@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { cleanSaIdNumber, giftsToUpdate, needsIdNudge, NUDGE_TEXT, SAVED_TEXT, CONFIRM_TEXT } from "@/lib/donations/monthly-id-nudge";
 
 const live = { status: "active", wants_18a: true, first_donation_id: "d-first" };
-const noId = { donor_type: "individual", id_number_encrypted: null, erased_at: null };
+const noId = { donor_type: "individual", id_number_encrypted: null, tax_reference_encrypted: "v1.tax", address_line1: "5 Rissik Street", erased_at: null };
 
 describe("who is asked for an ID number", () => {
   it("an active or paused s18A monthly donation of an individual with no ID number", () => {
@@ -23,6 +23,11 @@ describe("who is asked for an ID number", () => {
     expect(needsIdNudge(live, { ...noId, erased_at: "2026-11-01T00:00:00Z" })).toBe(false);
     expect(needsIdNudge(live, null)).toBe(false);
     expect(needsIdNudge(live, undefined)).toBe(false);
+  });
+  it("not for a monthly donation set up with \"Add my details after paying\": the s18A details form covers it, so one gift never shows two ID forms", () => {
+    expect(needsIdNudge(live, { ...noId, tax_reference_encrypted: null, address_line1: null })).toBe(false);
+    expect(needsIdNudge(live, { ...noId, tax_reference_encrypted: null })).toBe(false);
+    expect(needsIdNudge(live, { ...noId, address_line1: null })).toBe(false);
   });
 });
 

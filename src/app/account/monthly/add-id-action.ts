@@ -8,6 +8,7 @@ import { cleanSaIdNumber, giftsToUpdate, needsIdNudge, SAVED_TEXT } from "@/lib/
 import type { FormState } from "@/lib/form";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { onIssuedReceipt as onIssuedReceiptOf } from "@/lib/donations/s18a-complete";
 
 const TRY_AGAIN = "We couldn't save your ID number. Nothing has changed. Please try again.";
 
@@ -41,7 +42,7 @@ export async function addMonthlyId(_prev: FormState, formData: FormData): Promis
   if (!rec || !donorIds.has(rec.donor_id as string)) return { ok: false, message: "We couldn't find that monthly donation on your account. Nothing has changed." };
   const { data: source, error: sourceError } = await db
     .from("donation_checkout_details")
-    .select("donation_id, donor_type, id_number_encrypted, erased_at")
+    .select("donation_id, donor_type, id_number_encrypted, tax_reference_encrypted, address_line1, erased_at")
     .eq("donation_id", rec.first_donation_id ?? "")
     .maybeSingle();
   if (sourceError) return { ok: false, message: TRY_AGAIN };
@@ -65,11 +66,9 @@ export async function addMonthlyId(_prev: FormState, formData: FormData): Promis
     .eq("tax_year", thisYear);
   if (giftsError) return { ok: false, message: TRY_AGAIN };
   const candidateIds = (gifts ?? []).map((g) => g.id as string);
-  const { data: links, error: linksError } = candidateIds.length
-    ? await db.from("s18a_receipt_donations").select("donation_id, s18a_receipts!inner(status)").in("donation_id", candidateIds).eq("s18a_receipts.status", "issued")
-    : { data: [], error: null };
-  if (linksError) return { ok: false, message: TRY_AGAIN };
-  const onIssuedReceipt = new Set((links ?? []).map((l) => l.donation_id as string));
+  // Shared with "Add my details after paying" (s18a-complete.ts): a gift on an issued receipt is never changed.
+  const onIssuedReceipt = await onIssuedReceiptOf(db, candidateIds).catch(() => null);
+  if (!onIssuedReceipt) return { ok: false, message: TRY_AGAIN };
   const targets = new Set(giftsToUpdate((gifts ?? []) as Parameters<typeof giftsToUpdate>[0], { recurringId, donorIds, taxYear: thisYear, onIssuedReceipt }));
   // The source details every new monthly gift is copied from, first: once this is in, no new gift goes out without the ID.
   targets.add(source!.donation_id as string);

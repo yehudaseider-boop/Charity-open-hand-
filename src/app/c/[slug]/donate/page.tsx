@@ -8,7 +8,9 @@ import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
 import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { cleanLabel } from "@/lib/donations/labels";
-import { formatRand, parseRandToCents } from "@/lib/money";
+import { formatRand } from "@/lib/money";
+import { readGiveLink } from "@/lib/donations/give-link";
+import { preselectedAmount } from "@/lib/charity/suggested-amounts";
 import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { sourceTag, withSource } from "@/lib/donations/source";
@@ -35,17 +37,16 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   const sp = await searchParams;
   const fromApp = sp.from === "app";
   const initialLabel = cleanLabel(sp.label) ?? undefined;
-  // Trying again after a declined card keeps the amount the donor chose (our links carry it in cents). A
-  // phone that sends the amount box before the page has finished loading sends what was typed, in Rand.
-  const again =
-    typeof sp.cents === "string" && /^\d{1,12}$/.test(sp.cents) ? Number(sp.cents)
-    : typeof sp.amount === "string" ? (parseRandToCents(sp.amount.slice(0, 16)) ?? 0)
-    : 0;
-  const initialAmountCents = again > 0 && again <= platformConfig.maxDonationCents ? again : undefined;
+  // A give link can preselect the amount and a monthly gift (?amount=250&monthly=1, decided 04/11/2026); trying
+  // again after a declined card keeps the amount the donor chose (our links carry it in cents). A silly value is
+  // ignored quietly and the page starts as usual.
+  const link = readGiveLink(sp, platformConfig);
   const charity = await loadCharity(slug);
   if (!charity) notFound();
   // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift).
   const campaign = typeof sp.campaign === "string" ? (await loadOpenCampaigns(charity.id)).find((c) => c.id === sp.campaign) : undefined;
+  // Otherwise one of the charity's own amounts starts selected (Givezy never suggests a figure of its own).
+  const initialAmountCents = link.amountCents ?? preselectedAmount(charity.suggestedCents, platformConfig);
   const viewer = await getViewer();
   const account = viewer?.email ? { email: viewer.email, savedIdLast4: charity.receiptsAvailable ? await savedIdLast4(viewer.userId) : null } : undefined;
 
@@ -70,11 +71,13 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           contributionMinimumLabel={formatRand(platformConfig.minContributionCents)}
           initialLabel={initialLabel}
           initialAmountCents={initialAmountCents}
+          initialMonthly={link.monthly && !campaign}
           fromApp={fromApp}
           campaign={campaign ? { id: campaign.id, title: campaign.title } : undefined}
           account={account}
           source={sourceTag(sp.src)}
           cardChargeAvailable={cardChargeRates() !== null}
+          singleAgreementTick={platformConfig.checkout.singleAgreementTick}
         />
       ) : (
         <Card><p className="text-sm">{charity.name_en} isn&apos;t taking online donations yet.</p></Card>

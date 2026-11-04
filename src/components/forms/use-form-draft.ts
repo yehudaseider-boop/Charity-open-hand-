@@ -7,7 +7,7 @@ import { useEffect, type RefObject } from "react";
 const NEVER = /id_number|tax_number|tax_reference|registration_number|passport|consent|agree|terms|card|^website$/i;
 const KEEP_FOR_MS = 2 * 60 * 60 * 1000;
 /** The few choices that decide which boxes show (who is giving, whether they want an s18A receipt, a dedication). */
-const CHOICES = /^(donor_type|wants_18a|dedication_kind)$/;
+const CHOICES = /^(donor_type|wants_18a|s18a_when|dedication_kind)$/;
 
 function draftStoreKey(key: string): string {
   return `gz_draft:${key}`;
@@ -46,7 +46,8 @@ export function useFormDraft(form: RefObject<HTMLFormElement | null>, key: strin
     const storeKey = draftStoreKey(key);
     const fields = () =>
       [...el.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input[name], textarea[name]")].filter(
-        (f) => !NEVER.test(f.name) && (f instanceof HTMLTextAreaElement || ["text", "email", "tel", ""].includes(f.type)),
+        // `data-no-draft`: a box the page fills itself (the amount comes back in the address instead).
+        (f) => !NEVER.test(f.name) && !f.hasAttribute("data-no-draft") && (f instanceof HTMLTextAreaElement || ["text", "email", "tel", ""].includes(f.type)),
       );
     const choiceInputs = () => [...el.querySelectorAll<HTMLInputElement>("input[type=radio][name], input[type=checkbox][name]")].filter((f) => CHOICES.test(f.name));
     try {

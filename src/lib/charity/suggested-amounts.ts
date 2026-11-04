@@ -40,3 +40,16 @@ export function tapAmounts(own: number[], charity: number[], max = MAX_SUGGESTED
   }
   return out;
 }
+
+/**
+ * The amount the website's give form starts with (decided 04/11/2026: one of the charity's own amounts is
+ * preselected): the middle one of three, the first of one or two. With none, nothing is preselected (Givezy never
+ * suggests a figure of its own), and the donor types the amount. With `limits` (the platform's minimum and maximum,
+ * passed in so this file stays dependency-free), amounts outside them are skipped.
+ */
+export function preselectedAmount(charity: number[], limits?: { minDonationCents: number; maxDonationCents: number }): number | undefined {
+  // Only an amount the server will take: one outside the platform's minimum and maximum is never preselected.
+  const list = charity.filter((c) => Number.isInteger(c) && c > 0 && (!limits || (c >= limits.minDonationCents && c <= limits.maxDonationCents)));
+  if (!list.length) return undefined;
+  return list[Math.floor((list.length - 1) / 2)];
+}

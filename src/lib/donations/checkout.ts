@@ -3,9 +3,7 @@ import { randomUUID } from "node:crypto";
 import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
-import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { getGateway, GatewayError, isGatewayRefusal } from "@/lib/gateway";
-import { formatRand } from "@/lib/money";
 import { savedAddress, savedIdNumber } from "./saved-id";
 import { savedCardsOpen } from "./app-api";
 import { loadSavedCardToken, requestCardSave } from "./saved-card";
@@ -14,54 +12,17 @@ import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
-import { cardChargeRates } from "./card-charge";
+import { checkShownTotal, type Quote } from "./quote";
 import { issueConfirmationToken, reissueConfirmationToken } from "./confirmation-access";
 import { chargeDayOf } from "./schedule";
 import { cameFromOf } from "./source";
 import { optOutAtCheckout } from "@/lib/charity/appeals";
-import { checkDonorDetails, givingLabelOf, type CheckoutInput } from "./validation";
+import { checkDonorDetails, givingLabelOf, s18aDetailsLater, type CheckoutInput } from "./validation";
 import { isUuid } from "@/lib/ids";
 import { parseDedication } from "./dedication";
 
-export type Quote = Pricing;
-
-export type QuoteResult =
-  /** `cardChargeOffer`: what "cover the card charge" would add to this gift, or null when the box doesn't show (no provider rates yet). */
-  | { ok: true; quote: Quote; cardChargeOffer: number | null }
-  | { ok: false; message: string };
-
-const minimums = {
-  minDonationCents: platformConfig.minDonationCents,
-  minContributionCents: platformConfig.minContributionCents,
-  maxDonationCents: platformConfig.maxDonationCents,
-};
-
-function feeErrorMessage(e: FeeError): string {
-  if (e.code === "above_maximum") {
-    return `The most you can give online in one go is ${formatRand(platformConfig.maxDonationCents)}. Check the amount, or for a bigger gift please contact the charity directly.`;
-  }
-  if (e.code === "below_minimum") return `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.`;
-  if (e.code === "contribution_below_minimum") {
-    return `The minimum contribution to ${platformConfig.appName} is ${formatRand(platformConfig.minContributionCents)}.`;
-  }
-  return e.message;
-}
-
-/**
- * Work out what the donor will pay: the donation plus any contribution, plus the card charge when the donor ticked
- * "cover the card charge" and the provider's rates are known. No fees.
- */
-export function quoteDonation(giftCents: number, contributionCents: number, coverCardCharge = false): QuoteResult {
-  try {
-    const rates = cardChargeRates();
-    const quote = priceDonation(giftCents, contributionCents, minimums, coverCardCharge ? rates : null);
-    const cardChargeOffer = rates ? (quote.cardChargeCents || priceDonation(giftCents, contributionCents, minimums, rates).cardChargeCents) : null;
-    return { ok: true, quote, cardChargeOffer };
-  } catch (e) {
-    if (e instanceof FeeError) return { ok: false, message: feeErrorMessage(e) };
-    throw e;
-  }
-}
+// The pricing itself is shared with the give form's live total (quote.ts), so both always agree.
+export { quoteDonation, type Quote, type QuoteResult } from "./quote";
 
 export type StartResult =
   /** `reference` and `token` let the phone app ask whether this payment went through (api/app/status). */
@@ -119,7 +80,7 @@ export async function startDonation(args: {
 
   let input = args.input;
   const saved = args.useSavedIdOf;
-  if (saved && input.wants_18a === "on" && input.donor_type === "individual" && !input.id_number) {
+  if (saved && input.wants_18a === "on" && input.s18a_when !== "later" && input.donor_type === "individual" && !input.id_number) {
     const mismatch = "Your saved ID number goes with your account's email address. Use that email, or type the number.";
     if (saved.email.trim().toLowerCase() !== input.email.trim().toLowerCase()) return { ok: false, message: mismatch, fieldErrors: { id_number: mismatch } };
     const id = await savedIdNumber(saved.userId);
@@ -157,12 +118,10 @@ export async function startDonation(args: {
   if (args.campaignId && !campaign) return { ok: false, message: "This campaign has ended. You can still give to the charity.", campaignEnded: true };
   if (campaign && input.monthly === "on") return { ok: false, message: "Campaign gifts are once-off. Switch off monthly giving, or give monthly to the charity itself." };
 
-  const quoted = quoteDonation(args.giftCents, args.contributionCents, args.coverCardCharge);
-  if (!quoted.ok) return { ok: false, message: quoted.message };
-  const fees = quoted.quote;
-  if (fees.totalCents !== args.shownTotalCents) {
-    return { ok: false, message: `The total is now ${formatRand(fees.totalCents)}. Please confirm again.`, quote: fees };
-  }
+  // Never charge a total the donor did not see: stop, say so plainly, and show the new figures (the form keeps everything typed).
+  const checked = checkShownTotal(args.giftCents, args.contributionCents, Boolean(args.coverCardCharge), args.shownTotalCents);
+  if (!checked.ok) return checked.quote ? { ok: false, message: checked.message, quote: checked.quote } : { ok: false, message: checked.message };
+  const fees = checked.quote;
 
   // Only attempts that would reach the payment page count. One email gets 5 tries in 10 minutes;
   // one address gets more, because an office's Wi-Fi or a mobile network puts many donors behind it.
@@ -173,6 +132,9 @@ export async function startDonation(args: {
 
   const v = input;
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
+  // "Add my details after paying": an s18A gift whose ID or registration number and address come later (thank-you
+  // page or account). Nothing of them is kept from this form, so the receipt waits for the donor's own entry.
+  const detailsNow = want18a && !s18aDetailsLater(v, charity.receiptsAvailable);
   // Already checked in checkDonorDetails, so here it is a dedication or none.
   const parsedDedication = parseDedication(v.dedication_kind, v.dedication_name);
   const dedication = parsedDedication && !("error" in parsedDedication) ? parsedDedication : null;
@@ -204,7 +166,7 @@ export async function startDonation(args: {
       return { ok: true, charged: true, reference: attemptId, token: await reissueConfirmationToken(attemptId) };
     }
   }
-  const donorId = await findOrCreateDonor(v, want18a);
+  const donorId = await findOrCreateDonor(v, detailsNow);
   // Signed in with this same (confirmed) email: the donation joins their account now,
   // not at their next sign-in. Never for a different address.
   try {
@@ -286,7 +248,7 @@ export async function startDonation(args: {
     registration_number: v.registration_number ?? null,
     contact_person: v.contact_person ?? null,
     phone: v.phone ?? null,
-    ...(want18a
+    ...(detailsNow
       ? {
           receipt_identity: receiptIdentity({
             donorType: v.donor_type,

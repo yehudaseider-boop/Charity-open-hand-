@@ -10,6 +10,7 @@ import { buildReceiptHtml } from "./html";
 import { receiptDonorName } from "./details";
 import { runReceiptsJob, type JobSummary } from "./issue";
 import { planReceipts, type PlannedReceipt } from "./plan";
+import { completionWindow, inCompletionWindow } from "@/lib/donations/s18a-details";
 import { supabaseReceiptStore } from "./store";
 
 /**
@@ -38,7 +39,19 @@ const RUN_COLUMNS = "id, charity_id, tax_year, status, plan_fingerprint, receipt
 
 /** One line of the list a charity approves: who gets a receipt, for how many gifts, for how much. */
 export type PlanLine = { donorName: string; gifts: number; totalCents: number };
-export type Plan = { taxYear: number; lines: PlanLine[]; totalCents: number; fingerprint: string };
+/**
+ * A gift that asked for an s18A receipt but whose donor chose "Add my details after paying" and hasn't yet:
+ * not on the list until they do (decided 04/11/2026). Shown to the charity and to Givezy, never receipted as is.
+ */
+export type DetailsMissingLine = {
+  donorName: string;
+  paidAt: string;
+  amountCents: number;
+  missing: string[];
+  /** Inside the window for adding details on Givezy (this tax year, or the one just closed until 31 May). */
+  canAddOnGivezy: boolean;
+};
+export type Plan = { taxYear: number; lines: PlanLine[]; totalCents: number; fingerprint: string; detailsMissing: DetailsMissingLine[] };
 
 /**
  * A fingerprint of exactly what would be issued: each receipt's donor, identity, donations and amount.
@@ -62,19 +75,31 @@ const store = () => supabaseReceiptStore(createAdminClient());
  * issuing job, with each donor's name from their latest gift (as the receipt prints it). A few queries
  * in all, however many donors, because the charity opens this page often.
  */
-export async function loadPlan(charityId: string, taxYear: number): Promise<Plan> {
+export async function loadPlan(charityId: string, taxYear: number, now: Date = new Date()): Promise<Plan> {
   const s = store();
   const donations = await s.listDonations(taxYear, charityId);
   const charities = await s.listCharities([...new Set(donations.map((d) => d.charityId))]);
-  const { receipts } = planReceipts({ taxYear, donations, charities, alreadyReceipted: await s.receiptedDonationIds(taxYear) });
-  const names = await namesByDonation(receipts.flatMap((r) => r.donationIds));
+  const { receipts, skipped } = planReceipts({ taxYear, donations, charities, alreadyReceipted: await s.receiptedDonationIds(taxYear) });
+  const held = skipped.filter((k) => k.reason === "details_missing").map((k) => k.donationId);
+  const window = completionWindow(now);
+  const names = await namesByDonation([...receipts.flatMap((r) => r.donationIds), ...held]);
+  const byId = new Map(donations.map((d) => [d.id, d]));
+  const detailsMissing = held
+    .map((id) => ({
+      donorName: names.get(id)?.name || "Name missing",
+      paidAt: names.get(id)?.paidAt ?? "",
+      amountCents: byId.get(id)?.amountCents ?? 0,
+      missing: byId.get(id)?.detailsMissing ?? [],
+      canAddOnGivezy: inCompletionWindow(byId.get(id)?.taxYear ?? taxYear, window),
+    }))
+    .sort((a, b) => a.donorName.localeCompare(b.donorName, "en-ZA") || a.paidAt.localeCompare(b.paidAt));
   const lines = receipts
     .map((r) => {
       const latest = r.donationIds.map((id) => names.get(id)).filter((n) => n !== undefined).sort((a, b) => b.paidAt.localeCompare(a.paidAt))[0];
       return { donorName: latest?.name || "Name missing", gifts: r.donationIds.length, totalCents: r.totalCents };
     })
     .sort((a, b) => a.donorName.localeCompare(b.donorName, "en-ZA"));
-  return { taxYear, lines, totalCents: lines.reduce((t, l) => t + l.totalCents, 0), fingerprint: fingerprintPlan(receipts) };
+  return { taxYear, lines, totalCents: lines.reduce((t, l) => t + l.totalCents, 0), fingerprint: fingerprintPlan(receipts), detailsMissing };
 }
 
 /** The donor name typed with each donation, and when it was paid. */

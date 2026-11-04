@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
+import { s18aDetailsMissing, type S18aDetailsRow } from "./s18a-details";
 import { NOT_REUSABLE } from "./recurring";
 
 /**
@@ -42,13 +43,14 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
   try {
     const { data: d, error } = await createAdminClient()
       .from("donations")
-      .select("id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_checkout_details(email)")
+      .select("id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_checkout_details(email, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
       .eq("id", donationId)
       .single();
     if (error) throw error;
     const charity = d.charities as unknown as { name_en: string };
-    const details = d.donation_checkout_details as unknown as { email: string } | { email: string }[] | null;
-    const email = (Array.isArray(details) ? details[0] : details)?.email;
+    const details = d.donation_checkout_details as unknown as (S18aDetailsRow & { email: string }) | (S18aDetailsRow & { email: string })[] | null;
+    const row = Array.isArray(details) ? details[0] : details;
+    const email = row?.email;
     if (!email || !d.paid_at) return true;
     let monthly: Parameters<typeof confirmationEmail>[0]["monthly"];
     if (d.recurring_id) {
@@ -74,6 +76,9 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
       totalCents: Number(d.total_charged_cents),
       paidAt: d.paid_at,
       wants18a: d.wants_18a,
+      // "Add my details after paying": the email says how to add them (the thank-you page's link isn't in an email).
+      s18aDetailsMissing: Boolean(d.wants_18a && row && row.donor_type && s18aDetailsMissing(row).length),
+      accountUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
       dedication: (() => {
         const ded = dedicationFrom(d.dedication_kind, d.dedication_name);
         return ded ? dedicationLine(ded) : null;

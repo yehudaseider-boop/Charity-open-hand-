@@ -57,10 +57,27 @@ export const platformConfig = {
   taxYear: {
     /** SA tax year starts 1 March (month 3) and ends end of February. */
     startMonth: 3,
+    /**
+     * "Add my details after paying" (decided 04/11/2026 by Yehuda's CTO): a donor may add missing s18A details to a
+     * gift of the tax year just closed only until this day (Johannesburg time) of the year it closed, the date the
+     * annual IT3(d) return is due. The date is from accounting-firm and PBO-support sources, not SARS's own page:
+     * confirm it with the accountant (go-live list).
+     */
+    lateDetailsUntil: { month: 5, day: 31 },
   },
 
   donor: {
     minimumAge: 18,
+  },
+
+  checkout: {
+    /**
+     * One tick on the website's give form instead of two: "I'm 18 or older and I agree to the Terms and Privacy
+     * Policy, and that my details are shared with {charity} so they can record my donation." It records the same
+     * agreements as the two ticks (decided 04/11/2026).
+     * Turn on once Yosef approves the wording (go-live list).
+     */
+    singleAgreementTick: false as boolean,
   },
 } as const;
 

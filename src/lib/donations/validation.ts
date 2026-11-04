@@ -26,6 +26,11 @@ export const checkoutSchema = z.object({
   contact_person: line(120, "the contact person"),
   phone: str(20, "the phone number"),
   wants_18a: yes,
+  /**
+   * With an s18A receipt: give the details now, or "Add my details after paying" (decided 04/11/2026). After
+   * paying, the ID or registration number and the address are added on the thank-you page or from the account.
+   */
+  s18a_when: z.enum(["now", "later"]).optional(),
   id_number: str(20, "the ID number"),
   tax_reference: str(20, "the income tax number"),
   address_line1: line(200, "the street address"),
@@ -56,6 +61,8 @@ export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean): Record<string, string> {
   const e: Record<string, string> = {};
   const want18a = receiptsAvailable && v.wants_18a === "on";
+  // "Add my details after paying": the gift goes ahead without them (the receipt waits until they are added).
+  const detailsNow = want18a && !s18aDetailsLater(v, receiptsAvailable);
 
   if (v.donor_type === "individual") {
     if (!v.first_name) e.first_name = "Enter your first name";
@@ -64,8 +71,8 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
     if (!v.organisation_name) e.organisation_name = "Enter the registered name";
     if (!v.contact_person) e.contact_person = "Enter a contact person";
     // SARS reports a company by its CIPC number (Appendix K) and a trust by its Master's number (decided 03/11/2026).
-    if (want18a && !v.registration_number?.trim()) e.registration_number = "Needed for an s18A receipt";
-    else if (want18a && v.donor_type === "company" && !isValidCompanyRegistration(v.registration_number!, new Date())) {
+    if (detailsNow && !v.registration_number?.trim()) e.registration_number = "Needed for an s18A receipt";
+    else if (want18a && v.registration_number?.trim() && v.donor_type === "company" && !isValidCompanyRegistration(v.registration_number, new Date())) {
       e.registration_number = "Use the company's CIPC number, for example 2015/123456/07";
     }
   }
@@ -75,7 +82,7 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   // s18A details: the donor's address (section 18A(2) asks for the donor's name and address on the receipt; the
   // receipt job refuses one without it), and a person's SA ID number, which SARS needs to report the receipt
   // (decided 03/11/2026: the ID number is required, the income tax number optional).
-  if (want18a) {
+  if (detailsNow) {
     if (!v.address_line1) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
     if (!v.city) e.city = "Enter your city or town";
     if (!v.postal_code) e.postal_code = "Enter your postal code";
@@ -96,6 +103,33 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";
   if (v.popia_consent !== "on") e.popia_consent = "Please agree so we can record your donation";
   return e;
+}
+
+/** The donor asked for an s18A receipt and chose to add the details after paying. */
+export function s18aDetailsLater(v: Pick<CheckoutInput, "wants_18a" | "s18a_when">, receiptsAvailable: boolean): boolean {
+  return receiptsAvailable && v.wants_18a === "on" && v.s18a_when === "later";
+}
+
+/**
+ * The website's single agreement tick (platformConfig.checkout.singleAgreementTick): one box, "agreement", stands
+ * for both the age tick and the Terms, Privacy and sharing tick, so the same agreements are recorded either way.
+ * With the switch off the two ticks are read as before and a stray "agreement" is ignored.
+ */
+export function applyAgreementTick(raw: Record<string, string | undefined>, singleTick: boolean): Record<string, string | undefined> {
+  const { agreement, ...rest } = raw;
+  if (!singleTick) return rest;
+  const agreed = agreement === "on" ? "on" : undefined;
+  return { ...rest, age_confirmed: agreed, popia_consent: agreed };
+}
+
+/** With the single tick, a missing age or agreement tick is one problem, on the one box. */
+export const AGREEMENT_ERROR = "Please tick this box to give. You must be 18 or older, and we need your agreement to record your donation";
+export function agreementErrors(fieldErrors: Record<string, string>, singleTick: boolean): Record<string, string> {
+  if (!singleTick || !(fieldErrors.age_confirmed || fieldErrors.popia_consent)) return fieldErrors;
+  const { age_confirmed: _a, popia_consent: _p, ...rest } = fieldErrors;
+  void _a;
+  void _p;
+  return { ...rest, agreement: AGREEMENT_ERROR };
 }
 
 export function cleanPhone(v: string | undefined) {
