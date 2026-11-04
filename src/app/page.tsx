@@ -113,7 +113,7 @@ export default async function Home() {
         />
       <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
         <h1 className="max-w-[46rem] text-[clamp(2.375rem,4.6vw,3.5rem)] font-bold! leading-[1.12] text-balance">
-          Give in a minute. We keep the <Key>paperwork</Key>.
+          <Key>Good</Key> starts here.
         </h1>
         <p className="max-w-[36rem] text-[17px] leading-relaxed text-muted">
           Find a charity, give from {min} once or every month, and see every gift in one place. We check every charity before it can take a gift.

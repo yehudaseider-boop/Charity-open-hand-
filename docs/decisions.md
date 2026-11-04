@@ -1489,6 +1489,7 @@ Yehuda shared the "Deupload" landing pages (Figma community) as the feel he want
 - **"Try it" calculator** on the home page: type any amount, see the year's total for a monthly gift. It never suggests an amount (rule of 16/10/2026: Givezy suggests no figures). Nothing is sent.
 - **Motion** stops for anyone who asks their device to reduce motion.
 - **New copy, approved by Yehuda 29/10/2026:** "Quick. Checked. Free.", "Your details, kept private" (charities never see the ID number or the maaser choice: both true), "Simple. Fair to every charity.", "No hidden fees and no subscriptions."
+- **Home headline (Yehuda, 04/11/2026):** "Good starts here." replaces "Give in a minute. We keep the paperwork." (it talked about Givezy, not the giver). The page title and description for Google stay descriptive ("Givezy: give to South African charities online"), and the "Give in a minute" card and the footer line stay: they describe what giving is like, not the slogan.
 - **Hosting:** stays on Vercel (Yehuda, 29/10/2026), not Netlify. The Netlify copy is only the PSFA demo.
 
 ## Donor list sorting and importing a charity's own donor list (02/11/2026)
