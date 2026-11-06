@@ -106,7 +106,7 @@ describe("checkout details", () => {
       await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: mealsAdmin, role: "authenticated", aal: "aal2" })]);
       // Only the paid donation: people who abandoned checkout stay private.
       expect((await run("select id from public.charity_donations")).rows.map((r) => r.id)).toEqual([id]);
-      expect((await run("select * from public.donation_checkout_details")).rowCount).toBe(0); // raw table is closed to charities
+      expect((await run("select donation_id from public.donation_checkout_details")).rowCount).toBe(0); // raw table is closed to charities
       await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: hallAdmin, role: "authenticated", aal: "aal2" })]);
       expect((await run("select * from public.charity_donations")).rowCount).toBe(0);
     });

@@ -1,5 +1,6 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { sameSecret } from "@/lib/secret-compare";
 import { GatewayError, type BankAccountCheck, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /** Paystack's name for each bank our application offers (lower case). Banks not listed here are matched by name. */
@@ -226,10 +227,8 @@ export const paystackGateway: PaymentGateway = {
     // Signature: HMAC-SHA512 of the raw body with the secret key, hex, in x-paystack-signature. VERIFY.
     const expected = createHmac("sha512", secretKey()).update(rawBody).digest("hex");
     const got = headers.get("x-paystack-signature") ?? "";
-    // Compare as bytes, so odd characters in the header are a plain "no" and never an error.
-    const gotBytes = Buffer.from(got, "hex");
-    const expectedBytes = Buffer.from(expected, "hex");
-    if (!/^[0-9a-f]{128}$/i.test(got) || gotBytes.length !== expectedBytes.length || !timingSafeEqual(gotBytes, expectedBytes)) return null;
+    // Odd characters in the header are a plain "no", never an error; the comparison is constant-time.
+    if (!/^[0-9a-f]{128}$/i.test(got) || !sameSecret(got.toLowerCase(), expected)) return null;
     type Data = {
       id?: number;
       reference?: string;

@@ -116,6 +116,15 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 
 ## B. Before the switch (technical)
 
+### Security audit of 06/11/2026 (no cross-charity or private-data access found; the items below came out of it)
+
+- [ ] **BLOCKING before live, and to do on the TEST project now: exact sign-in addresses only.** In Supabase, Authentication, URL Configuration, the redirect list must not contain `https://*.vercel.app/**`. List exact addresses only: `https://charity-open-hand.vercel.app/**`, `https://test.givezy.co.za/**`, and later `https://givezy.co.za/**`. A wildcard lets anyone receive a donor's sign-in link on their own Vercel site. Yehuda asked to fix it on the test project 06/11/2026: tick when he confirms it is done.
+- [ ] **Supabase's hosted sign-in limits for code checks:** confirm in the live project (Authentication, Rate Limits) how many code verifications are allowed per hour, and consider a captcha on sign-in (Supabase supports one; the website and app would both need it).
+- [ ] **Decision: the donation return page's link never expires.** The link a donor comes back on (and the status view it opens) works for as long as the gift exists. Decide an expiry for the status view; changing s18A details already has its own time window.
+- [ ] **Known, for later: inline scripts and readable sign-in cookies.** The Content Security Policy still allows inline scripts, and the sign-in cookies can be read by page scripts (the Supabase browser client needs them). Later: script nonces in the CSP.
+- [ ] **Tidy (no user-facing effect):** move the `citext` extension out of the `public` schema; the `donation_giving_kinds` check constraint still lists the old kind names. Both with a small migration later.
+- [ ] **Migration `20261106000001_security_hardening.sql`** (storage names with `..` refused; ciphertext and payment provider references no longer readable by browsers): run on the TEST project once Yehuda says yes, then on live. Admin, Settings check shows "Security hardening (06/11/2026)" once it is in. Any column added later to `charity_private`, `donors`, `donation_checkout_details` or `recurring_donations` must be granted to browsers explicitly.
+
 - [ ] **New look, v2.1 (25/10/2026):** the website, emails, receipt PDF and app code all have it (the app took Bricolage Grotesque on 30/10/2026). It reaches phones with the first TestFlight build or an update published to the preview (needs Yehuda's yes).
 - [ ] **"Cover the card charge" (built 25/10/2026):** fill in Paystack's rates in `src/config/platform.ts` (`gatewayPercent`, `gatewayFixedCents`, `gatewayRatesIncludeVat`) from Paystack's rate sheet; until then the box stays hidden. Check one test payment: the charity's settlement should equal the gift. If Paystack caps or waives its charge on some amounts, the cover may be a few cents more than needed (never less).
 - [ ] **Yosef:** does a covered card charge count on the s18A receipt? Built to leave it off (gift only).
