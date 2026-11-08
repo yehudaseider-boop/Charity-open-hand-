@@ -14,7 +14,7 @@ import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { Chevron } from "@/components/chevron";
-import { AppWindow, BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Key, MiniPoint, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
+import { AppWindow, BlueBand, Bubbles, FeatureCard, Floating, Icon, Key, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 
 // Home page, direction B (preview, 29/10/2026), laid out after the Deupload landing page Yehuda liked: see
 // components/marketing.tsx. Every figure in a picture is a labelled sample; every claim is one we can back today.
@@ -104,11 +104,6 @@ export default async function Home() {
           items={[
             { c: "-left-40 -top-40 h-[26rem] w-[26rem] bg-honey-soft" },
             { c: "-right-32 top-24 h-80 w-80 bg-peach" },
-            { c: "max-md:hidden left-[12%] top-28 h-6 w-6 bg-coral", anim: "bob" },
-            { c: "max-md:hidden left-[8%] top-64 h-10 w-10 border-[4px] border-brand", anim: "bob-slow" },
-            { c: "max-md:hidden right-[14%] top-16 h-8 w-8 bg-brand", anim: "bob-slow" },
-            { c: "max-md:hidden right-[9%] top-56 h-4 w-4 bg-coral", anim: "bob" },
-            { c: "max-md:hidden right-[20%] top-80 h-12 w-12 border-[5px] border-honey", anim: "bob" },
           ]}
         />
       <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
@@ -133,7 +128,6 @@ export default async function Home() {
         </div>
 
         <div className="relative mt-14 w-full max-w-[60rem]">
-          <Confetti />
           <Splash className="absolute -top-24 left-[6%] z-10 hidden h-auto w-32 md:block" />
           <div className="relative mx-auto max-w-[48rem]">
             <AppWindow nav={["Home", "Giving", "Receipts", "Charities", "Account"]} active={1}><HeroScreen /></AppWindow>
@@ -165,22 +159,20 @@ export default async function Home() {
       </div>
       </section>
 
-      {/* Three blue cards */}
-      <section className="mx-auto flex max-w-[75rem] flex-col gap-12 px-4 pb-24 sm:px-6">
-        <SectionHead title={<>Quick. Checked. <Key>Free.</Key></>}>
-          Everything you need to give with confidence, and nothing taken off your gift by us.
-        </SectionHead>
-        <BlueCards
-          items={[
-            { icon: "bolt", title: "Give in a minute", body: `Choose an amount from ${min}, once or every month, and pay on the payment provider's secure page.`, href: "/charities", link: "Find a charity" },
-            { icon: "shield", title: "Every charity checked", body: "A person looks at each charity's registration documents and bank details before it can take a gift.", href: "/for-charities", link: "How charities join" },
-            { icon: "heart", title: "No Givezy fee", body: "We don't take a cut. The card provider's fee comes off before the gift reaches the charity.", href: "#pricing", link: "What it costs" },
+      {/* How it works */}
+      <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6 md:pb-36">
+        <SectionHead title="How it works">Three steps, then it&apos;s done. You can come back to your account any time.</SectionHead>
+        <Steps
+          steps={[
+            { icon: "search", title: "Pick a charity", body: "Search by name, cause or area. Every charity is checked before it can take a gift." },
+            { icon: "heart", title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page." },
+            { icon: "receipt", title: "Keep track", body: "Every gift sits in your account, with your s18A receipts when the tax year ends." },
           ]}
         />
       </section>
 
       {/* Two pastel cards and a wide lilac card */}
-      <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6">
+      <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6 md:pb-36">
         <h2 className={`max-w-[34rem] ${h2Class}`}>One account for all your giving, ready at <Key>tax time</Key>.</h2>
         <div className="grid gap-5 md:grid-cols-2">
           <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation and pause or stop it yourself whenever you like.">
@@ -263,16 +255,12 @@ export default async function Home() {
       </section>
 
       {/* Soft section: words on the left, stacked white cards on the right */}
-      <section className="relative overflow-hidden bg-honey-soft">
-        <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, { c: "right-[40%] top-10 h-6 w-6 bg-coral", anim: "bob" }, "-right-12 -top-12 h-32 w-32 bg-honey md:-right-24 md:-top-24 md:h-72 md:w-72", "max-md:hidden left-[30%] bottom-8 h-10 w-10 border-[4px] border-brand/40"]} />
-        <div className="relative mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2">
+      <section className="relative mb-24 overflow-hidden bg-honey-soft md:mb-36">
+        <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, "-right-12 -top-12 h-32 w-32 bg-honey md:-right-24 md:-top-24 md:h-72 md:w-72"]} />
+        <div className="relative mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2 md:py-32">
           <div className="flex flex-col gap-5">
             <h2 className={h2Class}>Your details, kept <Key>private</Key>.</h2>
-            <p className="text-[17px] leading-relaxed text-muted">The charity sees what it needs to thank you and record your gift. The rest stays between you and {platformConfig.appName}.</p>
-            <div className="mt-4 grid gap-6 sm:grid-cols-2">
-              <MiniPoint icon="eye" tone="sage" title="Anonymous in public" body="Tick a box and your name stays off the charity's public page." />
-              <MiniPoint icon="download" tone="peach" title="Your information, your call" body="Download everything we hold about you, or ask us to erase it." />
-            </div>
+            <p className="text-[17px] leading-relaxed text-muted">The charity sees what it needs to thank you and record your gift. The rest stays between you and {platformConfig.appName}. You can also give anonymously.</p>
           </div>
           <ul className="flex flex-col gap-4">
             <FeatureCard icon="lock" title="Your card stays with the bank" body={`You pay on the payment provider's page. ${platformConfig.appName} never sees or stores card details.`} />
@@ -283,7 +271,7 @@ export default async function Home() {
       </section>
 
       {/* Coloured band with cards hanging over its edge */}
-      <section id="pricing" className="pb-24">
+      <section id="pricing" className="pb-24 md:pb-36">
         <BlueBand className="pb-48 pt-20">
           <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-3 px-4 text-center sm:px-6">
             <h2 className="font-display text-[clamp(1.875rem,3.2vw,2.75rem)] font-bold leading-[1.12] text-white!">Simple. <span className="text-honey">Fair</span> to every charity.</h2>
@@ -298,8 +286,6 @@ export default async function Home() {
             <p className="text-[13px] text-muted">{platformConfig.appName} fee on your gift</p>
             <Link href="/charities" className="pressable mt-3 w-full rounded-control bg-brand px-5 py-3 font-bold text-white">Find a charity</Link>
             <ul className="mt-3 flex flex-col gap-2 self-stretch text-left text-[14px]">
-              <li className="flex gap-2"><Tick />Give from {min}, once or monthly</li>
-              <li className="flex gap-2"><Tick />Every gift and receipt in one account</li>
               <li className="flex gap-2"><Tick />Add a contribution to {platformConfig.appName} only if you choose, from {minContribution}</li>
             </ul>
           </div>
@@ -323,20 +309,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6">
-        <SectionHead title="How it works">Three steps, then it&apos;s done. You can come back to your account any time.</SectionHead>
-        <Steps
-          steps={[
-            { icon: "search", title: "Pick a charity", body: "Search by name, cause or area. Every charity is checked before it can take a gift." },
-            { icon: "heart", title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page." },
-            { icon: "receipt", title: "Keep track", body: "Every gift sits in your account, with your s18A receipts when the tax year ends." },
-          ]}
-        />
-      </section>
-
       {/* Ready to get started? */}
-      <section className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6">
+      <section className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6 md:pb-36">
         <Ready
           button={{ href: "/charities", label: "Find a charity" }}
           small={{ icon: "user", title: "Giving as a person?", body: "Find a registered charity and give once or every month. Every gift lands in one list.", href: "/charities", link: "Start giving" }}
