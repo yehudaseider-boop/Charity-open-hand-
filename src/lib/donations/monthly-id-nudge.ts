@@ -23,14 +23,21 @@ export type MonthlyForNudge = {
 export type SourceDetails = {
   donor_type: string;
   id_number_encrypted: string | null;
+  tax_reference_encrypted: string | null;
+  address_line1: string | null;
   erased_at?: string | null;
 };
 
-/** A live (active or paused) s18A monthly donation of an individual whose details have no ID number. */
+/**
+ * A live (active or paused) s18A monthly donation of an individual whose details carry an income tax number but no
+ * ID number. Not one set up with "Add my details after paying" (no ID number, no tax number, or no address): the
+ * account page's "s18A details still needed" asks for those, so one gift never shows two ID forms.
+ */
 export function needsIdNudge(m: MonthlyForNudge, details: SourceDetails | null | undefined): boolean {
   if (m.status !== "active" && m.status !== "paused") return false;
   if (!m.wants_18a || !m.first_donation_id) return false;
   if (!details || details.erased_at) return false;
+  if (!details.tax_reference_encrypted || !details.address_line1?.trim()) return false;
   return details.donor_type === "individual" && !details.id_number_encrypted;
 }
 

@@ -25,6 +25,13 @@ describe("confirmation email", () => {
     expect(m.text).toContain("Contribution to Givezy: R25");
     expect(m.text).toContain("Total paid: R205");
   });
+
+  it("with s18A details still to add, says how to add them and that the receipt waits for them (04/11/2026)", () => {
+    const m = confirmationEmail({ ...base, contributionCents: 0, wants18a: true, s18aDetailsMissing: true, accountUrl: "https://givezy.test/account" });
+    expect(m.text).toContain("add your SA ID number (or registration number) and address: sign in at https://givezy.test/account");
+    expect(m.text).not.toContain("This donation will be on your annual s18A receipt");
+    expect(confirmationEmail({ ...base, contributionCents: 0, wants18a: true }).text).toContain("This donation will be on your annual s18A receipt");
+  });
 });
 
 describe("s18A details", () => {

@@ -10,12 +10,14 @@ export const metadata: Metadata = { title: "Settings check" };
 export const dynamic = "force-dynamic";
 
 /** The newest database changes, each found by something it added. In date order: the last one in means all are. */
-const DATABASE_CHANGES: { label: string; table: string; column: string }[] = [
+const DATABASE_CHANGES: ({ label: string; table: string; column: string } | { label: string; rpc: string })[] = [
   { label: "Impact per gift (22/10/2026)", table: "charities", column: "impact_unit_cents" },
   { label: "Update my card (22/10/2026)", table: "monthly_card_updates", column: "donation_id" },
   { label: "Receipt emails sent once (22/10/2026)", table: "s18a_receipts", column: "email_claimed_at" },
   { label: "Update my card, same page again (22/10/2026)", table: "monthly_card_updates", column: "checkout_url" },
   { label: "Charities' SARS details for IT3(d) (03/11/2026)", table: "charity_private", column: "tax_reference_number" },
+  // Adds no column: found by a check that answers true once browsers can no longer read the hidden columns.
+  { label: "Security hardening (06/11/2026)", rpc: "ciphertext_hidden_from_browsers" },
 ];
 
 async function databaseChecks(): Promise<SettingCheck[]> {
@@ -29,7 +31,9 @@ async function databaseChecks(): Promise<SettingCheck[]> {
   if (error) return [{ name: "Database", status: "fix", says: "Can't reach it with these settings. Check the Supabase address and secret key." }];
   const out: SettingCheck[] = [{ name: "Database", status: "ok", says: "Reached." }];
   for (const c of DATABASE_CHANGES) {
-    const { error: e } = await db.from(c.table).select(c.column, { head: true }).limit(1);
+    const e = "rpc" in c
+      ? await db.rpc(c.rpc).then((r) => r.error ?? (r.data === true ? null : new Error("not yet")))
+      : (await db.from(c.table).select(c.column, { head: true }).limit(1)).error;
     out.push(e ? { name: c.label, status: "fix", says: "Not in this database yet. Claude applies it once you say yes." } : { name: c.label, status: "ok", says: "In." });
   }
   return out;

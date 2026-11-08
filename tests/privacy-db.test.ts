@@ -104,10 +104,18 @@ describe("a donor", () => {
       expect((await run("select kind from public.donation_giving_kinds where donation_id = $1", [id])).rows[0].kind).toBe("maaser");
       expect((await run("select id from public.recurring_donations where donor_id = $1", [ids.donor])).rowCount).toBeGreaterThan(0);
       // What was typed at checkout (ID number, fingerprint) stays with the server.
-      expect((await run("select * from public.donation_checkout_details where donation_id = $1", [id])).rowCount).toBe(0);
+      expect((await run("select donation_id from public.donation_checkout_details where donation_id = $1", [id])).rowCount).toBe(0);
       // And nothing of charities' private side.
       expect((await run("select * from public.charity_donations")).rowCount).toBe(0);
-      expect((await run("select * from public.charity_private")).rowCount).toBe(0);
+      expect((await run("select charity_id from public.charity_private")).rowCount).toBe(0);
+      // Not even the ciphertext of their own ID and tax numbers, or the payment provider's references for their
+      // own monthly donation: the server reads those (06/11/2026).
+      expect((await run("select id_number_last4 from public.donors where id = $1", [ids.donor])).rowCount).toBe(1);
+      await denied("select id_number_encrypted from public.donors where id = $1", [ids.donor]);
+      await denied("select tax_reference_encrypted from public.donors where id = $1", [ids.donor]);
+      await denied("select * from public.donors where id = $1", [ids.donor]);
+      await denied("select gateway_customer_ref from public.recurring_donations where donor_id = $1", [ids.donor]);
+      await denied("select gateway_subscription_ref from public.recurring_donations where donor_id = $1", [ids.donor]);
     });
   });
 
@@ -134,14 +142,17 @@ describe("a charity admin", () => {
       }
       // The raw tables stay closed.
       expect((await run("select * from public.donations where id = $1", [id])).rowCount).toBe(0);
-      expect((await run("select * from public.donation_checkout_details where donation_id = $1", [id])).rowCount).toBe(0);
+      expect((await run("select donation_id from public.donation_checkout_details where donation_id = $1", [id])).rowCount).toBe(0);
       expect((await run("select * from public.donation_giving_kinds where donation_id = $1", [id])).rowCount).toBe(0);
       // Monthly donations: no whole-row read at all (the stored card authorisation is not readable), and no rows from the readable columns.
       await denied("select * from public.recurring_donations where charity_id = $1", [ids.meals]);
       expect((await run("select id, status from public.recurring_donations where charity_id = $1", [ids.meals])).rowCount).toBe(0);
-      expect((await run("select * from public.donors")).rowCount).toBe(0);
-      // Not even their own charity's gateway reference.
+      expect((await run("select id from public.donors")).rowCount).toBe(0);
+      // Not even their own charity's gateway reference, or its bank account number's ciphertext (06/11/2026).
       await denied("select gateway_subaccount_ref from public.charities where id = $1", [ids.meals]);
+      expect((await run("select bank_account_last4, tax_reference_number from public.charity_private where charity_id = $1", [ids.meals])).rowCount).toBe(1);
+      await denied("select bank_account_number_encrypted from public.charity_private where charity_id = $1", [ids.meals]);
+      await denied("select * from public.charity_private where charity_id = $1", [ids.meals]);
     });
   });
 
@@ -150,7 +161,7 @@ describe("a charity admin", () => {
       const id = await paidDonation();
       await as(ids.hallAdmin);
       expect((await run("select * from public.charity_donations where id = $1", [id])).rowCount).toBe(0);
-      expect((await run("select * from public.charity_private where charity_id = $1", [ids.meals])).rowCount).toBe(0);
+      expect((await run("select charity_id from public.charity_private where charity_id = $1", [ids.meals])).rowCount).toBe(0);
       expect((await run("select * from public.charity_documents where charity_id = $1", [ids.meals])).rowCount).toBe(0);
       expect((await run("select * from public.s18a_receipts where charity_id = $1", [ids.meals])).rowCount).toBe(0);
       await run("savepoint p");
@@ -183,6 +194,24 @@ describe("charity documents", () => {
       ).rejects.toThrow(/charity_documents_own_folder/);
       await run("rollback to savepoint q");
       await run("insert into public.charity_documents (charity_id, document_type, storage_path, file_name) values ($1, 'npo_certificate', $2, 'x.pdf')", [ids.meals, `${ids.meals}/npo.pdf`]);
+    });
+  });
+
+  it("storage refuses a file name that climbs out of the charity's own folder (06/11/2026)", async () => {
+    await tx(async () => {
+      const other = "00000000-0000-0000-0000-000000000001";
+      await as(ids.mealsAdmin);
+      const put = (bucket: string, name: string) => run("insert into storage.objects (bucket_id, name) values ($1, $2)", [bucket, name]);
+      for (const bucket of ["charity-public", "charity-documents"]) {
+        for (const name of [`${ids.meals}/../${other}/pwn.png`, `${ids.meals}/a/../../${other}/pwn.png`, `${ids.meals}/..`, `${ids.meals}\\..\\${other}/pwn.png`, `/${ids.meals}/pwn.png`]) {
+          await run("savepoint s");
+          // Refused by the policy (a name the folder check can't even read as a charity id is refused too).
+          await expect(put(bucket, name)).rejects.toThrow(/row-level security|invalid input syntax for type uuid/);
+          await run("rollback to savepoint s");
+        }
+        // Their own folder still works.
+        await put(bucket, `${ids.meals}/logo.png`);
+      }
     });
   });
 });

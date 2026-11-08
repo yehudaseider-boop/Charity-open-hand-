@@ -101,7 +101,7 @@ export async function runReceiptsJob(args: {
     emailed: 0,
     emailFailed: 0,
     skippedByReason: {},
-    needsAttention: skipped.filter((s) => s.reason === "charity_cannot_issue" || s.reason === "mandate_after_payment" || s.reason === "late_after_receipt"),
+    needsAttention: skipped.filter((s) => s.reason === "charity_cannot_issue" || s.reason === "mandate_after_payment" || s.reason === "late_after_receipt" || s.reason === "details_missing"),
     checkIdentities: severalIdentities,
     failed: [],
   };

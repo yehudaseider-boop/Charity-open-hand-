@@ -7,7 +7,7 @@ import { formatDate, formatDateTime, taxYearLabel, taxYearName } from "@/lib/dat
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { receiptsEnabled } from "@/config/receipts";
-import { getRun, listUnfinishedRuns, listWaitingRuns, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
+import { getRun, listUnfinishedRuns, listWaitingRuns, loadPlan, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
 import { finishReceipts, markReceiptsStopped, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
 import { FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
 import { yearsWithReceipts } from "@/lib/receipts/year-list-store";
@@ -47,6 +47,8 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
   if (error) throw error;
   const [waiting, unfinished, years] = await Promise.all([listWaitingRuns(), listUnfinishedRuns(), yearsWithReceipts()]);
   const pending = await Promise.all(waiting.map((w) => pendingAtYearEnd(w.charity_id, w.tax_year)));
+  // Gifts held back because the donor hasn't added the s18A details yet (they are never receipted as they are).
+  const detailsMissing = await Promise.all(waiting.map((w) => loadPlan(w.charity_id, w.tax_year).then((p) => p.detailsMissing.length).catch(() => null)));
   const enabled = receiptsEnabled();
 
   return (
@@ -78,6 +80,11 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
               {taxYearLabel(w.tax_year)}: {w.receipts_planned} {w.receipts_planned === 1 ? "receipt" : "receipts"}, {formatRand(w.total_cents)}. Approved by the charity on {formatDate(w.charity_approved_at)}.
             </p>
             {pending[i] ? <p className="text-warning">{pending[i]} s18A {pending[i] === 1 ? "payment" : "payments"} from the last days of the year still pending. Check Payments first.</p> : null}
+            {detailsMissing[i] ? (
+              <p className="text-warning">
+                Details missing: {detailsMissing[i]} {detailsMissing[i] === 1 ? "gift" : "gifts"} held back, because the donor asked for an s18A receipt but hasn&apos;t added the ID or registration number and address yet. They are not on this list and get no receipt until they do.
+              </p>
+            ) : detailsMissing[i] === null ? <p className="text-muted">We couldn&apos;t check for gifts with missing s18A details just now. Refresh to try again.</p> : null}
             {w.status === "issuing" ? (
               <div className="space-y-2">
                 <p className="text-muted">Being issued since {w.signed_off_at ? formatDateTime(w.signed_off_at) : "just now"}.</p>
@@ -201,6 +208,9 @@ function RunDone({ run }: { run: NonNullable<Awaited<ReturnType<typeof getRun>>>
       <p className="font-medium text-navy">
         {run.charity_name}, {taxYearLabel(run.tax_year)}: {s.issued} of {s.planned} {s.planned === 1 ? "receipt" : "receipts"} issued, {s.pdfsMade} PDFs made, {s.emailed} emailed.
       </p>
+      {s.skippedByReason?.details_missing ? (
+        <p>Details missing: {s.skippedByReason.details_missing} {s.skippedByReason.details_missing === 1 ? "gift was" : "gifts were"} held back, because the donor hasn&apos;t added the s18A details yet. No receipt was issued for {s.skippedByReason.details_missing === 1 ? "it" : "them"}.</p>
+      ) : null}
       {unfinished ? (
         <p>
           Not everything is done yet{s.emailed < s.issued && s.failed.length === 0 && s.emailFailed === 0 ? ": receipts are not emailed while email is not switched on (EMAIL_TRANSPORT) or SITE_URL is missing" : ""}.

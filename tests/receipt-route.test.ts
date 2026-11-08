@@ -8,10 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 let user: { id: string } | null = { id: "u1" };
 let receipt: Record<string, unknown> | null = null;
+let amr: { method: string }[] = [{ method: "otp" }];
 vi.mock("@/lib/audit", () => ({ logAudit: async () => undefined }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    auth: { getUser: async () => ({ data: { user } }) },
+    auth: { getUser: async () => ({ data: { user } }), getClaims: async () => ({ data: { claims: { amr } } }) },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: receipt }) }) }) }),
   }),
 }));
@@ -32,6 +33,7 @@ beforeEach(() => {
   process.env.SITE_URL = "https://givezy.test";
   user = { id: "u1" };
   receipt = null;
+  amr = [{ method: "otp" }];
 });
 afterEach(() => {
   delete process.env.SITE_URL;
@@ -56,6 +58,12 @@ describe("an unavailable receipt", () => {
 
   it("sends a signed-out person to sign in, on the site's own address", async () => {
     user = null;
+    expect(sentTo(await open())).toBe(`https://givezy.test/login?next=${encodeURIComponent(`/receipts/${ID}`)}`);
+  });
+
+  it("sends a session started with a password to sign in again, and hands out nothing", async () => {
+    receipt = { id: ID, charity_id: CHARITY, status: "issued", pdf_path: "r.pdf" };
+    amr = [{ method: "password" }];
     expect(sentTo(await open())).toBe(`https://givezy.test/login?next=${encodeURIComponent(`/receipts/${ID}`)}`);
   });
 

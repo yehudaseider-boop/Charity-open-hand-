@@ -118,6 +118,7 @@ export function OverviewView(p: OverviewProps) {
             <p className="mb-2">Share your Givezy page with your supporters:</p>
             <ShareLinks url={publicLink} message={`Give to ${charityName} on Givezy:`} />
             <Link href={`${base}/poster`} className="mt-2 inline-block text-brand underline">Print a QR poster for your notice board</Link>
+            <Link href={`${base}/poster#link-builder`} className="mt-2 block text-brand underline">Make a give link or QR code with an amount</Link>
             <Link href={`${base}/website-button`} className="mt-2 block text-brand underline">Add a &quot;Give with Givezy&quot; button to your website</Link>
           </div>
         </Card>

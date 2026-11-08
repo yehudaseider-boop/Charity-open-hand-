@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { sameSecret } from "@/lib/secret-compare";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -39,7 +40,5 @@ export async function confirmationTokenMatches(donationId: string, token: string
     .eq("donation_id", donationId)
     .maybeSingle();
   if (error || !data) return false;
-  const a = Buffer.from(data.token_hash, "hex");
-  const b = Buffer.from(hash(token), "hex");
-  return a.length === b.length && timingSafeEqual(a, b);
+  return sameSecret(String(data.token_hash).toLowerCase(), hash(token));
 }

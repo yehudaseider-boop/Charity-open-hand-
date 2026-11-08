@@ -1,6 +1,6 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { runMonthlyGiving } from "@/lib/donations/monthly-store";
+import { cronAllowed } from "@/lib/ops/alert";
 
 /**
  * Collects the monthly donations that are due. A scheduler calls this about once an hour
@@ -8,13 +8,9 @@ import { runMonthlyGiving } from "@/lib/donations/monthly-store";
  * Without CRON_SECRET set, the job is switched off.
  */
 async function handle(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return new NextResponse("Switched off", { status: 503 });
-  const got = request.headers.get("authorization") ?? "";
-  const want = `Bearer ${secret}`;
-  const a = Buffer.from(got);
-  const b = Buffer.from(want);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return new NextResponse("Not allowed", { status: 401 });
+  const allowed = cronAllowed(request);
+  if (allowed === null) return new NextResponse("Switched off", { status: 503 });
+  if (!allowed) return new NextResponse("Not allowed", { status: 401 });
 
   try {
     // Only ids and counts come back: no donor details.

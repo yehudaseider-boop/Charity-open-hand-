@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en-ZA"><head><meta charset="utf-8">
+<title>Givezy: briefing for legal and tax review</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/*FONTS*/
+:root { --ink:#0E1B3D; --blue:#1749B5; --slate:#4A5878; --stripe:#F4F1FF; --line:#ECE8F6; --ok:#1f6b4a; --okbg:#e3f2ea; --warn:#7a5200; --warnbg:#fbf0d3; --bad:#b3261e; --badbg:#f9e1dc; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "DM Sans", Arial, sans-serif; font-size: 9pt; line-height: 1.36; color: var(--ink); background: #fff; margin: 0; }
+h1, h2, h3, .display { font-family: "Bricolage Grotesque", "DM Sans", Arial, sans-serif; color: var(--ink); }
+h1 { font-weight: 800; font-size: 19pt; line-height: 1.15; margin: 0 0 3mm; padding-bottom: 2mm; border-bottom: 2px solid var(--blue); break-after: avoid; }
+h2 { font-weight: 700; font-size: 12pt; margin: 5mm 0 1.5mm; break-after: avoid; }
+h3 { font-weight: 700; font-size: 10pt; margin: 3.5mm 0 1mm; break-after: avoid; }
+p { margin: 0 0 1.6mm; orphans: 3; widows: 3; }
+ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+li { margin: 0 0 0.8mm; }
+a { color: var(--blue); }
+code { font-family: "DejaVu Sans Mono", "Liberation Mono", Menlo, monospace; font-size: 0.82em; color: var(--ink); background: var(--stripe); padding: 0 1mm; border-radius: 1mm; overflow-wrap: anywhere; }
+.pb { break-before: page; }
+.where { font-size: 7.6pt; color: var(--slate); margin: 0 0 3mm; overflow-wrap: anywhere; }
+.where b { font-weight: 700; }
+.where code { font-size: 0.95em; background: none; padding: 0; color: var(--slate); }
+.muted { color: var(--slate); }
+.small { font-size: 8.4pt; }
+table { width: 100%; border-collapse: collapse; margin: 1mm 0 2.5mm; font-size: 7.9pt; }
+th, td { padding: 1.1mm 1.6mm; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: break-word; }
+thead th { background: var(--stripe); border-bottom: 1.5px solid var(--blue); font-weight: 700; font-size: 8pt; color: var(--ink); }
+tbody tr:nth-child(even) td { background: var(--stripe); }
+tr { break-inside: avoid; }
+td.r, th.r { text-align: right; white-space: nowrap; }
+.tag { display: inline-block; font-size: 7pt; font-weight: 700; padding: 0.3mm 1.8mm; border-radius: 3mm; white-space: nowrap; line-height: 1.5; }
+.tag.built { background: var(--okbg); color: var(--ok); }
+.tag.proof { background: var(--warnbg); color: var(--warn); }
+.tag.no { background: var(--badbg); color: var(--bad); }
+.tag.aud { background: var(--stripe); color: var(--blue); border: 0.3mm solid var(--line); }
+.box { background: var(--stripe); border-left: 1.2mm solid var(--blue); border-radius: 0 2.5mm 2.5mm 0; padding: 2.5mm 3.5mm; margin: 2mm 0 3mm; break-inside: avoid; }
+.box.warn { border-left-color: #c58a00; background: var(--warnbg); }
+.box p:last-child, .box ul:last-child { margin-bottom: 0; }
+.quote { font-size: 8.5pt; border-left: 0.8mm solid var(--blue); padding-left: 3mm; margin: 1mm 0 3mm; color: var(--ink); }
+.qlist { list-style: none; padding: 0; margin: 1mm 0 3mm; }
+.qlist li { display: grid; grid-template-columns: 11mm 1fr; gap: 2mm; padding: 1.4mm 0; border-bottom: 1px solid var(--line); break-inside: avoid; }
+.qid { font-weight: 700; color: var(--blue); white-space: nowrap; }
+.qa { margin-bottom: 2.2mm; break-inside: avoid; }
+.qa .qt { display: grid; grid-template-columns: 12mm 1fr; gap: 2mm; }
+.qa .why { margin-left: 14mm; color: var(--slate); font-size: 8.4pt; }
+.qa .ans { margin: 2mm 0 0 14mm; border-bottom: 0.4mm solid var(--slate); height: 6.5mm; font-size: 7.5pt; color: var(--slate); }
+.legend { display: grid; grid-template-columns: auto 1fr; gap: 1.5mm 3mm; align-items: baseline; margin: 2mm 0 3mm; }
+/* cover */
+.cover { height: 247mm; display: flex; flex-direction: column; justify-content: space-between; }
+.cover .brand img { height: 14mm; width: auto; }
+.cover h1.title { font-size: 34pt; line-height: 1.08; border: 0; padding: 0; margin: 0 0 6mm; font-weight: 800; }
+.cover h1.title span { color: var(--blue); }
+.cover .rule { height: 1.6mm; width: 38mm; background: var(--blue); border-radius: 1mm; margin-bottom: 7mm; }
+.cover .meta { font-size: 12pt; line-height: 1.7; }
+.cover .meta b { font-family: "Bricolage Grotesque", sans-serif; }
+.cover .statusline { display: inline-block; background: var(--stripe); border: 0.3mm solid var(--line); border-radius: 4mm; padding: 2mm 5mm; font-weight: 700; margin-top: 4mm; }
+.cover .note { font-size: 8.4pt; color: var(--slate); max-width: 150mm; }
+/* contents */
+.toc { list-style: none; padding: 0; margin: 2mm 0 0; }
+.toc li { display: flex; gap: 2mm; align-items: baseline; margin: 0; padding: 0.9mm 0; }
+.toc li .t { flex: 0 1 auto; }
+.toc li .d { flex: 1 1 auto; border-bottom: 0.3mm dotted var(--slate); transform: translateY(-1mm); min-width: 6mm; }
+.toc li .p { flex: 0 0 8mm; text-align: right; font-variant-numeric: tabular-nums; }
+.toc li.top { font-weight: 700; margin-top: 1.2mm; }
+.toc li.sub { padding-left: 6mm; font-size: 8.8pt; color: var(--slate); }
+/* diagram */
+.fig { margin: 2mm 0 3mm; break-inside: avoid; }
+.fig svg { width: 100%; height: auto; display: block; }
+.fig .cap { font-size: 8pt; color: var(--slate); }
+/* samples */
+.sample { margin: 2mm 0 4mm; break-inside: avoid; }
+.sample img { width: 100%; max-width: 135mm; display: block; margin: 0 auto 1mm; border: 0.3mm solid var(--slate); }
+.sample .cap { font-weight: 700; color: var(--bad); text-align: center; font-size: 9pt; }
+pre.mono { font-family: "DejaVu Sans Mono", "Liberation Mono", Menlo, monospace; font-size: 6.4pt; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; background: var(--stripe); border: 0.3mm solid var(--line); border-radius: 2mm; padding: 2.5mm; margin: 1.5mm 0 3mm; color: var(--ink); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+.summary h2 { margin-top: 3.5mm; }
+.summary { font-size: 9.2pt; }
+.summary li { margin-bottom: 0.6mm; }
+</style></head>
+<body>
+<!--BODY-->
+</body></html>

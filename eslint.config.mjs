@@ -22,6 +22,8 @@ const eslintConfig = defineConfig([
     "apps/**",
     // The PSFA demo is plain browser JavaScript, built and tested on its own (demo/psfa-dashboard/README.md).
     "demo/**",
+    // Build scripts for the legal and tax briefing PDF (docs/legal-briefing/README.md), not application code.
+    "docs/legal-briefing/**",
   ]),
 ]);
 

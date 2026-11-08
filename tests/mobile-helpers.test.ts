@@ -56,6 +56,12 @@ describe("app hand-off to the website", () => {
       "https://example.co.za/c/a/donate?campaign=c0ffee00-0000-4000-8000-000000000001&from=app",
     );
   });
+  it("carries the amount and monthly choice made in the app (04/11/2026), never monthly for a campaign", () => {
+    expect(donateUrl("https://example.co.za", "a", null, undefined, { amountCents: 25_000, monthly: true })).toBe("https://example.co.za/c/a/donate?amount=250&monthly=1&from=app");
+    expect(donateUrl("https://example.co.za", "a", null, undefined, { amountCents: 18_050 })).toBe("https://example.co.za/c/a/donate?cents=18050&from=app");
+    expect(donateUrl("https://example.co.za", "a", null, "c1", { amountCents: 25_000, monthly: true })).toBe("https://example.co.za/c/a/donate?campaign=c1&amount=250&from=app");
+    expect(donateUrl("https://example.co.za", "a", null, undefined, { amountCents: null, monthly: false })).toBe("https://example.co.za/c/a/donate?from=app");
+  });
   it("refuses a website address that isn't https", () => {
     expect(donateUrl("http://example.co.za", "x", "tzedaka")).toBeNull();
     expect(donateUrl("", "x", "tzedaka")).toBeNull();

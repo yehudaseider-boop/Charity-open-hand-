@@ -22,6 +22,9 @@ import { Splash } from "@/components/splash";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { ClearFormDraft } from "@/components/forms/use-form-draft";
 import { currentFocus } from "@/lib/focus-server";
+import { loadS18aToComplete } from "@/lib/donations/s18a-complete";
+import { missingWords } from "@/lib/donations/s18a-details";
+import { S18aDetailsForm } from "@/components/s18a-details-form";
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };
@@ -93,6 +96,8 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (tag) retryParams.set(SOURCE_PARAM, tag);
   // A declined card tries again with the same amount filled in (the donor's own figure, not a secret).
   if (outcome === "failed" && d?.amount_cents) retryParams.set("cents", String(d.amount_cents));
+  // A declined first payment of a monthly donation tries again as monthly (the give form starts with it on).
+  if (outcome === "failed" && d?.recurring_id) retryParams.set("monthly", "1");
   const retryQuery = retryParams.size ? `?${retryParams}` : "";
   // A new card for a monthly donation ("Update my card"): trying again goes back there, not to a new gift.
   // Only for the donor holding this payment's credential, who is the one the update link was for.
@@ -103,6 +108,13 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     // What this gift pays for, worked out from the charity's own figure (none when it set no figure).
     const unit = impactUnitFrom(charity);
     const paysFor = unit ? impactLine(Number(d.amount_cents), unit, { you: true, monthly: Boolean(d.recurring_id) }) : null;
+    // "Add my details after paying": the gift is paid, and its s18A receipt waits for the ID (or registration)
+    // number and the address. Only the donor reaches this: the credential, or their own signed-in account.
+    const completer = holdsToken ? ({ token: true } as const) : viewer ? { userId: viewer.userId } : null;
+    // A failed check is said plainly, never shown as "it will be on your receipt".
+    const loaded = d.wants_18a && completer ? await loadS18aToComplete(d.id, completer).catch((e) => (console.error(e), "unavailable" as const)) : null;
+    const toComplete = loaded === "unavailable" ? null : loaded;
+    const s18aUnchecked = loaded === "unavailable";
     return (
       <Result
         tone="paid"
@@ -144,9 +156,22 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
               : "This month's donation is paid. Your monthly donation is not active, so nothing more will be collected."}
           </p>
         ) : null}
+        {toComplete ? (
+          <section aria-labelledby="add-s18a" className="mt-5 space-y-3 rounded-control border-2 border-brand bg-honey-soft p-4">
+            <h2 id="add-s18a" className="font-display text-xl font-bold text-indigo">Add your s18A details</h2>
+            <S18aDetailsForm
+              donationId={d.id}
+              token={holdsToken ? t : undefined}
+              donorType={toComplete.donorType}
+              missing={toComplete.missing}
+              intro={`Your gift is paid. For your s18A receipt we still need ${missingWords(toComplete.missing)}. Add ${toComplete.missing.length > 1 ? "them" : "it"} now, or later from your account${d.recurring_id ? ". They are used for your future monthly gifts too" : ""}. Until then this gift can't go on your s18A receipt.`}
+            />
+          </section>
+        ) : null}
         <p className="mt-3 text-sm text-muted">
           A confirmation is on its way to your email.{" "}
-          {d.wants_18a ? "This donation will be on your annual s18A receipt after the tax year closes." : null}
+          {d.wants_18a && s18aUnchecked ? "We couldn't check your s18A details just now. You can add them later from your account." : null}
+          {d.wants_18a && !toComplete && !s18aUnchecked ? "This donation will be on your annual s18A receipt after the tax year closes." : null}
         </p>
         {givingLabel ? (
           <p className="mt-2 text-sm text-muted">

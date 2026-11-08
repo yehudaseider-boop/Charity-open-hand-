@@ -120,8 +120,11 @@ describe("the charity view", () => {
       const d = await donor();
       await donation(c, d);
       await asUser(a);
-      for (const table of ["donations", "donors", "donation_checkout_details", "donation_giving_kinds"]) {
-        expect((await run(`select * from public.${table}`)).rowCount).toBe(0);
+      // Named columns: `select *` on donors and checkout details is refused outright since 06/11/2026, because it
+      // would include the ciphertext columns browsers may no longer read.
+      const firstColumn: Record<string, string> = { donations: "id", donors: "id", donation_checkout_details: "donation_id", donation_giving_kinds: "donation_id" };
+      for (const [table, column] of Object.entries(firstColumn)) {
+        expect((await run(`select ${column} from public.${table}`)).rowCount).toBe(0);
       }
     });
   });

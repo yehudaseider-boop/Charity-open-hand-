@@ -6,17 +6,27 @@ import { authoriseIt3d, prepareIt3d, readChoice } from "@/lib/receipts/it3d-requ
 const say = (message: string, status: number) =>
   new NextResponse(message, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 
+function fromThisSite(req: NextRequest): boolean {
+  const origin = req.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host === req.headers.get("host");
+    } catch {
+      return false;
+    }
+  }
+  return req.headers.get("sec-fetch-site") === "same-origin";
+}
+
 /**
  * The IT3(d) data file (.psv) for SARS HTTPS. A POST, so the Source Identifier never sits in an address or a log.
  * It is used for this one file and never stored, logged or sent back.
  */
 export async function POST(req: NextRequest, ctx: RouteContext<"/charity-admin/[id]/receipts/sars/file">) {
   const { id } = await ctx.params;
-  // Only from this site's own page.
-  const origin = req.headers.get("origin");
-  if (origin && (() => { try { return new URL(origin).host !== req.headers.get("host"); } catch { return true; } })()) {
-    return say("This download only works from the SARS page on Givezy. Nothing was downloaded.", 403);
-  }
+  // Only from this site's own page: the browser's Origin must be this site, or, when a browser sends no Origin,
+  // Sec-Fetch-Site must say same-origin. A request with neither is refused like one from another site.
+  if (!fromThisSite(req)) return say("This download only works from the SARS page on Givezy. Nothing was downloaded.", 403);
   const who = await authoriseIt3d(id);
   if ("status" in who) return say(who.message, who.status);
 

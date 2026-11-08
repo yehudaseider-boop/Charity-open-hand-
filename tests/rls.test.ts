@@ -177,7 +177,7 @@ describe("charity admin", () => {
       // The raw tables are closed to a charity admin (donors and platform admins only).
       expect(await rows("select id from public.donations")).toHaveLength(0);
       expect(await rows("select id from public.donors")).toHaveLength(0);
-      expect(await rows("select * from public.donation_checkout_details")).toHaveLength(0);
+      expect(await rows("select donation_id from public.donation_checkout_details")).toHaveLength(0);
       // Fees, gateway data and the giving kind are not in the view.
       for (const hidden of ["platform_fee_cents", "fee_vat_cents", "processing_charge_cents", "total_charged_cents", "gateway", "gateway_ref", "giving_kind"]) {
         expect(Object.keys(seen[0])).not.toContain(hidden);

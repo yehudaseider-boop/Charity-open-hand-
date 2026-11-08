@@ -17,6 +17,10 @@ export function confirmationEmail(d: {
   totalCents: number;
   paidAt: string;
   wants18a: boolean;
+  /** Asked for an s18A receipt with "Add my details after paying" and hasn't added them yet (04/11/2026). */
+  s18aDetailsMissing?: boolean;
+  /** The account page, where the donor adds them. */
+  accountUrl?: string;
   /** Part of a monthly donation: its first payment, a later one, or a first payment whose card cannot be charged again. */
   monthly?: { kind: "first"; chargeDay: number; cardLast4: string | null } | { kind: "repeat" } | { kind: "not_started" };
   /** Where a donor manages their monthly donation on the website, when known. */
@@ -35,9 +39,11 @@ export function confirmationEmail(d: {
     `Reference: ${ref}`,
     ...(d.dedication ? [d.dedication] : []),
     "",
-    d.wants18a
-      ? "This donation will be on your annual s18A receipt, which we send after the tax year closes at the end of February."
-      : "You did not ask for an s18A receipt for this donation.",
+    d.wants18a && d.s18aDetailsMissing
+      ? `You asked for an s18A receipt. To get it, add your SA ID number (or registration number) and address: sign in${d.accountUrl ? ` at ${d.accountUrl}` : " to your Givezy account"} with this email address. Until then this donation can't go on your s18A receipt, which we send after the tax year closes at the end of February.`
+      : d.wants18a
+        ? "This donation will be on your annual s18A receipt, which we send after the tax year closes at the end of February."
+        : "You did not ask for an s18A receipt for this donation.",
     "",
     ...monthlyLines(d),
     "You can see all your donations, and your giving goal, in the Givezy app. Sign in with this email address.",

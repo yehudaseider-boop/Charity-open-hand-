@@ -3,6 +3,7 @@ import { isErasedAddress } from "@/lib/email";
 import type { CharityRow, DonorRow, ReceiptDetails } from "./details";
 import type { IssuedReceipt, ReceiptStore } from "./issue";
 import type { PlanCharity, PlanDonation, PlannedReceipt } from "./plan";
+import { s18aDetailsMissing, type S18aDetailsRow } from "@/lib/donations/s18a-details";
 
 const PAGE = 1000;
 
@@ -23,6 +24,12 @@ function identityOf(embed: unknown): string {
   return ((row as { receipt_identity?: string | null } | null | undefined)?.receipt_identity ?? "") || "";
 }
 
+/** What a gift's s18A particulars still lack ("Add my details after paying", not yet added). */
+function missingOf(embed: unknown): string[] {
+  const row = (Array.isArray(embed) ? embed[0] : embed) as S18aDetailsRow | null | undefined;
+  return row ? s18aDetailsMissing(row) : [];
+}
+
 /** How long a send may hold a receipt before another run may take it over. */
 const EMAIL_CLAIM_MINUTES = 15;
 
@@ -33,7 +40,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         const q = db
           .from("donations")
           // A donor whose information was erased can no longer be given a receipt (their details are gone), so they are left out.
-          .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at, donation_checkout_details!inner(receipt_identity, erased_at)")
+          .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at, donation_checkout_details!inner(receipt_identity, erased_at, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
           .is("donation_checkout_details.erased_at", null)
           .eq("tax_year", taxYear)
           .eq("status", "paid")
@@ -51,6 +58,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
           status: r.status as string,
           wants18a: r.wants_18a as boolean,
           paidAt: r.paid_at as string | null,
+          detailsMissing: missingOf(r.donation_checkout_details),
         }),
       );
     },

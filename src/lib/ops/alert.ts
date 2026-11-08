@@ -1,5 +1,6 @@
 import "server-only";
 import { getEmailTransport } from "@/lib/email";
+import { bearerMatches } from "@/lib/secret-compare";
 
 /**
  * Tell the Givezy team something needs a person (a chargeback, the daily check's list). Goes to
@@ -27,10 +28,5 @@ export async function alertGivezy(subject: string, lines: string[]): Promise<"se
 export function cronAllowed(request: Request): boolean | null {
   const secret = process.env.CRON_SECRET;
   if (!secret) return null;
-  const got = request.headers.get("authorization") ?? "";
-  const want = `Bearer ${secret}`;
-  if (got.length !== want.length) return false;
-  let diff = 0;
-  for (let i = 0; i < want.length; i++) diff |= got.charCodeAt(i) ^ want.charCodeAt(i);
-  return diff === 0;
+  return bearerMatches(request.headers.get("authorization"), secret);
 }

@@ -6,10 +6,16 @@
  */
 export const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL;
 
-/** The charity's donation page, with the donor's label (and campaign, if any) carried over. */
-export function donateUrl(site: string | undefined, slug: string, label: string | null, campaign?: string): string | null {
+/**
+ * The charity's donation page, with the donor's label (and campaign, if any) carried over, and the amount and
+ * monthly choice when the donor chose them in the app (the website preselects them, 04/11/2026; a campaign gift is
+ * once-off). Whole Rand go as `amount=250`, an amount with cents as `cents=` (the website reads both).
+ */
+export function donateUrl(site: string | undefined, slug: string, label: string | null, campaign?: string, chosen: { amountCents?: number | null; monthly?: boolean } = {}): string | null {
   if (!site || !site.startsWith("https://")) return null;
-  const q = [label ? `label=${encodeURIComponent(label)}` : "", campaign ? `campaign=${encodeURIComponent(campaign)}` : "", "from=app"].filter(Boolean).join("&");
+  const c = chosen.amountCents && Number.isSafeInteger(chosen.amountCents) && chosen.amountCents > 0 ? chosen.amountCents : null;
+  const amount = c === null ? "" : c % 100 === 0 ? `amount=${c / 100}` : `cents=${c}`;
+  const q = [label ? `label=${encodeURIComponent(label)}` : "", campaign ? `campaign=${encodeURIComponent(campaign)}` : "", amount, chosen.monthly && !campaign ? "monthly=1" : "", "from=app"].filter(Boolean).join("&");
   return `${site.replace(/\/+$/, "")}/c/${encodeURIComponent(slug)}/donate?${q}`;
 }
 

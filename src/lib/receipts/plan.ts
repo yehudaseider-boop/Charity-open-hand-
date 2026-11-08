@@ -18,6 +18,11 @@ export type PlanDonation = {
   status: string;
   wants18a: boolean;
   paidAt: string | null;
+  /**
+   * What the gift's s18A particulars still lack (the donor chose "Add my details after paying" and hasn't yet):
+   * an SA ID or registration number, an address. Such a gift is not receiptable until they are added.
+   */
+  detailsMissing?: string[];
 };
 
 export type PlanCharity = {
@@ -42,7 +47,7 @@ export type PlannedReceipt = {
  */
 export type SeveralIdentities = { charityId: string; donorId: string; taxYear: number; receipts: number };
 
-export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_requested" | "charity_cannot_issue" | "mandate_after_payment" | "already_receipted" | "late_after_receipt" | "wrong_year" };
+export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_requested" | "charity_cannot_issue" | "mandate_after_payment" | "already_receipted" | "late_after_receipt" | "wrong_year" | "details_missing" };
 
 /** Can this charity issue s18A receipts: approval confirmed and a signed mandate. */
 export function charityCanIssue(c: PlanCharity): boolean {
@@ -80,6 +85,8 @@ export function planReceipts(args: {
     const charity = charityById.get(d.charityId);
     if (!charity || !charityCanIssue(charity)) { skip("charity_cannot_issue"); continue; }
     if (new Date(charity.mandateSignedAt!).getTime() > new Date(d.paidAt).getTime()) { skip("mandate_after_payment"); continue; }
+    // Never a receipt without the required particulars: listed for the charity and Givezy as "details missing".
+    if (d.detailsMissing?.length) { skip("details_missing"); continue; }
     if (receiptedGroups.has(groupKey(d))) { skip("late_after_receipt"); continue; }
 
     const key = groupKey(d);

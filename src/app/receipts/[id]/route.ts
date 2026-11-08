@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { logAudit } from "@/lib/audit";
+import { signedInWithPassword } from "@/lib/auth";
 import { requestOrigin } from "@/lib/request-origin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -38,8 +39,9 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/receipts/[id
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return unavailable();
-  // An expired session gets the sign-in page, not a bare line of text.
-  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(`/receipts/${id}`)}`, origin), { status: 303 });
+  // An expired session gets the sign-in page, not a bare line of text. So does a session started with a password:
+  // Givezy signs people in with an emailed code only, like every other page (see getViewer).
+  if (!user || (await signedInWithPassword(supabase))) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(`/receipts/${id}`)}`, origin), { status: 303 });
 
   const { data: receipt } = await supabase
     .from("s18a_receipts")

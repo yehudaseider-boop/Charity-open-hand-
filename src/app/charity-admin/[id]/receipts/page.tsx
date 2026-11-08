@@ -14,6 +14,7 @@ import { formatDate, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { DonePanel } from "@/components/done-panel";
+import { missingWords, type MissingDetail } from "@/lib/donations/s18a-details";
 import { closedTaxYears, listRuns, loadPlan, pendingAtYearEnd, type Plan, type ReceiptRun } from "@/lib/receipts/runs";
 import { approveReceipts, withdrawReceipts } from "./actions";
 import { ApproveReceiptsForm, WithdrawReceiptsForm } from "./forms";
@@ -187,7 +188,8 @@ function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityI
     );
   }
   if (!plan || plan.lines.length === 0) {
-    if (latest?.status !== "done") return null;
+    const held = plan?.detailsMissing.length ? <DetailsMissing lines={plan.detailsMissing} /> : null;
+    if (latest?.status !== "done") return held ? <Card title={`${taxYearLabel(taxYear)}: waiting for donors`}>{held}</Card> : null;
     const s = latest.summary;
     return (
       <Card title={`${taxYearLabel(taxYear)}: issued`}>
@@ -195,6 +197,7 @@ function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityI
           {s ? `${s.issued} ${s.issued === 1 ? "receipt" : "receipts"} issued` : "Receipts issued"} on {formatDate(latest.signed_off_at ?? latest.finished_at ?? latest.charity_approved_at)}
           {s ? `, ${s.emailed} emailed to donors so far.` : "."} You can see each one in the list below.
         </p>
+        {held ? <div className="mt-3">{held}</div> : null}
       </Card>
     );
   }
@@ -244,8 +247,47 @@ function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityI
           </table>
         </div>
         <p className="text-xs text-muted">Amounts are the donations only, never a contribution to Givezy. A name looks wrong, or someone is missing? Don&apos;t approve yet: tell us (<SupportContact />).</p>
+        {plan.detailsMissing.length ? <DetailsMissing lines={plan.detailsMissing} /> : null}
         <ApproveReceiptsForm action={approveReceipts.bind(null, charityId, taxYear, plan.fingerprint)} count={plan.lines.length} total={total} />
       </div>
     </Card>
+  );
+}
+
+/**
+ * Gifts held back from the list: the donor asked for an s18A receipt and chose to add their details after paying,
+ * and hasn't yet. Never receipted without the required particulars (decided 04/11/2026).
+ */
+function DetailsMissing({ lines }: { lines: Plan["detailsMissing"] }) {
+  const open = lines.filter((l) => l.canAddOnGivezy).length;
+  const late = lines.length - open;
+  return (
+    <div className="space-y-2 rounded-control bg-warning-soft p-3 text-sm">
+      <p className="font-semibold text-warning">
+        Details missing: {lines.length} {lines.length === 1 ? "gift is" : "gifts are"} not on this list yet
+      </p>
+      <p className="text-navy">
+        {lines.length === 1 ? "This donor" : "These donors"} asked for an s18A receipt but {lines.length === 1 ? "hasn't" : "haven't"} added the details SARS needs.
+        {open ? " Where it says so, the donor can still add them from their Givezy account. Once they do, the gift joins the list. If that donor's receipt was issued already, Givezy withdraws it and issues it again with the gift." : null}
+        {late ? " Where it says too late, the donor can no longer add them on Givezy." : null}
+      </p>
+      <ul className="divide-y divide-border">
+        {lines.map((l, i) => (
+          <li key={i} className="flex items-start justify-between gap-3 py-2">
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate font-medium" dir="auto">{l.donorName}</span>
+              <span className="text-muted">
+                {l.paidAt ? formatDate(l.paidAt) : null}
+                {l.missing.length ? ` · Missing: ${missingWords(l.missing as MissingDetail[], "their").replace(/^their /, "")}` : null}
+              </span>
+              <span className={l.canAddOnGivezy ? "text-muted" : "font-medium text-navy"}>
+                {l.canAddOnGivezy ? "The donor can still add them on Givezy." : "Too late to add on Givezy: the donor can ask you for a receipt directly."}
+              </span>
+            </span>
+            <span className="shrink-0 tabular-nums">{formatRand(l.amountCents)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

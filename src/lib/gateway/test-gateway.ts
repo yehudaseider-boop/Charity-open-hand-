@@ -1,5 +1,6 @@
 import "server-only";
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
+import { sameSecret } from "@/lib/secret-compare";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isoDateInJhb } from "@/lib/dates";
 import { GatewayError, type PaymentGateway, type PayoutLine, type VerifiedTransaction, type WebhookEvent } from "./types";
@@ -31,14 +32,8 @@ export const TEST_CHECKOUT_KEYS = ["reference", "total", "charity", "contributio
 export function readSignedTestCheckout(get: (key: string) => string | null | undefined, sig: unknown) {
   const params = new URLSearchParams();
   for (const k of TEST_CHECKOUT_KEYS) params.set(k, get(k) ?? "");
-  if (typeof sig !== "string" || !safeEqual(sig, testGatewaySign(params.toString()))) return null;
+  if (typeof sig !== "string" || !sameSecret(sig, testGatewaySign(params.toString()))) return null;
   return params;
-}
-
-function safeEqual(a: string, b: string) {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  return ab.length === bb.length && timingSafeEqual(ab, bb);
 }
 
 export const testGateway: PaymentGateway = {
@@ -108,7 +103,7 @@ export const testGateway: PaymentGateway = {
 
   async parseWebhook(rawBody, headers): Promise<WebhookEvent | null> {
     const sig = headers.get("x-test-signature") ?? "";
-    if (!safeEqual(sig, testGatewaySign(rawBody))) return null;
+    if (!sameSecret(sig, testGatewaySign(rawBody))) return null;
     const body = JSON.parse(rawBody) as { id: string; outcome: string; reference: string; amount?: number; resolution?: string };
     const type: WebhookEvent["type"] =
       body.outcome === "success" ? "payment_succeeded"

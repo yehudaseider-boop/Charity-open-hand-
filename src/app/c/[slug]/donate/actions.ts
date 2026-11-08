@@ -2,38 +2,14 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { quoteDonation, startDonation, type Quote } from "@/lib/donations/checkout";
+import { startDonation, type Quote } from "@/lib/donations/checkout";
 import { loadDonatableCharity } from "@/lib/donations/charity";
-import { checkDonorDetails, checkoutSchema, cleanPhone, type CheckoutInput } from "@/lib/donations/validation";
+import { agreementErrors, applyAgreementTick, checkDonorDetails, checkoutSchema, cleanPhone, type CheckoutInput } from "@/lib/donations/validation";
 import { clientIp } from "@/lib/client-ip";
 import { getViewer } from "@/lib/auth";
 import { formToObject } from "@/lib/form";
-import { COMMA_THOUSANDS_MESSAGE, formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { platformConfig } from "@/config/platform";
 import { SOURCE_PARAM } from "@/lib/donations/source";
-
-export type QuoteState = { ok: boolean; message?: string; quote?: Quote };
-
-export async function getQuote(slug: string, _prev: QuoteState, formData: FormData): Promise<QuoteState> {
-  const charity = await loadDonatableCharity(slug);
-  if (!charity?.acceptingPayments) return { ok: false, message: "This charity can't take online donations right now." };
-  const typed = String(formData.get("amount") ?? "");
-  const cents = parseRandToCents(typed);
-  if (cents === null) {
-    // SA writes thousands with a space; a comma is the decimal mark, so 1,250 can't be read safely.
-    if (usesCommaThousands(typed)) return { ok: false, message: `${COMMA_THOUSANDS_MESSAGE}.` };
-    return { ok: false, message: "Enter an amount in Rand, for example 180 or 180.50." };
-  }
-  if (cents === 0) return { ok: false, message: `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.` };
-  let contribution = 0;
-  if (formData.get("give_extra") === "on") {
-    const c = parseRandToCents(String(formData.get("contribution") ?? ""));
-    if (c === null) return { ok: false, message: "Enter your contribution in Rand, for example 10 or 25.50." };
-    contribution = c;
-  }
-  const result = quoteDonation(cents, contribution, formData.get("cover_card_charge") === "on");
-  return result.ok ? { ok: true, quote: result.quote } : { ok: false, message: result.message };
-}
 
 export type CheckoutState = {
   ok: boolean;
@@ -60,7 +36,9 @@ export async function submitDonation(
   // Bots fill in every field, including this hidden one.
   if (formData.get("website")) return { ok: false, message: "Something went wrong. Please try again." };
 
-  const raw = formToObject(formData);
+  // One agreement tick or two (platformConfig.checkout.singleAgreementTick): the same agreements are recorded either way.
+  const single = platformConfig.checkout.singleAgreementTick;
+  const raw = applyAgreementTick(formToObject(formData), single);
   // Where the link came from (WhatsApp, a copied link, the QR poster): checked in startDonation, not a donor detail.
   const sourceTagged = typeof raw[SOURCE_PARAM] === "string" ? raw[SOURCE_PARAM] : null;
   delete raw[SOURCE_PARAM];
@@ -75,7 +53,8 @@ export async function submitDonation(
     // s18A checks don't apply yet (startDonation runs them on the merged details).
     const usingSavedId = formData.get("use_saved_id") === "on";
     for (const [k, v] of Object.entries(checkDonorDetails(raw as CheckoutInput, Boolean(charity?.receiptsAvailable) && !usingSavedId))) fieldErrors[k] ??= v;
-    return { ok: false, message: fixMessage(fieldErrors), fieldErrors };
+    const shown = agreementErrors(fieldErrors, single);
+    return { ok: false, message: fixMessage(shown), fieldErrors: shown };
   }
 
   const h = await headers();
@@ -86,7 +65,10 @@ export async function submitDonation(
   const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, coverCardCharge, shownTotalCents, fromApp, campaignId, sourceTag: sourceTagged, input: parsed.data, ip, useSavedIdOf });
   if (!result.ok) {
     const { providerDown, ...rest } = result;
-    if (rest.message === "Please check the highlighted fields." && rest.fieldErrors) return { ...rest, message: fixMessage(rest.fieldErrors) };
+    if (rest.message === "Please check the highlighted fields." && rest.fieldErrors) {
+      const shown = agreementErrors(rest.fieldErrors, single);
+      return { ...rest, fieldErrors: shown, message: fixMessage(shown) };
+    }
     return { ...rest, failedToStart: providerDown };
   }
   // The website never charges a saved card (only the app does), so there is always a payment page.
