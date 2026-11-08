@@ -111,7 +111,7 @@ export default async function Home() {
           <Key>Good</Key> starts here.
         </h1>
         <p className="max-w-[36rem] text-[17px] leading-relaxed text-muted">
-          Find a charity, give from {min} once or every month, and see every gift in one place. We check every charity before it can take a gift.
+          Find a charity you care about, give once or every month, and keep every gift and s18A receipt in one place.
         </p>
         <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
           <Link href="/charities" className="pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Find a charity</Link>
@@ -161,12 +161,12 @@ export default async function Home() {
 
       {/* How it works */}
       <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6 md:pb-36">
-        <SectionHead title="How it works">Three steps, then it&apos;s done. You can come back to your account any time.</SectionHead>
+        <SectionHead title="How it works">Three steps. Come back any time.</SectionHead>
         <Steps
           steps={[
-            { icon: "search", title: "Pick a charity", body: "Search by name, cause or area. Every charity is checked before it can take a gift." },
+            { icon: "search", title: "Pick a charity", body: "Search by name, cause or area." },
             { icon: "heart", title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page." },
-            { icon: "receipt", title: "Keep track", body: "Every gift sits in your account, with your s18A receipts when the tax year ends." },
+            { icon: "receipt", title: "Keep track", body: "Every gift lands in your account, with your s18A receipts ready at tax time." },
           ]}
         />
       </section>
@@ -175,7 +175,7 @@ export default async function Home() {
       <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6 md:pb-36">
         <h2 className={`max-w-[34rem] ${h2Class}`}>One account for all your giving, ready at <Key>tax time</Key>.</h2>
         <div className="grid gap-5 md:grid-cols-2">
-          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation and pause or stop it yourself whenever you like.">
+          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation. Pause or stop it yourself, any time.">
             <Screen>
               <p className="text-[13px] font-semibold text-muted">Your monthly donations</p>
               <ul className="mt-2 flex flex-col gap-2 text-[14px]">
@@ -201,7 +201,7 @@ export default async function Home() {
         <div id="discover" className="grid items-center gap-8 rounded-[1.25rem] bg-honey-soft p-7 sm:p-10 md:grid-cols-2">
           <div className="flex flex-col items-start gap-4">
             <h3 className="font-display text-[clamp(1.625rem,2.6vw,2.125rem)] font-bold leading-tight"><Key>Find a cause</Key> that feels close to home.</h3>
-            <p className="text-[16px] leading-relaxed text-muted">Food parcels, schools, animal care, medical help and more. Every charity on {platformConfig.appName} is registered and checked.</p>
+            <p className="text-[16px] leading-relaxed text-muted">Food parcels, schools, animal care, medical help and more, from registered South African charities.</p>
             {categories.length > 0 ? (
               <ul className="flex flex-wrap gap-2" aria-label="Causes">
                 {categories.map((c) => (
@@ -263,8 +263,8 @@ export default async function Home() {
             <p className="text-[17px] leading-relaxed text-muted">The charity sees what it needs to thank you and record your gift. The rest stays between you and {platformConfig.appName}. You can also give anonymously.</p>
           </div>
           <ul className="flex flex-col gap-4">
-            <FeatureCard icon="lock" title="Your card stays with the bank" body={`You pay on the payment provider's page. ${platformConfig.appName} never sees or stores card details.`} />
-            <FeatureCard icon="user" title="Your ID stays off the dashboard" body="Charities never see your ID number on Givezy. It goes on your s18A receipt and in the report the charity must send to SARS, nowhere else." />
+            <FeatureCard icon="lock" title="We never see your card" body={`You pay on the payment provider's secure page. ${platformConfig.appName} never sees or stores your card details.`} />
+            <FeatureCard icon="user" title="Your ID number stays private" body="Charities never see it on Givezy. It only goes on your s18A receipt and the report the charity sends to SARS." />
             <FeatureCard icon="heart" title="Your notes stay yours" body="Any label or note you add to a gift, like Work giving or Family, is private to you. Charities don't see it." />
           </ul>
         </div>
@@ -274,8 +274,8 @@ export default async function Home() {
       <section id="pricing" className="pb-24 md:pb-36">
         <BlueBand className="pb-48 pt-20">
           <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-3 px-4 text-center sm:px-6">
-            <h2 className="font-display text-[clamp(1.875rem,3.2vw,2.75rem)] font-bold leading-[1.12] text-white!">Simple. <span className="text-honey">Fair</span> to every charity.</h2>
-            <p className="text-[17px] leading-relaxed text-honey-soft">{platformConfig.appName} costs donors and charities nothing to use.</p>
+            <h2 className="font-display text-[clamp(1.875rem,3.2vw,2.75rem)] font-bold leading-[1.12] text-white!">No {platformConfig.appName} fee, <span className="text-honey">for anyone</span>.</h2>
+            <p className="text-[17px] leading-relaxed text-honey-soft">Donors and charities pay {platformConfig.appName} nothing. The card provider&apos;s fee comes off each donation, and that&apos;s the only cost.</p>
           </div>
         </BlueBand>
         <div className="relative z-10 mx-auto -mt-36 grid max-w-[56rem] gap-0 px-4 sm:px-6 md:grid-cols-2">
@@ -309,11 +309,12 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Ready to get started? */}
+      {/* Start with one charity */}
       <section className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6 md:pb-36">
         <Ready
+          title="Start with one charity."
           button={{ href: "/charities", label: "Find a charity" }}
-          small={{ icon: "user", title: "Giving as a person?", body: "Find a registered charity and give once or every month. Every gift lands in one list.", href: "/charities", link: "Start giving" }}
+          small={{ icon: "user", title: "Want to give?", body: "Find a registered charity and give once or every month. Every gift lands in one list.", href: "/charities", link: "Start giving" }}
           wide={{
             icon: "building",
             title: "Run a charity?",

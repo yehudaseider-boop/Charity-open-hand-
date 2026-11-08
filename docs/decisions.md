@@ -1568,3 +1568,35 @@ Decided by Yehuda, 04/11/2026. Before and after counts in `docs/give-friction.md
 - **Result:** no way found for one charity to reach another charity's data, or for anyone to read someone else's private details, in the database (row-level security, functions, storage) or on the website.
 - **Hardened (migration `20261106000001_security_hardening.sql`, not yet applied anywhere):** storage refuses object names with `..`, a backslash or a leading slash; browsers can no longer read ciphertext or payment provider references (bank account number, donor ID and tax number ciphertext, monthly donation provider references), only the server can. Code: one constant-time secret comparison for the scheduler key, webhook signatures and confirmation tokens (`src/lib/secret-compare.ts`); the receipt download refuses a password session like every other page; the IT3(d) file download needs this site's Origin (or `Sec-Fetch-Site: same-origin`).
 - **For Yehuda (go-live list, "Security audit of 06/11/2026"):** remove the `*.vercel.app` wildcard from Supabase's sign-in addresses (blocking), hosted sign-in limits and a captcha, an expiry for the return-page status link, script nonces later, two tidy items.
+
+## The Givezy voice, and the home page wording (Yehuda, 08/11/2026)
+
+**Voice** (for the website, the app, emails and receipts):
+1. Warm and local: plain words, SA English, Rand, like a friendly person from here.
+2. About the giver, not about us: "you" more than "we".
+3. Short: one idea per sentence; headlines of about six words or fewer.
+4. True, every word: no made-up impact, no guilt, no pressure, no exclamation marks.
+5. Say trust once, well: "checked" in the right place, not on every card.
+6. The same name for the same thing: "s18A receipt", "monthly donation", "Givezy fee".
+
+**Home page wording approved** (all twelve lines Yehuda was shown): the intro under "Good starts here." ("Find a charity
+you care about, give once or every month, and keep every gift and s18A receipt in one place."), shorter How it works
+lines, "We never see your card" (it was "Your card stays with the bank", which was not accurate: the payment provider
+handles the card), "Your ID number stays private", the pricing band "No Givezy fee, for anyone." with the card fee said
+plainly (it was "costs donors and charities nothing", not quite true for charities, whose donations carry the card fee),
+"Start with one charity.", "Want to give?", and the footer line "Good starts here. Give to checked South African
+charities and keep every gift in one place." Next: For charities, a charity's page and the give flow, emails, the app.
+
+## App: news from your charities, and a payday reminder (Yehuda, 08/11/2026)
+
+From the "build for the second Tuesday" idea: give people a reason to open the app each month that is useful, never
+pressure. Two parts, sketched and approved:
+- **News from your charities** on Home: recent updates from charities the person gave to, in the charity's own words,
+  with "Read more" and "Give again" (opens the normal give screen, no amount filled in). Built first; it needs no
+  notifications.
+- **Payday reminder** (later, needs phone notifications, Apple and Google set-up, and a Privacy Policy line for Yosef):
+  off until switched on in Account, Reminders. The person picks the day: 1st, 15th, 20th, 25th or the last day. The
+  message, approved: "It's the 25th. Your charities are a tap away, if you'd like to give this month." Never more than
+  once a month, skipped if they already gave that month. It opens "Give this month": the charities they gave to, each
+  with Give, monthly donations marked "Already set", "Find another charity", and a quiet "Not this month". An opt-in
+  "News from your charities" notification sits next to it.

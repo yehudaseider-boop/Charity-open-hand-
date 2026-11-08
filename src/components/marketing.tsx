@@ -230,10 +230,12 @@ export function Steps({ steps }: { steps: { icon: IconName; title: string; body:
 
 /** "Ready to get started?": a heading row, then a small blue card and a wide lilac card with a picture. */
 export function Ready({
+  title = "Ready to get started?",
   button,
   small,
   wide,
 }: {
+  title?: string;
   button: { href: string; label: string };
   small: { icon: IconName; title: string; body: string; href: string; link: string };
   wide: { icon: IconName; title: string; body: string; href: string; link: string; picture: React.ReactNode };
@@ -242,7 +244,7 @@ export function Ready({
     <div className="reveal flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
-          <h2 className="font-display text-[clamp(1.75rem,2.6vw,2.25rem)] font-bold">Ready to get started?</h2>
+          <h2 className="font-display text-[clamp(1.75rem,2.6vw,2.25rem)] font-bold">{title}</h2>
           <p className="text-[16px] text-muted">It takes a minute, and you can stop or change your mind any time.</p>
         </div>
         <Link href={button.href} className="pressable rounded-control bg-brand px-6 py-3.5 font-bold text-white">{button.label}</Link>

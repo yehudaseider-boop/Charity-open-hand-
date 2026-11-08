@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { causes as sampleCauses, charities as sampleCharities, findCharity, type Cause, type Charity } from "@/data/sample";
+import { causes as sampleCauses, charities as sampleCharities, findCharity, type Cause, type Charity, type CharityUpdate } from "@/data/sample";
 import { CHARITY_COLUMNS, markFeatured, raisingNow, weekStartJhb, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type RaisingNow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
 import { supabase } from "./supabase";
 import { secureStorage } from "./secure-storage";
@@ -225,3 +225,51 @@ export function useCharity(slug: string | undefined) {
   if (!live) return { live, charity: findCharity(slug) ?? null, failed: false, retry };
   return { live, charity, failed, retry };
 }
+
+/**
+ * The latest updates from the charities the donor gave to, for "News from your charities" on Home. A bonus: if it
+ * can't load, Home simply doesn't show the section. Live: row-level security only returns approved charities and
+ * their updates. Preview: the sample charities' updates.
+ */
+async function loadNews(slugs: string[]): Promise<Map<string, CharityUpdate[]>> {
+  const db = supabase!;
+  const { data: rows, error } = await db.from("charities").select("id, slug").in("slug", slugs).eq("status", "approved");
+  if (error) throw error;
+  const slugById = new Map(((rows ?? []) as { id: string; slug: string }[]).map((r) => [r.id, r.slug]));
+  const out = new Map<string, CharityUpdate[]>();
+  if (!slugById.size) return out;
+  const updates = await db
+    .from("charity_updates")
+    .select("id, charity_id, body_en, photo_path, created_at")
+    .in("charity_id", [...slugById.keys()])
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (updates.error) throw updates.error;
+  for (const row of (updates.data ?? []) as (UpdateRow & { charity_id: string })[]) {
+    const slug = slugById.get(row.charity_id);
+    if (!slug) continue;
+    out.set(slug, [...(out.get(slug) ?? []), ...toUpdates([row], base)]);
+  }
+  return out;
+}
+
+export function useCharityNews(slugs: string[]) {
+  const demo = useDemoMode();
+  const live = supabase !== null && !demo;
+  const key = slugs.join(",");
+  const [news, setNews] = useState<Map<string, CharityUpdate[]> | null>(null);
+  useEffect(() => {
+    if (!live || !key) return;
+    let current = true;
+    loadNews(key.split(",")).then(
+      (next) => current && setNews(next),
+      () => current && setNews(new Map()),
+    );
+    return () => {
+      current = false;
+    };
+  }, [live, key]);
+  if (!live) return { live, news: new Map(slugs.map((s) => [s, findCharity(s)?.updates ?? []])) };
+  return { live, news: key ? news : new Map<string, CharityUpdate[]>() };
+}
+

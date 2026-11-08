@@ -7,6 +7,7 @@ import { Blob } from "@/components/blob";
 import { Bubbles, People } from "@/components/people";
 import { Button } from "@/components/button";
 import { CharityPhotoCard } from "@/components/charity-photo-card";
+import { NewsCard } from "@/components/charity-news";
 import { GoalRing } from "@/components/goal-ring";
 import { CalendarIcon, ChevronIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { useStatusCover } from "@/components/status-cover";
@@ -16,7 +17,8 @@ import { useScreenState } from "@/lib/screen-state";
 import { Text } from "@/components/text";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, receipts as sampleReceipts, recurring as sampleRecurring, sampleGoals } from "@/data/giving";
 import { useAccount } from "@/lib/account";
-import { useDirectory } from "@/lib/directory";
+import { useCharityNews, useDirectory } from "@/lib/directory";
+import { charitiesGivenTo, newsFeed } from "@/lib/charity-news";
 import { ddmmyyyy, rand, jhbToday } from "@/lib/format";
 import { taxYearFor, taxYearName } from "@/lib/tax-year";
 import { openGiveScreen } from "@/lib/give-entry";
@@ -93,6 +95,10 @@ export default function Home() {
   const counted = goal && progress ? [...gifts, ...elsewhere].filter((g) => g.date >= progress.window.start && g.date <= progress.window.end && counts(goal, g.label)).length : 0;
   const pct = progress?.targetCents ? Math.floor((progress.givenCents * 100) / progress.targetCents) : 0;
   const initial = (account.email ?? (preview ? "Sarah" : "?")).slice(0, 1).toUpperCase();
+  // News from the charities they gave to (08/11/2026): only when there is some, so Home never shows an empty box.
+  const gaveTo = charitiesGivenTo(gifts, monthlyList);
+  const charityNews = useCharityNews(gaveTo.map((c) => c.slug));
+  const news = charityNews.news && !(preview && demoState !== "ready") ? newsFeed(gaveTo, charityNews.news, jhbToday(), charityNews.live ? undefined : Infinity) : [];
 
   return (
     <>
@@ -193,6 +199,13 @@ export default function Home() {
                 </Pressable>
               ))}
             </View>
+          </View>
+        ) : null}
+
+        {news.length ? (
+          <View style={[styles.gutter, { gap: 12 }]}>
+            <Text variant="h2" accessibilityRole="header">News from your charities</Text>
+            {news.map((n) => <NewsCard key={n.id} item={n} />)}
           </View>
         ) : null}
 

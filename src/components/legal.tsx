@@ -40,7 +40,7 @@ export function SiteFooter() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="Givezy" width={97} height={32} className="h-8 w-auto" />
           </Link>
-          <p className="max-w-[18rem] text-[15px] leading-relaxed text-white/70">Registered South African charities, checked by us. Give in a minute, and keep every gift in one place.</p>
+          <p className="max-w-[18rem] text-[15px] leading-relaxed text-white/70">Good starts here. Give to checked South African charities and keep every gift in one place.</p>
         </div>
         {footerGroups.map((g) => (
           <nav key={g.title} aria-label={g.title} className="flex flex-col gap-1">
