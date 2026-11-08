@@ -15,6 +15,8 @@ import { typedDay } from "@/lib/typed-date";
 import { plural } from "@/lib/text";
 import { donorFacts, type DemoData, type DemoGift } from "./data";
 import { DEMO_BASE as base, DEMO_LAPSED_DAYS, monthOf, saDay } from "./sample";
+import { DEMO_TAGS, demoCareSeed, demoDonorIndex } from "./care";
+import { DemoDonorCare } from "./donor-care";
 
 /**
  * The demo's own versions of the dashboard pages: the same look and the same words as the real pages, drawn
@@ -228,24 +230,32 @@ export function DemoDonors({ data, sp }: { data: DemoData; sp: Params }) {
   const groups = donorGroupsFor(DEMO_LAPSED_DAYS);
   const group = groups.some((g) => g.key === one(sp.group)) ? one(sp.group) : "";
   const q = one(sp.q).trim().toLowerCase().slice(0, 60);
+  const today = saDay(data.now.toISOString());
+  const tagsOf = (donorId: string) => demoCareSeed(demoDonorIndex(donorId), today).tags;
+  const tag = DEMO_TAGS.includes(one(sp.tag)) ? one(sp.tag) : "";
   const monthlyIds = new Set(data.monthly.filter((m) => m.status === "active").map((m) => m.email));
   const facts = donorFacts(data).sort((a, b) => b.last_paid_at.localeCompare(a.last_paid_at));
-  const rows = facts.filter((f) => (!group || donorGroup(f, data.now, DEMO_LAPSED_DAYS) === group) && (!q || f.display_name.toLowerCase().includes(q) || f.email.includes(q)));
+  const rows = facts.filter((f) => (!group || donorGroup(f, data.now, DEMO_LAPSED_DAYS) === group) && (!tag || tagsOf(f.donor_id).includes(tag)) && (!q || f.display_name.toLowerCase().includes(q) || f.email.includes(q)));
   const href = (g: string) => `${base}/donors${g ? `?group=${g}` : ""}`;
   return (
     <div className="space-y-5">
-      <PageHeader title="Donors" intro="Everyone who has given to you, most recent first. Open a donor for their gifts." actions={<ActionLink href={`${base}/email-donors`}>Email donors</ActionLink>} />
+      <PageHeader title="Donors" intro="Everyone who has given to you, most recent first. Open a donor for their gifts, notes, tags and follow-ups." actions={<ActionLink href={`${base}/email-donors`}>Email donors</ActionLink>} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs label="Donor groups" items={[{ href: href(""), label: "All", active: !group, count: facts.length }, ...groups.map((g) => ({ href: href(g.key), label: g.label, active: group === g.key, count: facts.filter((f) => donorGroup(f, data.now, DEMO_LAPSED_DAYS) === g.key).length }))]} />
-        <form action={`${base}/donors`} method="get" className="flex gap-2">
+        <form action={`${base}/donors`} method="get" className="flex flex-wrap gap-2">
           {group ? <input type="hidden" name="group" value={group} /> : null}
+          <label htmlFor="demo-donor-tag" className="sr-only">Filter by tag</label>
+          <select id="demo-donor-tag" name="tag" defaultValue={tag} className={field}>
+            <option value="">Any tag</option>
+            {DEMO_TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
           <label htmlFor="demo-donor-q" className="sr-only">Search donors</label>
           <input id="demo-donor-q" name="q" defaultValue={one(sp.q)} placeholder="Search name or email" className={`${field} w-56`} />
           <button className={blueAction}>Search</button>
         </form>
       </div>
       {rows.length === 0 ? (
-        <EmptyState title="No matches" action={<ActionLink href={`${base}/donors`}>Show every donor</ActionLink>}>No donors match. Try another name or group.</EmptyState>
+        <EmptyState title="No matches" action={<ActionLink href={`${base}/donors`}>Show every donor</ActionLink>}>No donors match. Try another name, group or tag.</EmptyState>
       ) : (
         <Card>
           <ul className="divide-y divide-border">
@@ -259,6 +269,7 @@ export function DemoDonors({ data, sp }: { data: DemoData; sp: Params }) {
                       <span className="block truncate text-xs text-muted">{plural(f.donation_count, "donation")} · last {formatDate(f.last_paid_at)}</span>
                     </span>
                     {monthlyIds.has(f.email) ? <Badge tone="success">Gives monthly</Badge> : null}
+                    {tagsOf(f.donor_id).slice(0, 1).map((t) => <span key={t} className="hidden sm:inline"><Badge>{t}</Badge></span>)}
                   </span>
                   <span className="shrink-0 font-display text-lg font-bold tabular-nums">{formatRand(f.total_cents)}</span>
                 </Link>
@@ -278,6 +289,8 @@ export function DemoDonor({ data, id }: { data: DemoData; id: string }) {
   const paid = gifts.filter((g) => g.status === "paid");
   const largest = [...paid].sort((a, b) => b.amountCents - a.amountCents)[0];
   const monthly = data.monthly.find((m) => m.email === d.email);
+  const today = saDay(data.now.toISOString());
+  const index = demoDonorIndex(id);
   return (
     <div className="space-y-5">
       <PageHeader
@@ -291,6 +304,7 @@ export function DemoDonor({ data, id }: { data: DemoData; id: string }) {
         <MiniStat label="Latest gift" value={formatDate(paid[0]?.paidAt ?? gifts[0].paidAt)} />
         <MiniStat label="Largest gift" value={largest ? formatRand(largest.amountCents) : "None"} note={largest ? formatDate(largest.paidAt) : undefined} />
       </div>
+      <DemoDonorCare donorId={id} donorIndex={index} today={today} tagSuggestions={DEMO_TAGS} />
       <Card lights title="Gifts">
         <ul className="divide-y divide-border">
           {gifts.map((g) => {

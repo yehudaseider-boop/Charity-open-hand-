@@ -1600,3 +1600,13 @@ pressure. Two parts, sketched and approved:
   once a month, skipped if they already gave that month. It opens "Give this month": the charities they gave to, each
   with Give, monthly donations marked "Already set", "Find another charity", and a quiet "Not this month". An opt-in
   "News from your charities" notification sits next to it.
+
+## Public dashboard demo: the donor CRM works (Yehuda, 09/11/2026)
+
+Yehuda wants to send a demo CRM to the charities he has been meeting. Rather than a new demo, the public one at
+`/demo/dashboard` (the real dashboard with made-up records, linked from For charities) now has a working donor CRM:
+on a donor's page, follow-ups (add, Done, Undo, Remove), tags (add, take off) and notes (add, edit, remove), as in
+the real dashboard. They are kept only in the visitor's own browser: nothing is saved on Givezy or sent, the page
+says so after every action, and "Put back the sample" restores the start. Every fourth made-up donor starts with a
+note, two tags and a follow-up (`src/app/demo/dashboard/care.ts`), and Donors can be filtered by tag. Email donors
+and Thank donors are still described rather than shown.
