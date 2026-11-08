@@ -205,7 +205,7 @@ export default async function Home() {
             {categories.length > 0 ? (
               <ul className="flex flex-wrap gap-2" aria-label="Causes">
                 {categories.map((c) => (
-                  <li key={c.id}><Link href={`/charities?category=${c.slug}`} className="inline-block rounded-full border-[1.5px] border-honey bg-white px-3.5 py-1.5 text-[14px] font-semibold text-navy hover:border-brand">{c.name_en}</Link></li>
+                  <li key={c.id}><Link href={`/charities?category=${c.slug}`} className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-honey bg-white px-4 text-[14px] font-semibold text-navy hover:border-brand">{c.name_en}</Link></li>
                 ))}
               </ul>
             ) : null}
@@ -300,7 +300,7 @@ export default async function Home() {
               <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">Card fee</span>
               <p className="mt-2 text-[15px] leading-relaxed text-honey-soft">The card provider&apos;s fee comes off each donation. The rest goes straight to your bank account.</p>
             </div>
-            <Link href="/for-charities" className="mt-auto inline-flex items-center gap-1 font-bold text-white hover:underline">How it works for charities</Link>
+            <Link href="/for-charities" className="mt-auto inline-flex min-h-11 items-center gap-1 font-bold text-white hover:underline">How it works for charities</Link>
           </div>
         </div>
         <div className="mx-auto mt-10 flex max-w-[40rem] flex-col items-center gap-4 px-4 text-center">

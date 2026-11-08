@@ -54,9 +54,9 @@ function SearchBox({ initial, category }: { initial: string; category: string })
           autoComplete="off"
           className="min-w-0 flex-1 bg-transparent py-3 text-base outline-none focus-visible:outline-none"
         />
-        <span aria-hidden className={`h-5 w-5 shrink-0 rounded-full border-[3px] border-brand-soft border-t-brand transition-opacity ${pending ? "animate-spin opacity-100" : "opacity-0"}`} />
+        {pending ? <span aria-hidden className="h-5 w-5 shrink-0 animate-spin rounded-full border-[3px] border-brand-soft border-t-brand" /> : null}
       </div>
-      <button className="pressable rounded-control bg-brand px-5 py-3 font-bold text-brand-contrast">Search</button>
+      <button className="pressable rounded-control bg-brand px-4 py-3 font-bold text-brand-contrast sm:px-5">Search</button>
     </form>
   );
 }

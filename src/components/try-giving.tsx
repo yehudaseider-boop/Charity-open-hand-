@@ -29,7 +29,7 @@ export function TryGiving({ minCents }: { minCents: number }) {
   return (
     <div className="flex flex-col gap-3">
       <label htmlFor={`${id}-amount`} className="text-[13px] font-semibold text-muted">Try it: your amount</label>
-      <div className="flex items-center gap-2 rounded-xl border-2 border-brand bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-coral">
+      <div className="flex items-center gap-2 rounded-xl border-2 border-brand bg-white px-3 focus-within:ring-2 focus-within:ring-coral">
         <span className="font-display text-[1.25rem] font-bold text-navy">R</span>
         <input
           id={`${id}-amount`}
@@ -38,7 +38,7 @@ export function TryGiving({ minCents }: { minCents: number }) {
           value={typed}
           onChange={(e) => setTyped(e.target.value.slice(0, 12))}
           placeholder="0"
-          className="min-w-0 flex-1 bg-transparent font-display text-[1.25rem] font-bold text-navy outline-none placeholder:text-border focus-visible:outline-none"
+          className="h-12 min-w-0 flex-1 bg-transparent font-display text-[1.25rem] font-bold text-navy outline-none placeholder:text-border focus-visible:outline-none"
         />
       </div>
       <button
@@ -46,7 +46,7 @@ export function TryGiving({ minCents }: { minCents: number }) {
         role="switch"
         aria-checked={monthly}
         onClick={() => setMonthly((m) => !m)}
-        className="flex items-center justify-between rounded-xl px-1 py-1 text-[14px] font-semibold"
+        className="flex min-h-11 items-center justify-between rounded-xl px-1 text-[14px] font-semibold"
       >
         <span>Give every month</span>
         <span aria-hidden className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors ${monthly ? "bg-brand" : "bg-border"}`}>

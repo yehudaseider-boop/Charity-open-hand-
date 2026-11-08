@@ -42,9 +42,9 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
           items={[
             { c: "-left-40 -top-40 h-[24rem] w-[24rem] bg-honey-soft" },
             { c: "-right-32 top-32 h-72 w-72 bg-peach" },
-            { c: "left-[10%] top-24 h-5 w-5 bg-coral", anim: "bob" },
-            { c: "right-[12%] top-14 h-8 w-8 bg-brand", anim: "bob-slow" },
-            { c: "right-[22%] top-72 h-12 w-12 border-[5px] border-honey", anim: "bob" },
+            { c: "max-md:hidden left-[10%] top-24 h-5 w-5 bg-coral", anim: "bob" },
+            { c: "max-md:hidden right-[12%] top-14 h-8 w-8 bg-brand", anim: "bob-slow" },
+            { c: "max-md:hidden right-[22%] top-72 h-12 w-12 border-[5px] border-honey", anim: "bob" },
           ]}
         />
         <div className="relative mx-auto grid max-w-[75rem] gap-10 px-4 pb-16 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-center">

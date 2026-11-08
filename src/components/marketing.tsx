@@ -153,7 +153,7 @@ export function BlueCards({ items }: { items: { icon: IconName; title: string; b
           <IconCircle name={it.icon} />
           <h3 className="relative mt-2 font-display text-[1.375rem] font-bold leading-tight text-white!">{it.title}</h3>
           <p className="relative text-[15px] leading-relaxed text-honey-soft">{it.body}</p>
-          <Link href={it.href} className="relative mt-auto inline-flex items-center gap-1 pt-2 text-[15px] font-bold text-white hover:underline">{it.link}<Arrow /></Link>
+          <Link href={it.href} className="relative mt-auto inline-flex min-h-11 items-center gap-1 text-[15px] font-bold text-white hover:underline">{it.link}<Arrow /></Link>
         </li>
       ))}
     </ul>
@@ -253,7 +253,7 @@ export function Ready({
           <IconCircle name={small.icon} />
           <h3 className="relative mt-2 text-[1.25rem] font-bold text-white!">{small.title}</h3>
           <p className="relative max-w-[16rem] text-[15px] leading-relaxed text-honey-soft">{small.body}</p>
-          <Link href={small.href} className="relative mt-auto inline-flex items-center gap-1 pt-2 font-bold text-white hover:underline">{small.link}<Arrow /></Link>
+          <Link href={small.href} className="relative mt-auto inline-flex min-h-11 items-center gap-1 font-bold text-white hover:underline">{small.link}<Arrow /></Link>
         </div>
         <div className="relative grid items-center gap-6 overflow-hidden rounded-[1.25rem] bg-honey-soft p-7 sm:grid-cols-[1fr_1fr]">
           <Bubbles items={["-right-16 -top-16 h-48 w-48 bg-honey", "right-1/3 bottom-6 h-5 w-5 bg-coral", "left-1/2 -top-6 h-12 w-12 border-[6px] border-brand/20"]} />
@@ -261,7 +261,7 @@ export function Ready({
             <IconCircle name={wide.icon} tone="blue" />
             <h3 className="mt-2 text-[1.25rem] font-bold">{wide.title}</h3>
             <p className="text-[15px] leading-relaxed text-muted">{wide.body}</p>
-            <Link href={wide.href} className="inline-flex items-center gap-1 pt-2 font-bold text-brand hover:underline">{wide.link}<Arrow /></Link>
+            <Link href={wide.href} className="inline-flex min-h-11 items-center gap-1 font-bold text-brand hover:underline">{wide.link}<Arrow /></Link>
           </div>
           <div className="relative min-w-0">{wide.picture}</div>
         </div>
