@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
-import { ActionLink, PageHeader, table } from "@/components/dash";
+import { ActionLink, PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { SupportContact } from "@/components/legal";
@@ -18,6 +18,7 @@ import { missingWords, type MissingDetail } from "@/lib/donations/s18a-details";
 import { closedTaxYears, listRuns, loadPlan, pendingAtYearEnd, type Plan, type ReceiptRun } from "@/lib/receipts/runs";
 import { approveReceipts, withdrawReceipts } from "./actions";
 import { ApproveReceiptsForm, WithdrawReceiptsForm } from "./forms";
+import { CertificateList } from "./certificate-list";
 
 export const metadata: Metadata = { title: "s18A receipts" };
 
@@ -58,7 +59,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
           const open = runs.find((r) => r.tax_year === y && (r.status === "charity_approved" || r.status === "issuing")) ?? null;
           const latest = runs.find((r) => r.tax_year === y) ?? null;
           const plan = open ? null : await loadPlan(id, y);
-          const pending = plan && plan.lines.length ? await pendingAtYearEnd(id, y) : 0;
+          const pending = plan && plan.toIssue ? await pendingAtYearEnd(id, y) : 0;
           return { taxYear: y, open, latest, plan, pending };
         }),
       )
@@ -187,70 +188,73 @@ function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityI
       </Card>
     );
   }
-  if (!plan || plan.lines.length === 0) {
+  if (!plan || plan.toIssue === 0) {
     const held = plan?.detailsMissing.length ? <DetailsMissing lines={plan.detailsMissing} /> : null;
-    if (latest?.status !== "done") return held ? <Card title={`${taxYearLabel(taxYear)}: waiting for donors`}>{held}</Card> : null;
+    // Only declined receipts left (or none at all): nothing to approve, but each declined one can be reopened.
+    const declined = plan?.lines.length ? <CertificateList charityId={charityId} taxYear={taxYear} lines={plan.lines} /> : null;
+    const declinedNote = declined ? (
+      <div className="space-y-2 text-sm">
+        <p>{plan!.lines.length === 1 ? "This receipt is" : "These receipts are"} declined, so there&apos;s nothing to send to Givezy. Open one to reopen it.</p>
+        {declined}
+      </div>
+    ) : null;
+    if (latest?.status !== "done") {
+      if (!held && !declinedNote) return null;
+      return (
+        <div id={`year-${taxYear}`} className="scroll-mt-4">
+          <Card title={`${taxYearLabel(taxYear)}: ${declinedNote ? "declined" : "waiting for donors"}`}>
+            <div className="space-y-3">{declinedNote}{held}</div>
+          </Card>
+        </div>
+      );
+    }
     const s = latest.summary;
     return (
-      <Card title={`${taxYearLabel(taxYear)}: issued`}>
-        <p className="text-sm">
-          {s ? `${s.issued} ${s.issued === 1 ? "receipt" : "receipts"} issued` : "Receipts issued"} on {formatDate(latest.signed_off_at ?? latest.finished_at ?? latest.charity_approved_at)}
-          {s ? `, ${s.emailed} emailed to donors so far.` : "."} You can see each one in the list below.
-        </p>
-        {held ? <div className="mt-3">{held}</div> : null}
-      </Card>
+      <div id={`year-${taxYear}`} className="scroll-mt-4">
+        <Card title={`${taxYearLabel(taxYear)}: issued`}>
+          <p className="text-sm">
+            {s ? `${s.issued} ${s.issued === 1 ? "receipt" : "receipts"} issued` : "Receipts issued"} on {formatDate(latest.signed_off_at ?? latest.finished_at ?? latest.charity_approved_at)}
+            {s ? `, ${s.emailed} emailed to donors so far.` : "."} You can see each one in the list below.
+          </p>
+          {declinedNote ? <div className="mt-3">{declinedNote}</div> : null}
+          {held ? <div className="mt-3">{held}</div> : null}
+        </Card>
+      </div>
     );
   }
   // Sent back by Givezy (not withdrawn by the charity itself): say why.
   const sentBack = latest?.status === "cancelled" && latest.cancelled_reason && latest.cancelled_reason !== "The charity took back its approval." ? latest.cancelled_reason : null;
   const total = formatRand(plan.totalCents);
+  const c = plan.counts;
   return (
-    <Card title={`${taxYearLabel(taxYear)}: ready to approve`}>
-      <div className="space-y-3 text-sm">
-        {sentBack ? <Notice tone="warning">Your earlier approval came back from Givezy. {sentBack}</Notice> : null}
-        <p>
-          The tax year has ended. These donors asked for an s18A receipt. Check the names and amounts, then approve the list. Givezy signs it off after you,
-          and then each donor gets their receipt by email.
-        </p>
-        {pending > 0 ? (
-          <Notice tone="warning">
-            {pending} s18A {pending === 1 ? "payment" : "payments"} from the last days of the tax year {pending === 1 ? "is" : "are"} still waiting for the payment provider.
-            If {pending === 1 ? "it goes" : "they go"} through after you approve, that donor&apos;s receipt has to be withdrawn and issued again, so you may want to wait a day or two.
-          </Notice>
-        ) : null}
-        <div className={table.wrap}>
-          <table className={table.table}>
-            <thead>
-              <tr className={table.headRow}>
-                <th className={table.th}>Donor</th>
-                <th className={table.th}>Donations</th>
-                <th className={`${table.th} pr-0 text-right`}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plan.lines.map((l, i) => (
-                <tr key={i} className="border-b border-border last:border-0">
-                  <td className={`${table.td} max-w-[16rem] truncate`}>{l.donorName}</td>
-                  <td className={`${table.td} tabular-nums`}>{l.gifts}</td>
-                  <td className={table.num}>{formatRand(l.totalCents)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-border font-bold text-indigo">
-                <td className="py-2.5 pr-3" colSpan={2}>
-                  {plan.lines.length} {plan.lines.length === 1 ? "receipt" : "receipts"}
-                </td>
-                <td className="py-2.5 text-right tabular-nums">{total}</td>
-              </tr>
-            </tfoot>
-          </table>
+    <div id={`year-${taxYear}`} className="scroll-mt-4">
+      <Card title={`${taxYearLabel(taxYear)}: ready to approve`}>
+        <div className="space-y-3 text-sm">
+          {sentBack ? <Notice tone="warning">Your earlier approval came back from Givezy. {sentBack}</Notice> : null}
+          <p>
+            The tax year has ended. These donors asked for an s18A receipt. Open each one to see its preview, then approve it, correct the
+            donor&apos;s name or address, or decline it. Or check the names and amounts here and approve them all. Givezy signs the list off
+            after you, and then each donor gets their receipt by email.
+          </p>
+          <p className="font-medium text-indigo" role="status">
+            {c.to_check} to check · {c.approved + c.edited} approved{c.edited ? ` (${c.edited} edited)` : ""} · {c.declined} declined
+          </p>
+          {pending > 0 ? (
+            <Notice tone="warning">
+              {pending} s18A {pending === 1 ? "payment" : "payments"} from the last days of the tax year {pending === 1 ? "is" : "are"} still waiting for the payment provider.
+              If {pending === 1 ? "it goes" : "they go"} through after you approve, that donor&apos;s receipt has to be withdrawn and issued again, so you may want to wait a day or two.
+            </Notice>
+          ) : null}
+          <CertificateList charityId={charityId} taxYear={taxYear} lines={plan.lines} total={total} toIssue={plan.toIssue} />
+          <p className="text-xs text-muted">
+            Amounts are the donations only, never a contribution to Givezy, and come only from recorded donations: they can&apos;t be typed over.
+            Someone missing, or an amount wrong? Record or correct the gift on Donations, or tell us (<SupportContact />).
+          </p>
+          {plan.detailsMissing.length ? <DetailsMissing lines={plan.detailsMissing} /> : null}
+          <ApproveReceiptsForm action={approveReceipts.bind(null, charityId, taxYear, plan.fingerprint)} count={plan.toIssue} total={total} toCheck={c.to_check} declined={c.declined} />
         </div>
-        <p className="text-xs text-muted">Amounts are the donations only, never a contribution to Givezy. A name looks wrong, or someone is missing? Don&apos;t approve yet: tell us (<SupportContact />).</p>
-        {plan.detailsMissing.length ? <DetailsMissing lines={plan.detailsMissing} /> : null}
-        <ApproveReceiptsForm action={approveReceipts.bind(null, charityId, taxYear, plan.fingerprint)} count={plan.lines.length} total={total} />
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
 

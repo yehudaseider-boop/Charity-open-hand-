@@ -9,6 +9,7 @@ import { getEmailTransport, maskEmail, type EmailMessage } from "@/lib/email";
 import { buildReceiptHtml, esc } from "@/lib/receipts/html";
 import { previewReceipts, runReceiptsJob, type IssuedReceipt, type ReceiptStore } from "@/lib/receipts/issue";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } from "@/lib/receipts/plan";
+import { certificateFingerprint, type StoredDecision } from "@/lib/receipts/review";
 
 const charity: PlanCharity & CharityRow = {
   id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", quickgive_code: "LTC",
@@ -25,6 +26,13 @@ const don = (o: Partial<PlanDonation>): PlanDonation => ({
   id: "d1", charityId: "c1", donorId: "u1", donorIdentity: "", taxYear: 2027, amountCents: 50_000, status: "paid", wants18a: true,
   paidAt: "2026-10-01T10:00:00Z", ...o,
 });
+
+/** The charity approved every certificate on its list (09/11/2026: issuing needs the charity's yes for each one). */
+const approvedAll = (donations: PlanDonation[], already: Set<string> = new Set()) => async (taxYear: number): Promise<StoredDecision[]> =>
+  planReceipts({ taxYear, donations, charities: [charity], alreadyReceipted: already }).receipts.map((r, i) => ({
+    id: `dec${i}`, charityId: r.charityId, taxYear, donorId: r.donorId, donorIdentity: r.donorIdentity, decision: "approved",
+    certificateFingerprint: certificateFingerprint(r), decidedAt: "2027-03-02T08:00:00Z",
+  }));
 
 describe("who gets a receipt", () => {
   const plan = (donations: PlanDonation[], charities = [charity], already = new Set<string>()) =>
@@ -158,6 +166,7 @@ describe("the yearly job", () => {
       listDonations: async () => donations,
       listCharities: async () => [charity],
       receiptedDonationIds: async () => new Set(issued.flatMap(() => [] as string[])),
+      listDecisions: approvedAll(donations),
       donorDetailsFor: async (ids) => ids.map((id) => ({ id, paidAt: donations.find((d) => d.id === id)!.paidAt!, amountCents: donations.find((d) => d.id === id)!.amountCents, recordedMethod: null, donor })),
       issue: async (r, c, details) => {
         const receipt = { id: `r${++seq}`, reference: `${c.quickgive_code}-${r.taxYear}-000${seq}`, charityId: r.charityId, details, pdfPath: null };
@@ -277,6 +286,7 @@ describe("emailing receipts", () => {
       listDonations: async () => donations,
       listCharities: async () => [charity],
       receiptedDonationIds: async () => receipted,
+      listDecisions: async (y) => approvedAll(donations, receipted)(y),
       donorDetailsFor: async (ids) => ids.map((id) => ({ id, paidAt: donations.find((d) => d.id === id)!.paidAt!, amountCents: donations.find((d) => d.id === id)!.amountCents, recordedMethod: null, donor })),
       issue: async (r, c, details) => {
         r.donationIds.forEach((id) => receipted.add(id));

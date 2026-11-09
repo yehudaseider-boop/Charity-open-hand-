@@ -47,7 +47,11 @@ export type PlannedReceipt = {
  */
 export type SeveralIdentities = { charityId: string; donorId: string; taxYear: number; receipts: number };
 
-export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_requested" | "charity_cannot_issue" | "mandate_after_payment" | "already_receipted" | "late_after_receipt" | "wrong_year" | "details_missing" };
+export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_requested" | "charity_cannot_issue" | "mandate_after_payment" | "already_receipted" | "late_after_receipt" | "wrong_year" | "details_missing"
+  /** The charity declined this certificate (09/11/2026): left out of the run. */
+  | "declined"
+  /** The charity hasn't approved this certificate (or it changed since it did): left out of the run. */
+  | "not_approved" };
 
 /** Can this charity issue s18A receipts: approval confirmed and a signed mandate. */
 export function charityCanIssue(c: PlanCharity): boolean {

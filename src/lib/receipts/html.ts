@@ -18,7 +18,7 @@ export function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-const masked = (last4: string | null) => (last4 ? `•••• ${esc(last4)}` : "");
+const masked = (last4: string | null, hide = false) => (last4 ? (hide ? "On file (not shown on the dashboard)" : `•••• ${esc(last4)}`) : "");
 
 export function buildReceiptHtml(args: {
   details: ReceiptDetails;
@@ -30,6 +30,15 @@ export function buildReceiptHtml(args: {
   platformName: string;
   /** The logo as HTML (top left). Without it the platform name is printed as text. */
   logoHtml?: string;
+  /** The words of the draft mark (with `draft`). Default "DRAFT, NOT A TAX RECEIPT". */
+  mark?: string;
+  /**
+   * The charity's preview (09/11/2026): charities never see any part of a donor's ID or tax number, so those
+   * fields say only whether one is on file. Real receipts (the donor's) are never built with this.
+   */
+  hideIdNumbers?: boolean;
+  /** On a screen as well as on paper: the fields stack on a phone. Print layout unchanged. */
+  screen?: boolean;
 }): string {
   const { details: d, reference } = args;
   const total = d.donations.reduce((t, x) => t + x.amount_cents, 0);
@@ -98,8 +107,9 @@ thead th { font-size: 9pt; color: ${colours.muted}; font-weight: 600; background
 .total td { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 11.5pt; border-top: 1.5px solid ${colours.blue}; border-bottom: 0; padding-top: 3mm; }
 .foot { margin-top: 8mm; padding-top: 3mm; border-top: 1px solid ${colours.hairline}; font-size: 8.5pt; color: ${colours.muted}; }
 ${args.draft ? `.draft { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 46pt; font-weight: 600; color: ${colours.danger}2E; transform: rotate(-24deg); }` : ""}
+${args.screen ? "@media screen and (max-width: 560px) { body { padding: 16px; font-size: 10pt; } .top { flex-direction: column; gap: 3mm; } .f { grid-template-columns: 1fr; gap: 0.5mm; } .no { text-align: left; } h1 { font-size: 19pt; } th, td { padding: 2mm 1.5mm; } .draft { font-size: 24pt; } } @media screen { body { padding: 24px; } .page + .page { margin-top: 32px; padding-top: 24px; border-top: 2px dashed " + colours.hairline + "; } }" : ""}
 </style></head><body>
-${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
+${args.draft ? `<div class="draft">${esc(args.mark ?? "DRAFT, NOT A TAX RECEIPT")}</div>` : ""}
 <section class="page">
   <div class="top">${brand}<div class="no"><div class="l">Receipt number</div><strong>${esc(reference)}</strong></div></div>
   <h1>${esc(d.wording.title)}</h1>
@@ -111,8 +121,8 @@ ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
   <dl>
     ${field(`Donor (${kind})`, `<strong>${esc(d.donor.name)}</strong>`)}
     ${field("Registration number", d.donor.registration_number ? esc(d.donor.registration_number) : "")}
-    ${field("South African ID number", masked(d.donor.id_number_last4))}
-    ${field("Income tax number", masked(d.donor.tax_reference_last4))}
+    ${field("South African ID number", masked(d.donor.id_number_last4, args.hideIdNumbers))}
+    ${field("Income tax number", masked(d.donor.tax_reference_last4, args.hideIdNumbers))}
     ${field("Donor address", d.donor.address.map(esc).join(", "))}
     ${field(count === 1 ? "Date of donation" : "Dates of donations", esc(dates))}
     ${field("Nature of donation", esc(natures.join(", ")))}
@@ -141,3 +151,12 @@ ${args.draft ? '<div class="draft">DRAFT, NOT A TAX RECEIPT</div>' : ""}
 </section>
 </body></html>`;
 }
+
+/**
+ * The receipt's fonts for the charity's on-screen preview: the same files the PDF embeds, loaded from Givezy
+ * (src/app/receipt-fonts), because the website only lets a page load fonts from itself.
+ */
+export const previewFontCss = [
+  `@font-face{font-family:"Bricolage Grotesque";font-weight:700;font-style:normal;src:url(/receipt-fonts/bricolage-700.ttf) format("truetype");}`,
+  ...[400, 500, 600].map((w) => `@font-face{font-family:"DM Sans";font-weight:${w};font-style:normal;src:url(/receipt-fonts/dm-sans-${w}.woff2) format("woff2");}`),
+].join("\n");

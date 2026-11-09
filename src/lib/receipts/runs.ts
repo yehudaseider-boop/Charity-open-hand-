@@ -9,7 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buildReceiptHtml } from "./html";
 import { receiptDonorName } from "./details";
 import { runReceiptsJob, type JobSummary } from "./issue";
-import { planReceipts, type PlannedReceipt } from "./plan";
+import { planReceipts, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
+import { applyDecisions, certificateFingerprint, countStatuses, type CertificateStatus, type DecidedReceipt } from "./review";
 import { completionWindow, inCompletionWindow } from "@/lib/donations/s18a-details";
 import { supabaseReceiptStore } from "./store";
 
@@ -37,8 +38,12 @@ export type ReceiptRun = {
 };
 const RUN_COLUMNS = "id, charity_id, tax_year, status, plan_fingerprint, receipts_planned, total_cents, charity_approved_at, signed_off_at, finished_at, summary, cancelled_at, cancelled_reason";
 
-/** One line of the list a charity approves: who gets a receipt, for how many gifts, for how much. */
-export type PlanLine = { donorName: string; gifts: number; totalCents: number };
+/**
+ * One line of the list a charity approves: who gets a receipt, for how many gifts, for how much, and where the
+ * charity's check of that certificate stands (09/11/2026). `key` opens its preview; it never carries the donor
+ * record id or the identity fingerprint.
+ */
+export type PlanLine = { key: string; donorName: string; gifts: number; totalCents: number; status: CertificateStatus; changedSince: boolean };
 /**
  * A gift that asked for an s18A receipt but whose donor chose "Add my details after paying" and hasn't yet:
  * not on the list until they do (decided 04/11/2026). Shown to the charity and to Givezy, never receipted as is.
@@ -51,14 +56,30 @@ export type DetailsMissingLine = {
   /** Inside the window for adding details on Givezy (this tax year, or the one just closed until 31 May). */
   canAddOnGivezy: boolean;
 };
-export type Plan = { taxYear: number; lines: PlanLine[]; totalCents: number; fingerprint: string; detailsMissing: DetailsMissingLine[] };
+/**
+ * `totalCents` and `toIssue` count what would be issued: every certificate except the declined ones (those still
+ * to check are approved by "Approve all"). `fingerprint` covers every certificate and its decision.
+ */
+export type Plan = {
+  taxYear: number;
+  lines: PlanLine[];
+  totalCents: number;
+  toIssue: number;
+  counts: Record<CertificateStatus, number>;
+  fingerprint: string;
+  detailsMissing: DetailsMissingLine[];
+};
 
 /**
- * A fingerprint of exactly what would be issued: each receipt's donor, identity, donations and amount.
- * Pure. The same receipts in any order give the same fingerprint; any change gives a different one.
+ * A fingerprint of exactly what would be issued: each receipt's donor, identity, donations and amount, and
+ * (since 09/11/2026) the charity's decision on it and when it was made. Pure. The same receipts in any order
+ * give the same fingerprint; any change, including a certificate approved, declined, corrected or reopened
+ * after the list was approved, gives a different one, so the run goes back to the charity.
  */
-export function fingerprintPlan(receipts: Pick<PlannedReceipt, "donorId" | "donorIdentity" | "donationIds" | "totalCents">[]): string {
-  const lines = receipts.map((r) => `${r.donorId}|${r.donorIdentity}|${[...r.donationIds].sort().join(",")}|${r.totalCents}`).sort();
+export function fingerprintPlan(
+  receipts: (Pick<PlannedReceipt, "donorId" | "donorIdentity" | "donationIds" | "totalCents"> & { status?: string; decidedAt?: string | null })[],
+): string {
+  const lines = receipts.map((r) => `${r.donorId}|${r.donorIdentity}|${[...r.donationIds].sort().join(",")}|${r.totalCents}${r.status ? `|${r.status}|${r.decidedAt ?? ""}` : ""}`).sort();
   return createHash("sha256").update(lines.join("\n")).digest("hex");
 }
 
@@ -76,10 +97,7 @@ const store = () => supabaseReceiptStore(createAdminClient());
  * in all, however many donors, because the charity opens this page often.
  */
 export async function loadPlan(charityId: string, taxYear: number, now: Date = new Date()): Promise<Plan> {
-  const s = store();
-  const donations = await s.listDonations(taxYear, charityId);
-  const charities = await s.listCharities([...new Set(donations.map((d) => d.charityId))]);
-  const { receipts, skipped } = planReceipts({ taxYear, donations, charities, alreadyReceipted: await s.receiptedDonationIds(taxYear) });
+  const { receipts, skipped, donations } = await decidedPlan(charityId, taxYear);
   const held = skipped.filter((k) => k.reason === "details_missing").map((k) => k.donationId);
   const window = completionWindow(now);
   const names = await namesByDonation([...receipts.flatMap((r) => r.donationIds), ...held]);
@@ -93,13 +111,35 @@ export async function loadPlan(charityId: string, taxYear: number, now: Date = n
       canAddOnGivezy: inCompletionWindow(byId.get(id)?.taxYear ?? taxYear, window),
     }))
     .sort((a, b) => a.donorName.localeCompare(b.donorName, "en-ZA") || a.paidAt.localeCompare(b.paidAt));
-  const lines = receipts
+  const lines: PlanLine[] = receipts
     .map((r) => {
       const latest = r.donationIds.map((id) => names.get(id)).filter((n) => n !== undefined).sort((a, b) => b.paidAt.localeCompare(a.paidAt))[0];
-      return { donorName: latest?.name || "Name missing", gifts: r.donationIds.length, totalCents: r.totalCents };
+      return { key: r.key, donorName: latest?.name || "Name missing", gifts: r.donationIds.length, totalCents: r.totalCents, status: r.status, changedSince: r.changedSince };
     })
     .sort((a, b) => a.donorName.localeCompare(b.donorName, "en-ZA"));
-  return { taxYear, lines, totalCents: lines.reduce((t, l) => t + l.totalCents, 0), fingerprint: fingerprintPlan(receipts), detailsMissing };
+  const issuing = lines.filter((l) => l.status !== "declined");
+  return {
+    taxYear,
+    lines,
+    totalCents: issuing.reduce((t, l) => t + l.totalCents, 0),
+    toIssue: issuing.length,
+    counts: countStatuses(lines),
+    fingerprint: fingerprintPlan(receipts),
+    detailsMissing,
+  };
+}
+
+/**
+ * The planned certificates of one charity's tax year with the charity's decision on each: the same planning and
+ * the same decisions the issuing job uses, so the fingerprint shown is the one a sign-off checks.
+ */
+export async function decidedPlan(charityId: string, taxYear: number): Promise<{ receipts: DecidedReceipt[]; skipped: Skipped[]; donations: PlanDonation[] }> {
+  const s = store();
+  const donations = await s.listDonations(taxYear, charityId);
+  const charities = await s.listCharities([...new Set(donations.map((d) => d.charityId))]);
+  const [receipted, decisions] = await Promise.all([s.receiptedDonationIds(taxYear), s.listDecisions(taxYear, charityId)]);
+  const { receipts, skipped } = planReceipts({ taxYear, donations, charities, alreadyReceipted: receipted });
+  return { receipts: applyDecisions(receipts, decisions), skipped, donations };
 }
 
 /** The donor name typed with each donation, and when it was paid. */
@@ -188,32 +228,87 @@ export function runNeedsFinishing(summary: JobSummary | null): boolean {
   return summary.failed.length > 0 || summary.emailFailed > 0 || summary.pdfsMade < summary.issued || summary.emailed < summary.issued;
 }
 
-export type ApproveResult = { ok: true; run: ReceiptRun } | { ok: false; why: "nothing" | "changed" | "open" };
+export type ApproveResult = { ok: true; run: ReceiptRun; approvedNow: string[] } | { ok: false; why: "nothing" | "changed" | "open" };
 
-/** The charity approves the list it was shown. Refused when the list changed since it was shown. */
+/**
+ * "Approve all": the charity approves every certificate still to check and sends the list to Givezy. Refused
+ * when the list (or a decision on it) changed since it was shown. Declined certificates stay out. The ids of the
+ * approvals made here are returned, so Undo takes back exactly this action.
+ */
 export async function approveRun(args: { charityId: string; taxYear: number; fingerprint: string; userId: string }): Promise<ApproveResult> {
-  const plan = await loadPlan(args.charityId, args.taxYear);
-  if (plan.lines.length === 0) return { ok: false, why: "nothing" };
-  if (plan.fingerprint !== args.fingerprint) return { ok: false, why: "changed" };
-  const { data, error } = await createAdminClient()
+  const db = createAdminClient();
+  const before = await decidedPlan(args.charityId, args.taxYear);
+  if (fingerprintPlan(before.receipts) !== args.fingerprint) return { ok: false, why: "changed" };
+  if (!before.receipts.some((r) => r.status !== "declined")) return { ok: false, why: "nothing" };
+  const open = await openRun(args.charityId, args.taxYear);
+  if (open) return { ok: false, why: "open" };
+  const toCheck = before.receipts.filter((r) => r.status === "to_check");
+  let approvedNow: string[] = [];
+  if (toCheck.length) {
+    // An approval changed since was replaced (its certificate changed); a new one is written for what is shown now.
+    const { data, error } = await db
+      .from("receipt_plan_decisions")
+      .upsert(
+        toCheck.map((r) => ({
+          charity_id: args.charityId, tax_year: args.taxYear, donor_id: r.donorId, donor_identity: r.donorIdentity, decision: "approved",
+          certificate_fingerprint: certificateFingerprint(r), decided_by: args.userId, decided_at: new Date().toISOString(), decline_emailed_at: null,
+        })),
+        { onConflict: "charity_id,tax_year,donor_id,donor_identity" },
+      )
+      .select("id");
+    if (error) throw error;
+    approvedNow = (data ?? []).map((d) => d.id as string);
+  }
+  const after = await decidedPlan(args.charityId, args.taxYear);
+  const issuing = after.receipts.filter((r) => r.status === "approved" || r.status === "edited");
+  // Something else changed in between (a gift paid, refunded, or a decision by someone else): nothing is sent.
+  if (after.receipts.some((r) => r.status === "to_check") || !issuing.length) {
+    await removeDecisions(args.charityId, approvedNow);
+    return { ok: false, why: "changed" };
+  }
+  const { data, error } = await db
     .from("receipt_runs")
     .insert({
       charity_id: args.charityId,
       tax_year: args.taxYear,
-      plan_fingerprint: plan.fingerprint,
-      receipts_planned: plan.lines.length,
-      total_cents: plan.totalCents,
+      plan_fingerprint: fingerprintPlan(after.receipts),
+      receipts_planned: issuing.length,
+      total_cents: issuing.reduce((t, r) => t + r.totalCents, 0),
       charity_approved_by: args.userId,
     })
     .select(RUN_COLUMNS)
     .single();
   if (error) {
+    await removeDecisions(args.charityId, approvedNow);
     // Another person at the charity approved it a moment ago (one open run per year).
     if (/duplicate key|receipt_runs_one_open/.test(error.message)) return { ok: false, why: "open" };
     throw error;
   }
-  await logAudit({ actorUserId: args.userId, action: "receipts.run_approved", entityType: "charity", entityId: args.charityId, details: { runId: data.id, taxYear: args.taxYear, receipts: plan.lines.length } });
-  return { ok: true, run: data as ReceiptRun };
+  await logAudit({
+    actorUserId: args.userId, action: "receipts.run_approved", entityType: "charity", entityId: args.charityId,
+    details: { runId: data.id, taxYear: args.taxYear, receipts: issuing.length, approvedNow: approvedNow.length, declined: after.receipts.filter((r) => r.status === "declined").length },
+  });
+  return { ok: true, run: data as ReceiptRun, approvedNow };
+}
+
+/** Remove approvals made by one action (Approve all), when it didn't go through or was taken back. */
+export async function removeDecisions(charityId: string, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await createAdminClient().from("receipt_plan_decisions").delete().eq("charity_id", charityId).eq("decision", "approved").in("id", ids);
+  if (error) throw error;
+}
+
+/** The run of this charity's tax year waiting for Givezy or being issued, if any. */
+export async function openRun(charityId: string, taxYear: number): Promise<ReceiptRun | null> {
+  const { data, error } = await createAdminClient()
+    .from("receipt_runs")
+    .select(RUN_COLUMNS)
+    .eq("charity_id", charityId)
+    .eq("tax_year", taxYear)
+    .in("status", ["charity_approved", "issuing"])
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ReceiptRun | null) ?? null;
 }
 
 /** Take back an approval, or send a run back to the charity. Only while it still waits for sign-off. */
@@ -333,7 +428,7 @@ export async function signOffRun(args: { runId: string; userId: string; now?: Da
 }
 
 class PlanChanged extends Error {}
-const CHANGED_REASON = "The list changed after it was approved (a gift was refunded or paid late), so nothing was issued. Please check the new list and approve it again.";
+const CHANGED_REASON = "The list changed after it was approved (a gift was refunded or paid late, or a receipt on it was approved, declined or corrected again), so nothing was issued. Please check the new list and approve it again.";
 
 /** How long a sign-off may take before the admin page offers to mark it stopped. */
 export const STUCK_MINUTES = 15;

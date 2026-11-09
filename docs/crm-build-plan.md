@@ -13,6 +13,10 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
    ID or tax number) and then approve. Amounts and gifts come only from recorded donations and can't be typed
    over, so the receipt always matches the SARS IT3(d) file. Every action goes in the audit log.
    Check: open the demo charity's receipts, approve one, decline one, edit one.
+   **Built 09/11/2026, not yet on the test site** (migration `20261110000001_receipt_review.sql` waits for
+   Yehuda's yes; details in `docs/decisions.md`). As built: Edit covers the name and street address only. ID, tax
+   and registration numbers decide who the receipt is for, so they are not editable by the charity; the donor asks
+   for a correction from their account. Decline has no in-app notice until push (step 10).
 2. **"Asked for an s18A receipt" filter and reminder button** (2.1).
    Filter the donor list by asked / not asked / details missing. Button to remind selected donors to add
    their details (uses the existing reminder, at most once a week per donor).

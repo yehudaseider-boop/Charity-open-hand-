@@ -3,6 +3,7 @@ import { isErasedAddress } from "@/lib/email";
 import type { CharityRow, DonorRow, ReceiptDetails } from "./details";
 import type { IssuedReceipt, ReceiptStore } from "./issue";
 import type { PlanCharity, PlanDonation, PlannedReceipt } from "./plan";
+import type { StoredDecision } from "./review";
 import { s18aDetailsMissing, type S18aDetailsRow } from "@/lib/donations/s18a-details";
 
 const PAGE = 1000;
@@ -28,6 +29,21 @@ function identityOf(embed: unknown): string {
 function missingOf(embed: unknown): string[] {
   const row = (Array.isArray(embed) ? embed[0] : embed) as S18aDetailsRow | null | undefined;
   return row ? s18aDetailsMissing(row) : [];
+}
+
+/** A receipt_plan_decisions row as the review code uses it. */
+export function decisionFromRow(r: Record<string, unknown>): StoredDecision {
+  return {
+    id: r.id as string,
+    charityId: r.charity_id as string,
+    taxYear: Number(r.tax_year),
+    donorId: r.donor_id as string,
+    donorIdentity: (r.donor_identity as string | null) ?? "",
+    decision: r.decision as StoredDecision["decision"],
+    certificateFingerprint: r.certificate_fingerprint as string,
+    decidedAt: r.decided_at as string,
+    declineEmailedAt: (r.decline_emailed_at as string | null) ?? null,
+  };
 }
 
 /** How long a send may hold a receipt before another run may take it over. */
@@ -86,6 +102,17 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
           .range(from, to),
       );
       return new Set(rows.map((r) => r.donation_id));
+    },
+
+    async listDecisions(taxYear, charityId) {
+      const rows = await all<Record<string, unknown>>((from, to) => {
+        const q = db
+          .from("receipt_plan_decisions")
+          .select("id, charity_id, tax_year, donor_id, donor_identity, decision, certificate_fingerprint, decided_at, decline_emailed_at")
+          .eq("tax_year", taxYear);
+        return (charityId ? q.eq("charity_id", charityId) : q).order("id").range(from, to);
+      });
+      return rows.map(decisionFromRow);
     },
 
     async donorDetailsFor(donationIds) {

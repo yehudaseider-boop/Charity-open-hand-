@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { dropEmptyImports } from "./recorded-gifts-store";
 import { removeContactImport } from "./contacts-store";
 import { memberRole } from "./team";
+import { removeDecisions } from "@/lib/receipts/runs";
 import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 
 /**
@@ -22,8 +23,23 @@ export type Undo =
   | { type: "reinsert"; table: "charity_updates" | "charity_photos" | "charity_documents"; row: Record<string, unknown> }
   /** Start a campaign again that this action ended. */
   | { type: "reopen_campaign"; id: string }
-  /** Withdraw a receipt approval, while Givezy hasn't signed it off yet. */
-  | { type: "cancel_receipt_run"; id: string }
+  /**
+   * Withdraw a receipt approval, while Givezy hasn't signed it off yet, and the certificate approvals that
+   * "Approve all" made with it (09/11/2026).
+   */
+  | { type: "cancel_receipt_run"; id: string; decisionIds?: string[] }
+  /**
+   * Take back the charity's decision on one planned s18A receipt (09/11/2026), while its list isn't with Givezy:
+   * remove the decision this action wrote, put back the one it replaced (or a reopened one), and put back the
+   * donor's name and address a correction replaced, if nobody has changed them since. Server-only, kept 30 days.
+   */
+  | {
+      type: "receipt_decision";
+      taxYear: number;
+      remove?: { id: string; decidedAt: string };
+      reinsert?: Record<string, unknown> | null;
+      restore?: { donationId: string; before: Record<string, string | null>; after: Record<string, string | null> }[];
+    }
   /** Remove gifts the charity recorded (one, or a whole import), while none is on a receipt. */
   | { type: "remove_recorded"; donationIds?: string[]; importId?: string }
   /** Remove a whole import of a charity's own donor list (contacts). Only an owner may. */
@@ -79,7 +95,7 @@ export async function loadAction(charityId: string, id: string): Promise<ActionR
   return data as ActionRow;
 }
 
-export type UndoFailure = "gone" | "removed" | "late" | "changed" | "given" | "full" | "locked" | "ended" | "issued" | "owner" | "error";
+export type UndoFailure = "gone" | "removed" | "late" | "changed" | "given" | "full" | "locked" | "ended" | "issued" | "owner" | "sent" | "error";
 export type UndoResult = { ok: true; row: ActionRow } | { ok: false; why: UndoFailure; row: ActionRow | null };
 
 const editable = (status: string) => status === "draft" || status === "rejected";
@@ -203,7 +219,51 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
         .select("id");
       if (error) throw error;
       // Already signed off and issued (or already withdrawn): receipts can't be taken back here.
-      return data?.length ? null : "issued";
+      if (!data?.length) return "issued";
+      if (undo.decisionIds?.length) await removeDecisions(charityId, undo.decisionIds);
+      return null;
+    }
+    case "receipt_decision": {
+      // The list is with Givezy: it can't change until the charity takes its approval back.
+      const { data: runs, error: runError } = await db
+        .from("receipt_runs").select("id").eq("charity_id", charityId).eq("tax_year", undo.taxYear).in("status", ["charity_approved", "issuing"]);
+      if (runError) throw runError;
+      if (runs?.length) return "sent";
+      let removed: Record<string, unknown> | null = null;
+      if (undo.remove) {
+        const { data, error } = await db
+          .from("receipt_plan_decisions").delete().eq("id", undo.remove.id).eq("charity_id", charityId).eq("decided_at", undo.remove.decidedAt).select("*");
+        if (error) throw error;
+        // Decided again since (by this person or someone else at the charity): keep the newer decision.
+        if (!data?.length) return "changed";
+        removed = data[0] as Record<string, unknown>;
+      }
+      const putBack = async () => {
+        if (removed) await db.from("receipt_plan_decisions").insert(removed);
+      };
+      if (undo.restore?.length) {
+        const { error } = await db.rpc("correct_receipt_donor_details", {
+          p_charity_id: charityId,
+          p_tax_year: undo.taxYear,
+          p_rows: undo.restore.map((r) => ({ donation_id: r.donationId, expect: r.after, set: r.before })),
+        });
+        if (error) {
+          await putBack();
+          if (/receipt_details_issued/.test(error.message)) return "issued";
+          if (/receipt_details_changed/.test(error.message)) return "changed";
+          if (/receipt_details_not_found/.test(error.message)) return "removed";
+          throw error;
+        }
+      }
+      if (undo.reinsert && undo.reinsert.charity_id === charityId) {
+        const { error } = await db.from("receipt_plan_decisions").insert(undo.reinsert);
+        if (error) {
+          // Decided again since: keep the newer decision.
+          if (/duplicate key/.test(error.message)) return "changed";
+          throw error;
+        }
+      }
+      return null;
     }
     case "remove_member": {
       const { data, error } = await db.from("charity_admins").delete().eq("charity_id", charityId).eq("user_id", undo.userId).eq("role", "admin").select("user_id");
@@ -249,6 +309,7 @@ export function undoFailureText(why: UndoFailure): string {
     case "owner": return "Only your charity's owner can do this: change who has access or the bank account, or take back an import of donors.";
     case "ended": return "Its last day has passed, so it can't run again. Start a new campaign instead.";
     case "issued": return "It's already on an s18A receipt Givezy has issued, so it can't be taken back here. If something is wrong, tell us: only we can withdraw and re-issue a receipt.";
+    case "sent": return "Your list of s18A receipts is with Givezy now, so it can't change. Take back your approval first (s18A receipts), then try again.";
     case "error": return "Something went wrong and nothing was changed. Please try again.";
   }
 }

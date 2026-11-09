@@ -12,6 +12,7 @@ import type { EmailTransport } from "@/lib/email";
 import { buildReceiptEmail } from "./email";
 import { buildReceiptDetails, missingForSars, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped, type SeveralIdentities } from "./plan";
+import { applyDecisions, willIssue, type DecidedReceipt, type StoredDecision } from "./review";
 
 export type IssuedReceipt = { id: string; reference: string; charityId: string; details: ReceiptDetails; pdfPath: string | null };
 
@@ -20,6 +21,8 @@ export interface ReceiptStore {
   listDonations(taxYear: number, charityId?: string): Promise<PlanDonation[]>;
   listCharities(ids: string[]): Promise<(PlanCharity & CharityRow)[]>;
   receiptedDonationIds(taxYear: number): Promise<Set<string>>;
+  /** The charity's decision on each planned certificate (09/11/2026); one charity's only, when given. */
+  listDecisions(taxYear: number, charityId?: string): Promise<StoredDecision[]>;
   /** The donor details typed with a donation, plus when it was paid. */
   donorDetailsFor(donationIds: string[]): Promise<{ id: string; paidAt: string; amountCents: number; recordedMethod: string | null; donor: DonorRow }[]>;
   issue(receipt: PlannedReceipt, charity: CharityRow, details: ReceiptDetails): Promise<IssuedReceipt>;
@@ -76,10 +79,10 @@ export async function runReceiptsJob(args: {
   /** One charity's receipts only (the run it approved). Left out, every charity's. */
   charityId?: string;
   /**
-   * Called with exactly what is about to be issued, before anything is written. Throwing stops the run with
-   * nothing issued (the approved list no longer matches what would be issued).
+   * Called with every planned certificate and the charity's decision on each, before anything is written.
+   * Throwing stops the run with nothing issued (the approved list no longer matches what would be issued).
    */
-  checkPlan?: (receipts: PlannedReceipt[]) => void;
+  checkPlan?: (receipts: DecidedReceipt[]) => void;
 }): Promise<JobSummary> {
   const { store, taxYear, charityId } = args;
   const { start, end } = taxYearRange(taxYear);
@@ -90,7 +93,18 @@ export async function runReceiptsJob(args: {
   const donations = await store.listDonations(taxYear, charityId);
   const charities = await store.listCharities([...new Set(donations.map((d) => d.charityId))]);
   const already = await store.receiptedDonationIds(taxYear);
-  const { receipts, skipped, severalIdentities } = planReceipts({ taxYear, donations, charities, alreadyReceipted: already });
+  const planned = planReceipts({ taxYear, donations, charities, alreadyReceipted: already });
+  const { severalIdentities } = planned;
+  const skipped = [...planned.skipped];
+  // Issuing needs the charity's yes for each certificate (09/11/2026): a declined one, or one still to check
+  // (or changed since it was approved), is left out. A dry run lists everything on the plan.
+  const decided = args.mode === "issue" ? applyDecisions(planned.receipts, await store.listDecisions(taxYear, charityId)) : [];
+  if (args.mode === "issue") {
+    for (const r of decided.filter((x) => !willIssue(x))) {
+      for (const id of r.donationIds) skipped.push({ donationId: id, reason: r.status === "declined" ? "declined" : "not_approved" });
+    }
+  }
+  const receipts: PlannedReceipt[] = args.mode === "issue" ? decided.filter(willIssue) : planned.receipts;
 
   const summary: JobSummary = {
     taxYear,
@@ -108,7 +122,7 @@ export async function runReceiptsJob(args: {
   const fail = (what: string, e: unknown) => summary.failed.push({ what, message: e instanceof Error ? e.message : String(e) });
   for (const s of skipped) summary.skippedByReason[s.reason] = (summary.skippedByReason[s.reason] ?? 0) + 1;
   if (args.mode === "dry-run") return summary;
-  if (args.mode === "issue") args.checkPlan?.(receipts);
+  if (args.mode === "issue") args.checkPlan?.(decided);
 
   const charityById = new Map(charities.map((c) => [c.id, c]));
   // One bad receipt never stops the others: its failure is recorded and the run carries on.

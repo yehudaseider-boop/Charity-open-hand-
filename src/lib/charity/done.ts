@@ -43,10 +43,14 @@ export type ActionKind =
   | "appeal_sent"
   | "contacts_imported"
   | "contacts_removed"
-  | "sars_details_saved";
+  | "sars_details_saved"
+  | "certificate_approved"
+  | "certificate_edited"
+  | "certificate_declined"
+  | "certificate_reopened";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
-export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed"];
+export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed", "certificate_declined"];
 
 export type Details = Record<string, string | number | boolean | null | undefined>;
 export type Context = { base: string; publicUrl: string | null; approved: boolean };
@@ -141,6 +145,32 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         what: `You approved ${plural(Number(d.receipts ?? 0), "s18A receipt")} for the ${yearName(d.taxYear)} tax year, ${String(d.total ?? "")} in all. Nothing is issued yet: Givezy checks the list and signs it off, then each donor gets their receipt by email.`,
         next: { label: "See your donors", href: `${c.base}/donors` },
       };
+    case "certificate_approved":
+      return {
+        what: `You approved the s18A receipt for ${String(d.name ?? "this donor")}, ${String(d.total ?? "")} for the ${yearName(d.taxYear)} tax year. It's issued with your list once Givezy has signed it off.`,
+        next: nextCertificate(c, d),
+      };
+    case "certificate_edited":
+      return {
+        what: `You corrected the donor's ${String(d.changed ?? "details")} and approved the s18A receipt for ${String(d.name ?? "this donor")}. The receipt and your SARS file will both show the corrected details.`,
+        next: nextCertificate(c, d),
+      };
+    case "certificate_declined": {
+      const emailed = String(d.emailed ?? "");
+      const told =
+        emailed === "sent" ? `We've emailed them to contact you on ${String(d.phone ?? "your number")} or ${String(d.email ?? "your email")}.`
+        : emailed === "no_address" ? "We have no email address for them, so please contact them yourself."
+        : "The email to them hasn't gone yet: open the receipt and press Send the email again, or contact them yourself.";
+      return {
+        what: `You declined the s18A receipt for ${String(d.name ?? "this donor")}. It's left out of your list. ${told}`,
+        next: emailed === "sent" || emailed === "no_address" || !d.key ? nextCertificate(c, d) : { label: "Open the receipt", href: certificateHref(c, d.taxYear, d.key) },
+      };
+    }
+    case "certificate_reopened":
+      return {
+        what: `The s18A receipt for ${String(d.name ?? "this donor")} is back to "To check".${d.was === "declined" ? " We haven't emailed the donor about it." : ""}`,
+        next: d.key ? { label: "Open the receipt", href: certificateHref(c, d.taxYear, d.key) } : { label: "Back to your list", href: `${c.base}/receipts` },
+      };
     case "gift_recorded":
       return {
         what: `${String(d.amount ?? "The gift")} from ${String(d.name ?? "your donor")} on ${String(d.date ?? "")} is recorded${d.s18a ? ". It goes on their s18A receipt for the tax year" : ""}.`,
@@ -209,6 +239,9 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "document_uploaded": return `Taken back. ${quote(d.fileName)} is removed.`;
     case "document_removed": return `Taken back. ${quote(d.fileName)} is back.`;
     case "gift_recorded": return "Taken back. The gift is removed and no longer counts anywhere.";
+    case "certificate_approved": return `Taken back. The s18A receipt for ${String(d.name ?? "this donor")} is as it was before you approved it.`;
+    case "certificate_edited": return `Taken back. The donor's name and address are as they were before, and the s18A receipt is as it was before you corrected it.`;
+    case "certificate_reopened": return `Taken back. The s18A receipt for ${String(d.name ?? "this donor")} is ${d.was === "declined" ? "declined" : "approved"} again. We haven't emailed the donor.`;
     case "member_added": return `Taken back. ${String(d.email ?? "They")} no longer ${d.email ? "has" : "have"} access to your dashboard.`;
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;
     case "receipts_approved": return `Taken back. Your approval for the ${yearName(d.taxYear)} tax year is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
@@ -220,6 +253,7 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "gifts_removed":
     case "member_removed":
     case "appeal_sent":
+    case "certificate_declined":
       return "This can't be taken back.";
   }
 }
@@ -231,7 +265,7 @@ export function pageOf(kind: ActionKind): string {
   if (kind.startsWith("update_") || kind.startsWith("photo_")) return "updates";
   if (kind === "thank_you_sent") return "thank-donors";
   if (kind === "donor_thanked" || kind === "contacts_imported" || kind === "contacts_removed") return "donors";
-  if (kind === "receipts_approved" || kind === "sars_details_saved") return "receipts";
+  if (kind === "receipts_approved" || kind === "sars_details_saved" || kind.startsWith("certificate_")) return "receipts";
   if (kind === "gift_recorded" || kind === "gifts_imported" || kind === "gifts_removed") return "donations";
   if (kind === "member_added" || kind === "member_removed") return "team";
   if (kind === "appeal_sent") return "email-donors";
@@ -250,7 +284,19 @@ const KINDS = new Set<ActionKind>([
   "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
   "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
   "contacts_imported", "contacts_removed", "sars_details_saved",
+  "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened",
 ]);
+
+/** A planned s18A receipt's preview page. */
+export function certificateHref(c: Pick<Context, "base">, taxYear: unknown, key: unknown): string {
+  return `${c.base}/receipts/certificate?year=${encodeURIComponent(String(taxYear ?? ""))}&c=${encodeURIComponent(String(key ?? ""))}`;
+}
+
+/** After a decision on one s18A receipt: the next one still to check, or back to the list to approve it. */
+function nextCertificate(c: Context, d: Details): { label: string; href: string } {
+  if (d.nextKey) return { label: `Next to check: ${String(d.nextName ?? "the next receipt")}`, href: certificateHref(c, d.taxYear, d.nextKey) };
+  return { label: "Back to your list to approve it", href: `${c.base}/receipts#year-${String(d.taxYear ?? "")}` };
+}
 
 /** Undo is offered while it is recent, not yet taken back, and the action stored what it needs. */
 export function canUndo(row: { undo: unknown; undone_at: string | null; created_at: string }, now: Date): boolean {

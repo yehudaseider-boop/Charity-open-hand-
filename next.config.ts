@@ -58,6 +58,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/admin/receipts": receiptFiles,
     "/charity-admin/\\[id\\]/receipts": receiptFiles,
+    // The charity's preview of a receipt loads the receipt's fonts from here (09/11/2026).
+    "/receipt-fonts/\\[file\\]": ["./src/lib/receipts/fonts/BricolageGrotesque-Bold.ttf", "./node_modules/@fontsource/dm-sans/files/dm-sans-latin-{400,500,600}-normal.woff2"],
   },
   experimental: {
     // Server actions accept 1 MB by default, but charity photos and documents may be up to 4 MB

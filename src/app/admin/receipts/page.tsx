@@ -48,7 +48,10 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
   const [waiting, unfinished, years] = await Promise.all([listWaitingRuns(), listUnfinishedRuns(), yearsWithReceipts()]);
   const pending = await Promise.all(waiting.map((w) => pendingAtYearEnd(w.charity_id, w.tax_year)));
   // Gifts held back because the donor hasn't added the s18A details yet (they are never receipted as they are).
-  const detailsMissing = await Promise.all(waiting.map((w) => loadPlan(w.charity_id, w.tax_year).then((p) => p.detailsMissing.length).catch(() => null)));
+  const plans = await Promise.all(waiting.map((w) => loadPlan(w.charity_id, w.tax_year).catch(() => null)));
+  const detailsMissing = plans.map((p) => (p ? p.detailsMissing.length : null));
+  // Receipts the charity declined (09/11/2026): left out of its list, and the donor asked to contact the charity.
+  const declined = plans.map((p) => p?.counts.declined ?? 0);
   const enabled = receiptsEnabled();
 
   return (
@@ -79,6 +82,11 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
             <p>
               {taxYearLabel(w.tax_year)}: {w.receipts_planned} {w.receipts_planned === 1 ? "receipt" : "receipts"}, {formatRand(w.total_cents)}. Approved by the charity on {formatDate(w.charity_approved_at)}.
             </p>
+            {declined[i] ? (
+              <p className="text-muted">
+                The charity declined {declined[i]} {declined[i] === 1 ? "receipt" : "receipts"} after checking {declined[i] === 1 ? "it" : "them"}: left out of this list, and each donor was asked to contact the charity.
+              </p>
+            ) : null}
             {pending[i] ? <p className="text-warning">{pending[i]} s18A {pending[i] === 1 ? "payment" : "payments"} from the last days of the year still pending. Check Payments first.</p> : null}
             {detailsMissing[i] ? (
               <p className="text-warning">
