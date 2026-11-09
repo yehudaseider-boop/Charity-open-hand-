@@ -111,7 +111,7 @@ export function body({ cfg, logo, splash, today }) {
     <tbody>
       <tr><td>Signing up and listing</td><td>Nothing. No sign-up fee and no monthly fee.</td></tr>
       <tr><td>Givezy platform fee</td><td>None. Givezy charges no platform fee and no processing fee on donations.</td></tr>
-      <tr><td>Card fee</td><td>Our payment provider charges a fee on each card payment. It is paid by your charity, out of the donation, before the money reaches your bank. The exact fee will be confirmed before going live.</td></tr>
+      <tr><td>Card fee</td><td>Our payment provider charges a fee on each card payment. Each side pays it on its own share: your charity pays the fee on its donation, and Givezy pays the fee on any contribution a donor adds for Givezy. Your part comes off the donation before the money reaches your bank. The exact fee will be confirmed before going live.</td></tr>
     </tbody>
   </table>
 
@@ -132,7 +132,7 @@ export function body({ cfg, logo, splash, today }) {
   <h2>Gifts that don't come through Givezy</h2>
   <p>An EFT, cash, a debit order or a gift through another giving programme can be recorded on your dashboard (one at a time, or many from a spreadsheet). No card fee or contribution applies, and if the donor wants one, the gift goes on their yearly s18A receipt with their other gifts to you.</p>
 
-  ${open("To be confirmed before going live:", "the card fee itself (we will tell you the rate before going live), whether the fee on a donor's contribution to Givezy also comes out of your share, and whether Givezy charges anything for receipting gifts you record yourself. [to be agreed]")}
+  ${open("To be confirmed before going live:", "the card fee itself (we will tell you the rate before going live), and whether Givezy charges anything for receipting gifts you record yourself. [to be agreed]")}
 </div>
 
 <!-- 3 -->

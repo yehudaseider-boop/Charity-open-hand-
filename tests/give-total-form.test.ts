@@ -102,8 +102,8 @@ describe("the contribution to Givezy: buttons, Other and No thanks (decided 09/1
     expect(sent.at(-1)).toEqual({ giftCents: 25_000, contributionCents: 0, cover: false, shownTotalCents: 25_000 });
     expect(alertText()).toContain("Accepted by the server.");
 
-    await choose("3000");
-    expect(giveButton().textContent).toBe("Give R280");
+    await choose("2000");
+    expect(giveButton().textContent).toBe("Give R270");
     expect(host.textContent).not.toContain("No contribution this time");
   });
 
@@ -123,8 +123,8 @@ describe("the contribution to Givezy: buttons, Other and No thanks (decided 09/1
   it("says a month on the buttons and in the total when the gift is monthly", async () => {
     await tick("monthly");
     const labels = [...host.querySelectorAll('input[name="contribution_choice"]')].map((i) => i.closest("label")?.textContent);
-    expect(labels).toContain("R20 a month");
-    expect(breakdown()).toContain("Contribution to GivezyR20 a month");
+    expect(labels).toContain("R10 a month");
+    expect(breakdown()).toContain("Contribution to GivezyR10 a month");
     expect(breakdown()).toContain("Total each month");
   });
 });

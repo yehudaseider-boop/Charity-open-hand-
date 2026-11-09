@@ -1641,6 +1641,9 @@ From the code review, in `supabase/migrations/20261109000001_review_fixes_09_11.
 
 ## The contribution to Givezy: amount buttons, Other and No thanks (Yehuda, 09/11/2026)
 
+**Later the same day (Yehuda):** the buttons are R10, R15 and R20 with **R10 preselected** ("start on R10 and go up to R20 as max"); Other still takes more. And **each side pays the provider's card charge on its own share**: the charity on its gift, Givezy on the contribution (`gatewayChargePaidBy: "each"`). In the Paystack adapter this is an inline flat split with `bearer_type: "all-proportional"` (Paystack's API spec, SplitCreate, accepted by initialize and by charge_authorization), the charity's line as the subaccount's share and the rest to Givezy's main account; "cover the card charge" is then worked out on the gift alone. The 09/11 test payment had shown the charity carrying the whole charge (R3.16 on R60), including the part on Givezy's R10. Not yet proven against Paystack's test mode: the next test payment must show the two fees in proportion. The entry below describes the first version (R10/R20/R30, R20 preselected).
+
+
 Replaces the tick box and amount box (the 08/10/2026 entry: "unticked by default"). On the website's give form and
 the app's give screen the contribution to Givezy is now one radio group: R10, R20 and R30 buttons (Rand, not a
 percentage), "Other" (the donor types an amount, minimum R10, the same maximum as before) and, under the buttons, a

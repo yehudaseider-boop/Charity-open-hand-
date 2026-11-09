@@ -20,12 +20,14 @@ export const platformConfig = {
      * No platform fee and no processing fee on donations (Yehuda, 08/10/2026).
      * The donor may give Givezy a separate contribution (the buttons below, or "No thanks").
      *
-     * The gateway's own charge is paid by the charity, out of its donation
-     * (Yehuda, 14/10/2026). The donor may tick "cover the card charge" so the
+     * The gateway's own charge: each side pays it on its own share, in proportion
+     * (Yehuda, 09/11/2026: "Givezy should cover ... its charge"). The charity pays the
+     * charge on its gift, Givezy on the contribution. Was the charity on the whole
+     * payment (14/10/2026). The donor may tick "cover the card charge" so the
      * charity gets the full gift (Yehuda, 25/10/2026); the box only shows once
      * the gateway's rates below are filled in.
      */
-    gatewayChargePaidBy: "charity" as "charity" | "givezy" | null,
+    gatewayChargePaidBy: "each" as "charity" | "givezy" | "each" | null,
     /** The gateway's charge, from its rate sheet. Empty until Yehuda supplies it. */
     gatewayPercent: null as string | null,
     gatewayFixedCents: null as number | null,
@@ -53,8 +55,8 @@ export const platformConfig = {
    * "No thanks" (R0). Rand amounts, not a percentage. The default is preselected and must be one of the presets
    * (anything else starts on "No thanks"). With a monthly gift the contribution repeats each month.
    */
-  contributionPresetsCents: [1_000, 2_000, 3_000],
-  contributionDefaultCents: 2_000,
+  contributionPresetsCents: [1_000, 1_500, 2_000],
+  contributionDefaultCents: 1_000,
 
   vat: {
     /** Off until the company is VAT-registered. */

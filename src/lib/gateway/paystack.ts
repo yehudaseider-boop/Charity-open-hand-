@@ -36,7 +36,7 @@ const BANK_NAMES: Record<string, string> = {
  * `transaction_charge` (a flat amount, in cents) is what stays with the main account: the
  * donor's optional contribution to Givezy. `bearer` says who pays Paystack's own fee:
  * "subaccount" (the charity) or "account" (Givezy), from the platform setting
- * `gatewayChargePaidBy` (decided 14/10/2026: the charity pays it).
+ * `gatewayChargePaidBy` (decided 09/11/2026: each side pays it on its own share; before, the charity paid it all).
  *
  * Splitting is a switch: PAYSTACK_SPLITS=yes. Off, a charity takes no payments through
  * this gateway (the money would otherwise land with Givezy). Whether Paystack splits for
@@ -93,6 +93,21 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines">) {
   if (!req.feeBearer) throw new GatewayError("Who pays the gateway charge is not decided, so a split payment cannot start.");
   if (!Number.isSafeInteger(req.lines.contributionCents) || req.lines.contributionCents < 0) throw new GatewayError("The contribution must be a whole number of cents.");
+  if (req.feeBearer === "each") {
+    // Each side pays Paystack's charge on its own share: an inline split (Paystack's API spec, SplitCreate, accepted
+    // by initialize and by charge_authorization) of type flat, the charity's line to its subaccount and the rest (the
+    // contribution) to Givezy's main account, with bearer_type "all-proportional". Shares are in cents.
+    if (!Number.isSafeInteger(req.lines.charityCents) || req.lines.charityCents <= 0) throw new GatewayError("The charity's share must be a whole number of cents.");
+    return {
+      split: {
+        name: "Givezy gift",
+        type: "flat",
+        currency: "ZAR",
+        bearer_type: "all-proportional",
+        subaccounts: [{ subaccount: req.charityAccountRef, share: req.lines.charityCents }],
+      },
+    };
+  }
   return {
     subaccount: req.charityAccountRef,
     // Paystack's API spec types this as a string (on initialize and on charge_authorization). Still cents.

@@ -37,6 +37,11 @@ export type CardChargeRates = {
   fixedCents: number;
   /** The provider adds VAT on top of the rates above: the VAT rate in ppm. 0 when the rates already include it. */
   vatOnTopPpm: number;
+  /**
+   * Each side pays the provider's charge on its own share (decided 09/11/2026): the charity's charge is on the gift
+   * only, so the cover is worked out on the gift alone. Absent or false: the charity bears the charge on the whole payment.
+   */
+  coverGiftOnly?: boolean;
 };
 
 const PPM = BigInt(1_000_000);
@@ -79,7 +84,8 @@ export class FeeError extends Error {
 
 /**
  * `coverRates`: the donor ticked "cover the card charge" and the provider's rates are known. The charge is worked out
- * on the whole payment (gift and contribution), because the provider charges the whole payment and the charity bears it.
+ * on the whole payment (gift and contribution) when the charity bears the whole charge, or on the gift alone when each
+ * side pays the charge on its own share (`coverGiftOnly`). Rounded up either way: never a cent short.
  */
 export function priceDonation(amountCents: number, contributionCents: number, m: Minimums, coverRates?: CardChargeRates | null): Pricing {
   if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
@@ -102,6 +108,6 @@ export function priceDonation(amountCents: number, contributionCents: number, m:
   }
   const base = amountCents + contributionCents;
   if (!Number.isSafeInteger(base)) throw new FeeError("invalid_amount", "Enter a valid amount.");
-  const cardChargeCents = coverRates ? cardChargeToCover(base, coverRates) : 0;
+  const cardChargeCents = coverRates ? cardChargeToCover(coverRates.coverGiftOnly ? amountCents : base, coverRates) : 0;
   return { amountCents, contributionCents, cardChargeCents, totalCents: base + cardChargeCents };
 }

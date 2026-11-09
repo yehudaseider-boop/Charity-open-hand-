@@ -12,7 +12,7 @@ const b64 = (p) => readFileSync(join(root, p)).toString("base64");
 const { platformConfig: cfg } = await import(pathToFileURL(join(root, "src/config/platform.ts")).href);
 
 // The pack says the card fee is paid by the charity and is not set yet. Stop if either has changed.
-if (cfg.fees.gatewayChargePaidBy !== "charity") throw new Error("gatewayChargePaidBy changed: update section 2 of the pilot pack.");
+if (cfg.fees.gatewayChargePaidBy !== "each") throw new Error("gatewayChargePaidBy changed: update section 2 of the pilot pack.");
 if (cfg.fees.gatewayPercent !== null || cfg.fees.gatewayFixedCents !== null) throw new Error("Gateway rates are now set: update section 2 of the pilot pack.");
 
 const fonts = [

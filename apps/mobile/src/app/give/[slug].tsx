@@ -336,7 +336,7 @@ export default function Give() {
   const contribution = extraResult.ok ? extraResult.cents : null;
   // "Cover the card charge": shown only when the server sent the provider's rates (never a made-up figure).
   const rates = server?.cardChargeRates ?? null;
-  const cardCharge = coverCharge && rates && gift !== null && gift > 0 && contribution !== null ? cardChargeToCover(gift + contribution, rates) : 0;
+  const cardCharge = coverCharge && rates && gift !== null && gift > 0 && contribution !== null ? cardChargeToCover(rates.coverGiftOnly ? gift : gift + contribution, rates) : 0;
   const total = gift !== null && contribution !== null ? gift + contribution + cardCharge : null;
   // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
   const isMonthly = monthly && !campaignId && !heldAttempt;

@@ -50,4 +50,4 @@ export const sampleDonor = { name: "Sarah Dube", email: "sarah@example.co.za" };
  * The preview only (it has no server): the contribution buttons as the server sends them from
  * platformConfig. The live app always uses the server's figures; a test keeps these the same.
  */
-export const sampleContribution = { presetsCents: [1_000, 2_000, 3_000], defaultCents: 2_000, minCents: 1_000 };
+export const sampleContribution = { presetsCents: [1_000, 1_500, 2_000], defaultCents: 1_000, minCents: 1_000 };

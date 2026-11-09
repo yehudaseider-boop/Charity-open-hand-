@@ -179,7 +179,7 @@ export function cleanRates(v: unknown): CardChargeRates | null {
   const r = v as Record<string, unknown>;
   const ok = (n: unknown, max: number) => Number.isSafeInteger(n) && (n as number) >= 0 && (n as number) < max;
   if (!ok(r.percentPpm, 500_000) || !ok(r.fixedCents, 100_000) || !ok(r.vatOnTopPpm, 1_000_000)) return null;
-  return { percentPpm: r.percentPpm as number, fixedCents: r.fixedCents as number, vatOnTopPpm: r.vatOnTopPpm as number };
+  return { percentPpm: r.percentPpm as number, fixedCents: r.fixedCents as number, vatOnTopPpm: r.vatOnTopPpm as number, ...(r.coverGiftOnly === true ? { coverGiftOnly: true } : {}) };
 }
 
 /** A saved card as the server describes it: brand, last four digits and expiry only; anything else is dropped. */

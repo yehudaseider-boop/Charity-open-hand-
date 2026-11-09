@@ -71,6 +71,17 @@ describe("starting a checkout", () => {
     });
   });
 
+  it("each side paying its own share sends an inline flat split, the charity's line to its subaccount, fee in proportion", async () => {
+    await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "each" });
+    expect(calls[0].body).toMatchObject({
+      amount: 20_345,
+      split: { type: "flat", currency: "ZAR", bearer_type: "all-proportional", subaccounts: [{ subaccount: "ACCT_charity1", share: 18_000 }] },
+    });
+    expect(calls[0].body).not.toHaveProperty("subaccount");
+    expect(calls[0].body).not.toHaveProperty("transaction_charge");
+    expect(calls[0].body).not.toHaveProperty("bearer");
+  });
+
   it("Givezy bearing the fee means the main account bears it", async () => {
     await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "givezy" });
     expect(calls[0].body).toMatchObject({ bearer: "account", subaccount: "ACCT_charity1" });

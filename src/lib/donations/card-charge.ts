@@ -3,7 +3,7 @@ import { cardChargeToCover, type CardChargeRates } from "@/lib/fees";
 import { percentToPpm } from "@/lib/money";
 
 type FeeSettings = {
-  gatewayChargePaidBy: "charity" | "givezy" | null;
+  gatewayChargePaidBy: "charity" | "givezy" | "each" | null;
   gatewayPercent: string | null;
   gatewayFixedCents: number | null;
   gatewayRatesIncludeVat: boolean | null;
@@ -17,12 +17,13 @@ export function cardChargeRates(
   fees: FeeSettings = platformConfig.fees,
   vatPercent: string = platformConfig.vat.ratePercent,
 ): CardChargeRates | null {
-  if (fees.gatewayChargePaidBy !== "charity") return null;
+  if (fees.gatewayChargePaidBy !== "charity" && fees.gatewayChargePaidBy !== "each") return null;
   if (fees.gatewayPercent === null || fees.gatewayFixedCents === null || fees.gatewayRatesIncludeVat === null) return null;
   return {
     percentPpm: percentToPpm(fees.gatewayPercent),
     fixedCents: fees.gatewayFixedCents,
     vatOnTopPpm: fees.gatewayRatesIncludeVat ? 0 : percentToPpm(vatPercent),
+    ...(fees.gatewayChargePaidBy === "each" ? { coverGiftOnly: true } : {}),
   };
 }
 
@@ -31,5 +32,5 @@ export function cardChargeRates(
  * so a change in the provider's rates is followed. Nothing when the rates are not known.
  */
 export function monthlyCardCharge(amountCents: number, contributionCents: number, covers: boolean, rates: CardChargeRates | null = cardChargeRates()): number {
-  return covers && rates ? cardChargeToCover(amountCents + contributionCents, rates) : 0;
+  return covers && rates ? cardChargeToCover(rates.coverGiftOnly ? amountCents : amountCents + contributionCents, rates) : 0;
 }

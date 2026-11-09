@@ -13,8 +13,8 @@ const min = platformConfig.minContributionCents;
 
 describe("the config", () => {
   it("has the decided presets and default, in whole Rand cents, each at least the minimum", () => {
-    expect(platformConfig.contributionPresetsCents).toEqual([1_000, 2_000, 3_000]);
-    expect(platformConfig.contributionDefaultCents).toBe(2_000);
+    expect(platformConfig.contributionPresetsCents).toEqual([1_000, 1_500, 2_000]);
+    expect(platformConfig.contributionDefaultCents).toBe(1_000);
     for (const c of platformConfig.contributionPresetsCents) {
       expect(Number.isSafeInteger(c)).toBe(true);
       expect(c).toBeGreaterThanOrEqual(min);
@@ -28,7 +28,7 @@ describe("the config", () => {
 
 describe("startingChoice", () => {
   it("preselects the default when it is one of the presets", () => {
-    expect(startingChoice(platformConfig.contributionPresetsCents, platformConfig.contributionDefaultCents)).toBe(2_000);
+    expect(startingChoice(platformConfig.contributionPresetsCents, platformConfig.contributionDefaultCents)).toBe(1_000);
   });
   it("starts on No thanks rather than make up an amount", () => {
     expect(startingChoice([1_000, 3_000], 2_000)).toBe("none");

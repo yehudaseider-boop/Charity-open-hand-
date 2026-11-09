@@ -96,3 +96,16 @@ describe("monthly donations and the app", async () => {
     expect(cleanRates({ percentPpm: 29_000, fixedCents: -1, vatOnTopPpm: 0 })).toBeNull();
   });
 });
+
+describe("each side pays the charge on its own share (09/11/2026)", () => {
+  it("the cover is worked out on the gift alone, and is never smaller than the charity's part of the charge", () => {
+    const own = { ...R, coverGiftOnly: true };
+    const p = priceDonation(19_000, 2_000, { minDonationCents: 3_000, minContributionCents: 1_000 }, own);
+    expect(p.cardChargeCents).toBe(cardChargeToCover(19_000, R));
+    expect(p.cardChargeCents).toBeLessThan(cardChargeToCover(21_000, R));
+    // The charity's proportional part of the whole charge is covered in full.
+    const whole = providerCharge(p.totalCents, R);
+    const charityPart = Math.ceil((whole * (19_000 + p.cardChargeCents)) / p.totalCents);
+    expect(19_000 + p.cardChargeCents - charityPart).toBeGreaterThanOrEqual(19_000);
+  });
+});
