@@ -27,15 +27,13 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 6. **Donor journeys** (1.1, 1.2, and the Thank donors tab folded in, 5). Built in three chunks:
    - 6a. One general journey: steps (email, wait X days), on/off, who is at which step.
    - 6b. Campaign journeys: donating to a campaign enrols the donor.
-   - 6c. One limit across all journeys and thank-yous. **Decision: Yehuda** (suggest at most one message a
-     week per donor, as the personal thank-you already works).
+   - 6c. One limit across all journeys and thank-yous. Decided 09/11/2026: at most one message a week per donor.
    In-app messages come after push notifications (step 10).
 7. **Win-back from the lapsed list** (3): add lapsed donors to a journey from step 4's list. Needs 6.
 
 ## Phase 3: donors and team
 
-8. **Import template with phone and address** (4.1). ID and tax number stay optional. **Decision: Yehuda**
-   (recommended: optional; bulk ID numbers are a POPIA risk and only s18A needs them).
+8. **Import template with phone and address** (4.1). ID and tax number stay optional. Decided 09/11/2026: optional.
 9. **Roles: Admin, Finance, Fundraiser, Viewer** (6). The owner sets each person's role; sensitive actions
    (approve s18A, exports, IT3(d), bank, team) limited by role. Database rules updated so each role can only
    read what it may. Audit log shown readably ("Sarah approved the s18A receipt for ... on 03/03/2027").
@@ -48,7 +46,7 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 ## Phase 4: public profile
 
 12. **Profile video** (7.1). Link a YouTube or Vimeo video first (no storage cost); uploads later if needed.
-    **Decision: Yehuda** (link or upload; uploads cost storage).
+    Decided 09/11/2026: link first.
 13. **Charity's own "focus right now"** (7.2). Charity picks a campaign, dates and a short message; shown on
     its profile and in the app. Push to its donors only after step 10, with a limit (suggest once a month).
     Givezy's own cause of the week stays as it is.
@@ -72,8 +70,8 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 | s18A fields; Givezy issuing on the charity's behalf | Yosef / accountant | Built per SARS; mandate draft with Yosef |
 | One annual certificate or per donation | Decided | One per donor per tax year (built) |
 | Can a third party submit IT3(d) | Accountant | No; the charity uploads (step 15) |
-| ID and tax number optional on import | Yehuda | Recommend optional (step 8) |
+| ID and tax number optional on import | Decided 09/11/2026 | Optional |
 | POPIA wording for invited donors | Yosef | Needed before step 11 |
-| Most messages per donor per week | Yehuda | Suggest one (step 6c) |
+| Most messages per donor per week | Decided 09/11/2026 | One |
 | Netflorist | Yehuda | Parked |
-| Video limits | Yehuda | Links first (step 12) |
+| Video limits | Decided 09/11/2026 | Links first |
