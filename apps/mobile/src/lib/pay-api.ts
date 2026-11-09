@@ -130,7 +130,7 @@ export function startPayment(
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null }
+  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null; contributionPresetsCents: number[]; contributionDefaultCents: number }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
@@ -155,12 +155,22 @@ export async function checkReady(site: string, slug: string, campaignId: string 
         savedCardsOpen: j.savedCardsOpen === true,
         savedCard: cleanSavedCard(j.savedCard),
         cardChargeRates: cleanRates(j.cardChargeRates),
+        // The contribution buttons (platformConfig on the server). An older server sends none: then only Other and
+        // No thanks show, and nothing is preselected, rather than an amount made up in the app.
+        ...cleanContribution(j.contributionPresetsCents, j.contributionDefaultCents, j.minContributionCents),
       };
     }
   } catch {
     // fall through
   }
   return { ok: false, message: NETWORK };
+}
+
+/** The contribution buttons as the server sends them: whole cents from the minimum, at most four; the default only when it is one of them. */
+export function cleanContribution(presets: unknown, def: unknown, minCents: number): { contributionPresetsCents: number[]; contributionDefaultCents: number } {
+  const list = Array.isArray(presets) ? presets.filter((c): c is number => Number.isSafeInteger(c) && c >= minCents && c <= 10_000_000).slice(0, 4) : [];
+  const d = typeof def === "number" && list.includes(def) ? def : 0;
+  return { contributionPresetsCents: list, contributionDefaultCents: d };
 }
 
 /** The provider's rates as the server sends them, or null (which hides "cover the card charge"). Anything odd is null. */

@@ -6,8 +6,16 @@ import { useEffect, type RefObject } from "react";
  * fresh, and the hidden "website" box (a trap for robots) is never filled in. */
 const NEVER = /id_number|tax_number|tax_reference|registration_number|passport|consent|agree|terms|card|^website$/i;
 const KEEP_FOR_MS = 2 * 60 * 60 * 1000;
-/** The few choices that decide which boxes show (who is giving, whether they want an s18A receipt, a dedication). */
-const CHOICES = /^(donor_type|wants_18a|s18a_when|dedication_kind)$/;
+/** The few choices that decide which boxes show (who is giving, whether they want an s18A receipt, a dedication),
+ * and the contribution to Givezy the donor chose (so "No thanks" is still chosen after a declined card). */
+const CHOICES = /^(donor_type|wants_18a|s18a_when|dedication_kind|contribution_choice)$/;
+
+/** A box whose value React holds (`data-draft-controlled`): set it the way typing does, so the page's own state follows. */
+function setControlled(f: HTMLInputElement | HTMLTextAreaElement, v: string) {
+  const proto = f instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(f, v);
+  f.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
 function draftStoreKey(key: string): string {
   return `gz_draft:${key}`;
@@ -56,7 +64,10 @@ export function useFormDraft(form: RefObject<HTMLFormElement | null>, key: strin
         const restoreText = () => {
           for (const f of fields()) {
             const v = saved.values[f.name];
-            if (v && !f.value) f.value = v;
+            if (v && !f.value) {
+              if (f.hasAttribute("data-draft-controlled")) setControlled(f, v);
+              else f.value = v;
+            }
           }
         };
         restoreText();
@@ -66,6 +77,9 @@ export function useFormDraft(form: RefObject<HTMLFormElement | null>, key: strin
           if (f.type === "radio" ? want && !f.checked : f.checked !== want) f.click();
         }
         restoreText();
+        // A click made inside this effect is rendered just after it, so boxes it opens (the contribution's
+        // Other amount) are filled once more on the next turn.
+        setTimeout(restoreText, 0);
       }
     } catch {
       // Storage blocked or a broken draft: start with an empty form, as before.

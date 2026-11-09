@@ -12,6 +12,7 @@ import { submitDonation, type CheckoutState } from "./actions";
 import { impactLine, impactSource, type ImpactUnit } from "@/lib/charity/impact";
 import { platformConfig } from "@/config/platform";
 import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
+import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionLabel, startingChoice, type ContributionChoice } from "@/lib/donations/contribution";
 
 type Props = {
   slug: string;
@@ -45,6 +46,17 @@ type Props = {
 
 const noSubscribe = () => () => {};
 
+/** The contribution buttons, from the config (never written into the page). */
+const contributionPresets: readonly number[] = platformConfig.contributionPresetsCents;
+
+function TickMark() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-current">
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
 /** As the donor would type it: 180, 180.50. */
 const centsToInput = (c: number) => (c % 100 ? `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}` : String(c / 100));
 
@@ -72,18 +84,25 @@ export function DonateFlow({
   // The amount, the contribution and the card charge box decide the live total, worked out as the donor types.
   const [amountText, setAmountText] = useState(initialAmountCents ? centsToInput(initialAmountCents) : "");
   const [picked, setPicked] = useState<number | null>(initialAmountCents && suggestedCents.includes(initialAmountCents) ? initialAmountCents : null);
-  const [giveExtra, setGiveExtra] = useState(false);
+  // The contribution to Givezy: the configured default preselected, or Other, or No thanks.
+  const [contribChoice, setContribChoice] = useState<ContributionChoice>(() => startingChoice(contributionPresets, platformConfig.contributionDefaultCents));
   const [contributionText, setContributionText] = useState("");
   const [coverCharge, setCoverCharge] = useState(false);
   // An amount's problem shows once the donor leaves the box or presses Give, not while they are still typing "3" of "300".
   const [amountTouched, setAmountTouched] = useState(false);
   const [contributionTouched, setContributionTouched] = useState(false);
-  const live = quoteFromTyped(amountText, giveExtra, contributionText, coverCharge);
+  const live = quoteFromTyped(amountText, contribChoice, contributionText, coverCharge);
   // When the server worked out a different total (the provider's rates changed since the page opened), its figures
   // are shown instead until the donor changes the amount again, so Give always sends the total on screen.
   const [serverQuote, setServerQuote] = useState<Quote | null>(null);
   const quote = serverQuote ?? (live.ok ? live.quote : null);
   const changed = () => setServerQuote(null);
+  const chooseContribution = (c: ContributionChoice) => {
+    setContribChoice(c);
+    changed();
+    // Other opens the box to type in; what was typed there before is kept.
+    if (c === "other") requestAnimationFrame(() => contributionRef.current?.focus());
+  };
 
   const typedCents = parseRandToCents(amountText);
   // Only for an amount we can take: never a "pays for" line next to an amount the server will refuse.
@@ -116,6 +135,7 @@ export function DonateFlow({
   const [s18aWhen, setS18aWhen] = useState<"now" | "later">(account?.savedIdLast4 ? "now" : "later");
   const [monthly, setMonthly] = useState(initialMonthly && !campaign);
   const org = donorType !== "individual";
+  const monthlyOn = monthly && !campaign;
   const detailsNow = want18a && s18aWhen === "now";
   const idBoxesShown = org || !(account?.savedIdLast4 && useSavedId);
   const formRef = useRef<HTMLFormElement>(null);
@@ -230,54 +250,10 @@ export function DonateFlow({
         {/* While the amount has a problem, its message says what to do; the hint comes back once it is fixed. */}
         {amountError ? null : <p id="amount-hint" className="text-sm text-muted">Minimum {minimumLabel}. No Givezy fee.</p>}
 
-        <div className="space-y-2 rounded-control bg-honey-soft p-4">
-          <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
-            <input
-              type="checkbox"
-              name="give_extra"
-              className="mt-0.5"
-              checked={giveExtra}
-              onChange={(e) => {
-                setGiveExtra(e.target.checked);
-                changed();
-              }}
-            />
-            <span>Also give to Givezy, to help keep this platform running. Optional.</span>
-          </label>
-          {giveExtra ? (
-            <div>
-              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Givezy</label>
-              <div className="mt-1 flex items-center rounded-[0.875rem] border-2 border-border bg-surface px-3 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
-                <span className="text-muted">R</span>
-                <input
-                  id="contribution"
-                  ref={contributionRef}
-                  name="contribution"
-                  data-no-draft
-                  inputMode="decimal"
-                  autoComplete="off"
-                  required
-                  maxLength={16}
-                  value={contributionText}
-                  aria-invalid={contributionError ? true : undefined}
-                  aria-describedby={contributionError ? "contribution-error" : undefined}
-                  onChange={(e) => {
-                    setContributionText(e.target.value);
-                    changed();
-                  }}
-                  onBlur={() => setContributionTouched(true)}
-                  className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
-                />
-              </div>
-              {contributionError ? (
-                <p id="contribution-error" role="alert" className="mt-1 flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{contributionError}</span></p>
-              ) : (
-                <p className="mt-1 text-xs text-muted">Any amount, minimum {contributionMinimumLabel}. Paid together with your donation, kept separate from it.</p>
-              )}
-            </div>
-          ) : null}
-          {cardChargeAvailable ? (
-            <label className="flex min-h-11 cursor-pointer items-start gap-3 border-t border-border py-1 pt-3 text-sm">
+        {/* Gift amount, then the card charge, then the contribution, then the total (decided 09/11/2026). */}
+        {cardChargeAvailable ? (
+          <div className="rounded-control bg-honey-soft p-4">
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
               <input
                 type="checkbox"
                 name="cover_card_charge"
@@ -290,13 +266,90 @@ export function DonateFlow({
               />
               <span>Cover the card charge, so {charityName} gets your full donation. Optional. The total below includes it.</span>
             </label>
+          </div>
+        ) : null}
+
+        {/* The contribution to Givezy: amount buttons, Other, and No thanks, one radio group (decided 09/11/2026).
+            The preselected amount always shows as its own line in the total below, so it is never hidden. */}
+        <fieldset className="space-y-3 rounded-control bg-honey-soft p-4" aria-describedby="contribution-about">
+          <legend className="float-left w-full font-semibold text-navy">Contribution to Givezy</legend>
+          <p id="contribution-about" className="clear-both text-sm text-muted">{CONTRIBUTION_EXPLAINER}</p>
+          <div className="grid grid-cols-4 gap-2">
+            {[...contributionPresets, "other" as const].map((c) => (
+              <label
+                key={c}
+                className="flex min-h-12 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-border bg-surface px-1 py-1.5 text-center font-bold tabular-nums text-navy transition hover:border-brand has-checked:border-brand has-checked:bg-brand has-checked:text-white has-focus-visible:ring-4 has-focus-visible:ring-brand-soft"
+              >
+                <input
+                  type="radio"
+                  name="contribution_choice"
+                  value={String(c)}
+                  className="sr-only"
+                  checked={contribChoice === c}
+                  onChange={() => chooseContribution(c)}
+                />
+                {c === "other" ? <span className="text-[15px]">Other</span> : (
+                  <>
+                    <span className="text-[17px] leading-tight">{formatRand(c)}</span>
+                    {/* The space keeps the label "R20 a month" for screen readers; a flex column doesn't show it. */}
+                    {monthlyOn ? <>{" "}<span className="text-xs font-semibold leading-tight">a month</span></> : null}
+                  </>
+                )}
+              </label>
+            ))}
+          </div>
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 text-sm font-semibold text-brand underline underline-offset-4 has-checked:no-underline has-checked:text-navy has-focus-visible:ring-4 has-focus-visible:ring-brand-soft">
+            <input
+              type="radio"
+              name="contribution_choice"
+              value="none"
+              className="sr-only"
+              checked={contribChoice === "none"}
+              onChange={() => chooseContribution("none")}
+            />
+            {contribChoice === "none" ? <TickMark /> : null}
+            No thanks
+          </label>
+          {contribChoice === "other" ? (
+            <div>
+              <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Givezy{monthlyOn ? ", each month" : ""}</label>
+              <div className="mt-1 flex items-center rounded-[0.875rem] border-2 border-border bg-surface px-3 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
+                <span className="text-muted">R</span>
+                <input
+                  id="contribution"
+                  ref={contributionRef}
+                  name="contribution"
+                  data-draft-controlled
+                  inputMode="decimal"
+                  autoComplete="off"
+                  maxLength={16}
+                  value={contributionText}
+                  aria-invalid={contributionError ? true : undefined}
+                  aria-describedby={contributionError ? "contribution-error" : "contribution-hint"}
+                  onChange={(e) => {
+                    setContributionText(e.target.value);
+                    changed();
+                  }}
+                  onBlur={() => setContributionTouched(true)}
+                  className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
+                />
+              </div>
+              {contributionError ? (
+                <p id="contribution-error" role="alert" className="mt-1 flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{contributionError}</span></p>
+              ) : (
+                <p id="contribution-hint" className="mt-1 text-xs text-muted">Any amount from {contributionMinimumLabel}.</p>
+              )}
+            </div>
           ) : null}
-        </div>
+          {contribChoice === "none" ? <p className="text-sm text-muted" aria-live="polite">{NO_CONTRIBUTION_NOTE}</p> : null}
+        </fieldset>
 
         {/* The total, always as it stands: it changes as the amount, the contribution or the card charge box changes. */}
         <div aria-live="polite">
-          {quote ? <Breakdown q={quote} charityName={charityName} /> : (
-            <p className="rounded-control bg-honey-soft p-4 text-[15px] text-muted">Your total shows here once you choose an amount.</p>
+          {quote ? <Breakdown q={quote} charityName={charityName} monthly={monthlyOn} /> : (
+            <p className="rounded-control bg-honey-soft p-4 text-[15px] text-muted">
+              {!live.ok && live.field === "contribution" ? "Your total shows here once the contribution above is fixed." : "Your total shows here once you choose an amount."}
+            </p>
           )}
         </div>
         {campaign ? <p className="text-sm text-muted">For the campaign: <span className="font-medium text-text">{campaign.title}</span></p> : null}
@@ -529,17 +582,16 @@ export function DonateFlow({
   );
 }
 
-function Breakdown({ q, charityName }: { q: Quote; charityName: string }) {
+/** The total, line by line. The contribution to Givezy always has its own line, R0 included, so a preselected amount is never hidden. */
+function Breakdown({ q, charityName, monthly }: { q: Quote; charityName: string; monthly: boolean }) {
   return (
     <dl className="space-y-1.5 rounded-control bg-honey-soft p-4 text-[15px] tabular-nums">
       <div className="flex justify-between gap-3"><dt className="min-w-0">Donation to {charityName}</dt><dd className="shrink-0">{formatRand(q.amountCents)}</dd></div>
-      {q.contributionCents > 0 ? (
-        <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd className="shrink-0">{formatRand(q.contributionCents)}</dd></div>
-      ) : null}
+      <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd className="shrink-0">{contributionLabel(q.contributionCents, monthly)}</dd></div>
       {q.cardChargeCents > 0 ? (
         <div className="flex justify-between gap-3"><dt className="min-w-0">Card charge, so {charityName} gets the full {formatRand(q.amountCents)}</dt><dd className="shrink-0">{formatRand(q.cardChargeCents)}</dd></div>
       ) : null}
-      <div className="flex justify-between gap-3 border-t-2 border-border pt-2 text-lg font-bold"><dt>Total</dt><dd className="shrink-0">{formatRand(q.totalCents)}</dd></div>
+      <div className="flex justify-between gap-3 border-t-2 border-border pt-2 text-lg font-bold"><dt>{monthly ? "Total each month" : "Total"}</dt><dd className="shrink-0">{formatRand(q.totalCents)}</dd></div>
     </dl>
   );
 }

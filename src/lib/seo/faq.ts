@@ -12,6 +12,7 @@ const { appName } = platformConfig;
 const min = formatRand(platformConfig.minDonationCents);
 const max = formatRand(platformConfig.maxDonationCents);
 const minContribution = formatRand(platformConfig.minContributionCents);
+const defaultContribution = formatRand(platformConfig.contributionDefaultCents);
 const reviewDays = platformConfig.applicationReviewWorkingDays;
 
 export const donorFaqs: Faq[] = [
@@ -25,7 +26,7 @@ export const donorFaqs: Faq[] = [
   },
   {
     q: `What does ${appName} cost?`,
-    a: `There is no ${appName} fee on your gift. The card provider's fee comes off before the gift reaches the charity. If you'd like to support ${appName}, you can add a separate contribution from ${minContribution}, only if you tick the box.`,
+    a: `There is no ${appName} fee on your gift. The card provider's fee comes off before the gift reaches the charity. The give form also offers a separate contribution to ${appName}, which keeps it running: ${defaultContribution} is preselected, you can type your own amount from ${minContribution}, or choose No thanks to give nothing extra. The total shows it on its own line before you pay.`,
   },
   {
     q: "How much can I give?",

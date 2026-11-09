@@ -286,7 +286,7 @@ export default async function Home() {
             <p className="text-[13px] text-muted">{platformConfig.appName} fee on your gift</p>
             <Link href="/charities" className="pressable mt-3 w-full rounded-control bg-brand px-5 py-3 font-bold text-white">Find a charity</Link>
             <ul className="mt-3 flex flex-col gap-2 self-stretch text-left text-[14px]">
-              <li className="flex gap-2"><Tick />Add a contribution to {platformConfig.appName} only if you choose, from {minContribution}</li>
+              <li className="flex gap-2"><Tick />An optional contribution to {platformConfig.appName} from {minContribution}, separate from your gift, or No thanks</li>
             </ul>
           </div>
           <div className="flex flex-col gap-5 rounded-[1.25rem] bg-navy p-8 text-white shadow-[0_30px_60px_rgba(14,27,61,0.25)] md:mt-8 md:rounded-l-none">

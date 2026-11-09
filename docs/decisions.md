@@ -1638,3 +1638,30 @@ From the code review, in `supabase/migrations/20261109000001_review_fixes_09_11.
 - **`my_news_opt_outs()`** gives the app the charities the signed-in person said "no news" to (matched on the hash
   of their sign-in email, as the opt-out is written), so the news feed on Home can leave them out.
 - `fee_settings.gateway_fixed_cents` was already bigint (20/10/2026); the migration only makes sure.
+
+## The contribution to Givezy: amount buttons, Other and No thanks (Yehuda, 09/11/2026)
+
+Replaces the tick box and amount box (the 08/10/2026 entry: "unticked by default"). On the website's give form and
+the app's give screen the contribution to Givezy is now one radio group: R10, R20 and R30 buttons (Rand, not a
+percentage), "Other" (the donor types an amount, minimum R10, the same maximum as before) and, under the buttons, a
+plain "No thanks" link for R0. R20 is preselected. The presets and the default live only in `src/config/platform.ts`
+(`contributionPresetsCents`, `contributionDefaultCents`); a default that isn't one of the presets starts on No thanks,
+never a made-up amount. The app gets them from the server's ready reply (`/api/app/ready`); an older server that sends
+none shows only Other and No thanks with nothing preselected. The shared, dependency-free logic is
+`src/lib/donations/contribution.ts` (also used by the app).
+- **Order:** gift amount, then "cover the card charge" (still hidden until the provider's rates are filled in), then
+  the contribution, then the total, then Pay.
+- **Honest:** one line, "Givezy is free for charities. A contribution keeps it running. It's separate from your
+  gift." The total always has a "Contribution to Givezy" line, R0 included, so the preselected R20 is never hidden;
+  in the app the pinned line above Give names it too. After No thanks the form says "No contribution this time.
+  Choose an amount above to add one." No guilt wording.
+- **Monthly:** the contribution repeats each month as before; the buttons and the total say "R20 a month", and the
+  total reads "Total each month".
+- **Server unchanged:** it re-quotes and refuses a total the donor did not see; R0 is allowed; under R10 (other than 0)
+  is refused in plain words. What the donor chose and typed is kept after an error, and after coming back from the
+  payment page (the choice is in the form draft). Give links (`?amount=`, `&monthly=1`) still work and never set a
+  contribution.
+- The FAQ, the home page and the app's How it works no longer say "only if you tick the box".
+- **Open (go-live list):** whether a preselected contribution is acceptable under the Consumer Protection Act
+  (Yosef), the Terms' wording on it, and the card fee the charity carries on Givezy's contribution, which a
+  preselected R20 makes the usual case.

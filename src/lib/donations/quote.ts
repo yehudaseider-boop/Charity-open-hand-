@@ -7,6 +7,7 @@ import { platformConfig } from "@/config/platform";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { COMMA_THOUSANDS_MESSAGE, formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { cardChargeRates } from "./card-charge";
+import { contributionCents, type ContributionChoice } from "./contribution";
 
 export type Quote = Pricing;
 
@@ -49,14 +50,14 @@ export function quoteDonation(giftCents: number, contributionCents: number, cove
 }
 
 /**
- * The give form's live total, from what is typed: the amount, and the contribution when its box is ticked. The
- * same `quoteDonation` the server runs again at Give, so the total on the button is the total charged. A problem
- * names the box it belongs to.
+ * The give form's live total, from what is chosen: the amount typed, and the contribution to Givezy (a preset
+ * button, an amount typed under "Other", or "No thanks"). The same `quoteDonation` the server runs again at Give,
+ * so the total on the button is the total charged. A problem names the box it belongs to.
  */
 export function quoteFromTyped(
   amountText: string,
-  giveExtra: boolean,
-  contributionText: string,
+  contribution: ContributionChoice,
+  otherText: string,
   cover: boolean,
 ): { ok: true; quote: Quote } | { ok: false; message: string; field: "amount" | "contribution" } {
   const gift = parseRandToCents(amountText);
@@ -66,15 +67,11 @@ export function quoteFromTyped(
     return { ok: false, field: "amount", message: "Enter an amount in Rand, for example 180 or 180.50." };
   }
   if (gift === 0) return { ok: false, field: "amount", message: `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.` };
-  let contribution = 0;
-  if (giveExtra) {
-    const c = parseRandToCents(contributionText);
-    if (c === null || c === 0) return { ok: false, field: "contribution", message: "Enter your contribution in Rand, for example 10 or 25.50, or untick the box." };
-    contribution = c;
-  }
-  const result = quoteDonation(gift, contribution, cover);
+  const chosen = contributionCents(contribution, otherText, platformConfig.minContributionCents);
+  if (!chosen.ok) return { ok: false, field: "contribution", message: chosen.message };
+  const result = quoteDonation(gift, chosen.cents, cover);
   if (result.ok) return { ok: true, quote: result.quote };
-  const contributionProblem = result.code === "contribution_below_minimum" || (result.code === "above_maximum" && contribution > platformConfig.maxDonationCents);
+  const contributionProblem = result.code === "contribution_below_minimum" || (result.code === "above_maximum" && chosen.cents > platformConfig.maxDonationCents);
   return { ok: false, field: contributionProblem ? "contribution" : "amount", message: result.message };
 }
 

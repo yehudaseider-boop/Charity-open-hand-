@@ -19,7 +19,8 @@ import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
-import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleGoals } from "@/data/giving";
+import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleContribution, sampleGoals } from "@/data/giving";
+import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionCents, contributionLabel, startingChoice, type ContributionChoice } from "@shared/donations/contribution";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
 import { cleanLabel } from "@shared/donations/labels";
@@ -74,7 +75,7 @@ const SECTION_OF: Record<string, string> = {
  * through: paid is thanked, anything else keeps the form so the donor can try again.
  */
 /** Exactly what one tap of Give sent, kept for the thank-you and for holding an unresolved saved-card attempt. */
-type Snapshot = { cents: number; contributionCents: number; email: string; monthly: boolean; label: string | null; amountText?: string; extraText?: string; extra?: boolean };
+type Snapshot = { cents: number; contributionCents: number; email: string; monthly: boolean; label: string | null; amountText?: string; extraText?: string; extraChoice?: ContributionChoice };
 
 export default function Give() {
   const insets = useSafeAreaInsets();
@@ -122,7 +123,8 @@ export default function Give() {
   const [more, setMore] = useState(Boolean(startLabel));
   const labelSuggestions = useLabelSuggestions();
   const [monthly, setMonthly] = useState(false);
-  const [extra, setExtra] = useState(false);
+  // The contribution to Givezy the donor picked; null until they pick, so the server's preselected amount shows.
+  const [extraPick, setExtraPick] = useState<ContributionChoice | null>(null);
   const [coverCharge, setCoverCharge] = useState(false);
   const [extraAmount, setExtraAmount] = useState("");
   const [first, setFirst] = useState("");
@@ -324,10 +326,14 @@ export default function Give() {
   const campaignEnded = Boolean(campaignParam) && !campaignId;
   const campaign = campaignId ? ((charity.campaigns ?? []).find((c) => c.id === campaignId) ?? null) : null;
   const minGift = server?.minGiftCents ?? 0;
-  const minExtra = server?.minContributionCents ?? 0;
+  const minExtra = server?.minContributionCents ?? (preview ? sampleContribution.minCents : 0);
+  // The contribution buttons come from the server (platformConfig), never from the app; the preview shows the same.
+  const extraPresets = server?.contributionPresetsCents ?? (preview ? sampleContribution.presetsCents : []);
+  const extraChoice = extraPick ?? startingChoice(extraPresets, server?.contributionDefaultCents ?? (preview ? sampleContribution.defaultCents : 0));
+  const extraResult = contributionCents(extraChoice, extraAmount, minExtra);
   const maxGift = server?.maxGiftCents ?? null;
   const gift = parseRandToCents(amount);
-  const contribution = extra ? parseRandToCents(extraAmount) : 0;
+  const contribution = extraResult.ok ? extraResult.cents : null;
   // "Cover the card charge": shown only when the server sent the provider's rates (never a made-up figure).
   const rates = server?.cardChargeRates ?? null;
   const cardCharge = coverCharge && rates && gift !== null && gift > 0 && contribution !== null ? cardChargeToCover(gift + contribution, rates) : 0;
@@ -401,8 +407,7 @@ export default function Give() {
     if (!gift) e.amount = amountProblem(amount, "180 or 180.50") ?? "Enter an amount in Rand, for example 180 or 180.50";
     else if (gift < minGift) e.amount = `The smallest donation is ${rand(minGift)}`;
     else if (maxGift !== null && gift > maxGift) e.amount = `The largest donation in the app is ${rand(maxGift)}. For a bigger gift, please contact the charity directly.`;
-    if (extra && !contribution) e.extra = "Enter your contribution in Rand, or switch it off";
-    else if (extra && contribution !== null && contribution < minExtra) e.extra = `The smallest contribution is ${rand(minExtra)}, or switch it off`;
+    if (!extraResult.ok) e.extra = extraResult.message;
     if (!first.trim()) e.first_name = "Enter your first name";
     if (!last.trim()) e.last_name = "Enter your surname";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
@@ -482,7 +487,7 @@ export default function Give() {
       age_confirmed: agreed,
       popia_consent: agreed,
     };
-    const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extra ? extraAmount : "", extra };
+    const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extraChoice === "other" ? extraAmount : "", extraChoice };
     // Anything that goes wrong before our server answers (the sign-in token, a bad address) has charged nothing:
     // say so, and free the Give button, instead of leaving it stuck on "Opening the payment page…".
     let r: Awaited<ReturnType<typeof startPayment>>;
@@ -545,7 +550,7 @@ export default function Give() {
         const held = heldAttempt ?? sent;
         setHeldAttempt(held);
         setAmount(held.amountText ?? amount);
-        setExtra(held.extra ?? extra);
+        setExtraPick(held.extraChoice ?? extraChoice);
         setExtraAmount(held.extraText ?? extraAmount);
         setEmail(held.email);
         setMonthly(false);
@@ -781,27 +786,70 @@ export default function Give() {
           ) : goal ? (
             <Text variant="bodyMuted">Every gift counts towards {goal.name}.</Text>
           ) : null}
-          <View style={styles.softCard} onLayout={at("extra")}>
+          {/* Cover the card charge: only once the server sent the provider's rates. */}
           {rates ? (
-            <SwitchRow
-              label="Cover the card charge"
-              description={
-                cardCharge
-                  ? `Adds ${rand(cardCharge)}, so ${charity.nameEn} gets your full ${rand(gift ?? 0)}.${isMonthly ? " Each month too." : ""}`
-                  : `Optional. ${charity.nameEn} then gets your full donation.${isMonthly ? " Each month too." : ""}`
-              }
-              value={coverCharge}
-              onChange={setCoverCharge}
-            />
+            <View style={styles.softCard}>
+              <SwitchRow
+                label="Cover the card charge"
+                description={
+                  cardCharge
+                    ? `Adds ${rand(cardCharge)}, so ${charity.nameEn} gets your full ${rand(gift ?? 0)}.${isMonthly ? " Each month too." : ""}`
+                    : `Optional. ${charity.nameEn} then gets your full donation.${isMonthly ? " Each month too." : ""}`
+                }
+                value={coverCharge}
+                onChange={setCoverCharge}
+              />
+            </View>
           ) : null}
 
-          <SwitchRow
-            label="Add a contribution to Givezy"
-            description={isMonthly ? "Optional. It helps us keep Givezy running, and repeats each month with your gift." : "Optional. It helps us keep Givezy running, and is kept separate from your gift."}
-            value={extra}
-            onChange={setExtra}
-          />
-          {extra ? <View><Field label="Contribution" prefix="R" keyboardType="decimal-pad" editable={!locked} value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `At least ${rand(minExtra)}.` : undefined} /></View> : null}
+          {/* The contribution to Givezy (decided 09/11/2026): amount buttons, Other and No thanks, one radio group,
+              after the card charge and before the total. The pinned total below always names it, R0 included. */}
+          <View style={[styles.softCard, { gap: 10 }]} onLayout={at("extra")}>
+            <Text style={styles.question} accessibilityRole="header">Contribution to Givezy</Text>
+            <Text variant="label">{CONTRIBUTION_EXPLAINER}{isMonthly ? " It repeats each month with your gift." : ""}</Text>
+            <View style={{ gap: 10 }} accessibilityRole="radiogroup" accessibilityLabel="Contribution to Givezy">
+              <View style={styles.chips}>
+                {[...extraPresets, "other" as const].map((c) => {
+                  const on = extraChoice === c;
+                  const label = c === "other" ? "Other" : contributionLabel(c, isMonthly);
+                  return (
+                    <Pressable
+                      key={String(c)}
+                      disabled={locked}
+                      onPress={() => {
+                        haptic.tap();
+                        setExtraPick(c);
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityLabel={c === "other" ? "Other amount" : label}
+                      accessibilityState={{ checked: on, disabled: locked }}
+                      style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}
+                    >
+                      {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
+                      <Text style={[styles.chipText, on && { color: colors.onInk }]}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {extraChoice === "other" ? (
+                <Field label={isMonthly ? "Your contribution each month" : "Your contribution"} prefix="R" keyboardType="decimal-pad" editable={!locked} value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `Any amount from ${rand(minExtra)}.` : undefined} />
+              ) : null}
+              <Pressable
+                disabled={locked}
+                onPress={() => {
+                  haptic.tap();
+                  setExtraPick("none");
+                }}
+                accessibilityRole="radio"
+                accessibilityLabel="No thanks"
+                accessibilityState={{ checked: extraChoice === "none", disabled: locked }}
+                style={styles.noThanks}
+              >
+                {extraChoice === "none" ? <CheckIcon size={16} color={colors.navy} /> : null}
+                <Text style={extraChoice === "none" ? styles.noThanksOn : styles.link}>No thanks</Text>
+              </Pressable>
+            </View>
+            {extraChoice === "none" ? <Text variant="label" accessibilityLiveRegion="polite">{NO_CONTRIBUTION_NOTE}</Text> : null}
           </View>
 
           {showDetailFields ? (
@@ -1043,7 +1091,7 @@ export default function Give() {
               <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
             )}
             <Text variant="label" style={styles.footerLine}>
-              {total ? `${rand(gift ?? 0)} to ${charity.nameEn}${contribution ? ` and ${rand(contribution)} to Givezy` : ""}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. ` : ""}
+              {total !== null ? `${rand(gift ?? 0)} to ${charity.nameEn}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. Contribution to Givezy: ${contributionLabel(contribution ?? 0, isMonthly)}. ` : ""}
               {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
             </Text>
           </View>
@@ -1089,6 +1137,8 @@ const styles = StyleSheet.create({
   links: { flexDirection: "row", gap: 18, marginLeft: 36, flexWrap: "wrap" },
   linkTap: { minHeight: 44, justifyContent: "center" },
   link: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.blue, textDecorationLine: "underline" },
+  noThanks: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, alignSelf: "flex-start", paddingRight: 12 },
+  noThanksOn: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.navy },
   stateCard: { gap: 10, padding: 22, borderRadius: radius.card, backgroundColor: colors.lilacSoft, overflow: "hidden" },
   stateTitle: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: colors.navy },
   key: { color: colors.blue },

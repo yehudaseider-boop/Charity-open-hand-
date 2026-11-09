@@ -69,13 +69,13 @@ describe("the preselected amount", () => {
 
 describe("the live total, box by box", () => {
   it("says what is wrong, next to the right box, in plain words", () => {
-    expect(quoteFromTyped("", false, "", false)).toMatchObject({ ok: false, field: "amount" });
-    expect(quoteFromTyped("5", false, "", false)).toMatchObject({ ok: false, field: "amount", message: "The minimum donation is R30." });
-    expect(quoteFromTyped("1,250", false, "", false)).toMatchObject({ ok: false, field: "amount" });
-    expect(quoteFromTyped("2000000", false, "", false)).toMatchObject({ ok: false, field: "amount" });
-    expect(quoteFromTyped("250", true, "", false)).toMatchObject({ ok: false, field: "contribution" });
-    expect(quoteFromTyped("250", true, "5", false)).toMatchObject({ ok: false, field: "contribution", message: "The minimum contribution to Givezy is R10." });
-    for (const r of [quoteFromTyped("", false, "", false), quoteFromTyped("abc", false, "", false), quoteFromTyped("250", true, "x", false)]) {
+    expect(quoteFromTyped("", "none", "", false)).toMatchObject({ ok: false, field: "amount" });
+    expect(quoteFromTyped("5", "none", "", false)).toMatchObject({ ok: false, field: "amount", message: "The minimum donation is R30." });
+    expect(quoteFromTyped("1,250", "none", "", false)).toMatchObject({ ok: false, field: "amount" });
+    expect(quoteFromTyped("2000000", "none", "", false)).toMatchObject({ ok: false, field: "amount" });
+    expect(quoteFromTyped("250", "other", "", false)).toMatchObject({ ok: false, field: "contribution" });
+    expect(quoteFromTyped("250", "other", "5", false)).toMatchObject({ ok: false, field: "contribution", message: "The minimum contribution to Givezy is R10. Choose a bigger amount, or No thanks." });
+    for (const r of [quoteFromTyped("", "none", "", false), quoteFromTyped("abc", "none", "", false), quoteFromTyped("250", "other", "x", false)]) {
       if (!r.ok) expect(r.message).not.toMatch(/!/);
     }
   });

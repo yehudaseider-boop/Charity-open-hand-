@@ -35,6 +35,9 @@ export async function POST(request: NextRequest) {
     campaignOpen,
     minGiftCents: platformConfig.minDonationCents,
     minContributionCents: platformConfig.minContributionCents,
+    // The contribution buttons and the preselected one (decided 09/11/2026), so the app shows the same as the website.
+    contributionPresetsCents: platformConfig.contributionPresetsCents,
+    contributionDefaultCents: platformConfig.contributionDefaultCents,
     maxGiftCents: platformConfig.maxDonationCents,
     savedIdLast4,
     suggestedCents: charity?.suggestedCents ?? [],
