@@ -1671,3 +1671,13 @@ none shows only Other and No thanks with nothing preselected. The shared, depend
 - **Open (go-live list):** whether a preselected contribution is acceptable under the Consumer Protection Act
   (Yosef), the Terms' wording on it, and the card fee the charity carries on Givezy's contribution, which a
   preselected R20 makes the usual case.
+- **Every page works** (Yehuda, 09/11/2026: "make everything work so I can show on my demo"). Thank donors, Email
+  donors, Team, Public profile, Photos and updates, Application (contact person), Record a gift, Import from a file,
+  Deposits, QR poster and Website button now work in the demo with the real dashboard's own forms; their actions keep
+  what is "sent" or saved in the visitor's browser and every result says nothing was emailed or saved on Givezy.
+  "Reset the demo" (asks first) puts everything back. The QR poster and Website button pages share their body with the
+  real dashboard (`poster/view.tsx`, `website-button/steps.ts`); in the demo the QR code, the give link and the button
+  preview open the demo. The import's "Download the template" gives three made-up gifts that import cleanly (no s18A
+  rows: those need an SA ID number, and the demo never makes one up). Deposits are the made-up gifts paid out a day
+  later; the card fee shows as "to be confirmed", because Givezy never makes up a fee. Checked by using every page
+  (24 checks, laptop and phone) and a crawl of 60 pages: no link leaves the demo except the QR code's own download.

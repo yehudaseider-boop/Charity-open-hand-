@@ -37,3 +37,23 @@ describe("the demo is a closed room", () => {
     for (const p of [null, "", "/", "/demos", "/for-charities", "/charity-admin/x", "/c/demo/dashboard"]) expect(isDemoPath(p)).toBe(false);
   });
 });
+
+describe("the demo's deposits and sample import file", () => {
+  it("never makes up a card fee", async () => {
+    const { demoData } = await import("@/app/demo/dashboard/data");
+    const { demoDepositsCsv } = await import("@/app/demo/dashboard/deposits");
+    const lines = demoDepositsCsv(demoData(new Date("2026-11-09T10:00:00+02:00"))).trim().split("\r\n");
+    expect(lines.length).toBeGreaterThan(1);
+    for (const l of lines.slice(1)) expect(l.endsWith('"To be confirmed"')).toBe(true);
+  });
+
+  it("offers a sample file that imports cleanly", async () => {
+    const { GET } = await import("@/app/demo/dashboard/donations/import/template/route");
+    const { checkFile } = await import("@/lib/charity/recorded-gifts");
+    const text = await GET().text();
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg" }).format(new Date());
+    const file = checkFile(text, { today, fallbackMethod: "eft" });
+    expect(file.ok).toBe(true);
+    if (file.ok) expect(file.rows.every((r) => r.check.ok)).toBe(true);
+  });
+});

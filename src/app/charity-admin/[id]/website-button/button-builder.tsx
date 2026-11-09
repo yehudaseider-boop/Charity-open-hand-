@@ -2,17 +2,25 @@
 
 import { useState } from "react";
 import { blueAction, field as fieldClass, primaryAction } from "@/components/dash";
-import { BUTTON_LABELS, BUTTON_STYLES, buttonHtml, buttonTarget, type ButtonLabel, type ButtonStyle } from "@/lib/charity/website-button";
+import { BUTTON_LABELS, BUTTON_STYLES, buttonHtml, buttonTarget, escapeHtml, type ButtonLabel, type ButtonStyle } from "@/lib/charity/website-button";
 
 type Campaign = { id: string; title: string };
 
 /** Choose the button's look and where it goes, see it as donors will, and copy the code or the link. */
-export function ButtonBuilder({ site, slug, charityName, campaigns }: { site: string; slug: string; charityName: string; campaigns: Campaign[] }) {
+export function ButtonBuilder({ site, slug, charityName, campaigns, previewHref }: {
+  site: string;
+  slug: string;
+  charityName: string;
+  campaigns: Campaign[];
+  /** Where the preview opens instead (the public demo, whose sample charity has no page). The code to copy is unchanged. */
+  previewHref?: string;
+}) {
   const [style, setStyle] = useState<ButtonStyle>("blue");
   const [label, setLabel] = useState<ButtonLabel>("give");
   const [campaignId, setCampaignId] = useState("");
   const html = buttonHtml({ site, slug, charityName, style, label, campaignId: campaignId || null });
   const link = buttonTarget(site, slug, campaignId || null);
+  const preview = previewHref ? html.replace(/href="[^"]*"/, `href="${escapeHtml(previewHref)}"`) : html;
 
   return (
     <div className="space-y-6">
@@ -37,8 +45,8 @@ export function ButtonBuilder({ site, slug, charityName, campaigns }: { site: st
         <p className="text-sm font-semibold text-navy">How it looks</p>
         {/* Shown on white and on a dark band, the two backgrounds charity websites mostly use. */}
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex min-h-28 items-center justify-center rounded-card border-2 border-border bg-surface p-5" dangerouslySetInnerHTML={{ __html: html }} />
-          <div className="flex min-h-28 items-center justify-center rounded-card bg-navy p-5" dangerouslySetInnerHTML={{ __html: html }} />
+          <div className="flex min-h-28 items-center justify-center rounded-card border-2 border-border bg-surface p-5" dangerouslySetInnerHTML={{ __html: preview }} />
+          <div className="flex min-h-28 items-center justify-center rounded-card bg-navy p-5" dangerouslySetInnerHTML={{ __html: preview }} />
         </div>
         <p className="text-xs text-muted">Press it to try it: it opens your page in a new tab, the way your donors will see it.</p>
       </div>

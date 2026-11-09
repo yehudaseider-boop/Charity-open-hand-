@@ -17,6 +17,14 @@ import { donorFacts, type DemoData, type DemoGift } from "./data";
 import { DEMO_BASE as base, DEMO_LAPSED_DAYS, monthOf, saDay } from "./sample";
 import { DEMO_TAGS, demoCareSeed, demoDonorIndex } from "./care";
 import { DemoDonorCare } from "./donor-care";
+import { DemoEmailDonors, DemoThankDonors } from "./donor-tools";
+import { DemoApplication } from "./application";
+import { demoDeposits, dmyDay } from "./deposits";
+import { DemoRecordGift } from "./charity-tools";
+import { ButtonBuilder } from "@/app/charity-admin/[id]/website-button/button-builder";
+import { STEPS } from "@/app/charity-admin/[id]/website-button/steps";
+import { PosterView } from "@/app/charity-admin/[id]/poster/view";
+import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
 
 /**
  * The demo's own versions of the dashboard pages: the same look and the same words as the real pages, drawn
@@ -483,21 +491,10 @@ export function DemoReport({ data, sp }: { data: DemoData; sp: Params }) {
   );
 }
 
-// Pages the demo describes rather than shows --------------------------------------------------------------------
+// An address the demo doesn't know -------------------------------------------------------------------------------
 
-const ABOUT: Record<string, { title: string; lines: string[] }> = {
-  "thank-donors": { title: "Thank donors", lines: ["Write a short personal thank-you and send it to new donors in one go.", "Each donor gets it once; you see who has been thanked."] },
-  "email-donors": { title: "Email donors", lines: ["Send an update or an appeal to a group of donors: new, coming back, lapsed, or a tag you chose.", "Every email carries an unsubscribe link, and you see who it goes to before it is sent."] },
-  team: { title: "Team", lines: ["Invite the people who help run your charity, as owners or admins.", "Each person signs in with their own email and a second step."] },
-  profile: { title: "Public profile", lines: ["Your name, story, photos, causes and suggested amounts, as donors see them on Givezy.", "Changes show on your public page as soon as you save them."] },
-  updates: { title: "Photos and updates", lines: ["Post short updates with a photo to show donors what their gifts did.", "You can email an update to your donors too."] },
-  application: { title: "Application", lines: ["Your registration details, documents and bank details, checked by Givezy before you can take donations."] },
-  poster: { title: "QR poster", lines: ["A printable poster with your own QR code for notice boards and events.", "Gifts that come from it are counted under QR poster."] },
-  "website-button": { title: "Website button", lines: ["A \"Give with Givezy\" button to paste into your own website, with a live preview.", "Gifts that come from it are counted under Website button."] },
-  "donations/record": { title: "Record a gift", lines: ["Add an EFT, cash or other gift that didn't come through Givezy, so it counts in your figures and s18A receipts."] },
-  "donations/import": { title: "Import from a file", lines: ["Bring in donors and gifts from a spreadsheet: check the file first, then import."] },
-  "donations/deposits": { title: "Deposits", lines: ["Each payout into your bank account, with the gifts it is made of, for your bookkeeper.", "Every deposit is checked so the lines add up to what reached the bank."] },
-};
+// Every page in the dashboard's menu works in the demo (09/11/2026). An address the demo doesn't know lands here.
+const ABOUT: Record<string, { title: string; lines: string[] }> = {};
 
 export function DemoAbout({ path }: { path: string }) {
   const about = Object.hasOwn(ABOUT, path) ? ABOUT[path] : undefined;
@@ -532,4 +529,157 @@ export function DemoMissing({ what, back, backLabel }: { what: string; back: str
       <EmptyState title={`No such ${what} in the demo`} action={<ActionLink href={back}>Back to {backLabel}</ActionLink>}>It may have been an old link. Everything in the demo is made up.</EmptyState>
     </div>
   );
+}
+
+// Thank donors and Email donors: worked out from the made-up records, then the real forms run in the browser ------
+
+/** Everyone who gave in a month (yyyy-mm-01), counted once: who a thank-you for that month would reach. */
+function giversIn(data: DemoData, month: string): Set<string> {
+  const ym = month.slice(0, 7);
+  return new Set(data.gifts.filter((g) => g.status === "paid" && monthOf(g.paidAt) === ym).map((g) => g.donorId));
+}
+
+export function DemoThankDonorsPage({ data }: { data: DemoData }) {
+  const months = recentMonths(data.now).map((m) => ({ month: m, label: monthLabel(m), count: giversIn(data, m).size }));
+  return <DemoThankDonors months={months} sampleName={data.donors[0]?.first ?? "Naledi"} />;
+}
+
+export function DemoEmailDonorsPage({ data }: { data: DemoData }) {
+  const today = saDay(data.now.toISOString());
+  const facts = donorFacts(data);
+  // A few donors in the demo have asked not to get emails, so the "left out" line shows as it does for real.
+  const stoppedOf = (ids: string[]) => ids.filter((id) => demoDonorIndex(id) % 23 === 5).length;
+  const audience = (value: string, label: string, ids: string[]) => ({ value, label, count: ids.length - stoppedOf(ids), stopped: stoppedOf(ids) });
+  const groups = donorGroupsFor(DEMO_LAPSED_DAYS);
+  const tagged = (t: string) => facts.filter((f) => demoCareSeed(demoDonorIndex(f.donor_id), today).tags.includes(t)).map((f) => f.donor_id);
+  const audiences = [
+    audience("all", "All your donors", facts.map((f) => f.donor_id)),
+    ...groups.map((g) => audience(`group:${g.key}`, g.label, facts.filter((f) => donorGroup(f, data.now, DEMO_LAPSED_DAYS) === g.key).map((f) => f.donor_id))),
+    ...DEMO_TAGS.map((t) => audience(`tag:${t}`, `Tagged "${t}"`, tagged(t))),
+    ...data.campaigns.map((c) => audience(`campaign:${c.id}`, c.title, [...new Set(data.gifts.filter((g) => g.status === "paid" && g.campaignId === c.id).map((g) => g.donorId))])),
+  ];
+  return (
+    <DemoEmailDonors
+      audiences={audiences}
+      groups={[
+        { group: "Everyone", values: ["all"] },
+        { group: "Donor groups", values: groups.map((g) => `group:${g.key}`) },
+        { group: "Tags", values: DEMO_TAGS.map((t) => `tag:${t}`) },
+        { group: "People who gave to a campaign", values: data.campaigns.map((c) => `campaign:${c.id}`) },
+      ]}
+    />
+  );
+}
+
+// Website button, QR poster, Deposits and Application: the real pages' own parts, with made-up details -----------
+
+export function DemoWebsiteButtonPage({ data, site }: { data: DemoData; site: string }) {
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Website button"
+        intro={<>Put a &quot;Give with Givezy&quot; button on your own website. Donors who press it land on your Givezy page and see only your charity, with no other charities to wander off to. Gifts made this way show as &quot;Website button&quot; on your Donations page.</>}
+      />
+      <Card title="Make your button">
+        <ButtonBuilder site={site} slug="sample-charity" charityName="Sample Charity" campaigns={data.campaigns.map((c) => ({ id: c.id, title: c.title }))} previewHref={base} />
+      </Card>
+      <Card title="2. Add it to your website">
+        <p className="mb-4 text-sm text-muted">Find the one your website is built with. It takes about five minutes, and you can take the button off again the same way.</p>
+        <div className="space-y-2">
+          {STEPS.map((s) => (
+            <details key={s.name} className="group rounded-control border-2 border-border bg-surface transition hover:border-brand/60 focus-within:border-brand/60 open:border-brand/60">
+              <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-control px-4 font-semibold text-navy transition hover:bg-honey-soft hover:text-brand focus-visible:bg-honey-soft focus-visible:text-brand">
+                {s.name}
+                <span aria-hidden className="text-muted transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <ol className="list-decimal space-y-1.5 px-4 pb-4 pl-9 text-[15px]">{s.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+            </details>
+          ))}
+        </div>
+        <p className="mt-4 text-sm text-muted">In the demo the code points to Sample Charity, which isn&apos;t a real page. Your own button opens your Givezy page.</p>
+      </Card>
+    </div>
+  );
+}
+
+export function DemoPosterPage({ sp, site }: { sp: Params; site: string }) {
+  return <PosterView name="Sample Charity" slug="sample-charity" issues18a sp={sp} backHref={base} demoHref={`${site.replace(/\/+$/, "")}${base}`} />;
+}
+
+const FEE_NOTE = "The card fee comes off each gift before the deposit. In this demo it shows as \"to be confirmed\": Givezy never makes up a fee.";
+
+export function DemoDeposits({ data }: { data: DemoData }) {
+  const deposits = demoDeposits(data);
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        back={<Link href={`${base}/donations`} className="font-semibold text-muted hover:text-brand">← Donations</Link>}
+        title="Deposits"
+        intro="The payment provider pays your gifts into your bank account in one deposit a day, with its fees taken off. Each deposit here shows the gifts it is made of, each fee, and what reached your bank, so it matches your bank statement line for line. s18A receipts are always for the full gift."
+        actions={<ActionLink href={`${base}/donations/deposits/csv`} download>Download all (CSV)</ActionLink>}
+      />
+      <Card>
+        <p className="text-sm text-muted">{FEE_NOTE} Not in deposits: gifts you recorded yourself (EFT, cash), which never pass through the payment provider.</p>
+      </Card>
+      <Card lights>
+        <ul className="divide-y divide-border">
+          {deposits.map((d) => (
+            <li key={d.id} className="py-1 first:pt-0 last:pb-0">
+              <Link href={`${base}/donations/deposits/${d.id}`} className={`${rowLink} items-start text-sm`}>
+                <span className="min-w-0">
+                  <span className="block font-semibold text-indigo group-hover:text-brand group-hover:underline">{formatDate(`${d.paidOutOn}T12:00:00+02:00`)}</span>
+                  <span className="block text-muted">{plural(d.gifts.length, "gift")}, {formatRand(d.giftCents)}, less the card fee</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-display text-lg font-bold tabular-nums text-indigo">{formatRand(d.giftCents)}</span>
+                  <span className="block text-xs text-muted">in gifts</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+export function DemoDeposit({ data, id }: { data: DemoData; id: string }) {
+  const d = demoDeposits(data).find((x) => x.id === id);
+  if (!d) return <DemoMissing what="deposit" back={`${base}/donations/deposits`} backLabel="Deposits" />;
+  return (
+    <div className="space-y-5">
+      <PageHeader back={<Link href={`${base}/donations/deposits`} className="font-semibold text-muted hover:text-brand">← Deposits</Link>} title={`Deposit of ${formatDate(`${d.paidOutOn}T12:00:00+02:00`)}`} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MiniStat strong label="Gifts" value={formatRand(d.giftCents)} note={plural(d.gifts.length, "gift")} />
+        <MiniStat label="Card fees" value="To be confirmed" />
+        <MiniStat label="To your bank" value="Gifts less fees" />
+      </div>
+      <Card title="What it is made of">
+        <ul className="divide-y divide-border text-sm">
+          {d.gifts.map((g) => (
+            <li key={g.id}>
+              <Link href={`${base}/donations/${g.id}`} className={rowLink}>
+                <span className="min-w-0">
+                  <span className="block font-semibold text-navy group-hover:text-brand">{data.donor(g.donorId)?.name ?? "A donor"}</span>
+                  <span className="block text-xs text-muted">{campaignTitle(data, g.campaignId)}{g.recurringId ? " · Monthly donation" : ""}</span>
+                </span>
+                <span className="font-semibold tabular-nums">{formatRand(g.amountCents)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 border-t border-border pt-3 text-xs text-muted">{FEE_NOTE}</p>
+      </Card>
+    </div>
+  );
+}
+
+
+export function DemoApplicationPage({ data }: { data: DemoData }) {
+  const start = data.months[0];
+  return <DemoApplication approvedOn={dmyDay(`${start}-12`)} uploadedOn={`${start}-05`} />;
+}
+
+export function DemoRecordGiftPage({ data }: { data: DemoData }) {
+  return <DemoRecordGift today={data.today} campaigns={data.campaigns.map((c) => ({ value: c.id, label: c.title }))} />;
 }
