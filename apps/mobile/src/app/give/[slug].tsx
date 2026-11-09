@@ -20,7 +20,7 @@ import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleContribution, sampleGoals } from "@/data/giving";
-import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionCents, contributionLabel, startingChoice, type ContributionChoice } from "@shared/donations/contribution";
+import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, NO_CONTRIBUTION_NOTE_OTHER_ONLY, contributionCents, contributionLabel, startingChoice, type ContributionChoice } from "@shared/donations/contribution";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
 import { cleanLabel } from "@shared/donations/labels";
@@ -849,7 +849,7 @@ export default function Give() {
                 <Text style={extraChoice === "none" ? styles.noThanksOn : styles.link}>No thanks</Text>
               </Pressable>
             </View>
-            {extraChoice === "none" ? <Text variant="label" accessibilityLiveRegion="polite">{NO_CONTRIBUTION_NOTE}</Text> : null}
+            {extraChoice === "none" ? <Text variant="label" accessibilityLiveRegion="polite">{extraPresets.length ? NO_CONTRIBUTION_NOTE : NO_CONTRIBUTION_NOTE_OTHER_ONLY}</Text> : null}
           </View>
 
           {showDetailFields ? (

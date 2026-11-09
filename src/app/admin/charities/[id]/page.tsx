@@ -254,7 +254,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
                 <p className="my-2 text-xs text-muted">
                   {contactChangedAt
                     ? `The charity's contact email or phone was last changed on ${formatDate(contactChangedAt)}.`
-                    : "No change to the charity's contact email or phone is on record."}
+                    : "No change to the charity's contact email or phone is on record since 09/11/2026, when we started recording them. Earlier changes were not recorded."}
                 </p>
                 {contactChangedAt && changedRecently(contactChangedAt) ? (
                   <Notice tone="warning">

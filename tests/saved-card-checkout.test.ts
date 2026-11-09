@@ -46,7 +46,7 @@ vi.mock("@/lib/donations/charity", () => ({
   loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: true, splitAccountRef: "ACCT_1" }),
 }));
 /** What the provider says when asked about a reference: it has it, has never seen it, or can't be reached. */
-let providerHas: "yes" | "no" | "down" = "yes";
+let providerHas: "yes" | "no" | "down" | "failed" = "yes";
 const verified: string[] = [];
 class FakeGatewayError extends Error {
   notFound: boolean;
@@ -64,7 +64,7 @@ vi.mock("@/lib/gateway", () => ({
       verified.push(reference);
       if (providerHas === "no") throw new FakeGatewayError("not found", { notFound: true });
       if (providerHas === "down") throw new FakeGatewayError("unreachable");
-      return { reference, status: "pending", amountCents: 10_000, currency: "ZAR", gatewayTransactionId: "1" };
+      return { reference, status: providerHas === "failed" ? "failed" : "pending", amountCents: 10_000, currency: "ZAR", gatewayTransactionId: "1" };
     },
     createCheckout: async (req: Record<string, unknown>) => (checkouts.push(req), { redirectUrl: "https://pay.test/x" }),
     chargeAuthorization: async (req: Record<string, unknown>) => (charges.push(req), chargeResult()),
@@ -284,6 +284,43 @@ describe("asking twice about the same saved-card gift", () => {
     expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId });
     expect(asked).toBe(1);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);
+  });
+
+  it("a first try the provider holds as declined is declined on the retry too, not claimed as charged", async () => {
+    prior = pendingPrior();
+    providerHas = "failed";
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
+    expect(charges).toHaveLength(0);
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+  });
+
+  it("a retried charge turned down while the provider can't be asked is neither claimed nor marked failed", async () => {
+    prior = pendingPrior();
+    providerHas = "no";
+    refusal = true;
+    chargeResult = async () => {
+      providerHas = "down";
+      throw new Error("refused");
+    };
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false });
+    expect(body.charged).toBeUndefined();
+    expect(body.message).toMatch(/won't be charged twice/);
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);
+  });
+
+  it("a retried charge turned down because the provider holds the first one as declined is declined", async () => {
+    prior = pendingPrior();
+    providerHas = "no";
+    refusal = true;
+    chargeResult = async () => {
+      providerHas = "failed";
+      throw new Error("refused");
+    };
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
   });
 
   it("a declined first try stays declined", async () => {

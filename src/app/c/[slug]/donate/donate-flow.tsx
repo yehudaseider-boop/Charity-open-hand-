@@ -100,8 +100,11 @@ export function DonateFlow({
   const chooseContribution = (c: ContributionChoice) => {
     setContribChoice(c);
     changed();
-    // Other opens the box to type in; what was typed there before is kept.
-    if (c === "other") requestAnimationFrame(() => contributionRef.current?.focus());
+    // Other opens the box to type in; what was typed there before is kept. Not when arrowing through the radios
+    // with the keyboard: moving focus into the box would break the arrow keys out of the group.
+    if (c === "other") requestAnimationFrame(() => {
+      if (!(document.activeElement instanceof HTMLInputElement && document.activeElement.type === "radio")) contributionRef.current?.focus();
+    });
   };
 
   const typedCents = parseRandToCents(amountText);

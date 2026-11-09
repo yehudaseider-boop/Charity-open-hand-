@@ -1,7 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { confirmPayment } from "@/lib/donations/confirm";
-import { GatewayError } from "@/lib/gateway";
+import { GatewayError, gatewayByName } from "@/lib/gateway";
 import { alertGivezy } from "@/lib/ops/alert";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -15,16 +15,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export type ReverseKind = "refunded" | "charged_back";
 export type ReverseOutcome = "done" | "already" | "not_paid" | "not_found";
 
-type Found = { id: string; status: string; total_charged_cents: number };
+type Found = { id: string; status: string; total_charged_cents: number; gateway: string };
 
 async function findByReference(reference: string): Promise<Found | null> {
   const { data, error } = await createAdminClient()
     .from("donations")
-    .select("id, status, total_charged_cents")
+    .select("id, status, total_charged_cents, gateway")
     .eq("gateway_ref", reference)
     .maybeSingle();
   if (error) throw error;
-  return data ? { id: data.id as string, status: data.status as string, total_charged_cents: Number(data.total_charged_cents) } : null;
+  return data ? { id: data.id as string, status: data.status as string, total_charged_cents: Number(data.total_charged_cents), gateway: String(data.gateway) } : null;
 }
 
 /** Move one paid donation to refunded or charged back. Safe to repeat. */
@@ -132,13 +132,19 @@ export async function handleRefund(reference: string | null, amountCents: number
   // applies as usual. If the provider doesn't say it was paid, the refund is held for a person as before.
   // confirmPayment never handles refunds, so this can't loop, and both steps are safe to repeat.
   if (d.status === "pending" || d.status === "failed") {
-    // A provider that answers "no such payment" or turns the check down won't answer differently on a repeat: held
-    // for a person. Anything else that fails (an outage, our database) is thrown, so the event is sent again.
-    const outcome = await confirmPayment(reference).catch((e) => {
+    // Ask the provider plainly first. A payment already refunded there answers "reversed", which confirmPayment
+    // would record as a declined card (and cancel a monthly donation as "first payment failed"), so confirmPayment
+    // runs only when the provider says the payment succeeded. A provider that answers "no such payment" or turns
+    // the check down won't answer differently on a repeat: held for a person. Anything else that fails (an
+    // outage, our database) is thrown, so the event is sent again.
+    const seen = await gatewayByName(d.gateway).verifyTransaction(reference).catch((e) => {
       if (e instanceof GatewayError && (e.notFound || e.refused)) return null;
       throw e;
     });
-    if (outcome === "paid") d = (await findByReference(reference)) ?? d;
+    if (seen?.status === "success") {
+      const outcome = await confirmPayment(reference);
+      if (outcome === "paid") d = (await findByReference(reference)) ?? d;
+    }
   }
   if (currency === "ZAR" && amountCents !== null && amountCents === d.total_charged_cents) {
     const outcome = await reverseDonation(d.id, "refunded", null, "the payment provider refunded the full amount");

@@ -90,9 +90,11 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** The split part of a checkout: the charity's subaccount, our flat share, and who bears Paystack's fee. */
-function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines">) {
+function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines" | "totalCents">) {
   if (!req.feeBearer) throw new GatewayError("Who pays the gateway charge is not decided, so a split payment cannot start.");
   if (!Number.isSafeInteger(req.lines.contributionCents) || req.lines.contributionCents < 0) throw new GatewayError("The contribution must be a whole number of cents.");
+  // The two lines must make up the whole payment: with a flat split, anything left over would sit with Givezy.
+  if (req.lines.charityCents + req.lines.contributionCents !== req.totalCents) throw new GatewayError("The charity's line and the contribution do not add up to the total, so the payment was not started.");
   if (req.feeBearer === "each") {
     // Each side pays Paystack's charge on its own share: an inline split (Paystack's API spec, SplitCreate, accepted
     // by initialize and by charge_authorization) of type flat, the charity's line to its subaccount and the rest (the
@@ -120,7 +122,7 @@ function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountR
  * With split payments on, every payment must name the charity's account: without one the whole
  * amount would settle to Givezy instead of the charity, so it is refused before anything is sent.
  */
-function splitOrNone(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines">, splitting: boolean) {
+function splitOrNone(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines" | "totalCents">, splitting: boolean) {
   if (req.charityAccountRef) return splitFields(req);
   if (splitting) throw new GatewayError("This charity has no gateway account, so the payment was not started (it would not reach the charity).");
   return {};

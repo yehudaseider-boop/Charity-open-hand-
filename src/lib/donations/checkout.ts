@@ -180,6 +180,11 @@ export async function startDonation(args: {
           await finishSavedCardRecords(attemptId, v);
           return chargeSavedCard({ donationId: attemptId, savedToken, v, fees, charity, token: await reissueConfirmationToken(attemptId), resumed: true });
         }
+        if (reached === "failed") {
+          // The first try's charge did reach the provider and was declined: say so, as the first try would have.
+          await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", attemptId).eq("status", "pending");
+          return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
+        }
       }
       return { ok: true, charged: true, reference: attemptId, token: await reissueConfirmationToken(attemptId) };
     }
@@ -349,11 +354,13 @@ export async function startDonation(args: {
 /** A saved-card gift recorded this recently may still be on its way to the provider: it is never charged from a retry. */
 const RESUME_AFTER_MS = 2 * 60_000;
 
-/** Whether the provider has a payment under this reference: "no" only when it says so plainly. */
-async function providerKnows(reference: string): Promise<"yes" | "no" | "unknown"> {
+/**
+ * What the provider holds under this reference: its status when it has the payment, "no" only when it says so
+ * plainly that it has never seen it, "unknown" when it can't be asked.
+ */
+async function providerKnows(reference: string): Promise<"success" | "failed" | "pending" | "no" | "unknown"> {
   try {
-    await getGateway().verifyTransaction(reference);
-    return "yes";
+    return (await getGateway().verifyTransaction(reference)).status;
   } catch (e) {
     if (e instanceof GatewayError && e.notFound) return "no";
     console.error(e);
@@ -400,8 +407,16 @@ async function chargeSavedCard(a: {
   const gateway = getGateway();
   const failGift = async (): Promise<StartResult> => {
     // A retried charge the provider turned down may have been turned down because the first one did reach it
-    // after all (the same reference twice): then the gift is not failed, and the provider's answer decides.
-    if (a.resumed && (await providerKnows(a.donationId)) !== "no") return { ok: true, charged: true, reference: a.donationId, token: a.token };
+    // after all (the same reference twice): then the provider's own record decides. A payment it holds as paid or
+    // still going is answered as charged (the status check settles it); one it holds as declined is declined; one
+    // it can't be asked about is neither claimed nor marked failed.
+    if (a.resumed) {
+      const known = await providerKnows(a.donationId);
+      if (known === "success" || known === "pending") return { ok: true, charged: true, reference: a.donationId, token: a.token };
+      if (known === "unknown") {
+        return { ok: false, message: "We couldn't check this gift with the payment provider. Please wait a minute and try again. Your card won't be charged twice." };
+      }
+    }
     await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", a.donationId).eq("status", "pending");
     return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
   };

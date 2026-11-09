@@ -14,6 +14,8 @@ export const CONTRIBUTION_EXPLAINER = "Givezy is free for charities. A contribut
 
 /** What the form shows after "No thanks", with the way back to an amount. */
 export const NO_CONTRIBUTION_NOTE = "No contribution this time. Choose an amount above to add one.";
+/** The same note when there are no amount buttons (an app talking to an older server): only Other is there. */
+export const NO_CONTRIBUTION_NOTE_OTHER_ONLY = "No contribution this time. Choose Other above to add one.";
 
 /** The choice the form starts with: the default when it is one of the presets, otherwise "No thanks" (never a made-up amount). */
 export function startingChoice(presetsCents: readonly number[], defaultCents: number): ContributionChoice {

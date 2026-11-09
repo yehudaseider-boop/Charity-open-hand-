@@ -55,7 +55,28 @@ vi.mock("@/lib/supabase/admin", () => ({
 /** What checking with the provider does to a donation not yet recorded paid (confirmPayment, faked). */
 let confirmAnswer: "paid" | "pending" | "failed" | Error = "pending";
 const confirmed: string[] = [];
-vi.mock("@/lib/gateway", () => ({ GatewayError: class GatewayError extends Error { notFound = false; refused = false; } }));
+/** What the provider itself says about the payment (verifyTransaction, faked). */
+let providerSays: "success" | "reversed" | "pending" | "not_found" | Error = "pending";
+const verified: string[] = [];
+class FakeGatewayError extends Error {
+  notFound = false;
+  refused = false;
+}
+vi.mock("@/lib/gateway", () => ({
+  GatewayError: FakeGatewayError,
+  gatewayByName: () => ({
+    verifyTransaction: async (reference: string) => {
+      verified.push(reference);
+      if (providerSays instanceof Error) throw providerSays;
+      if (providerSays === "not_found") {
+        const e = new FakeGatewayError("not found");
+        e.notFound = true;
+        throw e;
+      }
+      return { reference, status: providerSays === "success" ? "success" : providerSays === "reversed" ? "failed" : "pending", amountCents: 20_000, currency: "ZAR" };
+    },
+  }),
+}));
 vi.mock("@/lib/donations/confirm", () => ({
   confirmPayment: async (reference: string) => {
     confirmed.push(reference);
@@ -69,6 +90,8 @@ const { handleDispute, handleRefund, releaseDisputeHold, reverseDonation } = awa
 
 beforeEach(() => {
   donations = [{ id: "d1", gateway_ref: "ref-1", status: "paid", total_charged_cents: 20_000 }];
+  providerSays = "pending";
+  verified.length = 0;
   recurring = [];
   receiptLinks = [];
   voided = [];
@@ -104,6 +127,7 @@ describe("refunds", () => {
     for (const before of ["pending", "failed"]) {
       donations[0].status = before;
       audits.length = 0;
+      providerSays = "success";
       confirmAnswer = "paid";
       await handleRefund("ref-1", 20_000, "evt");
       expect(donations[0].status).toBe("refunded");
@@ -118,16 +142,34 @@ describe("refunds", () => {
 
   it("a refund for a payment the provider doesn't confirm is held for a person, as before", async () => {
     donations[0].status = "pending";
-    confirmAnswer = "pending";
+    providerSays = "pending";
     await handleRefund("ref-1", 20_000, "evt");
     expect(donations[0].status).toBe("pending");
+    expect(confirmed).toEqual([]);
     expect(audits.map((a) => a.action)).toEqual(["donation.refund_review"]);
     expect(audits[0].details).toMatchObject({ status: "pending" });
   });
 
+  it("a payment the provider already reversed is held, never recorded as a declined card", async () => {
+    donations[0].status = "pending";
+    providerSays = "reversed";
+    await handleRefund("ref-1", 20_000, "evt");
+    expect(donations[0].status).toBe("pending");
+    expect(confirmed).toEqual([]);
+    expect(audits.map((a) => a.action)).toEqual(["donation.refund_review"]);
+  });
+
+  it("a payment the provider has never seen is held too", async () => {
+    donations[0].status = "pending";
+    providerSays = "not_found";
+    await handleRefund("ref-1", 20_000, "evt");
+    expect(confirmed).toEqual([]);
+    expect(audits.map((a) => a.action)).toEqual(["donation.refund_review"]);
+  });
+
   it("an outage while checking is thrown, so the event is sent again", async () => {
     donations[0].status = "pending";
-    confirmAnswer = new Error("provider down");
+    providerSays = new Error("provider down");
     await expect(handleRefund("ref-1", 20_000, "evt")).rejects.toThrow("provider down");
     expect(audits).toEqual([]);
   });

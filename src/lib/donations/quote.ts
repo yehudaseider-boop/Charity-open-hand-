@@ -71,7 +71,9 @@ export function quoteFromTyped(
   if (!chosen.ok) return { ok: false, field: "contribution", message: chosen.message };
   const result = quoteDonation(gift, chosen.cents, cover);
   if (result.ok) return { ok: true, quote: result.quote };
-  const contributionProblem = result.code === "contribution_below_minimum" || (result.code === "above_maximum" && chosen.cents > platformConfig.maxDonationCents);
+  // priceDonation checks each line against the maximum on its own, so an above-maximum result is the
+  // contribution's only when the gift itself fits.
+  const contributionProblem = result.code === "contribution_below_minimum" || (result.code === "above_maximum" && gift <= platformConfig.maxDonationCents);
   return { ok: false, field: contributionProblem ? "contribution" : "amount", message: result.message };
 }
 
