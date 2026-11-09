@@ -4,6 +4,7 @@ import { CURRENT_PATH_HEADER } from "@/lib/current-path";
 import { SOURCE_PARAM } from "@/lib/donations/source";
 import { FOCUS_COOKIE, FOCUS_SECONDS, focusChange } from "@/lib/focus";
 import { canonicalRedirect } from "@/lib/canonical-host";
+import { hasSignInCookie } from "@/lib/header-viewer";
 
 /** Keeps the Supabase login session fresh on every page request. */
 export async function proxy(request: NextRequest) {
@@ -16,23 +17,26 @@ export async function proxy(request: NextRequest) {
   request.headers.set(CURRENT_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (toSet) => {
-          toSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+  // Nobody signed in (most visitors): no session to refresh, so no trip to Supabase before the page (09/11/2026).
+  if (hasSignInCookie(request.cookies.getAll().map((c) => c.name))) {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        cookies: {
+          getAll: () => request.cookies.getAll(),
+          setAll: (toSet) => {
+            toSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            response = NextResponse.next({ request });
+            toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+          },
         },
       },
-    },
-  );
+    );
 
-  // Do not remove: this call refreshes an expired session.
-  await supabase.auth.getUser();
+    // Do not remove: this call refreshes an expired session.
+    await supabase.auth.getUser();
+  }
 
   // A charity's own link (button, share, QR) keeps the visit on that charity; the home page or the
   // charities list ends it.

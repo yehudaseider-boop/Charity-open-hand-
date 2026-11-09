@@ -1681,3 +1681,29 @@ none shows only Other and No thanks with nothing preselected. The shared, depend
   rows: those need an SA ID number, and the demo never makes one up). Deposits are the made-up gifts paid out a day
   later; the card fee shows as "to be confirmed", because Givezy never makes up a fee. Checked by using every page
   (24 checks, laptop and phone) and a crawl of 60 pages: no link leaves the demo except the QR code's own download.
+
+## A faster website: public pages served from cache (Yehuda, 09/11/2026)
+
+Yehuda: "check all bugs that can mess with scrolling and user interaction, like the website response time is slow",
+then "Yes go ahead on the test branch" for the bigger fix.
+
+- **Why it was slow.** The shared header and footer read the request on every page (who is signed in, a charity's own
+  link, the demo), so every page on the site was rebuilt for each visit on a server in Frankfurt, and nothing was kept
+  near South Africa. On top of that, every request first checked the sign-in with Supabase, even for visitors who had
+  never signed in.
+- **Now.** The layout, header and footer read nothing from the request (`tests/header-cache.test.ts` keeps it that
+  way). Home, For charities, FAQ, Privacy and Terms are built ahead and served from Vercel's cache; Home is rebuilt
+  at most every 5 minutes so a new charity or the week's cause shows within minutes. Home, and the cause list on it,
+  read public data only (`src/lib/supabase/public.ts`). The proxy checks the sign-in only when there is a sign-in
+  cookie. Charities, a charity's page, giving and every signed-in page still build per visit, as they must.
+- **Sign in or Account.** The page always arrives with Sign in. When the browser has a sign-in cookie it asks
+  `/api/viewer` (never cached) and shows Account and the dashboard links; the answer is kept for the tab, so moving
+  around shows Account straight away. The cost Yehuda accepted: on the first page after signing in, Sign in can show
+  for a moment before Account.
+- **A charity's own link and the demo.** All three header and footer looks are in every page, and CSS shows the one
+  the page asks for (`<ChromeMark>`: the `/c/[slug]` and thank-you layouts for a charity's own link, the `/demo` layout
+  for the demo). The right header shows from the first paint, and leaving the charity no longer reloads the page.
+  A very old browser without `:has()` shows the full header on those pages.
+- Also fixed in this pass: new pages opened part way down and drifted to the top (Next 16 needs
+  `data-scroll-behavior`), the charity search lost the keyboard and what was typed while results loaded, and the
+  sticky header's blur cost frames on phones.

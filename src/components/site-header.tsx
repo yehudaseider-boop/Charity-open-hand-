@@ -1,34 +1,30 @@
 import Link from "next/link";
 import { platformConfig } from "@/config/platform";
-import { getViewer } from "@/lib/auth";
-import { dashboardLinks } from "@/lib/dashboard-link";
-import { FocusSync } from "@/components/focus-sync";
-import { MobileMenu } from "@/components/mobile-menu";
-import { NavLink } from "@/components/nav-link";
-import { currentFocus } from "@/lib/focus-server";
-import { headers } from "next/headers";
-import { CURRENT_PATH_HEADER } from "@/lib/current-path";
-import { isDemoPath } from "@/lib/demo-path";
+import { HeaderNav } from "@/components/header-nav";
 
-export async function SiteHeader() {
-  // The dashboard demo is a closed room: the logo and what this is, with no way off to the rest of Givezy.
-  if (isDemoPath((await headers()).get(CURRENT_PATH_HEADER))) {
-    return (
-      <header className="border-b border-border bg-surface print:hidden">
-        <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
-          <p className="rounded-full bg-honey-soft px-3 py-1 text-sm font-semibold text-navy">Charity dashboard demo</p>
+/**
+ * The site header. It reads nothing from the request, so public pages can be built once and served from cache
+ * near the visitor (09/11/2026). All three looks are in the page, and globals.css shows the right one:
+ * - the full header, with the links filled in by the browser (HeaderNav);
+ * - a charity's own link (lib/focus.ts): logo and "Secure giving" only, shown when the page carries
+ *   <ChromeMark kind="focus" /> (the /c/[slug] layout and the thank-you page);
+ * - the dashboard demo: a closed room with no way off to the rest of Givezy (<ChromeMark kind="demo" />).
+ */
+export function SiteHeader() {
+  return (
+    <>
+      {/* Stays at the top while the page scrolls, so Charities and Sign in are always one tap away. */}
+      <header className="site-header chrome-full sticky top-0 z-40 border-b border-border bg-surface print:hidden">
+        <div className="mx-auto flex h-16 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-[4.5rem] sm:px-6">
+          <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-9" />
+          </Link>
+          <HeaderNav />
         </div>
       </header>
-    );
-  }
-  // Arrived from a charity's own link: only that charity, so no way off to other charities from here.
-  const focus = await currentFocus();
-  if (focus) {
-    return (
-      <header className="border-b border-border bg-surface print:hidden">
-        <FocusSync slug={focus} />
+
+      <header className="chrome-focus border-b border-border bg-surface print:hidden">
         <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:px-6">
           {/* The one quiet way out to the rest of Givezy (30/10/2026): the logo goes home, which ends the focus. */}
           <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
@@ -44,44 +40,14 @@ export async function SiteHeader() {
           </p>
         </div>
       </header>
-    );
-  }
-  const viewer = await getViewer();
-  const dashboards = dashboardLinks(viewer);
-  return (
-    // Stays at the top while the page scrolls, so Charities and Sign in are always one tap away.
-    <header className="site-header sticky top-0 z-40 border-b border-border bg-surface print:hidden">
-      <div className="mx-auto flex h-16 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-[4.5rem] sm:px-6">
-        <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
+
+      <header className="chrome-demo border-b border-border bg-surface print:hidden">
+        <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-9" />
-        </Link>
-        <nav aria-label="Main" className="flex items-center gap-1 whitespace-nowrap text-[15px] sm:gap-2">
-          {/* Phones: one Menu button holds every part of the site, so no page is a dead end (30/10/2026). */}
-          <MobileMenu
-            items={[
-              { href: "/", label: "Home" },
-              { href: "/charities", label: "Find a charity" },
-              { href: "/for-charities", label: "For charities" },
-              ...dashboards.map((d) => ({ href: d.href, label: d.label })),
-              ...(viewer ? [{ href: "/account", label: "Account" }] : []),
-            ]}
-          />
-          <NavLink href="/charities" className="max-sm:hidden">Charities</NavLink>
-          <NavLink href="/for-charities" className="max-sm:hidden">For charities</NavLink>
-          {/* A charity admin or Givezy staff can always get back to their area from any public page. */}
-          {dashboards.map((d) => (
-            <NavLink key={d.href} href={d.href} className="max-sm:hidden">{d.label}</NavLink>
-          ))}
-          {viewer ? (
-            <NavLink href="/account" className="max-sm:hidden">Account</NavLink>
-          ) : (
-            <Link href="/login" className="ml-1 inline-flex min-h-11 items-center rounded-full bg-brand px-4 font-semibold text-brand-contrast transition-colors hover:bg-navy">
-              Sign in
-            </Link>
-          )}
-        </nav>
-      </div>
-    </header>
+          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
+          <p className="rounded-full bg-honey-soft px-3 py-1 text-sm font-semibold text-navy">Charity dashboard demo</p>
+        </div>
+      </header>
+    </>
   );
 }

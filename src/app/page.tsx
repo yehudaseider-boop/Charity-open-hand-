@@ -12,7 +12,7 @@ import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { Chevron } from "@/components/chevron";
 import { AppWindow, BlueBand, Bubbles, FeatureCard, Floating, Icon, Key, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 
@@ -73,9 +73,13 @@ function HeroScreen() {
   );
 }
 
+// Built once and served from cache near the visitor, then rebuilt at most every 5 minutes, so a new charity or the
+// week's cause shows within minutes (09/11/2026). Public data only: the page never knows who is looking.
+export const revalidate = 300;
+
 export default async function Home() {
   // A few approved charities to show (row-level security shows only approved ones).
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data: charities } = await supabase
     .from("charities")
     .select("id, slug, name_en, description_en, logo_path, suburb, city")

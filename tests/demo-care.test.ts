@@ -31,10 +31,11 @@ describe("the demo's sample donor care", () => {
 });
 
 describe("the demo is a closed room", () => {
-  it("knows the demo's addresses, and nothing else", async () => {
-    const { isDemoPath } = await import("@/lib/demo-path");
-    for (const p of ["/demo", "/demo/dashboard", "/demo/dashboard/donors?tag=Volunteer", "/demo/dashboard/donors/demo-donor-0"]) expect(isDemoPath(p)).toBe(true);
-    for (const p of [null, "", "/", "/demos", "/for-charities", "/charity-admin/x", "/c/demo/dashboard"]) expect(isDemoPath(p)).toBe(false);
+  it("every demo page asks for the demo's own header and footer", async () => {
+    const { default: DemoLayout } = await import("@/app/demo/layout");
+    const tree = DemoLayout({ children: null, params: Promise.resolve({}) } as never);
+    const marks = (tree.props.children as { props: { kind?: string } }[]).filter((c) => c?.props?.kind);
+    expect(marks.map((m) => m.props.kind)).toEqual(["demo"]);
   });
 });
 

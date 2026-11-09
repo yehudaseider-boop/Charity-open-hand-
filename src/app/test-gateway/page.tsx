@@ -9,8 +9,9 @@ export const metadata: Metadata = { title: "Test payment", robots: { index: fals
 
 /** The stand-in gateway's hosted payment page. Local development only. */
 export default async function TestGatewayPage({ searchParams }: PageProps<"/test-gateway">) {
-  if (getGateway().name !== "test") notFound();
+  // The address first: this page is always per request, never built ahead.
   const sp = await searchParams;
+  if (getGateway().name !== "test") notFound();
   const params = readSignedTestCheckout((k) => (typeof sp[k] === "string" ? (sp[k] as string) : ""), sp.sig);
   if (!params) notFound();
   const total = Number(params.get("total"));

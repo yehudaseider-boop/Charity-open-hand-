@@ -5,6 +5,7 @@ import { requireSecondStep } from "@/lib/mfa";
 import { currentNext } from "@/lib/current-path";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import type { DocumentType } from "./validation";
 
 export const CHARITY_FIELDS =
@@ -66,7 +67,8 @@ export async function loadCharityForManager(id: string) {
 }
 
 export async function loadCategories() {
-  const supabase = await createClient();
+  // Public for everyone, so it never reads the request (the home page is served from cache).
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("categories")
     .select("id, slug, name_en")
