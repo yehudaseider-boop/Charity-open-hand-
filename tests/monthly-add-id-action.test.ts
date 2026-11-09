@@ -1,6 +1,7 @@
 /**
  * Adding an SA ID number to a monthly donation (account page), with the database faked: a gift on an issued
- * s18A receipt is never changed, and that includes the first gift, which new monthly gifts copy from.
+ * s18A receipt is never changed, and that includes the first gift, which new monthly gifts copy from. Then the ID
+ * number is kept on the monthly donation itself, so every new gift still carries it.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +13,7 @@ const LATER = "33333333-3333-4333-8333-333333333333";
 
 let issued: Set<string>;
 let written: string[][];
+let carried: Record<string, unknown>[];
 const audits: { action: string; details?: Record<string, unknown> }[] = [];
 
 vi.mock("@/lib/auth", () => ({ requireViewer: async () => ({ userId: "u1" }) }));
@@ -28,7 +30,7 @@ vi.mock("@/lib/supabase/admin", () => ({
       let updating = false;
       const q: Record<string, unknown> = {};
       for (const m of ["select", "eq", "is"]) q[m] = () => q;
-      q.update = () => ((updating = true), q);
+      q.update = (v: Record<string, unknown>) => ((updating = true), table === "recurring_donations" && carried.push(v), q);
       q.in = (_c: string, v: string[]) => ((ids = v), q);
       q.maybeSingle = async () => {
         if (table === "recurring_donations") return { data: { id: REC, donor_id: "donor-1", status: "active", wants_18a: true, first_donation_id: FIRST }, error: null };
@@ -43,6 +45,7 @@ vi.mock("@/lib/supabase/admin", () => ({
           const gift = (id: string) => ({ id, recurring_id: REC, donor_id: "donor-1", status: "paid", tax_year: 2027 });
           return Promise.resolve({ data: [gift(FIRST), gift(LATER)], error: null }).then(ok);
         }
+        if (table === "recurring_donations" && updating) return Promise.resolve({ data: [{ id: REC }], error: null }).then(ok);
         if (table === "donation_checkout_details" && updating) {
           written.push(ids);
           return Promise.resolve({ data: ids.map((donation_id) => ({ donation_id })), error: null }).then(ok);
@@ -67,6 +70,7 @@ const form = () => {
 beforeEach(() => {
   issued = new Set();
   written = [];
+  carried = [];
   audits.length = 0;
   process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 });
@@ -79,22 +83,23 @@ describe("adding an ID number to a monthly donation", () => {
     expect(new Set(written[0])).toEqual(new Set([FIRST, LATER]));
   });
 
-  it("never changes a first gift that is on an issued s18A receipt, and still updates the gifts that can be", async () => {
+  it("never changes a first gift that is on an issued s18A receipt: keeps the ID on the monthly donation for new gifts", async () => {
     issued = new Set([FIRST]);
     const res = await addMonthlyId({ ok: false, message: "" } as never, form());
     expect(res.ok).toBe(true);
     expect(written).toEqual([[LATER]]);
-    expect(res.message).toMatch(/already on one/);
+    expect(carried).toHaveLength(1);
+    expect(carried[0]).toMatchObject({ id_number_carry_last4: "9087" });
+    expect(String(carried[0].id_number_carry_encrypted)).not.toContain("8001015009087");
     expect(res.message).not.toMatch(/!/);
-    expect(audits.at(-1)?.details).toMatchObject({ source_on_issued_receipt: true, gifts_updated: 1 });
+    expect(audits.at(-1)?.details).toMatchObject({ carried_on_monthly: true, gifts_updated: 1 });
   });
 
-  it("changes nothing when every gift is on an issued s18A receipt, and says how to reach a person", async () => {
+  it("still works when every gift so far is on an issued s18A receipt: new gifts carry the ID", async () => {
     issued = new Set([FIRST, LATER]);
     const res = await addMonthlyId({ ok: false, message: "" } as never, form());
-    expect(res.ok).toBe(false);
+    expect(res.ok).toBe(true);
     expect(written).toEqual([]);
-    expect(res.message).toMatch(/Nothing has changed/);
-    expect(res.message).toMatch(/reply to any email/);
+    expect(carried).toHaveLength(1);
   });
 });

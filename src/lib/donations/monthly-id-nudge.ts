@@ -18,6 +18,8 @@ export type MonthlyForNudge = {
   status: string;
   wants_18a: boolean | null;
   first_donation_id: string | null;
+  /** Set once an ID number was added after the first gift was receipted: new gifts already carry it. */
+  id_number_carry_last4?: string | null;
 };
 
 export type SourceDetails = {
@@ -36,6 +38,7 @@ export type SourceDetails = {
 export function needsIdNudge(m: MonthlyForNudge, details: SourceDetails | null | undefined): boolean {
   if (m.status !== "active" && m.status !== "paused") return false;
   if (!m.wants_18a || !m.first_donation_id) return false;
+  if (m.id_number_carry_last4) return false;
   if (!details || details.erased_at) return false;
   if (!details.tax_reference_encrypted || !details.address_line1?.trim()) return false;
   return details.donor_type === "individual" && !details.id_number_encrypted;
@@ -76,4 +79,22 @@ export function giftsToUpdate(
         !scope.onIssuedReceipt.has(g.id),
     )
     .map((g) => g.id);
+}
+
+/**
+ * An SA ID number added after the first gift was receipted lives on the monthly donation itself ("carry"), because
+ * the first gift can no longer change. Every new gift takes it, only where the copied details have no ID number.
+ */
+export function withCarriedId<T extends Record<string, unknown> | null>(
+  details: T,
+  rec: { id_number_carry_encrypted?: string | null; id_number_carry_last4?: string | null; receipt_identity_carry?: string | null },
+): T {
+  if (!details || !rec.id_number_carry_encrypted) return details;
+  if (details.id_number_encrypted || details.erased_at || details.donor_type !== "individual") return details;
+  return {
+    ...details,
+    id_number_encrypted: rec.id_number_carry_encrypted,
+    id_number_last4: rec.id_number_carry_last4 ?? null,
+    receipt_identity: rec.receipt_identity_carry ?? details.receipt_identity ?? null,
+  };
 }

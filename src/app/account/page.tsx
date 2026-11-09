@@ -40,7 +40,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const { data: monthlyGifts, error: monthlyError } = donorIds.length
     ? await supabase
         .from("recurring_donations")
-        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, held_reason, wants_18a, first_donation_id, charities(name_en, slug)")
+        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, held_reason, wants_18a, first_donation_id, id_number_carry_last4, charities(name_en, slug)")
         .in("donor_id", donorIds)
         .in("status", ["active", "paused", "failed"])
         .order("created_at", { ascending: false })

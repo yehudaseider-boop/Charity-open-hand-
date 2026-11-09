@@ -1,6 +1,6 @@
 /** Adding an SA ID number to a monthly s18A gift set up with only a tax number (03/11/2026): who is asked, and which gifts change. */
 import { describe, expect, it } from "vitest";
-import { cleanSaIdNumber, giftsToUpdate, needsIdNudge, NUDGE_TEXT, SAVED_TEXT, CONFIRM_TEXT } from "@/lib/donations/monthly-id-nudge";
+import { cleanSaIdNumber, giftsToUpdate, needsIdNudge, NUDGE_TEXT, SAVED_TEXT, CONFIRM_TEXT, withCarriedId } from "@/lib/donations/monthly-id-nudge";
 
 const live = { status: "active", wants_18a: true, first_donation_id: "d-first" };
 const noId = { donor_type: "individual", id_number_encrypted: null, tax_reference_encrypted: "v1.tax", address_line1: "5 Rissik Street", erased_at: null };
@@ -76,5 +76,22 @@ describe("wording", () => {
       expect(t).not.toMatch(/—/);
     }
     expect(NUDGE_TEXT).toContain("s18A receipt");
+  });
+});
+
+describe("an ID number kept on the monthly donation (first gift already receipted)", () => {
+  const rec = { id_number_carry_encrypted: "v1.id", id_number_carry_last4: "9087", receipt_identity_carry: "fp-id" };
+  it("stops asking once it is kept", () => {
+    expect(needsIdNudge({ ...live, id_number_carry_last4: "9087" }, noId)).toBe(false);
+  });
+  it("every new gift takes it when the copied details have none", () => {
+    expect(withCarriedId({ ...noId, receipt_identity: "fp-tax" }, rec)).toMatchObject({ id_number_encrypted: "v1.id", id_number_last4: "9087", receipt_identity: "fp-id" });
+  });
+  it("never over an ID already there, an erased record or an organisation, and not without one kept", () => {
+    expect(withCarriedId({ ...noId, id_number_encrypted: "v1.other" }, rec).id_number_encrypted).toBe("v1.other");
+    expect(withCarriedId({ ...noId, erased_at: "2026-11-01" }, rec).id_number_encrypted).toBeNull();
+    expect(withCarriedId({ ...noId, donor_type: "company" }, rec).id_number_encrypted).toBeNull();
+    expect(withCarriedId(noId, { id_number_carry_encrypted: null }).id_number_encrypted).toBeNull();
+    expect(withCarriedId(null, rec)).toBeNull();
   });
 });

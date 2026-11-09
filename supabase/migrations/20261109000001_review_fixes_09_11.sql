@@ -18,7 +18,18 @@
 --    charity's own folder, photos/ and updates/ under it), and documents may only be added while the
 --    application is in draft or sent back (the same rule as guard_charity_documents and the application page).
 -- 6. audit_charity_rename also records a suspended charity renaming itself.
--- 7. my_news_opt_outs(): the charities the signed-in person said "no news" to, for the app's news feed.
+-- 7. my_news_opt_outs(): the charities the signed-in person said "no news" to, for the app's news feed, under
+--    any email address they have used with us (sign-in, donor record, or typed at a checkout).
+-- 8. A monthly donation carries an SA ID number added later to every new gift, also when the first gift (which
+--    new gifts copy their details from) is already on an issued s18A receipt and so can't be changed. Browsers
+--    may read only the last four digits.
+
+-- 8 (columns first, the erase function below clears them) -----------------------------------------------------
+alter table public.recurring_donations
+  add column if not exists id_number_carry_encrypted text,
+  add column if not exists id_number_carry_last4 text,
+  add column if not exists receipt_identity_carry text;
+grant select (id_number_carry_last4) on public.recurring_donations to authenticated;
 
 -- 1 ---------------------------------------------------------------------------------------------------------
 create or replace function public.erase_donor_data(p_donor_ids uuid[]) returns jsonb
@@ -44,7 +55,8 @@ begin
      set status = 'cancelled', cancelled_at = coalesce(cancelled_at, now()), authorization_encrypted = null,
          ended_reason = 'the donor''s information was erased', message = null, dedication_kind = null, dedication_name = null,
          card_last4 = null, card_brand = null, card_exp = null, needs_gateway_sync = false,
-         gateway_customer_ref = null, gateway_subscription_ref = null
+         gateway_customer_ref = null, gateway_subscription_ref = null,
+         id_number_carry_encrypted = null, id_number_carry_last4 = null, receipt_identity_carry = null
    where donor_id = any (p_donor_ids);
   get diagnostics n_monthly = row_count;
 
@@ -202,6 +214,8 @@ language sql stable set search_path = '' as $$
        or has_column_privilege(r.role_name, 'public.recurring_donations', 'gateway_subscription_ref', 'select')
        or has_column_privilege(r.role_name, 'public.recurring_donations', 'gateway_customer_ref', 'select')
        or has_column_privilege(r.role_name, 'public.recurring_donations', 'authorization_encrypted', 'select')
+       or has_column_privilege(r.role_name, 'public.recurring_donations', 'id_number_carry_encrypted', 'select')
+       or has_column_privilege(r.role_name, 'public.recurring_donations', 'receipt_identity_carry', 'select')
        or has_any_column_privilege(r.role_name, 'public.saved_cards', 'select')
   )
 $$;
@@ -265,17 +279,27 @@ end $$;
 revoke execute on function public.audit_charity_rename() from public, anon, authenticated;
 
 -- 7 ---------------------------------------------------------------------------------------------------------
--- The charities whose news and appeals the signed-in person turned off. Opt-outs keep only a hash of the
--- address: sha256 of the address trimmed and in lower case, as emailHash() in src/lib/charity/thank-you.ts
--- (used by optOutAtCheckout and the stop link). Password sessions get nothing, like my_donor_ids().
+-- The charities whose news and appeals the signed-in person turned off, under any address they have used with us:
+-- their sign-in address, the address on their donor records, and every address typed at their checkouts. Opt-outs
+-- keep only a hash of the address: sha256 of the address trimmed and in lower case, as emailHash() in
+-- src/lib/charity/thank-you.ts (used by optOutAtCheckout and the stop link). Password sessions get nothing, like
+-- my_donor_ids().
 create or replace function public.my_news_opt_outs() returns setof uuid
 language sql stable security definer set search_path = '' as $$
-  select o.charity_id
+  with mine as (
+    select lower(btrim(u.email::text)) as e from auth.users u where u.id = (select auth.uid()) and u.email is not null
+    union
+    select lower(btrim(d.email::text)) from public.donors d
+     where d.id in (select public.my_donor_ids()) and d.email is not null and d.erased_at is null
+    union
+    select lower(btrim(c.email::text)) from public.donation_checkout_details c
+      join public.donations g on g.id = c.donation_id
+     where g.donor_id in (select public.my_donor_ids()) and c.email is not null and c.erased_at is null
+  )
+  select distinct o.charity_id
     from public.charity_email_opt_outs o
-    join auth.users u on u.id = (select auth.uid())
-   where u.email is not null
-     and o.email_hash = encode(sha256(convert_to(lower(btrim(u.email::text)), 'UTF8')), 'hex')
-     and public.signed_in_without_password()
+   where public.signed_in_without_password()
+     and o.email_hash in (select encode(sha256(convert_to(m.e, 'UTF8')), 'hex') from mine m)
 $$;
 revoke all on function public.my_news_opt_outs() from public, anon;
 grant execute on function public.my_news_opt_outs() to authenticated;

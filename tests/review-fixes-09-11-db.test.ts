@@ -233,6 +233,22 @@ describe("my_news_opt_outs", () => {
     });
   });
 
+  it("also matches the other addresses on the person's own donor records", async () => {
+    await tx(async () => {
+      await run("reset role");
+      // A donor record of theirs under another address (as when they gave with a work address before signing in).
+      await run(
+        "insert into public.donors (user_id, email, donor_type, first_name, last_name) values ($1, 'work.address@nedivlev.test', 'individual', 'Test', 'Donor')",
+        [ids.donorUser],
+      );
+      await run("insert into public.charity_email_opt_outs (charity_id, email_hash, source) values ($1, $2, 'checkout')", [ids.meals, hash("Work.Address@nedivlev.test")]);
+      await as(ids.donorUser);
+      expect((await run("select * from public.my_news_opt_outs() as charity_id")).rows.map((r) => r.charity_id)).toEqual([ids.meals]);
+      await as(ids.mealsAdmin);
+      expect((await run("select * from public.my_news_opt_outs()")).rows).toEqual([]);
+    });
+  });
+
   it("is not for visitors who are not signed in", async () => {
     await tx(async () => {
       await as("anon");

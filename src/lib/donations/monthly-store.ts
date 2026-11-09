@@ -1,5 +1,6 @@
 import "server-only";
 import { decrypt } from "@/lib/crypto";
+import { withCarriedId } from "./monthly-id-nudge";
 import { confirmPayment } from "./confirm";
 import { loadDonatableCharity } from "./charity";
 import { getEmailTransport } from "@/lib/email";
@@ -168,7 +169,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
  */
 export async function createMonthlyGift(recurringId: string, donationId: string, m: { amountCents: number; contributionCents: number; cardChargeCents?: number; totalCents: number }): Promise<void> {
   const db = createAdminClient();
-  const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id").eq("id", recurringId).maybeSingle(), "read the monthly donation");
+  const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id, id_number_carry_encrypted, id_number_carry_last4, receipt_identity_carry").eq("id", recurringId).maybeSingle(), "read the monthly donation");
   const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at, came_from").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
   const ins = await db.from("donations").insert({
     id: donationId,
@@ -202,7 +203,7 @@ export async function createMonthlyGift(recurringId: string, donationId: string,
   // makes it afresh instead of charging a gift with no donor details.
   try {
     const details = must(await db.from("donation_checkout_details").select("*").eq("donation_id", rec.first_donation_id).maybeSingle(), "read the donor's details");
-    const copy = await db.from("donation_checkout_details").insert({ ...details, donation_id: donationId });
+    const copy = await db.from("donation_checkout_details").insert({ ...withCarriedId(details, rec), donation_id: donationId });
     if (copy.error) throw new Error(`Could not copy the donor's details: ${copy.error.message}`);
     const kind = await db.from("donation_giving_kinds").select("kind, label").eq("donation_id", rec.first_donation_id).maybeSingle();
     if (kind.data) {
@@ -261,3 +262,4 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
   };
   return runMonthlyCharges(deps);
 }
+
