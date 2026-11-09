@@ -6,8 +6,23 @@ import { FocusSync } from "@/components/focus-sync";
 import { MobileMenu } from "@/components/mobile-menu";
 import { NavLink } from "@/components/nav-link";
 import { currentFocus } from "@/lib/focus-server";
+import { headers } from "next/headers";
+import { CURRENT_PATH_HEADER } from "@/lib/current-path";
+import { isDemoPath } from "@/lib/demo-path";
 
 export async function SiteHeader() {
+  // The dashboard demo is a closed room: the logo and what this is, with no way off to the rest of Givezy.
+  if (isDemoPath((await headers()).get(CURRENT_PATH_HEADER))) {
+    return (
+      <header className="border-b border-border bg-surface print:hidden">
+        <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
+          <p className="rounded-full bg-honey-soft px-3 py-1 text-sm font-semibold text-navy">Charity dashboard demo</p>
+        </div>
+      </header>
+    );
+  }
   // Arrived from a charity's own link: only that charity, so no way off to other charities from here.
   const focus = await currentFocus();
   if (focus) {

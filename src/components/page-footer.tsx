@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { platformConfig } from "@/config/platform";
 import { SiteFooter } from "@/components/legal";
 import { currentFocus } from "@/lib/focus-server";
+import { headers } from "next/headers";
+import { CURRENT_PATH_HEADER } from "@/lib/current-path";
+import { isDemoPath } from "@/lib/demo-path";
 
 /**
  * The site footer, or on a charity's own link (see lib/focus.ts) a short one: only what a donor
@@ -8,6 +12,16 @@ import { currentFocus } from "@/lib/focus-server";
  * legal.tsx because pages in the browser use that file too, and this one reads the request.
  */
 export async function PageFooter() {
+  // The dashboard demo: one quiet line, no links out (see lib/demo-path.ts).
+  if (isDemoPath((await headers()).get(CURRENT_PATH_HEADER))) {
+    return (
+      <footer className="mt-auto bg-honey-soft print:hidden">
+        <p className="mx-auto max-w-[75rem] px-4 py-6 text-[13px] text-muted sm:px-6">
+          A demonstration of the {platformConfig.appName} charity dashboard, with made-up donors and figures. © {new Date().getFullYear()} {platformConfig.appName}
+        </p>
+      </footer>
+    );
+  }
   if (!(await currentFocus())) return <SiteFooter />;
   return (
     <footer className="mt-auto bg-honey-soft print:hidden">

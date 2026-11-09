@@ -29,3 +29,11 @@ describe("the demo's sample donor care", () => {
     expect(demoDonorIndex("../demo-donor-1")).toBe(-1);
   });
 });
+
+describe("the demo is a closed room", () => {
+  it("knows the demo's addresses, and nothing else", async () => {
+    const { isDemoPath } = await import("@/lib/demo-path");
+    for (const p of ["/demo", "/demo/dashboard", "/demo/dashboard/donors?tag=Volunteer", "/demo/dashboard/donors/demo-donor-0"]) expect(isDemoPath(p)).toBe(true);
+    for (const p of [null, "", "/", "/demos", "/for-charities", "/charity-admin/x", "/c/demo/dashboard"]) expect(isDemoPath(p)).toBe(false);
+  });
+});

@@ -1611,6 +1611,9 @@ the real dashboard. They are kept only in the visitor's own browser: nothing is 
 says so after every action, and "Put back the sample" restores the start. Every fourth made-up donor starts with a
 note, two tags and a follow-up (`src/app/demo/dashboard/care.ts`), and Donors can be filtered by tag. Email donors
 and Thank donors are still described rather than shown.
+- **A closed room** (Yehuda, 09/11/2026): on `/demo/...` the site's header and footer give way to a plain bar (the
+  Givezy logo and "Charity dashboard demo") and one footer line, with no links to Charities, For charities, Sign in or
+  anything else (`src/lib/demo-path.ts`). A crawl of 60 demo pages found no link leaving the demo.
 
 ## Review fixes, database and SARS file (09/11/2026)
 
