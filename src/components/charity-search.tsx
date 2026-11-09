@@ -8,13 +8,23 @@ import { useEffect, useRef, useState, useTransition } from "react";
  * Without JavaScript it is still a plain form that searches on Enter or the button.
  */
 export function CharitySearch(props: { initial: string; category: string }) {
-  // Starting over when the page's own search or category changes (for example "See all charities") keeps the box in step with the list.
-  return <SearchBox key={`${props.initial}|${props.category}`} {...props} />;
+  // A new category starts the box over. A new search only does when it came from elsewhere (for example "See all
+  // charities"): rebuilding the box on its own results took the keyboard away mid-word and lost what was typed meanwhile.
+  return <SearchBox key={props.category} {...props} />;
 }
 
 function SearchBox({ initial, category }: { initial: string; category: string }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
+  const [sent, setSent] = useState(initial);
+  const [seen, setSeen] = useState(initial);
+  if (initial !== seen) {
+    setSeen(initial);
+    if (initial.trim() !== sent.trim()) {
+      setValue(initial);
+      setSent(initial);
+    }
+  }
   const [pending, startTransition] = useTransition();
   const first = useRef(true);
 
@@ -30,6 +40,7 @@ function SearchBox({ initial, category }: { initial: string; category: string })
       if (q) p.set("q", q);
       if (category) p.set("category", category);
       const qs = p.toString();
+      setSent(q);
       startTransition(() => router.replace(qs ? `/charities?${qs}` : "/charities", { scroll: false }));
     }, 300);
     return () => clearTimeout(t);

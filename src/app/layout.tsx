@@ -27,7 +27,9 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-ZA" className={`${dmSans.variable} ${bricolage.variable} h-full antialiased`}>
+    // data-scroll-behavior: smooth scrolling is for in-page links (#how) only. Without it, Next.js 16 lets a new page
+    // open part way down and drift up to the top (found 09/11/2026), and going back drifts too.
+    <html lang="en-ZA" data-scroll-behavior="smooth" className={`${dmSans.variable} ${bricolage.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <RouteMemory />
         <SiteHeader />
