@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en-ZA"><head><meta charset="utf-8">
+<title>Givezy charity pilot pack</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/*FONTS*/
+:root { --ink:#0E1B3D; --blue:#1749B5; --blue-edge:#0F358A; --orange:#FF8A3D; --orange-edge:#D9621C; --lavender:#C9B4FA; --line:#ECE8F6; --lilac:#F4F1FF; --slate:#4A5878; --sage:#3E8E6A; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "DM Sans", Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: var(--ink); background: #FFFFFF; margin: 0; }
+h1, h2, h3, .display { font-family: "Bricolage Grotesque", "DM Sans", Arial, sans-serif; color: var(--ink); }
+h1 { font-weight: 800; font-size: 21pt; line-height: 1.12; margin: 0 0 3mm; break-after: avoid; }
+h2 { font-weight: 700; font-size: 13pt; line-height: 1.2; margin: 4.5mm 0 1.6mm; break-after: avoid; }
+h3 { font-weight: 700; font-size: 11pt; margin: 4mm 0 1.2mm; break-after: avoid; }
+.k { color: var(--blue); }
+p { margin: 0 0 2.4mm; orphans: 3; widows: 3; }
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin: 0 0 1mm; }
+a { color: var(--blue); }
+.muted { color: var(--slate); }
+.small { font-size: 9.2pt; }
+.section { break-before: page; }
+h2.section { margin-top: 0; }
+.lead { font-size: 11pt; color: var(--slate); margin-bottom: 3.5mm; max-width: 160mm; }
+.badge { display: inline-flex; align-items: center; justify-content: center; width: 11mm; height: 11mm; border-radius: 50%; background: var(--orange); color: var(--ink); font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 14pt; margin-bottom: 2.5mm; box-shadow: 0 1mm 0 var(--orange-edge); }
+.soft { background: var(--lilac); border: 0.4mm solid var(--line); border-radius: 5mm; padding: 3.2mm 4.5mm; margin: 2.5mm 0 3mm; break-inside: avoid; }
+.soft p:last-child, .soft ul:last-child, .soft ol:last-child { margin-bottom: 0; }
+.soft h3:first-child { margin-top: 0; }
+.block { position: relative; overflow: hidden; background: var(--blue); color: #FFFFFF; border-radius: 6mm; padding: 5mm 6mm; margin: 3mm 0 4mm; break-inside: avoid; }
+.block h2, .block h3 { color: #FFFFFF; margin-top: 0; }
+.block p:last-child, .block ul:last-child { margin-bottom: 0; }
+.block .ring { position: absolute; right: -9mm; top: -9mm; width: 28mm; height: 28mm; border-radius: 50%; border: 3.5mm solid var(--lavender); opacity: 0.9; }
+.block .dot { position: absolute; right: 18mm; bottom: -5mm; width: 11mm; height: 11mm; border-radius: 50%; background: var(--lavender); opacity: 0.55; }
+.block .inner { position: relative; max-width: 150mm; }
+.open { border: 0.5mm dashed var(--lavender); border-radius: 4mm; padding: 3mm 4.5mm; margin: 3mm 0 4mm; break-inside: avoid; background: #FFFFFF; }
+.open b.t { color: var(--blue); }
+.open p:last-child { margin-bottom: 0; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 2mm 0 4mm; font-size: 9.3pt; border: 0.4mm solid var(--line); border-radius: 3.5mm; overflow: hidden; }
+th, td { padding: 1.6mm 2.8mm; text-align: left; vertical-align: top; border-bottom: 0.3mm solid var(--line); overflow-wrap: break-word; }
+tr:last-child td { border-bottom: 0; }
+thead th { background: var(--lilac); font-weight: 700; color: var(--ink); border-bottom: 0.5mm solid var(--blue); }
+td:first-child { font-weight: 600; width: 34%; }
+tr { break-inside: avoid; }
+.who { display: inline-block; font-size: 8pt; font-weight: 700; padding: 0.2mm 2.2mm; border-radius: 3mm; background: #FFFFFF; border: 0.35mm solid var(--blue); color: var(--blue); white-space: nowrap; margin-left: 1mm; }
+ol.steps { list-style: none; padding: 0; counter-reset: s; margin: 2mm 0 4mm; }
+ol.steps > li { counter-increment: s; position: relative; padding: 0 0 0 11mm; margin: 0 0 2.2mm; break-inside: avoid; }
+ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: -0.3mm; width: 7.5mm; height: 7.5mm; border-radius: 50%; background: var(--blue); color: #FFFFFF; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 10pt; display: flex; align-items: center; justify-content: center; }
+ol.steps > li b:first-child { display: block; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.two > .soft { margin: 0; }
+.tick { list-style: none; padding: 0; margin: 0; }
+.tick li { display: grid; grid-template-columns: 7mm 1fr; gap: 2mm; padding: 2mm 0; border-bottom: 0.3mm solid var(--line); break-inside: avoid; margin: 0; }
+.tick li:last-child { border-bottom: 0; }
+.tick .box { width: 5mm; height: 5mm; border: 0.5mm solid var(--blue); border-radius: 1.3mm; margin-top: 0.6mm; }
+.tick .note { display: block; font-size: 9pt; color: var(--slate); }
+.toc { list-style: none; padding: 0; margin: 0; columns: 2; column-gap: 8mm; }
+.toc li { padding: 1.6mm 0; border-bottom: 0.3mm solid var(--line); margin: 0; break-inside: avoid; }
+.toc li b { color: var(--blue); font-family: "Bricolage Grotesque", sans-serif; display: inline-block; width: 7mm; }
+/* cover */
+.cover { height: 251mm; display: flex; flex-direction: column; justify-content: space-between; }
+.cover .logo { height: 13mm; width: auto; }
+.cover .hero { position: relative; overflow: hidden; background: var(--blue); border-radius: 8mm; padding: 16mm 12mm 14mm; color: #FFFFFF; }
+.cover .hero h1 { color: #FFFFFF; font-size: 36pt; line-height: 1.05; margin: 0 0 5mm; max-width: 125mm; position: relative; }
+.cover .hero p { font-size: 13pt; color: #FFFFFF; max-width: 115mm; position: relative; margin: 0; }
+.cover .hero .ring { position: absolute; right: -16mm; top: -16mm; width: 62mm; height: 62mm; border-radius: 50%; border: 7mm solid var(--lavender); }
+.cover .hero .dot { position: absolute; right: 30mm; bottom: -9mm; width: 22mm; height: 22mm; border-radius: 50%; background: var(--lavender); opacity: 0.6; }
+.cover .splash { width: 52mm; height: auto; display: block; margin: 0 0 0 auto; }
+.cover .draft { display: inline-block; background: var(--orange); color: var(--ink); font-weight: 700; padding: 2.5mm 6mm; border-radius: 5mm; box-shadow: 0 1mm 0 var(--orange-edge); font-size: 11pt; }
+.cover .for { font-size: 11pt; color: var(--slate); margin-top: 5mm; max-width: 150mm; }
+.cover .meta { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; }
+</style></head>
+<body>
+<!--BODY-->
+</body></html>
