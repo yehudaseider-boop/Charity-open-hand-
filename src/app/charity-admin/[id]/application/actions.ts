@@ -9,7 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { legalConfig } from "@/config/legal";
 import { requireViewer } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
-import { applicationReceivedEmail, contactChangedEmail, newApplicationEmail, notifyCharity } from "@/lib/charity/emails";
+import { applicationReceivedEmail, contactChangedEmail, contactPhoneChangedEmail, newApplicationEmail, notifyCharity } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import {
   addressSchema,
@@ -113,6 +113,9 @@ export async function saveAddress(charityId: string, _prev: FormState, formData:
 export async function saveContact(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity, priv: before } = await loadCharityForManager(charityId);
+  // Givezy staff call this number and write to this address to check second-step resets and bank changes:
+  // only the owner may change them, like the bank account.
+  if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can change the contact details. Nothing was changed." };
   const raw = formToObject(formData);
   raw.contact_phone = normalisePhone(raw.contact_phone);
   const parsed = contactSchema.safeParse(raw);
@@ -130,6 +133,12 @@ export async function saveContact(charityId: string, _prev: FormState, formData:
   if (oldEmail && oldEmail.toLowerCase() !== v.contact_email.toLowerCase()) {
     await logAudit({ actorUserId: viewer.userId, action: "charity.contact_email_changed", entityType: "charity", entityId: charityId });
     await notifyCharity(contactChangedEmail(oldEmail, charity.name_en, v.contact_email));
+  }
+  // The number we call to check who someone is: tell the old address when it changes, too.
+  const newPhone = v.contact_phone ?? null;
+  if ((normalisePhone(before?.contact_phone ?? undefined) ?? "") !== (newPhone ?? "")) {
+    await logAudit({ actorUserId: viewer.userId, action: "charity.contact_phone_changed", entityType: "charity", entityId: charityId });
+    if (oldEmail) await notifyCharity(contactPhoneChangedEmail(oldEmail, charity.name_en, newPhone));
   }
   const done = await recordAction(charityId, viewer.userId, "contact_saved", { email: v.contact_email }, { type: "restore", table: "charity_private", before: contactBefore, after });
   revalidatePath(`/charity-admin/${charityId}/application`);

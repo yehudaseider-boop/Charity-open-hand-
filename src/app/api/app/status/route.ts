@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
   const { reference, token } = body.data;
   if (!(await confirmationTokenMatches(reference, token))) return NextResponse.json({ ok: false, message: "Donation not found." }, { status: 404 });
   // Per donation: donors behind one shared address (a school's or an office's Wi-Fi) must not block each other.
-  const limited = await hitRateLimit("return-check", [`ref:${reference}`], 40, 10).catch(() => false);
+  // A check that fails counts as limited (never as a free pass to ask the payment provider).
+  const limited = await hitRateLimit("return-check", [`ref:${reference}`], 40, 10).catch((e) => (console.error(e), true));
   // Busy or an error is "we couldn't check", never "still confirming": the app must not read either as a
   // gift on its way (the donor may have come back from a declined card).
   if (limited) return NextResponse.json({ ok: false, message: "Please wait a moment, then check again." }, { status: 429 });

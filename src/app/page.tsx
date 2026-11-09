@@ -264,7 +264,7 @@ export default async function Home() {
           </div>
           <ul className="flex flex-col gap-4">
             <FeatureCard icon="lock" title="We never see your card" body={`You pay on the payment provider's secure page. ${platformConfig.appName} never sees or stores your card details.`} />
-            <FeatureCard icon="user" title="Your ID number stays private" body="Charities never see it on Givezy. It only goes on your s18A receipt and the report the charity sends to SARS." />
+            <FeatureCard icon="user" title="Your ID number stays private" body="Charities don't see it on their dashboard. It goes only into the report the charity must send to SARS for your s18A receipt." />
             <FeatureCard icon="heart" title="Your notes stay yours" body="Any label or note you add to a gift, like Work giving or Family, is private to you. Charities don't see it." />
           </ul>
         </div>

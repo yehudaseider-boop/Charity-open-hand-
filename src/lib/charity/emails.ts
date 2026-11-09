@@ -145,6 +145,25 @@ export function contactChangedEmail(to: string, charityName: string, newEmail: s
   };
 }
 
+/**
+ * Givezy calls this number to check who someone is before a second-step reset or a bank change,
+ * so the contact address hears when it changes. Only the last digits of the new number are shown.
+ */
+export function contactPhoneChangedEmail(to: string, charityName: string, newPhone: string | null): EmailMessage {
+  const digits = (newPhone ?? "").replace(/\D/g, "");
+  const now = digits ? `changed to a number ending in ${digits.slice(-3)}` : "removed";
+  return {
+    to,
+    subject: `The contact phone number for ${charityName} on Givezy was changed`,
+    text: [
+      `The contact phone number for ${charityName} on Givezy was ${now}. We use this number to check it is really you before we reset a sign-in or change bank details.`,
+      "",
+      "If you did not expect this, reply to this email straight away.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
 export function secondStepResetEmail(to: string): EmailMessage {
   return {
     to,

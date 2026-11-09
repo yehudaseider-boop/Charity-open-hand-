@@ -56,13 +56,18 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // else sees the saved state only.
   const holdsToken = ref ? await confirmationTokenMatches(ref, t) : false;
   // Per donation: donors behind one shared address (a school's or an office's Wi-Fi) must not block each other.
-  const limited = holdsToken ? await hitRateLimit("return-check", [`ref:${ref}`, ...ipKeys(clientIp(await headers()))], 40, 10).catch(() => false) : false;
+  // A check that fails counts as limited (never as a free pass to ask the payment provider).
+  const limited = holdsToken ? await hitRateLimit("return-check", [`ref:${ref}`, ...ipKeys(clientIp(await headers()))], 40, 10).catch((e) => (console.error(e), true)) : false;
   const outcome = !holdsToken
     ? await savedOutcome(ref)
     : limited
       ? // Past the limit we stop asking the payment provider, but still read what is saved: a gift the
-        // webhook has settled shows as paid (or declined), never as "still confirming".
-        await savedOutcome(ref)
+        // webhook has settled shows as paid (or declined), never as "still confirming". If even that can't
+        // be read, the page says it is still confirming (with a way to check again), never an error page.
+        await savedOutcome(ref).catch((e) => {
+          console.error(e);
+          return "pending" as const;
+        })
       : await confirmPayment(ref).catch((e) => {
           console.error(e);
           return "pending" as const;

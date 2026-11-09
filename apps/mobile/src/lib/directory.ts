@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { AppState } from "react-native";
 import { causes as sampleCauses, charities as sampleCharities, findCharity, type Cause, type Charity, type CharityUpdate } from "@/data/sample";
 import { CHARITY_COLUMNS, markFeatured, raisingNow, weekStartJhb, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type RaisingNow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
 import { supabase } from "./supabase";
 import { secureStorage } from "./secure-storage";
+import { newsKey, optOutIds } from "./charity-news";
 
 /**
  * The charity directory. Live: approved charities from the database (row-level
@@ -228,15 +230,20 @@ export function useCharity(slug: string | undefined) {
 
 /**
  * The latest updates from the charities the donor gave to, for "News from your charities" on Home. A bonus: if it
- * can't load, Home simply doesn't show the section. Live: row-level security only returns approved charities and
- * their updates. Preview: the sample charities' updates.
+ * can't load, Home keeps what it last showed (or shows no section). Live: row-level security only returns approved
+ * charities and their updates. Preview: the sample charities' updates.
+ *
+ * Charities the donor asked for "No news or appeals from this charity" are left out. If we can't tell which those
+ * are, there is no news at all this time (asked again on the next refresh), never news they said no to.
  */
 async function loadNews(slugs: string[]): Promise<Map<string, CharityUpdate[]>> {
   const db = supabase!;
-  const { data: rows, error } = await db.from("charities").select("id, slug").in("slug", slugs).eq("status", "approved");
-  if (error) throw error;
-  const slugById = new Map(((rows ?? []) as { id: string; slug: string }[]).map((r) => [r.id, r.slug]));
+  const [charities, optOuts] = await Promise.all([db.from("charities").select("id, slug").in("slug", slugs).eq("status", "approved"), db.rpc("my_news_opt_outs")]);
+  if (charities.error) throw charities.error;
   const out = new Map<string, CharityUpdate[]>();
+  const saidNo = optOuts.error ? null : optOutIds(optOuts.data);
+  if (!saidNo) return out;
+  const slugById = new Map(((charities.data ?? []) as { id: string; slug: string }[]).filter((r) => !saidNo.has(r.id)).map((r) => [r.id, r.slug]));
   if (!slugById.size) return out;
   const updates = await db
     .from("charity_updates")
@@ -253,23 +260,36 @@ async function loadNews(slugs: string[]): Promise<Map<string, CharityUpdate[]>> 
   return out;
 }
 
+/**
+ * News for these charities (most recent first; only the first NEWS_MAX_CHARITIES are asked about). Asked again each
+ * time the app comes back to the front. A failed load keeps the last news that loaded for the same charities.
+ */
 export function useCharityNews(slugs: string[]) {
   const demo = useDemoMode();
   const live = supabase !== null && !demo;
-  const key = slugs.join(",");
-  const [news, setNews] = useState<Map<string, CharityUpdate[]> | null>(null);
+  const key = newsKey(slugs);
+  const [loaded, setLoaded] = useState<{ key: string; news: Map<string, CharityUpdate[]> } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!live) return;
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") setAttempt((n) => n + 1);
+    });
+    return () => sub.remove();
+  }, [live]);
   useEffect(() => {
     if (!live || !key) return;
     let current = true;
     loadNews(key.split(",")).then(
-      (next) => current && setNews(next),
-      () => current && setNews(new Map()),
+      (next) => current && setLoaded({ key, news: next }),
+      () => undefined,
     );
     return () => {
       current = false;
     };
-  }, [live, key]);
+  }, [live, key, attempt]);
   if (!live) return { live, news: new Map(slugs.map((s) => [s, findCharity(s)?.updates ?? []])) };
-  return { live, news: key ? news : new Map<string, CharityUpdate[]>() };
+  // Another set of charities (a new gift, or someone else signed in): nothing until it has loaded for them.
+  return { live, news: !key ? new Map<string, CharityUpdate[]>() : loaded?.key === key ? loaded.news : null };
 }
 

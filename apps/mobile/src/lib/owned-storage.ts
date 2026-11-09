@@ -8,13 +8,14 @@ import { secureStorage } from "./secure-storage";
  * Signed out, they're kept for "whoever uses this phone". The first person to
  * sign in who has nothing of their own yet takes that copy over (so someone
  * who set things up before signing in doesn't lose them), and it's then gone
- * from the shared slot.
+ * from the shared slot. Not for contact details (`adoptShared: false`): a name and email remembered while
+ * signed out may be someone else's, so they are never handed to whoever signs in next.
  */
 const keyFor = (base: string, userId: string | null) => (userId ? `${base}.u.${userId}` : base);
 
-export async function loadOwned(base: string, userId: string | null): Promise<string | null> {
+export async function loadOwned(base: string, userId: string | null, opts: { adoptShared?: boolean } = {}): Promise<string | null> {
   const own = await secureStorage.getItemStrict(keyFor(base, userId));
-  if (own !== null || !userId) return own;
+  if (own !== null || !userId || opts.adoptShared === false) return own;
   const shared = await secureStorage.getItemStrict(base);
   if (shared === null) return null;
   await secureStorage.setItem(keyFor(base, userId), shared);

@@ -137,3 +137,33 @@ describe("saved card in the app", () => {
     expect(!failed.ok && failed.message).toMatch(/couldn't remove/);
   });
 });
+
+import { fetchWithTimeout } from "../apps/mobile/src/lib/pay-api";
+
+describe("a stalled network", () => {
+  // A fetch that never answers until it is aborted, like a phone on a dead connection.
+  const stalled = ((_url: string, init?: RequestInit) =>
+    new Promise((_ok, fail) => init?.signal?.addEventListener("abort", () => fail(new Error("aborted"))))) as unknown as typeof fetch;
+
+  it("gives up after the timeout with a thrown network error", async () => {
+    await expect(fetchWithTimeout("https://example.org", { method: "POST" }, 20, stalled)).rejects.toThrow();
+  });
+
+  it("gives up when the reply starts but its body never finishes", async () => {
+    const slowBody = ((_url: string, init?: RequestInit) =>
+      Promise.resolve({ status: 200, json: () => new Promise((_ok, fail) => init?.signal?.addEventListener("abort", () => fail(new Error("aborted")))) })) as unknown as typeof fetch;
+    await expect(fetchWithTimeout("https://example.org", { method: "GET" }, 20, slowBody)).rejects.toThrow();
+  });
+
+  it("returns the reply when it comes in time", async () => {
+    const quick = (() => Promise.resolve({ status: 200, json: () => Promise.resolve({ ok: true }) })) as unknown as typeof fetch;
+    expect(await fetchWithTimeout("https://example.org", { method: "GET" }, 1000, quick)).toEqual({ status: 200, json: { ok: true } });
+  });
+
+  it("shows the plain no-reply message to the give screen, so it never hangs", async () => {
+    const post = (url: string, body: unknown) => fetchWithTimeout(url, { method: "POST", body: JSON.stringify(body) }, 20, stalled);
+    expect(await requestQuote("https://givezy.example", "meals", 10_000, 0, post)).toMatchObject({ ok: false, noReply: true });
+    expect(await checkReady("https://givezy.example", "meals", undefined, post)).toMatchObject({ ok: false });
+    expect(await paymentStatus("https://givezy.example", "ref", "tok", post)).toBe("unknown");
+  });
+});

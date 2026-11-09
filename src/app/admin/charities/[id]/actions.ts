@@ -356,7 +356,7 @@ export async function removeCharityAdmin(id: string, userId: string, _prev: Form
   const { data, error } = await db.from("charity_admins").delete().eq("charity_id", id).eq("user_id", userId).select("user_id");
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "That person no longer manages this charity." };
-  await logAudit({ actorUserId: admin.userId, action: "charity.admin_removed", entityType: "charity", entityId: id, details: { email: profile?.email ?? null } });
+  await logAudit({ actorUserId: admin.userId, action: "charity.admin_removed", entityType: "charity", entityId: id, details: { user_id: userId, by: "platform" } });
   if (profile?.email && charity) await notifyCharity(adminRemovedEmail(profile.email as string, charity.name_en));
   refresh(id);
   return { ok: true, message: `${profile?.email ?? "That person"} can no longer manage this charity.` };
@@ -385,7 +385,7 @@ export async function resetSecondStep(id: string, userId: string, _prev: FormSta
     if (del.error) return failed(del.error);
   }
   const { data: profile } = await db.from("profiles").select("email").eq("id", userId).maybeSingle();
-  await logAudit({ actorUserId: admin.userId, action: "charity.admin_second_step_reset", entityType: "charity", entityId: id, details: { email: profile?.email ?? null, checked: how.slice(0, 500) } });
+  await logAudit({ actorUserId: admin.userId, action: "charity.admin_second_step_reset", entityType: "charity", entityId: id, details: { user_id: userId, checked: how.slice(0, 500) } });
   if (profile?.email) await notifyCharity(secondStepResetEmail(profile.email as string));
   refresh(id);
   return { ok: true, message: "Reset. They'll set up a new authenticator app next time they sign in, and they've been emailed." };

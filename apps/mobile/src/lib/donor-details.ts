@@ -9,7 +9,8 @@ const KEY = "nediv-lev.donor-details";
 
 export async function loadDetails(userId: string | null): Promise<RememberedDetails | null> {
   try {
-    const raw = await loadOwned(KEY, userId);
+    // Never the details remembered while signed out: on a shared phone they may be someone else's.
+    const raw = await loadOwned(KEY, userId, { adoptShared: false });
     return raw ? cleanRemembered(JSON.parse(raw)) : null;
   } catch {
     return null;

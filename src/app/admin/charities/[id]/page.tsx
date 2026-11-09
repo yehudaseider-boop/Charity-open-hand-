@@ -34,13 +34,17 @@ import { AddAdminForm, ApproveForm, ChangeBankForm, ReasonForm, ReceiptsForm, Si
 
 export const metadata: Metadata = { title: "Review charity" };
 
+/** A contact change this recent could be someone else's: don't call that number to check a reset. */
+const CONTACT_CHANGE_CAUTION_DAYS = 30;
+const changedRecently = (at: string) => Date.now() - new Date(at).getTime() < CONTACT_CHANGE_CAUTION_DAYS * 24 * 60 * 60 * 1000;
+
 export default async function AdminCharityPage({ params }: PageProps<"/admin/charities/[id]">) {
   await requirePlatformAdmin();
   const { id } = await params;
   const { charity, priv, documents } = await loadCharityForManager(id);
   const bankCheck = bankCheckLines(await loadBankCheck(id, priv?.bank_account_last4 ?? null));
   const supabase = await createClient();
-  const [{ data: memberships }, { data: history }, { data: updates }, { data: campaignRows }] = await Promise.all([
+  const [{ data: memberships }, { data: history }, { data: updates }, { data: campaignRows }, { data: contactChanges }] = await Promise.all([
     supabase.from("charity_admins").select("user_id, role").eq("charity_id", id),
     supabase
       .from("audit_log")
@@ -52,7 +56,17 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
     // What goes public the moment the charity is approved: check it with the application.
     supabase.from("charity_updates").select("id, body_en, created_at").eq("charity_id", id).order("created_at", { ascending: false }).limit(10),
     supabase.from("campaigns").select("id, title, description, status").eq("charity_id", id).eq("status", "active").limit(3),
+    // When the contact email or phone last changed, so a reset isn't checked on a number someone just put there.
+    supabase
+      .from("audit_log")
+      .select("created_at")
+      .eq("entity_type", "charity")
+      .eq("entity_id", id)
+      .in("action", ["charity.contact_email_changed", "charity.contact_phone_changed"])
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
+  const contactChangedAt = (contactChanges?.[0]?.created_at as string | undefined) ?? null;
 
   // charity_admins links to auth users, so look up their emails separately.
   const { data: profiles } = await supabase
@@ -237,6 +251,17 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
                   First check it is really them: call them on a number we already have, not one they give you now. Anyone
                   who can read their email could otherwise set up a new authenticator and see donors&apos; details.
                 </p>
+                <p className="my-2 text-xs text-muted">
+                  {contactChangedAt
+                    ? `The charity's contact email or phone was last changed on ${formatDate(contactChangedAt)}.`
+                    : "No change to the charity's contact email or phone is on record."}
+                </p>
+                {contactChangedAt && changedRecently(contactChangedAt) ? (
+                  <Notice tone="warning">
+                    The contact details changed in the last {CONTACT_CHANGE_CAUTION_DAYS} days. Don&apos;t rely on the contact number to check a
+                    reset: whoever made the change may have put it there. Use a number we had before the change, or check another way.
+                  </Notice>
+                ) : null}
                 <ReasonForm
                   action={resetSecondStep.bind(null, id, a.userId)}
                   label="How you checked it was them (kept on record)"

@@ -68,7 +68,9 @@ describe("remove a charity admin", () => {
     const r = await removeCharityAdmin(CH, U2, { ok: false });
     expect(r.ok).toBe(true);
     expect(deleted).toEqual(["charity_admins"]);
-    expect(audits[0]).toMatchObject({ action: "charity.admin_removed", details: { email: "p@x.co" } });
+    // The user id, not the address: the audit log keeps no more personal data than it needs.
+    expect(audits[0]).toEqual(expect.objectContaining({ action: "charity.admin_removed", details: { user_id: U2, by: "platform" } }));
+    expect(JSON.stringify(audits)).not.toContain("p@x.co");
     expect(mails[0]).toMatchObject({ to: "p@x.co" });
   });
   it("says so when they had already gone", async () => {
@@ -88,7 +90,8 @@ describe("reset a lost authenticator", () => {
     const r = await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Called them on the number from the application" }));
     expect(r.ok).toBe(true);
     expect(deleted).toEqual(["factor:f1"]);
-    expect(audits[0]).toMatchObject({ action: "charity.admin_second_step_reset", details: { checked: "Called them on the number from the application" } });
+    expect(audits[0]).toEqual(expect.objectContaining({ action: "charity.admin_second_step_reset", details: { user_id: U2, checked: "Called them on the number from the application" } }));
+    expect(JSON.stringify(audits)).not.toContain("p@x.co");
     expect(mails[0].subject).toMatch(/second step was reset/);
   });
   it("never for someone outside this charity, or for the admin themselves", async () => {

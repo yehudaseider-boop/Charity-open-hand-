@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { Gift, Recurring } from "../apps/mobile/src/data/giving";
 import type { CharityUpdate } from "../apps/mobile/src/data/sample";
-import { charitiesGivenTo, newsFeed, postedWhen, relationLine, NEWS_LIMIT } from "../apps/mobile/src/lib/charity-news";
+import { charitiesGivenTo, newsFeed, newsKey, optOutIds, postedWhen, relationLine, NEWS_LIMIT, NEWS_MAX_CHARITIES } from "../apps/mobile/src/lib/charity-news";
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 const today = d(2026, 11, 8);
@@ -55,5 +55,33 @@ describe("the news on Home", () => {
   it("is empty when there is no news, so Home shows no section at all", () => {
     expect(newsFeed(gaveTo, new Map(), today)).toEqual([]);
     expect(newsFeed([], new Map([["meals", [upd("m1", d(2026, 11, 6))]]]), today)).toEqual([]);
+  });
+});
+
+describe("which charities' news is asked for", () => {
+  it("asks about the 20 most recent charities at most, so the query never gets too long", () => {
+    const slugs = Array.from({ length: 45 }, (_, i) => `charity-${i}`);
+    const key = newsKey(slugs);
+    expect(key.split(",")).toHaveLength(NEWS_MAX_CHARITIES);
+    expect(NEWS_MAX_CHARITIES).toBe(20);
+    expect(key.split(",")[0]).toBe("charity-0");
+    expect(newsKey(["a", "b"])).toBe("a,b");
+    expect(newsKey([])).toBe("");
+  });
+});
+
+describe("No news or appeals from this charity", () => {
+  it("reads the opted-out charities as a plain list or as rows", () => {
+    expect(optOutIds(["c1", "c2"])).toEqual(new Set(["c1", "c2"]));
+    expect(optOutIds([{ my_news_opt_outs: "c1" }, { my_news_opt_outs: "c2" }])).toEqual(new Set(["c1", "c2"]));
+    expect(optOutIds([])).toEqual(new Set());
+    expect(optOutIds(null)).toEqual(new Set());
+  });
+
+  it("treats anything odd as not known, so no news shows rather than news they said no to", () => {
+    expect(optOutIds({ my_news_opt_outs: "c1" })).toBeNull();
+    expect(optOutIds([{ other: "c1" }])).toBeNull();
+    expect(optOutIds([1, 2])).toBeNull();
+    expect(optOutIds("c1")).toBeNull();
   });
 });

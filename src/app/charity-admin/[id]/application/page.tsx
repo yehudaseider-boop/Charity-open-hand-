@@ -20,7 +20,7 @@ import {
   submitApplication,
   uploadDocument,
 } from "./actions";
-import { AddressForm, BankForm, ContactForm, OrganisationForm, SubmitForm, UploadForm } from "./forms";
+import { AddressForm, BankForm, ContactForm, ContactReadOnly, OrganisationForm, SubmitForm, UploadForm } from "./forms";
 
 export const metadata: Metadata = { title: "Application" };
 
@@ -144,7 +144,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
                 charity={{ address_line1: charity.address_line1, address_line2: charity.address_line2, suburb: charity.suburb, city: charity.city, postal_code: charity.postal_code }}
               />
             ) : null}
-            {step.key === "contact" ? <ContactForm action={saveContact.bind(null, id)} priv={priv} /> : null}
+            {step.key === "contact" ? (owner ? <ContactForm action={saveContact.bind(null, id)} priv={priv} /> : <ContactReadOnly priv={priv} />) : null}
             {step.key === "bank" ? (
               <>
                 <p className="mb-3 text-sm text-muted">
@@ -210,8 +210,14 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
           <Card title="Contact and bank"><PrivateSummary p={priv} /></Card>
           {/* The contact person can change at any time: our emails (approval, bank changes) go to them. */}
           <Card title="Contact person">
-            <p className="mb-3 text-sm text-muted">Who we email about your charity. If you change the email, we let the old address know too.</p>
-            <ContactForm action={saveContact.bind(null, id)} priv={priv} />
+            {owner ? (
+              <>
+                <p className="mb-3 text-sm text-muted">Who we email about your charity. If you change the email or phone number, we let the old address know too.</p>
+                <ContactForm action={saveContact.bind(null, id)} priv={priv} />
+              </>
+            ) : (
+              <ContactReadOnly priv={priv} />
+            )}
           </Card>
           <Card title="Documents"><DocumentList docs={documents} /></Card>
         </>

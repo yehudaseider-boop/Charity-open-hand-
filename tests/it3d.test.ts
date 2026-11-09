@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildIt3d,
+  ERASED_LEFT_OUT,
+  erasedWithoutSarsDetails,
   initialsAndNames,
   it3dBytes,
   it3dPeriodRange,
@@ -376,10 +378,42 @@ describe("problems", () => {
     expect(fieldsOf(only({ taxReference: "0001339050" }).lines[3])[13]).toBe("0001339050");
   });
 
-  it("blocks a missing address or an erased donor", () => {
+  it("blocks a missing address", () => {
     expect(blocking(only({ address: { line1: null, line2: null, suburb: null, city: null, postalCode: null } }))[0]).toMatch(/address is missing/);
-    const erased = only({ erased: true, firstName: null, lastName: null, idNumber: null });
-    expect(blocking(erased)).toEqual([expect.stringMatching(/erased at their request/)]);
+  });
+
+  it("leaves out only the receipt of a donor erased before the SARS details were kept, as a warning", () => {
+    const gone = receipt({ donor: person({ erased: true, firstName: null, lastName: null, idNumber: null, phone: null, email: null, address: { line1: null, line2: null, suburb: null, city: null, postalCode: null } }) });
+    const kept = receipt({ donations: [gift("2026-06-01T08:00:00Z", 25_000)] });
+    const r = buildIt3d(input({ receipts: [gone, kept] }));
+    expect(blocking(r)).toEqual([]);
+    expect(r.problems).toEqual([expect.objectContaining({ severity: "warning", message: ERASED_LEFT_OUT, receiptNumber: gone.receiptNumber })]);
+    expect(r.fileReady).toBe(true);
+    expect(r.totals).toMatchObject({ receipts: 1, donors: 1, donations: 1, totalCents: 25_000 });
+    expect(r.lines.join("\n")).not.toContain(gone.receiptNumber!);
+    expect(r.lines.join("\n")).toContain(kept.receiptNumber!);
+    // A company or trust erased the same way is left out too.
+    expect(erasedWithoutSarsDetails(person({ type: "company", erased: true, organisationName: null, registrationNumber: null }))).toBe(true);
+  });
+
+  it("never calls a period with only left-out receipts a null declaration", () => {
+    const gone = receipt({ donor: person({ erased: true, firstName: null, lastName: null, idNumber: null, phone: null, email: null, address: { line1: null, line2: null, suburb: null, city: null, postalCode: null } }) });
+    const r = buildIt3d(input({ receipts: [gone] }));
+    expect(r.nil).toBe(false);
+    expect(r.fileReady).toBe(false);
+    expect(r.lines).toEqual([]);
+  });
+
+  it("reports an erased donor whose SARS details were kept, without their contact details", () => {
+    const r = only({ erased: true, phone: null, email: "erased+x@erased.invalid" });
+    expect(r.problems).toEqual([]);
+    expect(r.fileReady).toBe(true);
+    const de = fieldsOf(r.lines[3]);
+    expect(de[6]).toBe("Mokoena");
+    expect(de[11]).toBe("8001015009087");
+    expect(de[24]).toBe("12 Main Road");
+    expect(de[30]).toBe(NO_PHONE);
+    expect(de[31]).toBe(NO_EMAIL);
   });
 
   it("blocks a pipe, a leading space, a character outside Latin-1 or a value too long, never changing it", () => {

@@ -96,8 +96,12 @@ describe("erase_donor_data", () => {
       expect(donor.email).toBe(`erased+${w.donor}@erased.invalid`);
       expect(donor.erased_at).not.toBeNull();
 
+      // The gift is on an issued s18A receipt, so what the charity reports to SARS (IT3(d)) stays; contact details go.
       const d = (await run("select * from public.donation_checkout_details where donation_id = $1", [w.don])).rows[0];
-      expect(d).toMatchObject({ first_name: null, last_name: null, phone: null, id_number_encrypted: null, address_line1: null, city: null, receipt_identity: null });
+      expect(w.receipt).not.toBeNull();
+      expect(d).toMatchObject({ first_name: "Erin", last_name: "Case", id_number_encrypted: "v1.x.y.z", address_line1: "1 Test Road", city: "Johannesburg" });
+      expect(d).toMatchObject({ phone: null, id_number_last4: null, receipt_identity: null });
+      expect(d.erased_at).not.toBeNull();
       expect(d.email).toMatch(/@erased\.invalid$/);
 
       // The donation itself, as the law requires, is untouched, except for the free text.

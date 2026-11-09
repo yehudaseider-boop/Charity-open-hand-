@@ -1610,3 +1610,30 @@ the real dashboard. They are kept only in the visitor's own browser: nothing is 
 says so after every action, and "Put back the sample" restores the start. Every fourth made-up donor starts with a
 note, two tags and a follow-up (`src/app/demo/dashboard/care.ts`), and Donors can be filtered by tag. Email donors
 and Thank donors are still described rather than shown.
+
+## Review fixes, database and SARS file (09/11/2026)
+
+From the code review, in `supabase/migrations/20261109000001_review_fixes_09_11.sql`:
+- **Erasure keeps what SARS needs for an issued s18A receipt.** Erasing a donor used to clear the names, ID and income
+  tax numbers, registration number and address on every gift, also those on an issued s18A receipt, so the charity's
+  IT3(d) file refused the whole tax year. Tax law requires the charity to report and keep those (POPIA s14 allows
+  keeping what a law requires). On gifts linked to an issued (not void) s18A receipt they now stay; the email, phone,
+  contact person, last four digits and identity fingerprint still go, and the gift is still marked erased. Gifts with
+  no issued receipt are erased in full, as before. The erasure email and request reply now say this. **For Yehuda and
+  Yosef:** how long these kept details stay (the tax retention period) is still open, like the rest of the
+  retention period on the Privacy page.
+- **IT3(d): an erased donor never blocks the file.** A receipt whose donor was erased before this change (nothing
+  kept) is left out of the file with a warning naming the receipt, so the charity captures that one by hand on
+  eFiling; the rest of the file can be downloaded. An erased donor whose details were kept is reported as usual,
+  without phone or email.
+- **Issuing an s18A receipt locks its donations first** (in id order), so a refund at the same moment can't slip
+  between the "still paid" check and the receipt.
+- **The ciphertext check** (admin settings) also checks the monthly card authorisation and the saved cards table,
+  and checks visitors who are not signed in as well as signed-in people.
+- **Storage:** a charity's public files may only be its logo and cover (in its own folder) or under `photos/` and
+  `updates/`, the paths the website uses. Documents can be uploaded only while the application is a draft or sent
+  back, the same rule as the documents table and the application page (platform admins and the server excepted).
+- **A suspended charity renaming itself** is now written to the audit log, like an approved one.
+- **`my_news_opt_outs()`** gives the app the charities the signed-in person said "no news" to (matched on the hash
+  of their sign-in email, as the opt-out is written), so the news feed on Home can leave them out.
+- `fee_settings.gateway_fixed_cents` was already bigint (20/10/2026); the migration only makes sure.

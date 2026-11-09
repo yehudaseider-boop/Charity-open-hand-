@@ -141,7 +141,10 @@ describe("app checkout endpoint", () => {
 
   it("never uses a saved ID number without a signed-in donor, or with another email", async () => {
     const guest = await call({ ...gift, useSavedId: true, details: { ...details, wants_18a: true } });
-    expect(guest.status).toBe(422);
+    // Signed out (or the sign-in expired): the same answer saved cards get, and nothing is recorded.
+    expect(guest.status).toBe(401);
+    expect((await guest.json()).message).toMatch(/^Please sign in again/);
+    expect(ops).toHaveLength(0);
     signedIn = { userId: "u1", email: "someone.else@example.com" };
     const other = await call({ ...gift, useSavedId: true, details: { ...details, wants_18a: true } });
     expect((await other.json()).fieldErrors.id_number).toMatch(/goes with your account's email/);

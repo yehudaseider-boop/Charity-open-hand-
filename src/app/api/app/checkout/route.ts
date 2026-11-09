@@ -35,6 +35,10 @@ export async function POST(request: NextRequest) {
   if ((body.data.saveCard || body.data.useSavedCard) && !account) {
     return NextResponse.json({ ok: false, message: "Please sign in again to use a saved card." }, { status: 401 });
   }
+  // "Use my ID ending 1234" without a signed-in account: the same answer, never a gift without the ID it asked for.
+  if (body.data.useSavedId && !account) {
+    return NextResponse.json({ ok: false, message: "Please sign in again to use your saved ID number." }, { status: 401 });
+  }
   const result = await startDonation({
     charitySlug: body.data.slug,
     giftCents: body.data.giftCents,

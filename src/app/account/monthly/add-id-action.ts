@@ -8,7 +8,7 @@ import { cleanSaIdNumber, giftsToUpdate, needsIdNudge, SAVED_TEXT } from "@/lib/
 import type { FormState } from "@/lib/form";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { onIssuedReceipt as onIssuedReceiptOf } from "@/lib/donations/s18a-complete";
+import { contactUs, onIssuedReceipt as onIssuedReceiptOf } from "@/lib/donations/s18a-complete";
 
 const TRY_AGAIN = "We couldn't save your ID number. Nothing has changed. Please try again.";
 
@@ -65,13 +65,21 @@ export async function addMonthlyId(_prev: FormState, formData: FormData): Promis
     .eq("status", "paid")
     .eq("tax_year", thisYear);
   if (giftsError) return { ok: false, message: TRY_AGAIN };
+  const sourceId = source!.donation_id as string;
   const candidateIds = (gifts ?? []).map((g) => g.id as string);
   // Shared with "Add my details after paying" (s18a-complete.ts): a gift on an issued receipt is never changed.
-  const onIssuedReceipt = await onIssuedReceiptOf(db, candidateIds).catch(() => null);
+  // The source gift (the first one, which every new gift is copied from) is checked too: it can be on one.
+  const onIssuedReceipt = await onIssuedReceiptOf(db, [...new Set([...candidateIds, sourceId])]).catch(() => null);
   if (!onIssuedReceipt) return { ok: false, message: TRY_AGAIN };
   const targets = new Set(giftsToUpdate((gifts ?? []) as Parameters<typeof giftsToUpdate>[0], { recurringId, donorIds, taxYear: thisYear, onIssuedReceipt }));
-  // The source details every new monthly gift is copied from, first: once this is in, no new gift goes out without the ID.
-  targets.add(source!.donation_id as string);
+  // The source details every new monthly gift is copied from, first: once this is in, no new gift goes out without
+  // the ID. Not when the source gift is on an issued receipt: that receipt is what it was issued as, and there is no
+  // other place new gifts copy from, so the gifts that can be updated are, and the donor is told plainly.
+  const sourceLocked = onIssuedReceipt.has(sourceId);
+  if (!sourceLocked) targets.add(sourceId);
+  if (!targets.size) {
+    return { ok: false, message: `Your first monthly gift is already on an issued s18A receipt, so we can't add your ID number here. Nothing has changed. Please ${contactUs()} and we'll add it for you.` };
+  }
 
   const { data: written, error: writeError } = await db
     .from("donation_checkout_details")
@@ -83,15 +91,21 @@ export async function addMonthlyId(_prev: FormState, formData: FormData): Promis
     .select("donation_id");
   if (writeError) return { ok: false, message: TRY_AGAIN };
   const updated = (written ?? []).map((w) => w.donation_id as string);
-  if (!updated.includes(source!.donation_id as string)) return { ok: false, message: TRY_AGAIN };
+  if (sourceLocked ? !updated.length : !updated.includes(sourceId)) return { ok: false, message: TRY_AGAIN };
 
   await logAudit({
     actorUserId: viewer.userId,
     action: "donor.monthly_id_added",
     entityType: "recurring_donation",
     entityId: recurringId,
-    details: { id_last4: patch.id_number_last4, tax_year: thisYear, gifts_updated: updated.filter((d) => d !== source!.donation_id).length },
+    details: { id_last4: patch.id_number_last4, tax_year: thisYear, gifts_updated: updated.filter((d) => d !== sourceId).length, source_on_issued_receipt: sourceLocked },
   });
+  if (sourceLocked) {
+    return {
+      ok: true,
+      message: `Saved on this tax year's gifts that aren't on an issued s18A receipt yet. Your first monthly gift is already on one, so new gifts can't carry your ID number yet. Please ${contactUs()} and we'll add it for you.`,
+    };
+  }
   // No revalidatePath here: the page would drop the form (the nudge no longer applies) and with it the words
   // saying what just happened. The form shows them itself; the next visit reads the page afresh.
   return { ok: true, message: SAVED_TEXT };

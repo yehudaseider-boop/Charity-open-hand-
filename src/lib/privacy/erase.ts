@@ -19,11 +19,12 @@ const UUID = /^[0-9a-f-]{36}$/i;
 
 /** What stays after an erasure, in words a person can read. */
 export const ERASE_KEPT_TEXT =
-  "We keep each donation's amount, date, charity and tax year, and any s18A receipt already issued, because tax law requires us to keep those records.";
+  "We keep each donation's amount, date, charity and tax year, and any s18A receipt already issued. For a donation on an issued s18A receipt we also keep the name, ID or income tax number, registration number and address the charity must report to SARS, because tax law requires us to keep those records. Your email address, phone number and everything else are erased.";
 
 /**
  * Erase everything that identifies a person, keeping only the records tax law requires
- * (donation amounts and dates, issued s18A receipts). Either by their account, or, for a
+ * (donation amounts and dates, issued s18A receipts, and for gifts on an issued s18A receipt the
+ * names, numbers and address the charity reports to SARS in its IT3(d) file). Either by their account, or, for a
  * donor who never had one, by the email address they gave with.
  *
  * Order matters: the database erasure is one step, the confirmation email follows (to the address

@@ -1,5 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
+import { confirmPayment } from "@/lib/donations/confirm";
+import { GatewayError } from "@/lib/gateway";
 import { alertGivezy } from "@/lib/ops/alert";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -116,13 +118,27 @@ async function pauseMonthlyFor(donationId: string): Promise<void> {
 
 /**
  * A refund from the gateway. Only a refund in rand can be matched to what the donor paid. A refund of the whole amount the donor paid marks the donation refunded.
- * A partial refund, an unknown amount or an unknown payment is held for a person.
+ * A partial refund, an unknown amount or an unknown payment is held for a person. A refund for a payment not yet
+ * recorded as paid is first checked with the provider (confirmPayment); one the provider doesn't confirm is held too.
  */
 export async function handleRefund(reference: string | null, amountCents: number | null, eventRowId: string, currency: string | null = "ZAR"): Promise<void> {
-  const d = reference ? await findByReference(reference) : null;
-  if (!d) {
+  let d = reference ? await findByReference(reference) : null;
+  if (!d || !reference) {
     await logAudit({ actorUserId: null, action: "refund.unmatched", entityType: "gateway_event", entityId: eventRowId, details: { reference, amountCents } });
     return;
+  }
+  // The refund can arrive before we have recorded the payment as paid (its success event is still being
+  // retried). Ask the provider first, as the success event would: once it is recorded paid, the refund below
+  // applies as usual. If the provider doesn't say it was paid, the refund is held for a person as before.
+  // confirmPayment never handles refunds, so this can't loop, and both steps are safe to repeat.
+  if (d.status === "pending" || d.status === "failed") {
+    // A provider that answers "no such payment" or turns the check down won't answer differently on a repeat: held
+    // for a person. Anything else that fails (an outage, our database) is thrown, so the event is sent again.
+    const outcome = await confirmPayment(reference).catch((e) => {
+      if (e instanceof GatewayError && (e.notFound || e.refused)) return null;
+      throw e;
+    });
+    if (outcome === "paid") d = (await findByReference(reference)) ?? d;
   }
   if (currency === "ZAR" && amountCents !== null && amountCents === d.total_charged_cents) {
     const outcome = await reverseDonation(d.id, "refunded", null, "the payment provider refunded the full amount");

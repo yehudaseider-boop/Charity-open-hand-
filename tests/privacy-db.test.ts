@@ -209,8 +209,8 @@ describe("charity documents", () => {
           await expect(put(bucket, name)).rejects.toThrow(/row-level security|invalid input syntax for type uuid/);
           await run("rollback to savepoint s");
         }
-        // Their own folder still works.
-        await put(bucket, `${ids.meals}/logo.png`);
+        // Their own folder still works (documents only while the application is open: review-fixes-09-11-db.test.ts).
+        if (bucket === "charity-public") await put(bucket, `${ids.meals}/logo.png`);
       }
     });
   });

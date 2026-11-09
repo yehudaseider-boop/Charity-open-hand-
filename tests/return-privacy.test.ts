@@ -25,7 +25,7 @@ const row = {
 let outcome = "paid";
 let adminReads = 0;
 let confirmCalls = 0;
-let overLimit = false;
+let overLimit: boolean | "broken" = false;
 let sessionRow: typeof row | null = null; // what row-level security lets the visitor read
 let askedRef = "";
 vi.mock("@/lib/donations/confirm", () => ({
@@ -39,7 +39,12 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ get: (name: string) => (name === "gz_focus" && focusCookie ? { name, value: focusCookie } : undefined) }),
 }));
 vi.mock("@/lib/auth", () => ({ getViewer: async () => null }));
-vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => overLimit, ipKeys: (ip: string) => [`ip:${ip}`] }));
+vi.mock("@/lib/rate-limit", () => ({
+  hitRateLimit: async () => {
+    if (overLimit === "broken") throw new Error("rate limit store down");
+    return overLimit;
+  },
+  ipKeys: (ip: string) => [`ip:${ip}`] }));
 vi.mock("@/lib/donations/confirmation-access", () => ({
   confirmationTokenMatches: async (_id: string, t?: string) => t === "good-credential",
 }));
@@ -161,6 +166,14 @@ describe("checking with the payment provider", () => {
     // Settled by the webhook meanwhile: a donor on a busy shared connection still sees it went through.
     outcome = "paid";
     expect(await page({ t: "good-credential" })).not.toContain("We&#x27;re confirming your payment");
+    expect(confirmCalls).toBe(0);
+  });
+
+  it("a limit check that fails counts as over the limit: the saved state, never the provider, and no error page", async () => {
+    overLimit = "broken";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    outcome = "pending";
+    expect(await page({ t: "good-credential" })).toContain("We&#x27;re confirming your payment");
     expect(confirmCalls).toBe(0);
   });
 

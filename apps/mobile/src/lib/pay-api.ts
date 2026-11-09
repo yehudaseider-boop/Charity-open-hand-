@@ -70,12 +70,33 @@ const api = (site: string, path: string) => {
   return `${base}/api/app/${path}`;
 };
 
+/**
+ * How long we wait for our server before giving up. A stalled network otherwise leaves the give screen on
+ * "Opening the payment page…" for ever; giving up is a thrown network error, so each caller shows its own
+ * plain "couldn't reach Givezy" message (and, for a saved card, holds the attempt so nothing is charged twice).
+ */
+export const REQUEST_TIMEOUT_MS = 20_000;
+
+/** `fetch`, and reading its reply, given up after `ms`. Throws on a timeout like any network error. */
+export async function fetchWithTimeout(url: string, init: RequestInit, ms = REQUEST_TIMEOUT_MS, f: typeof fetch = fetch): Promise<{ status: number; json: unknown }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const res = await f(url, { ...init, signal: controller.signal });
+    // A reply cut off half-way (or given up on) reads as no reply body.
+    const json = await res.json().catch(() => null);
+    if (controller.signal.aborted) throw new Error("Timed out");
+    return { status: res.status, json };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const fetchPost: Post = async (url, body, token) => {
   const headers: Record<string, string> = { "content-type": "application/json" };
   // Signed in: tells our server who is giving (for "use my ID ending 1234"). Never sent elsewhere.
   if (token) headers.authorization = `Bearer ${token}`;
-  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
-  return { status: res.status, json: await res.json().catch(() => null) };
+  return fetchWithTimeout(url, { method: "POST", headers, body: JSON.stringify(body) });
 };
 
 export function requestQuote(site: string, slug: string, giftCents: number, contributionCents: number, post: Post = fetchPost) {
@@ -171,10 +192,7 @@ export function cardLabel(card: SavedCard): string {
 
 type Send = (method: "GET" | "DELETE", url: string, token: string) => Promise<{ status: number; json: unknown }>;
 
-const fetchSend: Send = async (method, url, token) => {
-  const res = await fetch(url, { method, headers: { authorization: `Bearer ${token}` } });
-  return { status: res.status, json: await res.json().catch(() => null) };
-};
+const fetchSend: Send = (method, url, token) => fetchWithTimeout(url, { method, headers: { authorization: `Bearer ${token}` } });
 
 export type SavedCardReply = { ok: true; card: SavedCard | null } | { ok: false; closed?: true; message: string };
 

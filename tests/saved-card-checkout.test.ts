@@ -23,6 +23,7 @@ function builder(table: string) {
   for (const m of ["select", "eq", "is", "limit", "lt", "gte"]) b[m] = () => b;
   b.insert = (row: Record<string, unknown>) => (ops.push({ table, op: "insert", row }), b);
   b.update = (row: Record<string, unknown>) => (ops.push({ table, op: "update", row }), b);
+  b.upsert = (row: Record<string, unknown>) => (ops.push({ table, op: "upsert", row }), b);
   b.single = async () => ({ data: { id: "donor-1" }, error: null });
   b.maybeSingle = async () => ({ data: table === "donations" ? prior : null, error: null });
   b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok);
@@ -44,11 +45,27 @@ vi.mock("@/lib/donations/saved-card", () => ({
 vi.mock("@/lib/donations/charity", () => ({
   loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: true, splitAccountRef: "ACCT_1" }),
 }));
+/** What the provider says when asked about a reference: it has it, has never seen it, or can't be reached. */
+let providerHas: "yes" | "no" | "down" = "yes";
+const verified: string[] = [];
+class FakeGatewayError extends Error {
+  notFound: boolean;
+  constructor(m: string, o: { notFound?: boolean } = {}) {
+    super(m);
+    this.notFound = o.notFound ?? false;
+  }
+}
 vi.mock("@/lib/gateway", () => ({
-  GatewayError: class extends Error {},
+  GatewayError: FakeGatewayError,
   isGatewayRefusal: () => refusal,
   getGateway: () => ({
     name: "test",
+    verifyTransaction: async (reference: string) => {
+      verified.push(reference);
+      if (providerHas === "no") throw new FakeGatewayError("not found", { notFound: true });
+      if (providerHas === "down") throw new FakeGatewayError("unreachable");
+      return { reference, status: "pending", amountCents: 10_000, currency: "ZAR", gatewayTransactionId: "1" };
+    },
     createCheckout: async (req: Record<string, unknown>) => (checkouts.push(req), { redirectUrl: "https://pay.test/x" }),
     chargeAuthorization: async (req: Record<string, unknown>) => (charges.push(req), chargeResult()),
   }),
@@ -69,6 +86,8 @@ beforeEach(() => {
   chargeResult = async () => ({ status: "pending" });
   refusal = false;
   prior = null;
+  providerHas = "yes";
+  verified.length = 0;
   stored = { code: "AUTH_SECRET", gateway: "test" };
   signedIn = { userId: "u1", email: "A@example.com" };
   process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -204,16 +223,71 @@ describe("asking twice about the same saved-card gift", () => {
     expect(charges[0]).toMatchObject({ reference: attemptId });
   });
 
-  it("never charges again: the first answer comes back", async () => {
-    prior = { status: "pending", charity_id: "c1", total_charged_cents: 10_000, donation_checkout_details: { email: "a@example.com" } };
+  const longAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+  const pendingPrior = (createdAt = longAgo) => ({ status: "pending", charity_id: "c1", total_charged_cents: 10_000, created_at: createdAt, donation_checkout_details: { email: "a@example.com" } });
+
+  it("never charges again: the first answer comes back once the provider has the charge", async () => {
+    prior = pendingPrior();
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId, token: "tok2" });
+    expect(verified).toEqual([attemptId]);
     expect(charges).toHaveLength(0);
     expect(ops.filter((o) => o.op === "insert")).toHaveLength(0);
   });
 
+  it("a first try that stopped before the charge was sent: the retry sends it, under the same reference, and adds what was missing", async () => {
+    prior = pendingPrior();
+    providerHas = "no";
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details: { ...details, giving_label: "Work giving" } });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId, token: "tok2" });
+    expect(charges).toHaveLength(1);
+    expect(charges[0]).toMatchObject({ reference: attemptId, totalCents: 10_000, authorizationCode: "AUTH_SECRET" });
+    // The donation and its details are already there: only the consent is added (the label is upserted).
+    expect(ops.filter((o) => o.op === "insert").map((o) => o.table)).toEqual(["consents"]);
+    expect(ops.filter((o) => o.op === "upsert").map((o) => [o.table, o.row?.label])).toEqual([["donation_giving_kinds", "Work giving"]]);
+    expect(ops.some((o) => o.table === "donations" && o.op === "insert")).toBe(false);
+  });
+
+  it("never races a first try that may still be on its way to the provider", async () => {
+    prior = pendingPrior(new Date().toISOString());
+    providerHas = "no";
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.message).toMatch(/wait a minute/);
+    expect(charges).toHaveLength(0);
+  });
+
+  it("when the provider can't be asked, nothing is charged and nothing is claimed", async () => {
+    prior = pendingPrior();
+    providerHas = "down";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.charged).toBeUndefined();
+    expect(body.message).toMatch(/try again/);
+    expect(charges).toHaveLength(0);
+  });
+
+  it("a retried charge the provider turns down because the first one reached it is not marked failed", async () => {
+    prior = pendingPrior();
+    let asked = 0;
+    providerHas = "no";
+    refusal = true;
+    chargeResult = async () => {
+      asked++;
+      providerHas = "yes"; // the provider now has the first try's charge under this reference
+      throw new Error("duplicate reference");
+    };
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId });
+    expect(asked).toBe(1);
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);
+  });
+
   it("a declined first try stays declined", async () => {
-    prior = { status: "failed", charity_id: "c1", total_charged_cents: 10_000, donation_checkout_details: { email: "a@example.com" } };
+    prior = { status: "failed", charity_id: "c1", total_charged_cents: 10_000, created_at: longAgo, donation_checkout_details: { email: "a@example.com" } };
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
     expect(charges).toHaveLength(0);

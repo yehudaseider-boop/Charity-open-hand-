@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { sameSecret } from "@/lib/secret-compare";
 import { GatewayError, type BankAccountCheck, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
@@ -80,7 +80,10 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     // Paystack answered and said no to this request: 400, 402 or 422, or a 2xx with status false. A 401 or 403
     // means our key is wrong or was changed, and a 5xx or 429 that Paystack is struggling: those are outages,
     // never a declined card, so monthly donors are not stopped and saved cards not dropped because of them.
-    const refused = !notFound && ([400, 402, 422].includes(res.status) || (res.ok && body?.status === false));
+    // A "duplicate transaction reference" means a payment under this reference already reached Paystack: it is
+    // never a refusal of the card (the first payment may well have gone through), so nothing is marked failed.
+    const duplicate = /duplicate transaction reference/i.test(body?.message ?? "");
+    const refused = !notFound && !duplicate && ([400, 402, 422].includes(res.status) || (res.ok && body?.status === false));
     throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused, said: body?.message?.trim() || null });
   }
   return body.data as T;
@@ -255,7 +258,9 @@ export const paystackGateway: PaymentGateway = {
     const isPayment = type === "payment_succeeded" || type === "payment_failed";
     return {
       // Paystack events carry no event id; event type + transaction id is unique. VERIFY.
-      eventId: `${body.event}:${d.id ?? d.reference ?? original ?? "unknown"}`,
+      // With none of those, the body's own fingerprint: a repeat delivery is still the same event, and two
+      // different events are never taken for one (a fixed fallback would skip every later one).
+      eventId: `${body.event}:${d.id ?? d.reference ?? original ?? `sha256:${createHash("sha256").update(rawBody).digest("hex")}`}`,
       type,
       reference: isPayment ? (d.reference ?? null) : original,
       // Paystack amounts are in the smallest unit (cents for rand). VERIFY for refunds.

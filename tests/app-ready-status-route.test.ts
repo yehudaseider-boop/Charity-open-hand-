@@ -20,7 +20,13 @@ vi.mock("@/lib/donations/confirm", () => ({
   },
 }));
 vi.mock("@/lib/donations/confirmation-access", () => ({ confirmationTokenMatches: async (_r: string, t: string) => t === "a".repeat(43) }));
-vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => false }));
+let limitBroken = false;
+vi.mock("@/lib/rate-limit", () => ({
+  hitRateLimit: async () => {
+    if (limitBroken) throw new Error("rate limit store down");
+    return false;
+  },
+}));
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => null }));
 vi.mock("@/lib/donations/saved-id", () => ({ savedIdLast4: async () => "9087" }));
 
@@ -35,6 +41,7 @@ beforeEach(() => {
   campaignOpen = false;
   confirmed = 0;
   confirmFails = false;
+  limitBroken = false;
 });
 
 describe("app ready check", () => {
@@ -68,6 +75,14 @@ describe("app payment status", () => {
     const res = await status(req({ reference: REF, token: "a".repeat(43) }));
     expect(res.status).toBe(503);
     expect((await res.json()).ok).toBe(false);
+  });
+  it("a limit check that fails counts as limited: a plain 'check again', and the provider is not asked", async () => {
+    limitBroken = true;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await status(req({ reference: REF, token: "a".repeat(43) }));
+    expect(res.status).toBe(429);
+    expect((await res.json()).message).toMatch(/check again/);
+    expect(confirmed).toBe(0);
   });
   it("is closed with the server switch off", async () => {
     delete process.env.APP_GIVING;

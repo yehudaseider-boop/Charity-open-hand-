@@ -3,7 +3,7 @@
  * reads Paystack's answers, and how it checks webhook signatures. Nothing here talks to
  * Paystack; the real behaviour still has to be checked in Paystack's test mode.
  */
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -223,6 +223,14 @@ describe("webhook signature", () => {
     expect(await paystackGateway.parseWebhook(opened, headers(sign(opened)))).toMatchObject({ type: "dispute_opened", reference: base.reference });
     const resolved = JSON.stringify({ event: "charge.dispute.resolve", data: { id: 9, resolution: "declined", transaction: { reference: base.reference } } });
     expect(await paystackGateway.parseWebhook(resolved, headers(sign(resolved)))).toMatchObject({ type: "dispute_resolved", reference: base.reference, detail: "declined" });
+    // An event naming no id or reference is told apart by its body's fingerprint, never one fixed key.
+    const bare1 = JSON.stringify({ event: "refund.processed", data: { amount: 100 } });
+    const bare2 = JSON.stringify({ event: "refund.processed", data: { amount: 200 } });
+    const id1 = (await paystackGateway.parseWebhook(bare1, headers(sign(bare1))))?.eventId;
+    const id2 = (await paystackGateway.parseWebhook(bare2, headers(sign(bare2))))?.eventId;
+    expect(id1).toBe(`refund.processed:sha256:${createHash("sha256").update(bare1).digest("hex")}`);
+    expect(id2).not.toBe(id1);
+    expect((await paystackGateway.parseWebhook(bare1, headers(sign(bare1))))?.eventId).toBe(id1);
     // A refund whose shape we don't recognise names no payment, so it is held for a person.
     const odd = JSON.stringify({ event: "refund.processed", data: { id: 10, amount: 100 } });
     expect(await paystackGateway.parseWebhook(odd, headers(sign(odd)))).toMatchObject({ type: "refund_processed", reference: null });
@@ -331,6 +339,11 @@ describe("how Paystack's errors are read", () => {
     const e = await verifyError();
     expect(e.notFound).toBe(true);
     expect(e.refused).toBe(false);
+  });
+
+  it("a duplicate reference is never a refusal: a payment under it already reached Paystack", async () => {
+    answerWith(400, { status: false, message: "Duplicate Transaction Reference" });
+    expect(await verifyError()).toMatchObject({ refused: false, notFound: false });
   });
 
   it("a wrong or changed key (401, 403) is an outage, never a declined card", async () => {

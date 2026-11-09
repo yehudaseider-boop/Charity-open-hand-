@@ -19,7 +19,10 @@ export async function payWithNewCard(formData: FormData) {
   const allowed = newCardLinkValid(m, e, s, now) || (viewer ? await ownsMonthly(viewer.userId, m) : false);
   if (!allowed) redirect(back("link"));
   // A few tries per monthly donation in ten minutes: each one opens a payment page.
-  if (await hitRateLimit("monthly-new-card", [`m:${m}`], 5, 10).catch(() => false)) redirect(back("limit"));
+  // A check that fails counts as limited (never as a free pass): the donor is told plainly to try again.
+  const limited = await hitRateLimit("monthly-new-card", [`m:${m}`], 5, 10).catch((err) => (console.error(err), null));
+  if (limited === null) redirect(back("error"));
+  if (limited) redirect(back("limit"));
   let target: string;
   try {
     const r = await startNewCardPayment(m, now);

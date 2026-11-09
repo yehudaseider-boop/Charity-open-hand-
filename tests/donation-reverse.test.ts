@@ -52,6 +52,19 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
+/** What checking with the provider does to a donation not yet recorded paid (confirmPayment, faked). */
+let confirmAnswer: "paid" | "pending" | "failed" | Error = "pending";
+const confirmed: string[] = [];
+vi.mock("@/lib/gateway", () => ({ GatewayError: class GatewayError extends Error { notFound = false; refused = false; } }));
+vi.mock("@/lib/donations/confirm", () => ({
+  confirmPayment: async (reference: string) => {
+    confirmed.push(reference);
+    if (confirmAnswer instanceof Error) throw confirmAnswer;
+    if (confirmAnswer === "paid") for (const d of donations) if (d.gateway_ref === reference) d.status = "paid";
+    return confirmAnswer;
+  },
+}));
+
 const { handleDispute, handleRefund, releaseDisputeHold, reverseDonation } = await import("@/lib/donations/reverse");
 
 beforeEach(() => {
@@ -60,6 +73,8 @@ beforeEach(() => {
   receiptLinks = [];
   voided = [];
   audits.length = 0;
+  confirmAnswer = "pending";
+  confirmed.length = 0;
 });
 
 describe("refunds", () => {
@@ -78,6 +93,43 @@ describe("refunds", () => {
     await handleRefund("ref-1", null, "evt");
     expect(donations[0].status).toBe("paid");
     expect(audits.map((a) => a.action)).toEqual(["donation.refund_review", "donation.refund_review"]);
+  });
+
+  it("a paid donation is not checked again with the provider", async () => {
+    await handleRefund("ref-1", 20_000, "evt");
+    expect(confirmed).toEqual([]);
+  });
+
+  it("a refund that arrives before the payment was recorded paid: checked with the provider first, then refunded", async () => {
+    for (const before of ["pending", "failed"]) {
+      donations[0].status = before;
+      audits.length = 0;
+      confirmAnswer = "paid";
+      await handleRefund("ref-1", 20_000, "evt");
+      expect(donations[0].status).toBe("refunded");
+      expect(audits.map((a) => a.action)).toEqual(["donation.refunded"]);
+    }
+    expect(confirmed).toEqual(["ref-1", "ref-1"]);
+    // The late success event then changes nothing: a refunded donation never goes back to paid.
+    await handleRefund("ref-1", 20_000, "evt");
+    expect(confirmed).toHaveLength(2);
+    expect(donations[0].status).toBe("refunded");
+  });
+
+  it("a refund for a payment the provider doesn't confirm is held for a person, as before", async () => {
+    donations[0].status = "pending";
+    confirmAnswer = "pending";
+    await handleRefund("ref-1", 20_000, "evt");
+    expect(donations[0].status).toBe("pending");
+    expect(audits.map((a) => a.action)).toEqual(["donation.refund_review"]);
+    expect(audits[0].details).toMatchObject({ status: "pending" });
+  });
+
+  it("an outage while checking is thrown, so the event is sent again", async () => {
+    donations[0].status = "pending";
+    confirmAnswer = new Error("provider down");
+    await expect(handleRefund("ref-1", 20_000, "evt")).rejects.toThrow("provider down");
+    expect(audits).toEqual([]);
   });
 
   it("a refund for a payment we don't know is held, and changes nothing", async () => {

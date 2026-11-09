@@ -56,6 +56,33 @@ export function ContactForm({ action, priv }: {
   );
 }
 
+/** The contact details for an admin who isn't the owner: shown, not editable (only the owner can change them). */
+export function ContactReadOnly({ priv }: {
+  priv: { contact_name: string | null; contact_email: string | null; contact_phone: string | null } | null;
+}) {
+  const rows: [string, string | null | undefined][] = [
+    ["Full name", priv?.contact_name],
+    ["Email", priv?.contact_email],
+    ["Phone", priv?.contact_phone],
+  ];
+  return (
+    <div className="space-y-3">
+      <dl className="divide-y divide-border text-sm">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-1 gap-0.5 py-2 sm:grid-cols-3 sm:gap-3">
+            <dt className="text-muted">{label}</dt>
+            <dd dir="auto" className="break-words sm:col-span-2">{value || <span className="text-muted">Not provided</span>}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-sm text-muted">
+        Only your charity&apos;s owner can change the contact details. We use them to check who is asking before we reset
+        a sign-in or change the bank account. Ask the owner if they need updating.
+      </p>
+    </div>
+  );
+}
+
 export function BankForm({ action, priv }: {
   action: Action;
   priv: { bank_name: string | null; bank_account_holder: string | null; bank_account_last4: string | null; bank_branch_code: string | null } | null;

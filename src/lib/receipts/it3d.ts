@@ -68,7 +68,11 @@ export type It3dDonor = {
   phone: string | null;
   email: string | null;
   address: Address;
-  /** The donor asked for their information to be erased: the details are gone. */
+  /**
+   * The donor asked for their information to be erased. Since 09/11/2026 a gift on an issued s18A receipt keeps
+   * what SARS needs (names, ID, tax and registration numbers, address); only the contact details are gone. An
+   * erasure from before that left nothing: that receipt is left out of the file, to be captured by hand.
+   */
   erased: boolean;
   /** The gifts on this one receipt carry different ID numbers (should never happen). */
   idNumbersDiffer?: boolean;
@@ -195,6 +199,17 @@ function badCharacter(v: string): string | null {
     if (c > 0xff || c < 0x20 || (c >= 0x7f && c <= 0x9f)) return ch;
   }
   return null;
+}
+
+/** What the charity is told about a receipt left out because the donor was erased before the SARS details were kept. */
+export const ERASED_LEFT_OUT =
+  "This donor's details were erased at their request before Givezy kept what SARS needs, so this receipt is left out of the file. The rest of the file can still go. Capture this receipt by hand on eFiling from your own records, or ask your accountant.";
+
+/** An erased donor without the details SARS needs: names, the ID or registration number, and an address. */
+export function erasedWithoutSarsDetails(d: It3dDonor): boolean {
+  if (!d.address.line1?.trim()) return true;
+  if (d.type === "individual") return !d.lastName?.trim() || !d.firstName?.trim() || !d.idNumber?.trim();
+  return !d.organisationName?.trim() || !d.registrationNumber?.trim();
 }
 
 export function buildIt3d(input: It3dInput): It3dResult {
@@ -370,11 +385,19 @@ export function buildIt3d(input: It3dInput): It3dResult {
   const donors = new Map<string, De>();
   const drs: { de: De; receiptNumber: string; donation: It3dReceipt["donations"][number] }[] = [];
   let companyDonor = false;
+  /** Receipts whose donor was erased before the SARS details were kept: listed, not in the file. */
+  const leftOut: It3dReceipt[] = [];
 
   for (const r of receipts) {
     const d = r.donor;
     const donorName = d.type === "individual" ? [d.firstName, d.lastName].filter(Boolean).join(" ").trim() : (d.organisationName ?? "").trim();
     const who: Who = { receiptNumber: r.receiptNumber, donorName: donorName || "A donor", idLast4: last4(d.type === "individual" ? d.idNumber : d.registrationNumber), fix: null };
+    if (d.erased && erasedWithoutSarsDetails(d)) {
+      // Only this receipt is affected: the rest of the file can still go to SARS.
+      add("warning", ERASED_LEFT_OUT, who);
+      leftOut.push(r);
+      continue;
+    }
     const before = problems.filter((p) => p.severity === "blocking").length;
     const own: string[] = [];
     const say = (sev: "blocking" | "warning", m: string) => {
@@ -387,9 +410,7 @@ export function buildIt3d(input: It3dInput): It3dResult {
     let existing = donors.get(r.donorKey);
     if (!existing) {
       let surname = "", initials = "", names = "", idType = "", idNumber = "", dob = "", nature = "";
-      if (d.erased) {
-        say("blocking", "This donor's details were erased at their request, so this receipt can't go in the file. Report it on eFiling from your own records, or ask your accountant.");
-      } else if (d.type === "individual") {
+      if (d.type === "individual") {
         nature = "INDIVIDUAL";
         idType = "001";
         surname = (d.lastName ?? "").trim();
@@ -434,16 +455,15 @@ export function buildIt3d(input: It3dInput): It3dResult {
         say("warning", "This donor's income tax number doesn't pass SARS's check, so it is left out. SARS accepts the receipt without it for now.");
         tax = "";
       }
-      if (d.erased) tax = "";
 
       const a = d.address;
       let postalCode = (a.postalCode ?? "").trim();
-      if (!d.erased && !a.line1?.trim()) say("blocking", "This donor's address is missing. SARS needs a postal address. Ask Givezy to check the receipt.");
-      else if (!d.erased && !postalCode) {
+      if (!a.line1?.trim()) say("blocking", "This donor's address is missing. SARS needs a postal address. Ask Givezy to check the receipt.");
+      else if (!postalCode) {
         postalCode = "0000";
         say("warning", 'This donor\'s postal code is missing, so it is sent as "0000", as SARS allows.');
       } else if (postalCode && !/^[A-Za-z0-9. ]+$/.test(postalCode)) say("blocking", "This donor's postal code can only have letters, numbers and spaces. Ask Givezy to check it.");
-      const phone = sarsPhone(d.phone);
+      const phone = d.erased ? null : sarsPhone(d.phone);
       const email = (d.email ?? "").trim();
       const tel = phone && !phone.cell ? phone.digits : "";
       const cell = phone?.cell ? phone.digits : NO_PHONE;
@@ -471,11 +491,11 @@ export function buildIt3d(input: It3dInput): It3dResult {
         { no: 416, value: "", max: 30, label: "" },
         { no: 417, value: nature, max: 33, label: "" },
         ...[418, 419, 420, 421, 422, 423, 424].map((no, i) => ({ no, value: "", max: PHYSICAL_ADDRESS_MAX[i], label: "" })),
-        { no: 425, value: d.erased ? "" : (a.line1 ?? ""), max: 100, label: "The donor's address line 1" },
-        { no: 426, value: d.erased ? "" : (a.line2 ?? ""), max: 100, label: "The donor's address line 2" },
-        { no: 427, value: d.erased ? "" : (a.suburb ?? ""), max: 100, label: "The donor's suburb" },
-        { no: 428, value: d.erased ? "" : (a.city ?? ""), max: 100, label: "The donor's city or town" },
-        { no: 429, value: d.erased ? "" : postalCode, max: 10, label: "The donor's postal code" },
+        { no: 425, value: a.line1 ?? "", max: 100, label: "The donor's address line 1" },
+        { no: 426, value: a.line2 ?? "", max: 100, label: "The donor's address line 2" },
+        { no: 427, value: a.suburb ?? "", max: 100, label: "The donor's suburb" },
+        { no: 428, value: a.city ?? "", max: 100, label: "The donor's city or town" },
+        { no: 429, value: postalCode, max: 10, label: "The donor's postal code" },
         { no: 430, value: tel, max: 15, label: "" },
         { no: 431, value: cell, max: 15, label: "" },
         { no: 432, value: mail, max: 80, label: "The donor's email address" },
@@ -538,12 +558,13 @@ export function buildIt3d(input: It3dInput): It3dResult {
     return line;
   });
 
-  const nil = drLines.length === 0;
+  // A null declaration only when there were no receipts at all: receipts left out (erased donors) still exist.
+  const nil = drLines.length === 0 && leftOut.length === 0;
   const bodyCount = 1 + deLines.length + drLines.length;
   const trailer = ["T", String(bodyCount), "", centsToRandDecimal(totalCents)].join("|");
-  const lines = nil ? [] : [gh, se, re, ...deLines, ...drLines, trailer];
-  const totals: It3dTotals = { receipts: new Set(receipts.map((r) => r.receiptId)).size, donors: deList.length, donations: drLines.length, totalCents };
-  const fileReady = !nil && !problems.some((p) => p.severity === "blocking");
+  const lines = drLines.length === 0 ? [] : [gh, se, re, ...deLines, ...drLines, trailer];
+  const totals: It3dTotals = { receipts: new Set(receipts.filter((r) => !leftOut.includes(r)).map((r) => r.receiptId)).size, donors: deList.length, donations: drLines.length, totalCents };
+  const fileReady = drLines.length > 0 && !problems.some((p) => p.severity === "blocking");
 
   const entity: [string, string][] = [
     ["Tax year (SARS)", String(taxYear)],
