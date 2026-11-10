@@ -64,13 +64,17 @@ export async function GET(request: Request) {
   if (thanks.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   // Charities' donor journeys this person is on (a server-only table), with each email's step and dates: their own
   // rows only, by the donor ids established above. Before the journey's migration has run there are none.
-  const journeys = donorIds.length
-    ? await createAdminClient()
-        .from("charity_journey_enrolments")
-        .select("source, enrolled_at, status, stopped_reason, next_step, next_due_at, journey:charity_journeys(charity:charities(name_en)), emails:charity_journey_sends(position, status, created_at, sent_at)")
-        .in("donor_id", donorIds)
-        .order("enrolled_at")
-    : { data: [], error: null };
+  // Which journey (the charity's general one, a campaign's, or win-back) once journeys have kinds (20261110000011).
+  const readJourneys = (withKind: boolean) =>
+    createAdminClient()
+      .from("charity_journey_enrolments")
+      .select(
+        `source, enrolled_at, status, stopped_reason, next_step, next_due_at, journey:charity_journeys(${withKind ? "kind, " : ""}charity:charities(name_en)), emails:charity_journey_sends(position, status, created_at, sent_at)`,
+      )
+      .in("donor_id", donorIds)
+      .order("enrolled_at");
+  let journeys = donorIds.length ? await readJourneys(true) : { data: [], error: null };
+  if (journeys.error && (journeys.error.code === "42703" || journeys.error.code === "PGRST204" || journeys.error.code === "PGRST200")) journeys = await readJourneys(false);
   const journeysMissing = journeys.error && (journeys.error.code === "PGRST205" || journeys.error.code === "42P01");
   if (journeys.error && !journeysMissing) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   const [myReceipts, monthly] = donorIds.length

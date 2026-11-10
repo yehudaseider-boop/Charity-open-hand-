@@ -16,9 +16,11 @@ export async function undoCharityAction(charityId: string, actionId: string, ret
   const safe = safeNextPath(returnTo, base);
   const page = safe.startsWith(base) && !safe.includes("//") ? safe.split("?")[0] : base;
   const step = /[?&]step=([a-z]+)/.exec(returnTo)?.[1];
+  // Which donor journey the page was showing (general, win-back or a campaign's), so Undo comes back to it.
+  const journey = /[?&]j=(winback|campaign%3A[0-9a-fA-F-]{36}|campaign:[0-9a-fA-F-]{36})(?:&|$)/.exec(returnTo)?.[1];
   const r = await undoAction(charityId, actionId, viewer.userId, charity.status);
   revalidatePath(base, "layout");
   revalidatePath(`/c/${charity.slug}`);
-  const q = new URLSearchParams({ ...(step ? { step } : {}), ...(r.ok ? { undone: actionId } : { done: actionId, undo_failed: r.why }) });
+  const q = new URLSearchParams({ ...(step ? { step } : {}), ...(journey ? { j: decodeURIComponent(journey) } : {}), ...(r.ok ? { undone: actionId } : { done: actionId, undo_failed: r.why }) });
   redirect(`${page}?${q}`);
 }

@@ -22,7 +22,9 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
-import { viewerCan } from "@/lib/charity/team";
+import { isOwner, viewerCan } from "@/lib/charity/team";
+import { journeysV2 } from "@/lib/charity/journey-write";
+import { WINBACK_PRESS_CAP } from "@/lib/charity/journey";
 
 export const metadata: Metadata = { title: "Keeping donors" };
 
@@ -34,6 +36,8 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
   await requireViewer(`/charity-admin/${id}/keeping`);
   await loadCharityForManager(id);
   const canDownload = await viewerCan(id, "export");
+  // The owner can add donors who haven't given since to the win-back journey (CRM step 7).
+  const winBackOn = (await isOwner(id)) && (await journeysV2().catch(() => false));
   const sp = await searchParams;
   const w = keepingWindow(keepingYearKey(sp.year), new Date());
   const list = keepingListKey(sp.list);
@@ -64,6 +68,7 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
   const shown = listed.slice((current - 1) * PAGE, current * PAGE);
   const soFar = w.running ? " so far" : "";
   const meta = keepingLists.find((l) => l.key === list)!;
+  const canWinBack = winBackOn && (list === "lybunt" || list === "sybunt");
 
   return (
     <div className="space-y-5">
@@ -127,13 +132,28 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
                   Showing {(current - 1) * PAGE + 1} to {(current - 1) * PAGE + shown.length} of {plural(listed.length, "donor")}, {PAGE} to a page. The download has them all.
                 </p>
               ) : null}
+              {canWinBack ? (
+                <p className="text-sm text-muted">
+                  Tick donors below to add them to your win-back journey, or{" "}
+                  <Link href={`${base}/journey/winback?list=${list}${w.key === "last" ? "&year=last" : ""}&all=1`} className="font-semibold text-brand underline">
+                    add everyone on this list
+                  </Link>{" "}
+                  (up to {WINBACK_PRESS_CAP} at a time). You&apos;ll see who joins before anything happens.
+                </p>
+              ) : null}
+              <form method="get" action={`${base}/journey/winback`} className="space-y-2">
+              <input type="hidden" name="list" value={list} />
+              {w.key === "last" ? <input type="hidden" name="year" value="last" /> : null}
               <ul className="space-y-2">
                 {shown.map((r, i) => {
                   const d = keepingDetails(r);
                   return (
                     <li key={r.donor_id ?? `erased-${current}-${i}`} className="rounded-card border-2 border-border bg-surface p-4 text-sm sm:p-5">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        {canWinBack && d.donorId ? (
+                          <input type="checkbox" name="d" value={d.donorId} aria-label={`Choose ${d.name} for the win-back journey`} className="mt-1 size-5 shrink-0 accent-brand" />
+                        ) : null}
+                        <div className="min-w-0 flex-1">
                           <p className="truncate font-semibold text-indigo" dir="auto">{d.name}</p>
                           {d.email ? <p className="break-all text-muted">{d.email}</p> : null}
                           {d.phone ? <p className="text-muted">{d.phone}</p> : null}
@@ -159,6 +179,10 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
                   );
                 })}
               </ul>
+              {canWinBack ? (
+                <button className="inline-flex min-h-11 items-center rounded-control border-2 border-border px-4 text-sm font-semibold text-brand">Add ticked donors to win-back journey</button>
+              ) : null}
+              </form>
               {pages > 1 ? (
                 <div className="flex items-center justify-between gap-2 text-sm">
                   {current > 1 ? <Link href={href({ page: current - 1 })} className={secondaryAction}>← Previous</Link> : <span />}

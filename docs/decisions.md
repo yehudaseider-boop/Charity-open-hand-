@@ -2,6 +2,20 @@
 
 ## Decided
 
+- **Campaign journeys and win-back (CRM steps 6b and 7, built 10/11/2026; Yehuda: "do this").** Each journey now has its own id
+  and kind: the general journey (as before), one per campaign (only the charity's own campaign; it goes with the
+  campaign) and one win-back journey per charity. Migration `20261110000011_more_journeys.sql` keeps every existing
+  journey, email, enrolment and send record (they become the charity's general journey); rows written the old way (by
+  charity only) land on the general journey, so nothing is lost while the code and the migration go out. Until it runs,
+  the code behaves exactly as before (only the general journey). Campaign journey: a donor joins on their first gift to
+  that campaign after its journey was switched on (not erased, not opted out, not recorded-only); donors who gave to
+  the campaign before aren't added. Win-back: owner only, from the stopped monthly and keeping-donors lists, asked
+  first with who is left out and why, at most 100 a press and 5 presses a day, Undo for those not yet emailed; anyone
+  who gives again (any gift that went through after they were added) leaves it ("gave_again"). The one-message-a-week
+  rule holds across every journey: a donor on two journeys gets the later email a week later, never skipped. Changing
+  any journey needs "message" (Owner, Admin, Fundraiser); adding donors stays the owner's. Undo of a journey's save or
+  switch returns to that journey. The donor's story, their data download (with the journey's kind) and erasure cover
+  every journey. Starter wording for campaign and win-back journeys is DRAFT for Yosef.
 - **Videos in charity updates (CRM step 14, built 10/11/2026; links only, decided by Yehuda 10/11/2026).** A new update may carry a YouTube or Vimeo link, read on the server by the same `parseVideoLink` as the profile video; only the site and the video id are stored (`charity_updates.video_provider`/`video_id`, with the same checks as the profile video), never the link or any HTML. On the charity's page and in its own dashboard list the video plays with the update only after the visitor presses play (the profile video's player, no thumbnail fetched before); in the app, the same locked-down in-app player. Videos are read on their own, so updates still show (without one) before migration `20261110000010_update_video.sql` runs; adding one before then is refused plainly ("Videos on updates aren't switched on yet. Nothing was posted."). "Email this to your donors" prefills "Watch the video with this update on our page: <the charity's page>", never the video's own link. Posting stays with the page roles (Owner, Admin, Fundraiser). Updates are not edited in place, so a video is changed by removing the update and posting a new one (Undo still restores it, video included). The app's news feed shows updates without their videos (they play on the charity's screen).
 - **Team roles confirmed (10/11/2026, Yehuda, "yes yes yes"):** the migration runs on the TEST project; Admins do not see bank details or deposits (Owner edits, Finance views); emailing donors, updates, thank-yous and the journey widen from owner-only to Owner, Admin and Fundraiser, and the IT3(d) files to Owner, Admin and Finance, as in his table. The security review's findings were fixed and proven by the database tests before the migration ran.
 - **Team roles (CRM step 9, built 10/11/2026 from Yehuda's table, "go").** Five roles: Owner (one per charity), Admin, Finance, Fundraiser, Viewer. One table in `src/lib/charity/permissions.ts` and the same in the database (`public.charity_can()`, migration `20261110000009_team_roles.sql`, not applied anywhere yet):

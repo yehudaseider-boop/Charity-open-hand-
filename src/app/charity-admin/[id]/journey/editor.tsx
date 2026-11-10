@@ -47,6 +47,7 @@ export function JourneyEditor({
   saved,
   canEdit,
   siteUrl,
+  starter = STARTER_STEPS,
 }: {
   action: (s: FormState, f: FormData) => Promise<FormState>;
   charityName: string;
@@ -54,6 +55,8 @@ export function JourneyEditor({
   saved: JourneyStep[];
   canEdit: boolean;
   siteUrl?: string;
+  /** The suggested wording for this kind of journey (DRAFT for Yosef). */
+  starter?: JourneyStep[];
 }) {
   const safeAction = async (prev: FormState, formData: FormData): Promise<FormState> => {
     try {
@@ -122,7 +125,7 @@ export function JourneyEditor({
         ))}
       </ol>
     ) : (
-      <p className="rounded-control border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm text-muted">Your owner hasn&apos;t written any journey emails yet.</p>
+      <p className="rounded-control border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm text-muted">No emails have been written for this journey yet.</p>
     );
   }
 
@@ -145,7 +148,7 @@ export function JourneyEditor({
               <button
                 type="button"
                 onClick={() => {
-                  setDrafts(STARTER_STEPS.map((s) => toDraft(s, freshKey())));
+                  setDrafts(starter.map((s) => toDraft(s, freshKey())));
                   setShowing(0);
                 }}
                 className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast"

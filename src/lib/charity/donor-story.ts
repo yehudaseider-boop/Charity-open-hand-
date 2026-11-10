@@ -4,6 +4,7 @@
  * charity's own notes, newest first, on the donor's page. Pure: the rows come from `donor-story-store.ts`, which
  * reads only this charity's rows for this donor. No message bodies, no ID or tax numbers.
  */
+import { journeyName } from "./journey";
 import { taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { RECORDED_METHODS, type RecordedMethod } from "./recorded-gifts";
@@ -37,13 +38,22 @@ export type StoryRows = {
   thanks: { kind: string; sent_at: string }[];
   appeals: { subject: string | null; status: string; at: string | null }[];
   monthThanks: { period_month: string; status: string; at: string }[];
-  journey: { enrolled_at: string | null; status: string | null; stopped_reason: string | null; sends: { position: number; status: string; at: string }[] } | null;
+  /** Each journey they are or were on (CRM steps 6a, 6b and 7): the general one, a campaign's, win-back. */
+  journeys: {
+    kind: "general" | "campaign" | "winback";
+    campaignId: string | null;
+    campaignTitle: string | null;
+    enrolled_at: string | null;
+    status: string | null;
+    stopped_reason: string | null;
+    sends: { position: number; status: string; at: string }[];
+  }[];
   receipts: { receipt_number: number; tax_year: number; amount_cents: number; status: string; issued_at: string; voided_at: string | null; emailed_at: string | null }[];
   declined: { tax_year: number; decided_at: string; decline_emailed_at: string | null }[];
   notes: { created_at: string; author: string | null }[];
 };
 
-export const EMPTY_STORY: StoryRows = { gifts: [], monthly: [], thanks: [], appeals: [], monthThanks: [], journey: null, receipts: [], declined: [], notes: [] };
+export const EMPTY_STORY: StoryRows = { gifts: [], monthly: [], thanks: [], appeals: [], monthThanks: [], journeys: [], receipts: [], declined: [], notes: [] };
 
 /** The SQL meaning of "why it stopped" (charity_lapsed_monthly), so the story and the stopped list say the same. */
 export function monthlyStopReason(status: string, endedReason: string | null): LapsedReason {
@@ -70,6 +80,7 @@ const JOURNEY_STOPPED: Record<string, string> = {
   no_email: "there's no email address for them",
   no_gift: "they have no gift with you any more",
   not_delivered: "the emails couldn't be delivered",
+  gave_again: "they gave again",
 };
 
 /**
@@ -140,16 +151,18 @@ export function buildDonorStory(rows: StoryRows, opts: { base: string; erased: b
       const s = messageStatus(t.status);
       out.push({ at: t.at, kind: "month_thank_you", what: `Thank-you for ${monthLabel(t.period_month)}`, status: s.status, tone: s.tone, href: `${opts.base}/thank-donors` });
     }
-    if (rows.journey) {
-      const j = rows.journey;
-      if (j.enrolled_at) out.push({ at: j.enrolled_at, kind: "journey", what: "Joined your donor journey", status: null, tone: "neutral", href: `${opts.base}/journey` });
+    for (const j of rows.journeys) {
+      const name = journeyName(j.kind, j.campaignTitle);
+      const label = j.kind === "general" ? "Donor journey" : j.kind === "winback" ? "Win-back journey" : `Journey for ${(j.campaignTitle ?? "").trim() || "a campaign"}`;
+      const href = j.kind === "general" ? `${opts.base}/journey` : `${opts.base}/journey?j=${encodeURIComponent(j.kind === "winback" ? "winback" : `campaign:${j.campaignId}`)}`;
+      if (j.enrolled_at) out.push({ at: j.enrolled_at, kind: "journey", what: `Joined ${name}`, status: null, tone: "neutral", href });
       for (const s of j.sends) {
         const st = messageStatus(s.status);
-        out.push({ at: s.at, kind: "journey", what: `Donor journey email ${s.position}`, status: st.status, tone: st.tone, href: `${opts.base}/journey` });
+        out.push({ at: s.at, kind: "journey", what: `${label} email ${s.position}`, status: st.status, tone: st.tone, href });
       }
       if (j.status === "stopped" && j.stopped_reason) {
         const last = [j.enrolled_at, ...j.sends.map((s) => s.at)].filter(Boolean).sort().at(-1);
-        if (last) out.push({ at: last, kind: "journey", what: "Left your donor journey", status: `Because ${JOURNEY_STOPPED[j.stopped_reason] ?? "it was stopped"}`, tone: "neutral", href: `${opts.base}/journey` });
+        if (last) out.push({ at: last, kind: "journey", what: `Left ${name}`, status: `Because ${JOURNEY_STOPPED[j.stopped_reason] ?? "it was stopped"}`, tone: "neutral", href });
       }
     }
     for (const n of rows.notes) {

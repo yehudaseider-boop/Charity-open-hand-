@@ -246,7 +246,7 @@ describe("an email that doesn't go (review 10/11/2026)", () => {
   });
 
   it("taking back added donors says exactly what happened", () => {
-    expect(describeUndone("journey_existing_added", { added: 10, removed: 7, stayed: 3 })).toBe("Taken back. Removed 7 donors from your journey; 3 had already had their first email and stay on.");
-    expect(describeUndone("journey_existing_added", { added: 2, removed: 2, stayed: 0 })).toBe("Taken back. Removed 2 donors from your journey. Nobody was emailed.");
+    expect(describeUndone("journey_existing_added", { added: 10, removed: 7, stayed: 3 })).toBe("Taken back. Removed 7 donors from your donor journey; 3 had already had their first email and stay on.");
+    expect(describeUndone("journey_existing_added", { added: 2, removed: 2, stayed: 0 })).toBe("Taken back. Removed 2 donors from your donor journey. Nobody was emailed.");
   });
 });

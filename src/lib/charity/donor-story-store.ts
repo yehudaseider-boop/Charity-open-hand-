@@ -41,11 +41,20 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
       .limit(LIMIT),
     db.from("s18a_receipts").select("receipt_number, tax_year, amount_cents, status, issued_at, voided_at, emailed_at").eq("charity_id", charityId).eq("donor_id", donorId).limit(LIMIT),
     db.from("receipt_plan_decisions").select("tax_year, decided_at, decline_emailed_at").eq("charity_id", charityId).eq("donor_id", donorId).eq("decision", "declined").limit(LIMIT),
-    db.from("charity_journey_enrolments").select("id, enrolled_at, status, stopped_reason").eq("charity_id", charityId).eq("donor_id", donorId).maybeSingle(),
+    db.from("charity_journey_enrolments").select("id, enrolled_at, status, stopped_reason, journey:charity_journeys(kind, campaign_id)").eq("charity_id", charityId).eq("donor_id", donorId).limit(20),
     db.from("donors").select("email").eq("id", donorId).maybeSingle(),
   ]);
   for (const r of [donations, monthly, appeals, receipts, donorRow]) if (r.error) throw r.error;
-  if (enrolment.error && !isMissingTable(enrolment.error)) throw enrolment.error;
+  // Before the journeys had kinds (20261110000011) a donor has the one general journey: read it without the kind.
+  let enrolments = (enrolment.data ?? []) as { id: string; enrolled_at: string; status: string; stopped_reason: string | null; journey?: unknown }[];
+  if (enrolment.error) {
+    if (isMissingTable(enrolment.error)) enrolments = [];
+    else if (isNotSetUp(enrolment.error)) {
+      const plain = await db.from("charity_journey_enrolments").select("id, enrolled_at, status, stopped_reason").eq("charity_id", charityId).eq("donor_id", donorId).limit(20);
+      if (plain.error && !isMissingTable(plain.error)) throw plain.error;
+      enrolments = plain.error ? [] : ((plain.data ?? []) as typeof enrolments);
+    } else throw enrolment.error;
+  }
   // Receipt decisions (20261110000001) may not be on this project yet: then there are none to show.
   if (declinedRead.error && !isNotSetUp(declinedRead.error)) throw declinedRead.error;
   const declined = declinedRead.error ? [] : (declinedRead.data ?? []);
@@ -106,21 +115,41 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
     }
   }
 
-  let journey: StoryRows["journey"] = null;
-  if (enrolment.data) {
+  const journeys: StoryRows["journeys"] = [];
+  if (enrolments.length) {
     const { data, error } = await db
       .from("charity_journey_sends")
-      .select("position, status, created_at, sent_at")
+      .select("enrolment_id, position, status, created_at, sent_at")
       .eq("charity_id", charityId)
-      .eq("enrolment_id", enrolment.data.id as string)
-      .limit(20);
+      .in("enrolment_id", enrolments.map((e) => e.id))
+      .limit(100);
     if (error && !isMissingTable(error)) throw error;
-    journey = {
-      enrolled_at: enrolment.data.enrolled_at as string,
-      status: enrolment.data.status as string,
-      stopped_reason: enrolment.data.stopped_reason as string | null,
-      sends: (data ?? []).map((s) => ({ position: Number(s.position), status: s.status as string, at: (s.sent_at ?? s.created_at) as string })),
+    const kindOf = (e: (typeof enrolments)[number]) => {
+      const raw = e.journey as unknown;
+      const j = (Array.isArray(raw) ? raw[0] : raw) as { kind?: string; campaign_id?: string | null } | null | undefined;
+      return { kind: (j?.kind === "campaign" || j?.kind === "winback" ? j.kind : "general") as "general" | "campaign" | "winback", campaignId: j?.campaign_id ?? null };
     };
+    const campaignIds = [...new Set(enrolments.map((e) => kindOf(e).campaignId).filter((x): x is string => Boolean(x)))];
+    const titles = new Map<string, string>();
+    if (campaignIds.length) {
+      const { data: cs, error: ce } = await db.from("campaigns").select("id, title").eq("charity_id", charityId).in("id", campaignIds);
+      if (ce) throw ce;
+      for (const c of cs ?? []) titles.set(c.id as string, c.title as string);
+    }
+    for (const e of enrolments) {
+      const k = kindOf(e);
+      journeys.push({
+        kind: k.kind,
+        campaignId: k.campaignId,
+        campaignTitle: k.campaignId ? (titles.get(k.campaignId) ?? null) : null,
+        enrolled_at: e.enrolled_at,
+        status: e.status,
+        stopped_reason: e.stopped_reason,
+        sends: (data ?? [])
+          .filter((s) => (s.enrolment_id ?? e.id) === e.id)
+          .map((s) => ({ position: Number(s.position), status: s.status as string, at: (s.sent_at ?? s.created_at) as string })),
+      });
+    }
   }
 
   return {
@@ -141,7 +170,7 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
       return { subject: appeal?.subject ?? null, status: a.status as string, at: (a.sent_at ?? a.claimed_at ?? appeal?.created_at ?? null) as string | null };
     }),
     monthThanks,
-    journey,
+    journeys,
     receipts: (receipts.data ?? []).map((r) => ({
       receipt_number: Number(r.receipt_number),
       tax_year: Number(r.tax_year),

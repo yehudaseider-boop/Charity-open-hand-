@@ -15,6 +15,7 @@ import { CampaignForm } from "./forms";
 import { ShareLinks } from "../share-links";
 import { viewerCan } from "@/lib/charity/team";
 import { refusedFor } from "@/lib/charity/permissions";
+import { journeysV2 } from "@/lib/charity/journey-write";
 
 export const metadata: Metadata = { title: "Campaigns" };
 
@@ -31,6 +32,9 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   const giveUrl = (campaignId: string) => `${site}/c/${charity.slug}/donate?campaign=${campaignId}`;
   const whoGave = (campaignId: string) => `/charity-admin/${id}/donations?campaign=${campaignId}`;
+  // Each campaign can have its own donor journey (CRM step 6b), once journeys have their own ids.
+  const journeys = await journeysV2().catch(() => false);
+  const journeyOf = (campaignId: string) => `/charity-admin/${id}/journey?j=${encodeURIComponent(`campaign:${campaignId}`)}`;
 
   return (
     <div className="space-y-5">
@@ -70,7 +74,12 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
                   </form>
                 </div>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={c.endsAt} />
-                {c.giftCount ? <Link href={whoGave(c.id)} className={link}>See who gave</Link> : null}
+                {c.giftCount || journeys ? (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {c.giftCount ? <Link href={whoGave(c.id)} className={link}>See who gave</Link> : null}
+                    {journeys ? <Link href={journeyOf(c.id)} className={link}>Emails for this campaign&apos;s donors</Link> : null}
+                  </div>
+                ) : null}
                 {charity.status === "approved" ? (
                   <details className="text-sm">
                     <summary className="inline-flex min-h-9 cursor-pointer items-center rounded-control font-semibold text-brand underline hover:no-underline focus-visible:no-underline">Share this campaign</summary>

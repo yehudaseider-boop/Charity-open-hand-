@@ -205,12 +205,17 @@ describe("the donor journey's tables", () => {
         [TABLES.map((t) => `public.${t}`)],
       )).rows.map((r) => ({ tbl: String(r.tbl).replace(/^public\./, ""), col: r.col, rule: r.rule })).sort((a, b) => (a.tbl + " " + a.col < b.tbl + " " + b.col ? -1 : 1));
       // c = cascade, n = set null.
+      // Since 20261110000011 each journey has its own id: steps and enrolments belong to a journey, and a campaign's
+      // journey goes with its campaign.
       expect(fk).toEqual([
         { tbl: "charity_journey_enrolments", col: "charity_id", rule: "c" },
         { tbl: "charity_journey_enrolments", col: "donor_id", rule: "c" },
+        { tbl: "charity_journey_enrolments", col: "journey_id", rule: "c" },
         { tbl: "charity_journey_sends", col: "charity_id", rule: "c" },
         { tbl: "charity_journey_sends", col: "enrolment_id", rule: "c" },
         { tbl: "charity_journey_steps", col: "charity_id", rule: "c" },
+        { tbl: "charity_journey_steps", col: "journey_id", rule: "c" },
+        { tbl: "charity_journeys", col: "campaign_id", rule: "c" },
         { tbl: "charity_journeys", col: "charity_id", rule: "c" },
         { tbl: "charity_journeys", col: "updated_by", rule: "n" },
       ]);

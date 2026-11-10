@@ -8,6 +8,7 @@ import { can, isRole, permissionForAction } from "./permissions";
 import { removeDecisions } from "@/lib/receipts/runs";
 import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 import { readJourneyState, removeEnrolments, writeJourney, type JourneyState } from "./journey-write";
+import { GENERAL, type JourneyRef } from "./journey";
 
 /**
  * Records each dashboard action (for "what just happened") and takes it back on request. Every call
@@ -55,7 +56,7 @@ export type Undo =
    * Put the donor journey back as it was (10/11/2026): its switch and its emails. Only if nobody has changed it since.
    * Only an owner may.
    */
-  | { type: "journey"; before: JourneyState; after: JourneyState }
+  | { type: "journey"; ref?: JourneyRef; before: JourneyState; after: JourneyState }
   /** Take off the donors "Add my existing donors" added, those who haven't had an email yet. Only an owner may. */
   | { type: "journey_enrolments"; ids: string[] }
   /** Take away access this action gave (an admin, never an owner). Only an owner may. */
@@ -200,13 +201,14 @@ async function apply(charityId: string, undo: Undo, extra: Details = {}): Promis
       return null;
     }
     case "journey": {
-      const now = await readJourneyState(charityId);
+      const ref = undo.ref ?? GENERAL;
+      const now = await readJourneyState(charityId, ref);
       // Changed again since (by this person or another admin): don't overwrite their newer work.
       if (!same(now, undo.after)) return "changed";
       // Switching back on (taking back "switch off") counts from now: someone who first gave while it was off is an
       // existing donor, added only if the owner chooses, not a new one.
       const back = undo.before.enabled && !now.enabled ? { ...undo.before, switched_on_at: new Date().toISOString() } : undo.before;
-      await writeJourney(charityId, null, back);
+      await writeJourney(charityId, null, back, ref);
       return null;
     }
     case "journey_enrolments": {

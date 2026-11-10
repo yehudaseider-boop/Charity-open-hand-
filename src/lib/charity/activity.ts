@@ -6,6 +6,7 @@
  */
 import { formatDate, taxYearName } from "@/lib/dates";
 import { ROLE_LABEL, isRole } from "./permissions";
+import { journeyName, parseRefKey } from "./journey";
 
 type Details = Record<string, unknown>;
 
@@ -23,6 +24,8 @@ export function shortName(name: unknown): string {
 
 const quoted = (v: unknown, fallback: string) => (typeof v === "string" && v.trim() ? `"${v.trim()}"` : fallback);
 const roleText = (r: unknown) => (isRole(r) ? `${/^[aeiou]/i.test(ROLE_LABEL[r]) ? "an" : "a"} ${ROLE_LABEL[r].toLowerCase()}` : "a team member");
+/** "the donor journey", "the win-back journey", "the journey for Winter blankets" (older records: the donor journey). */
+const journeyLabel = (d: Record<string, unknown>) => journeyName(parseRefKey(d.jkey)?.kind ?? "general", typeof d.jtitle === "string" ? d.jtitle : null).replace(/^your /, "the ");
 const year = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) > 2000 ? ` for the ${taxYearName(Number(v))} tax year` : "");
 
 /** What a dashboard action did, after the person's name. Unknown kinds get a neutral line rather than nothing. */
@@ -69,10 +72,11 @@ export function actionPhrase(kind: string, d: Details): string {
     case "certificate_declined": return `declined the s18A receipt for ${shortName(d.name)}`;
     case "certificate_reopened": return `reopened the s18A receipt for ${shortName(d.name)}`;
     case "s18a_reminders_sent": return "sent reminders to add s18A details";
-    case "journey_saved": return "saved the donor journey";
-    case "journey_on": return "switched on the donor journey";
-    case "journey_off": return "switched off the donor journey";
+    case "journey_saved": return `saved ${journeyLabel(d)}`;
+    case "journey_on": return `switched on ${journeyLabel(d)}`;
+    case "journey_off": return `switched off ${journeyLabel(d)}`;
     case "journey_existing_added": return "added existing donors to the donor journey";
+    case "journey_winback_added": return "added donors to the win-back journey";
     default: return "made a change";
   }
 }

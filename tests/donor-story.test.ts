@@ -78,15 +78,20 @@ describe("the donor's story", () => {
       rows({
         receipts: [{ receipt_number: 12, tax_year: 2027, amount_cents: 125_000, status: "void", issued_at: "2027-03-05T08:00:00Z", voided_at: "2027-03-06T08:00:00Z", emailed_at: "2027-03-05T09:00:00Z" }],
         declined: [{ tax_year: 2026, decided_at: "2026-03-05T08:00:00Z", decline_emailed_at: null }],
-        journey: {
-          enrolled_at: "2026-10-01T08:00:00Z",
-          status: "stopped",
-          stopped_reason: "opted_out",
-          sends: [
-            { position: 1, status: "sent", at: "2026-10-02T08:00:00Z" },
-            { position: 2, status: "unknown", at: "2026-10-20T08:00:00Z" },
-          ],
-        },
+        journeys: [
+          {
+            kind: "general",
+            campaignId: null,
+            campaignTitle: null,
+            enrolled_at: "2026-10-01T08:00:00Z",
+            status: "stopped",
+            stopped_reason: "opted_out",
+            sends: [
+              { position: 1, status: "sent", at: "2026-10-02T08:00:00Z" },
+              { position: 2, status: "unknown", at: "2026-10-20T08:00:00Z" },
+            ],
+          },
+        ],
       }),
       { base, erased: false },
     );
@@ -109,7 +114,7 @@ describe("the donor's story", () => {
         appeals: [{ subject: "Hello", status: "sent", at: "2026-03-04T08:00:00Z" }],
         notes: [{ created_at: "2026-03-05T08:00:00Z", author: "Sarah" }],
         declined: [{ tax_year: 2026, decided_at: "2026-03-05T08:00:00Z", decline_emailed_at: null }],
-        journey: { enrolled_at: "2026-03-01T08:00:00Z", status: "active", stopped_reason: null, sends: [] },
+        journeys: [{ kind: "general", campaignId: null, campaignTitle: null, enrolled_at: "2026-03-01T08:00:00Z", status: "active", stopped_reason: null, sends: [] }],
       }),
       { base, erased: true },
     );
@@ -200,12 +205,12 @@ describe("loading a donor's story", () => {
     // The earliest payment starts the monthly donation; one month shows once, with its best outcome.
     expect(rowsOut.monthly[0].first_paid_at).toBe("2026-02-02T08:00:00Z");
     expect(rowsOut.monthThanks).toEqual([{ period_month: "2026-03-01", status: "sent", at: "2026-04-01T08:01:00Z" }]);
-    expect(rowsOut.journey).toBeNull();
+    expect(rowsOut.journeys).toEqual([]);
   });
 
   it("treats the donor journey as empty where its tables don't exist yet", async () => {
     missing = new Set(["charity_journey_enrolments", "charity_journey_sends"]);
-    await expect(loadDonorStory("c1", "dn1", [])).resolves.toMatchObject({ journey: null });
+    await expect(loadDonorStory("c1", "dn1", [])).resolves.toMatchObject({ journeys: [] });
   });
 
   it("reads the journey's sends for this charity's enrolment only", async () => {
@@ -214,8 +219,37 @@ describe("loading a donor's story", () => {
       charity_journey_sends: [{ position: 1, status: "sent", created_at: "2026-10-02T07:00:00Z", sent_at: "2026-10-02T08:00:00Z" }],
     };
     const out = await loadDonorStory("c1", "dn1", []);
-    expect(calls.find((x) => x.table === "charity_journey_sends")!.filters).toEqual([["charity_id", "eq", "c1"], ["enrolment_id", "eq", "e1"]]);
-    expect(out.journey?.sends).toEqual([{ position: 1, status: "sent", at: "2026-10-02T08:00:00Z" }]);
+    expect(calls.find((x) => x.table === "charity_journey_sends")!.filters).toEqual([["charity_id", "eq", "c1"], ["enrolment_id", "in", ["e1"]]]);
+    expect(out.journeys.map((j) => [j.kind, j.sends])).toEqual([["general", [{ position: 1, status: "sent", at: "2026-10-02T08:00:00Z" }]]]);
+  });
+
+  it("names each journey the donor is on: a campaign's by its own title, win-back, and the general one", async () => {
+    answer = {
+      charity_journey_enrolments: [
+        { id: "e1", enrolled_at: "2026-10-01T08:00:00Z", status: "active", stopped_reason: null, journey: { kind: "general", campaign_id: null } },
+        { id: "e2", enrolled_at: "2026-10-03T08:00:00Z", status: "active", stopped_reason: null, journey: { kind: "campaign", campaign_id: "k1" } },
+        { id: "e3", enrolled_at: "2026-10-05T08:00:00Z", status: "stopped", stopped_reason: "gave_again", journey: [{ kind: "winback", campaign_id: null }] },
+      ],
+      charity_journey_sends: [{ enrolment_id: "e2", position: 1, status: "sent", created_at: "2026-10-04T07:00:00Z", sent_at: "2026-10-04T08:00:00Z" }],
+      campaigns: [{ id: "k1", title: "Winter blankets" }],
+    };
+    const out = await loadDonorStory("c1", "dn1", []);
+    expect(calls.find((x) => x.table === "campaigns")!.filters).toEqual([["charity_id", "eq", "c1"], ["id", "in", ["k1"]]]);
+    const story = buildDonorStory({ ...EMPTY_STORY, journeys: out.journeys }, { base, erased: false });
+    expect(story.map((e) => [e.what, e.status, e.href])).toEqual([
+      ["Joined your win-back journey", null, `${base}/journey?j=winback`],
+      ["Left your win-back journey", "Because they gave again", `${base}/journey?j=winback`],
+      ["Journey for Winter blankets email 1", "Sent", `${base}/journey?j=${encodeURIComponent("campaign:k1")}`],
+      ["Joined the journey for Winter blankets", null, `${base}/journey?j=${encodeURIComponent("campaign:k1")}`],
+      ["Joined your donor journey", null, `${base}/journey`],
+    ]);
+  });
+
+  it("reads the journey without its kind where the journeys haven't got kinds yet", async () => {
+    missingColumns = new Set(["charity_journey_enrolments:campaign_id)"]);
+    answer = { charity_journey_enrolments: [{ id: "e1", enrolled_at: "2026-10-01T08:00:00Z", status: "active", stopped_reason: null }] };
+    const out = await loadDonorStory("c1", "dn1", []);
+    expect(out.journeys.map((j) => j.kind)).toEqual(["general"]);
   });
 
   it("shows no declined receipts, and reads thank-yous without their kind, where those migrations haven't run yet", async () => {

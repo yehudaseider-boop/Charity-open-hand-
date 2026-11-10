@@ -9,7 +9,9 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
-import { viewerCan } from "@/lib/charity/team";
+import { isOwner, viewerCan } from "@/lib/charity/team";
+import { journeysV2 } from "@/lib/charity/journey-write";
+import { WINBACK_PRESS_CAP } from "@/lib/charity/journey";
 
 export const metadata: Metadata = { title: "Monthly donors who stopped" };
 
@@ -21,6 +23,8 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
   await requireViewer(`/charity-admin/${id}/monthly/stopped`);
   await loadCharityForManager(id);
   const canDownload = await viewerCan(id, "export");
+  // The owner can add donors from here to the win-back journey (CRM step 7), once journeys have their own ids.
+  const canWinBack = (await isOwner(id)) && (await journeysV2().catch(() => false));
   const sp = await searchParams;
   const period = lapsedPeriod(lapsedPeriodKey(sp.period), new Date());
   const page = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
@@ -84,13 +88,29 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
             </p>
           ) : null}
 
+          {canWinBack ? (
+            <p className="text-sm text-muted">
+              Tick donors below to add them to your win-back journey, or{" "}
+              <Link href={`${base}/journey/winback?list=stopped&period=${period.key}&all=1`} className="font-semibold text-brand underline">
+                add everyone on this list
+              </Link>{" "}
+              (up to {WINBACK_PRESS_CAP} at a time). You&apos;ll see who joins before anything happens.
+            </p>
+          ) : null}
+
+          <form method="get" action={`${base}/journey/winback`} className="space-y-2">
+          <input type="hidden" name="list" value="stopped" />
+          <input type="hidden" name="period" value={period.key} />
           <ul className="space-y-2">
             {shown.map((r) => {
               const d = lapsedDetails(r);
               return (
                 <li key={r.recurring_id} className="rounded-card border-2 border-border bg-surface p-4 text-sm sm:p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    {canWinBack && d.donorId ? (
+                      <input type="checkbox" name="d" value={d.donorId} aria-label={`Choose ${d.name} for the win-back journey`} className="mt-1 size-5 shrink-0 accent-brand" />
+                    ) : null}
+                    <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold text-indigo" dir="auto">{d.name}</p>
                       {d.email ? <p className="break-all text-muted">{d.email}</p> : null}
                       {d.phone ? <p className="text-muted">{d.phone}</p> : null}
@@ -115,6 +135,10 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
               );
             })}
           </ul>
+          {canWinBack ? (
+            <button className="inline-flex min-h-11 items-center rounded-control border-2 border-border px-4 text-sm font-semibold text-brand">Add ticked donors to win-back journey</button>
+          ) : null}
+          </form>
 
           {pages > 1 ? (
             <div className="flex items-center justify-between gap-2 text-sm">

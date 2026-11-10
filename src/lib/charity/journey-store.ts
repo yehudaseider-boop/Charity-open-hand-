@@ -12,6 +12,12 @@ import {
   afterSend,
   existingSendAction,
   fairShares,
+  gaveAgain,
+  GENERAL,
+  WINBACK,
+  refKey,
+  type JourneyKind,
+  type JourneyRef,
   charityPageUrl,
   claimNote,
   decideDue,
@@ -20,10 +26,11 @@ import {
   newJoiners,
   nextWeekStart,
   planExisting,
+  planWinback,
   type ExistingSkip,
   type JourneyStep,
 } from "./journey";
-import type { JourneyState } from "./journey-write";
+import { findJourney, journeySteps, journeysV2, rowOf, type JourneyRow, type JourneyState } from "./journey-write";
 import { contacts, optedOutHashes } from "./s18a-reminder-send";
 import { emailHash, weekStart } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
@@ -40,23 +47,64 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 /** The kind of message stored in the weekly claim (charity_donor_thanks.kind). */
 export const JOURNEY_KIND = "journey";
 
-export type Journey = { enabled: boolean; switchedOnAt: string | null; updatedAt: string | null; steps: JourneyStep[] };
+export type Journey = {
+  /** Null before migration 20261110000011, when the charity's one journey is keyed by the charity. */
+  id: string | null;
+  kind: JourneyKind;
+  campaignId: string | null;
+  enabled: boolean;
+  switchedOnAt: string | null;
+  updatedAt: string | null;
+  steps: JourneyStep[];
+};
 export type { JourneyState } from "./journey-write";
-export { removeEnrolments, writeJourney } from "./journey-write";
+export { readJourneyState, removeEnrolments, writeJourney, journeysV2 } from "./journey-write";
 
-export async function loadJourney(charityId: string): Promise<Journey> {
-  const [j, s] = await Promise.all([
-    db().from("charity_journeys").select("enabled, switched_on_at, updated_at").eq("charity_id", charityId).maybeSingle(),
-    db().from("charity_journey_steps").select("position, subject, body, wait_days").eq("charity_id", charityId).order("position"),
+/** The charity's journey of this kind: off with no emails when it hasn't been made yet. */
+export async function loadJourney(charityId: string, ref: JourneyRef = GENERAL): Promise<Journey> {
+  const row = await findJourney(charityId, ref);
+  return fromRow(row ?? { id: null, kind: ref.kind, campaignId: ref.kind === "campaign" ? ref.campaignId : null, enabled: false, switchedOnAt: null, updatedAt: null }, await journeySteps(charityId, row));
+}
+
+function fromRow(r: JourneyRow, steps: JourneyStep[]): Journey {
+  return { id: r.id, kind: r.kind, campaignId: r.campaignId, enabled: r.enabled, switchedOnAt: r.switchedOnAt, updatedAt: r.updatedAt, steps };
+}
+
+export type JourneySummary = { ref: JourneyRef; kind: JourneyKind; campaignId: string | null; enabled: boolean; switchedOnAt: string | null; stepCount: number };
+
+/** Every journey the charity has made (the general one first, then win-back, then campaigns'). */
+export async function listJourneys(charityId: string): Promise<JourneySummary[]> {
+  if (!(await journeysV2())) {
+    const j = await loadJourney(charityId);
+    return j.switchedOnAt || j.steps.length ? [{ ref: GENERAL, kind: "general", campaignId: null, enabled: j.enabled, switchedOnAt: j.switchedOnAt, stepCount: j.steps.length }] : [];
+  }
+  const [js, st] = await Promise.all([
+    db().from("charity_journeys").select("id, kind, campaign_id, enabled, switched_on_at, updated_at").eq("charity_id", charityId),
+    db().from("charity_journey_steps").select("journey_id").eq("charity_id", charityId),
   ]);
-  if (j.error) throw j.error;
-  if (s.error) throw s.error;
-  return {
-    enabled: Boolean(j.data?.enabled),
-    switchedOnAt: (j.data?.switched_on_at as string | null) ?? null,
-    updatedAt: (j.data?.updated_at as string | null) ?? null,
-    steps: (s.data ?? []).map((r) => ({ subject: r.subject as string, body: r.body as string, waitDays: Number(r.wait_days) })),
-  };
+  if (js.error) throw js.error;
+  if (st.error) throw st.error;
+  const count = new Map<string, number>();
+  for (const r of st.data ?? []) count.set(r.journey_id as string, (count.get(r.journey_id as string) ?? 0) + 1);
+  const order: Record<JourneyKind, number> = { general: 0, winback: 1, campaign: 2 };
+  return (js.data ?? [])
+    .map((d) => rowOf(d))
+    .map((r) => ({
+      ref: (r.kind === "campaign" ? { kind: "campaign", campaignId: r.campaignId! } : r.kind === "winback" ? WINBACK : GENERAL) as JourneyRef,
+      kind: r.kind,
+      campaignId: r.campaignId,
+      enabled: r.enabled,
+      switchedOnAt: r.switchedOnAt,
+      stepCount: count.get(r.id!) ?? 0,
+    }))
+    .sort((a, b) => order[a.kind] - order[b.kind] || refKey(a.ref).localeCompare(refKey(b.ref)));
+}
+
+/** Only this journey's rows: by its id, or by the charity before the migration. */
+function scoped<Q>(q: Q, charityId: string, j: Pick<Journey, "id">): Q {
+  type Eq = { eq: (col: string, v: string) => Eq };
+  const by = (q as unknown as Eq).eq("charity_id", charityId);
+  return (j.id ? by.eq("journey_id", j.id) : by) as unknown as Q;
 }
 
 export function stateOf(j: Journey): JourneyState {
@@ -65,10 +113,10 @@ export function stateOf(j: Journey): JourneyState {
 
 
 /** Where everyone on the journey is: status and next email, for the counts. */
-export async function enrolmentStates(charityId: string): Promise<{ status: string; next_step: number }[]> {
+export async function enrolmentStates(charityId: string, j: Pick<Journey, "id">): Promise<{ status: string; next_step: number }[]> {
   const out: { status: string; next_step: number }[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db().from("charity_journey_enrolments").select("status, next_step").eq("charity_id", charityId).order("id").range(from, from + 999);
+    const { data, error } = await scoped(db().from("charity_journey_enrolments").select("status, next_step"), charityId, j).order("id").range(from, from + 999);
     if (error) throw error;
     out.push(...((data ?? []) as { status: string; next_step: number }[]));
     if (!data || data.length < 1000) break;
@@ -79,11 +127,8 @@ export async function enrolmentStates(charityId: string): Promise<{ status: stri
 export type JourneyPerson = { id: string; donorId: string; name: string; source: string; status: string; next_step: number; next_due_at: string; stopped_reason: string | null; enrolled_at: string };
 
 /** The most recently moved people on the journey, with their names from their latest paid gift. */
-export async function journeyPeople(charityId: string, limit = 50): Promise<JourneyPerson[]> {
-  const { data, error } = await db()
-    .from("charity_journey_enrolments")
-    .select("id, donor_id, source, status, next_step, next_due_at, stopped_reason, enrolled_at")
-    .eq("charity_id", charityId)
+export async function journeyPeople(charityId: string, j: Pick<Journey, "id">, limit = 50): Promise<JourneyPerson[]> {
+  const { data, error } = await scoped(db().from("charity_journey_enrolments").select("id, donor_id, source, status, next_step, next_due_at, stopped_reason, enrolled_at"), charityId, j)
     .order("updated_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -147,18 +192,18 @@ async function allDonorIds(charityId: string, before?: string): Promise<string[]
   return [...ids];
 }
 
-async function enrolledDonors(charityId: string, donorIds?: string[]): Promise<Set<string>> {
+async function enrolledDonors(charityId: string, j: Pick<Journey, "id">, donorIds?: string[]): Promise<Set<string>> {
   const out = new Set<string>();
   if (donorIds) {
     for (let i = 0; i < donorIds.length; i += 200) {
-      const { data, error } = await db().from("charity_journey_enrolments").select("donor_id").eq("charity_id", charityId).in("donor_id", donorIds.slice(i, i + 200));
+      const { data, error } = await scoped(db().from("charity_journey_enrolments").select("donor_id"), charityId, j).in("donor_id", donorIds.slice(i, i + 200));
       if (error) throw error;
       for (const r of data ?? []) out.add(r.donor_id as string);
     }
     return out;
   }
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db().from("charity_journey_enrolments").select("donor_id").eq("charity_id", charityId).order("id").range(from, from + 999);
+    const { data, error } = await scoped(db().from("charity_journey_enrolments").select("donor_id"), charityId, j).order("id").range(from, from + 999);
     if (error) throw error;
     for (const r of data ?? []) out.add(r.donor_id as string);
     if (!data || data.length < 1000) break;
@@ -170,9 +215,9 @@ async function enrolledDonors(charityId: string, donorIds?: string[]): Promise<S
  * "Add my existing donors": who would join, and why the others wouldn't. Only donors who first gave before the journey
  * was switched on (`switchedOnAt`): anyone later joins on their own as a new donor. Counts only leave this file.
  */
-export async function planExistingDonors(charityId: string, switchedOnAt: string) {
-  const ids = await allDonorIds(charityId, switchedOnAt);
-  const [who, already] = await Promise.all([contacts(charityId, ids), enrolledDonors(charityId)]);
+export async function planExistingDonors(charityId: string, journey: Pick<Journey, "id" | "switchedOnAt">) {
+  const ids = await allDonorIds(charityId, journey.switchedOnAt ?? undefined);
+  const [who, already] = await Promise.all([contacts(charityId, ids), enrolledDonors(charityId, journey)]);
   const hashes = [...who.byDonor.values()].map((c) => emailHash(c.email));
   const stopped = await optedOutHashes(charityId, hashes);
   return planExisting(
@@ -187,16 +232,54 @@ export async function planExistingDonors(charityId: string, switchedOnAt: string
 export async function addExistingDonors(charityId: string, now = new Date()): Promise<{ ids: string[]; skipped: Record<ExistingSkip, number>; firstDue: string | null }> {
   const journey = await loadJourney(charityId);
   if (!journey.steps.length || !journey.switchedOnAt) return { ids: [], skipped: { already: 0, erased: 0, opted_out: 0, recorded_only: 0 }, firstDue: null };
-  const plan = await planExistingDonors(charityId, journey.switchedOnAt);
+  const plan = await planExistingDonors(charityId, journey);
   const due = firstDue(now, journey.steps).toISOString();
+  const ids = await insertEnrolments(charityId, journey, plan.add.map((c) => c.donorId), "existing", now, due);
+  // Someone added at the same moment by another press or the daily job: counted as already on it.
+  plan.skipped.already += plan.add.length - ids.length;
+  return { ids, skipped: plan.skipped, firstDue: due };
+}
+
+/** Puts donors on a journey (never twice): the new enrolments' ids. */
+async function insertEnrolments(charityId: string, j: Pick<Journey, "id">, donorIds: string[], source: "existing" | "winback", now: Date, due: string): Promise<string[]> {
   const ids: string[] = [];
-  for (let i = 0; i < plan.add.length; i += 500) {
-    const rows = plan.add.slice(i, i + 500).map((c) => ({ charity_id: charityId, donor_id: c.donorId, source: "existing", enrolled_at: now.toISOString(), next_step: 1, next_due_at: due }));
-    const { data, error } = await db().from("charity_journey_enrolments").upsert(rows, { onConflict: "charity_id,donor_id", ignoreDuplicates: true }).select("id");
+  for (let i = 0; i < donorIds.length; i += 500) {
+    const rows = donorIds.slice(i, i + 500).map((donorId) => ({ charity_id: charityId, ...(j.id ? { journey_id: j.id } : {}), donor_id: donorId, source, enrolled_at: now.toISOString(), next_step: 1, next_due_at: due }));
+    const { data, error } = await db().from("charity_journey_enrolments").upsert(rows, { onConflict: j.id ? "journey_id,donor_id" : "charity_id,donor_id", ignoreDuplicates: true }).select("id");
     if (error) throw error;
     for (const r of data ?? []) ids.push(r.id as string);
   }
-  // Someone added at the same moment by another press or the daily job: counted as already on it.
+  return ids;
+}
+
+/**
+ * "Add to win-back journey" (CRM step 7): of the chosen donors, who would join and why the others wouldn't. Only this
+ * charity's own donors count (a paid gift to it); anyone else is left out without a word, as if never chosen.
+ */
+export async function planWinbackDonors(charityId: string, donorIds: string[]) {
+  const journey = await loadJourney(charityId, WINBACK);
+  const who = await contacts(charityId, donorIds);
+  const mine = donorIds.filter((id) => who.found.has(id));
+  const already = await enrolledDonors(charityId, journey, mine);
+  const hashes = [...who.byDonor.values()].map((c) => emailHash(c.email));
+  const stopped = await optedOutHashes(charityId, hashes);
+  return {
+    journey,
+    plan: planWinback(
+      mine.map((id) => {
+        const c = who.byDonor.get(id) ?? null;
+        return { donorId: id, already: journey.id ? already.has(id) : false, erased: who.erased.has(id), email: c?.email ?? null, optedOut: c ? stopped.has(emailHash(c.email)) : false };
+      }),
+    ),
+  };
+}
+
+/** Adds them to the win-back journey (it must be on). Returns the new enrolments' ids (for Undo) and the counts. */
+export async function addWinbackDonors(charityId: string, donorIds: string[], now = new Date()): Promise<{ ids: string[]; skipped: Record<ExistingSkip, number>; firstDue: string | null }> {
+  const { journey, plan } = await planWinbackDonors(charityId, donorIds);
+  if (!journey.id || !journey.enabled || !journey.steps.length) return { ids: [], skipped: plan.skipped, firstDue: null };
+  const due = firstDue(now, journey.steps).toISOString();
+  const ids = await insertEnrolments(charityId, journey, plan.add.map((c) => c.donorId), "winback", now, due);
   plan.skipped.already += plan.add.length - ids.length;
   return { ids, skipped: plan.skipped, firstDue: due };
 }
@@ -223,8 +306,8 @@ function failedForSure(e: unknown): boolean {
   return e instanceof EmailError;
 }
 
-type Live = { charityId: string; switchedOnAt: Date; name: string; slug: string; steps: JourneyStep[] };
-type DueRow = { id: string; charity_id: string; donor_id: string; next_step: number; attempts: number };
+type Live = { charityId: string; id: string | null; kind: JourneyKind; campaignId: string | null; switchedOnAt: Date; name: string; slug: string; steps: JourneyStep[] };
+type DueRow = { id: string; charity_id: string; journey_id?: string | null; donor_id: string; next_step: number; attempts: number };
 
 /**
  * The daily job's part (after collections, checks and the alert to Givezy): add new donors to switched-on journeys,
@@ -239,40 +322,50 @@ type DueRow = { id: string; charity_id: string; donor_id: string; next_step: num
  */
 export async function runJourneys(now: Date, deadline: number): Promise<JourneyRun> {
   const out: JourneyRun = { enrolled: 0, sent: 0, waiting: 0, stopped: 0, finished: 0, failed: 0, unknown: 0, leftOver: 0, emailOff: false };
-  const { data: journeys, error } = await db().from("charity_journeys").select("charity_id, switched_on_at, charities(status, name_en, slug)").eq("enabled", true);
+  // Before migration 20261110000011 the journeys have no id or kind: then each charity has its general one only.
+  const v2 = await journeysV2().catch(() => false);
+  const { data: journeys, error } = await db()
+    .from("charity_journeys")
+    .select(v2 ? "id, kind, campaign_id, charity_id, switched_on_at, charities(status, name_en, slug)" : "charity_id, switched_on_at, charities(status, name_en, slug)")
+    .eq("enabled", true);
   if (isMissingTable(error)) return { ...out, notSetUp: true };
   if (error) throw error;
   const live: Live[] = [];
-  for (const j of journeys ?? []) {
+  for (const j of (journeys ?? []) as unknown as Record<string, unknown>[]) {
     const raw = j.charities as unknown;
     const c = (Array.isArray(raw) ? raw[0] : raw) as { status: string; name_en: string; slug: string } | null;
     // Only a charity whose page is live sends anything.
     if (!c || c.status !== "approved" || !j.switched_on_at) continue;
-    const steps = (await loadJourney(j.charity_id as string)).steps;
-    if (steps.length) live.push({ charityId: j.charity_id as string, switchedOnAt: new Date(j.switched_on_at as string), name: c.name_en, slug: c.slug, steps });
+    const row = rowOf(j);
+    const steps = await journeySteps(j.charity_id as string, row);
+    if (steps.length) live.push({ charityId: j.charity_id as string, id: row.id, kind: row.kind, campaignId: row.campaignId, switchedOnAt: new Date(j.switched_on_at as string), name: c.name_en, slug: c.slug, steps });
   }
+  // Win-back donors who have given again leave it before anything is sent.
+  out.stopped += await stopGaveAgain(live.filter((j) => j.kind === "winback"), now, deadline);
   out.enrolled = await enrolNewDonors(live, now, deadline);
 
   const transport = getEmailTransport();
   if (transport.name === "console") return { ...out, emailOff: true };
   if (!live.length || Date.now() >= deadline) return out;
 
-  // Each charity's due list (up to the whole cap), then a fair share of the cap for each.
+  // Each charity's due list across its journeys (up to the whole cap), then a fair share of the cap for each charity.
+  const byCharity = new Map<string, Live[]>();
+  for (const j of live) byCharity.set(j.charityId, [...(byCharity.get(j.charityId) ?? []), j]);
   const dueBy = new Map<string, DueRow[]>();
-  for (const j of live) {
-    const { data, error: e } = await db()
+  for (const [charityId, js] of byCharity) {
+    const ids = js.map((j) => j.id).filter((x): x is string => Boolean(x));
+    let q = db()
       .from("charity_journey_enrolments")
-      .select("id, charity_id, donor_id, next_step, attempts")
-      .eq("charity_id", j.charityId)
+      .select(ids.length ? "id, charity_id, journey_id, donor_id, next_step, attempts" : "id, charity_id, donor_id, next_step, attempts")
+      .eq("charity_id", charityId)
       .eq("status", "active")
-      .lte("next_due_at", now.toISOString())
-      .order("next_due_at")
-      .limit(JOURNEY_RUN_CAP + 1);
+      .lte("next_due_at", now.toISOString());
+    if (ids.length) q = q.in("journey_id", ids);
+    const { data, error: e } = await q.order("next_due_at").limit(JOURNEY_RUN_CAP + 1);
     if (e) throw e;
-    if (data?.length) dueBy.set(j.charityId, data as DueRow[]);
+    if (data?.length) dueBy.set(charityId, data as unknown as DueRow[]);
   }
   const shares = fairShares(new Map([...dueBy].map(([k, v]) => [k, v.length])), Math.max(JOURNEY_RUN_CAP, JOURNEY_MIN_SHARE * dueBy.size));
-  const byCharity = new Map(live.map((j) => [j.charityId, j]));
   for (const [charityId, all] of dueBy) {
     const list = all.slice(0, shares.get(charityId) ?? 0);
     out.leftOver += all.length - list.length;
@@ -285,25 +378,60 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
   return out;
 }
 
+/**
+ * Win-back donors who gave again (any gift that went through, after they were added) leave the win-back journey
+ * ('gave_again'). Returns how many.
+ */
+async function stopGaveAgain(winbacks: Live[], now: Date, deadline: number): Promise<number> {
+  let stopped = 0;
+  for (const j of winbacks) {
+    if (!j.id || Date.now() >= deadline) continue;
+    const { data: rows, error } = await db().from("charity_journey_enrolments").select("id, donor_id, enrolled_at").eq("charity_id", j.charityId).eq("journey_id", j.id).eq("status", "active").limit(2000);
+    if (error) throw error;
+    const enrolled = new Map((rows ?? []).map((r) => [r.donor_id as string, { id: r.id as string, at: new Date(r.enrolled_at as string) }]));
+    const ids = [...enrolled.keys()];
+    const last = new Map<string, Date>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const earliest = new Date(Math.min(...ids.slice(i, i + 200).map((id) => enrolled.get(id)!.at.getTime()))).toISOString();
+      const { data, error: e } = await db().from("donations").select("donor_id, paid_at").eq("charity_id", j.charityId).eq("status", "paid").in("donor_id", ids.slice(i, i + 200)).gt("paid_at", earliest);
+      if (e) throw e;
+      for (const g of data ?? []) {
+        const at = new Date(g.paid_at as string);
+        const had = last.get(g.donor_id as string);
+        if (!had || at > had) last.set(g.donor_id as string, at);
+      }
+    }
+    for (const [donorId, e] of enrolled) {
+      if (!gaveAgain(e.at, last.get(donorId) ?? null)) continue;
+      const { error: u } = await db().from("charity_journey_enrolments").update({ status: "stopped", stopped_reason: "gave_again", updated_at: now.toISOString() }).eq("id", e.id).eq("status", "active");
+      if (u) throw u;
+      stopped++;
+    }
+  }
+  return stopped;
+}
+
 /** New donors: first paid gift on Givezy while the journey was on, not erased. Looks back 35 days, enough for a missed day. */
 async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promise<number> {
   let room = JOURNEY_ENROL_CAP;
   let enrolled = 0;
-  for (const j of live) {
+  // The win-back journey has no automatic joiners: the owner adds them.
+  for (const j of live.filter((x) => x.kind !== "winback")) {
     if (room <= 0 || Date.now() >= deadline) break;
     const since = new Date(Math.max(j.switchedOnAt.getTime(), now.getTime() - 35 * 86_400_000)).toISOString();
     const first = new Map<string, Date>();
     for (let from = 0; from < 5000; from += 1000) {
-      const { data, error: e } = await db()
+      let q = db()
         .from("donations")
         .select("donor_id, paid_at")
         .eq("charity_id", j.charityId)
         .eq("status", "paid")
         .neq("gateway", "recorded")
         .not("donor_id", "is", null)
-        .gte("paid_at", since)
-        .order("paid_at")
-        .range(from, from + 999);
+        .gte("paid_at", since);
+      // A campaign's journey: gifts to that campaign only.
+      if (j.kind === "campaign" && j.campaignId) q = q.eq("campaign_id", j.campaignId);
+      const { data, error: e } = await q.order("paid_at").range(from, from + 999);
       if (e) throw e;
       for (const r of data ?? []) if (!first.has(r.donor_id as string)) first.set(r.donor_id as string, new Date(r.paid_at as string));
       if (!data || data.length < 1000) break;
@@ -311,15 +439,18 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
     if (!first.size) continue;
     const ids = [...first.keys()];
     // A gift before the switch (or a recorded one) means they were already a donor: "Add my existing donors" covers them.
+    // For a campaign's journey, a gift to that campaign before the switch: donors who gave to it before aren't added.
     const earlier = new Set<string>();
     for (let i = 0; i < ids.length; i += 200) {
-      const { data, error: e } = await db()
+      let q = db()
         .from("donations")
         .select("donor_id")
         .eq("charity_id", j.charityId)
         .in("status", ["paid", "refunded", "charged_back"])
         .in("donor_id", ids.slice(i, i + 200))
         .lt("paid_at", j.switchedOnAt.toISOString());
+      if (j.kind === "campaign" && j.campaignId) q = q.eq("campaign_id", j.campaignId);
+      const { data, error: e } = await q;
       if (e) throw e;
       for (const r of data ?? []) earlier.add(r.donor_id as string);
     }
@@ -328,10 +459,10 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
     // Erased donors (their gifts stay, without their details) never join, even within the look-back.
     const who = await contacts(j.charityId, [...first.keys()]);
     for (const id of who.erased) first.delete(id);
-    const joiners = newJoiners(first, j.switchedOnAt, await enrolledDonors(j.charityId, [...first.keys()])).slice(0, room);
+    const joiners = newJoiners(first, j.switchedOnAt, await enrolledDonors(j.charityId, j, [...first.keys()])).slice(0, room);
     if (!joiners.length) continue;
-    const rows = joiners.map((n) => ({ charity_id: j.charityId, donor_id: n.donorId, source: "new_gift", enrolled_at: n.joined.toISOString(), next_step: 1, next_due_at: firstDue(n.joined, j.steps).toISOString() }));
-    const { data, error: e } = await db().from("charity_journey_enrolments").upsert(rows, { onConflict: "charity_id,donor_id", ignoreDuplicates: true }).select("id");
+    const rows = joiners.map((n) => ({ charity_id: j.charityId, ...(j.id ? { journey_id: j.id } : {}), donor_id: n.donorId, source: "new_gift", enrolled_at: n.joined.toISOString(), next_step: 1, next_due_at: firstDue(n.joined, j.steps).toISOString() }));
+    const { data, error: e } = await db().from("charity_journey_enrolments").upsert(rows, { onConflict: j.id ? "journey_id,donor_id" : "charity_id,donor_id", ignoreDuplicates: true }).select("id");
     if (e) throw e;
     enrolled += data?.length ?? 0;
     room -= data?.length ?? 0;
@@ -339,8 +470,11 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
   return enrolled;
 }
 
-async function sendDue(j: Live, list: DueRow[], transport: ReturnType<typeof getEmailTransport>, now: Date, deadline: number, out: JourneyRun): Promise<void> {
-  const charityId = j.charityId;
+async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof getEmailTransport>, now: Date, deadline: number, out: JourneyRun): Promise<void> {
+  const j0 = js[0];
+  const charityId = j0.charityId;
+  // Each row's own journey (before the migration, the charity's one journey).
+  const journeyOf = (r: DueRow) => js.find((x) => (x.id ?? null) === (r.journey_id ?? null)) ?? (r.journey_id ? null : j0);
   const donorIds = list.map((r) => r.donor_id);
   const [who, priv] = await Promise.all([contacts(charityId, donorIds), db().from("charity_private").select("contact_email").eq("charity_id", charityId).maybeSingle()]);
   const replyTo = (priv.data?.contact_email as string | null) ?? null;
@@ -360,6 +494,9 @@ async function sendDue(j: Live, list: DueRow[], transport: ReturnType<typeof get
       out.leftOver += list.length - at;
       return;
     }
+    const j = journeyOf(r);
+    // Its journey was switched off or emptied since the list was read: it waits.
+    if (!j) continue;
     const contact = who.byDonor.get(r.donor_id) ?? null;
     const decision = decideDue(
       { hasGift: who.found.has(r.donor_id), erased: who.erased.has(r.donor_id), email: contact?.email ?? null, optedOut: contact ? stopped.has(emailHash(contact.email)) : false, messagedThisWeek: recent.has(r.donor_id), nextStep: r.next_step },

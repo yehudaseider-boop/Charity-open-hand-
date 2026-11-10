@@ -3,7 +3,7 @@ import { reviewWithin } from "@/lib/charity/review-time";
 import { taxYearName } from "@/lib/dates";
 import { REMINDER_SKIPS, reminderOutcome } from "@/lib/charity/s18a-reminder";
 import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
-import { EXISTING_SKIPS, existingOutcome } from "@/lib/charity/journey";
+import { EXISTING_SKIPS, existingOutcome, journeyName, parseRefKey, winbackOutcome } from "@/lib/charity/journey";
 import { ROLE_LABEL } from "./permissions";
 
 /** "2026/27" from a stored tax year, or empty when it is missing. */
@@ -62,7 +62,8 @@ export type ActionKind =
   | "journey_saved"
   | "journey_on"
   | "journey_off"
-  | "journey_existing_added";
+  | "journey_existing_added"
+  | "journey_winback_added";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
 export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed", "certificate_declined", "s18a_reminders_sent"];
@@ -185,18 +186,27 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       };
     case "journey_saved":
       return {
-        what: `Your donor journey is saved: ${plural(Number(d.steps ?? 0), "email")}. ${d.on ? "Donors on it get the new wording from their next email." : "It's off, so nothing is sent until you switch it on."}`,
-        next: d.on ? { label: "See who is on your journey", href: `${c.base}/journey#people` } : { label: "Switch your journey on", href: `${c.base}/journey#switch` },
+        what: `${cap(jName(d))} is saved: ${plural(Number(d.steps ?? 0), "email")}. ${d.on ? "Donors on it get the new wording from their next email." : "It's off, so nothing is sent until you switch it on."}`,
+        next: d.on ? { label: "See who is on it", href: `${jHref(c, d)}#people` } : { label: "Switch it on", href: `${jHref(c, d)}#switch` },
       };
     case "journey_on":
       return {
-        what: `Your donor journey is on. From now, each new donor joins on their first gift and gets ${plural(Number(d.steps ?? 0), "email")} from you, never more than one message from you a week.`,
-        next: { label: "Add your existing donors too", href: `${c.base}/journey#existing` },
+        what: `${cap(jName(d))} is on. ${jJoin(d)} ${plural(Number(d.steps ?? 0), "email")} from you, never more than one message from you a week.`,
+        next: jKind(d) === "general" ? { label: "Add your existing donors too", href: `${c.base}/journey#existing` } : jKind(d) === "winback" ? { label: "Find donors to win back", href: `${c.base}/monthly/stopped` } : { label: "Back to your journeys", href: jHref(c, d) },
       };
     case "journey_off":
       return {
-        what: "Your donor journey is off. Nobody gets a journey email and nobody new joins until you switch it on again. Everyone keeps their place.",
-        next: { label: "Back to your donor journey", href: `${c.base}/journey` },
+        what: `${cap(jName(d))} is off. Nobody gets an email from it and nobody new joins until you switch it on again. Everyone keeps their place.`,
+        next: { label: "Back to your journeys", href: jHref(c, d) },
+      };
+    case "journey_winback_added":
+      return {
+        what: winbackOutcome({
+          added: Number(d.added ?? 0),
+          skipped: Object.fromEntries(EXISTING_SKIPS.map((k) => [k, Number(d[`skipped_${k}`] ?? 0)])),
+          firstEmail: d.firstEmail ? String(d.firstEmail) : null,
+        }),
+        next: { label: "See who is on your win-back journey", href: `${c.base}/journey?j=winback#people` },
       };
     case "journey_existing_added":
       return {
@@ -335,15 +345,16 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;
     case "receipts_approved": return `Taken back. Your approval for the ${yearName(d.taxYear)} tax year is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
     case "contacts_imported": return `Taken back. The ${plural(Number(d.contacts ?? 0), "donor")} from ${quote(d.file)} ${Number(d.contacts ?? 0) === 1 ? "is" : "are"} removed from your list.`;
-    case "journey_saved": return "Taken back. Your donor journey's emails are as they were before.";
-    case "journey_on": return "Taken back. Your donor journey is off again.";
-    case "journey_off": return "Taken back. Your donor journey is on again.";
+    case "journey_saved": return `Taken back. The emails of ${jName(d)} are as they were before.`;
+    case "journey_on": return `Taken back. ${cap(jName(d))} is off again.`;
+    case "journey_off": return `Taken back. ${cap(jName(d))} is on again.`;
+    case "journey_winback_added":
     case "journey_existing_added": {
       const removed = Number(d.removed ?? d.added ?? 0);
       const stayed = Number(d.stayed ?? 0);
       return stayed
-        ? `Taken back. Removed ${plural(removed, "donor")} from your journey; ${stayed} had already had their first email and ${stayed === 1 ? "stays" : "stay"} on.`
-        : `Taken back. Removed ${plural(removed, "donor")} from your journey. Nobody was emailed.`;
+        ? `Taken back. Removed ${plural(removed, "donor")} from ${jName(d)}; ${stayed} had already had their first email and ${stayed === 1 ? "stays" : "stay"} on.`
+        : `Taken back. Removed ${plural(removed, "donor")} from ${jName(d)}. Nobody was emailed.`;
     }
     case "application_submitted":
     case "thank_you_sent":
@@ -387,8 +398,28 @@ const KINDS = new Set<ActionKind>([
   "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "role_changed", "appeal_sent",
   "contacts_imported", "contacts_removed", "sars_details_saved",
   "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened", "s18a_reminders_sent",
-  "journey_saved", "journey_on", "journey_off", "journey_existing_added",
+  "journey_saved", "journey_on", "journey_off", "journey_existing_added", "journey_winback_added",
 ]);
+
+/** Which journey an action was on (older records: the general one). */
+function jKind(d: Details): "general" | "campaign" | "winback" {
+  return parseRefKey(d.jkey)?.kind ?? "general";
+}
+/** "your donor journey", "your win-back journey", "the journey for Winter blankets". */
+function jName(d: Details): string {
+  return journeyName(jKind(d), d.jtitle ? String(d.jtitle) : null);
+}
+function jHref(c: Pick<Context, "base">, d: Details): string {
+  const k = parseRefKey(d.jkey);
+  return !k || k.kind === "general" ? `${c.base}/journey` : `${c.base}/journey?j=${encodeURIComponent(String(d.jkey))}`;
+}
+function jJoin(d: Details): string {
+  const k = jKind(d);
+  if (k === "winback") return "Donors you add from your lists get";
+  if (k === "campaign") return "From now, each donor who first gives to this campaign gets";
+  return "From now, each new donor joins on their first gift and gets";
+}
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** "an admin", "a viewer": a role in a sentence. */
 function roleWord(r: unknown): string {

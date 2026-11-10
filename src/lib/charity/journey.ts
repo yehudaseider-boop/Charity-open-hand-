@@ -152,6 +152,122 @@ export const STARTER_STEPS: JourneyStep[] = [
   },
 ];
 
+/**
+ * Campaign journeys and the win-back journey (CRM steps 6b and 7, Yehuda 10/11/2026, "do this"). A charity has its
+ * general journey (everyone's first gift), one journey per campaign it chooses (a first gift to that campaign) and one
+ * win-back journey (donors the owner adds from the stopped monthly and keeping-donors lists). The same rules for all:
+ * up to five emails, no typed links, one message a week per donor per charity across everything.
+ */
+export type JourneyKind = "general" | "campaign" | "winback";
+export type JourneyRef = { kind: "general" } | { kind: "winback" } | { kind: "campaign"; campaignId: string };
+export const GENERAL: JourneyRef = { kind: "general" };
+export const WINBACK: JourneyRef = { kind: "winback" };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** How a journey is named in a link: "general", "winback" or "campaign:<id>". */
+export function refKey(ref: JourneyRef): string {
+  return ref.kind === "campaign" ? `campaign:${ref.campaignId}` : ref.kind;
+}
+
+/** A link's journey, or null when it names none (a made-up campaign id is checked against the charity's own later). */
+export function parseRefKey(raw: unknown): JourneyRef | null {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (s === "" || s === "general") return GENERAL;
+  if (s === "winback") return WINBACK;
+  const m = /^campaign:(.+)$/.exec(s);
+  return m && UUID.test(m[1]) ? { kind: "campaign", campaignId: m[1].toLowerCase() } : null;
+}
+
+export function sameRef(a: JourneyRef, b: JourneyRef): boolean {
+  return refKey(a) === refKey(b);
+}
+
+/** "your donor journey", "your win-back journey", "the journey for Winter blankets". */
+export function journeyName(kind: JourneyKind, campaignTitle?: string | null): string {
+  if (kind === "winback") return "your win-back journey";
+  if (kind === "campaign") return `the journey for ${(campaignTitle ?? "").replace(/\s+/g, " ").trim() || "your campaign"}`;
+  return "your donor journey";
+}
+
+/** The same, starting a sentence. */
+export function journeyTitle(kind: JourneyKind, campaignTitle?: string | null): string {
+  const n = journeyName(kind, campaignTitle);
+  return n.charAt(0).toUpperCase() + n.slice(1);
+}
+
+/**
+ * Starter wording for a campaign's journey. DRAFT WORDING for Yosef: warm, no guilt, no numbers we can't stand
+ * behind. The campaign's name is the charity's own.
+ */
+export function campaignStarterSteps(campaignTitle: string): JourneyStep[] {
+  const t = campaignTitle.replace(/\s+/g, " ").trim() || "our campaign";
+  return [
+    {
+      waitDays: 2,
+      subject: "Thank you for supporting our campaign",
+      body: `Thank you for giving to ${t}. It means a great deal to everyone here.\n\nWe'll send you a few short notes about how the campaign is going and what your support makes possible. You can stop them at any time with the link at the bottom.`,
+    },
+    {
+      waitDays: 21,
+      subject: "How the campaign is going",
+      body: `We wanted to tell you how ${t} is going. Our page on Givezy has the latest news and photos.\n\nIf you have a question, reply to this email and someone from our team will get back to you.`,
+    },
+  ];
+}
+
+/**
+ * Starter wording for the win-back journey. DRAFT WORDING for Yosef: warm, no guilt, no pressure, no numbers. These
+ * donors gave before and haven't lately: the emails say thank you and keep the door open, they don't ask why.
+ */
+export const WINBACK_STARTER_STEPS: JourneyStep[] = [
+  {
+    waitDays: 1,
+    subject: "Thank you for what you gave",
+    body: "We wanted to say thank you again for supporting us in the past. Your gifts made a real difference to the people we serve.\n\nWe'd love to keep you up to date with what we're doing now. You can stop these notes at any time with the link at the bottom.",
+  },
+  {
+    waitDays: 30,
+    subject: "What we've been doing",
+    body: "Here's a little news from us. Our page on Givezy has our latest updates and photos.\n\nIf you ever have a question, or would like to help in another way, reply to this email and someone from our team will get back to you.",
+  },
+];
+
+/** The starter for a kind of journey. */
+export function starterSteps(kind: JourneyKind, campaignTitle?: string | null): JourneyStep[] {
+  if (kind === "winback") return WINBACK_STARTER_STEPS;
+  if (kind === "campaign") return campaignStarterSteps(campaignTitle ?? "");
+  return STARTER_STEPS;
+}
+
+/** A win-back donor gave again (any gift that went through, after they joined): they leave the win-back journey. */
+export function gaveAgain(enrolledAt: Date, lastPaidAt: Date | null): boolean {
+  return Boolean(lastPaidAt && lastPaidAt.getTime() > enrolledAt.getTime());
+}
+
+/** The most donors one press of "Add to win-back journey" takes, and the presses a day. */
+export const WINBACK_PRESS_CAP = 100;
+export const WINBACK_PRESSES_PER_DAY = 5;
+
+/** The donors chosen on a list, cleaned: real ids only, each once, at most the cap; how many were over it. */
+export function chosenDonors(raw: unknown[], cap = WINBACK_PRESS_CAP): { ids: string[]; over: number } {
+  const ids = [...new Set(raw.filter((v): v is string => typeof v === "string" && UUID.test(v.trim())).map((v) => v.trim().toLowerCase()))];
+  return { ids: ids.slice(0, cap), over: Math.max(0, ids.length - cap) };
+}
+
+/** "Add to win-back journey": who joins and why each other donor doesn't, as for existing donors. */
+export function planWinback<T extends ExistingCandidate>(candidates: T[]) {
+  return planExisting(candidates);
+}
+
+/** What the page says after adding donors to the win-back journey. Counts only. */
+export function winbackOutcome(r: { added: number; skipped: Partial<Record<ExistingSkip, number>>; firstEmail: string | null }): string {
+  return [
+    r.added ? `${plural(r.added, "donor")} ${r.added === 1 ? "is" : "are"} on your win-back journey now.${r.firstEmail ? ` Their first email goes from ${r.firstEmail}, never more than one message from you a week. Anyone who gives again leaves it.` : ""}` : "Nobody new was added.",
+    existingSkippedSentence(r.skipped),
+  ].filter(Boolean).join(" ");
+}
+
 /** Days later, as a moment. */
 export function addDays(from: Date, days: number): Date {
   return new Date(from.getTime() + days * 86_400_000);
@@ -177,7 +293,7 @@ export function afterSend(sent: number, at: Date, steps: Pick<JourneyStep, "wait
   return next ? { nextStep: sent + 1, due: addDays(at, next.waitDays) } : null;
 }
 
-export type StopReason = "erased" | "opted_out" | "no_email" | "no_gift" | "not_delivered";
+export type StopReason = "erased" | "opted_out" | "no_email" | "no_gift" | "not_delivered" | "gave_again";
 
 /** One donor whose next email is due, and what the run found out about them. */
 export type DueCandidate = {
@@ -267,6 +383,7 @@ export const STOP_WORDS: Record<StopReason, string> = {
   no_email: "No email address on Givezy",
   no_gift: "No paid gift any more",
   not_delivered: "Emails couldn't be delivered",
+  gave_again: "Gave again, so they left your win-back journey",
 };
 
 /** "Email 2 on 03/12/2026", "Finished", "Stopped: turned off emails from you". */
