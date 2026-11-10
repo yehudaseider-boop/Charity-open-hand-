@@ -106,8 +106,8 @@ describe("taking back a change to the donor journey", () => {
     expect(tables.charity_actions[0].undone_at).toBeNull();
   });
 
-  it("only the owner can take it back", async () => {
-    role = "admin";
+  it("only a role that may change the journey can take it back (not finance)", async () => {
+    role = "finance";
     journeyNow = structuredClone(on);
     tables.charity_actions = [action("journey_on", { type: "journey", before: off, after: on })];
     expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: false, why: "owner" });

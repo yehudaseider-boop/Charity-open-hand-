@@ -22,6 +22,7 @@ export function DashboardShell({
   asGivezy,
   base: baseOverride,
   publicHref,
+  hiddenTabs,
   children,
 }: {
   id: string;
@@ -31,6 +32,8 @@ export function DashboardShell({
   base?: string;
   /** The charity's public page; `null` leaves the link out (the demo has none). */
   publicHref?: string | null;
+  /** Menu pages this person's role can't use (team roles, 10/11/2026); the pages refuse them anyway. */
+  hiddenTabs?: string[];
   children: React.ReactNode;
 }) {
   const base = baseOverride ?? `/charity-admin/${id}`;
@@ -47,7 +50,7 @@ export function DashboardShell({
             <span className={`mt-2 inline-block rounded-full border-2 px-2.5 py-0.5 text-xs font-semibold ${statusChip[status.tone]}`}>{status.label}</span>
           </div>
           <div className="lg:rounded-card lg:border-2 lg:border-border lg:bg-surface lg:p-3">
-            <CharityNav id={id} base={base} />
+            <CharityNav id={id} base={base} hidden={hiddenTabs} />
           </div>
         </aside>
         <div className="min-w-0 space-y-5">

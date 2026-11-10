@@ -34,6 +34,15 @@ async function scenario(setup: () => Promise<void>, act: () => Promise<void>) {
 }
 const run = (sql: string, args: unknown[] = []) => client.query(sql, args);
 const noop = async () => {};
+/** Read as the server: no browser reads the bank columns since team roles (10/11/2026). */
+async function asServer(sql: string, args: unknown[] = []) {
+  await run("reset role");
+  try {
+    return await run(sql, args);
+  } finally {
+    await run("set local role authenticated");
+  }
+}
 
 describe("approved charity", () => {
   it("can't change its legal identifiers", async () => {
@@ -146,10 +155,10 @@ describe("draft charity", () => {
         await run("update public.charity_private set bank_verified_at = now() where charity_id = $1", [meals]);
       },
       async () => {
-        const before = await run("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
+        const before = await asServer("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
         expect(before.rows[0].bank_verified_at).not.toBeNull();
         await run("update public.charity_private set bank_account_holder = 'SOMEONE ELSE' where charity_id = $1", [meals]);
-        const after = await run("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
+        const after = await asServer("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
         expect(after.rows[0].bank_verified_at).toBeNull();
       },
     );
@@ -163,7 +172,7 @@ describe("draft charity", () => {
       },
       async () => {
         await run("update public.charities set legal_name_en = 'Changed' where id = $1", [meals]);
-        const r = await run("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
+        const r = await asServer("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
         expect(r.rows[0].bank_verified_at).not.toBeNull();
       },
     );

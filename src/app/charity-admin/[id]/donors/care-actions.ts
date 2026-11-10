@@ -11,6 +11,7 @@ import { checkLapsedDays, checkNote, checkReminder, checkSegment, checkTagName }
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { isoDateInJhb } from "@/lib/dates";
 import type { FormState } from "@/lib/form";
+import { refusal } from "@/lib/charity/team";
 
 const isId = (s: string) => /^[0-9a-f-]{36}$/i.test(s);
 const donorPage = (charityId: string, donorId: string) => `/charity-admin/${charityId}/donors/${donorId}`;
@@ -19,6 +20,9 @@ const donorPage = (charityId: string, donorId: string) => `/charity-admin/${char
 async function forDonor(charityId: string, donorId: string) {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
+  // Notes, follow-ups and tags are part of looking after donors (team roles: "message").
+  const refused = await refusal(charityId, "message");
+  if (refused) throw new Error(refused);
   if (!(await donorGaveTo(charityId, donorId))) throw new Error("Not one of this charity's donors.");
   return viewer;
 }
@@ -109,6 +113,8 @@ export async function removeDonorTag(charityId: string, donorId: string, tagId: 
 export async function deleteCharityTag(charityId: string, tagId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "message");
+  if (refused) return { ok: false, message: refused };
   if (!isId(tagId) || !(await deleteTag(charityId, tagId))) return NOT_FOUND;
   redirect(`/charity-admin/${charityId}/donors?did=tag_deleted`);
 }
@@ -117,6 +123,8 @@ export async function deleteCharityTag(charityId: string, tagId: string, _prev: 
 export async function saveDonorList(charityId: string, filters: { group?: string; tag?: string; q?: string }, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "message");
+  if (refused) return { ok: false, message: refused };
   const tagIds = new Set((await listTags(charityId)).map((t) => t.id));
   const s = checkSegment(formData.get("name"), filters, tagIds);
   if (!s.ok) return { ok: false, fieldErrors: { name: s.error } };
@@ -130,6 +138,8 @@ export async function saveDonorList(charityId: string, filters: { group?: string
 export async function deleteDonorList(charityId: string, segmentId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "message");
+  if (refused) return { ok: false, message: refused };
   if (!isId(segmentId) || !(await deleteSegment(charityId, segmentId))) return NOT_FOUND;
   redirect(`/charity-admin/${charityId}/donors?did=list_removed`);
 }
@@ -137,6 +147,8 @@ export async function deleteDonorList(charityId: string, segmentId: string, _pre
 export async function saveLapsedPeriod(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "message");
+  if (refused) return { ok: false, message: refused };
   const d = checkLapsedDays(formData.get("days"));
   if (!d.ok) return { ok: false, fieldErrors: { days: d.error } };
   await setLapsedDays(charityId, d.value);

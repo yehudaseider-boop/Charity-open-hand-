@@ -150,7 +150,9 @@ describe("a charity admin", () => {
       expect((await run("select id from public.donors")).rowCount).toBe(0);
       // Not even their own charity's gateway reference, or its bank account number's ciphertext (06/11/2026).
       await denied("select gateway_subaccount_ref from public.charities where id = $1", [ids.meals]);
-      expect((await run("select bank_account_last4, tax_reference_number from public.charity_private where charity_id = $1", [ids.meals])).rowCount).toBe(1);
+      expect((await run("select contact_name, tax_reference_number from public.charity_private where charity_id = $1", [ids.meals])).rowCount).toBe(1);
+      // The bank account isn't read by any browser since team roles (10/11/2026): the server reads it for the owner and finance.
+      await denied("select bank_account_last4 from public.charity_private where charity_id = $1", [ids.meals]);
       await denied("select bank_account_number_encrypted from public.charity_private where charity_id = $1", [ids.meals]);
       await denied("select * from public.charity_private where charity_id = $1", [ids.meals]);
     });

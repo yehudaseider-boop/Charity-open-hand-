@@ -15,6 +15,14 @@ const recorded: { kind: string; details: Record<string, unknown>; undo: unknown 
 const told: string[] = [];
 const CAMPAIGN = "11111111-1111-4111-8111-111111111111";
 
+vi.mock("@/lib/charity/team", async () => {
+  const p = await import("@/lib/charity/permissions");
+  const role = () => "admin" as const;
+  return {
+    viewerCan: async (_c: string, perm: Parameters<typeof p.can>[1]) => p.can(role(), perm),
+    refusal: async (_c: string, perm: Parameters<typeof p.can>[1]) => (p.can(role(), perm) ? null : p.refusedFor(perm)),
+  };
+});
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`redirect:${to}`); } }));
 vi.mock("@/lib/auth", () => ({ requireViewer: async () => ({ userId: "u1", email: "admin@x.co" }) }));

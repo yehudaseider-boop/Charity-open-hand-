@@ -24,7 +24,15 @@ let storeFails = false;
 vi.mock("@/lib/auth", () => ({ requireViewer: async () => ({ userId: "u1", email: "owner@x.co" }) }));
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: Record<string, unknown>) => void audits.push(a) }));
 vi.mock("@/lib/charity/queries", () => ({ loadCharityForManager: async () => ({ charity: { id: C1, status: "approved" }, priv: null }) }));
-vi.mock("@/lib/charity/team", () => ({ isOwner: async () => owner }));
+vi.mock("@/lib/charity/team", async () => {
+  const p = await import("@/lib/charity/permissions");
+  const role = () => (owner ? "owner" : "fundraiser") as "owner" | "fundraiser";
+  return {
+    isOwner: async () => owner,
+    viewerCan: async (_c: string, perm: Parameters<typeof p.can>[1]) => p.can(role(), perm),
+    refusal: async (_c: string, perm: Parameters<typeof p.can>[1]) => (p.can(role(), perm) ? null : p.refusedFor(perm)),
+  };
+});
 vi.mock("@/lib/charity/charity-actions", () => ({ recordAction: async () => "a1" }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => { throw new Error("the actions reach the database only through the history store"); } }));
 vi.mock("@/lib/charity/export", () => ({
@@ -101,11 +109,12 @@ beforeEach(() => {
 });
 
 describe("marking a download as uploaded to SARS", () => {
-  it("an admin who isn't the owner is refused, for the mark and for Undo, and nothing changes", async () => {
+  it("a role without downloads (a fundraiser) is refused, for the mark and for Undo, and nothing changes", async () => {
     owner = false;
-    expect(await mark(MINE)).toEqual({ ok: false, message: "Only your charity's owner can mark a SARS file as uploaded. Nothing was changed." });
+    const message = "Your role doesn't include downloads or the SARS files. Nothing was downloaded or changed. Ask your charity's owner if you need them.";
+    expect(await mark(MINE)).toEqual({ ok: false, message });
     entries[MINE].uploadedOn = "2026-11-10";
-    expect(await unmark(MINE)).toEqual({ ok: false, message: "Only your charity's owner can change this. Nothing was changed." });
+    expect(await unmark(MINE)).toEqual({ ok: false, message });
     expect(entries[MINE].uploadedOn).toBe("2026-11-10");
   });
 

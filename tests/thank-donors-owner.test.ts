@@ -8,7 +8,15 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`redirect:${to}`); } }));
 vi.mock("@/lib/auth", () => ({ requireViewer: async () => ({ userId: "u1", email: "admin@x.co" }) }));
 vi.mock("@/lib/charity/queries", () => ({ loadCharityForManager: async () => ({ charity: { id: "c1", name_en: "Meals Fund", status: "approved" }, priv: null }) }));
-vi.mock("@/lib/charity/team", () => ({ isOwner: async () => owner }));
+vi.mock("@/lib/charity/team", async () => {
+  const p = await import("@/lib/charity/permissions");
+  const role = () => (owner ? "owner" : "finance") as "owner" | "finance";
+  return {
+    isOwner: async () => owner,
+    viewerCan: async (_c: string, perm: Parameters<typeof p.can>[1]) => p.can(role(), perm),
+    refusal: async (_c: string, perm: Parameters<typeof p.can>[1]) => (p.can(role(), perm) ? null : p.refusedFor(perm)),
+  };
+});
 vi.mock("@/lib/charity/charity-actions", () => ({ recordAction: async () => "a1" }));
 vi.mock("@/lib/charity/thank-you-send", () => ({
   sendThankYou: async (a: { month: string }) => (sends.push(`send:${a.month}`), { ok: true, sent: 1, failed: 0, remaining: 0 }),
@@ -29,9 +37,9 @@ beforeEach(() => {
 });
 
 describe("thank donors: owner only", () => {
-  it("an admin who isn't the owner can't send or finish a thank-you, and nothing goes", async () => {
+  it("a role without messages (finance) can't send or finish a thank-you, and nothing goes", async () => {
     owner = false;
-    const message = "Only your charity's owner can send thank-yous. Nothing was sent.";
+    const message = "Your role doesn't include thanking or emailing donors. Nothing was changed. Ask your charity's owner if you need it.";
     expect(await sendThankDonors("c1", month, { ok: false }, form())).toEqual({ ok: false, message });
     expect(await sendRestOfThankYou("c1", month, { ok: false }, form())).toEqual({ ok: false, message });
     expect(sends).toEqual([]);

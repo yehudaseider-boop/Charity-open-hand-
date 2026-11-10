@@ -6,13 +6,14 @@ import { requireViewer } from "@/lib/auth";
 import { recordAction } from "@/lib/charity/charity-actions";
 import { adminRemovedEmail, memberAddedEmail, notifyCharity } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { addMember, isOwner, removeMember } from "@/lib/charity/team";
+import { isRole } from "@/lib/charity/permissions";
+import { addMember, isOwner, removeMember, setMemberRole } from "@/lib/charity/team";
 import type { FormState } from "@/lib/form";
 import { hitRateLimit } from "@/lib/rate-limit";
 
-const NOT_OWNER: FormState = { ok: false, message: "Only your charity's owner can add or remove people. Nothing was changed." };
+const NOT_OWNER: FormState = { ok: false, message: "Only your charity's owner can add or remove people or change their roles. Nothing was changed." };
 
-/** Give someone access to the dashboard as an admin. Owner only. */
+/** Give someone access to the dashboard in a role (admin by default). Owner only. */
 export async function addTeamMember(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
@@ -26,11 +27,13 @@ export async function addTeamMember(charityId: string, _prev: FormState, formDat
   }
   // Adding people creates sign-ins: a handful an hour is plenty for a real team.
   if (await hitRateLimit("team-add", [`charity:${charityId}`, `user:${viewer.userId}`], 10, 60)) return { ok: false, message: "That's a lot of people in one go. Please wait an hour and try again. Nothing was changed." };
-  const r = await addMember(charityId, viewer.userId, email);
+  const role = String(formData.get("role") ?? "admin");
+  if (!isRole(role) || role === "owner") return { ok: false, fieldErrors: { role: "Choose a role." } };
+  const r = await addMember(charityId, viewer.userId, email, role);
   if (!r.ok) return { ok: false, message: r.message };
   if (!r.already) await notifyCharity(memberAddedEmail(r.email, charity.name_en, charityId));
   revalidatePath(`/charity-admin/${charityId}/team`);
-  const done = await recordAction(charityId, viewer.userId, "member_added", { email: r.email, already: r.already }, r.already ? null : { type: "remove_member", userId: r.userId });
+  const done = await recordAction(charityId, viewer.userId, "member_added", { email: r.email, already: r.already, role }, r.already ? null : { type: "remove_member", userId: r.userId });
   redirect(`/charity-admin/${charityId}/team?done=${done}`);
 }
 
@@ -47,5 +50,22 @@ export async function removeTeamMember(charityId: string, userId: string, _prev:
   // Removing yourself: you can't see this charity any more.
   if (userId === viewer.userId) redirect("/account");
   const done = await recordAction(charityId, viewer.userId, "member_removed", { email: r.email }, null);
+  redirect(`/charity-admin/${charityId}/team?done=${done}`);
+}
+
+/** Change someone's role. Owner only; the owner's own role isn't changed here. Undo puts it back. */
+export async function changeMemberRole(charityId: string, userId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const viewer = await requireViewer();
+  await loadCharityForManager(charityId);
+  if (!(await isOwner(charityId))) return NOT_OWNER;
+  if (!/^[0-9a-f-]{36}$/i.test(userId)) return { ok: false, message: "That person no longer has access." };
+  const role = String(formData.get("role") ?? "");
+  const was = String(formData.get("was") ?? "");
+  if (!isRole(role) || role === "owner") return { ok: false, fieldErrors: { role: "Choose a role." } };
+  const r = await setMemberRole(charityId, viewer.userId, userId, role, isRole(was) ? was : undefined);
+  if (!r.ok) return { ok: false, message: r.message };
+  if (r.before === r.after) return { ok: true, message: `${r.email || "They"} already had that role. Nothing changed.` };
+  revalidatePath(`/charity-admin/${charityId}`, "layout");
+  const done = await recordAction(charityId, viewer.userId, "role_changed", { email: r.email, from: r.before, to: r.after }, { type: "set_role", userId, from: r.before, to: r.after });
   redirect(`/charity-admin/${charityId}/team?done=${done}`);
 }

@@ -18,12 +18,15 @@ import { donorGroup, donorGroupsFor, monthlyByDonor } from "@/lib/charity/insigh
 import { formatDate, isoDateInJhb } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
+import { refusal } from "@/lib/charity/team";
 
 /** "Say thank you" on one donor: a short personal email from the charity, sent by Givezy. */
 export async function thankOneDonor(charityId: string, donorId: string, back: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   // Throws unless the signed-in person (with their second step) manages this charity.
   const { charity, priv } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "message");
+  if (refused) return { ok: false, message: refused };
   if (charity.status !== "approved") return { ok: false, message: "You can thank donors once your page is live." };
   if (!isUuid(donorId)) return { ok: false, message: "We couldn't find that donor. Please reload the page." };
   const checked = checkThankYou(String(formData.get("body") ?? ""));

@@ -28,7 +28,7 @@ import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isRealDocument } from "@/lib/charity/file-check";
 import { createClient } from "@/lib/supabase/server";
-import { isOwner } from "@/lib/charity/team";
+import { isOwner, refusal as roleRefusal } from "@/lib/charity/team";
 
 /** The values of these columns as they are now, for "Undo". */
 function pick(row: unknown, cols: string[]): Record<string, unknown> {
@@ -54,6 +54,8 @@ function editable(status: string) {
 
 async function loadEditable(charityId: string) {
   const data = await loadCharityForManager(charityId);
+  const refused = await roleRefusal(charityId, "application");
+  if (refused) return { data, locked: { ok: false, message: refused } as FormState };
   if (!editable(data.charity.status)) {
     return { data, locked: { ok: false, message: "This application has been submitted and is locked." } as FormState };
   }

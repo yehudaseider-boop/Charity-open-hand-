@@ -9,7 +9,7 @@ import { EXISTING_SKIPS, JOURNEY_MAX_STEPS, checkJourneySteps, existingOutcome }
 import { addExistingDonors } from "@/lib/charity/journey-store";
 import { readJourneyState, writeJourney } from "@/lib/charity/journey-write";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { isOwner } from "@/lib/charity/team";
+import { isOwner, refusal } from "@/lib/charity/team";
 import { formatDate } from "@/lib/dates";
 import type { FormState } from "@/lib/form";
 import { hitRateLimit, rateLimitReached } from "@/lib/rate-limit";
@@ -20,7 +20,6 @@ import { hitRateLimit, rateLimitReached } from "@/lib/rate-limit";
  * is asked first on the page and can be taken back until their first email goes.
  */
 
-const NOT_OWNER = "Only your charity's owner can change the donor journey. Nothing was changed.";
 const page = (id: string) => `/charity-admin/${id}/journey`;
 /** The most ids Undo keeps for "Add my existing donors". Beyond it the action stands, as the page said. */
 const UNDO_IDS = 5000;
@@ -29,7 +28,8 @@ export async function saveJourney(charityId: string, _prev: FormState, formData:
   const viewer = await requireViewer();
   // Throws (not found) unless the signed-in person, with their second step, manages this charity.
   await loadCharityForManager(charityId);
-  if (!(await isOwner(charityId))) return { ok: false, message: NOT_OWNER };
+  const notAllowed = await refusal(charityId, "message");
+  if (notAllowed) return { ok: false, message: notAllowed };
   const count = Math.min(JOURNEY_MAX_STEPS + 1, Math.max(0, Number(formData.get("steps") ?? 0) || 0));
   const raw = Array.from({ length: count }, (_, i) => ({ subject: formData.get(`subject_${i + 1}`), body: formData.get(`body_${i + 1}`), waitDays: formData.get(`wait_${i + 1}`) }));
   const checked = checkJourneySteps(raw);
@@ -60,7 +60,8 @@ export async function saveJourney(charityId: string, _prev: FormState, formData:
 export async function switchJourney(charityId: string, on: boolean, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
-  if (!(await isOwner(charityId))) return { ok: false, message: NOT_OWNER };
+  const notAllowed = await refusal(charityId, "message");
+  if (notAllowed) return { ok: false, message: notAllowed };
   const before = await readJourneyState(charityId);
   if (on && charity.status !== "approved") return { ok: false, message: "You can switch your journey on once your page is live. Nothing was changed." };
   if (on && !before.steps.length) return { ok: false, message: "Save at least one email first, then switch it on. Nothing was changed." };

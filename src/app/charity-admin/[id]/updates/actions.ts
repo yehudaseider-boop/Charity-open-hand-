@@ -14,6 +14,7 @@ import { isRealImage } from "@/lib/charity/file-check";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { cleanImage } from "@/lib/charity/clean-image";
+import { refusal } from "@/lib/charity/team";
 
 function revalidate(charityId: string, slug: string) {
   revalidatePath(`/charity-admin/${charityId}/updates`);
@@ -49,6 +50,8 @@ async function removeFile(charityId: string, path: string | null) {
 export async function postUpdate(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const parsed = updateSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   if (await hitRateLimit("charity-update", [`charity:${charityId}`], 20, 24 * 60)) {
@@ -75,6 +78,7 @@ export async function removeUpdate(charityId: string, updateId: string): Promise
   const viewer = await requireViewer();
   if (!isUuid(updateId)) return;
   const { charity } = await loadCharityForManager(charityId);
+  if (await refusal(charityId, "profile")) return;
   // The whole row, so "Undo" can put it back exactly; its photo file is kept for the same reason.
   const { data: row, error: readError } = await createAdminClient().from("charity_updates").select("*").eq("id", updateId).eq("charity_id", charityId).maybeSingle();
   if (readError) throw readError;
@@ -92,6 +96,8 @@ export async function removeUpdate(charityId: string, updateId: string): Promise
 export async function addPhoto(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const parsed = photoSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   const supabase = await createClient();
@@ -117,6 +123,7 @@ export async function removePhoto(charityId: string, photoId: string): Promise<v
   const viewer = await requireViewer();
   if (!isUuid(photoId)) return;
   const { charity } = await loadCharityForManager(charityId);
+  if (await refusal(charityId, "profile")) return;
   // The whole row, so "Undo" can put it back exactly; the file is kept for the same reason.
   const { data: row, error: readError } = await createAdminClient().from("charity_photos").select("*").eq("id", photoId).eq("charity_id", charityId).maybeSingle();
   if (readError) throw readError;

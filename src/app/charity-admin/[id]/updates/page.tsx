@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card } from "@/components/card";
+import { Card, Notice } from "@/components/card";
 import { EmptyState, PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager, loadStories, publicImageUrl } from "@/lib/charity/queries";
+import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { MAX_PHOTOS } from "@/lib/charity/validation";
 import { formatDate } from "@/lib/dates";
@@ -22,7 +23,8 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
   const { charity } = await loadCharityForManager(id);
   const [{ photos, updates }, role] = await Promise.all([loadStories(id), viewerRole(id)]);
   // Donors only see updates when they visit the page: the owner can email one to them too.
-  const canEmail = role === "owner" && charity.status === "approved";
+  const canEmail = can(role, "message") && charity.status === "approved";
+  const canEdit = can(role, "profile");
 
   return (
     <div className="space-y-5">
@@ -39,9 +41,13 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/updates`} />
 
-      <Card title="Post an update">
-        <UpdateForm key={k} action={postUpdate.bind(null, id)} />
-      </Card>
+      {canEdit ? (
+        <Card title="Post an update">
+          <UpdateForm key={k} action={postUpdate.bind(null, id)} />
+        </Card>
+      ) : (
+        <Notice>Your role doesn&apos;t include changing your charity&apos;s page. You can see your updates and photos below.</Notice>
+      )}
 
       {updates.length ? (
         <Card title="Your updates">
@@ -56,9 +62,11 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
                   {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border-2 border-border object-cover" /> : null}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     {canEmail ? <Link href={`/charity-admin/${id}/email-donors?update=${u.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline hover:text-indigo">Email this to your donors</Link> : null}
-                    <form action={removeUpdate.bind(null, id, u.id)}>
-                      <RemoveButton what={`the update from ${formatDate(u.created_at)}`} ask={false} />
-                    </form>
+                    {canEdit ? (
+                      <form action={removeUpdate.bind(null, id, u.id)}>
+                        <RemoveButton what={`the update from ${formatDate(u.created_at)}`} ask={false} />
+                      </form>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -75,9 +83,11 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} className="aspect-square w-full rounded-card border-2 border-border object-cover" />
                 {p.caption_en ? <p className="text-xs text-muted [overflow-wrap:anywhere]">{p.caption_en}</p> : null}
-                <form action={removePhoto.bind(null, id, p.id)}>
-                  <RemoveButton what={p.caption_en ? `the photo "${p.caption_en}"` : "this photo"} ask={false} />
-                </form>
+                {canEdit ? (
+                  <form action={removePhoto.bind(null, id, p.id)}>
+                    <RemoveButton what={p.caption_en ? `the photo "${p.caption_en}"` : "this photo"} ask={false} />
+                  </form>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -86,7 +96,7 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
             <EmptyState title="No photos yet">Photos of the work itself (parcels, a class, your building) mean the most to donors.</EmptyState>
           </div>
         )}
-        {photos.length < MAX_PHOTOS ? <PhotoForm key={k} action={addPhoto.bind(null, id)} /> : <p className="text-sm text-muted">Remove a photo to add another.</p>}
+        {!canEdit ? null : photos.length < MAX_PHOTOS ? <PhotoForm key={k} action={addPhoto.bind(null, id)} /> : <p className="text-sm text-muted">Remove a photo to add another.</p>}
       </Card>
     </div>
   );

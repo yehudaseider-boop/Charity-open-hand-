@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card } from "@/components/card";
+import { Card, Notice } from "@/components/card";
 import { ActionLink, PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { requireViewer } from "@/lib/auth";
@@ -14,6 +14,7 @@ import { loadFocusForManager, loadVideo } from "@/lib/charity/profile-extras";
 import { VIDEO_PROVIDER_NAME, videoWatchUrl } from "@/lib/charity/video";
 import { removeFocus, removeVideo, saveDonationEmails, saveFocus, saveProfile, saveVideo, uploadImage } from "./actions";
 import { DonationEmailsForm, FocusForm, ImageForm, ProfileForm, RemoveForm, VideoForm } from "./forms";
+import { viewerCan } from "@/lib/charity/team";
 
 export const metadata: Metadata = { title: "Public profile" };
 
@@ -43,6 +44,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         actions={charity.status === "approved" ? <ActionLink href={`/c/${charity.slug}`}>View your public page</ActionLink> : undefined}
       />
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/profile`} />
+      {!(await viewerCan(id, "profile")) ? <Notice>Your role doesn&apos;t include changing your charity&apos;s page. You can see it here; changes you try won&apos;t be saved.</Notice> : null}
       <Card title="Details">
         <ProfileForm
           key={k}

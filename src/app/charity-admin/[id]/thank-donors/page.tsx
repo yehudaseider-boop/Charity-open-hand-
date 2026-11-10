@@ -4,6 +4,7 @@ import { DonePanel, formKey } from "@/components/done-panel";
 import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { thankYouRecipients } from "@/lib/charity/thank-you-send";
@@ -30,7 +31,9 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
   await requireViewer(`/charity-admin/${id}/thank-donors`);
   const { charity } = await loadCharityForManager(id);
   // Only the owner sends thank-yous (Yehuda, 02/11/2026), as for Email donors. Others see what was sent.
-  const owner = (await viewerRole(id)) === "owner";
+  const role = await viewerRole(id);
+  const owner = can(role, "message");
+  const canWord = can(role, "profile");
   const supabase = await createClient();
   const { data: sentRows } = await supabase
     .from("charity_thank_yous")
@@ -70,14 +73,14 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
             Every donor gets this email from Givezy as soon as their gift is confirmed. You can add a short note of your own to it.
             The same note shows on the thank-you page after they pay and in the Givezy app.
           </p>
-          <WordingEditor
+          {canWord ? <WordingEditor
             key={formKey(sp, "wording")}
             action={saveThankYouWording.bind(null, id)}
             charityName={charity.name_en}
             saved={thankYouNoteToShow(charity.thank_you_en)}
             sampleDate={new Date().toISOString()}
             siteUrl={process.env.SITE_URL}
-          />
+          /> : <Notice>Your role doesn&apos;t include changing this note.</Notice>}
         </div>
       </Card>
 
@@ -86,7 +89,7 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
       {charity.status !== "approved" ? (
         <Notice tone="warning">You can thank donors once your page is live.</Notice>
       ) : !owner ? (
-        <Notice>Only your charity&apos;s owner can send thank-yous. You can see what was sent below.</Notice>
+        <Notice>Your role doesn&apos;t include sending thank-yous. You can see what was sent below.</Notice>
       ) : null}
 
       {unfinished.map(({ month, sent: done, total }) => (

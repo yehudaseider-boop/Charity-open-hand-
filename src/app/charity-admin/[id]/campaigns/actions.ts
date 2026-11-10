@@ -12,10 +12,13 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { formToObject, type FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
 import { createClient } from "@/lib/supabase/server";
+import { refusal } from "@/lib/charity/team";
 
 export async function startCampaign(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const checked = checkCampaign(formToObject(formData), saDate(new Date()));
   if (!checked.ok) return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: checked.fieldErrors };
   const v = checked.value;
@@ -45,6 +48,7 @@ export async function endCampaign(charityId: string, campaignId: string): Promis
   const viewer = await requireViewer();
   if (!isUuid(campaignId)) return;
   const { charity } = await loadCharityForManager(charityId);
+  if (await refusal(charityId, "profile")) return;
   const supabase = await createClient();
   const { data, error } = await supabase.from("campaigns").update({ status: "ended" }).eq("id", campaignId).eq("charity_id", charityId).eq("status", "active").select("id, title");
   if (error) throw error;

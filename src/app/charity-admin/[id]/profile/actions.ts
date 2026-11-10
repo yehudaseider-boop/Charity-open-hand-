@@ -24,6 +24,7 @@ import { isRunning } from "@/lib/charity/campaigns";
 import { checkFocus } from "@/lib/charity/focus-check";
 import { checkThankYouNote } from "@/lib/charity/thank-you-note";
 import { focusDay, focusStatus, jhbToday } from "@/lib/charity/focus";
+import { refusal } from "@/lib/charity/team";
 
 /** An approved charity is public with a "Verified" badge: tell us when its name or pictures change, so we can look. */
 async function tellReviewer(charity: { id: string; status: string; name_en: string }, what: string) {
@@ -46,6 +47,8 @@ function failed(error: unknown): FormState {
 export async function saveProfile(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity, categoryIds: categoriesBefore } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const parsed = profileSchema.safeParse(formToObject(formData));
   const suggested = parseSuggestedAmounts(
     [1, 2, 3].map((n) => formData.get(`suggested_${n}`)?.toString()),
@@ -128,6 +131,8 @@ export async function uploadImage(
   const viewer = await requireViewer();
   if (kind !== "logo" && kind !== "cover") return { ok: false, message: "Unknown image." };
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose an image" } };
   if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Images must be 4 MB or smaller" } };
@@ -161,6 +166,8 @@ export async function uploadImage(
 export async function saveDonationEmails(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { priv } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const on = formData.get("notify_donations") === "on";
   const supabase = await createClient();
   const { data, error } = await supabase.from("charity_private").update({ notify_donations: on }).eq("charity_id", charityId).select("charity_id");
@@ -183,6 +190,8 @@ const NOT_YET = "This isn't switched on here yet, so nothing was saved. Please t
 export async function saveVideo(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const read = parseVideoLink(formData.get("video_url"));
   if (!read.ok) return { ok: false, message: "That link wasn't saved.", fieldErrors: { video_url: read.message } };
   const current = await loadVideo(charityId);
@@ -209,6 +218,8 @@ export async function saveVideo(charityId: string, _prev: FormState, formData: F
 export async function removeVideo(charityId: string, prev: FormState): Promise<FormState> {
   await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const { video } = await loadVideo(charityId);
   if (!video) return { ok: true, message: "There is no video on your page." };
   return saveVideo(charityId, prev, new FormData());
@@ -221,6 +232,8 @@ export async function removeVideo(charityId: string, prev: FormState): Promise<F
 export async function saveFocus(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const now = new Date();
   const today = jhbToday(now);
   const campaigns = (await loadCampaigns(charityId)).filter((c) => isRunning(c, now));
@@ -248,6 +261,8 @@ export async function saveFocus(charityId: string, _prev: FormState, formData: F
 export async function removeFocus(charityId: string, _prev: FormState): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "profile");
+  if (refused) return { ok: false, message: refused };
   const current = await loadFocusForManager(charityId);
   if (!current.available) return { ok: false, message: NOT_YET };
   if (!current.row) return { ok: true, message: "You have no focus set." };

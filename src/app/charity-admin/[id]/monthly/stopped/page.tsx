@@ -9,6 +9,7 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import { viewerCan } from "@/lib/charity/team";
 
 export const metadata: Metadata = { title: "Monthly donors who stopped" };
 
@@ -19,6 +20,7 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/monthly/stopped`);
   await loadCharityForManager(id);
+  const canDownload = await viewerCan(id, "export");
   const sp = await searchParams;
   const period = lapsedPeriod(lapsedPeriodKey(sp.period), new Date());
   const page = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
@@ -49,7 +51,7 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
         back={<BackLink href={`${base}/monthly`}>← Monthly donations</BackLink>}
         title="Monthly donors who stopped"
         intro={<>Donors whose monthly donation was cancelled or stopped in {period.words}, newest first. A paused donation is not counted, and nor is a donor who has since started a new monthly donation to you.</>}
-        actions={rows && rows.length > 0 ? <ActionLink download href={`${base}/export/stopped-monthly?period=${period.key}`}>Download this list (CSV)</ActionLink> : undefined}
+        actions={rows && rows.length > 0 ? (canDownload ? <ActionLink download href={`${base}/export/stopped-monthly?period=${period.key}`}>Download this list (CSV)</ActionLink> : null) : undefined}
       />
 
       <Tabs label="Period" items={lapsedPeriods.map((p) => ({ href: href({ period: p.key }), label: p.label, active: period.key === p.key }))} />

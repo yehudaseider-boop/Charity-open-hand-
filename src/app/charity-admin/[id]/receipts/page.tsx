@@ -19,6 +19,7 @@ import { closedTaxYears, listRuns, loadPlan, pendingAtYearEnd, type Plan, type R
 import { approveReceipts, withdrawReceipts } from "./actions";
 import { ApproveReceiptsForm, WithdrawReceiptsForm } from "./forms";
 import { CertificateList } from "./certificate-list";
+import { viewerCan } from "@/lib/charity/team";
 
 export const metadata: Metadata = { title: "s18A receipts" };
 
@@ -31,6 +32,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
   const sp = await searchParams;
   await requireViewer(`/charity-admin/${id}/receipts`);
   const { charity } = await loadCharityForManager(id);
+  const canDownload = await viewerCan(id, "export");
   const supabase = await createClient();
   // Every receipt, read page by page (the database answers at most 1 000 rows at a time).
   // A narrow view: no part of the donor's ID or tax number reaches the charity.
@@ -68,6 +70,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
   return (
     <div className="space-y-5">
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/receipts`} />
+      {!(await viewerCan(id, "receipts")) ? <Notice>Your role doesn&apos;t include approving or declining s18A receipts. You can see them here.</Notice> : null}
       <PageHeader title="s18A receipts" actions={issuedYears.length ? <ActionLink href={`/charity-admin/${id}/receipts/sars`}>SARS submission (IT3(d))</ActionLink> : undefined} />
       {sp.receipt === "unavailable" ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">That s18A receipt PDF isn&apos;t available. It may have been withdrawn, or its PDF is not ready yet.</p> : null}
       {canIssue18a(charity) ? (
@@ -127,8 +130,8 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
               <li key={y} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
                 <span className="font-semibold text-indigo">{taxYearLabel(y)}</span>
                 <span className="flex flex-wrap gap-2">
-                  <ActionLink download href={`/charity-admin/${id}/receipts/year-list?year=${y}`}>CSV</ActionLink>
-                  <ActionLink download href={`/charity-admin/${id}/receipts/year-list?year=${y}&format=xlsx`}>Excel</ActionLink>
+                  {canDownload ? <ActionLink download href={`/charity-admin/${id}/receipts/year-list?year=${y}`}>CSV</ActionLink> : null}
+                  {canDownload ? <ActionLink download href={`/charity-admin/${id}/receipts/year-list?year=${y}&format=xlsx`}>Excel</ActionLink> : null}
                 </span>
               </li>
             ))}

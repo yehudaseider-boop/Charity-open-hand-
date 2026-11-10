@@ -18,6 +18,8 @@ import { Card } from "@/components/card";
 import { ActionLink, blueAction, EmptyState, field, PageHeader, rowLink, secondaryAction, Tabs } from "@/components/dash";
 import { showDay } from "@/lib/typed-date";
 import { createClient } from "@/lib/supabase/server";
+import { can } from "@/lib/charity/permissions";
+import { viewerRole } from "@/lib/charity/team";
 
 export const metadata: Metadata = { title: "Donations" };
 
@@ -58,6 +60,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
 
   const base = `/charity-admin/${id}/donations`;
+  const role = await viewerRole(id);
   const href = (over: { status?: typeof status; page?: number; period?: PeriodKey }) => {
     const f = { ...filters, ...(over.status ? { status: over.status } : {}), ...(over.period ? { period: over.period } : {}) };
     const s = filtersToQuery(f, over.page && over.page > 1 ? { page: String(over.page) } : {});
@@ -79,9 +82,9 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
         intro="Record a gift or import a file for EFT, cash and other gifts that didn't come through Givezy."
         actions={
           <>
-            <ActionLink href={`${base}/deposits`}>Deposits</ActionLink>
-            <ActionLink href={`${base}/import`}>Import from a file</ActionLink>
-            <ActionLink href={`${base}/record`} primary>Record a gift</ActionLink>
+            {can(role, "bank_view") ? <ActionLink href={`${base}/deposits`}>Deposits</ActionLink> : null}
+            {can(role, "gifts") ? <ActionLink href={`${base}/import`}>Import from a file</ActionLink> : null}
+            {can(role, "gifts") ? <ActionLink href={`${base}/record`} primary>Record a gift</ActionLink> : null}
           </>
         }
       />
@@ -155,7 +158,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
             ) : null}
           </div>
           {/* Paid only by default, so the bookkeeper's total is income received. */}
-          <div className="flex flex-wrap gap-2">
+          {can(role, "export") ? <div className="flex flex-wrap gap-2">
             <a href={csvHref} className={secondaryAction}>
               {status === "all" || status === "paid" ? "Download paid donations (CSV)" : "Download CSV"}
             </a>
@@ -163,7 +166,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
             {status === "all" ? (
               <a href={csvAllHref} className={secondaryAction}>Every status</a>
             ) : null}
-          </div>
+          </div> : null}
         </div>
       </div>
 
