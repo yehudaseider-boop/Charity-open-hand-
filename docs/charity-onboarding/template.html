@@ -31,7 +31,7 @@ i { font-style: normal; color: var(--slate); font-weight: 400; }
 .block p:last-child { margin-bottom: 0; }
 .block .ring { position: absolute; right: -9mm; top: -9mm; width: 28mm; height: 28mm; border-radius: 50%; border: 3.5mm solid var(--lavender); }
 .block .dot { position: absolute; right: 22mm; bottom: -5mm; width: 11mm; height: 11mm; border-radius: 50%; background: var(--lavender); opacity: 0.55; }
-.block .inner { position: relative; max-width: 150mm; }
+.block .inner { position: relative; max-width: calc(100% - 20mm); }
 .open { border: 0.5mm dashed var(--lavender); border-radius: 4mm; padding: 2.6mm 4.5mm; margin: 2.6mm 0; background: #FFFFFF; }
 .open b.t { color: var(--blue); } .open p:last-child { margin-bottom: 0; }
 .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin: 3mm 0; }
@@ -58,6 +58,16 @@ i { font-style: normal; color: var(--slate); font-weight: 400; }
 .panel h2 { margin: 0 0 1.6mm; }
 .panel h2::before { content: ""; display: inline-block; width: 2.6mm; height: 2.6mm; border-radius: 50%; background: var(--orange); margin-right: 2mm; vertical-align: 0.15mm; }
 .panel .grid:last-child, .panel .tkrow:last-child, .panel p:last-child { margin-bottom: 0.6mm; }
+/* simple steps and lists */
+ol.st.big > li { font-size: 9.8pt; margin: 0 0 3.6mm; padding-left: 10mm; }
+ol.st.big > li::before { width: 7mm; height: 7mm; font-size: 10pt; }
+ol.st .when { display: inline-block; font-size: 8pt; font-weight: 700; color: var(--blue); background: var(--honey-soft); border: 0.35mm solid var(--lavender); border-radius: 3mm; padding: 0.2mm 2.2mm; margin-left: 1.5mm; }
+ol.st .what { display: block; color: var(--slate); margin-top: 0.6mm; max-width: 150mm; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-bottom: 2mm; }
+.two .panel .tk { padding: 1.1mm 0; }
+.golist { list-style: none; padding: 0; margin: 2mm 0 4mm; display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 6mm; }
+.golist li { position: relative; padding: 2mm 3mm 2mm 9mm; background: var(--honey-soft); border: 0.4mm solid var(--line); border-radius: 3.5mm; margin: 0; font-weight: 600; }
+.golist li::before { content: ""; position: absolute; left: 3mm; top: 2.6mm; width: 3.4mm; height: 3.4mm; border-radius: 50%; background: var(--sage); }
 /* tables */
 table { background: #FFFFFF; width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.5mm 0 2.5mm; font-size: 8.7pt; border: 0.4mm solid var(--line); border-radius: 3.5mm; overflow: hidden; }
 th, td { padding: 1.5mm 2.6mm; text-align: left; vertical-align: top; border-bottom: 0.3mm solid var(--line); }

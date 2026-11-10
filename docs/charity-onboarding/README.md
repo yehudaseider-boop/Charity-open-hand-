@@ -1,6 +1,6 @@
 # Charity onboarding pack (draft 10/11/2026)
 
-An 11-page fillable PDF for a charity joining Givezy: what Givezy does, the 7 steps and timeline, how we check, what to prepare, four pages of boxes the charity types into on screen, and a go-live checklist with a sign-off. Draft for Yehuda to review; words in square brackets (the contact email and number) are still to be filled in.
+A 9-page fillable PDF for a charity joining Givezy, cut to what a charity needs (Yehuda, 10/11/2026: "as simple and straightforward as possible, but clear"): what Givezy does, the 7 steps, the documents to send (with tick boxes), four pages of boxes the charity types into on screen, and a short go-live list with a sign-off. Draft for Yehuda to review; words in square brackets (the contact email and number) are still to be filled in.
 
 Source: Yossi's "Givezy Charity Onboarding Process" document (10/11/2026), checked against what the product does today.
 
@@ -21,10 +21,12 @@ From the repo root, with Node 22 or later and the Playwright Chromium that is al
 | Files up to 10 MB | Up to 4 MB | The site accepts 4 MB (`MAX_UPLOAD_BYTES`): the host refuses anything over 4.5 MB |
 | Import files with `donor_ref`, `id_or_reg_number`, ISO dates, +27 phones | The two real templates: donor file (12 columns) and gift file (20 columns), dd/mm/yyyy, plain rand | That is what the import pages accept (`CONTACT_TEMPLATE_HEADINGS`, `TEMPLATE_HEADINGS`) |
 | Roles Admin, Finance, Fundraiser, Viewer | Owner and Admin | The team page has only those two |
-| Documents: 12 kinds | All 12 listed; the site has 5 named upload types plus "Other supporting document" | The extra ones go in as "Other" today |
+| Documents: 12 kinds | 13 listed (with logo and photos); the site has 5 named upload types plus "Other supporting document" | The extra ones go in as "Other" today |
 | 18A | s18A | House style |
 
 ## Left out on purpose
+
+- To keep it simple: the full verification table, the two long "what to prepare" tables (they repeated the fill-in pages), the import file columns (the charity gets the template), brand colours, and the year the charity started.
 
 - Everything under "Open questions to decide" in the process document (SARS Public Notice 6762, Givezy as IT3(d) submitter, the money flow, relaxed checks for pilot charities, who builds the application form).
 - Pricing: the document says "pricing tier agreed verbally", and no tier is written down.
