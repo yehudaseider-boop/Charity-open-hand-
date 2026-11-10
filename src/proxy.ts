@@ -15,7 +15,16 @@ export async function proxy(request: NextRequest) {
   // Tell the page which path (with its query) was asked for, so a detour via sign-in or the second
   // step can come back to it. Set here, never trusted from the browser.
   request.headers.set(CURRENT_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
-  let response = NextResponse.next({ request });
+  // The plain charities list (no search, no cause) is built ahead and served from cache: the page is the same for
+  // everyone, so it is sent to its cached twin. The address in the browser stays /charities.
+  const plainList = (request.method === "GET" || request.method === "HEAD") && request.nextUrl.pathname === "/charities" && !request.nextUrl.search;
+  const start = () => {
+    if (!plainList) return NextResponse.next({ request });
+    const to = request.nextUrl.clone();
+    to.pathname = "/browse-charities";
+    return NextResponse.rewrite(to, { request });
+  };
+  let response = start();
 
   // Nobody signed in (most visitors): no session to refresh, so no trip to Supabase before the page (09/11/2026).
   if (hasSignInCookie(request.cookies.getAll().map((c) => c.name))) {
@@ -27,7 +36,7 @@ export async function proxy(request: NextRequest) {
           getAll: () => request.cookies.getAll(),
           setAll: (toSet) => {
             toSet.forEach(({ name, value }) => request.cookies.set(name, value));
-            response = NextResponse.next({ request });
+            response = start();
             toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
           },
         },

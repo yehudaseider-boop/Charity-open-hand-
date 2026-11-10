@@ -1764,3 +1764,10 @@ Built from Yossi's notes (1.1) as step 6a of `docs/crm-build-plan.md`. Migration
 - **Privacy:** server-only tables (row-level security on, nothing granted to browsers, never a password session). Erasing a donor also removes their place on every journey. The donor's own data download lists the journeys they are on, with each email's step, status and dates. The week's claim keeps only "Donor journey email N: <subject>", which shows in the donor's own data download.
 - **Stops for:** this charity's opt-out and "no emails from charities" both stop it, as for appeals.
 - **Open (Yehuda / Yosef):** (1) the starter wording; (2) next: campaign journeys (6b); one limit across journeys (6c) is already met by the shared weekly claim.
+- **The plain charities list is cached too (Yehuda, 10/11/2026: "make the charities list faster too").** `/charities`
+  with no search and no cause is the same for everyone, so the proxy sends it to `src/app/browse-charities`, built
+  ahead and rebuilt at most every 5 minutes (a new charity shows within minutes). The address in the browser stays
+  `/charities`; that page carries no robots rule of its own and a canonical at `/charities`, so search engines list it
+  once. A search or a cause is still built per visit (`src/app/charities/page.tsx`), because the words typed change
+  the answer. Both use one view (`src/app/charities/view.tsx`) reading public data as an anonymous visitor.
+  Leaving a charity's own link for the list still ends the focus, as before.

@@ -44,3 +44,21 @@ describe("public pages stay cacheable", () => {
     expect(src).not.toMatch(/supabase\/server|getViewer|next\/headers/);
   });
 });
+
+describe("the plain charities list is served from cache", () => {
+  it("is built ahead from public data, with no robots rule of its own and a canonical at /charities", () => {
+    const page = readFileSync("src/app/browse-charities/page.tsx", "utf8");
+    expect(page).toMatch(/export const revalidate = \d+/);
+    expect(page).toMatch(/canonical: "\/charities"/);
+    expect(page.match(/export const metadata[^\n]*/)?.[0]).not.toMatch(/robots/);
+    const view = readFileSync("src/app/charities/view.tsx", "utf8");
+    expect(view).toMatch(/createPublicClient/);
+    expect(view).not.toMatch(/supabase\/server|next\/headers|getViewer/);
+  });
+
+  it("is only used for a plain visit: the proxy sends /charities there only with no search and no cause", () => {
+    const proxy = readFileSync("src/proxy.ts", "utf8");
+    expect(proxy).toMatch(/pathname === "\/charities" && !request\.nextUrl\.search/);
+    expect(proxy).toMatch(/"\/browse-charities"/);
+  });
+});
