@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en-ZA"><head><meta charset="utf-8"><title>Givezy for charities</title>
+<style>
+/*FONTS*/
+:root { --ink:#0E1B3D; --blue:#1749B5; --blue-edge:#0F358A; --orange:#FF8A3D; --orange-edge:#D9621C; --lavender:#C9B4FA; --line:#ECE8F6; --lilac:#F4F1FF; --peach:#FFEBDD; --slate:#4A5878; --sage:#3E8E6A; --sage-soft:#E3F2EA; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #fff; }
+body { font-family: "DM Sans", Arial, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #fff; }
+.scene { position: absolute; inset: 0; overflow: hidden; display: none; }
+.abs { position: absolute; }
+.d { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; letter-spacing: -0.01em; }
+.circle { position: absolute; border-radius: 50%; }
+.ring { position: absolute; border-radius: 50%; border-style: solid; background: transparent; }
+.kick { display: inline-block; font-weight: 700; font-size: 26px; padding: 10px 24px; border-radius: 40px; }
+.k-orange { background: var(--orange); color: var(--ink); box-shadow: 0 5px 0 var(--orange-edge); }
+.k-blue { background: var(--lilac); color: var(--blue); border: 3px solid var(--lavender); }
+h2.big { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 92px; line-height: 1.02; letter-spacing: -0.015em; }
+p.sub { font-size: 34px; line-height: 1.38; color: var(--slate); }
+.word { display: inline-block; }
+.card { background: #fff; border: 3px solid var(--line); border-radius: 30px; box-shadow: 0 40px 80px rgba(14,27,61,0.14); }
+.btn { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; border-radius: 22px; }
+.btn-orange { background: var(--orange); color: var(--ink); box-shadow: 0 6px 0 var(--orange-edge); }
+.btn-blue { background: var(--blue); color: #fff; box-shadow: 0 6px 0 var(--blue-edge); }
+.pill { display: inline-block; border-radius: 40px; padding: 6px 18px; font-weight: 700; }
+.tap { position: absolute; width: 74px; height: 74px; border-radius: 50%; background: rgba(23,73,181,0.22); border: 4px solid rgba(23,73,181,0.55); }
+.row { display: flex; align-items: center; gap: 22px; padding: 20px 0; border-bottom: 2px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.av { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; color: var(--blue); background: var(--lilac); flex: none; }
+.tag { font-size: 18px; font-weight: 700; color: var(--blue); background: #E5D9FF; border-radius: 20px; padding: 3px 14px; margin-left: 12px; }
+.bar { position: absolute; bottom: 0; width: 46px; border-radius: 10px 10px 0 0; background: var(--lavender); transform-origin: bottom; }
+.tick svg { display: block; }
+.col { position: absolute; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; gap: 30px; }
+.col > * { position: relative; }
+</style></head>
+<body><div id="stage">
+
+<!-- 1. Logo: Giving made easy -->
+<section class="scene" id="s1" style="background:#fff">
+  <div class="circle" id="s1c1" style="width:900px;height:900px;left:-300px;bottom:-420px;background:var(--lilac)"></div>
+  <div class="circle" id="s1c2" style="width:760px;height:760px;right:-260px;top:-320px;background:var(--peach)"></div>
+  <div class="ring" id="s1r" style="width:220px;height:220px;right:260px;bottom:120px;border-width:26px;border-color:var(--lavender)"></div>
+  <div class="circle" id="s1d1" style="width:38px;height:38px;left:340px;top:220px;background:var(--orange)"></div>
+  <div class="circle" id="s1d2" style="width:24px;height:24px;right:520px;top:300px;background:var(--blue)"></div>
+  <img id="splash1" class="abs" src="%SPLASH%" style="width:230px;left:845px;top:150px" alt="">
+  <img id="logo1" class="abs" src="%LOGO%" style="height:150px;left:50%;top:470px" alt="">
+  <div id="tag1" class="abs d" style="left:0;right:0;top:690px;text-align:center;font-size:96px;color:var(--ink)"><span class="word" id="w1">Giving</span> <span class="word" id="w2">made</span> <span class="word" id="w3" style="color:var(--blue)">easy.</span></div>
+  <div id="for1" class="abs" style="left:0;right:0;top:830px;text-align:center;font-size:34px;color:var(--slate)">For South African charities</div>
+  <div class="circle" id="wipe1" style="width:120px;height:120px;left:900px;top:480px;background:var(--blue)"></div>
+</section>
+
+<!-- 2. The problem -->
+<section class="scene" id="s2" style="background:var(--blue)">
+  <div class="ring" id="s2r" style="width:640px;height:640px;right:-200px;top:-220px;border-width:70px;border-color:var(--lavender)"></div>
+  <div class="circle" id="s2c" style="width:220px;height:220px;left:-60px;bottom:-70px;background:var(--lavender);opacity:.5"></div>
+  <div class="circle" style="width:34px;height:34px;left:180px;top:150px;background:var(--orange)"></div>
+  <div id="s2k" class="abs" style="left:160px;top:200px"><span class="kick k-orange">Running a charity?</span></div>
+  <h2 id="s2h" class="abs big" style="left:160px;top:290px;color:#fff;width:820px">It shouldn&apos;t take this much paperwork.</h2>
+  <div id="p1" class="abs card" style="left:990px;top:250px;width:780px;padding:30px 36px;font-size:34px;font-weight:700;display:flex;gap:24px;align-items:center"><span class="circle" style="position:static;width:58px;height:58px;background:var(--peach);display:flex;align-items:center;justify-content:center;flex:none">%ICON_COINS%</span>Gifts coming in by EFT, cash and card</div>
+  <div id="p2" class="abs card" style="left:1100px;top:440px;width:660px;padding:30px 36px;font-size:34px;font-weight:700;display:flex;gap:24px;align-items:center"><span class="circle" style="position:static;width:58px;height:58px;background:var(--peach);display:flex;align-items:center;justify-content:center;flex:none">%ICON_PEN%</span>s18A receipts typed by hand</div>
+  <div id="p3" class="abs card" style="left:1040px;top:630px;width:720px;padding:30px 36px;font-size:34px;font-weight:700;display:flex;gap:24px;align-items:center"><span class="circle" style="position:static;width:58px;height:58px;background:var(--peach);display:flex;align-items:center;justify-content:center;flex:none">%ICON_SHEET%</span>Donor details in old spreadsheets</div>
+  <h2 id="s2e" class="abs big" style="left:0;right:0;top:440px;text-align:center;color:#fff;font-size:120px">There&apos;s an easier way.</h2>
+  <div id="s2u" class="abs" style="left:640px;top:600px;height:16px;width:640px;border-radius:10px;background:var(--orange);transform-origin:left"></div>
+  <div id="wipe2" class="abs" style="left:0;right:0;top:1080px;height:1200px;background:#fff;border-radius:80px 80px 0 0"></div>
+</section>
+
+<!-- 3. Meet Givezy: the dashboard -->
+<section class="scene" id="s3" style="background:#fff">
+  <div class="circle" style="width:820px;height:820px;right:-260px;bottom:-360px;background:var(--lilac)"></div>
+  <div class="circle" style="width:400px;height:400px;left:-160px;top:-140px;background:var(--peach)"></div>
+  <div class="col" style="left:140px;width:680px">
+    <div id="s3k"><span class="kick k-blue">Meet Givezy</span></div>
+    <h2 id="s3h" class="big">One home for your charity&apos;s giving.</h2>
+    <p id="s3p" class="sub">Take gifts online, keep donors close, and let the receipts make themselves.</p>
+  </div>
+  <div id="dash" class="abs card" style="left:840px;top:190px;width:960px;height:700px;overflow:hidden;display:flex">
+    <div style="width:230px;border-right:3px solid var(--line);padding:34px 24px;display:flex;flex-direction:column;gap:10px;font-size:22px;color:var(--slate)">
+      <img src="%LOGO%" style="height:40px;width:auto;align-self:flex-start;margin:0 0 22px 12px" alt="">
+      <div style="background:#E5D9FF;color:var(--blue);font-weight:700;border-radius:14px;padding:12px 16px">Overview</div>
+      <div style="padding:12px 16px">Donations</div><div style="padding:12px 16px">Donors</div><div style="padding:12px 16px">Monthly</div><div style="padding:12px 16px">s18A receipts</div>
+    </div>
+    <div style="flex:1;padding:38px 40px;display:flex;flex-direction:column;gap:26px">
+      <div class="d" style="font-size:40px;font-weight:700">Overview</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px">
+        <div id="t1" style="background:var(--blue);color:#fff;border-radius:20px;padding:20px 22px"><div style="font-size:19px;color:#E5D9FF">This month</div><div class="d" id="n1" style="font-size:44px;font-weight:700">R0</div></div>
+        <div id="t2" style="background:var(--lilac);border-radius:20px;padding:20px 22px"><div style="font-size:19px;color:var(--slate)">Every month</div><div class="d" id="n2" style="font-size:44px;font-weight:700">R0</div></div>
+        <div id="t3" style="background:var(--lilac);border-radius:20px;padding:20px 22px"><div style="font-size:19px;color:var(--slate)">Donors</div><div class="d" id="n3" style="font-size:44px;font-weight:700">0</div></div>
+      </div>
+      <div style="position:relative;height:170px;border:3px solid var(--line);border-radius:20px;padding:0 24px" id="bars"></div>
+      <div style="font-size:24px">
+        <div id="l1" style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:2px solid var(--line)"><span>Sarah L. · monthly</span><b>R360</b></div>
+        <div id="l2" style="display:flex;justify-content:space-between;padding:12px 0"><span>Daniel C. · in memory of Grace Dlamini</span><b>R500</b></div>
+      </div>
+    </div>
+  </div>
+  <div id="newgift" class="abs card" style="left:930px;top:770px;width:380px;padding:24px 28px;border-color:var(--lavender)">
+    <div style="display:flex;align-items:center;gap:14px;font-size:24px;font-weight:700"><span class="circle" style="position:static;width:44px;height:44px;background:var(--sage-soft);display:flex;align-items:center;justify-content:center">%ICON_TICK%</span>New donation</div>
+    <div class="d" style="font-size:52px;margin-top:10px">R1 200</div>
+    <div style="font-size:20px;color:var(--slate)">Michael B. · s18A receipt requested</div>
+  </div>
+</section>
+
+<!-- 4. Donors give in a few taps -->
+<section class="scene" id="s4" style="background:#fff">
+  <div class="circle" style="width:900px;height:900px;left:-200px;top:100px;background:var(--peach)"></div>
+  <div class="ring" style="width:260px;height:260px;left:120px;top:-80px;border-width:30px;border-color:var(--lavender)"></div>
+  <div class="circle" style="width:30px;height:30px;left:820px;top:230px;background:var(--blue)"></div>
+  <div id="phone" class="abs" style="left:360px;top:110px;width:420px;height:860px;border-radius:64px;background:var(--ink);padding:16px;box-shadow:0 50px 90px rgba(14,27,61,.25)">
+    <div style="position:relative;width:100%;height:100%;border-radius:50px;background:#fff;overflow:hidden">
+      <div style="background:var(--blue);color:#fff;padding:70px 30px 34px">
+        <div style="display:flex;align-items:center;gap:16px"><span class="av" style="background:#fff">SC</span><div><div class="d" style="font-size:30px;font-weight:700">Sample Charity</div><div style="font-size:18px;opacity:.85">s18A receipts available</div></div></div>
+      </div>
+      <div style="padding:30px">
+        <div style="font-size:22px;font-weight:700;margin-bottom:18px">Choose an amount</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="chip" id="c100" style="border:3px solid var(--line);border-radius:18px;padding:18px;text-align:center;font-size:28px;font-weight:700">R100</div>
+          <div class="chip" id="c250" style="border:3px solid var(--line);border-radius:18px;padding:18px;text-align:center;font-size:28px;font-weight:700">R250</div>
+          <div class="chip" id="c500" style="border:3px solid var(--line);border-radius:18px;padding:18px;text-align:center;font-size:28px;font-weight:700">R500</div>
+          <div class="chip" style="border:3px solid var(--line);border-radius:18px;padding:18px;text-align:center;font-size:28px;font-weight:700">Other</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:26px 0;font-size:22px;font-weight:600">Give every month <span style="width:64px;height:36px;border-radius:20px;background:var(--line);position:relative"><span style="position:absolute;left:4px;top:4px;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></span></div>
+        <div id="givebtn" class="btn btn-orange" style="width:100%;height:84px;font-size:30px">Give</div>
+      </div>
+      <div id="thanks" style="position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:30px">
+        <div id="thtick" style="width:150px;height:150px;border-radius:50%;background:var(--sage-soft);display:flex;align-items:center;justify-content:center">%ICON_TICK_BIG%</div>
+        <div class="d" style="font-size:52px">Thank you</div>
+        <div style="font-size:24px;color:var(--slate)">R250 to Sample Charity</div>
+        <div style="font-size:20px;color:var(--slate);background:var(--lilac);border-radius:16px;padding:10px 18px">Saved to your giving history</div>
+      </div>
+    </div>
+  </div>
+  <div id="tap4" class="tap"></div>
+  <div class="col" style="left:1000px;width:780px">
+    <div id="s4k"><span class="kick k-blue">For your donors</span></div>
+    <h2 id="s4h" class="big">Giving takes a few taps.</h2>
+    <p id="s4p" class="sub">On the website or the app, once or every month. Donors pay on a secure card page.</p>
+  </div>
+</section>
+
+<!-- 5. s18A receipts -->
+<section class="scene" id="s5" style="background:var(--lilac)">
+  <div class="circle" style="width:700px;height:700px;right:-220px;top:-260px;background:#fff;opacity:.7"></div>
+  <div class="circle" style="width:460px;height:460px;left:-150px;bottom:-200px;background:var(--peach)"></div>
+  <div class="col" style="left:140px;width:720px">
+    <div id="s5k"><span class="kick k-orange">s18A receipts</span></div>
+    <h2 id="s5h" class="big">Receipts that make themselves.</h2>
+    <p id="s5p" class="sub">Each donor gets one s18A receipt for the tax year, ready for their tax return. No typing.</p>
+  </div>
+  <div id="r3" class="abs card" style="left:1100px;top:250px;width:560px;height:620px"></div>
+  <div id="r2" class="abs card" style="left:1080px;top:240px;width:560px;height:620px"></div>
+  <div id="r1" class="abs card" style="left:1060px;top:230px;width:560px;height:620px;padding:46px 48px">
+    <img src="%LOGO%" style="height:44px" alt="">
+    <div class="d" style="font-size:40px;font-weight:700;margin-top:30px">s18A receipt</div>
+    <div style="font-size:21px;color:var(--slate);margin-top:6px">Tax year 01/03/2026 to 28/02/2027</div>
+    <div style="margin-top:34px;font-size:22px;color:var(--slate)">Donor</div><div style="font-size:30px;font-weight:700">Sarah L.</div>
+    <div style="margin-top:22px;font-size:22px;color:var(--slate)">Donations this tax year</div><div class="d" style="font-size:56px">R3 240</div>
+    <div style="margin-top:26px;display:flex;flex-direction:column;gap:12px"><span style="height:14px;width:90%;background:var(--line);border-radius:8px"></span><span style="height:14px;width:70%;background:var(--line);border-radius:8px"></span><span style="height:14px;width:80%;background:var(--line);border-radius:8px"></span></div>
+  </div>
+  <div id="stamp" class="abs" style="left:1450px;top:600px;width:200px;height:200px;border-radius:50%;border:10px solid var(--sage);background:rgba(227,242,234,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--sage)">%ICON_TICK_BIG%<div class="d" style="font-size:34px;font-weight:700;margin-top:4px">s18A</div></div>
+</section>
+
+<!-- 6. Know and thank your donors -->
+<section class="scene" id="s6" style="background:#fff">
+  <div class="circle" style="width:760px;height:760px;left:-260px;bottom:-320px;background:var(--lilac)"></div>
+  <div class="ring" style="width:300px;height:300px;right:-90px;top:-90px;border-width:36px;border-color:var(--orange)"></div>
+  <div class="col" style="left:140px;width:660px">
+    <div id="s6k"><span class="kick k-blue">Your donors</span></div>
+    <h2 id="s6h" class="big">Know them. Thank them.</h2>
+    <p id="s6p" class="sub">Every donor and gift in one place, and a thank-you to all of them in one go.</p>
+  </div>
+  <div id="dl" class="abs card" style="left:900px;top:170px;width:860px;padding:36px 44px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div class="d" style="font-size:40px;font-weight:700">Donors</div><div id="thankbtn" class="btn btn-orange" style="height:66px;padding:0 30px;font-size:26px">Thank donors</div></div>
+    <div class="row" id="dr1"><span class="av">SL</span><div style="flex:1"><div style="font-size:28px;font-weight:700">Sarah L.<span class="tag">Monthly</span></div><div style="font-size:20px;color:var(--slate)">9 gifts · monthly since 03/2026</div></div><b style="font-size:28px">R3 240</b></div>
+    <div class="row" id="dr2"><span class="av">MB</span><div style="flex:1"><div style="font-size:28px;font-weight:700">Michael B.<span class="tag">New</span></div><div style="font-size:20px;color:var(--slate)">1 gift · 08/11/2026</div></div><b style="font-size:28px">R1 200</b></div>
+    <div class="row" id="dr3"><span class="av">DC</span><div style="flex:1"><div style="font-size:28px;font-weight:700">Daniel C.</div><div style="font-size:20px;color:var(--slate)">1 gift · 01/11/2026</div></div><b style="font-size:28px">R500</b></div>
+    <div class="row" id="dr4"><span class="av">TM</span><div style="flex:1"><div style="font-size:28px;font-weight:700">Thandi M.<span class="tag">Volunteer</span></div><div style="font-size:20px;color:var(--slate)">2 gifts · last 20/10/2026</div></div><b style="font-size:28px">R500</b></div>
+  </div>
+  <div id="tap6" class="tap"></div>
+  <div id="env1" class="abs">%ICON_MAIL%</div><div id="env2" class="abs">%ICON_MAIL%</div><div id="env3" class="abs">%ICON_MAIL%</div>
+  <div id="toast" class="abs card" style="left:1080px;top:900px;padding:22px 30px;font-size:26px;font-weight:700;display:flex;gap:14px;align-items:center;border-color:var(--sage)"><span class="circle" style="position:static;width:40px;height:40px;background:var(--sage-soft);display:flex;align-items:center;justify-content:center">%ICON_TICK%</span>Thank-you sent to 4 donors</div>
+</section>
+
+<!-- 7. Paid straight to your bank -->
+<section class="scene" id="s7" style="background:var(--blue)">
+  <div class="ring" style="width:560px;height:560px;left:-180px;bottom:-200px;border-width:64px;border-color:var(--lavender)"></div>
+  <div class="circle" style="width:260px;height:260px;right:-60px;top:-60px;background:var(--lavender);opacity:.5"></div>
+  <div class="circle" style="width:36px;height:36px;right:300px;bottom:180px;background:var(--orange)"></div>
+  <h2 id="s7h" class="abs big" style="left:140px;top:250px;width:760px;color:#fff">Paid straight to your bank.</h2>
+  <p id="s7p" class="abs sub" style="left:140px;top:480px;width:700px;color:#fff;opacity:.92">Gifts go to your charity&apos;s own bank account. Givezy never holds the money.</p>
+  <div id="pills" class="abs" style="left:140px;top:690px;display:flex;gap:18px">
+    <span id="pl1" class="pill" style="background:#fff;color:var(--blue);font-size:28px;padding:14px 28px">Free to list</span>
+    <span id="pl2" class="pill" style="background:#fff;color:var(--blue);font-size:28px;padding:14px 28px">No monthly fee</span>
+    <span id="pl3" class="pill" style="background:var(--orange);color:var(--ink);font-size:28px;padding:14px 28px">Every charity checked</span>
+  </div>
+  <div id="dep" class="abs card" style="left:1080px;top:270px;width:640px;padding:46px 50px;border:0">
+    <div style="display:flex;align-items:center;gap:22px"><span class="circle" style="position:static;width:88px;height:88px;background:var(--lilac);display:flex;align-items:center;justify-content:center">%ICON_BANK%</span><div><div style="font-size:24px;color:var(--slate)">Deposit to</div><div style="font-size:32px;font-weight:700">Your bank account</div></div></div>
+    <div class="d" id="n7" style="font-size:96px;margin-top:30px">R0</div>
+    <div style="font-size:22px;color:var(--slate)">Gifts this month, sample</div>
+    <div style="margin-top:28px;height:18px;border-radius:10px;background:var(--line);overflow:hidden"><div id="depbar" style="height:100%;width:100%;background:var(--sage);transform-origin:left;border-radius:10px"></div></div>
+  </div>
+</section>
+
+<!-- 8. Live in about 10 working days -->
+<section class="scene" id="s8" style="background:#fff">
+  <div class="circle" style="width:700px;height:700px;right:-240px;bottom:-300px;background:var(--peach)"></div>
+  <div class="circle" style="width:500px;height:500px;left:-200px;top:-220px;background:var(--lilac)"></div>
+  <h2 id="s8h" class="abs big" style="left:0;right:0;top:230px;text-align:center">Live in about 10 working days.</h2>
+  <div id="s8line" class="abs" style="left:520px;top:560px;width:880px;height:12px;border-radius:8px;background:var(--lavender);transform-origin:left"></div>
+  <div id="st1" class="abs" style="left:420px;top:480px;width:200px;text-align:center"><div class="circle d" style="position:static;margin:0 auto;width:170px;height:170px;background:var(--blue);color:#fff;font-size:72px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 0 var(--blue-edge)">1</div><div style="font-size:32px;font-weight:700;margin-top:26px">Apply online</div></div>
+  <div id="st2" class="abs" style="left:860px;top:480px;width:200px;text-align:center"><div class="circle d" style="position:static;margin:0 auto;width:170px;height:170px;background:var(--blue);color:#fff;font-size:72px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 0 var(--blue-edge)">2</div><div style="font-size:32px;font-weight:700;margin-top:26px;width:300px;margin-left:-50px">We check your details</div></div>
+  <div id="st3" class="abs" style="left:1300px;top:480px;width:200px;text-align:center"><div class="circle d" style="position:static;margin:0 auto;width:170px;height:170px;background:var(--orange);color:var(--ink);font-size:72px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 0 var(--orange-edge)">3</div><div style="font-size:32px;font-weight:700;margin-top:26px">Go live</div></div>
+</section>
+
+<!-- 9. Close -->
+<section class="scene" id="s9" style="background:var(--blue)">
+  <div class="ring" id="s9r" style="width:760px;height:760px;right:-240px;top:-260px;border-width:84px;border-color:var(--lavender)"></div>
+  <div class="circle" id="s9c" style="width:460px;height:460px;left:-160px;bottom:-200px;background:var(--lavender);opacity:.45"></div>
+  <div class="circle" style="width:46px;height:46px;left:300px;top:200px;background:var(--orange)"></div>
+  <div class="circle" style="width:26px;height:26px;right:420px;bottom:220px;background:#fff;opacity:.8"></div>
+  <div id="s9card" class="abs" style="left:660px;top:120px;width:600px;height:300px;background:#fff;border-radius:44px;display:flex;align-items:center;justify-content:center;gap:26px;box-shadow:0 40px 80px rgba(0,0,0,.18)">
+    <img src="%SPLASH%" style="height:190px" alt=""><img src="%LOGO%" style="height:110px" alt="">
+  </div>
+  <h2 id="s9h" class="abs big" style="left:0;right:0;top:480px;text-align:center;color:#fff;font-size:120px">Giving made easy.</h2>
+  <div id="s9b" class="abs" style="left:0;right:0;top:680px;text-align:center"><span class="btn btn-orange" style="height:100px;padding:0 54px;font-size:40px;border-radius:26px">List your charity for free</span></div>
+  <div id="s9u" class="abs d" style="left:0;right:0;top:850px;text-align:center;color:#fff;font-size:50px;font-weight:700">givezy.co.za</div>
+</section>
+
+</div>
+<script>
+const ease = {
+  out: (t) => 1 - Math.pow(1 - t, 3),
+  inOut: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+  back: (t) => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+  in: (t) => t * t * t,
+};
+const cl = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const P = (t, a, d) => cl((t - a) / d);
+const L = (a, b, k) => a + (b - a) * k;
+const $ = (id) => document.getElementById(id);
+function set(id, { x = 0, y = 0, s = 1, r = 0, o = 1, sx, sy, base = "" } = {}) {
+  const el = typeof id === "string" ? $(id) : id;
+  if (!el) return;
+  el.style.opacity = o;
+  el.style.transform = `${base} translate(${x}px, ${y}px) rotate(${r}deg) scale(${sx ?? s}, ${sy ?? s})`;
+}
+// An element entering: up from below (or from the side) with a fade, or popping with a little overshoot.
+function rise(id, t, at, { d = 0.6, dy = 60, dx = 0, pop = false, base = "" } = {}) {
+  const k = P(t, at, d);
+  if (pop) { const e = ease.back(k); set(id, { s: L(0.4, 1, e), o: cl(k * 2.5), base }); return; }
+  const e = ease.out(k);
+  set(id, { x: (1 - e) * dx, y: (1 - e) * dy, o: e, base });
+}
+// The middle of an element on the stage, measured, so a tap always lands on its button.
+function centre(id) { const r = $(id).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+const rand = (n) => "R" + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+// When each scene shows: [start, end] in seconds. Scenes fade and slide out over their last 0.45 s.
+const SC = { s1: [0, 4.3], s2: [4.2, 10.4], s3: [10.2, 16.2], s4: [16.0, 22.2], s5: [22.0, 28.2], s6: [28.0, 33.8], s7: [33.6, 38.8], s8: [38.6, 41.9], s9: [41.6, 45.1] };
+const OUT = 0.45;
+function sceneOut(id, t, b, kind = "left") {
+  const k = ease.in(P(t, b - OUT, OUT));
+  const el = $(id);
+  if (kind === "left") { el.style.transform = `translateX(${-k * 160}px)`; el.dataset.o = String(1 - k); }
+  else if (kind === "fade") { el.style.transform = ""; el.dataset.o = String(1 - k); }
+  else { el.style.transform = ""; el.dataset.o = "1"; }
+  el.style.opacity = el.dataset.o;
+}
+// Fading in: worked out fresh every frame from the time alone (times its fade-out, if it has one), never from
+// what the last frame left behind.
+function sceneIn(id, t, a) {
+  const k = ease.out(P(t, a, 0.45));
+  const el = $(id);
+  el.style.opacity = String(parseFloat(el.dataset.o ?? "1") * k);
+}
+
+// the bar chart in the dashboard
+const BARS = [32, 48, 40, 62, 50, 74, 58, 90];
+(function () {
+  const box = $("bars");
+  BARS.forEach((h, i) => {
+    const b = document.createElement("div");
+    b.className = "bar"; b.id = "bar" + i;
+    b.style.left = 30 + i * 74 + "px"; b.style.height = h * 1.5 + "px";
+    if (i === BARS.length - 1) b.style.background = "var(--blue)";
+    box.appendChild(b);
+  });
+})();
+
+function render(t) {
+  for (const [id, [a, b]] of Object.entries(SC)) $(id).style.display = t >= a && t < b ? "block" : "none";
+  // keep each scene's stacking order: later scenes on top
+  Object.keys(SC).forEach((id, i) => ($(id).style.zIndex = i + 1));
+
+  // ---------- 1. logo
+  if (t < SC.s1[1]) {
+    set("s1c1", { s: L(0.2, 1, ease.out(P(t, 0, 1.2))), base: "" });
+    set("s1c2", { s: L(0.2, 1, ease.out(P(t, 0.1, 1.2))) });
+    set("s1r", { r: t * 40, s: L(0, 1, ease.back(P(t, 0.5, 0.8))) });
+    rise("s1d1", t, 0.9, { pop: true }); rise("s1d2", t, 1.1, { pop: true });
+    const k = P(t, 0.2, 0.8);
+    set("splash1", { s: L(0.2, 1, ease.back(k)), r: L(-25, 0, ease.out(k)), o: cl(k * 3) });
+    rise("logo1", t, 0.9, { dy: 50, base: "translateX(-50%)" });
+    rise("w1", t, 1.6, { dy: 70, d: 0.5 }); rise("w2", t, 1.8, { dy: 70, d: 0.5 }); rise("w3", t, 2.0, { dy: 70, d: 0.5 });
+    rise("for1", t, 2.5, { dy: 30 });
+    const w = ease.in(P(t, 3.6, 0.7));
+    set("wipe1", { s: L(0, 34, w), o: w > 0 ? 1 : 0 });
+  }
+
+  // ---------- 2. the problem
+  if (t >= SC.s2[0] && t < SC.s2[1]) {
+    $("s2").style.opacity = 1; $("s2").style.transform = "";
+    set("s2r", { r: t * 25 });
+    rise("s2k", t, 4.45, { dy: 40 });
+    const hk = P(t, 8.2, 0.4);
+    set("s2h", { y: (1 - ease.out(P(t, 4.6, 0.6))) * 60 - ease.in(hk) * 40, o: ease.out(P(t, 4.6, 0.6)) * (1 - hk) });
+    set("s2k", { o: ease.out(P(t, 4.45, 0.6)) * (1 - hk), y: (1 - ease.out(P(t, 4.45, 0.6))) * 40 });
+    [["p1", 5.3, -2], ["p2", 6.0, 1.5], ["p3", 6.7, -1]].forEach(([id, at, r]) => {
+      const k = P(t, at, 0.6), e = ease.back(k), out = ease.in(P(t, 8.0, 0.45));
+      set(id, { x: (1 - ease.out(k)) * 500, r: L(r * 4, r, e), o: cl(k * 3) * (1 - out), y: out * 120 });
+    });
+    rise("s2e", t, 8.55, { dy: 80, d: 0.6 });
+    const u = ease.out(P(t, 9.0, 0.5));
+    set("s2u", { sx: u, sy: 1, o: u > 0 ? 1 : 0 });
+    const w = ease.inOut(P(t, 9.75, 0.6));
+    set("wipe2", { y: -w * 1180 });
+  }
+
+  // ---------- 3. dashboard
+  if (t >= SC.s3[0] && t < SC.s3[1]) {
+    sceneOut("s3", t, SC.s3[1], "left");
+    rise("s3k", t, 10.35, { dy: 40 }); rise("s3h", t, 10.5, { dy: 60 }); rise("s3p", t, 10.8, { dy: 40 });
+    rise("dash", t, 10.6, { dx: 260, dy: 0, d: 0.8 });
+    const c = ease.out(P(t, 11.4, 1.4));
+    $("n1").textContent = rand(4920 * c); $("n2").textContent = rand(970 * c); $("n3").textContent = String(Math.round(9 * c));
+    BARS.forEach((_, i) => { const k = ease.back(P(t, 11.5 + i * 0.12, 0.5)); set("bar" + i, { sx: 1, sy: k, o: k > 0 ? 1 : 0 }); });
+    rise("l1", t, 12.9, { dy: 24, d: 0.4 }); rise("l2", t, 13.15, { dy: 24, d: 0.4 });
+    rise("newgift", t, 13.7, { pop: true });
+  }
+
+  // ---------- 4. giving on a phone
+  if (t >= SC.s4[0] && t < SC.s4[1]) {
+    sceneOut("s4", t, SC.s4[1], "left"); sceneIn("s4", t, SC.s4[0]);
+    rise("phone", t, 16.2, { dy: 220, d: 0.8 });
+    rise("s4k", t, 16.5, { dy: 40 }); rise("s4h", t, 16.65, { dy: 60 }); rise("s4p", t, 16.95, { dy: 40 });
+    // the tap: in from the right, onto R250, then onto Give
+    const chip = centre("c250"), btn = centre("givebtn");
+    const m1 = ease.inOut(P(t, 17.4, 0.6)), m2 = ease.inOut(P(t, 18.5, 0.5));
+    const tx = L(L(1100, chip.x, m1), btn.x, m2), ty = L(L(900, chip.y, m1), btn.y, m2);
+    const press = (at) => 1 - 0.25 * Math.sin(Math.PI * P(t, at, 0.25));
+    const tapS = press(18.0) * press(19.0);
+    const tapO = cl(P(t, 17.3, 0.3)) * (1 - P(t, 19.3, 0.3));
+    set("tap4", { x: tx - 37, y: ty - 37, s: tapS, o: tapO });
+    const picked = t >= 18.1;
+    const c = $("c250"); c.style.background = picked ? "var(--blue)" : "#fff"; c.style.color = picked ? "#fff" : "var(--ink)"; c.style.borderColor = picked ? "var(--blue)" : "var(--line)";
+    $("givebtn").textContent = picked ? "Give R250" : "Give";
+    set("givebtn", { s: 1 - 0.05 * Math.sin(Math.PI * P(t, 19.0, 0.25)) });
+    const th = P(t, 19.35, 0.35);
+    $("thanks").style.opacity = ease.out(th); $("thanks").style.display = th > 0 ? "flex" : "none";
+    rise("thtick", t, 19.5, { pop: true });
+  }
+
+  // ---------- 5. s18A receipts
+  if (t >= SC.s5[0] && t < SC.s5[1]) {
+    sceneOut("s5", t, SC.s5[1], "left"); sceneIn("s5", t, SC.s5[0]);
+    rise("s5k", t, 22.25, { dy: 40 }); rise("s5h", t, 22.4, { dy: 60 }); rise("s5p", t, 22.7, { dy: 40 });
+    const f = ease.out(P(t, 25.0, 0.8));
+    [["r1", 22.5, 0, 0, -2], ["r2", 22.7, 70, 30, 4], ["r3", 22.9, 140, 60, 9]].forEach(([id, at, fx, fy, r]) => {
+      const k = ease.out(P(t, at, 0.7));
+      set(id, { x: (1 - k) * 400 + fx * f, y: fy * f, r: L(r + 10, r * (0.3 + 0.7 * f), k), o: k });
+    });
+    const sk = P(t, 24.2, 0.45);
+    set("stamp", { s: L(2.2, 1, ease.out(sk)), r: L(-30, -10, ease.out(sk)), o: cl(sk * 2) });
+  }
+
+  // ---------- 6. donors and thank-yous
+  if (t >= SC.s6[0] && t < SC.s6[1]) {
+    sceneOut("s6", t, SC.s6[1], "left"); sceneIn("s6", t, SC.s6[0]);
+    rise("s6k", t, 28.25, { dy: 40 }); rise("s6h", t, 28.4, { dy: 60 }); rise("s6p", t, 28.7, { dy: 40 });
+    rise("dl", t, 28.3, { dx: 240, dy: 0, d: 0.7 });
+    ["dr1", "dr2", "dr3", "dr4"].forEach((id, i) => rise(id, t, 28.8 + i * 0.18, { dx: 80, dy: 0, d: 0.45 }));
+    const tb = centre("thankbtn"), bx = tb.x, by = tb.y;
+    const m = ease.inOut(P(t, 30.0, 0.6));
+    const tapO = cl(P(t, 29.9, 0.3)) * (1 - P(t, 31.1, 0.3));
+    set("tap6", { x: L(1300, bx, m) - 37, y: L(760, by, m) - 37, s: 1 - 0.25 * Math.sin(Math.PI * P(t, 30.65, 0.25)), o: tapO });
+    set("thankbtn", { s: 1 - 0.06 * Math.sin(Math.PI * P(t, 30.65, 0.25)) });
+    [["env1", 30.9, 1, -1], ["env2", 31.05, 1.3, -0.4], ["env3", 31.2, 0.8, -1.6]].forEach(([id, at, vx, vy]) => {
+      const k = P(t, at, 1.1), e = ease.out(k);
+      set(id, { base: `translate(${bx - 40}px, ${by - 30}px)`, x: e * 520 * vx, y: e * 360 * vy - Math.sin(Math.PI * k) * 60, r: e * 25 * vx, s: L(0.6, 1.1, e), o: k > 0 ? 1 - ease.in(k) : 0 });
+    });
+    rise("toast", t, 31.7, { pop: true });
+  }
+
+  // ---------- 7. paid to your bank
+  if (t >= SC.s7[0] && t < SC.s7[1]) {
+    sceneOut("s7", t, SC.s7[1], "fade"); sceneIn("s7", t, SC.s7[0]);
+    rise("s7h", t, 33.8, { dy: 60 }); rise("s7p", t, 34.1, { dy: 40 });
+    rise("dep", t, 34.0, { dx: 260, dy: 0, d: 0.7 });
+    const c = ease.out(P(t, 34.6, 1.4));
+    $("n7").textContent = rand(4920 * c);
+    set("depbar", { sx: c, sy: 1 });
+    rise("pl1", t, 35.6, { pop: true }); rise("pl2", t, 35.85, { pop: true }); rise("pl3", t, 36.1, { pop: true });
+  }
+
+  // ---------- 8. three steps
+  if (t >= SC.s8[0] && t < SC.s8[1]) {
+    sceneOut("s8", t, SC.s8[1], "fade"); sceneIn("s8", t, SC.s8[0]);
+    rise("s8h", t, 38.75, { dy: 60 });
+    set("s8line", { sx: ease.inOut(P(t, 39.3, 1.4)), sy: 1 });
+    rise("st1", t, 39.2, { pop: true }); rise("st2", t, 39.85, { pop: true }); rise("st3", t, 40.5, { pop: true });
+  }
+
+  // ---------- 9. close
+  if (t >= SC.s9[0]) {
+    sceneIn("s9", t, SC.s9[0]);
+    set("s9r", { r: t * 20 });
+    set("s9c", { s: 1 + 0.05 * Math.sin(t * 2) });
+    rise("s9card", t, 41.8, { pop: true, d: 0.7 });
+    rise("s9h", t, 42.3, { dy: 70 });
+    rise("s9b", t, 42.8, { pop: true });
+    rise("s9u", t, 43.2, { dy: 30 });
+  }
+}
+window.renderAt = render;
+window.DURATION = 45;
+render(0);
+</script>
+</body></html>
