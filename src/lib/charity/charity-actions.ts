@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { dropEmptyImports } from "./recorded-gifts-store";
 import { removeContactImport } from "./contacts-store";
 import { memberRole } from "./team";
+import { can, isRole, permissionForAction } from "./permissions";
 import { removeDecisions } from "@/lib/receipts/runs";
 import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 import { readJourneyState, removeEnrolments, writeJourney, type JourneyState } from "./journey-write";
@@ -58,7 +59,9 @@ export type Undo =
   /** Take off the donors "Add my existing donors" added, those who haven't had an email yet. Only an owner may. */
   | { type: "journey_enrolments"; ids: string[] }
   /** Take away access this action gave (an admin, never an owner). Only an owner may. */
-  | { type: "remove_member"; userId: string };
+  | { type: "remove_member"; userId: string }
+  /** Put someone's role back (CRM step 9), if nobody has changed it again since. */
+  | { type: "set_role"; userId: string; from: string; to: string };
 
 export type ActionRow = { id: string; charity_id: string; kind: ActionKind; details: Details; undo: Undo | null; undone_at: string | null; created_at: string };
 
@@ -120,8 +123,10 @@ export async function undoAction(charityId: string, id: string, userId: string, 
   if (!row || !row.undo) return { ok: false, why: "gone", row };
   if (!canUndo(row, now)) return { ok: false, why: row.undone_at ? "gone" : "late", row };
   if (APPLICATION_KINDS.includes(row.kind) && !editable(charityStatus)) return { ok: false, why: "locked", row };
-  // Team changes are the owner's alone (Yehuda, 21/10/2026).
-  if ((row.undo.type === "remove_member" || row.undo.type === "remove_contacts" || row.undo.type === "journey" || row.undo.type === "journey_enrolments" || row.kind === "bank_saved" || row.kind === "contact_saved" || row.kind === "sars_details_saved") && (await memberRole(charityId, userId)) !== "owner") return { ok: false, why: "owner", row };
+  // Taking an action back needs what doing it needed (team roles, 10/11/2026: src/lib/charity/permissions.ts).
+  // Adding existing donors to the journey stays the owner's, as before.
+  const needs = row.undo.type === "journey_enrolments" ? "owner" : permissionForAction(row.kind);
+  if (!can(await memberRole(charityId, userId), needs)) return { ok: false, why: "owner", row };
 
   const db = createAdminClient();
   // Claim it first, so two taps (or two admins) can't take it back twice.
@@ -324,9 +329,15 @@ async function apply(charityId: string, undo: Undo, extra: Details = {}): Promis
       return null;
     }
     case "remove_member": {
-      const { data, error } = await db.from("charity_admins").delete().eq("charity_id", charityId).eq("user_id", undo.userId).eq("role", "admin").select("user_id");
+      const { data, error } = await db.from("charity_admins").delete().eq("charity_id", charityId).eq("user_id", undo.userId).neq("role", "owner").select("user_id");
       if (error) throw error;
       return data?.length ? null : "removed";
+    }
+    case "set_role": {
+      if (!isRole(undo.from) || !isRole(undo.to) || undo.from === "owner") return "gone";
+      const { data, error } = await db.from("charity_admins").update({ role: undo.from }).eq("charity_id", charityId).eq("user_id", undo.userId).eq("role", undo.to).select("user_id");
+      if (error) throw error;
+      return data?.length ? null : "changed";
     }
     case "remove_contacts": {
       if (!/^[0-9a-f-]{36}$/i.test(undo.importId)) return "gone";
@@ -364,7 +375,7 @@ export function undoFailureText(why: UndoFailure): string {
     case "given": return "Donors have already given to it, so it can't be removed. You can end it instead.";
     case "full": return "There's no room for it: you're at the limit. Remove or end one first, then try again.";
     case "locked": return "Your application has been submitted, so your details are locked while we review them.";
-    case "owner": return "Only your charity's owner can do this: change who has access or the bank account, the donor journey, or take back an import of donors.";
+    case "owner": return "Your role doesn't include taking this back. Nothing was changed. Ask your charity's owner, or someone whose role includes it.";
     case "ended": return "Its last day has passed, so it can't run again. Start a new campaign instead.";
     case "issued": return "It's already on an s18A receipt Givezy has issued, so it can't be taken back here. If something is wrong, tell us: only we can withdraw and re-issue a receipt.";
     case "sent": return "Your list of s18A receipts is with Givezy now, so it can't change. Take back your approval first (s18A receipts), then try again.";

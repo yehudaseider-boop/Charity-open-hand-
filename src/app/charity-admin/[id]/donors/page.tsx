@@ -30,7 +30,7 @@ import type { DonorRow } from "@/lib/charity/dashboard-queries";
 import { MAX_REMINDERS, S18A_FILTERS, S18A_FILTER_HINTS, inS18aFilter, isS18aFilter, missingList, s18aCounts, type S18aFilter } from "@/lib/charity/s18a-reminder";
 import { lastReminded, loadS18aMissing } from "@/lib/charity/s18a-reminder-send";
 import type { MissingDetail } from "@/lib/donations/s18a-details";
-import { isOwner } from "@/lib/charity/team";
+import { isOwner, viewerCan } from "@/lib/charity/team";
 import { remindS18aDetails } from "./reminder-actions";
 import { ReminderForm, ReminderTick } from "./reminder-form";
 
@@ -49,6 +49,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/donors`);
   const { charity } = await loadCharityForManager(id);
+  const canDownload = await viewerCan(id, "export");
   const sp = await searchParams;
   const q = safeSearch(typeof sp.q === "string" ? sp.q : "");
   const asked = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
@@ -139,9 +140,9 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         intro="People who have given to your charity. Anonymous donors are anonymous on public pages only: you see their details because you need them to record donations. Where a donor asked for one, Givezy issues the s18A receipt in your name."
         actions={
           <>
-            <ActionLink download href={`/charity-admin/${id}/export/donors`}>Download donors (CSV)</ActionLink>
-            <ActionLink download href={`/charity-admin/${id}/export/donors?format=xlsx`}>Excel</ActionLink>
-            <ActionLink download href={`/charity-admin/${id}/export/donors?format=salesforce`}>For Salesforce</ActionLink>
+            {canDownload ? <ActionLink download href={`/charity-admin/${id}/export/donors`}>Download donors (CSV)</ActionLink> : null}
+            {canDownload ? <ActionLink download href={`/charity-admin/${id}/export/donors?format=xlsx`}>Excel</ActionLink> : null}
+            {canDownload ? <ActionLink download href={`/charity-admin/${id}/export/donors?format=salesforce`}>For Salesforce</ActionLink> : null}
             <ActionLink href={`/charity-admin/${id}/donors/import`}>Import donors (CSV)</ActionLink>
           </>
         }

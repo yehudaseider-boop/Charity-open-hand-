@@ -10,6 +10,14 @@ const calls: string[] = [];
 const recorded: { kind: string; details: Record<string, unknown>; undo: unknown }[] = [];
 let canIssue = true;
 
+vi.mock("@/lib/charity/team", async () => {
+  const p = await import("@/lib/charity/permissions");
+  const role = () => "admin" as const;
+  return {
+    viewerCan: async (_c: string, perm: Parameters<typeof p.can>[1]) => p.can(role(), perm),
+    refusal: async (_c: string, perm: Parameters<typeof p.can>[1]) => (p.can(role(), perm) ? null : p.refusedFor(perm)),
+  };
+});
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`redirect:${to}`); } }));
 vi.mock("@/lib/auth", () => ({ requireViewer: async () => ({ userId: "admin-of-c1" }) }));

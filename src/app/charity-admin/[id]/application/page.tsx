@@ -37,7 +37,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
   const sp = await searchParams;
   const { step: asked } = sp as { step?: string };
   await requireViewer(`/charity-admin/${id}/application`);
-  const { charity, priv, documents } = await loadCharityForManager(id);
+  const { charity, priv, documents, canBank } = await loadCharityForManager(id);
   const owner = await isOwner(id);
   const editable = charity.status === "draft" || charity.status === "rejected";
   const checklist = applicationChecklist({ charity, priv, documentTypes: documents.map((d) => d.document_type) });
@@ -207,7 +207,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
       ) : (
         <>
           <Card title="Organisation"><OrganisationSummary c={charity} /></Card>
-          <Card title="Contact and bank"><PrivateSummary p={priv} /></Card>
+          <Card title="Contact and bank"><PrivateSummary p={priv} hideBank={!canBank} /></Card>
           {/* The contact person can change at any time: our emails (approval, bank changes) go to them. */}
           <Card title="Contact person">
             {owner ? (

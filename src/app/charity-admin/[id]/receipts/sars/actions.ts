@@ -6,7 +6,7 @@ import { requireViewer } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { recordAction } from "@/lib/charity/charity-actions";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { isOwner } from "@/lib/charity/team";
+import { isOwner, refusal } from "@/lib/charity/team";
 import type { FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
 import { isLegalForm } from "@/lib/receipts/it3d";
@@ -79,7 +79,8 @@ function toHistory(charityId: string, year: number, period: string, what: Record
 export async function markUploadedToSars(charityId: string, historyId: string, year: number, period: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
-  if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can mark a SARS file as uploaded. Nothing was changed." };
+  const notAllowed = await refusal(charityId, "export");
+  if (notAllowed) return { ok: false, message: notAllowed };
   const entry = isUuid(historyId) ? await loadIt3dHistoryEntry(charityId, historyId) : null;
   if (!entry) return { ok: false, message: "We couldn't find that download in your history, so nothing was changed. Reload the page and try again." };
   if (entry.uploadedOn) return { ok: false, message: "This one is already marked as uploaded, so nothing was changed. Reload the page to see it." };
@@ -100,7 +101,8 @@ export async function markUploadedToSars(charityId: string, historyId: string, y
 export async function unmarkUploadedToSars(charityId: string, historyId: string, year: number, period: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
-  if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can change this. Nothing was changed." };
+  const notAllowed = await refusal(charityId, "export");
+  if (notAllowed) return { ok: false, message: notAllowed };
   if (!isUuid(historyId)) return { ok: false, message: "We couldn't find that download in your history, so nothing was changed." };
   let cleared: boolean;
   try {

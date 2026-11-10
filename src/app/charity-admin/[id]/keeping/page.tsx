@@ -22,6 +22,7 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import { viewerCan } from "@/lib/charity/team";
 
 export const metadata: Metadata = { title: "Keeping donors" };
 
@@ -32,6 +33,7 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/keeping`);
   await loadCharityForManager(id);
+  const canDownload = await viewerCan(id, "export");
   const sp = await searchParams;
   const w = keepingWindow(keepingYearKey(sp.year), new Date());
   const list = keepingListKey(sp.list);
@@ -73,7 +75,7 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
             How many of last tax year&apos;s donors gave again in {w.words}, and who to get in touch with. Only donations that went through count; refunds don&apos;t. Gifts you recorded yourself count, as everywhere on your dashboard.
           </>
         }
-        actions={rows && listed.length > 0 ? <ActionLink download href={`${base}/export/keeping-donors?list=${list}${w.key === "last" ? "&year=last" : ""}`}>Download this list (CSV)</ActionLink> : undefined}
+        actions={rows && listed.length > 0 ? (canDownload ? <ActionLink download href={`${base}/export/keeping-donors?list=${list}${w.key === "last" ? "&year=last" : ""}`}>Download this list (CSV)</ActionLink> : null) : undefined}
       />
 
       <Tabs label="Tax year" items={keepingYears.map((y) => ({ href: href({ year: y.key, list }), label: y.label, active: w.key === y.key }))} />

@@ -11,6 +11,7 @@ import { kindWord } from "@/lib/charity/deposits";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { viewerCan } from "@/lib/charity/team";
 
 export const metadata: Metadata = { title: "Deposit" };
 
@@ -19,6 +20,15 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
   const { id, payoutId } = await params;
   await requireViewer(`/charity-admin/${id}/donations/deposits/${payoutId}`);
   await loadCharityForManager(id);
+  // Payouts go with the bank account: the owner and finance only (team roles, 10/11/2026).
+  if (!(await viewerCan(id, "bank_view"))) {
+    return (
+      <div className="space-y-5">
+        <PageHeader back={<Link href={`/charity-admin/${id}/donations`} className="text-muted hover:text-brand">← Donations</Link>} title="Deposits" />
+        <Notice>Your role doesn&apos;t include the bank account and deposits. Ask your charity&apos;s owner if you need them.</Notice>
+      </div>
+    );
+  }
   const d = await loadDeposit(id, payoutId);
   if (!d) notFound();
   const dep = d.deposit;

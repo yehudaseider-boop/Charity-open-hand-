@@ -4,6 +4,7 @@ import { taxYearName } from "@/lib/dates";
 import { REMINDER_SKIPS, reminderOutcome } from "@/lib/charity/s18a-reminder";
 import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import { EXISTING_SKIPS, existingOutcome } from "@/lib/charity/journey";
+import { ROLE_LABEL } from "./permissions";
 
 /** "2026/27" from a stored tax year, or empty when it is missing. */
 const yearName = (y: unknown) => (Number.isInteger(Number(y)) && Number(y) > 2000 ? taxYearName(Number(y)) : "");
@@ -48,6 +49,7 @@ export type ActionKind =
   | "gifts_removed"
   | "member_added"
   | "member_removed"
+  | "role_changed"
   | "appeal_sent"
   | "contacts_imported"
   | "contacts_removed"
@@ -275,6 +277,11 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       };
     case "member_removed":
       return { what: `${String(d.email ?? "That person")} no longer has access to your dashboard. We've let them know.`, next: { label: "Back to your team", href: `${c.base}/team` } };
+    case "role_changed":
+      return {
+        what: `${String(d.email ?? "That person")} is now ${roleWord(d.to)}, not ${roleWord(d.from)}. It applies the next time they open a page.`,
+        next: { label: "Back to your team", href: `${c.base}/team` },
+      };
     case "appeal_sent": {
       const sent = Number(d.sent ?? 0);
       const waiting = Number(d.waiting ?? 0);
@@ -324,6 +331,7 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "certificate_edited": return `Taken back. The donor's name and address are as they were before, and the s18A receipt is as it was before you corrected it.`;
     case "certificate_reopened": return `Taken back. The s18A receipt for ${String(d.name ?? "this donor")} is ${d.was === "declined" ? "declined" : "approved"} again. We haven't emailed the donor.`;
     case "member_added": return `Taken back. ${String(d.email ?? "They")} no longer ${d.email ? "has" : "have"} access to your dashboard.`;
+    case "role_changed": return `Taken back. ${String(d.email ?? "They")} ${d.email ? "is" : "are"} ${roleWord(d.from)} again.`;
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;
     case "receipts_approved": return `Taken back. Your approval for the ${yearName(d.taxYear)} tax year is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
     case "contacts_imported": return `Taken back. The ${plural(Number(d.contacts ?? 0), "donor")} from ${quote(d.file)} ${Number(d.contacts ?? 0) === 1 ? "is" : "are"} removed from your list.`;
@@ -359,7 +367,7 @@ export function pageOf(kind: ActionKind): string {
   if (kind === "donor_thanked" || kind === "contacts_imported" || kind === "contacts_removed" || kind === "s18a_reminders_sent") return "donors";
   if (kind === "receipts_approved" || kind === "sars_details_saved" || kind.startsWith("certificate_")) return "receipts";
   if (kind === "gift_recorded" || kind === "gifts_imported" || kind === "gifts_removed") return "donations";
-  if (kind === "member_added" || kind === "member_removed") return "team";
+  if (kind === "member_added" || kind === "member_removed" || kind === "role_changed") return "team";
   if (kind === "appeal_sent") return "email-donors";
   if (kind.startsWith("journey_")) return "journey";
   return "application";
@@ -376,11 +384,17 @@ const KINDS = new Set<ActionKind>([
   "video_saved", "video_removed", "focus_saved", "focus_removed",
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
   "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "thank_you_wording_saved", "donor_thanked",
-  "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
+  "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "role_changed", "appeal_sent",
   "contacts_imported", "contacts_removed", "sars_details_saved",
   "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened", "s18a_reminders_sent",
   "journey_saved", "journey_on", "journey_off", "journey_existing_added",
 ]);
+
+/** "an admin", "a viewer": a role in a sentence. */
+function roleWord(r: unknown): string {
+  const label = typeof r === "string" && r in ROLE_LABEL ? ROLE_LABEL[r as keyof typeof ROLE_LABEL].toLowerCase() : "a member";
+  return label === "a member" ? label : `${/^[aeiou]/.test(label) ? "an" : "a"} ${label}`;
+}
 
 /** A planned s18A receipt's preview page. */
 export function certificateHref(c: Pick<Context, "base">, taxYear: unknown, key: unknown): string {

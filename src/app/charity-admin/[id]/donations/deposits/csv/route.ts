@@ -9,7 +9,7 @@ import { toXlsx } from "@/lib/xlsx";
 export async function GET(req: NextRequest, ctx: RouteContext<"/charity-admin/[id]/donations/deposits/csv">) {
   const { id } = await ctx.params;
   // Donor names are in these files: the same checks, limit and audit entry as every other export.
-  const who = await authoriseExport(id);
+  const who = await authoriseExport(id, "bank_view");
   if (who instanceof NextResponse) return who;
   const deposits = await listDeposits(id, 1000);
   const format = req.nextUrl.searchParams.get("format");

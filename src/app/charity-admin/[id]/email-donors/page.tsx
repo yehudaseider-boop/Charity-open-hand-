@@ -9,6 +9,7 @@ import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { lapsedDaysFor, listSegments, listTags } from "@/lib/charity/donor-care";
 import { donorGroupsFor } from "@/lib/charity/insights";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate } from "@/lib/dates";
@@ -33,7 +34,8 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
   const [role, appeals, recent, tags, segments, campaigns, lapsedDays] = await Promise.all([
     viewerRole(id), listAppeals(id), appealsThisMonth(id), listTags(id), listSegments(id), loadCampaigns(id), lapsedDaysFor(id),
   ]);
-  const owner = role === "owner";
+  // Emailing donors is part of the "message" role permission (team roles, 10/11/2026).
+  const owner = can(role, "message");
   // "Email these donors" from a list, a tag or a campaign arrives with it chosen.
   const asked = parseAudience(sp.to);
   const audiences = [
@@ -69,7 +71,7 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
       {charity.status !== "approved" ? (
         <Notice tone="warning">You can email your donors once your page is live.</Notice>
       ) : !owner ? (
-        <Notice>Only your charity&apos;s owner can email donors. You can see what was sent below.</Notice>
+        <Notice>Your role doesn&apos;t include emailing donors. You can see what was sent below.</Notice>
       ) : (
         <Card title="Write an email">
           {recent ? <p className="mb-3 text-sm text-muted">You&apos;ve sent {recent} {recent === 1 ? "email" : "emails"} in the last 30 days.</p> : null}

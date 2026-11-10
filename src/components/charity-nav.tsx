@@ -26,6 +26,7 @@ const groups = [
       { href: "/journey", label: "Donor journey" },
       { href: "/email-donors", label: "Email donors" },
       { href: "/team", label: "Team" },
+      { href: "/activity", label: "Activity" },
     ],
   },
   {
@@ -45,7 +46,7 @@ const groups = [
  * The dashboard's pages: a grouped list down the side on a laptop, one scrolling row on a phone.
  * The page you're on is marked (aria-current) the same way in both.
  */
-export function CharityNav({ id, base: baseOverride }: { id: string; base?: string }) {
+export function CharityNav({ id, base: baseOverride, hidden = [] }: { id: string; base?: string; hidden?: string[] }) {
   const pathname = usePathname();
   const row = useCurrentTabInView<HTMLUListElement>(pathname);
   const base = baseOverride ?? `/charity-admin/${id}`;
@@ -57,7 +58,7 @@ export function CharityNav({ id, base: baseOverride }: { id: string; base?: stri
     <nav aria-label="Charity dashboard" className="print:hidden">
       {/* Phone and tablet: one row that scrolls sideways inside itself. */}
       <ul ref={row} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
-        {groups.flatMap((g) => g.tabs).map((t) => {
+        {groups.flatMap((g) => g.tabs).filter((t) => !hidden.includes(t.href)).map((t) => {
           const active = isActive(t);
           return (
             <li key={t.label} className="shrink-0">
@@ -78,7 +79,7 @@ export function CharityNav({ id, base: baseOverride }: { id: string; base?: stri
           <div key={g.title} className="space-y-1.5">
             <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted">{g.title}</p>
             <ul className="space-y-0.5">
-              {g.tabs.map((t) => {
+              {g.tabs.filter((t) => !hidden.includes(t.href)).map((t) => {
                 const active = isActive(t);
                 return (
                   <li key={t.label}>

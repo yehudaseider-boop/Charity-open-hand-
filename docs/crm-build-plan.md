@@ -71,6 +71,9 @@ Also added to the go-live checklist: load-test the busy times (end of February r
 9. **Roles: Admin, Finance, Fundraiser, Viewer** (6). The owner sets each person's role; sensitive actions
    (approve s18A, exports, IT3(d), bank, team) limited by role. Database rules updated so each role can only
    read what it may. Audit log shown readably ("Sarah approved the s18A receipt for ... on 03/03/2027").
+   **Built 10/11/2026, not yet on the test site** (migration `20261110000009_team_roles.sql` waits for Yehuda's yes;
+   the matrix and the deviations are in `docs/decisions.md`). As built: Owner, Admin, Finance, Fundraiser, Viewer; the
+   owner picks a role when adding someone and changes it on Team (Undo); an Activity page shows who did what.
 10. **Push notifications in the app** (needed by 7.2 and in-app journey steps). Free with Expo; needs a new
     app build and the donor's permission on the phone. **Approval: Yehuda** before any push is sent to real
     people.

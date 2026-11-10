@@ -9,7 +9,7 @@ import { toXlsx } from "@/lib/xlsx";
 export async function GET(req: NextRequest, ctx: RouteContext<"/charity-admin/[id]/donations/deposits/[payoutId]/csv">) {
   const { id, payoutId } = await ctx.params;
   // Donor names are in these files: the same checks, limit and audit entry as every other export.
-  const who = await authoriseExport(id);
+  const who = await authoriseExport(id, "bank_view");
   if (who instanceof NextResponse) return who;
   const d = await loadDeposit(id, payoutId);
   if (!d) return new NextResponse("Not found", { status: 404 });

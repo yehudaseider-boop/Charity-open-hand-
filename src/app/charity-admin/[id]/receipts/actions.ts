@@ -11,12 +11,15 @@ import { formatRand } from "@/lib/money";
 import { approveRun, cancelRun, closedTaxYears } from "@/lib/receipts/runs";
 import { approveCertificate, declineCertificate, editCertificate, reopenCertificate, reviewFailureText, type Certificate } from "@/lib/receipts/review-store";
 import { formToObject } from "@/lib/form";
+import { refusal } from "@/lib/charity/team";
 
 /** The charity approves the list of s18A receipts it was shown for a closed tax year. */
 export async function approveReceipts(charityId: string, taxYear: number, fingerprint: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   // Throws unless the signed-in person (with their second step) manages this charity.
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "receipts");
+  if (refused) return { ok: false, message: refused };
   if (!canIssue18a(charity)) return { ok: false, message: "Your charity can't issue s18A receipts yet: it needs confirmed s18A approval and a signed receipting mandate." };
   if (!closedTaxYears(new Date()).includes(taxYear)) return { ok: false, message: "Receipts for that tax year can't be approved here. Nothing was changed." };
   const r = await approveRun({ charityId, taxYear, fingerprint, userId: viewer.userId });
@@ -34,6 +37,8 @@ export async function approveReceipts(charityId: string, taxYear: number, finger
 export async function withdrawReceipts(charityId: string, runId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "receipts");
+  if (refused) return { ok: false, message: refused };
   const ok = await cancelRun({ runId, charityId, userId: viewer.userId, reason: "The charity took back its approval." });
   revalidatePath(`/charity-admin/${charityId}/receipts`);
   if (!ok) return { ok: false, message: "Givezy has already signed it off, so the receipts are issued. If one is wrong, tell us: only we can withdraw and re-issue a receipt." };
@@ -49,6 +54,8 @@ async function reviewer(charityId: string, taxYear: number) {
   const viewer = await requireViewer();
   // Throws (not found) unless the signed-in person manages this charity: another charity's admin gets nothing.
   const { charity, priv } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "receipts");
+  if (refused) return { error: refused } as const;
   if (!canIssue18a(charity)) return { error: "Your charity can't issue s18A receipts yet: it needs confirmed s18A approval and a signed receipting mandate." } as const;
   if (!closedTaxYears(new Date()).includes(taxYear)) return { error: "Receipts for that tax year can't be checked here. Nothing was changed." } as const;
   return { viewer, priv } as const;

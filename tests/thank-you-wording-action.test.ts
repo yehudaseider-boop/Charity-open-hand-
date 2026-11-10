@@ -9,7 +9,16 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`redirect:${to}`); } }));
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/auth", () => ({ requireViewer: async () => ({ userId: "u1", email: "admin@x.co" }) }));
-vi.mock("@/lib/charity/team", () => ({ isOwner: async () => false, memberRole: async () => "admin" }));
+vi.mock("@/lib/charity/team", async () => {
+  const p = await import("@/lib/charity/permissions");
+  const role = () => "admin" as const;
+  return {
+    isOwner: async () => false,
+    memberRole: async () => "admin",
+    viewerCan: async (_c: string, perm: Parameters<typeof p.can>[1]) => p.can(role(), perm),
+    refusal: async (_c: string, perm: Parameters<typeof p.can>[1]) => (p.can(role(), perm) ? null : p.refusedFor(perm)),
+  };
+});
 vi.mock("@/lib/charity/thank-you-send", () => ({ sendThankYou: async () => ({ ok: true }), continueThankYou: async () => ({ ok: true }) }));
 
 type Row = Record<string, unknown>;

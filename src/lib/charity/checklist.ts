@@ -17,6 +17,8 @@ type ChecklistInput = {
     contact_email: string | null;
     bank_account_last4: string | null;
     bank_branch_code: string | null;
+    /** Set by loadCharityForManager for every role; the account itself is the owner's and finance's to see. */
+    bank_set?: boolean;
   } | null;
   documentTypes: DocumentType[];
 };
@@ -41,7 +43,7 @@ export function applicationChecklist({ charity, priv, documentTypes }: Checklist
       done: Boolean(charity.address_line1 && charity.city && charity.postal_code),
     },
     { key: "contact", label: "Contact person", done: Boolean(priv?.contact_name && priv?.contact_email) },
-    { key: "bank", label: "Bank account", done: Boolean(priv?.bank_account_last4 && priv?.bank_branch_code) },
+    { key: "bank", label: "Bank account", done: Boolean(priv?.bank_set ?? (priv?.bank_account_last4 && priv?.bank_branch_code)) },
     { key: "bank_confirmation", label: "Bank confirmation letter", done: has("bank_confirmation") },
   ];
   if (charity.pbo_number) {

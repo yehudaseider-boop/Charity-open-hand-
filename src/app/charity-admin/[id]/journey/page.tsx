@@ -8,6 +8,7 @@ import { requireViewer } from "@/lib/auth";
 import { enrolmentLabel, existingSkippedSentence, journeyCounts } from "@/lib/charity/journey";
 import { enrolmentStates, journeyPeople, loadJourney, planExistingDonors } from "@/lib/charity/journey-store";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import { formatDate, formatDateTime } from "@/lib/dates";
@@ -27,12 +28,15 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
   const sp = await searchParams;
   await requireViewer(`/charity-admin/${id}/journey`);
   const { charity } = await loadCharityForManager(id);
-  const owner = (await viewerRole(id)) === "owner";
+  const role = await viewerRole(id);
+  // Changing the journey is part of "message"; adding existing donors stays the owner's (team roles, 10/11/2026).
+  const owner = can(role, "message");
+  const isTheOwner = role === "owner";
   const approved = charity.status === "approved";
   const journey = await loadJourney(id);
   const [states, people] = await Promise.all([enrolmentStates(id), journeyPeople(id)]);
   const counts = journeyCounts(states, journey.steps.length);
-  const existing = owner && approved && journey.enabled && journey.switchedOnAt && journey.steps.length ? await planExistingDonors(id, journey.switchedOnAt) : null;
+  const existing = isTheOwner && approved && journey.enabled && journey.switchedOnAt && journey.steps.length ? await planExistingDonors(id, journey.switchedOnAt) : null;
   const base = `/charity-admin/${id}`;
   const firstWait = journey.steps[0]?.waitDays ?? 0;
 
@@ -55,7 +59,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
       {!approved ? (
         <Notice tone="warning">You can write your emails now. The journey can be switched on once your page is live.</Notice>
       ) : !owner ? (
-        <Notice>Only your charity&apos;s owner can change the donor journey. You can see it and who is on it below.</Notice>
+        <Notice>Your role doesn&apos;t include changing the donor journey. You can see it and who is on it below.</Notice>
       ) : null}
 
       <Card title="On or off">
@@ -145,7 +149,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
         </div>
       </Card>
 
-      {owner && approved ? (
+      {isTheOwner && approved ? (
         <Card title="Add your existing donors">
           <div id="existing" className="space-y-3 text-sm">
             {!journey.enabled || !existing ? (

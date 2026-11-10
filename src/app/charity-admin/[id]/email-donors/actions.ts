@@ -7,7 +7,7 @@ import { createAppeal, pickAudience, recentSameAppeal, sendAppeal } from "@/lib/
 import { appealEmail, checkAppeal, parseAudience } from "@/lib/charity/appeals-rules";
 import { recordAction } from "@/lib/charity/charity-actions";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { isOwner } from "@/lib/charity/team";
+import { refusal } from "@/lib/charity/team";
 import { getEmailTransport } from "@/lib/email";
 import type { FormState } from "@/lib/form";
 import { hitRateLimit } from "@/lib/rate-limit";
@@ -22,7 +22,8 @@ const fingerprint = (subject: string, body: string, audience: string) => `${audi
 /** Owner, approved charity, and what was typed: the same checks before checking, testing and sending. */
 async function ready(charityId: string, formData: FormData) {
   const { charity, priv } = await loadCharityForManager(charityId);
-  if (!(await isOwner(charityId))) return { refused: "Only your charity's owner can email your donors. Nothing was sent." } as const;
+  const notAllowed = await refusal(charityId, "message");
+  if (notAllowed) return { refused: notAllowed };
   if (charity.status !== "approved") return { refused: "You can email your donors once your page is live." } as const;
   const checked = checkAppeal({ subject: formData.get("subject"), body: formData.get("body") });
   const audience = parseAudience(formData.get("audience"));
@@ -84,7 +85,8 @@ export async function sendAppealNow(charityId: string, _prev: FormState, formDat
 export async function continueAppeal(charityId: string, appealId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity, priv } = await loadCharityForManager(charityId);
-  if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can email your donors. Nothing was sent." };
+  const notAllowed = await refusal(charityId, "message");
+  if (notAllowed) return { ok: false, message: notAllowed };
   if (charity.status !== "approved") return { ok: false, message: "Your page isn't live just now, so the rest weren't sent. Contact Givezy if you think this is a mistake." };
   if (!/^[0-9a-f-]{36}$/i.test(appealId)) return { ok: false, message: "That email isn't there any more." };
   const p = await sendAppeal({ charityId, appealId, charityName: charity.name_en, replyTo: priv?.contact_email ?? null, userId: viewer.userId });

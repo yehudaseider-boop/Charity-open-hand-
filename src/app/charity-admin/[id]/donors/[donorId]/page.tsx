@@ -21,6 +21,7 @@ import { ButtonForm, NoteForm, ReminderForm, TagForm } from "../care-forms";
 import { BackLink } from "@/components/back-link";
 import { PageHeader, rowLink } from "@/components/dash";
 import { DonorStory, DonorStoryLoading } from "./story";
+import { viewerCan } from "@/lib/charity/team";
 
 export const metadata: Metadata = { title: "Donor" };
 
@@ -30,6 +31,8 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
   const sp = await searchParams;
   await requireViewer(`/charity-admin/${id}/donors/${donorId}`);
   await loadCharityForManager(id);
+  // Notes, follow-ups, tags and thanking are for the roles that look after donors (team roles, 10/11/2026).
+  const canCare = await viewerCan(id, "message");
   if (!/^[0-9a-f-]{36}$/i.test(donorId)) notFound();
   const donor = (await loadDonors(id)).find((d) => d.donor_id === donorId);
   if (!donor) notFound();
@@ -133,7 +136,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
               </ul>
             </details>
           ) : null}
-          <ReminderForm action={addDonorReminder.bind(null, id, donorId)} today={today} />
+          {canCare ? <ReminderForm action={addDonorReminder.bind(null, id, donorId)} today={today} /> : null}
         </div>
       </Card>
 
@@ -151,13 +154,13 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
           ) : (
             <p className="text-muted">No tags yet. Tags are your own labels, for finding donors later (Donors, filter by tag).</p>
           )}
-          <TagForm action={addDonorTag.bind(null, id, donorId)} existing={tags.filter((t) => !mine.has(t.id)).map((t) => t.name)} />
+          {canCare ? <TagForm action={addDonorTag.bind(null, id, donorId)} existing={tags.filter((t) => !mine.has(t.id)).map((t) => t.name)} /> : null}
         </div>
       </Card>
 
       <Card title={`Notes${notes.length ? ` (${notes.length})` : ""}`}>
         <div className="space-y-3 text-sm">
-          <NoteForm action={addDonorNote.bind(null, id, donorId)} />
+          {canCare ? <NoteForm action={addDonorNote.bind(null, id, donorId)} /> : null}
           <ul className="space-y-3">
             {notes.map((n) => (
               <li key={n.id} className="rounded-control border-2 border-border p-3">

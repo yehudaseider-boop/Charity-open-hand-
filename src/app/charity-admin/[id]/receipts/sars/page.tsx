@@ -7,6 +7,7 @@ import { FocusOnArrive } from "@/components/done-panel-parts";
 import { SupportContact } from "@/components/legal";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { formatDate, formatDateTime, isoDateInJhb, taxYearFor, taxYearName } from "@/lib/dates";
 import { firstParam } from "@/lib/form";
@@ -29,8 +30,9 @@ const SHOWN = 100;
 
 /**
  * The charity's IT3(d) submission to SARS (03/11/2026): choose the tax year and period, see what must be fixed and
- * the totals, then download the eFiling capture sheet or the SARS data file. Owner only (the files hold donors' full
- * ID numbers); on the page an ID shows only its last 4 digits.
+ * the totals, then download the eFiling capture sheet or the SARS data file. For the roles with downloads (owner, admin,
+ * finance: team roles, 10/11/2026), as the files hold donors' full ID numbers; on the page an ID shows only its last 4
+ * digits. The charity's SARS registration details stay the owner's to change.
  */
 export default async function SarsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/receipts/sars">) {
   const { id } = await params;
@@ -38,7 +40,9 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
   const k = formKey(sp);
   await requireViewer(`/charity-admin/${id}/receipts/sars`);
   const { charity, priv } = await loadCharityForManager(id);
-  const owner = (await viewerRole(id)) === "owner";
+  const role = await viewerRole(id);
+  const owner = can(role, "export");
+  const isTheOwner = role === "owner";
   const here = `/charity-admin/${id}/receipts/sars`;
   const back = <Link href={`/charity-admin/${id}/receipts`} className="text-muted hover:text-brand hover:underline">← s18A receipts</Link>;
   const intro = (
@@ -52,7 +56,7 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
     return (
       <div className="space-y-5">
         <PageHeader back={back} title="SARS submission (IT3(d))" intro={intro} />
-        <Notice>Only your charity&apos;s owner can see and download the SARS files, because they hold donors&apos; ID numbers. Ask your owner to do it.</Notice>
+        <Notice>Your role doesn&apos;t include the SARS files, because they hold donors&apos; ID numbers. Ask your charity&apos;s owner, or someone whose role includes downloads.</Notice>
       </div>
     );
   }
@@ -232,8 +236,12 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
             Your charity submits its own IT3(d), so SARS needs these about your charity. Your contact person ({priv?.contact_name ?? "not set"}) and their phone and email go in too:
             change them in <Link href={`/charity-admin/${id}/application?step=contact`} className="text-brand underline">your contact details</Link>.
           </p>
-          <SarsDetailsForm key={k} action={saveSarsDetails.bind(null, id, choice.taxYear, choice.period)}
-            values={{ tax: (sars?.tax_reference_number as string | null) ?? null, form: (sars?.legal_form as string | null) ?? null, reg: (sars?.registration_number as string | null) ?? null }} />
+          {isTheOwner ? (
+            <SarsDetailsForm key={k} action={saveSarsDetails.bind(null, id, choice.taxYear, choice.period)}
+              values={{ tax: (sars?.tax_reference_number as string | null) ?? null, form: (sars?.legal_form as string | null) ?? null, reg: (sars?.registration_number as string | null) ?? null }} />
+          ) : (
+            <p className="text-sm text-muted">Only your charity&apos;s owner can change these. Tax reference: {(sars?.tax_reference_number as string | null) ? "on file" : "not set"}.</p>
+          )}
         </Card>
       </section>
     </div>

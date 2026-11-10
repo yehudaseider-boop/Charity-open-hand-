@@ -38,13 +38,25 @@ export function OrganisationSummary({ c }: {
   );
 }
 
-export function PrivateSummary({ p }: {
+export function PrivateSummary({ p, hideBank = false }: {
   p: {
     contact_name: string | null; contact_email: string | null; contact_phone: string | null;
     bank_name: string | null; bank_account_holder: string | null; bank_account_last4: string | null;
     bank_branch_code: string | null; bank_verified_at: string | null;
   } | null;
+  /** The bank account is for the owner and finance only (team roles, 10/11/2026). */
+  hideBank?: boolean;
 }) {
+  if (hideBank) {
+    return (
+      <Rows rows={[
+        ["Contact person", p?.contact_name],
+        ["Contact email", p?.contact_email],
+        ["Contact phone", p?.contact_phone],
+        ["Bank account", "Shown to your charity's owner and finance only"],
+      ]} />
+    );
+  }
   return (
     <Rows rows={[
       ["Contact person", p?.contact_name],

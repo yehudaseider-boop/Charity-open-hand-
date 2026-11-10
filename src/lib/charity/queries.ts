@@ -7,12 +7,26 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import type { DocumentType } from "./validation";
+import { can } from "./permissions";
+import { viewerRole } from "./team";
 
 export const CHARITY_FIELDS =
   "id, slug, quickgive_code, name_en, legal_name_en, description_en, funds_use_en, thank_you_en, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many, suggested_amounts_cents, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, address_line1, address_line2, suburb, city, postal_code, status, rejection_reason, is_verified, verified_at, is_s18a, s18a_confirmed_at, mandate_signed_at, mandate_document_path, gateway, gateway_subaccount_ref, approved_at, created_at, updated_at";
 
 export const PRIVATE_FIELDS =
   "charity_id, contact_name, contact_email, contact_phone, bank_name, bank_account_holder, bank_account_last4, bank_branch_code, bank_verified_at, notify_donations";
+/** What every member reads as themselves; the bank columns are closed to browsers (migration 20261110000009). */
+const MEMBER_PRIVATE_FIELDS = "charity_id, contact_name, contact_email, contact_phone, notify_donations";
+const BANK_FIELDS = "bank_name, bank_account_holder, bank_account_last4, bank_branch_code, bank_verified_at";
+const NO_BANK = { bank_name: null, bank_account_holder: null, bank_account_last4: null, bank_branch_code: null, bank_verified_at: null };
+
+export type PrivateRow = {
+  charity_id: string; contact_name: string | null; contact_email: string | null; contact_phone: string | null;
+  bank_name: string | null; bank_account_holder: string | null; bank_account_last4: string | null; bank_branch_code: string | null;
+  bank_verified_at: string | null; notify_donations: boolean | null;
+  /** A bank account is saved (the account itself is only filled in for the owner and finance). */
+  bank_set: boolean;
+};
 
 export type CharityDocument = {
   id: string;
@@ -47,7 +61,7 @@ export async function loadCharityForManager(id: string) {
     // Gateway and mandate fields are closed to every client, so the server reads
     // the charity row itself, now that it knows this person manages it.
     createAdminClient().from("charities").select(CHARITY_FIELDS).eq("id", id).maybeSingle(),
-    supabase.from("charity_private").select(PRIVATE_FIELDS).eq("charity_id", id).maybeSingle(),
+    supabase.from("charity_private").select(MEMBER_PRIVATE_FIELDS).eq("charity_id", id).maybeSingle(),
     supabase
       .from("charity_documents")
       .select("id, document_type, file_name, storage_path, signed_on, uploaded_at")
@@ -58,9 +72,23 @@ export async function loadCharityForManager(id: string) {
   if (charity.error) throw charity.error;
   if (!charity.data) notFound();
 
+  // The bank account: the owner and finance (and Givezy) only (team roles, 10/11/2026), read by the server after
+  // that check. Everyone else gets the same shape with the bank left empty, and pages say who can see it.
+  // Whether a bank account is saved (for the application's checklist) is known to everyone; the account itself isn't.
+  const canBank = can(await viewerRole(id), "bank_view");
+  let bank: Record<string, unknown> = NO_BANK;
+  let bankSet = false;
+  if (priv.data) {
+    const { data, error } = await createAdminClient().from("charity_private").select(BANK_FIELDS).eq("charity_id", id).maybeSingle();
+    if (error) throw error;
+    bankSet = Boolean(data?.bank_account_last4 && data?.bank_branch_code);
+    if (canBank) bank = data ?? NO_BANK;
+  }
+
   return {
     charity: charity.data,
-    priv: priv.data,
+    priv: priv.data ? ({ ...priv.data, ...bank, bank_set: bankSet } as Record<string, unknown> as PrivateRow) : null,
+    canBank,
     documents: (docs.data ?? []) as CharityDocument[],
     categoryIds: (cats.data ?? []).map((c) => c.category_id as string),
   };

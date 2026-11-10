@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { getViewer } from "@/lib/auth";
+import { can } from "@/lib/charity/permissions";
 import { memberRole } from "@/lib/charity/team";
 import { hasSecondStep } from "@/lib/mfa";
 import { hitRateLimit } from "@/lib/rate-limit";
@@ -11,8 +12,8 @@ import { buildIt3d, type It3dPeriod, type It3dResult } from "./it3d";
 import { loadIt3dCharity, loadIt3dReceipts } from "./it3d-store";
 
 /**
- * The IT3(d) downloads hold donors' full ID numbers, so they are for the charity's owner only (as for thank-donors
- * and contact imports), with the second step done, and limited like the other exports. A refusal is a status and
+ * The IT3(d) downloads hold donors' full ID numbers, so they are for the roles with downloads (owner, admin and finance:
+ * team roles, 10/11/2026), with the second step done, and limited like the other exports. A refusal is a status and
  * one plain message for the page to show (the page fetches the file and says what happened).
  */
 export async function authoriseIt3d(charityId: string): Promise<{ userId: string } | { status: number; message: string }> {
@@ -25,7 +26,7 @@ export async function authoriseIt3d(charityId: string): Promise<{ userId: string
   ]);
   if (!manages && !isAdmin) return { status: 404, message: "This download isn't available to you. Nothing was downloaded." };
   if (!(await hasSecondStep())) return { status: 403, message: "Please complete your second step first (reload this page), then try again. Nothing was downloaded." };
-  if ((await memberRole(charityId, user.userId)) !== "owner") return { status: 403, message: "Only your charity's owner can download the SARS files, because they hold donors' ID numbers. Nothing was downloaded." };
+  if (!can(await memberRole(charityId, user.userId), "export")) return { status: 403, message: "Your role doesn't include the SARS files, because they hold donors' ID numbers. Nothing was downloaded." };
   if (await hitRateLimit("charity-export", [`user:${user.userId}`], 10, 10)) {
     return { status: 429, message: "Too many downloads in a few minutes. Nothing was downloaded. Please wait a few minutes and try again." };
   }

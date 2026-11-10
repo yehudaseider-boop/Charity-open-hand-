@@ -22,6 +22,7 @@ import { formatDate, isoDateInJhb, taxYearFor } from "@/lib/dates";
 import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { refusal } from "@/lib/charity/team";
 
 const FIELDS: GiftField[] = [
   "date", "amount", "method", "donor_type", "first_name", "last_name", "organisation_name", "registration_number", "email", "phone",
@@ -34,6 +35,8 @@ const giftName = (g: CleanGift) => (g.donorType === "individual" ? `${g.firstNam
 export async function recordOneGift(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "gifts");
+  if (refused) return { ok: false, message: refused };
   const f: GiftFields = {};
   for (const k of FIELDS) f[k] = String(formData.get(k) ?? "");
   f.wants_18a = formData.get("wants_18a") === "on" ? "yes" : "no";
@@ -90,6 +93,8 @@ export type ImportPreview =
 /** Check a file and its rows against the charity's campaigns and what it already recorded. Writes nothing. */
 async function checkUpload(charityId: string, text: string, method: string) {
   const { charity } = await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "gifts");
+  if (refused) return { file: { ok: false as const, message: refused }, charity, campaigns: new Map<string, string>() };
   const fallbackMethod = isRecordedMethod(method) ? method : null;
   const file = checkFile(text, { today: isoDateInJhb(), fallbackMethod, seen: await recordedKeys(charityId) });
   if (!file.ok) return { file, charity, campaigns: new Map<string, string>() };
@@ -191,6 +196,8 @@ export async function importGifts(charityId: string, _prev: FormState, formData:
 export async function removeRecordedGifts(charityId: string, target: { donationId?: string; importId?: string }, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
+  const refused = await refusal(charityId, "gifts");
+  if (refused) return { ok: false, message: refused };
   const id = target.importId ?? target.donationId ?? "";
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Nothing to remove." };
   const r = await removeRecorded({ charityId, userId: viewer.userId, ...target });

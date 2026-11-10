@@ -6,13 +6,15 @@ import { getViewer } from "@/lib/auth";
 import { hasSecondStep } from "@/lib/mfa";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { can, refusedFor, type Permission } from "./permissions";
+import { memberRole } from "./team";
 
 /**
  * Checks that the signed-in person manages this charity (or is a platform admin)
  * and may export again (a few exports every few minutes). Returns the person,
  * or a response to send straight back.
  */
-export async function authoriseExport(id: string): Promise<{ userId: string } | NextResponse> {
+export async function authoriseExport(id: string, permission: Permission = "export"): Promise<{ userId: string } | NextResponse> {
   const supabase = await createClient();
   // The viewer, not just any user: a session started with a password sees nothing (see auth.ts).
   const user = await getViewer();
@@ -23,6 +25,8 @@ export async function authoriseExport(id: string): Promise<{ userId: string } | 
   ]);
   if (!manages && !isAdmin) return refusal("This download isn't available to you.", 404, "/charity-admin", "Back to your charities");
   if (!(await hasSecondStep())) return refusal("Please complete your second step first, then try the download again.", 403, `/mfa?next=${encodeURIComponent(`/charity-admin/${id}`)}`, "Complete the second step");
+  // Downloads by role (team roles, 10/11/2026): owner, admin and finance; payouts, the owner and finance.
+  if (!can(await memberRole(id, user.userId), permission)) return refusal(refusedFor(permission), 403, `/charity-admin/${id}`, "Back to your dashboard");
   if (await hitRateLimit("charity-export", [`user:${user.userId}`], 10, 10)) {
     return refusal("Too many downloads in a few minutes. Nothing was downloaded. Please wait a few minutes and try again.", 429, `/charity-admin/${id}`, "Back to your dashboard");
   }
