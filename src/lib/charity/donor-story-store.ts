@@ -6,6 +6,11 @@ import type { StoryRows } from "./donor-story";
 
 /** Until a migration has run on a project there is no such table: that part of the story is simply empty. */
 const isMissingTable = (e: { code?: string } | null | undefined) => e?.code === "PGRST205" || e?.code === "42P01";
+/** A table or a column a newer migration adds, not yet run on this project: that part of the story is empty. */
+const isNotSetUp = (e: { code?: string } | null | undefined) => isMissingTable(e) || e?.code === "42703" || e?.code === "PGRST204";
+
+/** Gifts that really happened: only their addresses can have received the charity's monthly thank-you. */
+const COUNTED = ["paid", "refunded", "charged_back"];
 
 const LIMIT = 500;
 
@@ -18,7 +23,7 @@ const LIMIT = 500;
  */
 export async function loadDonorStory(charityId: string, donorId: string, notes: { created_at: string; author: string | null }[]): Promise<StoryRows> {
   const db = createAdminClient();
-  const [donations, monthly, thanks, appeals, receipts, declined, enrolment] = await Promise.all([
+  const [donations, monthly, thanksWithKind, appeals, receipts, declinedRead, enrolment, donorRow] = await Promise.all([
     db
       .from("donations")
       .select("id, status, amount_cents, paid_at, created_at, recorded_method, recurring_id, donation_checkout_details(email, erased_at)")
@@ -37,9 +42,21 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
     db.from("s18a_receipts").select("receipt_number, tax_year, amount_cents, status, issued_at, voided_at, emailed_at").eq("charity_id", charityId).eq("donor_id", donorId).limit(LIMIT),
     db.from("receipt_plan_decisions").select("tax_year, decided_at, decline_emailed_at").eq("charity_id", charityId).eq("donor_id", donorId).eq("decision", "declined").limit(LIMIT),
     db.from("charity_journey_enrolments").select("id, enrolled_at, status, stopped_reason").eq("charity_id", charityId).eq("donor_id", donorId).maybeSingle(),
+    db.from("donors").select("email").eq("id", donorId).maybeSingle(),
   ]);
-  for (const r of [donations, monthly, thanks, appeals, receipts, declined]) if (r.error) throw r.error;
+  for (const r of [donations, monthly, appeals, receipts, donorRow]) if (r.error) throw r.error;
   if (enrolment.error && !isMissingTable(enrolment.error)) throw enrolment.error;
+  // Receipt decisions (20261110000001) may not be on this project yet: then there are none to show.
+  if (declinedRead.error && !isNotSetUp(declinedRead.error)) throw declinedRead.error;
+  const declined = declinedRead.error ? [] : (declinedRead.data ?? []);
+  // The kind of message (20261110000002) may not be on this project yet: then every row is a personal thank-you.
+  let thanks = (thanksWithKind.data ?? []) as { kind?: string | null; sent_at: string }[];
+  if (thanksWithKind.error) {
+    if (!isNotSetUp(thanksWithKind.error)) throw thanksWithKind.error;
+    const plain = await db.from("charity_donor_thanks").select("sent_at").eq("charity_id", charityId).eq("donor_id", donorId).order("sent_at", { ascending: false }).limit(LIMIT);
+    if (plain.error && !isNotSetUp(plain.error)) throw plain.error;
+    thanks = plain.error ? [] : ((plain.data ?? []) as { sent_at: string }[]);
+  }
 
   type DonationRow = { id: string; status: string; amount_cents: number | string; paid_at: string | null; created_at: string; recorded_method: string | null; recurring_id: string | null; donation_checkout_details: unknown };
   const rows = (donations.data ?? []) as DonationRow[];
@@ -47,14 +64,19 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
   // When each monthly donation first went through: the dashboard counts a monthly donation only once it has.
   const firstPaid = new Map<string, string>();
   for (const d of rows) {
-    if (!d.recurring_id || !d.paid_at || !["paid", "refunded", "charged_back"].includes(d.status)) continue;
+    if (!d.recurring_id || !d.paid_at || !COUNTED.includes(d.status)) continue;
     const had = firstPaid.get(d.recurring_id);
     if (!had || d.paid_at < had) firstPaid.set(d.recurring_id, d.paid_at);
   }
 
-  // The monthly thank-you goes by address (kept only as a hash): this donor's addresses on their gifts to this charity.
+  // The monthly thank-you goes by address (kept only as a hash): this donor's own address and the addresses on their
+  // gifts to this charity that went through. A failed or abandoned checkout may carry a mistyped or someone else's
+  // address, so it never counts.
   const hashes = new Set<string>();
+  const own = (donorRow.data as { email?: string | null } | null)?.email;
+  if (own && !isErasedEmail(own)) hashes.add(emailHash(own));
   for (const d of rows) {
+    if (!COUNTED.includes(d.status)) continue;
     const raw = d.donation_checkout_details;
     const c = (Array.isArray(raw) ? raw[0] : raw) as { email: string | null; erased_at: string | null } | null;
     if (c?.email && !c.erased_at && !isErasedEmail(c.email)) hashes.add(emailHash(c.email));
@@ -112,7 +134,7 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
       paused_at: m.paused_at as string | null,
       ended_reason: m.ended_reason as string | null,
     })),
-    thanks: (thanks.data ?? []).map((t) => ({ kind: (t.kind as string) ?? "thank_you", sent_at: t.sent_at as string })),
+    thanks: thanks.map((t) => ({ kind: t.kind ?? "thank_you", sent_at: t.sent_at })),
     appeals: (appeals.data ?? []).map((a) => {
       const raw = a.charity_appeals as unknown;
       const appeal = (Array.isArray(raw) ? raw[0] : raw) as { subject: string | null; created_at: string | null } | null;
@@ -129,7 +151,7 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
       voided_at: r.voided_at as string | null,
       emailed_at: r.emailed_at as string | null,
     })),
-    declined: (declined.data ?? []).map((d) => ({ tax_year: Number(d.tax_year), decided_at: d.decided_at as string, decline_emailed_at: d.decline_emailed_at as string | null })),
+    declined: declined.map((d) => ({ tax_year: Number(d.tax_year), decided_at: d.decided_at as string, decline_emailed_at: d.decline_emailed_at as string | null })),
     notes,
   };
 }

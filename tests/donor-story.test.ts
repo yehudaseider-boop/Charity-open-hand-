@@ -128,12 +128,18 @@ type Call = { table: string; select: string; filters: [string, string, unknown][
 const calls: Call[] = [];
 let answer: Record<string, unknown[]> = {};
 let missing = new Set<string>();
+/** A column a newer migration adds, missing here: "table:column" fails any select that names it. */
+let missingColumns = new Set<string>();
 
 function from(table: string) {
   const call: Call = { table, select: "", filters: [] };
   calls.push(call);
   const q: Record<string, unknown> = {};
-  const result = () => (missing.has(table) ? { data: null, error: { code: "PGRST205", message: "missing" } } : { data: answer[table] ?? [], error: null });
+  const result = () => {
+    if (missing.has(table)) return { data: null, error: { code: "PGRST205", message: "missing" } };
+    if ([...missingColumns].some((tc) => tc.startsWith(`${table}:`) && call.select.split(/[ ,]+/).includes(tc.split(":")[1]))) return { data: null, error: { code: "42703", message: "no column" } };
+    return { data: answer[table] ?? [], error: null };
+  };
   Object.assign(q, {
     select: (s: string) => ((call.select = s), q),
     eq: (c: string, v: unknown) => (call.filters.push([c, "eq", v]), q),
@@ -157,6 +163,7 @@ beforeEach(() => {
   calls.length = 0;
   answer = {};
   missing = new Set();
+  missingColumns = new Set();
 });
 
 describe("loading a donor's story", () => {
@@ -165,7 +172,11 @@ describe("loading a donor's story", () => {
       donations: [
         { id: "d1", status: "paid", amount_cents: "5000", paid_at: "2026-03-02T08:00:00Z", created_at: "2026-03-02T08:00:00Z", recorded_method: null, recurring_id: "r1", donation_checkout_details: { email: "Ann@Example.org ", erased_at: null } },
         { id: "d2", status: "paid", amount_cents: "5000", paid_at: "2026-02-02T08:00:00Z", created_at: "2026-02-02T08:00:00Z", recorded_method: null, recurring_id: "r1", donation_checkout_details: [{ email: "gone@erased.invalid", erased_at: null }] },
+        // A failed checkout with someone else's (or a mistyped) address: it must never attribute their thank-you here.
+        { id: "d3", status: "failed", amount_cents: "5000", paid_at: null, created_at: "2026-02-03T08:00:00Z", recorded_method: null, recurring_id: null, donation_checkout_details: { email: "stranger@example.org", erased_at: null } },
+        { id: "d4", status: "pending", amount_cents: "5000", paid_at: null, created_at: "2026-02-04T08:00:00Z", recorded_method: null, recurring_id: null, donation_checkout_details: { email: "typo@exmaple.org", erased_at: null } },
       ],
+      donors: [{ email: "ann.account@example.org" }],
       recurring_donations: [{ id: "r1", status: "active", amount_cents: "5000", paused_at: null, cancelled_at: null, updated_at: "2026-03-02T08:00:00Z", ended_reason: null }],
       charity_thank_yous: [{ id: "t1", period_month: "2026-03-01" }],
       charity_thank_you_recipients: [
@@ -181,7 +192,7 @@ describe("loading a donor's story", () => {
     expect(calls.find((x) => x.table === "charity_thank_yous")!.filters).toEqual([["charity_id", "eq", "c1"]]);
     expect(calls.find((x) => x.table === "charity_thank_you_recipients")!.filters).toEqual([
       ["thank_you_id", "in", ["t1"]],
-      ["email_hash", "in", [emailHash("ann@example.org")]],
+      ["email_hash", "in", [emailHash("ann.account@example.org"), emailHash("ann@example.org")]],
     ]);
     for (const c of calls) {
       expect(c.select).not.toMatch(/\bbody\b|\bdetails\b|\bnote\b|id_number|tax_number/);
@@ -205,6 +216,24 @@ describe("loading a donor's story", () => {
     const out = await loadDonorStory("c1", "dn1", []);
     expect(calls.find((x) => x.table === "charity_journey_sends")!.filters).toEqual([["charity_id", "eq", "c1"], ["enrolment_id", "eq", "e1"]]);
     expect(out.journey?.sends).toEqual([{ position: 1, status: "sent", at: "2026-10-02T08:00:00Z" }]);
+  });
+
+  it("shows no declined receipts, and reads thank-yous without their kind, where those migrations haven't run yet", async () => {
+    missing = new Set(["receipt_plan_decisions"]);
+    missingColumns = new Set(["charity_donor_thanks:kind"]);
+    answer = { charity_donor_thanks: [{ sent_at: "2026-03-03T08:00:00Z" }] };
+    const out = await loadDonorStory("c1", "dn1", []);
+    expect(out.declined).toEqual([]);
+    expect(out.thanks).toEqual([{ kind: "thank_you", sent_at: "2026-03-03T08:00:00Z" }]);
+    const reads = calls.filter((c) => c.table === "charity_donor_thanks");
+    expect(reads.map((c) => c.select)).toEqual(["kind, sent_at", "sent_at"]);
+    expect(reads[1].filters).toEqual([["charity_id", "eq", "c1"], ["donor_id", "eq", "dn1"]]);
+    expect(buildDonorStory(out, { base, erased: false }).map((e) => e.what)).toEqual(["Your personal thank-you"]);
+  });
+
+  it("an older project with no weekly-claim table at all still shows the rest", async () => {
+    missing = new Set(["charity_donor_thanks"]);
+    await expect(loadDonorStory("c1", "dn1", [])).resolves.toMatchObject({ thanks: [] });
   });
 
   it("stops on any other read error, so the page says it couldn't load rather than showing half a story", async () => {
