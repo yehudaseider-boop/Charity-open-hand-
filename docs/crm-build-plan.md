@@ -32,6 +32,9 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
    charity can change the wording (with a preview and "back to Givezy's wording").
 6. **Donor journeys** (1.1, 1.2, and the Thank donors tab folded in, 5). Built in three chunks:
    - 6a. One general journey: steps (email, wait X days), on/off, who is at which step.
+     **Built 10/11/2026, not yet on the test site** (migration `20261110000007_donor_journey.sql` waits for Yehuda's yes;
+     details in `docs/decisions.md`). As built: new donors join on their first gift after it is switched on; the owner can
+     add existing donors (asked first); no typed links; at most 5 emails; daily sending shares the one-a-week claim.
    - 6b. Campaign journeys: donating to a campaign enrols the donor.
    - 6c. One limit across all journeys and thank-yous. Decided 09/11/2026: at most one message a week per donor.
    In-app messages come after push notifications (step 10).

@@ -12,6 +12,11 @@ const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f​-‏‪-
 /** A web address, however it is typed: "https://…", "www.…" or "example.org.za/page". */
 const WEB_ADDRESS = /(?:https?:\/\/|www\.)\S|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:co\.za|org\.za|net\.za|ac\.za|gov\.za|com|org|net|africa|io|ly|me)\b/i;
 
+/** Does the text hold a web address, however typed (an email address alone is fine). Also used for donor journey emails. */
+export function hasWebAddress(text: string): boolean {
+  return WEB_ADDRESS.test(text.replace(/\S+@\S+/g, ""));
+}
+
 /**
  * The note as it is kept and shown: no hidden or control characters, line breaks kept (at most one empty
  * line in a row), no spaces at the ends of lines, trimmed. Null when nothing is left.

@@ -3,6 +3,7 @@ import { runMonthlyGiving } from "@/lib/donations/monthly-store";
 import { syncPayouts } from "@/lib/donations/payouts";
 import { alertGivezy, cronAllowed } from "@/lib/ops/alert";
 import { collectMonthlyWithin, dailyDigest, runDailyChecks } from "@/lib/ops/daily";
+import { runJourneys } from "@/lib/charity/journey-store";
 
 /**
  * Everything that runs once a day, in order: collect the monthly donations that are due, read the payment
@@ -45,6 +46,15 @@ async function handle(request: NextRequest) {
     monthlyStopped: monthly?.stopped ?? 0,
     payoutsFailed: payouts === null || payouts.failed.length > 0,
   });
+  // Last, in what time is left: charities' donor journeys (CRM step 6a). Capped per run; the rest go tomorrow. A
+  // problem here never stops the checks above, and nothing is marked sent unless it went.
+  const journeys = Date.now() < started + 56_000
+    ? await runJourneys(new Date(), started + 56_000).catch((e) => {
+        console.error("[daily] journeys failed", e instanceof Error ? e.message : e);
+        return null;
+      })
+    : null;
+  if (journeys === null) lines.push("Donor journey emails didn't run today (see the job log). Nothing was sent twice; they try again tomorrow.");
   if (lines.length) await alertGivezy(`${lines.length} ${lines.length === 1 ? "thing needs" : "things need"} a person today`, lines);
   // Only counts come back: no donor details.
   const counts = (a: unknown[]) => a.length;
@@ -53,6 +63,7 @@ async function handle(request: NextRequest) {
       monthly: monthly && { ...monthly, waiting: counts(monthly.waiting), review: counts(monthly.review), errors: counts(monthly.errors) },
       payouts: payouts && { ...payouts, failed: counts(payouts.failed) },
       checks,
+      journeys,
       attention: lines.length,
     },
     { headers: { "Cache-Control": "no-store" } },

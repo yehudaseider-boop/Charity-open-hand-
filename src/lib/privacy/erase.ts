@@ -65,6 +65,10 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       const { error: careError } = await db.from(table).delete().in("donor_id", [...ids]);
       if (careError) throw careError;
     }
+    // Their place on charities' donor journeys (the send log goes with it). Until the journey's migration has run there
+    // is no such table, and that must never stop an erasure.
+    const { error: journeyError } = await db.from("charity_journey_enrolments").delete().in("donor_id", [...ids]);
+    if (journeyError && journeyError.code !== "PGRST205" && journeyError.code !== "42P01") throw new Error(`Could not erase: ${journeyError.message}`);
     // The charities' personal thank-yous to them, and their name in the dashboard's "what just happened" rows.
     const { error: thanksError } = await db.from("charity_donor_thanks").delete().in("donor_id", [...ids]);
     if (thanksError) throw new Error(`Could not erase: ${thanksError.message}`);

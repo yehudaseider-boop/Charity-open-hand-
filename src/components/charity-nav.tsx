@@ -22,6 +22,7 @@ const groups = [
     tabs: [
       { href: "/donors", label: "Donors" },
       { href: "/thank-donors", label: "Thank donors" },
+      { href: "/journey", label: "Donor journey" },
       { href: "/email-donors", label: "Email donors" },
       { href: "/team", label: "Team" },
     ],

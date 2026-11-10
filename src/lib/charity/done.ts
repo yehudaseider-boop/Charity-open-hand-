@@ -3,6 +3,7 @@ import { reviewWithin } from "@/lib/charity/review-time";
 import { taxYearName } from "@/lib/dates";
 import { REMINDER_SKIPS, reminderOutcome } from "@/lib/charity/s18a-reminder";
 import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
+import { EXISTING_SKIPS, existingOutcome } from "@/lib/charity/journey";
 
 /** "2026/27" from a stored tax year, or empty when it is missing. */
 const yearName = (y: unknown) => (Number.isInteger(Number(y)) && Number(y) > 2000 ? taxYearName(Number(y)) : "");
@@ -55,7 +56,11 @@ export type ActionKind =
   | "certificate_edited"
   | "certificate_declined"
   | "certificate_reopened"
-  | "s18a_reminders_sent";
+  | "s18a_reminders_sent"
+  | "journey_saved"
+  | "journey_on"
+  | "journey_off"
+  | "journey_existing_added";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
 export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed", "certificate_declined", "s18a_reminders_sent"];
@@ -175,6 +180,30 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       return {
         what: `Your thank-you went to ${String(d.name ?? "your donor")}.${d.replyTo ? ` If they reply, it goes to ${String(d.replyTo)}.` : ""}`,
         next: { label: "Back to your donors", href: `${c.base}/donors` },
+      };
+    case "journey_saved":
+      return {
+        what: `Your donor journey is saved: ${plural(Number(d.steps ?? 0), "email")}. ${d.on ? "Donors on it get the new wording from their next email." : "It's off, so nothing is sent until you switch it on."}`,
+        next: d.on ? { label: "See who is on your journey", href: `${c.base}/journey#people` } : { label: "Switch your journey on", href: `${c.base}/journey#switch` },
+      };
+    case "journey_on":
+      return {
+        what: `Your donor journey is on. From now, each new donor joins on their first gift and gets ${plural(Number(d.steps ?? 0), "email")} from you, never more than one message from you a week.`,
+        next: { label: "Add your existing donors too", href: `${c.base}/journey#existing` },
+      };
+    case "journey_off":
+      return {
+        what: "Your donor journey is off. Nobody gets a journey email and nobody new joins until you switch it on again. Everyone keeps their place.",
+        next: { label: "Back to your donor journey", href: `${c.base}/journey` },
+      };
+    case "journey_existing_added":
+      return {
+        what: existingOutcome({
+          added: Number(d.added ?? 0),
+          skipped: Object.fromEntries(EXISTING_SKIPS.map((k) => [k, Number(d[`skipped_${k}`] ?? 0)])),
+          firstEmail: d.firstEmail ? String(d.firstEmail) : null,
+        }),
+        next: { label: "See who is on your journey", href: `${c.base}/journey#people` },
       };
     case "s18a_reminders_sent":
       return {
@@ -298,6 +327,10 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;
     case "receipts_approved": return `Taken back. Your approval for the ${yearName(d.taxYear)} tax year is withdrawn and nothing will be issued. You can approve the list again when you're ready.`;
     case "contacts_imported": return `Taken back. The ${plural(Number(d.contacts ?? 0), "donor")} from ${quote(d.file)} ${Number(d.contacts ?? 0) === 1 ? "is" : "are"} removed from your list.`;
+    case "journey_saved": return "Taken back. Your donor journey's emails are as they were before.";
+    case "journey_on": return "Taken back. Your donor journey is off again.";
+    case "journey_off": return "Taken back. Your donor journey is on again.";
+    case "journey_existing_added": return "Taken back. The donors you added are off your journey. Nobody was emailed.";
     case "application_submitted":
     case "thank_you_sent":
     case "contacts_removed":
@@ -322,6 +355,7 @@ export function pageOf(kind: ActionKind): string {
   if (kind === "gift_recorded" || kind === "gifts_imported" || kind === "gifts_removed") return "donations";
   if (kind === "member_added" || kind === "member_removed") return "team";
   if (kind === "appeal_sent") return "email-donors";
+  if (kind.startsWith("journey_")) return "journey";
   return "application";
 }
 
@@ -339,6 +373,7 @@ const KINDS = new Set<ActionKind>([
   "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
   "contacts_imported", "contacts_removed", "sars_details_saved",
   "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened", "s18a_reminders_sent",
+  "journey_saved", "journey_on", "journey_off", "journey_existing_added",
 ]);
 
 /** A planned s18A receipt's preview page. */

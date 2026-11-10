@@ -79,10 +79,10 @@ export async function lastReminded(charityId: string, donorIds: string[]): Promi
   return out;
 }
 
-type Contact = { email: string; greeting: string | null };
+export type Contact = { email: string; greeting: string | null };
 
 /** Each donor's address and greeting from their latest paid gift on Givezy (never a gift the charity recorded: an address Givezy never checked). */
-async function contacts(charityId: string, donorIds: string[]): Promise<{ found: Set<string>; erased: Set<string>; byDonor: Map<string, Contact> }> {
+export async function contacts(charityId: string, donorIds: string[]): Promise<{ found: Set<string>; erased: Set<string>; byDonor: Map<string, Contact> }> {
   const found = new Set<string>();
   const erased = new Set<string>();
   const byDonor = new Map<string, Contact>();
@@ -114,7 +114,7 @@ async function contacts(charityId: string, donorIds: string[]): Promise<{ found:
 }
 
 /** Addresses (as hashes) that turned off this charity's emails. */
-async function optedOutHashes(charityId: string, hashes: string[]): Promise<Set<string>> {
+export async function optedOutHashes(charityId: string, hashes: string[]): Promise<Set<string>> {
   const out = new Set<string>();
   for (let i = 0; i < hashes.length; i += 200) {
     // This charity's opt-outs and "no emails from charities" overall, as appeals check (stoppedEmails).
