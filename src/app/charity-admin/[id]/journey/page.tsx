@@ -32,8 +32,9 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
   const journey = await loadJourney(id);
   const [states, people] = await Promise.all([enrolmentStates(id), journeyPeople(id)]);
   const counts = journeyCounts(states, journey.steps.length);
-  const existing = owner && approved && journey.enabled && journey.steps.length ? await planExistingDonors(id) : null;
+  const existing = owner && approved && journey.enabled && journey.switchedOnAt && journey.steps.length ? await planExistingDonors(id, journey.switchedOnAt) : null;
   const base = `/charity-admin/${id}`;
+  const firstWait = journey.steps[0]?.waitDays ?? 0;
 
   return (
     <div className="space-y-5">
@@ -117,7 +118,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
                 </li>
                 {counts.stopped ? (
                   <li className="rounded-card bg-honey-soft p-3">
-                    <span className="font-display text-xl font-bold text-indigo tabular-nums">{counts.stopped}</span> <span className="text-muted">stopped (turned off your emails, erased, or no address)</span>
+                    <span className="font-display text-xl font-bold text-indigo tabular-nums">{counts.stopped}</span> <span className="text-muted">stopped (turned off your emails, erased, no address, no gift any more, or emails couldn&apos;t be delivered)</span>
                   </li>
                 ) : null}
               </ul>
@@ -154,7 +155,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
             ) : (
               <>
                 <p>
-                  {plural(existing.add.length, "donor")} who gave before your journey started can join it. They begin at email 1, and never get more than one
+                  {plural(existing.add.length, "donor")} who first gave before your journey was switched on can join it. They begin at email 1, and never get more than one
                   message from you a week. {existingSkippedSentence(existing.skipped)}
                 </p>
                 <ActionForm
@@ -162,7 +163,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
                   action={addExisting.bind(null, id)}
                   submitLabel={`Add ${plural(existing.add.length, "donor")}`}
                   pendingLabel="Adding…"
-                  confirm={`Add ${plural(existing.add.length, "donor")} to your journey? Their first email goes from the next morning. You can take this back for 30 minutes, until anyone has had an email.`}
+                  confirm={`Add ${plural(existing.add.length, "donor")} to your journey? Their first email goes ${firstWait === 0 ? "from the next morning" : `about ${plural(firstWait, "day")} from now, in the morning`}. You can take this back for 30 minutes, and only for those who haven't had an email yet.`}
                   confirmLabel="Yes, add them"
                 />
               </>

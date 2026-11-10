@@ -29,6 +29,56 @@ export const WAIT = { min: 7, max: 180 } as const;
 export const JOURNEY_RUN_CAP = 100;
 /** The most new donors one daily run adds, across all charities. */
 export const JOURNEY_ENROL_CAP = 500;
+/** Each charity's fair share of a run starts here; what one charity doesn't use goes to the others. */
+export const JOURNEY_MIN_SHARE = 5;
+/** Tries at one email before the donor is stopped ('not_delivered'). */
+export const MAX_ATTEMPTS = 4;
+/** An email logged as "sending" this long ago, and never confirmed, is treated as unknown: it may have gone. */
+export const STALE_SENDING_MINUTES = 30;
+/** One email's time limit. A send cut off by it may have gone, so it is never sent again. */
+export const SEND_TIMEOUT_MS = 8_000;
+
+/**
+ * After an email didn't go (refused, or an address the test site may not email): try again in 1, then 3, then 7
+ * days; after MAX_ATTEMPTS tries the donor stops, so a row that never sends can't hold up everyone else's.
+ */
+export function afterFailure(attemptsBefore: number, now: Date): { stop: true } | { stop: false; attempts: number; due: Date } {
+  const attempts = attemptsBefore + 1;
+  if (attempts >= MAX_ATTEMPTS) return { stop: true };
+  return { stop: false, attempts, due: addDays(now, [1, 3, 7][attempts - 1] ?? 7) };
+}
+
+/**
+ * An email already logged for this donor and step (the log row is written before the send). Sent: move on. Still
+ * "sending" a while later: it may have gone, so it is marked unknown and the donor moves on, never sent twice (a lost
+ * email is better than a double one). Sending just now: another run has it; leave it.
+ */
+export function existingSendAction(row: { status: string; created_at: string }, now: Date): "advance" | "mark_unknown" | "leave" {
+  if (row.status === "sent" || row.status === "unknown") return "advance";
+  return now.getTime() - new Date(row.created_at).getTime() >= STALE_SENDING_MINUTES * 60_000 ? "mark_unknown" : "leave";
+}
+
+/**
+ * How many of a run's emails each charity gets: round by round, one each, until the cap or everyone's due list is
+ * used up. A charity with thousands due can't crowd out the others.
+ */
+export function fairShares(due: ReadonlyMap<string, number>, cap: number): Map<string, number> {
+  const out = new Map([...due.keys()].map((k) => [k, 0]));
+  let left = cap;
+  let progress = true;
+  while (left > 0 && progress) {
+    progress = false;
+    for (const [k, n] of due) {
+      if (left <= 0) break;
+      if (out.get(k)! < n) {
+        out.set(k, out.get(k)! + 1);
+        left--;
+        progress = true;
+      }
+    }
+  }
+  return out;
+}
 
 export type JourneyStep = { subject: string; body: string; waitDays: number };
 
@@ -127,7 +177,7 @@ export function afterSend(sent: number, at: Date, steps: Pick<JourneyStep, "wait
   return next ? { nextStep: sent + 1, due: addDays(at, next.waitDays) } : null;
 }
 
-export type StopReason = "erased" | "opted_out" | "no_email" | "no_gift";
+export type StopReason = "erased" | "opted_out" | "no_email" | "no_gift" | "not_delivered";
 
 /** One donor whose next email is due, and what the run found out about them. */
 export type DueCandidate = {
@@ -216,6 +266,7 @@ export const STOP_WORDS: Record<StopReason, string> = {
   opted_out: "Turned off emails from you",
   no_email: "No email address on Givezy",
   no_gift: "No paid gift any more",
+  not_delivered: "Emails couldn't be delivered",
 };
 
 /** "Email 2 on 03/12/2026", "Finished", "Stopped: turned off emails from you". */

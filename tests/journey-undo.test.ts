@@ -17,7 +17,7 @@ vi.mock("@/lib/charity/journey-write", () => ({
   },
   removeEnrolments: async (_c: string, ids: string[]) => {
     removed.push(ids);
-    return removable;
+    return { removed: removable, stayed: ids.length - removable };
   },
 }));
 
@@ -73,6 +73,16 @@ beforeEach(() => {
 });
 
 describe("taking back a change to the donor journey", () => {
+  it("taking back 'switch off' switches it on from now, so people who first gave while it was off don't join as new", async () => {
+    journeyNow = structuredClone(off);
+    journeyNow.switched_on_at = on.switched_on_at;
+    tables.charity_actions = [action("journey_off", { type: "journey", before: on, after: { ...off, switched_on_at: on.switched_on_at } })];
+    const before = Date.now();
+    expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: true });
+    expect(journeyNow.enabled).toBe(true);
+    expect(new Date(journeyNow.switched_on_at!).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
   it("switching on is taken back: it is off again", async () => {
     journeyNow = structuredClone(on);
     tables.charity_actions = [action("journey_on", { type: "journey", before: off, after: on })];
@@ -106,9 +116,11 @@ describe("taking back a change to the donor journey", () => {
 
   it("added donors come off; once they have all had an email, they stay", async () => {
     tables.charity_actions = [action("journey_existing_added", { type: "journey_enrolments", ids: ["e1", "e2"] })];
-    removable = 2;
-    expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: true });
+    removable = 1;
+    expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: true, row: { details: { removed: 1, stayed: 1 } } });
     expect(removed).toEqual([["e1", "e2"]]);
+    // The record says so, for "what just happened".
+    expect(tables.charity_actions[0].details).toMatchObject({ removed: 1, stayed: 1 });
     tables.charity_actions = [action("journey_existing_added", { type: "journey_enrolments", ids: ["e3"] })];
     removable = 0;
     expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: false, why: "emailed" });

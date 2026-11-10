@@ -25,6 +25,8 @@ export type EmailMessage = {
    * List-Unsubscribe-Post, see ./headers). Never set on sign-in codes, receipts or confirmations.
    */
   headers?: Record<string, string>;
+  /** Gives up on the send when it fires (a time limit). Never sent to the provider. A send cut off this way may still have gone. */
+  signal?: AbortSignal;
 };
 
 /** "sent" means a real email left; "skipped" means nothing was sent (console transport, erased or disallowed address). */
@@ -65,6 +67,7 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
     async send(m) {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
+        ...(m.signal ? { signal: m.signal } : {}),
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           from,

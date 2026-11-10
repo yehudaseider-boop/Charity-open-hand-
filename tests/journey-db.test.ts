@@ -35,7 +35,7 @@ async function refused(sql: string, args: unknown[], pattern: RegExp) {
   await expect(run(sql, args)).rejects.toThrow(pattern);
   await run("rollback to savepoint s");
 }
-const donor = async (email = "journey.test@example.com") => (await run("insert into public.donors (email, first_name) values ($1, 'Thandi') returning id", [email])).rows[0].id as string;
+const donor = async (email = "journey.test@example.com"): Promise<string> => (await run("insert into public.donors (email, first_name) values ($1, 'Thandi') returning id", [email])).rows[0].id as string;
 const journey = async () => {
   await run("insert into public.charity_journeys (charity_id, enabled, switched_on_at) values ($1, true, now())", [charity]);
   await run("insert into public.charity_journey_steps (charity_id, position, subject, body, wait_days) values ($1, 1, 'Welcome', 'Thank you for your gift.', 2)", [charity]);
@@ -117,13 +117,74 @@ describe("the donor journey's tables", () => {
     });
   });
 
-  it("each email is logged once per donor", async () => {
+  it("each email is logged once per donor: 'sending' first, then 'sent' with when, or 'unknown'", async () => {
     await tx(async () => {
       await journey();
       const e = await enrol(await donor());
-      await run("insert into public.charity_journey_sends (enrolment_id, charity_id, position) values ($1, $2, 1)", [e, charity]);
+      const id = (await run("insert into public.charity_journey_sends (enrolment_id, charity_id, position) values ($1, $2, 1) returning id, status, sent_at", [e, charity])).rows[0];
+      expect(id).toMatchObject({ status: "sending", sent_at: null });
       await refused("insert into public.charity_journey_sends (enrolment_id, charity_id, position) values ($1, $2, 1)", [e, charity], /journey_send_once/);
       await refused("insert into public.charity_journey_sends (enrolment_id, charity_id, position) values ($1, $2, 6)", [e, charity], /journey_send_position/);
+      await refused("update public.charity_journey_sends set status = 'sent' where id = $1", [id.id], /journey_send_sent_at/);
+      await refused("update public.charity_journey_sends set sent_at = now() where id = $1", [id.id], /journey_send_sent_at/);
+      await refused("update public.charity_journey_sends set status = 'bounced' where id = $1", [id.id], /journey_send_status/);
+      await run("update public.charity_journey_sends set status = 'sent', sent_at = now() where id = $1", [id.id]);
+      await run("update public.charity_journey_sends set status = 'unknown', sent_at = null where id = $1", [id.id]);
+    });
+  });
+
+  it("tries are counted, and a donor whose emails can't be delivered is stopped with that reason", async () => {
+    await tx(async () => {
+      await journey();
+      const e = await enrol(await donor());
+      await run("update public.charity_journey_enrolments set attempts = 3 where id = $1", [e]);
+      await refused("update public.charity_journey_enrolments set attempts = -1 where id = $1", [e], /journey_enrolment_attempts/);
+      await refused("update public.charity_journey_enrolments set attempts = 11 where id = $1", [e], /journey_enrolment_attempts/);
+      await run("update public.charity_journey_enrolments set status = 'stopped', stopped_reason = 'not_delivered' where id = $1", [e]);
+    });
+  });
+
+  it("the journey is saved in one go, server only: the switch and exactly the emails given", async () => {
+    await tx(async () => {
+      const save = "select public.save_charity_journey($1, $2, $3, $4::jsonb, $5)";
+      const two = JSON.stringify([{ subject: "Welcome", body: "Thank you for your gift.", waitDays: 2 }, { subject: "More", body: "A little more about us.", waitDays: 21 }]);
+      await run(save, [charity, true, new Date().toISOString(), two, admin]);
+      expect((await run("select enabled, updated_by from public.charity_journeys where charity_id = $1", [charity])).rows[0]).toEqual({ enabled: true, updated_by: admin });
+      expect((await run("select position, subject, wait_days from public.charity_journey_steps where charity_id = $1 order by position", [charity])).rows).toEqual([
+        { position: 1, subject: "Welcome", wait_days: 2 },
+        { position: 2, subject: "More", wait_days: 21 },
+      ]);
+      // Fewer emails: the rest go. No emails: it can't be on.
+      await run(save, [charity, true, new Date().toISOString(), JSON.stringify([{ subject: "Only one", body: "Thank you for your gift.", waitDays: 0 }]), admin]);
+      expect(Number((await run("select count(*) from public.charity_journey_steps where charity_id = $1", [charity])).rows[0].count)).toBe(1);
+      await run(save, [charity, true, new Date().toISOString(), "[]", admin]);
+      expect((await run("select enabled from public.charity_journeys where charity_id = $1", [charity])).rows[0].enabled).toBe(false);
+      // A bad email leaves everything as it was: the save is one transaction.
+      await run(save, [charity, false, null, two, admin]);
+      await refused(save, [charity, true, new Date().toISOString(), JSON.stringify([{ subject: "Welcome", body: "Thank you for your gift.", waitDays: 2 }, { subject: "Bad", body: "Waits too little.", waitDays: 1 }]), admin], /journey_step_wait/);
+      expect(Number((await run("select count(*) from public.charity_journey_steps where charity_id = $1", [charity])).rows[0].count)).toBe(2);
+      await refused(save, [charity, false, null, JSON.stringify(Array.from({ length: 6 }, () => ({ subject: "Hello", body: "Some words here.", waitDays: 7 }))), admin], /journey_too_many_steps/);
+      for (const [user, aal] of [[admin, "aal2"], [null, ""]] as const) {
+        await as(user, aal);
+        await refused(save, [charity, false, null, two, admin], /permission denied/);
+        await refused("select * from public.remove_journey_enrolments($1, $2::uuid[])", [charity, []], /permission denied/);
+        await run("reset role");
+      }
+    });
+  });
+
+  it("taking back added donors removes only those with no email logged, and says how many stayed", async () => {
+    await tx(async () => {
+      await journey();
+      const a = await enrol(await donor("journey.a@example.com"), { source: "existing" });
+      const b = await enrol(await donor("journey.b@example.com"), { source: "existing" });
+      const c = await enrol(await donor("journey.c@example.com"), { source: "existing" });
+      await run("insert into public.charity_journey_sends (enrolment_id, charity_id, position) values ($1, $2, 1)", [b, charity]);
+      const other = (await run("select id from public.charities where slug = $1", ["glenhazel-community-hall"])).rows[0].id;
+      // Another charity's ids are never touched.
+      expect((await run("select removed, stayed from public.remove_journey_enrolments($1, $2::uuid[])", [other, [a, b, c]])).rows[0]).toEqual({ removed: 0, stayed: 0 });
+      expect((await run("select removed, stayed from public.remove_journey_enrolments($1, $2::uuid[])", [charity, [a, b, c]])).rows[0]).toEqual({ removed: 2, stayed: 1 });
+      expect((await run("select id from public.charity_journey_enrolments where id = any($1::uuid[])", [[a, b, c]])).rows.map((r) => r.id)).toEqual([b]);
     });
   });
 

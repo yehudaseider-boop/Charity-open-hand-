@@ -134,7 +134,9 @@ export async function undoAction(charityId: string, id: string, userId: string, 
   if (claimError) throw claimError;
   if (!claimed?.length) return { ok: false, why: "gone", row };
 
-  const why = await apply(charityId, row.undo).catch((e) => {
+  // What the undo itself found out, for "what just happened" (how many came off a journey, and how many stayed).
+  const extra: Details = {};
+  const why = await apply(charityId, row.undo, extra).catch((e) => {
     console.error("[undo]", row.kind, e instanceof Error ? e.message : e);
     return "error" as const;
   });
@@ -144,14 +146,20 @@ export async function undoAction(charityId: string, id: string, userId: string, 
     return { ok: false, why, row };
   }
   await logAudit({ actorUserId: userId, action: "charity.action_undone", entityType: "charity", entityId: charityId, details: { kind: row.kind, actionId: id } });
-  return { ok: true, row: { ...row, undone_at: now.toISOString() } };
+  let details = row.details;
+  if (Object.keys(extra).length) {
+    details = { ...row.details, ...extra };
+    const { error: detailsError } = await db.from("charity_actions").update({ details }).eq("id", id);
+    if (detailsError) console.error("[undo] details not saved", detailsError.message);
+  }
+  return { ok: true, row: { ...row, details, undone_at: now.toISOString() } };
 }
 
 /** Bigint columns come back from the database as strings ("1200") but were saved as numbers (1200): both count as the same. */
 const plain = (v: unknown) => JSON.stringify(v ?? null, (_k, x) => (typeof x === "number" ? String(x) : x));
 export const same = (a: unknown, b: unknown) => plain(a) === plain(b);
 
-async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null> {
+async function apply(charityId: string, undo: Undo, extra: Details = {}): Promise<UndoFailure | null> {
   const db = createAdminClient();
   const ownPath = (p: string) => p.startsWith(`${charityId}/`) && !p.includes("..");
   switch (undo.type) {
@@ -186,13 +194,19 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
       const now = await readJourneyState(charityId);
       // Changed again since (by this person or another admin): don't overwrite their newer work.
       if (!same(now, undo.after)) return "changed";
-      await writeJourney(charityId, null, undo.before);
+      // Switching back on (taking back "switch off") counts from now: someone who first gave while it was off is an
+      // existing donor, added only if the owner chooses, not a new one.
+      const back = undo.before.enabled && !now.enabled ? { ...undo.before, switched_on_at: new Date().toISOString() } : undo.before;
+      await writeJourney(charityId, null, back);
       return null;
     }
     case "journey_enrolments": {
       if (!undo.ids.length) return "removed";
-      const removed = await removeEnrolments(charityId, undo.ids);
-      return removed ? null : "emailed";
+      const { removed, stayed } = await removeEnrolments(charityId, undo.ids);
+      if (!removed) return "emailed";
+      extra.removed = removed;
+      extra.stayed = stayed;
+      return null;
     }
     case "focus": {
       const cols = ["campaign_id", "title", "message", "starts_on", "ends_on"];

@@ -330,7 +330,13 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "journey_saved": return "Taken back. Your donor journey's emails are as they were before.";
     case "journey_on": return "Taken back. Your donor journey is off again.";
     case "journey_off": return "Taken back. Your donor journey is on again.";
-    case "journey_existing_added": return "Taken back. The donors you added are off your journey. Nobody was emailed.";
+    case "journey_existing_added": {
+      const removed = Number(d.removed ?? d.added ?? 0);
+      const stayed = Number(d.stayed ?? 0);
+      return stayed
+        ? `Taken back. Removed ${plural(removed, "donor")} from your journey; ${stayed} had already had their first email and ${stayed === 1 ? "stays" : "stay"} on.`
+        : `Taken back. Removed ${plural(removed, "donor")} from your journey. Nobody was emailed.`;
+    }
     case "application_submitted":
     case "thank_you_sent":
     case "contacts_removed":

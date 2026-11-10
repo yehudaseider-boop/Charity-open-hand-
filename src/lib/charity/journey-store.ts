@@ -1,12 +1,17 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { getEmailTransport } from "@/lib/email";
+import { EmailError, getEmailTransport } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   JOURNEY_ENROL_CAP,
+  JOURNEY_MIN_SHARE,
   JOURNEY_RUN_CAP,
+  SEND_TIMEOUT_MS,
+  afterFailure,
   afterSend,
+  existingSendAction,
+  fairShares,
   charityPageUrl,
   claimNote,
   decideDue,
@@ -125,11 +130,16 @@ async function donorNames(charityId: string, donorIds: string[]): Promise<Map<st
   return out;
 }
 
-/** Every donor with a paid gift to this charity (on Givezy or recorded by the charity). */
-async function allDonorIds(charityId: string): Promise<string[]> {
+/**
+ * Every donor with a paid gift to this charity (on Givezy or recorded by the charity), paid before `before` when given:
+ * someone whose first gift came after the journey was switched on joins as a new donor instead.
+ */
+async function allDonorIds(charityId: string, before?: string): Promise<string[]> {
   const ids = new Set<string>();
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db().from("donations").select("donor_id").eq("charity_id", charityId).eq("status", "paid").not("donor_id", "is", null).order("id").range(from, from + 999);
+    let q = db().from("donations").select("donor_id").eq("charity_id", charityId).eq("status", "paid").not("donor_id", "is", null);
+    if (before) q = q.lt("paid_at", before);
+    const { data, error } = await q.order("id").range(from, from + 999);
     if (error) throw error;
     for (const r of data ?? []) ids.add(r.donor_id as string);
     if (!data || data.length < 1000) break;
@@ -156,9 +166,12 @@ async function enrolledDonors(charityId: string, donorIds?: string[]): Promise<S
   return out;
 }
 
-/** "Add my existing donors": who would join, and why the others wouldn't. Counts only leave this file. */
-export async function planExistingDonors(charityId: string) {
-  const ids = await allDonorIds(charityId);
+/**
+ * "Add my existing donors": who would join, and why the others wouldn't. Only donors who first gave before the journey
+ * was switched on (`switchedOnAt`): anyone later joins on their own as a new donor. Counts only leave this file.
+ */
+export async function planExistingDonors(charityId: string, switchedOnAt: string) {
+  const ids = await allDonorIds(charityId, switchedOnAt);
   const [who, already] = await Promise.all([contacts(charityId, ids), enrolledDonors(charityId)]);
   const hashes = [...who.byDonor.values()].map((c) => emailHash(c.email));
   const stopped = await optedOutHashes(charityId, hashes);
@@ -173,8 +186,8 @@ export async function planExistingDonors(charityId: string) {
 /** Adds them. Returns the new enrolments' ids (for Undo) and the counts. A donor already on it is never added twice. */
 export async function addExistingDonors(charityId: string, now = new Date()): Promise<{ ids: string[]; skipped: Record<ExistingSkip, number>; firstDue: string | null }> {
   const journey = await loadJourney(charityId);
-  if (!journey.steps.length) return { ids: [], skipped: { already: 0, erased: 0, opted_out: 0, recorded_only: 0 }, firstDue: null };
-  const plan = await planExistingDonors(charityId);
+  if (!journey.steps.length || !journey.switchedOnAt) return { ids: [], skipped: { already: 0, erased: 0, opted_out: 0, recorded_only: 0 }, firstDue: null };
+  const plan = await planExistingDonors(charityId, journey.switchedOnAt);
   const due = firstDue(now, journey.steps).toISOString();
   const ids: string[] = [];
   for (let i = 0; i < plan.add.length; i += 500) {
@@ -188,19 +201,47 @@ export async function addExistingDonors(charityId: string, now = new Date()): Pr
   return { ids, skipped: plan.skipped, firstDue: due };
 }
 
+export type JourneyRun = {
+  enrolled: number;
+  sent: number;
+  waiting: number;
+  stopped: number;
+  finished: number;
+  failed: number;
+  unknown: number;
+  leftOver: number;
+  emailOff: boolean;
+  /** The journey's tables aren't there yet (its migration hasn't run): nothing to do, nothing to report. */
+  notSetUp?: boolean;
+};
 
-export type JourneyRun = { enrolled: number; sent: number; waiting: number; stopped: number; finished: number; failed: number; leftOver: number; emailOff: boolean };
+/** The table isn't there (PostgREST's "not in the schema cache", or Postgres's "no such table"). */
+export const isMissingTable = (e: { code?: string } | null | undefined) => e?.code === "PGRST205" || e?.code === "42P01";
+
+/** Did a send that threw maybe go? A refusal from the email service didn't; a time-out or a broken connection may have. */
+function failedForSure(e: unknown): boolean {
+  return e instanceof EmailError;
+}
+
+type Live = { charityId: string; switchedOnAt: Date; name: string; slug: string; steps: JourneyStep[] };
+type DueRow = { id: string; charity_id: string; donor_id: string; next_step: number; attempts: number };
 
 /**
- * The daily job's part (after collections and checks): add new donors to switched-on journeys, then send the emails
- * that are due, up to JOURNEY_RUN_CAP and the deadline; the rest go the next day. With email not switched on, nothing
- * is sent and nothing is marked sent. Each email claims the donor's week first (handed back if it couldn't go).
+ * The daily job's part (after collections, checks and the alert to Givezy): add new donors to switched-on journeys,
+ * then send the emails that are due, shared fairly between charities, up to JOURNEY_RUN_CAP, and none started after
+ * the deadline; the rest go the next day. With email not switched on, nothing is sent and nothing is marked sent.
+ *
+ * Each email: its log row is written first ("sending"), then the donor's week is claimed, then it is sent with a time
+ * limit. Sent: the log says so and the donor moves to the next email. Refused or not allowed: the log row and the week
+ * are handed back, and the email is tried again later (1, 3, 7 days), then the donor stops. Cut off or a broken
+ * connection: it may have gone, so the row stays "sending", and a later run marks it unknown and moves on without
+ * sending it again.
  */
 export async function runJourneys(now: Date, deadline: number): Promise<JourneyRun> {
-  const out: JourneyRun = { enrolled: 0, sent: 0, waiting: 0, stopped: 0, finished: 0, failed: 0, leftOver: 0, emailOff: false };
+  const out: JourneyRun = { enrolled: 0, sent: 0, waiting: 0, stopped: 0, finished: 0, failed: 0, unknown: 0, leftOver: 0, emailOff: false };
   const { data: journeys, error } = await db().from("charity_journeys").select("charity_id, switched_on_at, charities(status, name_en, slug)").eq("enabled", true);
+  if (isMissingTable(error)) return { ...out, notSetUp: true };
   if (error) throw error;
-  type Live = { charityId: string; switchedOnAt: Date; name: string; slug: string; steps: JourneyStep[] };
   const live: Live[] = [];
   for (const j of journeys ?? []) {
     const raw = j.charities as unknown;
@@ -210,9 +251,44 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
     const steps = (await loadJourney(j.charity_id as string)).steps;
     if (steps.length) live.push({ charityId: j.charity_id as string, switchedOnAt: new Date(j.switched_on_at as string), name: c.name_en, slug: c.slug, steps });
   }
+  out.enrolled = await enrolNewDonors(live, now, deadline);
 
-  // 1. New donors: first paid gift on Givezy while the journey was on. Looks back 35 days, enough for a missed day.
+  const transport = getEmailTransport();
+  if (transport.name === "console") return { ...out, emailOff: true };
+  if (!live.length || Date.now() >= deadline) return out;
+
+  // Each charity's due list (up to the whole cap), then a fair share of the cap for each.
+  const dueBy = new Map<string, DueRow[]>();
+  for (const j of live) {
+    const { data, error: e } = await db()
+      .from("charity_journey_enrolments")
+      .select("id, charity_id, donor_id, next_step, attempts")
+      .eq("charity_id", j.charityId)
+      .eq("status", "active")
+      .lte("next_due_at", now.toISOString())
+      .order("next_due_at")
+      .limit(JOURNEY_RUN_CAP + 1);
+    if (e) throw e;
+    if (data?.length) dueBy.set(j.charityId, data as DueRow[]);
+  }
+  const shares = fairShares(new Map([...dueBy].map(([k, v]) => [k, v.length])), Math.max(JOURNEY_RUN_CAP, JOURNEY_MIN_SHARE * dueBy.size));
+  const byCharity = new Map(live.map((j) => [j.charityId, j]));
+  for (const [charityId, all] of dueBy) {
+    const list = all.slice(0, shares.get(charityId) ?? 0);
+    out.leftOver += all.length - list.length;
+    if (Date.now() >= deadline) {
+      out.leftOver += list.length;
+      continue;
+    }
+    await sendDue(byCharity.get(charityId)!, list, transport, now, deadline, out);
+  }
+  return out;
+}
+
+/** New donors: first paid gift on Givezy while the journey was on, not erased. Looks back 35 days, enough for a missed day. */
+async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promise<number> {
   let room = JOURNEY_ENROL_CAP;
+  let enrolled = 0;
   for (const j of live) {
     if (room <= 0 || Date.now() >= deadline) break;
     const since = new Date(Math.max(j.switchedOnAt.getTime(), now.getTime() - 35 * 86_400_000)).toISOString();
@@ -248,147 +324,147 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
       for (const r of data ?? []) earlier.add(r.donor_id as string);
     }
     for (const id of earlier) first.delete(id);
+    if (!first.size) continue;
+    // Erased donors (their gifts stay, without their details) never join, even within the look-back.
+    const who = await contacts(j.charityId, [...first.keys()]);
+    for (const id of who.erased) first.delete(id);
     const joiners = newJoiners(first, j.switchedOnAt, await enrolledDonors(j.charityId, [...first.keys()])).slice(0, room);
     if (!joiners.length) continue;
     const rows = joiners.map((n) => ({ charity_id: j.charityId, donor_id: n.donorId, source: "new_gift", enrolled_at: n.joined.toISOString(), next_step: 1, next_due_at: firstDue(n.joined, j.steps).toISOString() }));
     const { data, error: e } = await db().from("charity_journey_enrolments").upsert(rows, { onConflict: "charity_id,donor_id", ignoreDuplicates: true }).select("id");
     if (e) throw e;
-    out.enrolled += data?.length ?? 0;
+    enrolled += data?.length ?? 0;
     room -= data?.length ?? 0;
   }
+  return enrolled;
+}
 
-  // 2. Emails that are due.
-  const transport = getEmailTransport();
-  if (transport.name === "console") {
-    out.emailOff = true;
-    return out;
-  }
-  if (!live.length) return out;
-  const byCharity = new Map(live.map((j) => [j.charityId, j]));
-  const { data: due, error: dueError } = await db()
-    .from("charity_journey_enrolments")
-    .select("id, charity_id, donor_id, next_step")
-    .eq("status", "active")
-    .lte("next_due_at", now.toISOString())
-    .in("charity_id", [...byCharity.keys()])
-    .order("next_due_at")
-    .limit(JOURNEY_RUN_CAP + 1);
-  if (dueError) throw dueError;
-  const rows = (due ?? []).slice(0, JOURNEY_RUN_CAP);
-  out.leftOver = (due ?? []).length - rows.length;
+async function sendDue(j: Live, list: DueRow[], transport: ReturnType<typeof getEmailTransport>, now: Date, deadline: number, out: JourneyRun): Promise<void> {
+  const charityId = j.charityId;
+  const donorIds = list.map((r) => r.donor_id);
+  const [who, priv] = await Promise.all([contacts(charityId, donorIds), db().from("charity_private").select("contact_email").eq("charity_id", charityId).maybeSingle()]);
+  const replyTo = (priv.data?.contact_email as string | null) ?? null;
+  const withEmail = donorIds.flatMap((id) => {
+    const c = who.byDonor.get(id);
+    return c ? [{ donorId: id, hash: emailHash(c.email) }] : [];
+  });
+  const [stopped, recent] = await Promise.all([optedOutHashes(charityId, withEmail.map((d) => d.hash)), messagedThisWeek(charityId, withEmail, now)]);
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   const week = weekStart(now);
-  const groups = new Map<string, typeof rows>();
-  for (const r of rows) groups.set(r.charity_id as string, [...(groups.get(r.charity_id as string) ?? []), r]);
   const update = (id: string, set: Record<string, unknown>) => db().from("charity_journey_enrolments").update({ ...set, updated_at: new Date().toISOString() }).eq("id", id).eq("status", "active");
 
-  for (const [charityId, list] of groups) {
-    const j = byCharity.get(charityId)!;
+  for (let at = 0; at < list.length; at++) {
+    const r = list[at];
+    // No new email starts after the deadline: the rest go the next day.
     if (Date.now() >= deadline) {
-      out.leftOver += list.length;
+      out.leftOver += list.length - at;
+      return;
+    }
+    const contact = who.byDonor.get(r.donor_id) ?? null;
+    const decision = decideDue(
+      { hasGift: who.found.has(r.donor_id), erased: who.erased.has(r.donor_id), email: contact?.email ?? null, optedOut: contact ? stopped.has(emailHash(contact.email)) : false, messagedThisWeek: recent.has(r.donor_id), nextStep: r.next_step },
+      j.steps.length,
+    );
+    if (decision.kind === "stop") {
+      await update(r.id, { status: "stopped", stopped_reason: decision.reason });
+      out.stopped++;
       continue;
     }
-    const donorIds = list.map((r) => r.donor_id as string);
-    const [who, priv] = await Promise.all([contacts(charityId, donorIds), db().from("charity_private").select("contact_email").eq("charity_id", charityId).maybeSingle()]);
-    const replyTo = (priv.data?.contact_email as string | null) ?? null;
-    const withEmail = donorIds.flatMap((id) => {
-      const c = who.byDonor.get(id);
-      return c ? [{ donorId: id, hash: emailHash(c.email) }] : [];
-    });
-    const [stopped, recent] = await Promise.all([optedOutHashes(charityId, withEmail.map((d) => d.hash)), messagedThisWeek(charityId, withEmail, now)]);
-    for (let at = 0; at < list.length; at++) {
-      const r = list[at];
-      if (Date.now() >= deadline) {
-        out.leftOver += list.length - at;
-        break;
+    if (decision.kind === "finish") {
+      await update(r.id, { status: "finished", next_step: Math.min(6, j.steps.length + 1) });
+      out.finished++;
+      continue;
+    }
+    if (decision.kind === "wait_week") {
+      await update(r.id, { next_due_at: nextWeekStart(now).toISOString() });
+      out.waiting++;
+      continue;
+    }
+    const position = r.next_step;
+    const step = j.steps[position - 1];
+    const advance = () => {
+      const next = afterSend(position, new Date(), j.steps);
+      return update(r.id, next ? { next_step: next.nextStep, next_due_at: next.due.toISOString(), attempts: 0 } : { status: "finished", next_step: position + 1, attempts: 0 });
+    };
+    // 1. The log row first: an email is never sent twice.
+    const logged = await db().from("charity_journey_sends").insert({ enrolment_id: r.id, charity_id: charityId, position, status: "sending" }).select("id").single();
+    if (logged.error) {
+      // Taken off the journey a moment ago (Undo of "Add my existing donors"): nothing to send.
+      if (logged.error.code === "23503") continue;
+      if (logged.error.code !== "23505") throw logged.error;
+      const { data: prior, error: e } = await db().from("charity_journey_sends").select("id, status, created_at").eq("enrolment_id", r.id).eq("position", position).maybeSingle();
+      if (e) throw e;
+      const what = prior ? existingSendAction(prior as { status: string; created_at: string }, now) : "leave";
+      if (what === "mark_unknown") {
+        await db().from("charity_journey_sends").update({ status: "unknown" }).eq("id", prior!.id).eq("status", "sending");
+        out.unknown++;
       }
-      const donorId = r.donor_id as string;
-      const contact = who.byDonor.get(donorId) ?? null;
-      const decision = decideDue(
-        { hasGift: who.found.has(donorId), erased: who.erased.has(donorId), email: contact?.email ?? null, optedOut: contact ? stopped.has(emailHash(contact.email)) : false, messagedThisWeek: recent.has(donorId), nextStep: Number(r.next_step) },
-        j.steps.length,
-      );
-      if (decision.kind === "stop") {
-        await update(r.id as string, { status: "stopped", stopped_reason: decision.reason });
-        out.stopped++;
-        continue;
-      }
-      if (decision.kind === "finish") {
-        await update(r.id as string, { status: "finished", next_step: Math.min(6, j.steps.length + 1) });
-        out.finished++;
-        continue;
-      }
-      if (decision.kind === "wait_week") {
-        await update(r.id as string, { next_due_at: nextWeekStart(now).toISOString() });
+      if (what !== "leave") await advance();
+      continue;
+    }
+    const unlog = () => db().from("charity_journey_sends").delete().eq("id", logged.data.id).eq("status", "sending");
+    const notSent = async () => {
+      // Definitely not sent: hand back the week and the log, and try again later (or stop after a few tries).
+      await unlog();
+      const next = afterFailure(r.attempts, now);
+      await update(r.id, next.stop ? { status: "stopped", stopped_reason: "not_delivered" } : { attempts: next.attempts, next_due_at: next.due.toISOString() });
+      if (next.stop) out.stopped++;
+      out.failed++;
+    };
+    // 2. The donor's week.
+    const claim = await db().from("charity_donor_thanks").insert({ charity_id: charityId, donor_id: r.donor_id, week_start: week, kind: JOURNEY_KIND, body: claimNote(position, step.subject), sent_by: null }).select("id").single();
+    if (claim.error) {
+      await unlog();
+      // Another message took this donor's week a moment ago.
+      if (claim.error.code === "23505") {
+        await update(r.id, { next_due_at: nextWeekStart(now).toISOString() });
         out.waiting++;
         continue;
       }
-      const position = Number(r.next_step);
-      const step = j.steps[position - 1];
-      const advance = () => {
-        const next = afterSend(position, new Date(), j.steps);
-        return update(r.id as string, next ? { next_step: next.nextStep, next_due_at: next.due.toISOString() } : { status: "finished", next_step: position + 1 });
-      };
-      // The send log is claimed first: an email that went before a hiccup is never sent twice.
-      const logged = await db().from("charity_journey_sends").insert({ enrolment_id: r.id, charity_id: charityId, position }).select("id").single();
-      if (logged.error) {
-        if (logged.error.code === "23505") {
-          // This email went already (the move to the next one didn't save): move on now.
-          await advance();
-          continue;
-        }
-        throw logged.error;
-      }
-      const unlog = () => db().from("charity_journey_sends").delete().eq("id", logged.data.id);
-      const claim = await db().from("charity_donor_thanks").insert({ charity_id: charityId, donor_id: donorId, week_start: week, kind: JOURNEY_KIND, body: claimNote(position, step.subject), sent_by: null }).select("id").single();
-      if (claim.error) {
-        await unlog();
-        // Another message took this donor's week a moment ago.
-        if (claim.error.code === "23505") {
-          await update(r.id as string, { next_due_at: nextWeekStart(now).toISOString() });
-          out.waiting++;
-          continue;
-        }
-        throw claim.error;
-      }
-      const release = async () => {
-        await db().from("charity_donor_thanks").delete().eq("id", claim.data.id);
-        await unlog();
-      };
-      const token = randomBytes(32).toString("base64url");
-      const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: charityId, email_hash: emailHash(contact!.email) });
-      if (saved.error) {
-        await release();
-        out.failed++;
-        continue;
-      }
-      let outcome: "sent" | "skipped" | "error" = "error";
-      try {
-        outcome = await transport.send(
-          journeyEmail(contact!.email, {
-            charityName: j.name,
-            firstName: contact!.greeting,
-            subject: step.subject,
-            body: step.body,
-            pageUrl: charityPageUrl(site, j.slug),
-            stopUrl: `${site}/news/stop?t=${token}`,
-            oneClickUrl: oneClickStopUrl(site, "news", token),
-            replyTo,
-          }),
-        );
-      } catch (e) {
-        console.error("[journey] not sent", e instanceof Error ? e.message : e);
-      }
-      if (outcome !== "sent") {
-        // Not sent (an error, or an address the test site may not email): the week is handed back and the step stays due.
-        await release();
-        out.failed++;
-        continue;
-      }
-      out.sent++;
-      const moved = await advance();
-      if (moved.error) console.error("[journey] next email not set", moved.error.message);
+      throw claim.error;
     }
+    const release = () => db().from("charity_donor_thanks").delete().eq("id", claim.data.id);
+    const token = randomBytes(32).toString("base64url");
+    const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: charityId, email_hash: emailHash(contact!.email) });
+    if (saved.error) {
+      await release();
+      await notSent();
+      continue;
+    }
+    // 3. The email, with a time limit (never past the job's own end).
+    let outcome: "sent" | "skipped" | "maybe" | "refused";
+    try {
+      outcome = await transport.send({
+        ...journeyEmail(contact!.email, {
+          charityName: j.name,
+          firstName: contact!.greeting,
+          subject: step.subject,
+          body: step.body,
+          pageUrl: charityPageUrl(site, j.slug),
+          stopUrl: `${site}/news/stop?t=${token}`,
+          oneClickUrl: oneClickStopUrl(site, "news", token),
+          replyTo,
+        }),
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+      });
+    } catch (e) {
+      console.error("[journey] not sent", e instanceof Error ? e.message : e);
+      outcome = failedForSure(e) ? "refused" : "maybe";
+    }
+    if (outcome === "skipped" || outcome === "refused") {
+      await release();
+      await notSent();
+      continue;
+    }
+    if (outcome === "maybe") {
+      // It may have gone: the week stays claimed and the log stays "sending"; a later run marks it unknown and moves on.
+      out.unknown++;
+      continue;
+    }
+    out.sent++;
+    const marked = await db().from("charity_journey_sends").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", logged.data.id);
+    if (marked.error) console.error("[journey] send not marked", marked.error.message);
+    const moved = await advance();
+    if (moved.error) console.error("[journey] next email not set", moved.error.message);
   }
-  return out;
 }

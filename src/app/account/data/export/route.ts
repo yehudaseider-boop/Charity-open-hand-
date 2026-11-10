@@ -62,6 +62,17 @@ export async function GET(request: Request) {
     ? await createAdminClient().from("charity_donor_thanks").select("kind, body, sent_at, charities(name_en)").in("donor_id", donorIds).order("sent_at")
     : { data: [], error: null };
   if (thanks.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+  // Charities' donor journeys this person is on (a server-only table), with each email's step and dates: their own
+  // rows only, by the donor ids established above. Before the journey's migration has run there are none.
+  const journeys = donorIds.length
+    ? await createAdminClient()
+        .from("charity_journey_enrolments")
+        .select("source, enrolled_at, status, stopped_reason, next_step, next_due_at, journey:charity_journeys(charity:charities(name_en)), emails:charity_journey_sends(position, status, created_at, sent_at)")
+        .in("donor_id", donorIds)
+        .order("enrolled_at")
+    : { data: [], error: null };
+  const journeysMissing = journeys.error && (journeys.error.code === "PGRST205" || journeys.error.code === "42P01");
+  if (journeys.error && !journeysMissing) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   const [myReceipts, monthly] = donorIds.length
     ? await Promise.all([
         supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, donor_as_printed:details->donor").in("donor_id", donorIds),
@@ -120,6 +131,7 @@ export async function GET(request: Request) {
     s18a_receipts: myReceipts.data ?? [],
     agreements: [...(consents.data ?? []), ...checkoutAgreements],
     thank_you_notes_from_charities: thanks.data ?? [],
+    donor_journeys_from_charities: journeysMissing ? [] : (journeys.data ?? []),
     requests: requests.data ?? [],
     saved_charities: favourites.data ?? [],
     giving_target_settings: givingTarget.data ?? [],

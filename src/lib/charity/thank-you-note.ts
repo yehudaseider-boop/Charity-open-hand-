@@ -9,12 +9,24 @@
 export const THANK_YOU_NOTE_MAX = 300;
 
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f​-‏‪-‮⁠⁦-⁩﻿]/g;
-/** A web address, however it is typed: "https://…", "www.…" or "example.org.za/page". */
-const WEB_ADDRESS = /(?:https?:\/\/|www\.)\S|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:co\.za|org\.za|net\.za|ac\.za|gov\.za|com|org|net|africa|io|ly|me)\b/i;
+/**
+ * A plain email address standing on its own (after a space, a bracket or a quote, or at the start), with nothing like
+ * a path after it: "info@kitchen.org.za". Only these are allowed through; "https://x.example/pay?r=a@b" is not one.
+ */
+const PLAIN_EMAIL = /(^|[\s(<"'])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?=$|[\s)>"',;:!?]|\.(?:$|\s))/g;
+/**
+ * A web address, however it is typed: any "scheme://", "www.", "word.word/" (a path), or a bare domain with a
+ * letters-only ending of two or more ("donate.xyz", "t.co", "kitchen.org.za"). The ending is all lower case or all
+ * capitals, so a missing space after a full stop ("thank you.We") isn't taken for one; "3.5 tonnes", "R1 250" and
+ * "e.g. our team" and "4.5/5" aren't either.
+ */
+const BARE_DOMAIN = /\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:[a-z]{2,}|[A-Z]{2,})(?![A-Za-z0-9])/;
+const OTHER_ADDRESS = /[a-z][a-z0-9+.-]*:\/\/|\bwww\.|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z][a-z0-9-]*\//i;
 
-/** Does the text hold a web address, however typed (an email address alone is fine). Also used for donor journey emails. */
+/** Does the text hold a web address, however typed (a plain email address alone is fine). Also used for donor journey emails. */
 export function hasWebAddress(text: string): boolean {
-  return WEB_ADDRESS.test(text.replace(/\S+@\S+/g, ""));
+  const rest = text.replace(PLAIN_EMAIL, "$1");
+  return OTHER_ADDRESS.test(rest) || BARE_DOMAIN.test(rest);
 }
 
 /**
@@ -41,7 +53,7 @@ export function checkThankYouNote(raw: string | null | undefined): { ok: true; n
   if (note.length > THANK_YOU_NOTE_MAX) {
     return { ok: false, message: `Please keep it to ${THANK_YOU_NOTE_MAX} characters or fewer. It is ${note.length} now. Nothing was saved.` };
   }
-  if (WEB_ADDRESS.test(note.replace(/\S+@\S+/g, ""))) {
+  if (hasWebAddress(note)) {
     return { ok: false, message: "Leave out web addresses: this note can't carry links. Donors find your page through Givezy. Nothing was saved." };
   }
   return { ok: true, note };
@@ -51,7 +63,7 @@ export function checkThankYouNote(raw: string | null | undefined): { ok: true; n
 export function thankYouNoteToShow(stored: string | null | undefined): string | null {
   // A note saved before the no-links rule, or written another way, is never shown: it would go out in Givezy's emails.
   const note = cleanThankYouNote(stored);
-  if (note && WEB_ADDRESS.test(note.replace(/\S+@\S+/g, ""))) return null;
+  if (note && hasWebAddress(note)) return null;
   return note ? note.slice(0, THANK_YOU_NOTE_MAX).trimEnd() : null;
 }
 

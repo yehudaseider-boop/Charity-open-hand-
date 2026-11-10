@@ -20,6 +20,10 @@ import {
   nextWeekStart,
   planExisting,
   enrolmentLabel,
+  afterFailure,
+  existingSendAction,
+  fairShares,
+  MAX_ATTEMPTS,
 } from "@/lib/charity/journey";
 import { describeDone, describeUndone, isActionKind, pageOf } from "@/lib/charity/done";
 import { textEmailHtml } from "@/lib/email/html";
@@ -210,5 +214,39 @@ describe("the dashboard's record of journey actions", () => {
       expect(describeUndone(kind, {})).toMatch(/^Taken back\./);
     }
     expect(describeDone("journey_saved", { steps: 3, on: false }, c).what).toBe("Your donor journey is saved: 3 emails. It's off, so nothing is sent until you switch it on.");
+  });
+});
+
+describe("an email that doesn't go (review 10/11/2026)", () => {
+  const now = new Date("2026-11-10T06:15:00Z");
+  it("is tried again in 1, 3 and 7 days, then the donor stops, so it can't hold up everyone else", () => {
+    expect(afterFailure(0, now)).toEqual({ stop: false, attempts: 1, due: new Date("2026-11-11T06:15:00Z") });
+    expect(afterFailure(1, now)).toEqual({ stop: false, attempts: 2, due: new Date("2026-11-13T06:15:00Z") });
+    expect(afterFailure(2, now)).toEqual({ stop: false, attempts: 3, due: new Date("2026-11-17T06:15:00Z") });
+    expect(afterFailure(MAX_ATTEMPTS - 1, now)).toEqual({ stop: true });
+  });
+
+  it("an email already logged is never sent twice: sent moves on, a stale 'sending' becomes unknown and moves on, a fresh one is left", () => {
+    expect(existingSendAction({ status: "sent", created_at: "2026-11-10T06:00:00Z" }, now)).toBe("advance");
+    expect(existingSendAction({ status: "unknown", created_at: "2026-11-01T06:00:00Z" }, now)).toBe("advance");
+    expect(existingSendAction({ status: "sending", created_at: "2026-11-10T05:45:00Z" }, now)).toBe("mark_unknown");
+    expect(existingSendAction({ status: "sending", created_at: "2026-11-10T06:00:00Z" }, now)).toBe("leave");
+  });
+
+  it("a run's emails are shared fairly: a charity with thousands due can't crowd out the others", () => {
+    const shares = fairShares(new Map([["big", 5000], ["small", 3], ["mid", 40]]), 100);
+    expect(Object.fromEntries(shares)).toEqual({ big: 57, small: 3, mid: 40 });
+    expect([...fairShares(new Map([["a", 2]]), 100).values()]).toEqual([2]);
+    expect([...fairShares(new Map([["a", 80], ["b", 80]]), 100).values()]).toEqual([50, 50]);
+  });
+
+  it("a stop for undelivered emails is labelled plainly", () => {
+    expect(enrolmentLabel({ status: "stopped", next_step: 1, next_due_at: "2026-11-10T06:15:00Z", stopped_reason: "not_delivered" }, 3, (d) => d)).toBe("Stopped: emails couldn't be delivered");
+    expect(enrolmentLabel({ status: "stopped", next_step: 1, next_due_at: "2026-11-10T06:15:00Z", stopped_reason: "no_gift" }, 3, (d) => d)).toBe("Stopped: no paid gift any more");
+  });
+
+  it("taking back added donors says exactly what happened", () => {
+    expect(describeUndone("journey_existing_added", { added: 10, removed: 7, stayed: 3 })).toBe("Taken back. Removed 7 donors from your journey; 3 had already had their first email and stay on.");
+    expect(describeUndone("journey_existing_added", { added: 2, removed: 2, stayed: 0 })).toBe("Taken back. Removed 2 donors from your journey. Nobody was emailed.");
   });
 });

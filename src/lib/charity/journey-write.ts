@@ -13,37 +13,37 @@ const db = () => createAdminClient();
 /** What Undo puts back: the switch and the emails. */
 export type JourneyState = { enabled: boolean; switched_on_at: string | null; steps: JourneyStep[] };
 
-/** Put the journey as given: the switch and exactly these emails (more are removed). */
+/**
+ * Put the journey as given: the switch and exactly these emails, in one database transaction
+ * (save_charity_journey), so the daily run never sees half a save.
+ */
 export async function writeJourney(charityId: string, userId: string | null, state: JourneyState): Promise<void> {
-  const now = new Date().toISOString();
-  const up = await db()
-    .from("charity_journeys")
-    .upsert({ charity_id: charityId, enabled: state.enabled && state.steps.length > 0, switched_on_at: state.switched_on_at, updated_at: now, updated_by: userId }, { onConflict: "charity_id" });
-  if (up.error) throw up.error;
-  const del = await db().from("charity_journey_steps").delete().eq("charity_id", charityId).gt("position", state.steps.length);
-  if (del.error) throw del.error;
-  if (state.steps.length) {
-    const rows = state.steps.map((s, i) => ({ charity_id: charityId, position: i + 1, subject: s.subject, body: s.body, wait_days: s.waitDays, updated_at: now }));
-    const put = await db().from("charity_journey_steps").upsert(rows, { onConflict: "charity_id,position" });
-    if (put.error) throw put.error;
-  }
+  const { error } = await db().rpc("save_charity_journey", {
+    p_charity_id: charityId,
+    p_enabled: state.enabled && state.steps.length > 0,
+    p_switched_on_at: state.switched_on_at,
+    p_steps: state.steps.map((s) => ({ subject: s.subject, body: s.body, waitDays: s.waitDays })),
+    p_user: userId,
+  });
+  if (error) throw error;
 }
 
-/** Undo for "Add my existing donors": takes off the ones added that haven't had an email yet. */
-export async function removeEnrolments(charityId: string, ids: string[]): Promise<number> {
+/**
+ * Undo for "Add my existing donors": takes off the ones added that haven't had an email (not even one being sent), in
+ * one locked statement (remove_journey_enrolments), so the daily run can't start one in between. Says how many came
+ * off and how many stay.
+ */
+export async function removeEnrolments(charityId: string, ids: string[]): Promise<{ removed: number; stayed: number }> {
   let removed = 0;
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i + 200);
-    const sent = await db().from("charity_journey_sends").select("enrolment_id").in("enrolment_id", chunk);
-    if (sent.error) throw sent.error;
-    const had = new Set((sent.data ?? []).map((r) => r.enrolment_id as string));
-    const go = chunk.filter((id) => !had.has(id));
-    if (!go.length) continue;
-    const { data, error } = await db().from("charity_journey_enrolments").delete().eq("charity_id", charityId).in("id", go).select("id");
+  let stayed = 0;
+  for (let i = 0; i < ids.length; i += 1000) {
+    const { data, error } = await db().rpc("remove_journey_enrolments", { p_charity_id: charityId, p_ids: ids.slice(i, i + 1000) });
     if (error) throw error;
-    removed += data?.length ?? 0;
+    const row = (Array.isArray(data) ? data[0] : data) as { removed: number; stayed: number } | null;
+    removed += Number(row?.removed ?? 0);
+    stayed += Number(row?.stayed ?? 0);
   }
-  return removed;
+  return { removed, stayed };
 }
 
 /** The journey as it stands now, in Undo's shape. */

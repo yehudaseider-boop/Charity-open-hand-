@@ -55,7 +55,10 @@ create table public.charity_journey_enrolments (
   next_step int not null default 1 constraint journey_enrolment_step check (next_step between 1 and 6),
   next_due_at timestamptz not null,
   status text not null default 'active' constraint journey_enrolment_status check (status in ('active', 'finished', 'stopped')),
-  stopped_reason text constraint journey_enrolment_stopped_reason check (stopped_reason in ('erased', 'opted_out', 'no_email', 'no_gift')),
+  stopped_reason text constraint journey_enrolment_stopped_reason check (stopped_reason in ('erased', 'opted_out', 'no_email', 'no_gift', 'not_delivered')),
+  -- Tries at the email due now that didn't go (refused, or an address the test site may not email). Each waits longer;
+  -- after a few the donor is stopped ('not_delivered'), so a row that never sends can't hold up the rest.
+  attempts int not null default 0 constraint journey_enrolment_attempts check (attempts between 0 and 10),
   updated_at timestamptz not null default now(),
   constraint journey_enrolment_reason check ((status = 'stopped') = (stopped_reason is not null)),
   -- A donor goes through a charity's journey once.
@@ -64,16 +67,21 @@ create table public.charity_journey_enrolments (
 create index charity_journey_enrolments_due on public.charity_journey_enrolments (next_due_at) where status = 'active';
 create index charity_journey_enrolments_charity on public.charity_journey_enrolments (charity_id, status, next_step);
 
--- 5. Each email that went: once per donor per step.
+-- 5. Each email: claimed as 'sending' before it goes, 'sent' once the email service took it. A 'sending' row whose
+--    send timed out or broke off is 'unknown': it may have gone, so it is never sent again (a lost email is better
+--    than a double one). Once per donor per step.
 create table public.charity_journey_sends (
   id uuid primary key default gen_random_uuid(),
   enrolment_id uuid not null references public.charity_journey_enrolments (id) on delete cascade,
   charity_id uuid not null references public.charity_journeys (charity_id) on delete cascade,
   position int not null constraint journey_send_position check (position between 1 and 5),
-  sent_at timestamptz not null default now(),
+  status text not null default 'sending' constraint journey_send_status check (status in ('sending', 'sent', 'unknown')),
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  constraint journey_send_sent_at check ((status = 'sent') = (sent_at is not null)),
   constraint journey_send_once unique (enrolment_id, position)
 );
-create index charity_journey_sends_charity on public.charity_journey_sends (charity_id, sent_at desc);
+create index charity_journey_sends_charity on public.charity_journey_sends (charity_id, created_at desc);
 
 -- Server-only: row-level security on, no policies, nothing granted, and never a password session.
 do $$
@@ -85,3 +93,44 @@ begin
     execute format('create policy no_password_sessions on public.%I as restrictive for all to authenticated using (public.signed_in_without_password()) with check (public.signed_in_without_password())', t);
   end loop;
 end $$;
+
+-- 6. Saving the journey in one go: the switch and every email together, so the daily run never sees half a save.
+--    Service role only (the website calls it after checking the person is the charity's owner).
+create function public.save_charity_journey(p_charity_id uuid, p_enabled boolean, p_switched_on_at timestamptz, p_steps jsonb, p_user uuid)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare n int := coalesce(jsonb_array_length(p_steps), 0);
+begin
+  if n > 5 then raise exception 'journey_too_many_steps'; end if;
+  insert into public.charity_journeys (charity_id, enabled, switched_on_at, updated_at, updated_by)
+  values (p_charity_id, p_enabled and n > 0, p_switched_on_at, now(), p_user)
+  on conflict (charity_id) do update
+    set enabled = excluded.enabled, switched_on_at = excluded.switched_on_at, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
+  delete from public.charity_journey_steps where charity_id = p_charity_id;
+  insert into public.charity_journey_steps (charity_id, position, subject, body, wait_days)
+  select p_charity_id, s.ord::int, s.value->>'subject', s.value->>'body', (s.value->>'waitDays')::int
+  from jsonb_array_elements(p_steps) with ordinality as s(value, ord);
+end $$;
+revoke all on function public.save_charity_journey(uuid, boolean, timestamptz, jsonb, uuid) from public, anon, authenticated;
+grant execute on function public.save_charity_journey(uuid, boolean, timestamptz, jsonb, uuid) to service_role;
+
+-- 7. Undo of "Add my existing donors": takes off the ones it added that have had no email (not even one being sent).
+--    The rows are locked first, so the daily run can't start an email to one of them in between: it either logged the
+--    email before (the donor stays) or finds them gone (and sends nothing). Returns how many came off and stayed.
+create function public.remove_journey_enrolments(p_charity_id uuid, p_ids uuid[])
+returns table (removed int, stayed int)
+language plpgsql security definer set search_path = '' as $$
+declare total int; gone int;
+begin
+  perform 1 from public.charity_journey_enrolments e where e.charity_id = p_charity_id and e.id = any(p_ids) for update;
+  select count(*) into total from public.charity_journey_enrolments e where e.charity_id = p_charity_id and e.id = any(p_ids);
+  with d as (
+    delete from public.charity_journey_enrolments e
+    where e.charity_id = p_charity_id and e.id = any(p_ids)
+      and not exists (select 1 from public.charity_journey_sends s where s.enrolment_id = e.id)
+    returning 1
+  ) select count(*) into gone from d;
+  return query select gone, total - gone;
+end $$;
+revoke all on function public.remove_journey_enrolments(uuid, uuid[]) from public, anon, authenticated;
+grant execute on function public.remove_journey_enrolments(uuid, uuid[]) to service_role;
