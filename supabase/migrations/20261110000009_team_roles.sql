@@ -207,18 +207,30 @@ create policy charity_categories_write on public.charity_categories for all to a
 drop policy campaigns_admin_rw on public.campaigns;
 create policy campaigns_admin_read on public.campaigns for select to authenticated
   using (public.is_charity_admin(charity_id) or public.is_platform_admin());
-create policy campaigns_admin_write on public.campaigns for all to authenticated
+create policy campaigns_admin_insert on public.campaigns for insert to authenticated
+  with check (public.charity_can(charity_id, 'profile'));
+create policy campaigns_admin_update on public.campaigns for update to authenticated
   using (public.charity_can(charity_id, 'profile'))
   with check (public.charity_can(charity_id, 'profile'));
+create policy campaigns_admin_delete on public.campaigns for delete to authenticated
+  using (public.charity_can(charity_id, 'profile'));
 
 drop policy charity_documents_rw on public.charity_documents;
 -- The bank confirmation letter shows the bank account: for the owner and finance (and Givezy) only.
 create policy charity_documents_read on public.charity_documents for select to authenticated
   using ((public.is_charity_admin(charity_id) or public.is_platform_admin())
          and (document_type <> 'bank_confirmation' or public.charity_can(charity_id, 'bank_view')));
-create policy charity_documents_write on public.charity_documents for all to authenticated
-  using (public.charity_can(charity_id, 'application'))
+-- Writes only (insert, update, delete), never "for all": a FOR ALL policy also grants SELECT, and permissive
+-- policies are OR'd, so it would let an admin read the bank confirmation letter that the read policy above keeps
+-- to the owner and finance.
+create policy charity_documents_insert on public.charity_documents for insert to authenticated
   with check (public.charity_can(charity_id, 'application'));
+create policy charity_documents_update on public.charity_documents for update to authenticated
+  using (public.charity_can(charity_id, 'application')
+         and (document_type <> 'bank_confirmation' or public.charity_can(charity_id, 'bank_view')))
+  with check (public.charity_can(charity_id, 'application'));
+create policy charity_documents_delete on public.charity_documents for delete to authenticated
+  using (public.charity_can(charity_id, 'application'));
 
 drop policy charity_photos_add on public.charity_photos;
 create policy charity_photos_add on public.charity_photos for insert to authenticated

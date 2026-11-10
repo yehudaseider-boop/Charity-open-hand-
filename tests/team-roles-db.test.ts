@@ -339,10 +339,13 @@ describe("team roles", () => {
         await as(people[r]);
         const page = TABLE.profile.includes(r);
         const application = TABLE.application.includes(r);
+        // A new value for each role: the guard only refuses a real change, and an update to the value an earlier role
+        // already saved changes nothing.
+        const n = ROLES.indexOf(r);
         for (const sql of [
-          "update public.charities set legal_name_en = 'Changed NPC' where id = $1 returning id",
-          "update public.charities set npo_number = '123-456 NPO' where id = $1 returning id",
-          "update public.charities set city = 'Durban' where id = $1 returning id",
+          `update public.charities set legal_name_en = 'Changed NPC ${n}' where id = $1 returning id`,
+          `update public.charities set npo_number = '12${n}-456 NPO' where id = $1 returning id`,
+          `update public.charities set city = 'Durban ${n}' where id = $1 returning id`,
         ]) {
           if (application) {
             expect([r, sql, (await run(sql, [c])).rowCount]).toEqual([r, sql, 1]);
@@ -356,6 +359,20 @@ describe("team roles", () => {
         }
         await reset();
       }
+    });
+  });
+  it("has both guards on and no policy that widens who reads the documents", async () => {
+    await tx(async () => {
+      const triggers = (await run(
+        "select tgname, tgenabled from pg_trigger where tgname in ('charity_private_contact_guard', 'charities_application_guard') order by tgname",
+      )).rows;
+      expect(triggers).toEqual([
+        { tgname: "charities_application_guard", tgenabled: "O" },
+        { tgname: "charity_private_contact_guard", tgenabled: "O" },
+      ]);
+      // Any policy that grants SELECT on charity_documents (FOR SELECT or FOR ALL) must be the read policy alone.
+      const readers = (await run("select policyname from pg_policies where schemaname = 'public' and tablename = 'charity_documents' and cmd in ('SELECT', 'ALL') and permissive = 'PERMISSIVE'")).rows.map((p) => p.policyname);
+      expect(readers).toEqual(["charity_documents_read"]);
     });
   });
 });
