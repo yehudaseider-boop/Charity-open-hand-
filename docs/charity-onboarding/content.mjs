@@ -21,7 +21,7 @@ export function body({ cfg, logo, splash, today, art }) {
     bg("lil", 92, "left:-36mm;bottom:26mm") + bg("lav", 36, "right:-14mm;bottom:-12mm") + bg("or", 10, "left:60mm;bottom:22mm") + bg("ring-or", 24, "right:30mm;bottom:48mm"),
     bg("peach", 70, "left:-30mm;bottom:-22mm") + bg("lil", 60, "right:-24mm;bottom:30mm") + bg("bl", 7, "left:70mm;bottom:20mm") + bg("or", 6, "left:42mm;bottom:40mm"),
   ];
-  const COVER = bg("lil", 120, "left:-48mm;top:50mm") + bg("peach", 130, "right:-52mm;bottom:-34mm") + bg("ring", 40, "right:22mm;bottom:12mm") + bg("or", 11, "right:44mm;bottom:78mm") + bg("bl", 6, "left:130mm;bottom:96mm") + bg("lav", 26, "right:30mm;top:96mm");
+  const COVER = bg("lil", 104, "left:-42mm;bottom:-44mm") + bg("peach", 140, "right:-50mm;bottom:-40mm") + bg("lav", 30, "right:-8mm;top:46mm") + bg("or", 11, "left:96mm;bottom:104mm") + bg("bl", 6, "right:70mm;bottom:96mm") + bg("ring-or", 22, "left:14mm;bottom:112mm");
   // One of the website's own illustrations, placed in the empty corner of a page.
   const pic = (name, style) => `<div class="pic" style="${style}">${art[name]}</div>`;
   let n = 0;
@@ -50,14 +50,17 @@ export function body({ cfg, logo, splash, today, art }) {
     <div class="meta"><img class="logo" src="${logo}" alt="Givezy"><img class="splash" src="${splash}" alt=""></div>
     <div class="hero">
       <div class="ring"></div><div class="dot"></div>
-      <h1>Getting your charity started on Givezy</h1>
-      <p>What happens, what to prepare, and the details we need from you. One short pack, in plain words.</p>
+      <div class="kicker">Charity onboarding pack</div>
+      <h1>Giving made easy.</h1>
+      <p>Getting your charity started on Givezy: what happens, what to prepare, and the details we need from you.</p>
     </div>
-    <div>
+    <div class="pills"><span>Every charity checked</span><span>s18A receipts made for you</span><span>Free to list</span></div>
+    <div class="bottom">
       <span class="draft">Draft for Yehuda to review, ${today}</span>
       <p class="for">For the director or administrator of a charity joining Givezy. Read pages 2 to 6, then fill in pages 7 to 10 on screen and send the file back to us. Page 11 is your go-live checklist.</p>
       <p class="for small">Words in square brackets are still to be filled in by Givezy.</p>
-    </div>`);
+    </div>
+    ${pic("findingTheWay", "right:14mm;bottom:12mm;width:50mm;")}`);
 
   // ---- 2. what Givezy is
   const about = page("", `
