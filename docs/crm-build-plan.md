@@ -51,6 +51,8 @@ Next after the donor journey, in this order, then roles (step 9) moved up behind
     donors, donors missing s18A details, each with its button.
 18. **The donor's whole story on the donor page.** Gifts plus every message the charity sent them (thank-yous,
     reminders, appeals, journey emails) and the charity's own notes, in one timeline.
+    **Built 10/11/2026** ("Their story with you" on the donor's page; no migration). Notes show as "Note added by
+    ..." in the story; their words stay in the Notes box. Message bodies are never shown in the story.
 
 Then step 9 (roles). Not taken from the doc: religious features such as maaser tracking (no religious features,
 decided 30/10/2026), and its statistics, which are vendor or second-hand figures and never go on Givezy pages.

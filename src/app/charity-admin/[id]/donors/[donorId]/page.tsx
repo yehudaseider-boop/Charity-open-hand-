@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/badge";
@@ -19,10 +20,11 @@ import { addDonorNote, addDonorReminder, addDonorTag, deleteDonorNote, deleteDon
 import { ButtonForm, NoteForm, ReminderForm, TagForm } from "../care-forms";
 import { BackLink } from "@/components/back-link";
 import { PageHeader, rowLink } from "@/components/dash";
+import { DonorStory, DonorStoryLoading } from "./story";
 
 export const metadata: Metadata = { title: "Donor" };
 
-/** One donor: their giving to this charity, their gifts, and the charity's own tags, follow-ups and notes. */
+/** One donor: their giving to this charity, their whole story with it, their gifts, and the charity's own tags, follow-ups and notes. */
 export default async function DonorPage({ params, searchParams }: PageProps<"/charity-admin/[id]/donors/[donorId]">) {
   const { id, donorId } = await params;
   const sp = await searchParams;
@@ -95,6 +97,12 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
         {giving.byCampaign.some((l) => l.key !== "none") ? <GivingLines title="By campaign" lines={giving.byCampaign} /> : null}
         {giving.bySource.length ? <GivingLines title="How they gave" lines={giving.bySource} /> : null}
       </Card>
+
+      <div id="story" className="scroll-mt-4">
+        <Suspense fallback={<DonorStoryLoading />}>
+          <DonorStory charityId={id} donorId={donorId} erased={isErasedEmail(donor.email)} showAll={sp.story === "all"} notes={notes.map((n) => ({ created_at: n.created_at, author: n.author }))} />
+        </Suspense>
+      </div>
 
       <Card title={`Follow-ups${open.length ? ` (${open.length})` : ""}`}>
         <div className="space-y-3 text-sm">
