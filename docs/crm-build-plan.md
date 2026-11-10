@@ -50,9 +50,12 @@ Next after the donor journey, in this order, then roles (step 9) moved up behind
     **Built 10/11/2026, not yet on the test site** (migration `20261110000008_keeping_donors.sql` waits for Yehuda's
     yes). As built: a "Keeping donors" card on the overview and a Keeping donors page (People), this or last tax year;
     the lists show contact details and open the donor's page, where the thank-you and follow-ups are (one message a
-    week still applies there). CSV download per list.
+    week still applies there). CSV download per list. "Not since" checks up to today, so last tax year's lists leave
+    out donors who came back afterwards.
 17. **"This week" list on the overview.** One card: new donors to thank, declined monthly cards, stopped monthly
     donors, donors missing s18A details, each with its button.
+    **Built 10/11/2026** (no migration). The overview's "Needs you this week" card, moved near the top, now also
+    has new donors to thank this week and missing s18A details; stopped monthly donors link to the stopped list.
 18. **The donor's whole story on the donor page.** Gifts plus every message the charity sent them (thank-yous,
     reminders, appeals, journey emails) and the charity's own notes, in one timeline.
     **Built 10/11/2026** ("Their story with you" on the donor's page; no migration). Notes show as "Note added by

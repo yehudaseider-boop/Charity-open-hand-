@@ -11,16 +11,25 @@ import { allTime, lastMonth, monthlySummary, saDate, thisMonth, thisTaxYear } fr
 import { countDonorGroups, donorGroupsFor, endsWithinAWeek, giftsPerDonor, lapsedPeriodText, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
 import { dueReminders, lapsedDaysFor } from "@/lib/charity/donor-care";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
-import { isRunning, progressPercent } from "@/lib/charity/campaigns";
+import { isRunning } from "@/lib/charity/campaigns";
 import { loadDonors, loadGiftSources, loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview, loadRecentDonations } from "@/lib/charity/dashboard-queries";
-import { formatDate, isoDateInJhb } from "@/lib/dates";
-import { formatRand } from "@/lib/money";
-import { plural } from "@/lib/text";
+import { isoDateInJhb } from "@/lib/dates";
 import { impactUnitFrom } from "@/lib/charity/impact";
-import { keepingSummary, keepingWindow } from "@/lib/charity/keeping-donors";
-import { KeepingNotSetUp, loadKeepingDonors } from "@/lib/charity/keeping-donors-queries";
+import { keepingWindow } from "@/lib/charity/keeping-donors";
+import { lapsedPeriod } from "@/lib/charity/lapsed-monthly";
+import { loadLapsedMonthly } from "@/lib/charity/lapsed-monthly-queries";
+import { loadS18aMissing } from "@/lib/charity/s18a-reminder-send";
+import { thisWeek } from "@/lib/charity/this-week";
+import { newDonorsToThank } from "@/lib/charity/this-week-store";
+import { KeepingNotSetUp, loadKeepingSummary } from "@/lib/charity/keeping-donors-queries";
 
 export const metadata: Metadata = { title: "Overview" };
+
+/** One part of "Needs you this week" couldn't be read: log it (no donor details) and let the card say so. */
+function quiet(what: string, e: unknown): null {
+  console.error(`[overview] ${what} couldn't load`, e instanceof Error ? e.message : e);
+  return null;
+}
 
 export default async function CharityDashboardPage({ params }: PageProps<"/charity-admin/[id]">) {
   const { id } = await params;
@@ -88,13 +97,22 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     loadGiftSources(id, taxYear),
   ]);
   const keepingYear = keepingWindow("this", now);
-  const [lapsedDays, due, keepingRows] = await Promise.all([
+  // "Needs you this week" (CRM step 17): each line links to the page where the charity acts on it. Unpaid attempts
+  // are not shown to charities. A part that can't be read is named on the card; the rest still shows.
+  const [lapsedDays, due, keepingRows, toThank, stopped, s18aMissing] = await Promise.all([
     lapsedDaysFor(id),
     dueReminders(id, isoDateInJhb(now)),
     // A bonus panel: if it can't load, the overview still shows, with a plain line instead. Not set up yet: no panel.
-    loadKeepingDonors(id, keepingYear).catch((e) => (e instanceof KeepingNotSetUp ? undefined : null)),
+    loadKeepingSummary(id, keepingYear).catch((e) => (e instanceof KeepingNotSetUp ? undefined : null)),
+    newDonorsToThank(id, donors, now).catch((e: unknown) => quiet("new donors to thank", e)),
+    loadLapsedMonthly(id, lapsedPeriod("30-days", now)).then(
+      (rows) => ({ count: rows.length, centsPerMonth: rows.reduce((t, r) => t + Number(r.amount_cents), 0) }),
+      (e: unknown) => quiet("stopped monthly donors", e),
+    ),
+    // Anyone who manages the charity sees the count; only the owner can send the reminder from the Donors list.
+    loadS18aMissing(id, now).then((m) => m.size, (e: unknown) => quiet("s18A details", e)),
   ]);
-  const keeping = keepingRows === undefined ? undefined : keepingRows === null ? null : { summary: keepingSummary(keepingRows), window: keepingYear };
+  const keeping = keepingRows === undefined ? undefined : keepingRows === null ? null : { summary: keepingRows, window: keepingYear };
   const donorGroups = donorGroupsFor(lapsedDays);
   const activeCampaigns = campaigns.filter((c) => isRunning(c, now));
   const start = gettingStarted(charity, { updates: stories.updates.length, campaigns: campaigns.length }, base);
@@ -110,19 +128,19 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const perDonor = giftsPerDonor(giftsTotal, donors.length);
   const needs = monthlyAttention(recurring, now);
   const endingSoon = activeCampaigns.filter((c) => endsWithinAWeek(c.endsAt, now));
-  // Each line links to the page where the charity can act on it. Unpaid attempts are not shown to charities.
-  const todo: { key: string; text: string; href: string; link: string }[] = [];
-  if (insights.newDonors > 0) todo.push({ key: "new", text: `${plural(insights.newDonors, "new donor")} this month`, href: `${base}/thank-donors`, link: "Say thank you" });
-  if (needs.retrying > 0) todo.push({ key: "retry", text: `${plural(needs.retrying, "monthly donation")} declined this month and being tried again`, href: `${base}/monthly?show=running`, link: "See who" });
-  if (needs.endedRecently > 0) todo.push({ key: "ended", text: `${plural(needs.endedRecently, "monthly donation")} stopped or cancelled in the last 30 days (${formatRand(needs.endedRecentlyCents)} a month)`, href: `${base}/monthly?show=ended`, link: "See who" });
-  if (needs.pausedRecently > 0) todo.push({ key: "paused", text: `${plural(needs.pausedRecently, "monthly donor")} paused in the last 30 days`, href: `${base}/monthly?show=paused`, link: "See who" });
-  if (groups.lapsed > 0) todo.push({ key: "lapsed", text: `${plural(groups.lapsed, "donor")} ${groups.lapsed === 1 ? "hasn't" : "haven't"} given in the last ${lapsedPeriodText(lapsedDays)}`, href: `${base}/donors?group=lapsed`, link: "See who" });
-  // Follow-ups the charity set itself, due today or earlier: the first few by name, then the count.
-  for (const r of due.slice(0, 5)) todo.push({ key: `f-${r.id}`, text: `Follow up with ${r.donor_name}: ${r.what}${r.due_on < isoDateInJhb(now) ? ` (was due ${formatDate(`${r.due_on}T12:00:00+02:00`)})` : ""}`, href: `${base}/donors/${r.donor_id}`, link: "Open" });
-  if (due.length > 5) todo.push({ key: "f-more", text: `${plural(due.length - 5, "more follow-up")} due`, href: `${base}/donors`, link: "See donors" });
-  for (const c of endingSoon) todo.push({ key: `c-${c.id}`, text: `"${c.title}" ends on ${formatDate(c.endsAt as string)}${c.targetCents ? `, at ${progressPercent(c.raisedCents, c.targetCents)}% of its goal` : ""}`, href: `${base}/campaigns`, link: "Share it again" });
-  if (all.refunded_count > 0) todo.push({ key: "refund", text: `${plural(all.refunded_count, "donation")} refunded (${formatRand(all.refunded_cents)})`, href: `${base}/donations?status=refunded`, link: "See them" });
-  if (all.charged_back_count > 0) todo.push({ key: "cb", text: `${plural(all.charged_back_count, "donation")} charged back`, href: `${base}/donations?status=charged_back`, link: "See them" });
+  const week = thisWeek({
+    base,
+    todaySa: isoDateInJhb(now),
+    toThank,
+    monthly: needs,
+    stopped,
+    s18aMissing,
+    lapsed: { count: groups.lapsed, periodText: lapsedPeriodText(lapsedDays) },
+    followUps: due,
+    endingSoon,
+    refunded: { count: all.refunded_count, cents: all.refunded_cents },
+    chargedBack: all.charged_back_count,
+  });
 
   return (
     <OverviewView
@@ -152,7 +170,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
       perDonor={perDonor}
       unit={unit}
       receipts={receipts}
-      todo={todo}
+      todo={week.items}
+      todoUnavailable={week.unavailable}
       keeping={keeping}
     />
   );

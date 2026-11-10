@@ -19,6 +19,8 @@ import { giftSourceLabel } from "@/lib/donations/source";
 import { formatDate, taxYearLabel, taxYearName, taxYearRange } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import type { WeekItem } from "@/lib/charity/this-week";
+import { ThisWeekCard } from "./this-week-card";
 import { keepingLists, retentionSentence, type KeepingSummary, type KeepingWindow } from "@/lib/charity/keeping-donors";
 
 export type OverviewProps = {
@@ -48,7 +50,9 @@ export type OverviewProps = {
   perDonor: ReturnType<typeof giftsPerDonor>;
   unit: ReturnType<typeof impactUnitFrom>;
   receipts: boolean;
-  todo: { key: string; text: string; href: string; link: string }[];
+  todo: WeekItem[];
+  /** Parts of "Needs you this week" that couldn't be checked just now (the card names them). */
+  todoUnavailable?: string[];
   /** Keeping donors (step 16). Left out: no panel (not set up yet, or a preview). Null: it couldn't load. */
   keeping?: { summary: KeepingSummary; window: KeepingWindow } | null;
 };
@@ -58,7 +62,7 @@ export type OverviewProps = {
  * drawn from sample figures too (tests, previews), with no sign-in or database.
  */
 export function OverviewView(p: OverviewProps) {
-  const { charityName, base, now, publicLink, month, prev, year, all, taxYear, chart, recurring, regular, sources, recent, campaigns, activeCampaigns, start, groups, donorGroups, insights, donorCount, top, giftsTotal, perDonor, unit, receipts, todo, keeping } = p;
+  const { charityName, base, now, publicLink, month, prev, year, all, taxYear, chart, recurring, regular, sources, recent, campaigns, activeCampaigns, start, groups, donorGroups, insights, donorCount, top, giftsTotal, perDonor, unit, receipts, todo, todoUnavailable, keeping } = p;
   const startDone = start.filter((i) => i.done).length;
   const today = saDate(now);
   // The figures' trends come from the same rows as the chart, so they always agree with it.
@@ -127,6 +131,9 @@ export function OverviewView(p: OverviewProps) {
         </Card>
       ) : null}
 
+      {/* What needs a person this week, near the top (CRM step 17). Shown once the first donation is in. */}
+      {all.paid_count > 0 ? <ThisWeekCard items={todo} unavailable={todoUnavailable} base={base} /> : null}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi strong href={`${base}/donations?status=paid&period=this-month`} label="This month so far" value={formatRand(month.paid_cents)} note={`${plural(month.paid_count, "donation")} · last month ${formatRand(prev.paid_cents)}`} trend={chart.slice(-6).map((m) => m.amountCents)} />
         <Kpi href={`${base}/donations?status=paid&period=this-tax-year`} label={`${taxYearName(taxYear.taxYear)} tax year`} value={formatRand(year.paid_cents)} note={plural(year.paid_count, "donation")} trend={monthsFrom(chart, taxStart).map((m) => m.amountCents)} />
@@ -193,24 +200,6 @@ export function OverviewView(p: OverviewProps) {
           </Card>
         </div>
         <div className="space-y-4 lg:col-span-4">
-          {all.paid_count > 0 ? (
-            <Card lights title="Needs you this week">
-              {todo.length === 0 ? (
-                <p className="text-sm text-muted">Nothing needs you right now. New donors, declined monthly donations and campaigns about to end show up here.</p>
-              ) : (
-                <ul className="divide-y divide-border text-sm">
-                  {todo.map((t) => (
-                    <li key={t.key} className="py-1 first:pt-0 last:pb-0">
-                      <Link href={t.href} className="group -mx-2 block space-y-1 rounded-control px-2 py-1.5 transition hover:bg-honey-soft focus-visible:bg-honey-soft">
-                        <p className="text-navy">{t.text}</p>
-                        <span className="font-semibold text-brand underline group-hover:no-underline">{t.link} <span aria-hidden className="inline-block transition-transform motion-safe:group-hover:translate-x-1">→</span></span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          ) : null}
           {top.length > 0 ? (
             <Card lights title="Your biggest supporters">
               <ol className="space-y-1 text-sm">
