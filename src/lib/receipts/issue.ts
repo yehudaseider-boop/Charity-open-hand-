@@ -29,7 +29,8 @@ export interface ReceiptStore {
   listIssuedWithoutPdf(taxYear: number, charityId?: string): Promise<IssuedReceipt[]>;
   savePdf(receipt: IssuedReceipt, pdf: Buffer): Promise<void>;
   /** Issued receipts with a PDF that have not been emailed yet, with the donor's email address. */
-  listToEmail(taxYear: number, charityId?: string): Promise<(IssuedReceipt & { email: string })[]>;
+  /** Issued receipts ready to email. `receiptId` narrows it to that one receipt (a try again reads one, not the year). */
+  listToEmail(taxYear: number, charityId?: string, receiptId?: string): Promise<(IssuedReceipt & { email: string })[]>;
   readPdf(receipt: IssuedReceipt): Promise<Buffer>;
   /**
    * Claim a receipt before its email goes, so two runs at once never both send it. False when another run

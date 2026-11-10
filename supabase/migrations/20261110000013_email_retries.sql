@@ -2,12 +2,14 @@
 --
 -- A donor's gift confirmation, an s18A receipt email or a declined-card notice that failed to send is noted here
 -- and tried again: an hour later (in practice the next daily run), then a day later, then three days after that.
--- After three more tries the row says gave_up and Givezy is told once, in the daily email (counts only).
+-- After three more tries the row says gave_up and Givezy is told once, in the daily email (counts only). A send cut
+-- off mid-way (it may have gone) says unknown and is never tried again by itself: a person checks it. A row older
+-- than 7 days is not tried any more (gave_up).
 --
 -- No email address or name is kept: a row names the gift, receipt or monthly donation it belongs to, and the
 -- address is read again, as it is then, at each try (an erased donor is never emailed). The payload holds only
 -- what a declined-card notice needs besides the donation: the amount in cents, whether it was the final notice,
--- and when it failed.
+-- when it failed, and the donation's failed tries then (a newer try's notice replaces it).
 --
 -- Server-only: the daily job reads and writes it with the service role. No browser can read or write it.
 
@@ -19,7 +21,7 @@ create table public.email_retries (
   payload jsonb not null default '{}'::jsonb constraint email_retry_payload check (jsonb_typeof(payload) = 'object'),
   -- Tries so far, the first send included.
   tries int not null default 1 constraint email_retry_tries check (tries between 1 and 10),
-  status text not null default 'waiting' constraint email_retry_status check (status in ('waiting', 'sent', 'skipped', 'gone', 'gave_up')),
+  status text not null default 'waiting' constraint email_retry_status check (status in ('waiting', 'sent', 'skipped', 'gone', 'unknown', 'gave_up')),
   next_try_at timestamptz not null,
   -- A run's lock while it sends; one older than 15 minutes was cut off and is taken over.
   claimed_at timestamptz,

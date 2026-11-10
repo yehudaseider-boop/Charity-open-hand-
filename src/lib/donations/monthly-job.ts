@@ -65,7 +65,7 @@ export type MonthlyDeps = {
   isRefused(e: unknown): boolean;
   /** Whether the charity can still take donations, and its account at the gateway. */
   charityState(slug: string): Promise<{ accepting: boolean }>;
-  notifyFailed(r: DueMonthly, info: { totalCents: number; final: boolean }): Promise<void>;
+  notifyFailed(r: DueMonthly, info: { totalCents: number; final: boolean; failedAttempts: number }): Promise<void>;
   now: Date;
   limit?: number;
 };
@@ -241,7 +241,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         const failedAttempts = attempt + 1;
         const retryAt = retryTime(now, failedAttempts);
         await store.recordFailure(r.id, period, failedAttempts, retryAt);
-        await deps.notifyFailed(r, { totalCents, final: retryAt === null }).catch((e) => console.error("[monthly] failure email not sent", e));
+        await deps.notifyFailed(r, { totalCents, final: retryAt === null, failedAttempts }).catch((e) => console.error("[monthly] failure email not sent", e));
         summary.failed += 1;
         if (retryAt === null) summary.stopped += 1;
       } else if (outcome === "review") {

@@ -164,7 +164,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       }));
     },
 
-    async listToEmail(taxYear, charityId) {
+    async listToEmail(taxYear, charityId, receiptId) {
       type Row = {
         id: string;
         charity_id: string;
@@ -180,7 +180,8 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
           .eq("status", "issued")
           .not("pdf_path", "is", null)
           .is("emailed_at", null);
-        return (charityId ? q.eq("charity_id", charityId) : q).order("id").range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+        const one = receiptId ? q.eq("id", receiptId) : q;
+        return (charityId ? one.eq("charity_id", charityId) : one).order("id").range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
       });
       const out: (IssuedReceipt & { email: string })[] = [];
       for (const r of rows) {

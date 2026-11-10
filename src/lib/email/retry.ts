@@ -1,7 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { afterTry, emailIsOn, nextTryAt, safeErrorText, type RetryKind, type RetryResult, type RetryStatus } from "./retry-plan";
+import { afterTry, emailIsOn, nextTryAt, safeErrorText, tooOld, wasCutOff, type RetryKind, type RetryResult, type RetryStatus } from "./retry-plan";
 
 /**
  * Important emails that failed, tried again by the daily job (10/11/2026; rules in ./retry-plan). Each failed
@@ -11,18 +11,24 @@ import { afterTry, emailIsOn, nextTryAt, safeErrorText, type RetryKind, type Ret
  * falls back to its older once-a-day resend of confirmations.
  */
 
-export type RetryRow = { id: string; kind: RetryKind; refId: string; payload: Record<string, unknown>; tries: number };
+export type RetryRow = { id: string; kind: RetryKind; refId: string; payload: Record<string, unknown>; tries: number; createdAt: Date };
 
 /** One kind's sender. Throws when the send failed; otherwise says what happened. */
-export type RetryHandler = (row: RetryRow, signal: AbortSignal) => Promise<Exclude<RetryResult, "failed">>;
+export type RetryHandler = (row: RetryRow, signal: AbortSignal) => Promise<Exclude<RetryResult, "failed" | "unknown">>;
+
+/** A run's hold on a row: when it claimed it (written on the row, so only this run's finish can write it). */
+export type Claim = { token: string; tookOver: boolean };
 
 export interface RetryStore {
   /** Waiting rows whose time has come, oldest first. Null when the table isn't there yet. */
   due(now: Date, limit: number): Promise<RetryRow[] | null>;
-  /** Take a row for this run. False when another run has it (or it was taken in the last 15 minutes). */
-  claim(id: string, now: Date): Promise<boolean>;
-  /** Write a try's result and hand the claim back. */
-  finish(id: string, patch: { status: RetryStatus; tries: number; nextTryAt: Date | null; lastError: string | null }, now: Date): Promise<void>;
+  /**
+   * Take a row for this run. Null when another run has it. `tookOver` when a run that claimed it earlier stopped
+   * without finishing (its claim is more than 15 minutes old): that run may have sent it.
+   */
+  claim(id: string, now: Date): Promise<Claim | null>;
+  /** Write a try's result and hand the claim back, only on the row this run claimed. */
+  finish(id: string, claim: Claim, patch: { status: RetryStatus; tries: number; nextTryAt: Date | null; lastError: string | null }, now: Date): Promise<void>;
 }
 
 export type RetrySummary = {
@@ -38,11 +44,17 @@ export type RetrySummary = {
   failedAgain: number;
   /** Stopped trying today, after the last try failed. Givezy is told once, in the daily email. */
   gaveUp: number;
+  /** Waited more than RETRY_MAX_AGE_DAYS: not tried, told once. */
+  expired: number;
+  /** Cut off mid-send (may have gone): not tried again by itself, told once, for a person to check. */
+  unknown: number;
 };
 
 const CLAIM_MINUTES = 15;
-/** Each send may take this long before it is given up and counted as failed. */
+/** Each send may take this long. A send cut off at the limit may still have gone, so it counts as unknown. */
 const SEND_LIMIT_MS = 8_000;
+/** No new row is started this close to the deadline: one send (8 seconds) plus its reads and writes must fit. */
+const DEADLINE_MARGIN_MS = 12_000;
 
 export async function runEmailRetries(deps: {
   store: RetryStore;
@@ -52,35 +64,59 @@ export async function runEmailRetries(deps: {
   emailOn?: boolean;
   audit?: (action: string, row: RetryRow, details: Record<string, unknown>) => Promise<void>;
   limit?: number;
+  clock?: () => number;
 }): Promise<RetrySummary> {
-  const out: RetrySummary = { off: false, notSetUp: false, incomplete: false, resent: 0, skipped: 0, gone: 0, failedAgain: 0, gaveUp: 0 };
+  const out: RetrySummary = { off: false, notSetUp: false, incomplete: false, resent: 0, skipped: 0, gone: 0, failedAgain: 0, gaveUp: 0, expired: 0, unknown: 0 };
   if (!(deps.emailOn ?? emailIsOn())) return { ...out, off: true };
   const rows = await deps.store.due(deps.now, deps.limit ?? 50);
   if (rows === null) return { ...out, notSetUp: true };
   const audit = deps.audit ?? (async () => undefined);
+  const clock = deps.clock ?? Date.now;
   for (const row of rows) {
-    if (Date.now() > deps.deadline) {
+    if (clock() > deps.deadline - DEADLINE_MARGIN_MS) {
       out.incomplete = true;
       break;
     }
     // Claimed first: two daily runs at once must never send the same email twice.
-    if (!(await deps.store.claim(row.id, deps.now))) continue;
+    const claim = await deps.store.claim(row.id, deps.now);
+    if (!claim) continue;
     let result: RetryResult;
     let lastError: string | null = null;
-    try {
-      result = await deps.handlers[row.kind](row, AbortSignal.timeout(SEND_LIMIT_MS));
-    } catch (e) {
+    let expired = false;
+    if (claim.tookOver) {
+      // The run that had it stopped part-way: it may have sent it. A person checks rather than risk a second copy.
+      result = "unknown";
+      lastError = "A run that was sending this stopped part-way; it may have gone.";
+    } else if (tooOld(row.createdAt, deps.now)) {
       result = "failed";
-      lastError = safeErrorText(e);
+      expired = true;
+    } else {
+      try {
+        result = await deps.handlers[row.kind](row, AbortSignal.timeout(SEND_LIMIT_MS));
+      } catch (e) {
+        result = wasCutOff(e) ? "unknown" : "failed";
+        lastError = safeErrorText(e);
+      }
     }
-    const next = afterTry(row.tries, result, new Date());
-    await deps.store.finish(row.id, { ...next, lastError }, deps.now);
-    if (result === "sent") {
+    const next = expired ? { status: "gave_up" as const, tries: row.tries, nextTryAt: null } : afterTry(row.tries, result, new Date(clock()));
+    try {
+      await deps.store.finish(row.id, claim, { ...next, lastError }, deps.now);
+    } catch (e) {
+      // The claim stays on the row: in 15 minutes a later run takes it over as "unknown" and never resends it.
+      console.error(`[email] could not record a try for ${row.kind} ${row.refId}`, e);
+    }
+    if (expired) {
+      out.expired += 1;
+      await audit("email.retry_gave_up", row, { kind: row.kind, tries: row.tries, reason: "too_old" });
+    } else if (result === "sent") {
       out.resent += 1;
       await audit("email.retry_sent", row, { kind: row.kind, try: next.tries });
     } else if (result === "skipped") out.skipped += 1;
     else if (result === "gone") out.gone += 1;
-    else if (result === "failed") {
+    else if (result === "unknown") {
+      out.unknown += 1;
+      await audit("email.retry_unknown", row, { kind: row.kind, try: next.tries, message: lastError });
+    } else if (result === "failed") {
       if (next.status === "gave_up") {
         out.gaveUp += 1;
         await audit("email.retry_gave_up", row, { kind: row.kind, tries: next.tries, message: lastError });
@@ -98,28 +134,34 @@ export function supabaseRetryStore(db = createAdminClient()): RetryStore {
     async due(now, limit) {
       const { data, error } = await db
         .from("email_retries")
-        .select("id, kind, ref_id, payload, tries")
+        .select("id, kind, ref_id, payload, tries, created_at")
         .eq("status", "waiting")
         .lte("next_try_at", now.toISOString())
         .order("next_try_at", { ascending: true })
         .limit(limit);
       if (isMissingTable(error)) return null;
       if (error) throw new Error(`Could not list emails to try again: ${error.message}`);
-      return (data ?? []).map((r) => ({ id: r.id as string, kind: r.kind as RetryKind, refId: r.ref_id as string, payload: (r.payload as Record<string, unknown>) ?? {}, tries: Number(r.tries) }));
+      return (data ?? []).map((r) => ({
+        id: r.id as string,
+        kind: r.kind as RetryKind,
+        refId: r.ref_id as string,
+        payload: (r.payload as Record<string, unknown>) ?? {},
+        tries: Number(r.tries),
+        createdAt: new Date(r.created_at as string),
+      }));
     },
     async claim(id, now) {
-      const stale = new Date(now.getTime() - CLAIM_MINUTES * 60_000).toISOString();
-      const { data, error } = await db
-        .from("email_retries")
-        .update({ claimed_at: now.toISOString() })
-        .eq("id", id)
-        .eq("status", "waiting")
-        .or(`claimed_at.is.null,claimed_at.lt.${stale}`)
-        .select("id");
-      if (error) throw new Error(`Could not take an email to try again: ${error.message}`);
-      return Boolean(data?.length);
+      // Precise to the millisecond and written on the row: finish matches it, so only this run writes the result.
+      const token = new Date(Math.max(Date.now(), now.getTime())).toISOString();
+      const fresh = await db.from("email_retries").update({ claimed_at: token }).eq("id", id).eq("status", "waiting").is("claimed_at", null).select("id");
+      if (fresh.error) throw new Error(`Could not take an email to try again: ${fresh.error.message}`);
+      if (fresh.data?.length) return { token, tookOver: false };
+      const stale = new Date(Date.now() - CLAIM_MINUTES * 60_000).toISOString();
+      const old = await db.from("email_retries").update({ claimed_at: token }).eq("id", id).eq("status", "waiting").lt("claimed_at", stale).select("id");
+      if (old.error) throw new Error(`Could not take an email to try again: ${old.error.message}`);
+      return old.data?.length ? { token, tookOver: true } : null;
     },
-    async finish(id, p, now) {
+    async finish(id, claim, p, now) {
       const { error } = await db
         .from("email_retries")
         .update({
@@ -130,7 +172,8 @@ export function supabaseRetryStore(db = createAdminClient()): RetryStore {
           claimed_at: null,
           updated_at: now.toISOString(),
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("claimed_at", claim.token);
       if (error) throw new Error(`Could not record an email try: ${error.message}`);
     },
   };
@@ -168,4 +211,38 @@ export async function recordFailedEmail(kind: RetryKind, refId: string, opts: { 
 export async function auditRetry(action: string, row: RetryRow, details: Record<string, unknown>): Promise<void> {
   const entityType = row.kind === "donation_confirmation" ? "donation" : row.kind === "s18a_receipt" ? "s18a_receipt" : "recurring_donation";
   await logAudit({ actorUserId: null, action, entityType, entityId: row.refId, details }).catch((e) => console.error("[email] could not record a try in the audit log", e));
+}
+
+/**
+ * Note several confirmations that failed (found only in the audit log, from before the list existed), in one write.
+ * Existing rows are kept as they are. Never throws.
+ */
+export async function recordFailedConfirmations(donationIds: string[], now = new Date()): Promise<void> {
+  if (!donationIds.length) return;
+  try {
+    const next = nextTryAt(1, now)!.toISOString();
+    const rows = donationIds.map((id) => ({ kind: "donation_confirmation", ref_id: id, payload: {}, tries: 1, status: "waiting", next_try_at: next, updated_at: now.toISOString() }));
+    const { error } = await createAdminClient().from("email_retries").upsert(rows, { onConflict: "kind,ref_id", ignoreDuplicates: true });
+    if (error && !isMissingTable(error)) console.error(`[email] could not list older failed confirmations: ${error.message}`);
+  } catch (e) {
+    console.error("[email] could not list older failed confirmations", e);
+  }
+}
+
+/**
+ * A newer email of this kind just went, so an older failed one waiting to be tried again would say the same thing
+ * twice (a declined-card notice that failed yesterday, when today's notice went): mark it gone. Never throws.
+ */
+export async function markRetryGone(kind: RetryKind, refId: string, now = new Date()): Promise<void> {
+  try {
+    const { error } = await createAdminClient()
+      .from("email_retries")
+      .update({ status: "gone", claimed_at: null, updated_at: now.toISOString() })
+      .eq("kind", kind)
+      .eq("ref_id", refId)
+      .eq("status", "waiting");
+    if (error && !isMissingTable(error)) console.error(`[email] could not close an older ${kind} email: ${error.message}`);
+  } catch (e) {
+    console.error(`[email] could not close an older ${kind} email`, e);
+  }
 }

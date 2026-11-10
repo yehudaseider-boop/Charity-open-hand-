@@ -3,6 +3,7 @@ import { platformConfig } from "@/config/platform";
 import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildReceiptEmail } from "./email";
+import { wasCutOff } from "@/lib/email/retry-plan";
 import { supabaseReceiptStore } from "./store";
 
 /**
@@ -19,7 +20,7 @@ export async function retryReceiptEmail(receiptId: string, signal: AbortSignal):
   if (!siteUrl) throw new Error("SITE_URL is not set, so a receipt email can't link to the site");
   const store = supabaseReceiptStore(db);
   // listToEmail applies the rules (PDF made, gifts still paid, donor not erased); a receipt it leaves out has nothing to send.
-  const r = (await store.listToEmail(Number(row.tax_year), row.charity_id as string)).find((x) => x.id === receiptId);
+  const r = (await store.listToEmail(Number(row.tax_year), row.charity_id as string, receiptId)).find((x) => x.id === receiptId);
   if (!r) return "gone";
   if (!(await store.claimEmail(r))) return "busy";
   try {
@@ -38,7 +39,9 @@ export async function retryReceiptEmail(receiptId: string, signal: AbortSignal):
     await store.releaseEmail(r);
     return "skipped";
   } catch (e) {
-    await store.releaseEmail(r).catch(() => undefined);
+    // A send cut off at the time limit may have gone: the claim stays, so nothing sends it again straight away,
+    // and the daily job flags it for a person (email.retry_unknown). Any other failure frees it for the next try.
+    if (!wasCutOff(e)) await store.releaseEmail(r).catch(() => undefined);
     throw e;
   }
 }

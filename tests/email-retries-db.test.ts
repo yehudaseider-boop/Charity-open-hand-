@@ -57,6 +57,8 @@ describe("the list of emails to try again", () => {
     await tx(async () => {
       await refused("insert into public.email_retries (kind, ref_id, next_try_at) values ('appeal', $1, now())", [REF], /email_retry_kind/);
       await refused("insert into public.email_retries (kind, ref_id, next_try_at, status) values ('s18a_receipt', $1, now(), 'maybe')", [REF], /email_retry_status/);
+      // "unknown" (a send cut off mid-way) is a known state.
+      await run("insert into public.email_retries (kind, ref_id, next_try_at, status) values ('monthly_declined', $1, now(), 'unknown')", [REF]);
       await refused("insert into public.email_retries (kind, ref_id, next_try_at, tries) values ('s18a_receipt', $1, now(), 0)", [REF], /email_retry_tries/);
       await refused("insert into public.email_retries (kind, ref_id, next_try_at, last_error) values ('s18a_receipt', $1, now(), repeat('x', 301))", [REF], /email_retry_error/);
       await refused("insert into public.email_retries (kind, ref_id, next_try_at, payload) values ('monthly_declined', $1, now(), '[1]'::jsonb)", [REF], /email_retry_payload/);

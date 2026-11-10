@@ -6,8 +6,8 @@ import { confirmPayment } from "@/lib/donations/confirm";
 import { deliverDonorConfirmation } from "@/lib/donations/notify";
 import { retryDeclinedNotice } from "@/lib/donations/monthly-declined-retry";
 import { retryReceiptEmail } from "@/lib/receipts/email-retry";
-import { auditRetry, recordFailedEmail, runEmailRetries, supabaseRetryStore, type RetryHandler, type RetrySummary } from "@/lib/email/retry";
-import { emailIsOn, gaveUpLine, type RetryKind } from "@/lib/email/retry-plan";
+import { auditRetry, recordFailedConfirmations, runEmailRetries, supabaseRetryStore, type RetryHandler, type RetrySummary } from "@/lib/email/retry";
+import { emailIsOn, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
 import { heldLabel } from "./held";
 
 /**
@@ -59,7 +59,7 @@ export type DailyChecks = {
   /** The older once-a-day resend of confirmations, used only until the email_retries table is there. */
   confirmations: { resent: number; failedAgain: number };
   /** Important emails tried again (gift confirmations, s18A receipts, declined-card notices). */
-  emailRetries?: Pick<RetrySummary, "resent" | "skipped" | "gone" | "failedAgain" | "gaveUp">;
+  emailRetries?: Pick<RetrySummary, "resent" | "skipped" | "gone" | "failedAgain" | "gaveUp" | "expired" | "unknown"> & { broken?: boolean };
   /** Payment messages from the provider not handled after an hour. */
   unhandledEvents: number;
   /** Held items from the last day, by what they are. */
@@ -141,13 +141,28 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
   // Givezy is told once. Nothing at all while email is off: a "sent" must mean a real email left.
   if (emailIsOn()) {
     const since = new Date(now.getTime() - 7 * 24 * HOUR).toISOString();
-    const retries = await runEmailRetries({ store: supabaseRetryStore(db), handlers: retryHandlers, now, deadline, audit: auditRetry });
-    if (retries.notSetUp) await resendConfirmationsOldWay(db, since, deadline, out);
-    else {
-      if (retries.incomplete) out.incomplete = true;
-      out.emailRetries = { resent: retries.resent, skipped: retries.skipped, gone: retries.gone, failedAgain: retries.failedAgain, gaveUp: retries.gaveUp };
-      // Confirmations that failed before the table existed (only in the audit log): put them on the list once.
-      await queueAuditOnlyFailures(db, since);
+    // Its own catch: a problem with the list to try again never stops the checks below or the daily email.
+    try {
+      const retries = await runEmailRetries({ store: supabaseRetryStore(db), handlers: retryHandlers, now, deadline, audit: auditRetry });
+      if (retries.notSetUp) await resendConfirmationsOldWay(db, since, deadline, out);
+      else {
+        if (retries.incomplete) out.incomplete = true;
+        out.emailRetries = {
+          resent: retries.resent,
+          skipped: retries.skipped,
+          gone: retries.gone,
+          failedAgain: retries.failedAgain,
+          gaveUp: retries.gaveUp,
+          expired: retries.expired,
+          unknown: retries.unknown,
+        };
+        // Confirmations that failed before the table existed (only in the audit log): put them on the list once,
+        // in one write. Skipped on a run that is out of time: tomorrow's run does it.
+        if (!retries.incomplete && Date.now() < deadline) await queueAuditOnlyFailures(db, since);
+      }
+    } catch (e) {
+      console.error("[daily] trying failed emails again did not run", e);
+      out.emailRetries = { resent: 0, skipped: 0, gone: 0, failedAgain: 0, gaveUp: 0, expired: 0, unknown: 0, broken: true };
     }
   }
 
@@ -183,8 +198,8 @@ async function queueAuditOnlyFailures(db: ReturnType<typeof createAdminClient>, 
   const { data: resentMail } = await db.from("audit_log").select("entity_id").eq("action", "donation.confirmation_email_resent").gte("created_at", since).limit(1000);
   const done = new Set((resentMail ?? []).map((r) => r.entity_id as string));
   const ids = [...new Set((failedMail ?? []).map((r) => r.entity_id as string))].filter((id) => id && !done.has(id));
-  // recordFailedEmail keeps an existing row as it is, so this never resets a row's tries.
-  for (const id of ids) await recordFailedEmail("donation_confirmation", id);
+  // One write, and an existing row is kept as it is, so this never resets a row's tries.
+  await recordFailedConfirmations(ids);
 }
 
 /**
@@ -233,8 +248,7 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   if (jobs.payoutsFailed) lines.push("The deposit report could not be updated today. It tries again tomorrow.");
   if (c.stuckPending) lines.push(`${n(c.stuckPending, "payment has", "payments have")} been pending for more than 3 days.`);
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
-  const gaveUp = gaveUpLine(c.emailRetries?.gaveUp ?? 0);
-  if (gaveUp) lines.push(gaveUp);
+  if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));
   if (c.confirmations.failedAgain) lines.push(`${n(c.confirmations.failedAgain, "confirmation email", "confirmation emails")} to donors still could not be sent.`);
   for (const [action, count] of Object.entries(c.held)) lines.push(`${heldLabel[action] ?? action}: ${count}`);
   return lines;

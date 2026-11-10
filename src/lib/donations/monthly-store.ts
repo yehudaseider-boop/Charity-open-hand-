@@ -10,7 +10,7 @@ import { platformConfig } from "@/config/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore, type MonthlySummary } from "./monthly-job";
 import { declinedNotice } from "./monthly-declined-retry";
-import { recordFailedEmail } from "@/lib/email/retry";
+import { markRetryGone, recordFailedEmail } from "@/lib/email/retry";
 import { newCardPendingFor } from "./new-card";
 import { DECLINED_REASON } from "./monthly-reasons";
 import { monthlyCardCharge } from "./card-charge";
@@ -251,9 +251,12 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
         await getEmailTransport().send({ to: r.email, ...m });
       } catch (e) {
         // Tried again by the daily job (an hour later, then a day, then three days), as the donation is then.
-        await recordFailedEmail("monthly_declined", r.id, { payload: { totalCents: info.totalCents, final: info.final, failedAt: now.toISOString() }, error: e });
+        const payload = { totalCents: info.totalCents, final: info.final, failedAt: now.toISOString(), failedAttempts: info.failedAttempts };
+        await recordFailedEmail("monthly_declined", r.id, { payload, error: e });
         throw e;
       }
+      // This notice says it now: an older one still waiting to be tried again would be a second "card declined".
+      await markRetryGone("monthly_declined", r.id, now);
     },
   };
   return runMonthlyCharges(deps);

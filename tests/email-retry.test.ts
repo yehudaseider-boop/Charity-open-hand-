@@ -2,24 +2,32 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+/** Every call made on the admin client, as [method, ...args], so a write's filters can be checked. */
+const dbCalls: unknown[][] = [];
+const chain: Record<string, unknown> = {};
+for (const m of ["from", "update", "eq", "is", "lt", "select", "upsert"]) chain[m] = (...args: unknown[]) => (dbCalls.push([m, ...args]), chain);
+chain.then = (ok: (v: unknown) => unknown) => ok({ data: [], error: null });
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => chain }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(async () => undefined) }));
 
-const { afterTry, nextTryAt, safeErrorText, emailIsOn, gaveUpLine, MAX_TRIES } = await import("@/lib/email/retry-plan");
-const { runEmailRetries } = await import("@/lib/email/retry");
+const { afterTry, nextTryAt, safeErrorText, emailIsOn, retryDigestLines, tooOld, wasCutOff, MAX_TRIES } = await import("@/lib/email/retry-plan");
+const { runEmailRetries, markRetryGone, recordFailedConfirmations } = await import("@/lib/email/retry");
 const { declinedNoticeStillTrue, declinedInfoFrom } = await import("@/lib/donations/monthly-declined-retry");
 const { DECLINED_REASON } = await import("@/lib/donations/monthly-reasons");
 const { dailyDigest } = await import("@/lib/ops/daily");
 
-type Row = { id: string; kind: "donation_confirmation" | "s18a_receipt" | "monthly_declined"; refId: string; payload: Record<string, unknown>; tries: number };
+type Row = { id: string; kind: "donation_confirmation" | "s18a_receipt" | "monthly_declined"; refId: string; payload: Record<string, unknown>; tries: number; createdAt: Date };
+type Patch = { status: string; tries: number; nextTryAt: Date | null; lastError: string | null };
 const T0 = new Date("2026-11-10T08:00:00+02:00");
 const H = 3_600_000;
 
-function fakeStore(rows: Row[], opts: { taken?: Set<string>; missing?: boolean } = {}) {
-  const finished: Record<string, { status: string; tries: number; nextTryAt: Date | null; lastError: string | null }> = {};
+function fakeStore(rows: Row[], opts: { taken?: Set<string>; missing?: boolean; stale?: Set<string>; finishFails?: Set<string> } = {}) {
+  const finished: Record<string, Patch> = {};
+  const tokens: Record<string, string> = {};
   const claims: string[] = [];
   return {
     finished,
+    tokens,
     claims,
     store: {
       async due() {
@@ -27,17 +35,21 @@ function fakeStore(rows: Row[], opts: { taken?: Set<string>; missing?: boolean }
       },
       async claim(id: string) {
         claims.push(id);
-        if (opts.taken?.has(id)) return false;
+        if (opts.stale?.has(id)) return { token: `t-${id}`, tookOver: true };
+        if (opts.taken?.has(id)) return null;
         opts.taken?.add(id);
-        return true;
+        return { token: `t-${id}`, tookOver: false };
       },
-      async finish(id: string, p: { status: string; tries: number; nextTryAt: Date | null; lastError: string | null }) {
+      async finish(id: string, claim: { token: string }, p: Patch) {
+        if (opts.finishFails?.has(id)) throw new Error("database went away");
         finished[id] = p;
+        tokens[id] = claim.token;
       },
     },
   };
 }
-const row = (id: string, o: Partial<Row> = {}): Row => ({ id, kind: "donation_confirmation", refId: `ref-${id}`, payload: {}, tries: 1, ...o });
+const row = (id: string, o: Partial<Row> = {}): Row => ({ id, kind: "donation_confirmation", refId: `ref-${id}`, payload: {}, tries: 1, createdAt: T0, ...o });
+const cutOff = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
 
 describe("the waits", () => {
   it("tries an hour after the first failure, then a day, then three days, then stops", () => {
@@ -47,6 +59,17 @@ describe("the waits", () => {
     expect(nextTryAt(4, T0)).toBeNull();
     expect(MAX_TRIES).toBe(4);
   });
+  it("rounds the next try down to the hour, so a once-a-day job finds it on the day meant, not a day late", () => {
+    // Finished at 06:16 after a run that started at 06:05: tomorrow's 06:05 run must find it.
+    const finishedAt = new Date("2026-11-10T06:16:42Z");
+    expect(nextTryAt(2, finishedAt)).toEqual(new Date("2026-11-11T06:00:00Z"));
+    expect(afterTry(2, "failed", finishedAt).nextTryAt).toEqual(new Date("2026-11-13T06:00:00Z"));
+    expect(afterTry(2, "busy", finishedAt).nextTryAt).toEqual(new Date("2026-11-10T07:00:00Z"));
+  });
+  it("stops trying a row noted more than 7 days ago", () => {
+    expect(tooOld(new Date(T0.getTime() - 7 * 24 * H), T0)).toBe(false);
+    expect(tooOld(new Date(T0.getTime() - 7 * 24 * H - 1), T0)).toBe(true);
+  });
   it("refuses nonsense", () => {
     expect(nextTryAt(0, T0)).toBeNull();
     expect(nextTryAt(1.5, T0)).toBeNull();
@@ -54,8 +77,8 @@ describe("the waits", () => {
 });
 
 describe("after a try", () => {
-  it("stops for good when it went, was skipped on purpose, or has nothing left to send", () => {
-    for (const r of ["sent", "skipped", "gone"] as const) expect(afterTry(2, r, T0)).toEqual({ status: r, tries: 3, nextTryAt: null });
+  it("stops for good when it went, was skipped on purpose, has nothing left to send, or may have gone", () => {
+    for (const r of ["sent", "skipped", "gone", "unknown"] as const) expect(afterTry(2, r, T0)).toEqual({ status: r, tries: 3, nextTryAt: null });
   });
   it("waits again after a failure, until the last try", () => {
     expect(afterTry(1, "failed", T0)).toEqual({ status: "waiting", tries: 2, nextTryAt: new Date(T0.getTime() + 24 * H) });
@@ -73,7 +96,7 @@ describe("after a try", () => {
 });
 
 describe("the daily run of tries", () => {
-  const handlers = (fn: (r: Row) => Promise<"sent" | "skipped" | "gone" | "busy">) => ({ donation_confirmation: fn, s18a_receipt: fn, monthly_declined: fn });
+  const handlers = (fn: (r: Row, signal: AbortSignal) => Promise<"sent" | "skipped" | "gone" | "busy">) => ({ donation_confirmation: fn, s18a_receipt: fn, monthly_declined: fn });
 
   it("does nothing at all while email is off", async () => {
     const f = fakeStore([row("a")]);
@@ -104,6 +127,8 @@ describe("the daily run of tries", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(s.resent).toBe(1);
     expect(Object.keys(f.finished)).toEqual(["a"]);
+    // The result is written only on the row this run claimed.
+    expect(f.tokens.a).toBe("t-a");
     expect(audit).toHaveBeenCalledWith("email.retry_sent", expect.objectContaining({ id: "a" }), { kind: "donation_confirmation", try: 2 });
   });
 
@@ -154,6 +179,61 @@ describe("the daily run of tries", () => {
     expect(f.claims).toEqual([]);
   });
 
+  it("starts no new send within 12 seconds of the deadline: one send must fit", async () => {
+    let t = 1_000_000;
+    const f = fakeStore([row("a"), row("b")]);
+    const send = vi.fn(async () => ((t += 5_000), "sent" as const));
+    // 20 seconds left: "a" starts (and takes 5 seconds), then "b" with 15 left. With 11 left, nothing starts.
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(send), now: T0, deadline: t + 20_000, emailOn: true, clock: () => t });
+    expect(f.claims).toEqual(["a", "b"]);
+    const s2 = await runEmailRetries({ store: fakeStore([row("c")]).store, handlers: handlers(send), now: T0, deadline: t + 11_000, emailOn: true, clock: () => t });
+    expect(s.incomplete).toBe(false);
+    expect(s2).toMatchObject({ incomplete: true, resent: 0 });
+  });
+
+  it("never resends a send that was cut off (it may have gone): marks it for a person instead", async () => {
+    const f = fakeStore([row("a", { kind: "s18a_receipt" })]);
+    const audit = vi.fn(async () => undefined);
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(async () => Promise.reject(cutOff())), now: T0, deadline: Infinity, emailOn: true, audit });
+    expect(s).toMatchObject({ unknown: 1, failedAgain: 0, gaveUp: 0 });
+    expect(f.finished.a).toMatchObject({ status: "unknown", tries: 2, nextTryAt: null });
+    expect(audit).toHaveBeenCalledWith("email.retry_unknown", expect.objectContaining({ id: "a" }), expect.objectContaining({ kind: "s18a_receipt", try: 2 }));
+    expect(wasCutOff(Object.assign(new Error("x"), { name: "AbortError" }))).toBe(true);
+    expect(wasCutOff(new Error("Resend 500"))).toBe(false);
+  });
+
+  it("doesn't send a row taken over from a run that stopped mid-way: that run may have sent it", async () => {
+    const f = fakeStore([row("a")], { stale: new Set(["a"]) });
+    const send = vi.fn(async () => "sent" as const);
+    const audit = vi.fn(async () => undefined);
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(send), now: T0, deadline: Infinity, emailOn: true, audit });
+    expect(send).not.toHaveBeenCalled();
+    expect(s).toMatchObject({ unknown: 1, resent: 0 });
+    expect(f.finished.a).toMatchObject({ status: "unknown", nextTryAt: null });
+    expect(audit).toHaveBeenCalledWith("email.retry_unknown", expect.anything(), expect.anything());
+  });
+
+  it("keeps going when a result can't be written after a real send, and counts the send", async () => {
+    const f = fakeStore([row("a"), row("b")], { finishFails: new Set(["a"]) });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(async () => "sent"), now: T0, deadline: Infinity, emailOn: true });
+    spy.mockRestore();
+    // "a" keeps its claim: a later run takes it over as unknown (test above) and never sends it again.
+    expect(s.resent).toBe(2);
+    expect(Object.keys(f.finished)).toEqual(["b"]);
+  });
+
+  it("gives up on a row older than 7 days without trying it, and says so once", async () => {
+    const f = fakeStore([row("a", { createdAt: new Date(T0.getTime() - 8 * 24 * H) })]);
+    const send = vi.fn(async () => "sent" as const);
+    const audit = vi.fn(async () => undefined);
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(send), now: T0, deadline: Infinity, emailOn: true, audit });
+    expect(send).not.toHaveBeenCalled();
+    expect(s).toMatchObject({ expired: 1, gaveUp: 0 });
+    expect(f.finished.a).toMatchObject({ status: "gave_up", tries: 1, nextTryAt: null });
+    expect(audit).toHaveBeenCalledWith("email.retry_gave_up", expect.anything(), { kind: "donation_confirmation", tries: 1, reason: "too_old" });
+  });
+
   it("sends each kind to its own sender", async () => {
     const seen: string[] = [];
     const f = fakeStore([row("a"), row("b", { kind: "s18a_receipt" }), row("c", { kind: "monthly_declined" })]);
@@ -187,24 +267,66 @@ describe("a declined-card notice tried again", () => {
     expect(declinedNoticeStillTrue({ status: "failed", ended_reason: DECLINED_REASON }, final, false)).toBe(true);
     expect(declinedNoticeStillTrue({ status: "active", ended_reason: null }, final, false)).toBe(false);
   });
+  it("doesn't go once the card was tried again since: that try's own notice says it", () => {
+    const kept = { ...info, failedAttempts: 1 };
+    expect(declinedNoticeStillTrue({ status: "active", ended_reason: null, failed_attempts: 1 }, kept, false)).toBe(true);
+    expect(declinedNoticeStillTrue({ status: "active", ended_reason: null, failed_attempts: 2 }, kept, false)).toBe(false);
+  });
+  it("closes an older waiting notice once a newer one went, and only a waiting one", async () => {
+    dbCalls.length = 0;
+    await markRetryGone("monthly_declined", "rec-1", T0);
+    expect(dbCalls).toEqual([
+      ["from", "email_retries"],
+      ["update", { status: "gone", claimed_at: null, updated_at: T0.toISOString() }],
+      ["eq", "kind", "monthly_declined"],
+      ["eq", "ref_id", "rec-1"],
+      ["eq", "status", "waiting"],
+    ]);
+  });
   it("reads back only a sane kept notice", () => {
     expect(declinedInfoFrom(info)).toEqual(info);
+    expect(declinedInfoFrom({ ...info, failedAttempts: 2 })).toEqual({ ...info, failedAttempts: 2 });
+    expect(declinedInfoFrom({ ...info, failedAttempts: 0 })).toBeNull();
     expect(declinedInfoFrom({ ...info, totalCents: 12.5 })).toBeNull();
     expect(declinedInfoFrom({ ...info, final: "yes" })).toBeNull();
     expect(declinedInfoFrom({ ...info, failedAt: "soon" })).toBeNull();
   });
 });
 
+describe("older failed confirmations from the audit log", () => {
+  it("are put on the list in one write that never resets a row already there", async () => {
+    dbCalls.length = 0;
+    await recordFailedConfirmations(["d1", "d2"], T0);
+    const upserts = dbCalls.filter((c) => c[0] === "upsert");
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0][1]).toHaveLength(2);
+    expect(upserts[0][2]).toEqual({ onConflict: "kind,ref_id", ignoreDuplicates: true });
+  });
+});
+
 describe("Givezy's daily email", () => {
   const quiet = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+  const none = { resent: 0, skipped: 0, gone: 0, failedAgain: 0, gaveUp: 0, expired: 0, unknown: 0 };
   const fine = { monthlyErrors: 0, monthlyReview: 0, monthlyStopped: 0, payoutsFailed: false, monthlyFailed: false };
   it("says nothing about emails that went, were skipped or are still waiting", () => {
-    expect(dailyDigest({ ...quiet, emailRetries: { resent: 3, skipped: 1, gone: 1, failedAgain: 2, gaveUp: 0 } }, fine)).toEqual([]);
+    expect(dailyDigest({ ...quiet, emailRetries: { ...none, resent: 3, skipped: 1, gone: 1, failedAgain: 2 } }, fine)).toEqual([]);
   });
   it("tells Givezy once, with a count only, when emails gave up", () => {
-    const lines = dailyDigest({ ...quiet, emailRetries: { resent: 0, skipped: 0, gone: 0, failedAgain: 0, gaveUp: 2 } }, fine);
-    expect(lines).toEqual([gaveUpLine(2)]);
+    const lines = dailyDigest({ ...quiet, emailRetries: { ...none, gaveUp: 2 } }, fine);
+    expect(lines).toEqual(retryDigestLines({ gaveUp: 2, expired: 0, unknown: 0 }));
+    expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/^2 important emails to donors .* after 3 more tries/);
     expect(lines[0]).not.toMatch(/@/);
+  });
+  it("names sends that may have gone, and rows too old to try, for a person to check", () => {
+    const lines = dailyDigest({ ...quiet, emailRetries: { ...none, unknown: 1, expired: 3 } }, fine);
+    expect(lines).toHaveLength(2);
+    expect(lines.join(" ")).toMatch(/3 failed emails to donors waited more than 7 days/);
+    expect(lines.join(" ")).toMatch(/1 email to donors may or may not have gone .* email\.retry_unknown/);
+  });
+  it("says so when trying again couldn't run at all, and the rest of the email still goes", () => {
+    const lines = dailyDigest({ ...quiet, stuckPending: 1, emailRetries: { ...none, broken: true } }, fine);
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toMatch(/could not run today/);
   });
 });
