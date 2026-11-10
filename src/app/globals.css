@@ -69,9 +69,11 @@
 }
 
 /* In-page links (#how) land below the sticky header, not under it. */
+/* No global smooth scrolling: going back to a page, find-in-page and restoring the place on a page stay instant, so a
+   page never opens in the wrong place and then slides (found 10/11/2026). Links to a section of the same page (#how)
+   glide instead, through SmoothSectionLinks. */
 html {
   scroll-padding-top: 5.5rem;
-  scroll-behavior: smooth;
 }
 @media (prefers-reduced-motion: reduce) {
   html {

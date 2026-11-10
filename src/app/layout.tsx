@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans } from "next/font/google";
 import { platformConfig } from "@/config/platform";
 import { PageFooter } from "@/components/page-footer";
+import { SmoothSectionLinks } from "@/components/smooth-section-links";
 import { RouteMemory } from "@/components/route-memory";
 import { SiteHeader } from "@/components/site-header";
 import { siteIndexable } from "@/lib/seo/indexing";
@@ -27,11 +28,13 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // data-scroll-behavior: smooth scrolling is for in-page links (#how) only. Without it, Next.js 16 lets a new page
-    // open part way down and drift up to the top (found 09/11/2026), and going back drifts too.
+    // Scrolling is instant everywhere (a new page opens at the top, Back returns to the same place) and only links to a
+    // section of the same page glide, through SmoothSectionLinks (10/11/2026). data-scroll-behavior stays as a guard in
+    // case smooth scrolling is ever set in CSS again.
     <html lang="en-ZA" data-scroll-behavior="smooth" className={`${dmSans.variable} ${bricolage.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <RouteMemory />
+        <SmoothSectionLinks />
         <SiteHeader />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>
         <PageFooter />
