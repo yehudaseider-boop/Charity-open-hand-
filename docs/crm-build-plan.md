@@ -13,15 +13,13 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
    ID or tax number) and then approve. Amounts and gifts come only from recorded donations and can't be typed
    over, so the receipt always matches the SARS IT3(d) file. Every action goes in the audit log.
    Check: open the demo charity's receipts, approve one, decline one, edit one.
-   **Built 09/11/2026, not yet on the test site** (migration `20261110000001_receipt_review.sql` waits for
-   Yehuda's yes; details in `docs/decisions.md`). As built: Edit covers the name and street address only. ID, tax
+   **Built 09/11/2026, on the test project** (migration `20261110000001_receipt_review.sql` applied 10/11/2026; details in `docs/decisions.md`). As built: Edit covers the name and street address only. ID, tax
    and registration numbers decide who the receipt is for, so they are not editable by the charity; the donor asks
    for a correction from their account. Decline has no in-app notice until push (step 10).
 2. **"Asked for an s18A receipt" filter and reminder button** (2.1).
    Filter the donor list by asked / not asked / details missing. Button to remind selected donors to add
    their details (uses the existing reminder, at most once a week per donor).
-   **Built 10/11/2026, not yet on the test site** (migration `20261110000002_s18a_details_reminder.sql` waits for
-   Yehuda's yes; details in `docs/decisions.md`). As built: counts per filter; the reminder is owner-only, asked
+   **Built 10/11/2026, on the test project** (migration `20261110000002_s18a_details_reminder.sql` applied 10/11/2026; details in `docs/decisions.md`). As built: counts per filter; the reminder is owner-only, asked
    first, shares the one-a-week claim with the personal thank-you, and skips erased, opted-out, complete and
    recorded-only donors. "Didn't ask" is a filter only (prompting them is step 6).
 3. **Charity's own logo and signatory on the certificate** (2.2). **Decision: Yosef** (already on his list).
@@ -41,7 +39,7 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 
 ## Phase 3: donors and team
 
-8. **Import template with phone and address** (4.1). ID and tax number stay optional. Decided 09/11/2026: optional.
+8. **Import template with phone and address** (4.1). Decided 10/11/2026: ID and tax numbers are not taken on import (donors add their own). Built 10/11/2026.
 9. **Roles: Admin, Finance, Fundraiser, Viewer** (6). The owner sets each person's role; sensitive actions
    (approve s18A, exports, IT3(d), bank, team) limited by role. Database rules updated so each role can only
    read what it may. Audit log shown readably ("Sarah approved the s18A receipt for ... on 03/03/2027").
@@ -78,7 +76,7 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 | s18A fields; Givezy issuing on the charity's behalf | Yosef / accountant | Built per SARS; mandate draft with Yosef |
 | One annual certificate or per donation | Decided | One per donor per tax year (built) |
 | Can a third party submit IT3(d) | Accountant | No; the charity uploads (step 15) |
-| ID and tax number optional on import | Decided 09/11/2026 | Optional |
+| ID and tax number on import | Decided 10/11/2026 | Not taken; donors add their own |
 | POPIA wording for invited donors | Yosef | Needed before step 11 |
 | Most messages per donor per week | Decided 09/11/2026 | One |
 | Netflorist | Yehuda | Parked |
