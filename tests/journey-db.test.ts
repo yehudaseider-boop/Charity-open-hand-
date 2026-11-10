@@ -204,9 +204,9 @@ describe("the donor journey's tables", () => {
         "select c.conrelid::regclass::text as tbl, a.attname::text as col, c.confdeltype::text as rule from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1] where c.contype = 'f' and c.conrelid = any($1::regclass[])",
         [TABLES.map((t) => `public.${t}`)],
       )).rows.map((r) => ({ tbl: String(r.tbl).replace(/^public\./, ""), col: r.col, rule: r.rule })).sort((a, b) => (a.tbl + " " + a.col < b.tbl + " " + b.col ? -1 : 1));
-      // c = cascade, n = set null.
-      // Since 20261110000011 each journey has its own id: steps and enrolments belong to a journey, and a campaign's
-      // journey goes with its campaign.
+      // c = cascade, n = set null, a = no action.
+      // Since 20261110000011 each journey has its own id: steps and enrolments belong to a journey. A campaign with a
+      // journey can't be deleted (no action), so its email history is kept; deleting the whole charity still works.
       expect(fk).toEqual([
         { tbl: "charity_journey_enrolments", col: "charity_id", rule: "c" },
         { tbl: "charity_journey_enrolments", col: "donor_id", rule: "c" },
@@ -215,7 +215,7 @@ describe("the donor journey's tables", () => {
         { tbl: "charity_journey_sends", col: "enrolment_id", rule: "c" },
         { tbl: "charity_journey_steps", col: "charity_id", rule: "c" },
         { tbl: "charity_journey_steps", col: "journey_id", rule: "c" },
-        { tbl: "charity_journeys", col: "campaign_id", rule: "c" },
+        { tbl: "charity_journeys", col: "campaign_id", rule: "a" },
         { tbl: "charity_journeys", col: "charity_id", rule: "c" },
         { tbl: "charity_journeys", col: "updated_by", rule: "n" },
       ]);
