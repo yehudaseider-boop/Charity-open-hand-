@@ -16,8 +16,10 @@ export async function proxy(request: NextRequest) {
   // step can come back to it. Set here, never trusted from the browser.
   request.headers.set(CURRENT_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
   // The plain charities list (no search, no cause) is built ahead and served from cache: the page is the same for
-  // everyone, so it is sent to its cached twin. The address in the browser stays /charities.
-  const plainList = (request.method === "GET" || request.method === "HEAD") && request.nextUrl.pathname === "/charities" && !request.nextUrl.search;
+  // everyone, so it is sent to its cached twin. The address in the browser stays /charities. Other parameters
+  // (utm_source, fbclid, a share code) change nothing on the page, so they don't stop it.
+  const query = request.nextUrl.searchParams;
+  const plainList = (request.method === "GET" || request.method === "HEAD") && request.nextUrl.pathname === "/charities" && !query.has("q") && !query.has("category");
   const start = () => {
     if (!plainList) return NextResponse.next({ request });
     const to = request.nextUrl.clone();

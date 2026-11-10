@@ -56,9 +56,9 @@ describe("the plain charities list is served from cache", () => {
     expect(view).not.toMatch(/supabase\/server|next\/headers|getViewer/);
   });
 
-  it("is only used for a plain visit: the proxy sends /charities there only with no search and no cause", () => {
+  it("is only used for a plain visit: the proxy sends /charities there when there is no search and no cause, whatever other parameters ride along", () => {
     const proxy = readFileSync("src/proxy.ts", "utf8");
-    expect(proxy).toMatch(/pathname === "\/charities" && !request\.nextUrl\.search/);
+    expect(proxy).toMatch(/pathname === "\/charities" && !query\.has\("q"\) && !query\.has\("category"\)/);
     expect(proxy).toMatch(/"\/browse-charities"/);
   });
 });
