@@ -8,7 +8,7 @@ import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/
 import { requireViewer } from "@/lib/auth";
 import { applicationChecklist, applicationSteps, currentStep, isComplete } from "@/lib/charity/checklist";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { isOwner } from "@/lib/charity/team";
+import { isOwner, viewerCan } from "@/lib/charity/team";
 import { statusLabels } from "@/lib/charity/status";
 import { reviewWithin } from "@/lib/charity/review-time";
 import {
@@ -37,10 +37,12 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
   const sp = await searchParams;
   const { step: asked } = sp as { step?: string };
   await requireViewer(`/charity-admin/${id}/application`);
-  const { charity, priv, documents, canBank } = await loadCharityForManager(id);
+  const { charity, priv, documents, documentTypes, canBank } = await loadCharityForManager(id);
   const owner = await isOwner(id);
-  const editable = charity.status === "draft" || charity.status === "rejected";
-  const checklist = applicationChecklist({ charity, priv, documentTypes: documents.map((d) => d.document_type) });
+  // A role without the application (finance, fundraiser, viewer) sees it read-only (team roles, 10/11/2026).
+  const canApply = await viewerCan(id, "application");
+  const editable = canApply && (charity.status === "draft" || charity.status === "rejected");
+  const checklist = applicationChecklist({ charity, priv, documentTypes });
   const status = statusLabels[charity.status as keyof typeof statusLabels];
   const steps = applicationSteps(checklist);
   const step = currentStep(steps, asked);

@@ -283,4 +283,79 @@ describe("team roles", () => {
       await reset();
     });
   });
+  it("keeps the charity's contact person, email and phone to the owner, even where the row may be updated", async () => {
+    await tx(async () => {
+      const { c, people } = await team();
+      for (const r of ROLES) {
+        await as(people[r]);
+        if (r === "owner") {
+          const ok = await run("update public.charity_private set contact_phone = '0115550000' where charity_id = $1 returning charity_id", [c]);
+          expect(ok.rowCount).toBe(1);
+        } else if (TABLE.profile.includes(r) || TABLE.application.includes(r)) {
+          for (const sql of [
+            "update public.charity_private set contact_name = 'Someone else' where charity_id = $1",
+            "update public.charity_private set contact_email = 'other@x.test' where charity_id = $1",
+            "update public.charity_private set contact_phone = '0119990000' where charity_id = $1",
+          ]) {
+            await run("savepoint s");
+            await expect(run(sql, [c])).rejects.toThrow(/only be changed by its owner/);
+            await run("rollback to savepoint s");
+          }
+          // Their own settings still save.
+          expect((await run("update public.charity_private set notify_donations = false where charity_id = $1 returning charity_id", [c])).rowCount).toBe(1);
+        } else {
+          expect((await run("update public.charity_private set contact_name = 'Someone else' where charity_id = $1 returning charity_id", [c])).rowCount).toBe(0);
+        }
+        await reset();
+      }
+      expect((await one("select contact_name from public.charity_private where charity_id = $1", [c])).contact_name).toBe("Lerato");
+    });
+  });
+
+  it("keeps the bank confirmation letter, its record and its file, to the owner and finance", async () => {
+    await tx(async () => {
+      const { c, people } = await team();
+      const letter = `${c}/bank_confirmation-${stamp()}.pdf`;
+      const cert = `${c}/npo_certificate-${stamp()}.pdf`;
+      await run("insert into public.charity_documents (charity_id, document_type, storage_path, file_name) values ($1, 'bank_confirmation', $2, 'bank.pdf'), ($1, 'npo_certificate', $3, 'npo.pdf')", [c, letter, cert]);
+      await run("insert into storage.objects (bucket_id, name) values ('charity-documents', $1), ('charity-documents', $2)", [letter, cert]);
+      for (const r of ROLES) {
+        await as(people[r]);
+        const sees = TABLE.bank_view.includes(r);
+        const types = (await run("select document_type from public.charity_documents where charity_id = $1 order by document_type", [c])).rows.map((x) => x.document_type);
+        expect([r, types]).toEqual([r, sees ? ["bank_confirmation", "npo_certificate"] : ["npo_certificate"]]);
+        const files = (await run("select name from storage.objects where bucket_id = 'charity-documents' and name in ($1, $2) order by name", [letter, cert])).rows.map((x) => x.name);
+        expect([r, files.includes(letter), files.includes(cert)]).toEqual([r, sees, true]);
+        await reset();
+      }
+    });
+  });
+
+  it("lets only the owner and admins change the application's details, while page roles change the page", async () => {
+    await tx(async () => {
+      const { c, people } = await team();
+      await run("update public.charities set status = 'draft' where id = $1", [c]);
+      for (const r of ROLES) {
+        await as(people[r]);
+        const page = TABLE.profile.includes(r);
+        const application = TABLE.application.includes(r);
+        for (const sql of [
+          "update public.charities set legal_name_en = 'Changed NPC' where id = $1 returning id",
+          "update public.charities set npo_number = '123-456 NPO' where id = $1 returning id",
+          "update public.charities set city = 'Durban' where id = $1 returning id",
+        ]) {
+          if (application) {
+            expect([r, sql, (await run(sql, [c])).rowCount]).toEqual([r, sql, 1]);
+          } else if (page) {
+            await run("savepoint s");
+            await expect(run(sql, [c])).rejects.toThrow(/application details can only be changed by its owner or an admin/);
+            await run("rollback to savepoint s");
+          } else {
+            expect([r, sql, (await run(sql, [c])).rowCount]).toEqual([r, sql, 0]);
+          }
+        }
+        await reset();
+      }
+    });
+  });
 });

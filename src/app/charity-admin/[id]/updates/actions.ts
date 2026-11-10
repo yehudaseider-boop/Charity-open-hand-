@@ -78,7 +78,8 @@ export async function removeUpdate(charityId: string, updateId: string): Promise
   const viewer = await requireViewer();
   if (!isUuid(updateId)) return;
   const { charity } = await loadCharityForManager(charityId);
-  if (await refusal(charityId, "profile")) return;
+  // Back to the page with the plain refusal shown there (nothing was changed).
+  if (await refusal(charityId, "profile")) redirect(`/charity-admin/${charityId}/updates?refused=profile`);
   // The whole row, so "Undo" can put it back exactly; its photo file is kept for the same reason.
   const { data: row, error: readError } = await createAdminClient().from("charity_updates").select("*").eq("id", updateId).eq("charity_id", charityId).maybeSingle();
   if (readError) throw readError;
@@ -123,7 +124,8 @@ export async function removePhoto(charityId: string, photoId: string): Promise<v
   const viewer = await requireViewer();
   if (!isUuid(photoId)) return;
   const { charity } = await loadCharityForManager(charityId);
-  if (await refusal(charityId, "profile")) return;
+  // Back to the page with the plain refusal shown there (nothing was changed).
+  if (await refusal(charityId, "profile")) redirect(`/charity-admin/${charityId}/updates?refused=profile`);
   // The whole row, so "Undo" can put it back exactly; the file is kept for the same reason.
   const { data: row, error: readError } = await createAdminClient().from("charity_photos").select("*").eq("id", photoId).eq("charity_id", charityId).maybeSingle();
   if (readError) throw readError;

@@ -33,7 +33,9 @@ export async function addTeamMember(charityId: string, _prev: FormState, formDat
   if (!r.ok) return { ok: false, message: r.message };
   if (!r.already) await notifyCharity(memberAddedEmail(r.email, charity.name_en, charityId));
   revalidatePath(`/charity-admin/${charityId}/team`);
-  const done = await recordAction(charityId, viewer.userId, "member_added", { email: r.email, already: r.already, role }, r.already ? null : { type: "remove_member", userId: r.userId });
+  // Someone already in the team keeps the role they have: change it below their name instead.
+  if (r.already) return { ok: true, message: `${r.email} already has access. To change what they can do, change their role in the list above.` };
+  const done = await recordAction(charityId, viewer.userId, "member_added", { email: r.email, already: false, role }, { type: "remove_member", userId: r.userId });
   redirect(`/charity-admin/${charityId}/team?done=${done}`);
 }
 

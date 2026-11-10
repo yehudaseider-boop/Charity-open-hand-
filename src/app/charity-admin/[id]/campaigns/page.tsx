@@ -14,6 +14,7 @@ import { endCampaign, startCampaign } from "./actions";
 import { CampaignForm } from "./forms";
 import { ShareLinks } from "../share-links";
 import { viewerCan } from "@/lib/charity/team";
+import { refusedFor } from "@/lib/charity/permissions";
 
 export const metadata: Metadata = { title: "Campaigns" };
 
@@ -44,6 +45,8 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
       />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/campaigns`} />
+
+      {sp.refused === "profile" ? <Notice>{refusedFor("profile")}</Notice> : null}
 
       {!(await viewerCan(id, "profile")) ? <Notice>Your role doesn&apos;t include starting or ending campaigns. You can see them here.</Notice> : null}
 

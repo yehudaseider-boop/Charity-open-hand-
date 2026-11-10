@@ -280,7 +280,7 @@ export async function submitApplication(charityId: string, _prev: FormState, for
   const checklist = applicationChecklist({
     charity: data.charity,
     priv: data.priv,
-    documentTypes: data.documents.map((d) => d.document_type),
+    documentTypes: data.documentTypes,
   });
   if (!isComplete(checklist)) {
     return { ok: false, message: "Some sections are still incomplete. See the checklist." };

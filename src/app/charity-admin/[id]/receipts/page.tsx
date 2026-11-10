@@ -33,6 +33,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
   await requireViewer(`/charity-admin/${id}/receipts`);
   const { charity } = await loadCharityForManager(id);
   const canDownload = await viewerCan(id, "export");
+  const canCheck = await viewerCan(id, "receipts");
   const supabase = await createClient();
   // Every receipt, read page by page (the database answers at most 1 000 rows at a time).
   // A narrow view: no part of the donor's ID or tax number reaches the charity.
@@ -70,7 +71,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
   return (
     <div className="space-y-5">
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/receipts`} />
-      {!(await viewerCan(id, "receipts")) ? <Notice>Your role doesn&apos;t include approving or declining s18A receipts. You can see them here.</Notice> : null}
+      {!canCheck ? <Notice>Your role doesn&apos;t include approving or declining s18A receipts. You can see them here.</Notice> : null}
       <PageHeader title="s18A receipts" actions={issuedYears.length ? <ActionLink href={`/charity-admin/${id}/receipts/sars`}>SARS submission (IT3(d))</ActionLink> : undefined} />
       {sp.receipt === "unavailable" ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">That s18A receipt PDF isn&apos;t available. It may have been withdrawn, or its PDF is not ready yet.</p> : null}
       {canIssue18a(charity) ? (
@@ -85,7 +86,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
       )}
 
       {years.map((y) => (
-        <YearRun key={y.taxYear} charityId={id} {...y} />
+        <YearRun key={y.taxYear} charityId={id} canCheck={canCheck} {...y} />
       ))}
 
       {progress.length > 0 ? (
@@ -173,7 +174,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
 }
 
 /** One closed tax year: its list of receipts to approve, or where the approval stands. */
-function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityId: string; taxYear: number; open: ReceiptRun | null; latest: ReceiptRun | null; plan: Plan | null; pending: number }) {
+function YearRun({ charityId, taxYear, open, latest, plan, pending, canCheck }: { charityId: string; taxYear: number; open: ReceiptRun | null; latest: ReceiptRun | null; plan: Plan | null; pending: number; canCheck: boolean }) {
   if (open) {
     return (
       <Card title={`${taxYearLabel(taxYear)}: approved`}>
@@ -194,7 +195,7 @@ function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityI
   if (!plan || plan.toIssue === 0) {
     const held = plan?.detailsMissing.length ? <DetailsMissing lines={plan.detailsMissing} /> : null;
     // Only declined receipts left (or none at all): nothing to approve, but each declined one can be reopened.
-    const declined = plan?.lines.length ? <CertificateList charityId={charityId} taxYear={taxYear} lines={plan.lines} /> : null;
+    const declined = plan?.lines.length ? <CertificateList charityId={charityId} taxYear={taxYear} lines={plan.lines} canOpen={canCheck} /> : null;
     const declinedNote = declined ? (
       <div className="space-y-2 text-sm">
         <p>{plan!.lines.length === 1 ? "This receipt is" : "These receipts are"} declined, so there&apos;s nothing to send to Givezy. Open one to reopen it.</p>
@@ -248,7 +249,7 @@ function YearRun({ charityId, taxYear, open, latest, plan, pending }: { charityI
               If {pending === 1 ? "it goes" : "they go"} through after you approve, that donor&apos;s receipt has to be withdrawn and issued again, so you may want to wait a day or two.
             </Notice>
           ) : null}
-          <CertificateList charityId={charityId} taxYear={taxYear} lines={plan.lines} total={total} toIssue={plan.toIssue} />
+          <CertificateList charityId={charityId} taxYear={taxYear} lines={plan.lines} total={total} toIssue={plan.toIssue} canOpen={canCheck} />
           <p className="text-xs text-muted">
             Amounts are the donations only, never a contribution to Givezy, and come only from recorded donations: they can&apos;t be typed over.
             Someone missing, or an amount wrong? Record or correct the gift on Donations, or tell us (<SupportContact />).

@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
-import { Card } from "@/components/card";
+import { Card, Notice } from "@/components/card";
 import { PageHeader } from "@/components/dash";
 import { platformConfig } from "@/config/platform";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { viewerCan } from "@/lib/charity/team";
 import { formatDate } from "@/lib/dates";
 import { firstParam } from "@/lib/form";
 import { buildReceiptHtml, previewFontCss } from "@/lib/receipts/html";
@@ -33,6 +34,15 @@ export default async function CertificatePage({ params, searchParams }: PageProp
   const { charity, priv } = await loadCharityForManager(id);
   const base = `/charity-admin/${id}/receipts`;
   if (!canIssue18a(charity) || !closedTaxYears(new Date()).includes(taxYear)) notFound();
+  // The preview shows the donor's postal address: only the roles that check receipts open it (team roles, 10/11/2026).
+  if (!(await viewerCan(id, "receipts"))) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Check an s18A receipt" back={<BackLink href={base}>← s18A receipts</BackLink>} />
+        <Notice>Your role doesn&apos;t include checking s18A receipts, so this receipt isn&apos;t shown. Nothing was changed. Ask your charity&apos;s owner if you need it.</Notice>
+      </div>
+    );
+  }
   const cert = await loadCertificate(id, taxYear, key);
   if (!cert) {
     return (

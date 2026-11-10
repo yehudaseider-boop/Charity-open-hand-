@@ -85,11 +85,22 @@ export async function loadCharityForManager(id: string) {
     if (canBank) bank = data ?? NO_BANK;
   }
 
+  // Which documents are uploaded, for the application's checklist: the bank confirmation letter is only shown to
+  // the owner and finance (team roles), but everyone who may submit needs to know it's there.
+  const documents = (docs.data ?? []) as CharityDocument[];
+  let documentTypes = documents.map((d) => d.document_type);
+  if (!canBank) {
+    const { data: letter, error: letterError } = await createAdminClient().from("charity_documents").select("id").eq("charity_id", id).eq("document_type", "bank_confirmation").limit(1);
+    if (letterError) throw letterError;
+    if (letter?.length && !documentTypes.includes("bank_confirmation")) documentTypes = [...documentTypes, "bank_confirmation"];
+  }
+
   return {
     charity: charity.data,
+    documentTypes,
     priv: priv.data ? ({ ...priv.data, ...bank, bank_set: bankSet } as Record<string, unknown> as PrivateRow) : null,
     canBank,
-    documents: (docs.data ?? []) as CharityDocument[],
+    documents,
     categoryIds: (cats.data ?? []).map((c) => c.category_id as string),
   };
 }

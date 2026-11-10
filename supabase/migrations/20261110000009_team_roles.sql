@@ -85,18 +85,20 @@ create or replace view public.charity_donations with (security_barrier = true) a
     d.paid_at, d.created_at, d.refunded_at, d.charged_back_at, d.tax_year,
     d.wants_18a, d.is_anonymous, d.message, d.campaign_id, d.recurring_id,
     c.donor_type, c.first_name, c.last_name, c.organisation_name, c.registration_number,
-    case when public.charity_can(d.charity_id, 'contact') then c.contact_person end as contact_person,
-    public.charity_contact_or_null(d.charity_id, c.email::text)::public.citext as email,
-    case when public.charity_can(d.charity_id, 'contact') then c.phone end as phone,
-    case when public.charity_can(d.charity_id, 'contact') then c.address_line1 end as address_line1,
-    case when public.charity_can(d.charity_id, 'contact') then c.address_line2 end as address_line2,
-    case when public.charity_can(d.charity_id, 'contact') then c.suburb end as suburb,
-    case when public.charity_can(d.charity_id, 'contact') then c.city end as city,
-    case when public.charity_can(d.charity_id, 'contact') then c.postal_code end as postal_code,
+    case when k.contact then c.contact_person end as contact_person,
+    (case when k.contact or c.email::text ilike '%@erased.invalid' then c.email end)::public.citext as email,
+    case when k.contact then c.phone end as phone,
+    case when k.contact then c.address_line1 end as address_line1,
+    case when k.contact then c.address_line2 end as address_line2,
+    case when k.contact then c.suburb end as suburb,
+    case when k.contact then c.city end as city,
+    case when k.contact then c.postal_code end as postal_code,
     d.dedication_kind, d.dedication_name,
     d.recorded_method, d.external_ref, d.came_from, d.import_id
   from public.donations d
   left join public.donation_checkout_details c on c.donation_id = d.id
+  -- Worked out once per row, not once per column.
+  cross join lateral (select public.charity_can(d.charity_id, 'contact') as contact) k
   where d.status in ('paid', 'refunded', 'charged_back')
     and (public.is_charity_admin(d.charity_id) or public.is_platform_admin());
 
@@ -210,8 +212,10 @@ create policy campaigns_admin_write on public.campaigns for all to authenticated
   with check (public.charity_can(charity_id, 'profile'));
 
 drop policy charity_documents_rw on public.charity_documents;
+-- The bank confirmation letter shows the bank account: for the owner and finance (and Givezy) only.
 create policy charity_documents_read on public.charity_documents for select to authenticated
-  using (public.is_charity_admin(charity_id) or public.is_platform_admin());
+  using ((public.is_charity_admin(charity_id) or public.is_platform_admin())
+         and (document_type <> 'bank_confirmation' or public.charity_can(charity_id, 'bank_view')));
 create policy charity_documents_write on public.charity_documents for all to authenticated
   using (public.charity_can(charity_id, 'application'))
   with check (public.charity_can(charity_id, 'application'));
@@ -242,6 +246,17 @@ create policy charity_public_write on storage.objects for all to authenticated
          and (name ~ '^[^/]+/(logo|cover)[^/]*$' or name ~ '^[^/]+/(photos|updates)/[^/]+$')
          and public.charity_can(((storage.foldername(name))[1])::uuid, 'profile'));
 
+-- The files themselves: the website names them <charity id>/<document type>-<uuid>.<ext>
+-- (src/app/charity-admin/[id]/application/actions.ts), so a bank confirmation letter is found by its name.
+drop policy if exists charity_documents_read on storage.objects;
+create policy charity_documents_read on storage.objects for select to authenticated
+  using (bucket_id = 'charity-documents'
+         and name !~ '\.\.' and name !~ '^/' and strpos(name, chr(92)) = 0
+         and (public.is_platform_admin()
+              or (public.is_charity_admin(((storage.foldername(name))[1])::uuid)
+                  and (name !~ '^[^/]+/bank_confirmation-'
+                       or public.charity_can(((storage.foldername(name))[1])::uuid, 'bank_view')))));
+
 drop policy if exists charity_documents_insert on storage.objects;
 create policy charity_documents_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'charity-documents'
@@ -249,6 +264,53 @@ create policy charity_documents_insert on storage.objects for insert to authenti
          and (public.is_platform_admin()
               or (public.charity_can(((storage.foldername(name))[1])::uuid, 'application')
                   and public.charity_application_open(((storage.foldername(name))[1])::uuid))));
+
+-- The charity's contact person, email and phone are what Givezy uses to check a second-step reset or a bank change:
+-- the owner's alone to change (the website saves them only for the owner), whatever the row policy allows.
+create function public.guard_charity_contact_fields() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if current_user in ('service_role', 'postgres', 'supabase_admin') or public.is_platform_admin() then
+    return new;
+  end if;
+  if (new.contact_name is distinct from old.contact_name
+      or new.contact_email is distinct from old.contact_email
+      or new.contact_phone is distinct from old.contact_phone)
+     and not public.charity_can(new.charity_id, 'owner') then
+    raise exception 'A charity''s contact details can only be changed by its owner';
+  end if;
+  return new;
+end $$;
+revoke all on function public.guard_charity_contact_fields() from public, anon, authenticated;
+create trigger charity_private_contact_guard before update on public.charity_private
+  for each row execute function public.guard_charity_contact_fields();
+
+-- The application's details (legal name, registration numbers, address) are the application roles' (owner and
+-- admin), even though the page roles may update the charity row for the profile.
+create function public.guard_charity_application_fields() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if current_user in ('service_role', 'postgres', 'supabase_admin') or public.is_platform_admin() then
+    return new;
+  end if;
+  if (new.legal_name_en is distinct from old.legal_name_en
+      or new.legal_name_he is distinct from old.legal_name_he
+      or new.npo_number is distinct from old.npo_number
+      or new.pbo_number is distinct from old.pbo_number
+      or new.s18a_reference is distinct from old.s18a_reference
+      or new.address_line1 is distinct from old.address_line1
+      or new.address_line2 is distinct from old.address_line2
+      or new.suburb is distinct from old.suburb
+      or new.city is distinct from old.city
+      or new.postal_code is distinct from old.postal_code)
+     and not public.charity_can(new.id, 'application') then
+    raise exception 'A charity''s application details can only be changed by its owner or an admin';
+  end if;
+  return new;
+end $$;
+revoke all on function public.guard_charity_application_fields() from public, anon, authenticated;
+create trigger charities_application_guard before update on public.charities
+  for each row execute function public.guard_charity_application_fields();
 
 -- 5 ---------------------------------------------------------------------------------------------------------
 -- Every column of charity_private except the ciphertext was readable by any member (20261106000001). The bank

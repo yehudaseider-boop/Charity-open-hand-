@@ -10,18 +10,17 @@ const STATUS_TONE = { to_check: "warning", approved: "success", edited: "success
  * The year's planned receipts: who, how many gifts, how much, and where each one's check stands. Each line opens
  * the receipt's preview. A list rather than a table, so it reads on a phone (375px) without scrolling sideways.
  */
-export function CertificateList({ charityId, taxYear, lines, total, toIssue }: { charityId: string; taxYear: number; lines: PlanLine[]; total?: string; toIssue?: number }) {
+export function CertificateList({ charityId, taxYear, lines, total, toIssue, canOpen = true }: { charityId: string; taxYear: number; lines: PlanLine[]; total?: string; toIssue?: number; canOpen?: boolean }) {
   return (
     <div>
       <ul className="divide-y divide-border border-y border-border">
         {lines.map((l) => (
           <li key={l.key}>
-            <Link
-              href={`/charity-admin/${charityId}/receipts/certificate?year=${taxYear}&c=${l.key}`}
-              className="group -mx-2 flex items-start justify-between gap-3 rounded-control px-2 py-3 transition hover:bg-honey-soft focus-visible:bg-honey-soft"
+            <Row
+              href={canOpen ? `/charity-admin/${charityId}/receipts/certificate?year=${taxYear}&c=${l.key}` : null}
             >
               <span className="min-w-0">
-                <span className="block truncate font-medium text-brand underline" dir="auto">{l.donorName}</span>
+                <span className={`block truncate font-medium ${canOpen ? "text-brand underline" : "text-navy"}`} dir="auto">{l.donorName}</span>
                 <span className="block text-xs text-muted">
                   {l.gifts} {l.gifts === 1 ? "donation" : "donations"}
                 </span>
@@ -31,7 +30,7 @@ export function CertificateList({ charityId, taxYear, lines, total, toIssue }: {
                 <Badge tone={STATUS_TONE[l.status]}>{STATUS_WORDS[l.status]}</Badge>
                 {l.changedSince ? <span className="text-xs text-warning">Changed since</span> : null}
               </span>
-            </Link>
+            </Row>
           </li>
         ))}
       </ul>
@@ -42,5 +41,16 @@ export function CertificateList({ charityId, taxYear, lines, total, toIssue }: {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** A line that opens the receipt's preview, or (for a role that can't check receipts) the same line without a link. */
+function Row({ href, children }: { href: string | null; children: React.ReactNode }) {
+  const cls = "group -mx-2 flex items-start justify-between gap-3 rounded-control px-2 py-3";
+  if (!href) return <div className={cls}>{children}</div>;
+  return (
+    <Link href={href} className={`${cls} transition hover:bg-honey-soft focus-visible:bg-honey-soft`}>
+      {children}
+    </Link>
   );
 }

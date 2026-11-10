@@ -115,10 +115,10 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
               <li key={r.id} className={`rounded-control border-2 p-3 ${r.due_on <= today ? "border-warning bg-warning-soft" : "border-border"}`}>
                 <p className="font-medium">{r.what}</p>
                 <p className="text-xs text-muted">{r.due_on < today ? "Was due" : r.due_on === today ? "Due today" : "Due"} {formatDate(`${r.due_on}T12:00:00+02:00`)}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                {canCare ? <div className="mt-2 flex flex-wrap gap-2">
                   <ButtonForm action={markReminder.bind(null, id, donorId, r.id, true)} label="Done" pending="Marking…" />
                   <ButtonForm action={deleteDonorReminder.bind(null, id, donorId, r.id)} label="Remove" pending="Removing…" confirm="Remove this follow-up? It can't be undone." confirmLabel="Yes, remove" />
-                </div>
+                </div> : null}
               </li>
             ))}
           </ul>
@@ -130,7 +130,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
                   <li key={r.id} className="rounded-control border-2 border-border p-3 text-muted">
                     <p className="line-through">{r.what}</p>
                     <p className="text-xs">Done {formatDateTime(r.done_at!)}</p>
-                    <ButtonForm action={markReminder.bind(null, id, donorId, r.id, false)} label="Undo" pending="Putting it back…" />
+                    {canCare ? <ButtonForm action={markReminder.bind(null, id, donorId, r.id, false)} label="Undo" pending="Putting it back…" /> : null}
                   </li>
                 ))}
               </ul>
@@ -147,7 +147,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
               {myTags.map((t) => (
                 <li key={t.id} className="flex max-w-full items-center gap-1 rounded-full border-2 border-border bg-honey-soft py-1 pl-3 pr-1">
                   <span className="min-w-0 [overflow-wrap:anywhere]">{t.name}</span>
-                  <ButtonForm action={removeDonorTag.bind(null, id, donorId, t.id)} label="Take off" pending="Taking off…" />
+                  {canCare ? <ButtonForm action={removeDonorTag.bind(null, id, donorId, t.id)} label="Take off" pending="Taking off…" /> : null}
                 </li>
               ))}
             </ul>
@@ -168,13 +168,13 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
                 <p className="mt-1 text-xs text-muted">
                   {n.author ? `${n.author}, ` : ""}{formatDateTime(n.created_at)}{n.edited_at ? ` (edited ${formatDateTime(n.edited_at)})` : ""}
                 </p>
-                <details className="mt-2">
+                {canCare ? <details className="mt-2">
                   <summary className="min-h-11 cursor-pointer content-center font-semibold text-brand hover:underline">Edit or remove</summary>
                   <div className="mt-2 space-y-2">
                     <NoteForm action={editDonorNote.bind(null, id, donorId, n.id)} defaultBody={n.body} label="Edit the note" submit="Save changes" />
                     <ButtonForm action={deleteDonorNote.bind(null, id, donorId, n.id)} label="Remove note" pending="Removing…" confirm="Remove this note? It can't be undone." confirmLabel="Yes, remove" />
                   </div>
-                </details>
+                </details> : null}
               </li>
             ))}
           </ul>

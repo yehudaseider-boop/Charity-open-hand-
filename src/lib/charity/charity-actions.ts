@@ -151,6 +151,10 @@ export async function undoAction(charityId: string, id: string, userId: string, 
     return { ok: false, why, row };
   }
   await logAudit({ actorUserId: userId, action: "charity.action_undone", entityType: "charity", entityId: charityId, details: { kind: row.kind, actionId: id } });
+  // A role put back is a role change like any other, in the audit log too.
+  if (row.undo.type === "set_role") {
+    await logAudit({ actorUserId: userId, action: "charity.role_changed", entityType: "charity", entityId: charityId, details: { user_id: row.undo.userId, from: row.undo.to, to: row.undo.from, via: "undo" } });
+  }
   let details = row.details;
   if (Object.keys(extra).length) {
     details = { ...row.details, ...extra };

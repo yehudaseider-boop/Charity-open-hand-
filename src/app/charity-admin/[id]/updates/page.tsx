@@ -12,6 +12,7 @@ import { MAX_PHOTOS } from "@/lib/charity/validation";
 import { formatDate } from "@/lib/dates";
 import { addPhoto, postUpdate, removePhoto, removeUpdate } from "./actions";
 import { PhotoForm, UpdateForm } from "./forms";
+import { refusedFor } from "@/lib/charity/permissions";
 
 export const metadata: Metadata = { title: "Photos and updates" };
 
@@ -40,6 +41,8 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
       />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/updates`} />
+
+      {sp.refused === "profile" ? <Notice>{refusedFor("profile")}</Notice> : null}
 
       {canEdit ? (
         <Card title="Post an update">

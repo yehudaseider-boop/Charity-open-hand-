@@ -2,6 +2,7 @@ import "server-only";
 import { logAudit } from "@/lib/audit";
 import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { CERTIFICATE_KINDS, TEAM_KINDS, namesFrom, scrubCertificateDetails } from "./scrub-actions";
 
 export type EraseSummary = {
   donors: number;
@@ -57,6 +58,22 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     for (const d of data ?? []) ids.add(d.id as string);
   }
 
+  // The names they gave and the charities they gave to, read before their details are erased: the s18A receipt
+  // check's action records (shown on each charity's Activity page) name them.
+  const theirNames = new Set<string>();
+  const theirCharities = new Set<string>();
+  if (ids.size) {
+    const gifts = await allPages((from) => db.from("donations").select("id, charity_id").in("donor_id", [...ids]).order("id").range(from, from + 999));
+    for (const g of gifts) if (typeof g.charity_id === "string") theirCharities.add(g.charity_id);
+    const giftIdList = gifts.map((g) => g.id as string);
+    for (let i = 0; i < giftIdList.length; i += 500) {
+      const rows = await allPages((from) =>
+        db.from("donation_checkout_details").select("donation_id, first_name, last_name, organisation_name").in("donation_id", giftIdList.slice(i, i + 500)).order("donation_id").range(from, from + 999),
+      );
+      for (const n of namesFrom(rows as { first_name?: string | null; last_name?: string | null; organisation_name?: string | null }[])) theirNames.add(n);
+    }
+  }
+
   const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
   if (error) throw new Error(`Could not erase: ${error.message}`);
   if (ids.size) {
@@ -97,11 +114,24 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       }
     }
   }
+  // Their name on the s18A receipt check's records, in the charities they gave to.
+  if (theirNames.size && theirCharities.size) {
+    const certs = await allPages((from) =>
+      db.from("charity_actions").select("id, details").in("kind", [...CERTIFICATE_KINDS]).in("charity_id", [...theirCharities]).order("id").range(from, from + 999),
+    );
+    for (const a of certs) {
+      const scrubbed = scrubCertificateDetails((a.details ?? {}) as Record<string, unknown>, theirNames);
+      if (scrubbed) {
+        const { error: e } = await db.from("charity_actions").update({ details: scrubbed }).eq("id", a.id);
+        if (e) throw new Error(`Could not erase: ${e.message}`);
+      }
+    }
+  }
   // If they were on a charity's team, their address goes from the team rows of "what just happened" as well.
   if (email) {
     const exact = email.replace(/[\\%_]/g, (ch) => `\\${ch}`);
     const teamRows = await allPages((from) =>
-      db.from("charity_actions").select("id, details").in("kind", ["member_added", "member_removed"]).ilike("details->>email", exact).order("id").range(from, from + 999),
+      db.from("charity_actions").select("id, details").in("kind", [...TEAM_KINDS]).ilike("details->>email", exact).order("id").range(from, from + 999),
     );
     for (const a of teamRows) {
       const details = (a.details ?? {}) as Record<string, unknown>;

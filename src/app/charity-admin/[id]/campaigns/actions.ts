@@ -48,7 +48,8 @@ export async function endCampaign(charityId: string, campaignId: string): Promis
   const viewer = await requireViewer();
   if (!isUuid(campaignId)) return;
   const { charity } = await loadCharityForManager(charityId);
-  if (await refusal(charityId, "profile")) return;
+  // Back to the page with the plain refusal shown there (nothing was changed).
+  if (await refusal(charityId, "profile")) redirect(`/charity-admin/${charityId}/campaigns?refused=profile`);
   const supabase = await createClient();
   const { data, error } = await supabase.from("campaigns").update({ status: "ended" }).eq("id", campaignId).eq("charity_id", charityId).eq("status", "active").select("id, title");
   if (error) throw error;

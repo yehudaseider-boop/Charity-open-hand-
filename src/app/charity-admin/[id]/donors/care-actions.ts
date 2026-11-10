@@ -16,21 +16,24 @@ import { refusal } from "@/lib/charity/team";
 const isId = (s: string) => /^[0-9a-f-]{36}$/i.test(s);
 const donorPage = (charityId: string, donorId: string) => `/charity-admin/${charityId}/donors/${donorId}`;
 
-/** The signed-in person manages this charity, and this donor gave to it. Throws otherwise (the page shows an error). */
-async function forDonor(charityId: string, donorId: string) {
+/**
+ * The signed-in person manages this charity, may look after its donors (team roles: "message"), and this donor
+ * gave to it. A role without it gets the plain refusal back; a donor of another charity throws (the page errors).
+ */
+async function forDonor(charityId: string, donorId: string): Promise<{ viewer: { userId: string }; refused: null } | { viewer: null; refused: FormState }> {
   const viewer = await requireViewer();
   await loadCharityForManager(charityId);
-  // Notes, follow-ups and tags are part of looking after donors (team roles: "message").
   const refused = await refusal(charityId, "message");
-  if (refused) throw new Error(refused);
+  if (refused) return { viewer: null, refused: { ok: false, message: refused } };
   if (!(await donorGaveTo(charityId, donorId))) throw new Error("Not one of this charity's donors.");
-  return viewer;
+  return { viewer, refused: null };
 }
 
 const NOT_FOUND: FormState = { ok: false, message: "It isn't there any more (someone may have removed it). Nothing was changed." };
 
 export async function addDonorNote(charityId: string, donorId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  const viewer = await forDonor(charityId, donorId);
+  const { viewer, refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   const note = checkNote(formData.get("body"));
   if (!note.ok) return { ok: false, fieldErrors: { body: note.error } };
   await addNote(charityId, donorId, note.value, viewer.userId);
@@ -39,7 +42,8 @@ export async function addDonorNote(charityId: string, donorId: string, _prev: Fo
 }
 
 export async function editDonorNote(charityId: string, donorId: string, noteId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  await forDonor(charityId, donorId);
+  const { refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   if (!isId(noteId)) return NOT_FOUND;
   const note = checkNote(formData.get("body"));
   if (!note.ok) return { ok: false, fieldErrors: { body: note.error } };
@@ -49,14 +53,16 @@ export async function editDonorNote(charityId: string, donorId: string, noteId: 
 }
 
 export async function deleteDonorNote(charityId: string, donorId: string, noteId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
-  await forDonor(charityId, donorId);
+  const { refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   if (!isId(noteId) || !(await deleteNote(charityId, donorId, noteId))) return NOT_FOUND;
   revalidatePath(donorPage(charityId, donorId));
   redirect(`${donorPage(charityId, donorId)}?did=note_removed`);
 }
 
 export async function addDonorReminder(charityId: string, donorId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  const viewer = await forDonor(charityId, donorId);
+  const { viewer, refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   const r = checkReminder(formData.get("what"), formData.get("due_on"), isoDateInJhb());
   if (!r.ok) return { ok: false, fieldErrors: r.errors };
   await addReminder(charityId, donorId, r.what, r.dueOn, viewer.userId);
@@ -66,7 +72,8 @@ export async function addDonorReminder(charityId: string, donorId: string, _prev
 }
 
 export async function markReminder(charityId: string, donorId: string, reminderId: string, done: boolean, _prev: FormState, _formData: FormData): Promise<FormState> {
-  const viewer = await forDonor(charityId, donorId);
+  const { viewer, refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   if (!isId(reminderId) || !(await setReminderDone(charityId, donorId, reminderId, done, viewer.userId))) return NOT_FOUND;
   revalidatePath(donorPage(charityId, donorId));
   revalidatePath(`/charity-admin/${charityId}`);
@@ -74,7 +81,8 @@ export async function markReminder(charityId: string, donorId: string, reminderI
 }
 
 export async function deleteDonorReminder(charityId: string, donorId: string, reminderId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
-  await forDonor(charityId, donorId);
+  const { refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   if (!isId(reminderId) || !(await deleteReminder(charityId, donorId, reminderId))) return NOT_FOUND;
   revalidatePath(donorPage(charityId, donorId));
   revalidatePath(`/charity-admin/${charityId}`);
@@ -82,7 +90,8 @@ export async function deleteDonorReminder(charityId: string, donorId: string, re
 }
 
 export async function addDonorTag(charityId: string, donorId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  await forDonor(charityId, donorId);
+  const { refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   const name = checkTagName(formData.get("name"));
   if (!name.ok) return { ok: false, fieldErrors: { name: name.error } };
   // The tag as the charity already spells it ("volunteer" typed finds "Volunteer"), so the message names it.
@@ -101,7 +110,8 @@ export async function addDonorTag(charityId: string, donorId: string, _prev: For
 }
 
 export async function removeDonorTag(charityId: string, donorId: string, tagId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
-  await forDonor(charityId, donorId);
+  const { refused } = await forDonor(charityId, donorId);
+  if (refused) return refused;
   if (!isId(tagId)) return NOT_FOUND;
   await untagDonor(charityId, donorId, tagId);
   revalidatePath(donorPage(charityId, donorId));

@@ -25,6 +25,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
   const k = formKey(sp);
   await requireViewer(`/charity-admin/${id}/profile`);
   const [{ charity, priv, categoryIds }, categories] = await Promise.all([loadCharityForManager(id), loadCategories()]);
+  const canEdit = await viewerCan(id, "profile");
   const now = new Date();
   // Bonuses: if either can't be read, the rest of the page still works and its card says so.
   const [video, focusLoad, allCampaigns] = await Promise.all([loadVideo(id), loadFocusForManager(id), loadCampaigns(id).catch(() => [])]);
@@ -44,7 +45,9 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         actions={charity.status === "approved" ? <ActionLink href={`/c/${charity.slug}`}>View your public page</ActionLink> : undefined}
       />
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/profile`} />
-      {!(await viewerCan(id, "profile")) ? <Notice>Your role doesn&apos;t include changing your charity&apos;s page. You can see it here; changes you try won&apos;t be saved.</Notice> : null}
+      {!canEdit ? <Notice>Your role doesn&apos;t include changing your charity&apos;s page. You can see it here, but the forms are switched off.</Notice> : null}
+      {/* Switched off as a whole for a role that can't save (the server refuses anyway). */}
+      <fieldset disabled={!canEdit} className="m-0 min-w-0 space-y-5 border-0 p-0">
       <Card title="Details">
         <ProfileForm
           key={k}
@@ -124,6 +127,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         {cover ? <img src={cover} alt="" className="mb-3 aspect-[3/1] w-full rounded-card border-2 border-border object-cover" /> : null}
         <ImageForm key={k} action={uploadImage.bind(null, id, "cover")} label="Wide image, about 3 times wider than tall" />
       </Card>
+      </fieldset>
     </div>
   );
 }
