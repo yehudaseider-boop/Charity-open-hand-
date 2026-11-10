@@ -2,6 +2,7 @@
 
 ## Decided
 
+- **Team roles confirmed (10/11/2026, Yehuda, "yes yes yes"):** the migration runs on the TEST project; Admins do not see bank details or deposits (Owner edits, Finance views); emailing donors, updates, thank-yous and the journey widen from owner-only to Owner, Admin and Fundraiser, and the IT3(d) files to Owner, Admin and Finance, as in his table. The security review's findings were fixed and proven by the database tests before the migration ran.
 - **Team roles (CRM step 9, built 10/11/2026 from Yehuda's table, "go").** Five roles: Owner (one per charity), Admin, Finance, Fundraiser, Viewer. One table in `src/lib/charity/permissions.ts` and the same in the database (`public.charity_can()`, migration `20261110000009_team_roles.sql`, not applied anywhere yet):
 
   | | Owner | Admin | Finance | Fundraiser | Viewer |
