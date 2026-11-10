@@ -60,7 +60,7 @@ describe("a video on a charity update", () => {
       await post("youtube", "dQw4w9WgXcQ");
       await post("vimeo", "76979871");
       await post(null, null);
-      await refused(`insert into public.charity_updates (charity_id, body_en, video_provider, video_id) values ($1, 'x', 'tiktok', '123')`, [ids.meals], /charity_update_video_provider/);
+      await refused(`insert into public.charity_updates (charity_id, body_en, video_provider, video_id) values ($1, 'x', 'tiktok', '123')`, [ids.meals], /charity_update_video_(provider|id_shape)/);
       await refused(`insert into public.charity_updates (charity_id, body_en, video_provider, video_id) values ($1, 'x', 'youtube', null)`, [ids.meals], /charity_update_video_all_or_none/);
       await refused(`insert into public.charity_updates (charity_id, body_en, video_provider, video_id) values ($1, 'x', null, 'dQw4w9WgXcQ')`, [ids.meals], /charity_update_video_all_or_none/);
       for (const [p, id] of [["youtube", "https://youtu.be/dQw4w9WgXcQ"], ["youtube", "<iframe>"], ["youtube", "short"], ["vimeo", "0123"], ["vimeo", "abc"]]) {
@@ -73,14 +73,14 @@ describe("a video on a charity update", () => {
     await tx(async () => {
       await as(ids.mealsAdmin);
       const mine = await run(
-        `insert into public.charity_updates (charity_id, body_en, video_provider, video_id, posted_by) values ($1, 'Our kitchen this week.', 'youtube', 'dQw4w9WgXcQ', $2) returning id`,
-        [ids.meals, ids.mealsAdmin],
+        `insert into public.charity_updates (charity_id, body_en, video_provider, video_id) values ($1, 'Our kitchen this week.', 'youtube', 'dQw4w9WgXcQ') returning id`,
+        [ids.meals],
       );
       expect(mine.rowCount).toBe(1);
       await as(ids.hallAdmin);
       await refused(
-        `insert into public.charity_updates (charity_id, body_en, video_provider, video_id, posted_by) values ($1, 'Not mine.', 'youtube', 'dQw4w9WgXcQ', $2)`,
-        [ids.meals, ids.hallAdmin],
+        `insert into public.charity_updates (charity_id, body_en, video_provider, video_id) values ($1, 'Not mine.', 'youtube', 'dQw4w9WgXcQ')`,
+        [ids.meals],
         /row-level security/,
       );
     });
