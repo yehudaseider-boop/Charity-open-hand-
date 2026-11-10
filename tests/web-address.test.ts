@@ -23,6 +23,9 @@ const LINKS = [
   "Mail a@b.com/x",
   "(see example.africa)",
   "pay.me",
+  "Visit Donate.Com today",
+  "Kitchen.Org.Za",
+  "Our-Kitchen.Africa",
 ];
 const FINE = [
   "R1 250 feeds a family for a month.",

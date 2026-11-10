@@ -21,12 +21,14 @@ const PLAIN_EMAIL = /(^|[\s(<"'])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-
  * "e.g. our team" and "4.5/5" aren't either.
  */
 const BARE_DOMAIN = /\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:[a-z]{2,}|[A-Z]{2,})(?![A-Za-z0-9])/;
+/** Common endings in any capitals ("Donate.Com", "Kitchen.Org.Za"): mail apps still turn these into links. */
+const COMMON_ENDING = /\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|org|net|za|co|io|ly|me|info|biz|ngo|africa|xyz|app|online|site|link|click|top|shop|store|live|church|charity|foundation|fund|gives|donate)(?![A-Za-z0-9])/i;
 const OTHER_ADDRESS = /[a-z][a-z0-9+.-]*:\/\/|\bwww\.|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z][a-z0-9-]*\//i;
 
 /** Does the text hold a web address, however typed (a plain email address alone is fine). Also used for donor journey emails. */
 export function hasWebAddress(text: string): boolean {
   const rest = text.replace(PLAIN_EMAIL, "$1");
-  return OTHER_ADDRESS.test(rest) || BARE_DOMAIN.test(rest);
+  return OTHER_ADDRESS.test(rest) || BARE_DOMAIN.test(rest) || COMMON_ENDING.test(rest);
 }
 
 /**
