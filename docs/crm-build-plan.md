@@ -32,7 +32,7 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
    charity can change the wording (with a preview and "back to Givezy's wording").
 6. **Donor journeys** (1.1, 1.2, and the Thank donors tab folded in, 5). Built in three chunks:
    - 6a. One general journey: steps (email, wait X days), on/off, who is at which step.
-     **Built 10/11/2026, not yet on the test site** (migration `20261110000007_donor_journey.sql` waits for Yehuda's yes;
+     **Built 10/11/2026, on the test project** (migration `20261110000007_donor_journey.sql` applied 10/11/2026;
      details in `docs/decisions.md`). As built: new donors join on their first gift after it is switched on; the owner can
      add existing donors (asked first); no typed links; at most 5 emails; daily sending shares the one-a-week claim.
    - 6b. Campaign journeys: donating to a campaign enrols the donor.
@@ -47,7 +47,7 @@ Next after the donor journey, in this order, then roles (step 9) moved up behind
 16. **Keeping donors panel.** For the tax year: share of last year's donors who gave again, who gave last year but
     not this year (LYBUNT), who gave some earlier year but not since (SYBUNT), who gave more and who gave less. Worked
     out only from recorded gifts; nothing typed. Lists open with Call / Email / Say thank you, like the stopped list.
-    **Built 10/11/2026, not yet on the test site** (migration `20261110000008_keeping_donors.sql` waits for Yehuda's
+    **Built 10/11/2026, on the test project** (migration `20261110000008_keeping_donors.sql` applied 10/11/2026; was waiting for Yehuda's
     yes). As built: a "Keeping donors" card on the overview and a Keeping donors page (People), this or last tax year;
     the lists show contact details and open the donor's page, where the thank-you and follow-ups are (one message a
     week still applies there). CSV download per list. "Not since" checks up to today, so last tax year's lists leave
