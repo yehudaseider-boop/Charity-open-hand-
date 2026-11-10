@@ -4,6 +4,7 @@ import { ChromeMark } from "@/components/chrome-mark";
 import { JsonLd } from "@/components/json-ld";
 import { Doors } from "@/components/landing/doors";
 import { NotifyForm } from "@/components/landing/notify-form";
+import { TryDemo } from "@/components/landing/try-demo";
 import { Icon, type IconName } from "@/components/marketing";
 import { Splash } from "@/components/splash";
 import { appLinks } from "@/config/app-links";
@@ -47,17 +48,20 @@ function Point({ icon, title, body, tone }: { icon: IconName; title: string; bod
 }
 
 /** One door's story: a title, three points and one button, with a sample picture beside it. */
-function Story({ title, points, action, picture, tone }: { title: string; points: { icon: IconName; title: string; body: string }[]; action: React.ReactNode; picture: React.ReactNode; tone: "brand" | "lilac" }) {
+function Story({ title, points, action, after, picture, tone }: { title: string; points: { icon: IconName; title: string; body: string }[]; action?: React.ReactNode; after?: React.ReactNode; picture: React.ReactNode; tone: "brand" | "lilac" }) {
   return (
-    <div className="grid items-center gap-10 pb-6 pt-8 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] md:gap-14 md:pt-14">
-      <div className="flex min-w-0 flex-col gap-7">
-        <h2 data-panel-title tabIndex={-1} className="font-display text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.02em] text-balance outline-none">{title}</h2>
-        <ul className="flex flex-col gap-5">
-          {points.map((p) => <Point key={p.title} {...p} tone={tone} />)}
-        </ul>
-        <div>{action}</div>
+    <div className="flex flex-col gap-10 pb-6 pt-8 md:gap-14 md:pt-14">
+      <div className="grid items-center gap-10 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] md:gap-14">
+        <div className="flex min-w-0 flex-col gap-7">
+          <h2 data-panel-title tabIndex={-1} className="font-display text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.02em] text-balance outline-none">{title}</h2>
+          <ul className="flex flex-col gap-5">
+            {points.map((p) => <Point key={p.title} {...p} tone={tone} />)}
+          </ul>
+          {action ? <div>{action}</div> : null}
+        </div>
+        <div className="min-w-0">{picture}</div>
       </div>
-      <div className="min-w-0">{picture}</div>
+      {after}
     </div>
   );
 }
@@ -202,7 +206,12 @@ export default function Home() {
                 { icon: "receipt", title: "Every s18A receipt in one place", body: "One s18A receipt a year from each charity that issues them, ready for your tax return." },
                 { icon: "lock", title: "Your card stays private", body: "You type it on a secure payment page. Givezy never sees or stores it." },
               ]}
-              action={<GiveAction />}
+              after={
+                <div className="flex max-w-[46rem] flex-col gap-7">
+                  <TryDemo />
+                  <GiveAction />
+                </div>
+              }
               picture={<PhonePicture />}
             />
           }

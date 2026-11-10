@@ -360,20 +360,117 @@ body:has([data-chrome="landing"]) .chrome-full {
   grid-template-rows: 1fr;
   opacity: 1;
 }
+/*
+ * The doors react to touch (10/11/2026). With a mouse, a door lifts and tips a few degrees toward the pointer
+ * (--rx/--ry, set by doors.tsx) and a soft light follows it (--gx/--gy). A keyboard focus gets the same lift and
+ * light, without the tilt. A press sinks it onto its solid bottom edge, like every pressable button. Phones get the
+ * press only: no tilt that fights scrolling. Movement is transform and opacity; the edge is the buttons' box-shadow.
+ */
 .door {
-  transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 260ms ease, box-shadow 260ms ease;
+  --edge: #0b2a73;
+  --rx: 0deg;
+  --ry: 0deg;
+  --lift: 0px;
+  transform: perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(var(--lift));
+  box-shadow: 0 6px 0 var(--edge), 0 24px 60px rgba(14, 27, 61, 0.14);
+  transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 260ms ease, box-shadow 160ms ease;
+  will-change: transform;
 }
-.door:hover {
-  transform: translateY(-4px);
+.door[data-door="charity"] {
+  --edge: rgba(23, 73, 181, 0.32);
+}
+.door[data-tilting] {
+  transition: transform 90ms linear, opacity 260ms ease, box-shadow 160ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .door:hover {
+    --lift: -6px;
+  }
+}
+.door:focus-visible {
+  --lift: -6px;
+}
+.door:active {
+  --lift: 4px;
+  --rx: 0deg;
+  --ry: 0deg;
+  box-shadow: 0 2px 0 var(--edge), 0 10px 24px rgba(14, 27, 61, 0.12);
+  transition-duration: 80ms;
+}
+.door-glow {
+  --gx: 14rem;
+  --gy: 5rem;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26rem;
+  height: 26rem;
+  margin: -13rem 0 0 -13rem;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
+  opacity: 0;
+  transform: translate3d(var(--gx), var(--gy), 0);
+  transition: opacity 320ms ease;
+  pointer-events: none;
+}
+.door[data-door="charity"] .door-glow {
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+}
+@media (hover: hover) and (pointer: fine) {
+  .door:hover .door-glow {
+    opacity: 1;
+  }
+}
+.door:focus-visible .door-glow {
+  opacity: 1;
 }
 .doors[data-chosen] .door:not([aria-expanded="true"]) {
   opacity: 0.82;
 }
+/* The round button: a plus at rest, an arrow pointing down at the story on hover or focus, a cross once open. */
 .door-plus {
-  transition: transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: transform 320ms cubic-bezier(0.34, 1.5, 0.64, 1);
 }
-.door[aria-expanded="true"] .door-plus {
+.door-plus svg {
+  grid-area: 1 / 1;
+  transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 200ms ease;
+}
+.door-plus .door-arrow {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+@media (hover: hover) and (pointer: fine) {
+  .door:hover:not([aria-expanded="true"]) .door-plus .door-cross {
+    opacity: 0;
+    transform: translateY(10px) rotate(90deg);
+  }
+  .door:hover:not([aria-expanded="true"]) .door-plus .door-arrow {
+    opacity: 1;
+    transform: none;
+  }
+}
+.door:focus-visible:not([aria-expanded="true"]) .door-plus .door-cross {
+  opacity: 0;
+  transform: translateY(10px) rotate(90deg);
+}
+.door:focus-visible:not([aria-expanded="true"]) .door-plus .door-arrow {
+  opacity: 1;
+  transform: none;
+}
+.door[aria-expanded="true"] .door-plus .door-cross {
   transform: rotate(45deg);
+}
+.door:active .door-plus {
+  transform: scale(0.92);
+}
+/* The story rises into place as its door opens, with a small settle at the end. */
+.door-panel > div > * {
+  transform: translateY(18px) scale(0.985);
+  transition: transform 560ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.door-panel[data-open] > div > *,
+.doors:not([data-ready]) .door-panel:target > div > * {
+  transform: none;
 }
 /* The logo's splash, breathing slowly beside the headline: the one thing that moves without being asked. */
 @keyframes splash-breathe {
@@ -386,11 +483,22 @@ body:has([data-chrome="landing"]) .chrome-full {
 @media (prefers-reduced-motion: reduce) {
   .door-panel,
   .door,
-  .door-plus {
+  .door-plus,
+  .door-plus svg,
+  .door-glow,
+  .door-panel > div > * {
     transition: none;
   }
-  .door:hover {
+  .door,
+  .door:hover,
+  .door:focus-visible,
+  .door:active,
+  .door:active .door-plus,
+  .door-panel > div > * {
     transform: none;
+  }
+  .door:active {
+    box-shadow: 0 2px 0 var(--edge), 0 10px 24px rgba(14, 27, 61, 0.12);
   }
   .splash-breathe {
     animation: none;
