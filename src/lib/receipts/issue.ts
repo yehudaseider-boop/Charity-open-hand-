@@ -42,7 +42,13 @@ export interface ReceiptStore {
 }
 
 /** Sends receipts by email. Left out of a run unless asked for. */
-export type Mailer = { transport: EmailTransport; siteUrl: string; platformName: string };
+export type Mailer = {
+  transport: EmailTransport;
+  siteUrl: string;
+  platformName: string;
+  /** Called when a receipt's email fails, so the daily job can try it again (never throws). */
+  onEmailFailed?: (receipt: IssuedReceipt, error: unknown) => Promise<void>;
+};
 
 export type Renderer = (receipt: { details: ReceiptDetails; reference: string }) => Promise<Buffer>;
 
@@ -187,6 +193,7 @@ export async function runReceiptsJob(args: {
       } catch (e) {
         await store.releaseEmail(r).catch(() => undefined);
         summary.emailFailed += 1;
+        await args.mailer.onEmailFailed?.(r, e).catch(() => undefined);
         console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);
       }
     }

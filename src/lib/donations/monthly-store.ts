@@ -4,15 +4,14 @@ import { withCarriedId } from "./monthly-id-nudge";
 import { confirmPayment } from "./confirm";
 import { loadDonatableCharity } from "./charity";
 import { getEmailTransport } from "@/lib/email";
-import { formatRand } from "@/lib/money";
 import { getGateway } from "@/lib/gateway";
 import { isGatewayNotFound, isGatewayRefusal } from "@/lib/gateway/types";
 import { platformConfig } from "@/config/platform";
-import { legalConfig } from "@/config/legal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore, type MonthlySummary } from "./monthly-job";
-import { monthlyFailedEmail } from "./monthly-email";
-import { newCardLink, newCardPendingFor } from "./new-card";
+import { declinedNotice } from "./monthly-declined-retry";
+import { recordFailedEmail } from "@/lib/email/retry";
+import { newCardPendingFor } from "./new-card";
 import { DECLINED_REASON } from "./monthly-reasons";
 import { monthlyCardCharge } from "./card-charge";
 
@@ -247,17 +246,14 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
       return { accepting: Boolean((await loadDonatableCharity(slug))?.acceptingPayments) };
     },
     async notifyFailed(r, info) {
-      const site = process.env.SITE_URL;
-      const m = monthlyFailedEmail({
-        charityName: r.charityName,
-        totalText: formatRand(info.totalCents),
-        cardLast4: r.cardLast4,
-        final: info.final,
-        manageUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
-        newCardUrl: site ? newCardLink(site, r.id, now) : undefined,
-        helpEmail: legalConfig.supportEmail,
-      });
-      await getEmailTransport().send({ to: r.email, ...m });
+      const m = declinedNotice(r, info, now);
+      try {
+        await getEmailTransport().send({ to: r.email, ...m });
+      } catch (e) {
+        // Tried again by the daily job (an hour later, then a day, then three days), as the donation is then.
+        await recordFailedEmail("monthly_declined", r.id, { payload: { totalCents: info.totalCents, final: info.final, failedAt: now.toISOString() }, error: e });
+        throw e;
+      }
     },
   };
   return runMonthlyCharges(deps);

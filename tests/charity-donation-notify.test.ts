@@ -6,7 +6,7 @@ const sent: { to: string; subject: string; text: string }[] = [];
 let notifyOn = true;
 const rows: Record<string, unknown> = {
   donations: {
-    id: "d1", amount_cents: 18_000, contribution_cents: 1_000, total_charged_cents: 19_000, paid_at: "2026-10-16T08:00:00Z",
+    id: "d1", status: "paid", amount_cents: 18_000, contribution_cents: 1_000, total_charged_cents: 19_000, paid_at: "2026-10-16T08:00:00Z",
     wants_18a: false, recurring_id: null, dedication_kind: null, dedication_name: null, charity_id: "c1", campaign_id: null,
     charities: { name_en: "Meals Fund" }, donation_checkout_details: { email: "donor@x.co" },
   },

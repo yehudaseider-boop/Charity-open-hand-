@@ -8,7 +8,8 @@ import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildReceiptHtml } from "./html";
 import { receiptDonorName } from "./details";
-import { runReceiptsJob, type JobSummary } from "./issue";
+import { runReceiptsJob, type IssuedReceipt, type JobSummary } from "./issue";
+import { recordFailedEmail } from "@/lib/email/retry";
 import { planReceipts, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
 import { applyDecisions, certificateFingerprint, countStatuses, type CertificateStatus, type DecidedReceipt } from "./review";
 import { completionWindow, inCompletionWindow } from "@/lib/donations/s18a-details";
@@ -350,7 +351,9 @@ function job(runId: string) {
   const siteUrl = process.env.SITE_URL ?? "";
   return {
     // Receipt emails link to the site: without its address they would be broken, so nothing is emailed.
-    mailer: siteUrl ? { transport: getEmailTransport(), siteUrl, platformName: platformConfig.appName } : undefined,
+    mailer: siteUrl
+      ? { transport: getEmailTransport(), siteUrl, platformName: platformConfig.appName, onEmailFailed: (r: IssuedReceipt, e: unknown) => recordFailedEmail("s18a_receipt", r.id, { error: e }) }
+      : undefined,
     render: async ({ details, reference }: { details: Parameters<typeof buildReceiptHtml>[0]["details"]; reference: string }) => {
       // Loaded only when a PDF is made, so pages that never make one don't load Chrome's driver.
       const pdf = await import("./pdf");

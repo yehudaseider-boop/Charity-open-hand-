@@ -7,6 +7,7 @@ import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
 import { s18aDetailsMissing, type S18aDetailsRow } from "./s18a-details";
 import { NOT_REUSABLE } from "./recurring";
+import { recordFailedEmail } from "@/lib/email/retry";
 
 /**
  * Called once, when a donation is confirmed paid (by the webhook or the
@@ -36,61 +37,16 @@ export function monthlyLineLater(
 }
 
 /**
- * The donor's confirmation email. True when it went (or there was no one to send it to); a failure is logged
- * in the audit log, where the daily check finds it and tries again.
+ * The donor's confirmation email. True when it went (or there was nothing to send); a failure is logged in the
+ * audit log and noted for the daily job, which tries it again (an hour later, then a day, then three days).
  */
 export async function sendDonorConfirmation(donationId: string, opts: { monthly?: "activated" | "not_reusable" | "none" } = {}): Promise<boolean> {
   try {
-    const { data: d, error } = await createAdminClient()
-      .from("donations")
-      .select("id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en, thank_you_en), donation_checkout_details(email, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
-      .eq("id", donationId)
-      .single();
-    if (error) throw error;
-    const charity = d.charities as unknown as { name_en: string; thank_you_en: string | null };
-    const details = d.donation_checkout_details as unknown as (S18aDetailsRow & { email: string }) | (S18aDetailsRow & { email: string })[] | null;
-    const row = Array.isArray(details) ? details[0] : details;
-    const email = row?.email;
-    if (!email || !d.paid_at) return true;
-    let monthly: Parameters<typeof confirmationEmail>[0]["monthly"];
-    if (d.recurring_id) {
-      if (opts.monthly === "not_reusable") monthly = { kind: "not_started" };
-      else if (opts.monthly === "activated") {
-        const { data: r } = await createAdminClient().from("recurring_donations").select("charge_day, card_last4").eq("id", d.recurring_id).maybeSingle();
-        monthly = { kind: "first", chargeDay: r?.charge_day ?? 1, cardLast4: r?.card_last4 ?? null };
-      } else {
-        // Sent again later (the daily check resending a failed email): work out from the monthly donation as it is now.
-        const { data: r } = await createAdminClient().from("recurring_donations").select("first_donation_id, status, ended_reason, charge_day, card_last4").eq("id", d.recurring_id).maybeSingle();
-        monthly = monthlyLineLater(d.id, r);
-      }
-    }
-    const site = process.env.SITE_URL;
-    const m = confirmationEmail({
-      monthly,
-      manageUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
-      id: d.id,
-      charityName: charity.name_en,
-      // The charity's own thank-you paragraph, if it wrote one. Who gets this email is unchanged.
-      charityNote: charity.thank_you_en,
-      amountCents: Number(d.amount_cents),
-      contributionCents: Number(d.contribution_cents),
-      cardChargeCents: Number(d.processing_charge_cents ?? 0),
-      totalCents: Number(d.total_charged_cents),
-      paidAt: d.paid_at,
-      wants18a: d.wants_18a,
-      // "Add my details after paying": the email says how to add them (the thank-you page's link isn't in an email).
-      s18aDetailsMissing: Boolean(d.wants_18a && row && row.donor_type && s18aDetailsMissing(row).length),
-      accountUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
-      dedication: (() => {
-        const ded = dedicationFrom(d.dedication_kind, d.dedication_name);
-        return ded ? dedicationLine(ded) : null;
-      })(),
-    });
-    await getEmailTransport().send({ to: email, ...m });
+    await deliverDonorConfirmation(donationId, opts);
     return true;
   } catch (e) {
     console.error(`[notify] confirmation email for donation ${donationId} failed`, e);
-    // The audit log is where the team finds confirmations to resend. Never let that write undo a payment.
+    // The audit log is where the team finds confirmations that failed. Never let that write undo a payment.
     await logAudit({
       actorUserId: null,
       action: "donation.confirmation_email_failed",
@@ -98,8 +54,67 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
       entityId: donationId,
       details: { message: e instanceof Error ? e.message : String(e) },
     }).catch((err) => console.error("[notify] could not record the failed email", err));
+    await recordFailedEmail("donation_confirmation", donationId, { error: e });
     return false;
   }
+}
+
+/**
+ * Build and send the confirmation, as the gift is now. Throws when the send fails. "gone" when there is nothing
+ * to send (no address, not paid, or refunded or charged back since: no "thank you for your donation" then);
+ * "skipped" when nothing was sent on purpose (email off, an erased donor, or an address the test site may not
+ * email).
+ */
+export async function deliverDonorConfirmation(
+  donationId: string,
+  opts: { monthly?: "activated" | "not_reusable" | "none"; signal?: AbortSignal } = {},
+): Promise<"sent" | "skipped" | "gone"> {
+  const { data: d, error } = await createAdminClient()
+    .from("donations")
+    .select("id, status, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en, thank_you_en), donation_checkout_details(email, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
+    .eq("id", donationId)
+    .single();
+  if (error) throw error;
+  const charity = d.charities as unknown as { name_en: string; thank_you_en: string | null };
+  const details = d.donation_checkout_details as unknown as (S18aDetailsRow & { email: string }) | (S18aDetailsRow & { email: string })[] | null;
+  const row = Array.isArray(details) ? details[0] : details;
+  const email = row?.email;
+  if (!email || !d.paid_at || d.status !== "paid") return "gone";
+  let monthly: Parameters<typeof confirmationEmail>[0]["monthly"];
+  if (d.recurring_id) {
+    if (opts.monthly === "not_reusable") monthly = { kind: "not_started" };
+    else if (opts.monthly === "activated") {
+      const { data: r } = await createAdminClient().from("recurring_donations").select("charge_day, card_last4").eq("id", d.recurring_id).maybeSingle();
+      monthly = { kind: "first", chargeDay: r?.charge_day ?? 1, cardLast4: r?.card_last4 ?? null };
+    } else {
+      // Sent again later (the daily check resending a failed email): work out from the monthly donation as it is now.
+      const { data: r } = await createAdminClient().from("recurring_donations").select("first_donation_id, status, ended_reason, charge_day, card_last4").eq("id", d.recurring_id).maybeSingle();
+      monthly = monthlyLineLater(d.id, r);
+    }
+  }
+  const site = process.env.SITE_URL;
+  const m = confirmationEmail({
+    monthly,
+    manageUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
+    id: d.id,
+    charityName: charity.name_en,
+    // The charity's own thank-you paragraph, if it wrote one. Who gets this email is unchanged.
+    charityNote: charity.thank_you_en,
+    amountCents: Number(d.amount_cents),
+    contributionCents: Number(d.contribution_cents),
+    cardChargeCents: Number(d.processing_charge_cents ?? 0),
+    totalCents: Number(d.total_charged_cents),
+    paidAt: d.paid_at,
+    wants18a: d.wants_18a,
+    // "Add my details after paying": the email says how to add them (the thank-you page's link isn't in an email).
+    s18aDetailsMissing: Boolean(d.wants_18a && row && row.donor_type && s18aDetailsMissing(row).length),
+    accountUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
+    dedication: (() => {
+      const ded = dedicationFrom(d.dedication_kind, d.dedication_name);
+      return ded ? dedicationLine(ded) : null;
+    })(),
+  });
+  return await getEmailTransport().send({ to: email, ...m, ...(opts.signal ? { signal: opts.signal } : {}) });
 }
 
 /** Tell the charity a donation came in, unless it turned these emails off. Never blocks or undoes anything. */
