@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en-ZA"><head><meta charset="utf-8">
+<title>Getting your charity started on Givezy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/*FONTS*/
+:root { --navy:#0E1B3D; --brand:#1749B5; --brand-soft:#E5D9FF; --coral:#FF8A3D; --honey:#C9B4FA; --honey-soft:#F4F1FF; --ink:#0E1B3D; --blue:#1749B5; --blue-edge:#0F358A; --orange:#FF8A3D; --orange-edge:#D9621C; --lavender:#C9B4FA; --line:#ECE8F6; --lilac:#F4F1FF; --peach:#FFEBDD; --slate:#4A5878; --sage:#3E8E6A; }
+* { box-sizing: border-box; }
+@page { size: 210mm 297mm; margin: 0; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "DM Sans", Arial, sans-serif; font-size: 9.6pt; line-height: 1.38; color: var(--ink); background: #FFFFFF; margin: 0; }
+h1, h2, h3, .display { font-family: "Bricolage Grotesque", "DM Sans", Arial, sans-serif; color: var(--ink); }
+h1 { font-weight: 800; font-size: 20pt; line-height: 1.1; margin: 0 0 2.5mm; }
+h2 { font-weight: 700; font-size: 12pt; line-height: 1.2; margin: 4mm 0 1.5mm; }
+h3 { font-weight: 700; font-size: 10.5pt; margin: 0 0 1mm; }
+p { margin: 0 0 2mm; }
+ul { margin: 0; padding-left: 5mm; } li { margin: 0 0 0.8mm; }
+.muted { color: var(--slate); } .small { font-size: 8.8pt; }
+i { font-style: normal; color: var(--slate); font-weight: 400; }
+/* one A4 page each */
+.page { position: relative; width: 210mm; height: 297mm; overflow: hidden; padding: 15mm 16mm 18mm; break-after: page; page-break-after: always; }
+.page:last-child { break-after: auto; page-break-after: auto; }
+.page > * { position: relative; }
+.foot { position: absolute !important; left: 16mm; right: 16mm; bottom: 8mm; display: flex; justify-content: space-between; font-size: 7.5pt; color: var(--slate); border-top: 0.3mm solid var(--line); padding-top: 2mm; }
+.kicker { display: inline-block; background: var(--orange); color: var(--ink); font-weight: 700; font-size: 8pt; padding: 0.8mm 3.2mm; border-radius: 4mm; box-shadow: 0 0.6mm 0 var(--orange-edge); margin-bottom: 3mm; }
+.lead { font-size: 10.5pt; color: var(--slate); margin-bottom: 3.5mm; max-width: 165mm; }
+.soft { background: var(--lilac); border: 0.4mm solid var(--line); border-radius: 4.5mm; padding: 3mm 4.5mm; margin: 2.6mm 0; }
+.soft p:last-child, .soft ul:last-child { margin-bottom: 0; }
+.block { position: relative; overflow: hidden; background: var(--blue); color: #FFFFFF; border-radius: 6mm; padding: 5mm 6mm; margin: 3mm 0; }
+.block h2 { color: #FFFFFF; margin-top: 0; }
+.block p:last-child { margin-bottom: 0; }
+.block .ring { position: absolute; right: -9mm; top: -9mm; width: 28mm; height: 28mm; border-radius: 50%; border: 3.5mm solid var(--lavender); }
+.block .dot { position: absolute; right: 22mm; bottom: -5mm; width: 11mm; height: 11mm; border-radius: 50%; background: var(--lavender); opacity: 0.55; }
+.block .inner { position: relative; max-width: 150mm; }
+.open { border: 0.5mm dashed var(--lavender); border-radius: 4mm; padding: 2.6mm 4.5mm; margin: 2.6mm 0; background: #FFFFFF; }
+.open b.t { color: var(--blue); } .open p:last-child { margin-bottom: 0; }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin: 3mm 0; }
+.card { background: var(--lilac); border: 0.4mm solid var(--line); border-radius: 4.5mm; padding: 3.5mm 4.5mm; }
+.card b { font-family: "Bricolage Grotesque", sans-serif; font-size: 11pt; color: var(--blue); display: block; margin-bottom: 1mm; }
+.card p { margin: 0; }
+/* brand shapes behind the content, bleeding off the page edges */
+.bg { position: absolute !important; border-radius: 50%; z-index: 0; }
+.bg.peach { background: var(--peach); } .bg.lil { background: var(--honey-soft); } .bg.lav { background: var(--honey); opacity: 0.7; }
+.bg.or { background: var(--coral); } .bg.bl { background: var(--blue); }
+.bg.ring { background: transparent; border: 6mm solid var(--lavender); } .bg.ring-or { background: transparent; border: 4mm solid var(--orange); opacity: 0.85; }
+.pic { position: absolute !important; z-index: 1; }
+.pic svg { display: block; width: 100%; height: auto; }
+/* the blue colour-block header at the top of every page */
+.hd { position: relative; overflow: hidden; margin: -15mm -16mm 5mm; padding: 12mm 16mm 6mm; background: var(--blue); color: #FFFFFF; border-radius: 0 0 8mm 8mm; }
+.hd h1 { color: #FFFFFF; margin: 0 0 2mm; position: relative; }
+.hd .lead { color: #FFFFFF; opacity: 0.92; margin: 0 0 1mm; position: relative; }
+.hd .kicker { position: relative; margin-bottom: 2.5mm; }
+.hd .hr { position: absolute; right: -12mm; top: -14mm; width: 46mm; height: 46mm; border-radius: 50%; border: 6mm solid var(--lavender); }
+.hd .hdot { position: absolute; right: 38mm; bottom: -7mm; width: 15mm; height: 15mm; border-radius: 50%; background: var(--lavender); opacity: 0.55; }
+.hd .hdot::after { content: ""; position: absolute; left: -22mm; top: 4mm; width: 5mm; height: 5mm; border-radius: 50%; background: var(--orange); }
+/* the fill-in sections: a soft lilac card, so the white boxes stand out */
+.panel { background: var(--honey-soft); border: 0.4mm solid var(--line); border-radius: 5mm; padding: 2.4mm 4.5mm 1.6mm; margin: 0 0 2.6mm; }
+.panel h2 { margin: 0 0 1.6mm; }
+.panel h2::before { content: ""; display: inline-block; width: 2.6mm; height: 2.6mm; border-radius: 50%; background: var(--orange); margin-right: 2mm; vertical-align: 0.15mm; }
+.panel .grid:last-child, .panel .tkrow:last-child, .panel p:last-child { margin-bottom: 0.6mm; }
+/* tables */
+table { background: #FFFFFF; width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.5mm 0 2.5mm; font-size: 8.7pt; border: 0.4mm solid var(--line); border-radius: 3.5mm; overflow: hidden; }
+th, td { padding: 1.5mm 2.6mm; text-align: left; vertical-align: top; border-bottom: 0.3mm solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+thead th { background: var(--lilac); font-weight: 700; border-bottom: 0.5mm solid var(--blue); }
+.prep td:first-child { font-weight: 600; width: 36%; } .prep td:nth-child(2) { width: 15%; white-space: nowrap; } .prep th:nth-child(2) { white-space: nowrap; }
+.note { display: block; font-size: 8pt; color: var(--slate); }
+table.steps td:first-child, table.steps th:first-child { width: 8mm; text-align: center; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; color: var(--blue); }
+.chk2 td:first-child { font-weight: 600; width: 32%; } .chk2 td:nth-child(3) { width: 24%; }
+ol.st { list-style: none; padding: 0; counter-reset: s; margin: 1.5mm 0 2.5mm; }
+ol.st > li { counter-increment: s; position: relative; padding: 0 0 0 9mm; margin: 0 0 2mm; font-size: 8.9pt; }
+ol.st > li::before { content: counter(s); position: absolute; left: 0; top: -0.2mm; width: 6.4mm; height: 6.4mm; border-radius: 50%; background: var(--blue); color: #FFFFFF; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; }
+.done { display: block; color: var(--sage); font-weight: 600; }
+/* fill-in fields: this only keeps the space; the real form field, with its own box, is laid there in the PDF */
+.grid { display: grid; gap: 2.4mm 4mm; margin: 0 0 2.4mm; }
+.fl { display: block; min-width: 0; }
+.lab { display: block; font-size: 8pt; font-weight: 600; color: var(--ink); margin: 0 0 0.7mm; }
+.f { display: block; height: 7mm; }
+.f.multi { height: 20mm; }
+.f.chk { width: 5mm; height: 5mm; flex: none; margin-top: 0.4mm; }
+.tk { display: flex; gap: 2.4mm; align-items: flex-start; padding: 1.1mm 0; }
+.tk .tt { flex: 1; }
+.tkrow { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 4mm; margin: 0 0 2mm; }
+.tkrow.solo { grid-template-columns: 1fr; } .tkrow.four { grid-template-columns: repeat(4, 1fr); }
+.cl .tk { border-bottom: 0.3mm solid var(--line); padding: 1.7mm 0; } .cl .tk:last-child { border-bottom: 0; }
+.cols { color: var(--slate); font-size: 8.4pt; }
+.page.fill h2 { margin-top: 3mm; }
+/* cover */
+.page.cover { display: flex; flex-direction: column; justify-content: space-between; padding: 15mm 16mm 18mm; }
+.cover .logo { height: 13mm; width: auto; }
+.cover .hero { position: relative; overflow: hidden; background: var(--blue); border-radius: 8mm; padding: 26mm 12mm 22mm; color: #FFFFFF; }
+.cover .hero h1 { color: #FFFFFF; font-size: 34pt; line-height: 1.05; margin: 0 0 5mm; max-width: 130mm; position: relative; }
+.cover .hero p { font-size: 13pt; color: #FFFFFF; max-width: 118mm; position: relative; margin: 0; }
+.cover .hero .ring { position: absolute; right: -16mm; top: -16mm; width: 62mm; height: 62mm; border-radius: 50%; border: 7mm solid var(--lavender); }
+.cover .hero .dot { position: absolute; right: 30mm; bottom: -9mm; width: 22mm; height: 22mm; border-radius: 50%; background: var(--lavender); opacity: 0.6; }
+.cover .splash { width: 52mm; height: auto; display: block; margin: 0 0 0 auto; }
+.cover .draft { display: inline-block; background: var(--orange); color: var(--ink); font-weight: 700; padding: 2.5mm 6mm; border-radius: 5mm; box-shadow: 0 1mm 0 var(--orange-edge); font-size: 11pt; }
+.cover .for { font-size: 11pt; color: var(--slate); margin-top: 5mm; max-width: 150mm; }
+.cover .for.small { font-size: 9pt; margin-top: 2mm; }
+.cover .meta { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; }
+</style></head>
+<body>
+<!--BODY-->
+</body></html>
