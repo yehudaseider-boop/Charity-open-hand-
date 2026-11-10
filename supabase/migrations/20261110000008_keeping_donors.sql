@@ -37,7 +37,7 @@ begin
         and d.paid_at is not null and d.paid_at < greatest(p_this_to, p_now)
     ), totals as (
       select p.did,
-             coalesce(sum(p.amt) filter (where p.pat >= p_this_from), 0)::bigint as this_c,
+             coalesce(sum(p.amt) filter (where p.pat >= p_this_from and p.pat < p_this_to), 0)::bigint as this_c,
              coalesce(sum(p.amt) filter (where p.pat >= p_last_from and p.pat < p_this_from), 0)::bigint as last_c,
              coalesce(sum(p.amt) filter (where p.pat < p_last_from), 0)::bigint as earlier_c,
              coalesce(sum(p.amt) filter (where p.pat >= p_this_to), 0)::bigint as after_c,

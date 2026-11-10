@@ -179,9 +179,9 @@ describe("keeping donors", () => {
       await gift(c, less, 4_000, "2026-08-01T10:00:00Z");
       await gift(c, lapsed, 30_000, "2025-12-01T10:00:00Z");
       await gift(c, older, 5_000, "2024-05-01T10:00:00Z");
+      const empty = await charity(a);
       await asUser(a);
       expect(await summary(c)).toEqual([{ last_year_donors: "3", gave_again: "2", lybunt: "1", sybunt: "1", gave_more: "1", gave_less: "1", lybunt_last_cents: "30000" }]);
-      const empty = await charity(a);
       expect(await summary(empty)).toEqual([{ last_year_donors: "0", gave_again: "0", lybunt: "0", sybunt: "0", gave_more: "0", gave_less: "0", lybunt_last_cents: "0" }]);
     });
   });
