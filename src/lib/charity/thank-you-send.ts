@@ -6,8 +6,10 @@ import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
 import { emailHash, monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
+import { WEEKLY_LIMIT, messagedThisWeek } from "./weekly-limit";
 
-export type Recipient = { email: string; firstName: string | null };
+/** One address that gave in the month, with the donors it belongs to (for the one-message-a-week rule). */
+export type Recipient = { email: string; firstName: string | null; donorIds: string[] };
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -23,7 +25,7 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   for (let start = 0; ; start += 1000) {
     const { data, error } = await db
       .from("donations")
-      .select("id, donation_checkout_details(email, first_name, erased_at)")
+      .select("id, donor_id, donation_checkout_details(email, first_name, erased_at)")
       .eq("charity_id", charityId)
       .eq("status", "paid")
       // Only people who gave on Givezy: a gift the charity recorded itself carries an email Givezy never checked.
@@ -38,7 +40,9 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
       const d = (Array.isArray(raw) ? raw[0] : raw) as { email: string | null; first_name: string | null; erased_at: string | null } | null;
       if (!d?.email || d.erased_at || isErasedEmail(d.email)) continue;
       const key = d.email.trim().toLowerCase();
-      if (!byEmail.has(key)) byEmail.set(key, { email: d.email.trim(), firstName: d.first_name });
+      const had = byEmail.get(key);
+      if (!had) byEmail.set(key, { email: d.email.trim(), firstName: d.first_name, donorIds: [row.donor_id as string] });
+      else if (!had.donorIds.includes(row.donor_id as string)) had.donorIds.push(row.donor_id as string);
     }
     if (!data || data.length < 1000) break;
   }
@@ -54,7 +58,9 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   return all.filter((r) => !stopped.has(emailHash(r.email)));
 }
 
-export type SendResult = { ok: true; sent: number; failed: number; remaining: number; sentThisRun?: number } | { ok: false; message: string };
+export type SendResult =
+  | { ok: true; sent: number; failed: number; remaining: number; sentThisRun?: number; /** Left out this run: they already had a message from the charity this week. */ thisWeek?: number }
+  | { ok: false; message: string };
 
 /**
  * Send the charity's thank-you for one month, until the time runs out (a web request can't run for ever).
@@ -82,6 +88,11 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
     await db.from("charity_thank_yous").delete().eq("id", claim.data.id);
     return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
   }
+  // Everyone already had a message from the charity this week: hand the month back, so it can go from Monday.
+  if (r.ok && (r.sentThisRun ?? 0) === 0 && r.sent === 0 && r.failed === 0 && r.remaining === 0 && (r.thisWeek ?? 0) > 0) {
+    await db.from("charity_thank_yous").delete().eq("id", claim.data.id);
+    return { ok: false, message: `Everyone who gave that month already had a message from you this week, so nothing was sent. ${WEEKLY_LIMIT} You can send this thank-you from Monday.` };
+  }
   return r;
 }
 
@@ -106,12 +117,17 @@ async function runThankYou(args: { charityId: string; charityName: string; month
   const transport = getEmailTransport();
   const recipients = await thankYouRecipients(args.charityId, args.month);
   const claimed = await claimedHashes(args.thankYouId);
+  // One message a week per donor from a charity (09/11/2026): anyone who already had one this week is left out of
+  // this thank-you, and counted so the page can say so.
+  const waiting = recipients.filter((r) => !claimed.has(emailHash(r.email)));
+  const recent = await messagedThisWeek(args.charityId, waiting.flatMap((r) => r.donorIds.map((donorId) => ({ donorId, hash: emailHash(r.email) }))), new Date(), { thankYouId: args.thankYouId });
+  const leftOut = new Set(waiting.filter((r) => r.donorIds.some((id) => recent.has(id))).map((r) => emailHash(r.email)));
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   let stoppedEarly = false;
   let sentThisRun = 0;
   for (const r of recipients) {
     const hash = emailHash(r.email);
-    if (claimed.has(hash)) continue;
+    if (claimed.has(hash) || leftOut.has(hash)) continue;
     if (Date.now() - started >= budget) {
       stoppedEarly = true;
       break;
@@ -142,13 +158,13 @@ async function runThankYou(args: { charityId: string; charityName: string; month
     }
   }
   const counts = await thankYouCounts(args.thankYouId);
-  const remaining = stoppedEarly ? recipients.filter((r) => !claimed.has(emailHash(r.email))).length : 0;
+  const remaining = stoppedEarly ? recipients.filter((r) => !claimed.has(emailHash(r.email)) && !leftOut.has(emailHash(r.email))).length : 0;
   await db
     .from("charity_thank_yous")
     .update({ recipient_count: counts.sent, ...(remaining === 0 ? { finished_at: new Date().toISOString() } : {}) })
     .eq("id", args.thankYouId);
-  await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining } });
-  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun };
+  await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining, thisWeek: leftOut.size } });
+  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun, thisWeek: leftOut.size };
 }
 
 /** Addresses (as hashes) already claimed for this thank-you, in pages. */
@@ -181,8 +197,10 @@ async function thankYouCounts(thankYouId: string): Promise<{ sent: number; faile
 export type DonorThankResult = { ok: true; name: string } | { ok: false; message: string };
 
 /**
- * A charity's personal thank-you to one of its donors (someone with a paid gift to it). At most once a
- * week per donor: the week is claimed first, and handed back if the email couldn't go. Call only after
+ * A charity's personal thank-you to one of its donors (someone with a paid gift to it). At most one message a
+ * week per donor from the charity (thank-yous, reminders, news and appeals, the monthly thank-you): anyone already
+ * messaged this week is refused, and the week is claimed first (shared with the s18A details reminder, so two presses
+ * can't both send) and handed back if the email couldn't go. Call only after
  * checking the signed-in person manages this charity: it reads with the service role.
  */
 export async function sendDonorThankYou(args: {
@@ -219,6 +237,9 @@ export async function sendDonorThankYou(args: {
   const { data: stopped, error: stopError } = await db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", hash).maybeSingle();
   if (stopError) throw stopError;
   if (stopped) return { ok: false, message: `${name} asked not to get thank-you emails from charities, so nothing was sent.` };
+  const thisWeek = `${name} already had a message from you this week, so nothing was sent. ${WEEKLY_LIMIT} You can thank them from Monday.`;
+  // A news email, appeal or the monthly thank-you this week counts too, not only a thank-you or reminder.
+  if ((await messagedThisWeek(args.charityId, [{ donorId: args.donorId, hash }])).has(args.donorId)) return { ok: false, message: thisWeek };
 
   const claim = await db
     .from("charity_donor_thanks")
@@ -226,7 +247,8 @@ export async function sendDonorThankYou(args: {
     .select("id")
     .single();
   if (claim.error) {
-    if (claim.error.code === "23505") return { ok: false, message: `You've already thanked ${name} this week, so nothing was sent. You can thank them again from Monday.` };
+    // One message a week per donor from a charity (09/11/2026): a thank-you or a reminder to add s18A details.
+    if (claim.error.code === "23505") return { ok: false, message: thisWeek };
     throw claim.error;
   }
   const release = () => db.from("charity_donor_thanks").delete().eq("id", claim.data.id);
@@ -262,6 +284,8 @@ export async function lastThanked(charityId: string, donorIds: string[]): Promis
     .from("charity_donor_thanks")
     .select("donor_id, sent_at")
     .eq("charity_id", charityId)
+    // Thank-yous only: the same table also holds the week's s18A reminders (they share the one-a-week limit).
+    .eq("kind", "thank_you")
     .in("donor_id", donorIds)
     .order("sent_at", { ascending: false });
   if (error) throw error;

@@ -11,6 +11,12 @@ export type EmailMessage = {
   subject: string;
   text: string;
   html?: string;
+  /**
+   * Words someone outside Givezy wrote that sit inside one of our own emails (a charity's note in the donor's
+   * confirmation). `inText` is exactly how they stand in `text`; the HTML version shows `heading` and `body`
+   * in their place, in their own box, escaped, with no links. Never sent to the provider as a field.
+   */
+  quoted?: { heading: string; body: string; inText: string };
   /** Where a reply goes (for example the charity, on a thank-you sent in its name). */
   replyTo?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
@@ -90,7 +96,7 @@ function withHtml(inner: EmailTransport, siteUrl: string | undefined): EmailTran
   return {
     name: inner.name,
     async send(m) {
-      return inner.send(m.html ? m : { ...m, html: textEmailHtml({ subject: m.subject, text: m.text, siteUrl }) });
+      return inner.send(m.html ? m : { ...m, html: textEmailHtml({ subject: m.subject, text: m.text, siteUrl, quoted: m.quoted }) });
     },
   };
 }

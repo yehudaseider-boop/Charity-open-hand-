@@ -17,6 +17,13 @@ import { parseSuggestedAmounts } from "@/lib/charity/suggested-amounts";
 import { platformConfig } from "@/config/platform";
 import { formatRand } from "@/lib/money";
 import { checkImpactUnit } from "@/lib/charity/impact";
+import { parseVideoLink, VIDEO_PROVIDER_NAME } from "@/lib/charity/video";
+import { loadFocusForManager, loadVideo, writeFocus } from "@/lib/charity/profile-extras";
+import { loadCampaigns } from "@/lib/charity/campaign-queries";
+import { isRunning } from "@/lib/charity/campaigns";
+import { checkFocus } from "@/lib/charity/focus-check";
+import { checkThankYouNote } from "@/lib/charity/thank-you-note";
+import { focusDay, focusStatus, jhbToday } from "@/lib/charity/focus";
 
 /** An approved charity is public with a "Verified" badge: tell us when its name or pictures change, so we can look. */
 async function tellReviewer(charity: { id: string; status: string; name_en: string }, what: string) {
@@ -50,12 +57,14 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     one: formData.get("impact_unit_one")?.toString(),
     many: formData.get("impact_unit_many")?.toString(),
   });
+  // The same rules as the Thank donors editor (no web addresses): the note goes into Givezy's own emails.
+  const note = checkThankYouNote(formData.get("thank_you_en")?.toString());
   // Every problem at once, so nobody fixes one lot and then meets another.
-  if (!parsed.success || !suggested.ok || !impact.ok) {
+  if (!parsed.success || !suggested.ok || !impact.ok || !note.ok) {
     return {
       ok: false,
       message: "Please fix the highlighted fields.",
-      fieldErrors: { ...(parsed.success ? {} : zodErrors(parsed.error).fieldErrors), ...(suggested.ok ? {} : suggested.fieldErrors), ...(impact.ok ? {} : impact.fieldErrors) },
+      fieldErrors: { ...(parsed.success ? {} : zodErrors(parsed.error).fieldErrors), ...(suggested.ok ? {} : suggested.fieldErrors), ...(impact.ok ? {} : impact.fieldErrors), ...(note.ok ? {} : { thank_you_en: note.message }) },
     };
   }
   const v = parsed.data;
@@ -66,7 +75,7 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     name_en: v.name_en,
     description_en: v.description_en ?? null,
     funds_use_en: v.funds_use_en ?? null,
-    thank_you_en: v.thank_you_en ?? null,
+    thank_you_en: note.ok ? note.note : null,
     impact_en: v.impact_en ?? null,
     impact_unit_cents: impact.unit?.cents ?? null,
     impact_unit_one: impact.unit?.one ?? null,
@@ -162,5 +171,93 @@ export async function saveDonationEmails(charityId: string, _prev: FormState, fo
     type: "restore", table: "charity_private", before: { notify_donations: priv?.notify_donations !== false }, after: { notify_donations: on },
   });
   revalidatePath(`/charity-admin/${charityId}/profile`);
+  redirect(`/charity-admin/${charityId}/profile?done=${done}`);
+}
+
+const NOT_YET = "This isn't switched on here yet, so nothing was saved. Please try again later, or tell us.";
+
+/**
+ * The profile video (decided 09/11/2026: a link first, no uploads). The link is read here, on the server, and
+ * only the site and the video's id are kept. An empty link removes the video.
+ */
+export async function saveVideo(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const viewer = await requireViewer();
+  const { charity } = await loadCharityForManager(charityId);
+  const read = parseVideoLink(formData.get("video_url"));
+  if (!read.ok) return { ok: false, message: "That link wasn't saved.", fieldErrors: { video_url: read.message } };
+  const current = await loadVideo(charityId);
+  if (!current.available) return { ok: false, message: NOT_YET };
+  const next = read.video;
+  if (!next && !current.video) return { ok: false, fieldErrors: { video_url: "Paste the link to your video on YouTube or Vimeo" } };
+  if (next && current.video && next.provider === current.video.provider && next.id === current.video.id) return { ok: true, message: "That's the video already on your page. Nothing changed." };
+
+  const before = { video_provider: current.video?.provider ?? null, video_id: current.video?.id ?? null };
+  const after = { video_provider: next?.provider ?? null, video_id: next?.id ?? null };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("charities").update(after).eq("id", charityId).select("id");
+  if (error) return failed(error);
+  if (!data?.length) return { ok: false, message: "You can't edit this charity." };
+
+  await logAudit({ actorUserId: viewer.userId, action: next ? "charity.video_saved" : "charity.video_removed", entityType: "charity", entityId: charityId, details: next ? { provider: next.provider, video_id: next.id } : undefined });
+  if (next) await tellReviewer(charity, "its profile video");
+  const done = await recordAction(charityId, viewer.userId, next ? "video_saved" : "video_removed", next ? { site: VIDEO_PROVIDER_NAME[next.provider], had: Boolean(current.video) } : {}, { type: "restore", table: "charities", before, after });
+  revalidate(charityId, charity.slug);
+  redirect(`/charity-admin/${charityId}/profile?done=${done}`);
+}
+
+/** "Remove video": the block disappears from the page and the app. Can be taken back. */
+export async function removeVideo(charityId: string, prev: FormState): Promise<FormState> {
+  await requireViewer();
+  await loadCharityForManager(charityId);
+  const { video } = await loadVideo(charityId);
+  if (!video) return { ok: true, message: "There is no video on your page." };
+  return saveVideo(charityId, prev, new FormData());
+}
+
+/**
+ * The charity's own focus ("What we're focused on right now", 10/11/2026): one at a time, between two
+ * Johannesburg dates. No notification is sent, and Givezy's cause of the week is not touched.
+ */
+export async function saveFocus(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const viewer = await requireViewer();
+  const { charity } = await loadCharityForManager(charityId);
+  const now = new Date();
+  const today = jhbToday(now);
+  const campaigns = (await loadCampaigns(charityId)).filter((c) => isRunning(c, now));
+  const checked = checkFocus(formToObject(formData), today, campaigns);
+  if (!checked.ok) return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: checked.fieldErrors };
+  const current = await loadFocusForManager(charityId);
+  if (!current.available) return { ok: false, message: NOT_YET };
+  const v = checked.value;
+  try {
+    await writeFocus(charityId, v, viewer.userId);
+  } catch (e) {
+    return failed(e);
+  }
+  await logAudit({ actorUserId: viewer.userId, action: "charity.focus_saved", entityType: "charity", entityId: charityId, details: { starts_on: v.starts_on, ends_on: v.ends_on, campaign_id: v.campaign_id } });
+  const done = await recordAction(
+    charityId, viewer.userId, "focus_saved",
+    { title: v.title, from: focusDay(v.starts_on), to: focusDay(v.ends_on), status: focusStatus({ startsOn: v.starts_on, endsOn: v.ends_on }, today), had: Boolean(current.row) },
+    { type: "focus", before: current.row, after: v },
+  );
+  revalidate(charityId, charity.slug);
+  redirect(`/charity-admin/${charityId}/profile?done=${done}`);
+}
+
+/** "Remove focus": it stops showing straight away. Can be taken back. */
+export async function removeFocus(charityId: string, _prev: FormState): Promise<FormState> {
+  const viewer = await requireViewer();
+  const { charity } = await loadCharityForManager(charityId);
+  const current = await loadFocusForManager(charityId);
+  if (!current.available) return { ok: false, message: NOT_YET };
+  if (!current.row) return { ok: true, message: "You have no focus set." };
+  try {
+    await writeFocus(charityId, null, viewer.userId);
+  } catch (e) {
+    return failed(e);
+  }
+  await logAudit({ actorUserId: viewer.userId, action: "charity.focus_removed", entityType: "charity", entityId: charityId });
+  const done = await recordAction(charityId, viewer.userId, "focus_removed", { title: current.row.title }, { type: "focus", before: current.row, after: null });
+  revalidate(charityId, charity.slug);
   redirect(`/charity-admin/${charityId}/profile?done=${done}`);
 }

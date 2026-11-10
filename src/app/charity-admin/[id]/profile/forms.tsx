@@ -2,9 +2,11 @@
 
 import { ActionForm } from "@/components/forms/action-form";
 import { useState } from "react";
-import { CheckboxGroup, FileField, TextArea, TextField } from "@/components/forms/fields";
+import { CheckboxGroup, DateField, ErrorMark, FileField, TextArea, TextField, useFieldId } from "@/components/forms/fields";
+import { useFieldError } from "@/components/forms/action-form";
 import { checkImpactUnit, impactLine, impactSource } from "@/lib/charity/impact";
 import type { FormState } from "@/lib/form";
+import { FOCUS_MAX_DAYS, FOCUS_MESSAGE_MAX, FOCUS_TITLE_MAX } from "@/lib/charity/focus";
 
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
@@ -63,6 +65,72 @@ export function DonationEmailsForm({ action, on, email }: { action: Action; on: 
         <span>Email me when a donation comes in{email ? <> (to {email})</> : null}. The email shows the amount only, never who gave.</span>
       </label>
     </ActionForm>
+  );
+}
+
+/** The profile video: a YouTube or Vimeo link. The server keeps only which site and which video. */
+export function VideoForm({ action, link }: { action: Action; link: string | null }) {
+  return (
+    <ActionForm action={action} submitLabel={link ? "Save video" : "Add video"}>
+      <TextField name="video_url" label="Link to your video on YouTube or Vimeo" type="url" inputMode="url" autoComplete="off" maxLength={300} defaultValue={link}
+        hint="Open the video on YouTube or Vimeo, copy its link and paste it here, for example https://youtu.be/… The video must be public. We don't store the video itself." />
+    </ActionForm>
+  );
+}
+
+/** A second, smaller form beside a main one: "Remove video", "Remove focus". The page offers Undo afterwards. */
+export function RemoveForm({ action, label }: { action: Action; label: string }) {
+  return <ActionForm action={action} submitLabel={label} pendingLabel="Removing…" />;
+}
+
+/**
+ * The charity's own focus: one of its running campaigns or a typed title, a short message, and the first and
+ * last day it shows.
+ */
+export function FocusForm({ action, focus, campaigns }: {
+  action: Action;
+  focus: { campaign_id: string | null; title: string; message: string; starts_on: string; ends_on: string } | null;
+  campaigns: { id: string; title: string }[];
+}) {
+  const [left, setLeft] = useState(FOCUS_MESSAGE_MAX - (focus?.message.length ?? 0));
+  // A title that is only the campaign's own name is shown as empty: it follows the campaign.
+  const fromCampaign = focus?.campaign_id ? campaigns.find((c) => c.id === focus.campaign_id) : undefined;
+  return (
+    <ActionForm action={action} submitLabel="Save focus">
+      {campaigns.length ? <CampaignSelect campaigns={campaigns} defaultValue={fromCampaign?.id ?? ""} /> : null}
+      <TextField name="title" label="Title" autoDirection maxLength={FOCUS_TITLE_MAX} required={!campaigns.length}
+        defaultValue={focus && focus.title !== fromCampaign?.title ? focus.title : ""}
+        hint={campaigns.length ? "A few words, for example: Winter blankets. Leave it empty to use the campaign's name." : "A few words, for example: Winter blankets."} />
+      <div onInput={(e) => { const t = e.target as HTMLTextAreaElement; if (t.name === "message") setLeft(FOCUS_MESSAGE_MAX - t.value.length); }}>
+        <TextArea name="message" label="Short message" required rows={3} maxLength={FOCUS_MESSAGE_MAX} defaultValue={focus?.message}
+          hint={`One or two sentences, in your own words, on what you're working on and why now. Up to ${FOCUS_MESSAGE_MAX} characters.`} />
+        <p className="mt-1 text-xs text-muted" aria-live="polite">{left} {left === 1 ? "character" : "characters"} left</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <DateField name="starts_on" label="First day it shows" required defaultValue={focus?.starts_on} />
+        <DateField name="ends_on" label="Last day it shows" required defaultValue={focus?.ends_on} hint={`Up to ${FOCUS_MAX_DAYS} days after the first day.`} />
+      </div>
+    </ActionForm>
+  );
+}
+
+function CampaignSelect({ campaigns, defaultValue }: { campaigns: { id: string; title: string }[]; defaultValue: string }) {
+  const error = useFieldError("campaign_id");
+  const id = useFieldId("campaign_id");
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="block text-sm font-semibold">Campaign <span className="font-normal text-muted">(optional)</span></label>
+      <select id={id} name="campaign_id" defaultValue={defaultValue} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : `${id}-hint`}
+        className="w-full rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger">
+        <option value="">No campaign: gifts go to your general giving</option>
+        {campaigns.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+      </select>
+      {error ? (
+        <p id={`${id}-error`} role="alert" className="flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{error}</span></p>
+      ) : (
+        <p id={`${id}-hint`} className="text-xs text-muted">Choose one of your running campaigns and the give button goes to it.</p>
+      )}
+    </div>
   );
 }
 

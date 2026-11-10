@@ -6,6 +6,8 @@ import { blueAction, EmptyState, field, MiniStat, PageHeader, secondaryAction, T
 import { requireViewer } from "@/lib/auth";
 import { chargeDayLabel, ERASED_DONOR, isErasedEmail, monthlyState, monthlyStateLabel, monthlySummary, safeSearch, shownEmail, type MonthlyState } from "@/lib/charity/dashboard";
 import { loadMonthlyDonations } from "@/lib/charity/dashboard-queries";
+import { lapsedPeriod, lapsedSummary } from "@/lib/charity/lapsed-monthly";
+import { loadLapsedMonthly } from "@/lib/charity/lapsed-monthly-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
@@ -37,7 +39,11 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
   const show: Filter = filters.some((f) => f.key === sp.show) ? (sp.show as Filter) : "";
   const page = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
 
-  const all = await loadMonthlyDonations(id);
+  // The count of donors who stopped is an extra: if it can't be read, the rest of the page still shows.
+  const [all, lapsed] = await Promise.all([
+    loadMonthlyDonations(id),
+    loadLapsedMonthly(id, lapsedPeriod("tax-year", new Date())).then(lapsedSummary, () => null),
+  ]);
   const summary = monthlySummary(all);
   const needle = q.toLowerCase();
   const rows = all.filter(
@@ -64,6 +70,19 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
         <MiniStat strong label="Running" value={formatRand(summary.runningCentsPerMonth)} note={`a month from ${plural(summary.runningCount, "donor")}`} />
         <MiniStat label="Paused or ended" value={summary.pausedCount + summary.endedCount} note={`${summary.pausedCount} paused, ${summary.endedCount} ended`} />
       </div>
+      {lapsed ? (
+        <MiniStat
+          href={`${base}/stopped`}
+          label="Stopped this tax year"
+          value={plural(lapsed.count, "monthly donor")}
+          note={lapsed.count > 0 ? `${formatRand(lapsed.centsPerMonth)} a month no longer coming in. See who, and get in touch →` : "None so far. Choose another period →"}
+        />
+      ) : (
+        <p className="rounded-card border-2 border-border bg-surface p-4 text-sm text-navy">
+          We couldn&apos;t count the monthly donors who stopped just now. The rest of this page is up to date.{" "}
+          <a href={base} className="font-semibold text-brand underline-offset-2 hover:underline">Try again</a>
+        </p>
+      )}
       <p className="text-xs text-muted">Amounts are the donations only. Any contribution a donor chose to add for Givezy is not included.</p>
       <MonthlyTrend rows={all} now={new Date()} />
 

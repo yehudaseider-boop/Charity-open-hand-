@@ -4,6 +4,11 @@
  * file is all or nothing: every row must pass, or nothing is imported. Values are never guessed or cut: a
  * value that is too long, or a file whose columns could be read two ways, is refused with what to change.
  * Givezy never emails these people.
+ *
+ * What a row holds (10/11/2026, CRM build plan step 8): a name (first name and surname, or an organisation), and
+ * optionally an email, a phone number, a postal address, a note and tags. No ID or tax number: nothing on Givezy
+ * uses one for a person who hasn't given (an s18A receipt takes its details from the gift itself), so the import
+ * doesn't ask for or keep them (POPIA: only what is used). A column of them is listed under "Columns we didn't use".
  */
 import { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, parseCsv } from "./recorded-gifts";
 
@@ -73,33 +78,73 @@ export function splitTags(raw: string | undefined): string[] {
   return out;
 }
 
+/**
+ * A cell a spreadsheet wrote as ="0821234567" (a common way to keep the 0 at the front of a number) is read as
+ * the text inside. Only for the phone number and postal code, where that is the only thing it can mean.
+ */
+function textCell(v: string | undefined): string {
+  const s = (v ?? "").trim();
+  return /^="[^"]*"$/.test(s) ? s.slice(2, -1).trim() : s;
+}
+
+/** A cell that starts with = is a formula a spreadsheet saved as text, never a name, an address or an email. */
+const FORMULA = /^=/;
+const formulaProblem = (label: string) => `${label} starts with "=", which a spreadsheet reads as a formula. Type it as plain text`;
+
+/**
+ * A South African phone number without spaces, brackets, dots or dashes, as the rest of the site keeps it:
+ * 0821234567 or +27821234567. A spreadsheet drops the + (27821234567), and some lists write 0027: both are the
+ * same number, so they are written with +27. Null when it can't be read.
+ */
+export function cleanContactPhone(raw: string | undefined): { phone: string | null; problem?: string } {
+  const typed = textCell(raw);
+  let p = typed.replace(/[\s().-]/g, "");
+  if (!p) return { phone: null };
+  if (/^27\d{9}$/.test(p)) p = `+${p}`;
+  else if (/^0027\d{9}$/.test(p)) p = `+${p.slice(2)}`;
+  if (/^(\+27|0)\d{9}$/.test(p)) return { phone: p };
+  const shown = typed.length > 30 ? `${typed.slice(0, 30)}…` : typed;
+  // Nine digits not starting with 0: a spreadsheet read the number as a sum and dropped the 0 at the front.
+  if (/^[1-9]\d{8}$/.test(p)) return { phone: null, problem: `"${shown}" is one digit short for a phone number. If a spreadsheet dropped the 0 at the front, type it as 0${p} and set the column to Text` };
+  return { phone: null, problem: `"${shown}" isn't a phone number we can read. Use a South African number, e.g. 082 123 4567` };
+}
+
 /** Check one row. */
 export function checkContact(f: ContactFields): ContactCheck {
   const e: Partial<Record<ContactField, string>> = {};
   const text: Partial<Record<keyof typeof LIMITS, string | null>> = {};
   for (const [field, [label, max]] of Object.entries(LIMITS) as [keyof typeof LIMITS, [string, number]][]) {
     const v = oneLine(f[field]);
-    if (v && v.length > max) e[field] = `${label} is over ${max} characters`;
+    if (v && FORMULA.test(v)) e[field] = formulaProblem(label);
+    else if (v && v.length > max) e[field] = `${label} is over ${max} characters`;
     text[field] = v;
   }
   if (!text.first_name && !text.last_name && !text.organisation_name) e.first_name = "Name missing: add a first name and surname, or an organisation";
 
   const emailRaw = (f.email ?? "").trim();
   const email = emailRaw.toLowerCase() || null;
-  if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)) e.email = `"${emailRaw}" isn't an email address`;
+  const emailShown = emailRaw.length > 60 ? `${emailRaw.slice(0, 60)}…` : emailRaw;
+  if (email && FORMULA.test(email)) e.email = formulaProblem("Email");
+  else if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)) e.email = `"${emailShown}" isn't an email address`;
 
-  const phone = (f.phone ?? "").replace(/[\s()-]/g, "") || null;
-  if (phone && !/^(\+27|0)\d{9}$/.test(phone)) e.phone = `"${(f.phone ?? "").trim()}" isn't a phone number we can read. Use a South African number, e.g. 082 123 4567`;
+  const { phone, problem: phoneProblem } = cleanContactPhone(f.phone);
+  if (phoneProblem) e.phone = phoneProblem;
 
-  const postalCode = (f.postal_code ?? "").trim() || null;
-  if (postalCode && !/^\d{4}$/.test(postalCode)) e.postal_code = `"${postalCode}" isn't a postal code: they are 4 digits`;
+  const postalCode = textCell(f.postal_code) || null;
+  if (postalCode && !/^\d{4}$/.test(postalCode)) {
+    const shown = postalCode.length > 20 ? `${postalCode.slice(0, 20)}…` : postalCode;
+    e.postal_code = /^\d{1,3}$/.test(postalCode)
+      ? `"${shown}" isn't a postal code: they are 4 digits. If a spreadsheet dropped a 0 at the front, type it as ${postalCode.padStart(4, "0")} and set the column to Text`
+      : `"${shown}" isn't a postal code: they are 4 digits`;
+  }
 
   const note = noteText(f.note);
   if (note && note.length > MAX_NOTE_LENGTH) e.note = "The note is over 2 000 characters";
 
   const tags = splitTags(f.tags);
   const long = tags.find((t) => t.length > MAX_TAG_LENGTH);
-  if (long) e.tags = `The tag "${long.slice(0, 20)}…" is over ${MAX_TAG_LENGTH} characters`;
+  if (tags.some((t) => FORMULA.test(t))) e.tags = formulaProblem("A tag");
+  else if (long) e.tags = `The tag "${long.slice(0, 20)}…" is over ${MAX_TAG_LENGTH} characters`;
   else if (tags.length > MAX_TAGS_PER_ROW) e.tags = `${tags.length} tags: one person can have at most ${MAX_TAGS_PER_ROW}`;
 
   if (Object.keys(e).length) return { ok: false, errors: e };
@@ -137,12 +182,12 @@ const HEADINGS: Record<ContactField, string[]> = {
   last_name: ["surname", "last name", "lastname", "family name"],
   organisation_name: ["organisation", "organization", "company", "organisation name", "company name", "trust name"],
   email: ["email", "e-mail", "email address"],
-  phone: ["phone", "cell", "mobile", "phone number", "cellphone"],
-  address_line1: ["address", "street address", "address line 1", "address 1"],
+  phone: ["phone", "cell", "mobile", "phone number", "cellphone", "cell number", "cell phone", "cellphone number", "mobile number", "telephone", "tel", "contact number"],
+  address_line1: ["address", "street address", "address line 1", "address 1", "postal address", "street"],
   address_line2: ["address line 2", "address 2"],
   suburb: ["suburb"],
   city: ["city", "town", "city or town"],
-  postal_code: ["postal code", "postcode", "code", "zip"],
+  postal_code: ["postal code", "postcode", "post code", "code", "zip"],
   note: ["note", "notes", "comment", "comments"],
   tags: ["tags", "tag", "labels"],
 };
@@ -152,6 +197,19 @@ export const CONTACT_TEMPLATE_HEADINGS = ["First name", "Surname", "Organisation
 
 /** Headings that belong to a gift file: a sign the person chose the wrong import. */
 const GIFT_HEADINGS = ["amount", "amount (r)", "date", "gift date", "donation date", "transaction date"];
+
+/** Headings of an ID or tax number column. The import never reads or keeps these (see the top of this file). */
+const IDENTITY_HEADINGS = [
+  "id number", "id", "id no", "id no.", "sa id", "sa id number", "identity number", "rsa id", "rsa id number", "passport", "passport number",
+  "tax number", "tax reference", "tax reference number", "income tax number", "income tax reference number", "tax no", "tax no.", "sars number",
+];
+
+const hasAddress = (c: CleanContact) => Boolean(c.addressLine1 || c.addressLine2 || c.suburb || c.city || c.postalCode);
+
+/** A contact's postal address on one line, in the order it is written on an envelope. Empty when there is none. */
+export function contactAddress(c: { address_line1?: string | null; address_line2?: string | null; suburb?: string | null; city?: string | null; postal_code?: string | null }): string {
+  return [c.address_line1, c.address_line2, c.suburb, c.city, c.postal_code].filter(Boolean).join(", ");
+}
 
 export type ContactHeadings = { columns: Partial<Record<ContactField, number>>; unknown: string[]; twice: string[][] };
 
@@ -175,7 +233,13 @@ export function mapContactHeadings(header: string[]): ContactHeadings {
 export type ContactRow = { line: number; check: ContactCheck };
 export type ContactFileCheck =
   | { ok: false; message: string }
-  | { ok: true; rows: ContactRow[]; unknownColumns: string[]; good: number; bad: number; looksLikeGifts: boolean; tagNames: string[] };
+  | {
+      ok: true; rows: ContactRow[]; unknownColumns: string[]; good: number; bad: number; looksLikeGifts: boolean; tagNames: string[];
+      /** How many of the good rows carry a phone number, and how many any part of an address. */
+      withPhone: number; withAddress: number;
+      /** Headings of ID or tax number columns in the file: they are not read into the list or kept. */
+      identityColumns: string[];
+    };
 
 /**
  * Read and check a whole file. `existingEmails` holds the emails of contacts this charity already imported
@@ -218,8 +282,14 @@ export function checkContactFile(text: string, opts: { existingEmails?: Set<stri
   const good = rows.filter((r) => r.check.ok).length;
   const tagNames: string[] = [];
   for (const r of rows) if (r.check.ok) for (const t of r.check.contact.tags) if (!tagNames.some((n) => n.toLowerCase() === t.toLowerCase())) tagNames.push(t);
-  const headings = all[0].map((h) => h.trim().toLowerCase());
-  return { ok: true, rows, unknownColumns: unknown, good, bad: rows.length - good, looksLikeGifts: headings.some((h) => GIFT_HEADINGS.includes(h)), tagNames };
+  const headings = all[0].map((h) => h.trim().toLowerCase().replace(/\s+/g, " "));
+  const clean = rows.flatMap((r) => (r.check.ok ? [r.check.contact] : []));
+  return {
+    ok: true, rows, unknownColumns: unknown, good, bad: rows.length - good, looksLikeGifts: headings.some((h) => GIFT_HEADINGS.includes(h)), tagNames,
+    withPhone: clean.filter((c) => c.phone).length,
+    withAddress: clean.filter(hasAddress).length,
+    identityColumns: unknown.filter((h) => IDENTITY_HEADINGS.includes(h.toLowerCase().replace(/\s+/g, " "))),
+  };
 }
 
 /** Problems per row, in plain words, for the preview. */

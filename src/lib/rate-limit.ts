@@ -35,3 +35,19 @@ export async function hitRateLimit(bucket: string, keys: string[], limit: number
   await db.from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString());
   return false;
 }
+
+/**
+ * Whether these keys already used up their allowance, without counting this attempt. For limits that count only
+ * presses that did something (an email actually tried): check with this first, then count with hitRateLimit after.
+ */
+export async function rateLimitReached(bucket: string, keys: string[], limit: number, windowMinutes: number): Promise<boolean> {
+  if (keys.length === 0) return false;
+  const db = createAdminClient();
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  for (const key of keys) {
+    const { count, error } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
+    if (error) throw error;
+    if ((count ?? 0) >= limit) return true;
+  }
+  return false;
+}

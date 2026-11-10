@@ -5,6 +5,7 @@
 import { DECLINED_REASON } from "@shared/donations/monthly-reasons";
 import type { Gift, Receipt, Recurring } from "../data/giving";
 import { cleanLabel, labelOf } from "@shared/donations/labels";
+import { thankYouNoteToShow } from "@shared/charity/thank-you-note";
 import { jhbDay } from "./format";
 
 export type DonationRow = {
@@ -55,6 +56,8 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
     .filter((d) => d.status === "paid" && d.paid_at)
     .map((d) => {
       const c = one(d.charities);
+      // Cleaned as the website shows it: no hidden characters, and never a note with a web address in it.
+      const thankYou = thankYouNoteToShow(c?.thank_you_en);
       return {
         id: d.id,
         date: jhbDay(new Date(d.paid_at!)),
@@ -65,7 +68,7 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
         monthly: d.recurring_id !== null,
         with18a: d.wants_18a,
         label: labelFor.get(d.id) ?? null,
-        ...(c?.thank_you_en ? { thankYou: c.thank_you_en } : {}),
+        ...(thankYou ? { thankYou } : {}),
       };
     })
     .sort((a, b) => momentOf(b) - momentOf(a));

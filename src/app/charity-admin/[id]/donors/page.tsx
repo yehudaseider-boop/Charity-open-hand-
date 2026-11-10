@@ -5,6 +5,8 @@ import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { lastThanked, optedOut } from "@/lib/charity/thank-you-send";
+import { WEEKLY_LIMIT, messagedThisWeek } from "@/lib/charity/weekly-limit";
+import { emailHash } from "@/lib/charity/thank-you";
 import { thankOneDonor } from "./actions";
 import { ThankOneForm } from "./thank-form";
 import { DonorPeekLink } from "./donor-peek";
@@ -25,6 +27,12 @@ import { loadContacts, type ContactRow } from "@/lib/charity/contacts-store";
 import { contactName } from "@/lib/charity/contacts";
 import { DONOR_SORTS, parseDonorSort, sortDonors } from "@/lib/charity/donor-sort";
 import type { DonorRow } from "@/lib/charity/dashboard-queries";
+import { MAX_REMINDERS, S18A_FILTERS, S18A_FILTER_HINTS, inS18aFilter, isS18aFilter, missingList, s18aCounts, type S18aFilter } from "@/lib/charity/s18a-reminder";
+import { lastReminded, loadS18aMissing } from "@/lib/charity/s18a-reminder-send";
+import type { MissingDetail } from "@/lib/donations/s18a-details";
+import { isOwner } from "@/lib/charity/team";
+import { remindS18aDetails } from "./reminder-actions";
+import { ReminderForm, ReminderTick } from "./reminder-form";
 
 /** One line of the list: a donor who gave, or someone the charity imported who hasn't given through Givezy. */
 type Line =
@@ -32,6 +40,8 @@ type Line =
   | { kind: "contact"; id: string; name: string; totalCents: number; firstAt: string | null; lastAt: string | null; c: ContactRow };
 
 export const metadata: Metadata = { title: "Donors" };
+// Reminders to add s18A details are sent from this page and can take a while (as on Thank donors and Email donors).
+export const maxDuration = 60;
 
 const PAGE = 25;
 
@@ -44,28 +54,40 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const asked = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
 
   const group = isDonorGroup(sp.group) ? sp.group : null;
+  // The s18A filter (CRM step 2, 10/11/2026): asked, didn't ask, or asked with details still missing.
+  const s18a: S18aFilter | null = isS18aFilter(sp.s18a) ? sp.s18a : null;
   // An unknown ?sort= keeps the usual order (most given first).
   const sort = parseDonorSort(sp.sort);
 
-  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays, contacts] = await Promise.all([
+  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays, contacts, missingRead, owner] = await Promise.all([
     loadDonors(id), loadMonthlyGifts(id), loadMonthlyDonations(id), listTags(id), tagsByDonor(id), listSegments(id), lapsedDaysFor(id), loadContacts(id),
+    // Read with the service role now that loadCharityForManager has checked access. Only what is missing comes back, never a number.
+    loadS18aMissing(id).catch((e: unknown) => {
+      console.error("[donors] s18A details check failed", e instanceof Error ? e.message : e);
+      return null;
+    }),
+    isOwner(id),
   ]);
+  const missing: ReadonlyMap<string, MissingDetail[]> = missingRead ?? new Map();
   const donorGroups = donorGroupsFor(lapsedDays);
   const tagName = new Map(tags.map((t) => [t.id, t.name]));
   const tag = typeof sp.tag === "string" && tagName.has(sp.tag) ? sp.tag : null;
   const givesMonthly = monthlyByDonor(monthlyGifts, monthly);
   const now = new Date();
   const needle = q.toLowerCase();
-  const donorLines: Line[] = all
-    .filter(
-      (d) =>
-        (!group || donorGroup(d, now, lapsedDays) === group) &&
-        (!tag || (byDonor.get(d.donor_id) ?? []).includes(tag)) &&
-        (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
-    )
+  const matching = all.filter(
+    (d) =>
+      (!group || donorGroup(d, now, lapsedDays) === group) &&
+      (!tag || (byDonor.get(d.donor_id) ?? []).includes(tag)) &&
+      (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
+  );
+  // Counts for the s18A filters, within the group, tag and search chosen.
+  const counts = s18aCounts(matching, missing);
+  const donorLines: Line[] = matching
+    .filter((d) => !s18a || inS18aFilter(d, s18a, missing))
     .map((d) => ({ kind: "donor", id: d.donor_id, name: isErasedEmail(d.email) ? ERASED_DONOR : d.display_name, totalCents: d.total_cents, firstAt: d.first_paid_at, lastAt: d.last_paid_at, d }));
-  // Imported donors have no giving group, so a group shows only people who gave.
-  const contactLines: Line[] = group
+  // Imported donors have no giving group and no s18A request, so those filters show only people who gave.
+  const contactLines: Line[] = group || s18a
     ? []
     : contacts
         .filter((c) => (!tag || c.tag_ids.includes(tag)) && (!needle || contactName(c).toLowerCase().includes(needle) || (c.email ?? "").includes(needle)))
@@ -79,18 +101,34 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const page = Math.min(asked, pages);
   const shown = donors.slice((page - 1) * PAGE, page * PAGE);
   const base = `/charity-admin/${id}/donors`;
-  const href = (p: number, g: string | null = group, t: string | null = tag) =>
-    `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(t ? { tag: t } : {}), ...(sort ? { sort } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
+  const href = (p: number, g: string | null = group, t: string | null = tag, f: string | null = s18a) =>
+    `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(g ? { group: g } : {}), ...(t ? { tag: t } : {}), ...(f ? { s18a: f } : {}), ...(sort ? { sort } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
   const segmentHref = (f: { group?: string; tag?: string; q?: string }) =>
     `${base}?${new URLSearchParams({ ...(f.q ? { q: f.q } : {}), ...(f.group ? { group: f.group } : {}), ...(f.tag ? { tag: f.tag } : {}), ...(sort ? { sort } : {}) }).toString()}`.replace(/\?$/, "");
   // "Say thank you": only once the page is live, never to erased donors or anyone who asked not to get them.
   const canThank = charity.status === "approved";
   const shownDonors = shown.flatMap((l) => (l.kind === "donor" ? [l.d] : []));
-  const [thanked, stopped] = canThank
-    ? await Promise.all([lastThanked(id, shownDonors.map((d) => d.donor_id)), optedOut(shownDonors.filter((d) => shownEmail(d.email)).map((d) => d.email))])
-    : [new Map<string, string>(), new Set<string>()];
+  const emailed = shownDonors.filter((d) => shownEmail(d.email));
+  // One message a week per donor from the charity (09/11/2026): anyone who had any this week (a thank-you, a
+  // reminder, a news email or appeal, the monthly thank-you) isn't offered "Say thank you" until Monday.
+  const [thanked, stopped, thisWeek] = canThank
+    ? await Promise.all([
+        lastThanked(id, shownDonors.map((d) => d.donor_id)),
+        optedOut(emailed.map((d) => d.email)),
+        // If this check fails the button still shows: sending checks again and says plainly if it's this week.
+        messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) }))).catch((e: unknown) => {
+          console.error("[donors] weekly check failed", e instanceof Error ? e.message : e);
+          return new Set<string>();
+        }),
+      ])
+    : [new Map<string, string>(), new Set<string>(), new Set<string>()];
   const here = href(page);
   const key = formKey(sp);
+  // "Remind to add their details": only on "Details missing", for the owner of a live charity (as for Email donors).
+  const reminding = s18a === "details_missing" && missingRead !== null;
+  const canRemind = reminding && owner && charity.status === "approved";
+  const reminderIds = canRemind ? donorLines.map((l) => l.id) : [];
+  const reminded = reminding ? await lastReminded(id, shownDonors.map((d) => d.donor_id)) : new Map<string, string>();
 
   const pill = "inline-flex min-h-9 items-center rounded-full border-2 px-3.5 text-sm font-semibold transition";
 
@@ -116,6 +154,27 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
       <div className="space-y-3">
         <Tabs label="Donor groups" items={[{ key: null, label: "All" }, ...donorGroups].map((g) => ({ href: href(1, g.key), label: g.label, active: group === g.key }))} />
         {group ? <p className="text-xs text-muted">{donorGroups.find((g) => g.key === group)?.hint}.</p> : null}
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-semibold text-muted">s18A receipt:</span>
+          <Tabs
+            label="s18A receipt"
+            items={[
+              { href: href(1, group, tag, null), label: "Everyone", active: !s18a },
+              ...(Object.keys(S18A_FILTERS) as S18aFilter[]).map((f) => ({
+                href: href(1, group, tag, s18a === f ? null : f),
+                label: S18A_FILTERS[f],
+                active: s18a === f,
+                // No count when the details check failed: a 0 would wrongly say nobody is missing anything.
+                ...(f === "details_missing" && missingRead === null ? {} : { count: counts[f] }),
+              })),
+            ]}
+          />
+        </div>
+        {s18a ? <p className="text-xs text-muted">{S18A_FILTER_HINTS[s18a]}.</p> : null}
+        {missingRead === null ? (
+          <p role="status" className="rounded-card bg-warning-soft p-3 text-sm text-warning">We couldn&apos;t check which donors have s18A details missing just now. Nothing has changed. Refresh the page to try again.</p>
+        ) : null}
 
         {tags.length ? (
           <nav aria-label="Tags" className="flex flex-wrap items-center gap-1.5 text-sm">
@@ -145,6 +204,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         <LiveFilterForm action={base} className="flex flex-wrap gap-2">
           {group ? <input type="hidden" name="group" value={group} /> : null}
           {tag ? <input type="hidden" name="tag" value={tag} /> : null}
+          {s18a ? <input type="hidden" name="s18a" value={s18a} /> : null}
           <input
             name="q"
             defaultValue={q}
@@ -163,10 +223,24 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         </LiveFilterForm>
       </div>
 
-      {contacts.length ? <p className="text-xs text-muted">Donors you imported are marked &quot;Imported, no gifts yet&quot;. Givezy never emails them.</p> : null}
+      {reminding && shown.length ? (
+        canRemind ? (
+          <ReminderForm key={key} action={remindS18aDetails.bind(null, id, here)} allIds={reminderIds} charityName={charity.name_en} max={MAX_REMINDERS} />
+        ) : (
+          <p className="rounded-card bg-honey-soft p-3 text-sm text-navy">
+            {!owner ? "Only your charity's owner can send reminders to add s18A details." : "You can send reminders to add s18A details once your page is live."}
+          </p>
+        )
+      ) : null}
+
+      {contacts.length && !s18a ? <p className="text-xs text-muted">Donors you imported are marked &quot;Imported, no gifts yet&quot;. Givezy never emails them.</p> : null}
 
       {shown.length === 0 ? (
-        q || group || tag ? (
+        s18a === "details_missing" && missingRead !== null && !q && !group && !tag ? (
+          <EmptyState title="No details missing">
+            Every donor who asked for an s18A receipt has added what SARS needs, so there is nobody to remind.
+          </EmptyState>
+        ) : q || group || tag || s18a ? (
           <Card><p className="text-sm text-muted"><NoMatch what="donors" clearHref={base} /></p></Card>
         ) : (
           <EmptyState title="No donors yet" action={<ActionLink href={`${base}/import`}>Import donors (CSV)</ActionLink>}>
@@ -210,19 +284,31 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                       {givesMonthly.get(d.donor_id) === "paused" ? <Badge>Monthly paused</Badge> : null}
                       {d.donor_type !== "individual" ? <Badge>{d.donor_type === "company" ? "Company" : "Trust"}</Badge> : null}
                       {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
+                      {missing.has(d.donor_id) ? <Badge tone="warning">s18A details missing</Badge> : null}
                       {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
                       {(byDonor.get(d.donor_id) ?? []).map((t) => (tagName.has(t) ? <Badge key={t}>{tagName.get(t)}</Badge> : null))}
                     </div>
                   </div>
                   <p className="shrink-0 whitespace-nowrap font-display text-lg font-bold tabular-nums text-indigo">{formatRand(d.total_cents)}</p>
                 </div>
+                {missing.has(d.donor_id) ? (
+                  <p className="mt-1.5 text-navy">Still needed for the s18A receipt: {missingList(missing.get(d.donor_id)!)}.</p>
+                ) : null}
+                {reminding && reminded.get(d.donor_id) ? <p className="mt-1 text-xs text-muted">Last reminded on {formatDate(reminded.get(d.donor_id)!)}.</p> : null}
+                {canRemind && missing.has(d.donor_id) ? <ReminderTick key={`tick-${d.donor_id}-${key}`} donorId={d.donor_id} name={isErasedEmail(d.email) ? ERASED_DONOR : d.display_name || "this donor"} /> : null}
                 {canThank && shownEmail(d.email) ? (
                   stopped.has(d.email.trim().toLowerCase()) ? (
                     <p className="mt-2 text-xs text-muted">Asked not to get thank-you emails from charities.</p>
                   ) : (
                     <>
                       {thanked.get(d.donor_id) ? <p className="mt-2 text-xs text-muted">Last thanked personally on {formatDate(thanked.get(d.donor_id)!)}.</p> : null}
-                      <ThankOneForm key={`${d.donor_id}-${key}`} action={thankOneDonor.bind(null, id, d.donor_id, here)} name={d.display_name || "this donor"} />
+                      {thisWeek.has(d.donor_id) ? (
+                        <p className="relative z-10 mt-2 text-xs text-muted">
+                          <span className="font-semibold text-navy">Messaged this week.</span> {WEEKLY_LIMIT} You can thank them from Monday.
+                        </p>
+                      ) : (
+                        <ThankOneForm key={`${d.donor_id}-${key}`} action={thankOneDonor.bind(null, id, d.donor_id, here)} name={d.display_name || "this donor"} />
+                      )}
                     </>
                   )
                 ) : null}
@@ -241,7 +327,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         </div>
       ) : null}
 
-      {group || tag || q ? (
+      {(group || tag || q) && !s18a ? (
         <Card title="Keep this list">
           <SaveListForm action={saveDonorList.bind(null, id, { ...(group ? { group } : {}), ...(tag ? { tag } : {}), ...(q ? { q } : {}) })} />
           {/* One group or one tag can be emailed straight away; other mixes are saved as a list first. */}

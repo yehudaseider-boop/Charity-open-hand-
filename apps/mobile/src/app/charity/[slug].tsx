@@ -11,9 +11,12 @@ import { Sheet } from "@/components/sheet";
 import { CheckedBadge } from "@/components/charity-photo-card";
 import { Bubbles, People } from "@/components/people";
 import { CampaignCard } from "@/components/campaign-card";
+import { FocusCard } from "@/components/focus-card";
+import * as WebBrowser from "expo-web-browser";
+import { focusGive, videoLink, videoNote } from "@/lib/charity-extras";
 import { GiveSheet } from "@/components/give-sheet";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
-import { openUrl } from "@/lib/open-site";
+import { notify, openUrl } from "@/lib/open-site";
 import { campaignShareText, charityShareText } from "@/lib/share";
 import { ShareButton } from "@/components/share-button";
 import { donateUrl, SITE_URL } from "@/lib/website";
@@ -50,6 +53,7 @@ export default function CharityDetail() {
   const savedList = useSaved();
   const [pop] = useState(() => new Animated.Value(1));
   const [scrollY] = useState(() => new Animated.Value(0));
+  const [openingVideo, setOpeningVideo] = useState(false);
 
   // Back to where this page was opened from, or Discover when there is nothing behind it.
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/discover"));
@@ -87,6 +91,24 @@ export default function CharityDetail() {
   const firstPct = firstCampaign?.targetCents ? campaignPercent(firstCampaign) : null;
   // Only the charity's own words: a bracketed placeholder (sample data) is never shown, and the block hides.
   const impact = realImpactLine(charity.impact);
+  const focusTo = charity.focus ? focusGive(charity.focus, charity.campaigns) : null;
+  const giveFromFocus = () => {
+    if (focusTo?.campaignId) return GIVE_IN_APP ? openGiveScreen(charity.slug, { campaign: focusTo.campaignId }) : openUrl(donateUrl(SITE_URL, charity.slug, null, focusTo.campaignId));
+    return GIVE_IN_APP ? openGiveScreen(charity.slug) : setSheetOpen(true);
+  };
+  // The video opens in the phone's in-app browser sheet, the same one giving uses. Nothing from the video site
+  // loads until the button is pressed.
+  const watchVideo = async () => {
+    if (!charity.video || openingVideo) return;
+    setOpeningVideo(true);
+    try {
+      await WebBrowser.openBrowserAsync(videoLink(charity.video));
+    } catch {
+      notify("Couldn't open the video", "Nothing else has changed. Please check your connection and try again.");
+    } finally {
+      setOpeningVideo(false);
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -99,7 +121,14 @@ export default function CharityDetail() {
         <View style={styles.sheet}>
           {kicker ? <View style={styles.kickerPill}><Text style={styles.kickerCaps} numberOfLines={1}>{kicker}</Text></View> : null}
           <Text accessibilityRole="header" style={styles.name}>{charity.nameEn}</Text>
+          {charity.focus && focusTo ? <FocusCard focus={charity.focus} giveLabel={focusTo.label} onGive={giveFromFocus} /> : null}
           {charity.about[0] ? <Text style={styles.lead}>{charity.about[0]}</Text> : null}
+          {charity.video ? (
+            <View style={styles.videoBlock}>
+              <Button variant="secondary" label={openingVideo ? "Opening the video…" : "Watch our video"} disabled={openingVideo} onPress={watchVideo} accessibilityHint={videoNote(charity.video)} />
+              <Text variant="label" style={{ textAlign: "center" }}>{videoNote(charity.video)}</Text>
+            </View>
+          ) : null}
 
           {/* What a gift does, in the charity's own words, and how this month's campaign is going. */}
           {impact || charity.impactUnit || firstCampaign ? (
@@ -270,6 +299,7 @@ const styles = StyleSheet.create({
   kickerCaps: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.blue },
   name: { fontFamily: fonts.displayBold, fontSize: 36, lineHeight: 40, letterSpacing: -0.7, color: colors.navy },
   lead: { fontSize: 18, lineHeight: 27, color: colors.ink, marginTop: 14 },
+  videoBlock: { marginTop: 18, gap: 8 },
   impactCard: { marginTop: space.block, padding: 22, gap: 6, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
   impactKicker: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.lilac },
   impactLine: { fontFamily: fonts.display, fontSize: 24, lineHeight: 30, letterSpacing: -0.3, color: colors.onInk },

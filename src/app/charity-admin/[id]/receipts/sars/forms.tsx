@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ActionForm, useFieldError } from "@/components/forms/action-form";
-import { TextField } from "@/components/forms/fields";
+import { DateField, TextField } from "@/components/forms/fields";
 import { blueAction, primaryAction } from "@/components/dash";
 import type { FormState } from "@/lib/form";
 import { LEGAL_FORMS, SOURCE_IDENTIFIER_LENGTH } from "@/lib/receipts/it3d";
+import { MAX_UPLOAD_REFERENCE } from "@/lib/receipts/it3d-history";
 
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
@@ -85,12 +87,16 @@ function StatusLine({ status }: { status: Status }) {
 
 export function SheetDownload({ url }: { url: string }) {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const router = useRouter();
   return (
     <div className="space-y-2">
       <button type="button" className={primaryAction} disabled={status.kind === "working"}
         onClick={async () => {
           setStatus({ kind: "working" });
-          setStatus(await download(url, { method: "GET" }, (n) => `Downloaded ${n}. It holds donors' full ID numbers: keep it safe and delete it once you've submitted.`));
+          const result = await download(url, { method: "GET" }, (n) => `Downloaded ${n}. It holds donors' full ID numbers: keep it safe and delete it once you've submitted. It is listed in your history below.`);
+          setStatus(result);
+          // The history below now has this download: fetch it, keeping everything typed on the page.
+          if (result.kind === "done") router.refresh();
         }}>
         {status.kind === "working" ? "Preparing…" : "eFiling capture sheet (.xlsx)"}
       </button>
@@ -102,6 +108,7 @@ export function SheetDownload({ url }: { url: string }) {
 export function FileDownload({ url, year, period, ready, notReady }: { url: string; year: number; period: string; ready: boolean; notReady: string | null }) {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [source, setSource] = useState("");
+  const router = useRouter();
   const length = [...source.trim()].length;
   return (
     <form
@@ -112,7 +119,9 @@ export function FileDownload({ url, year, period, ready, notReady }: { url: stri
         data.set("year", String(year));
         data.set("period", period);
         setStatus({ kind: "working" });
-        setStatus(await download(url, { method: "POST", body: data }, (n) => `Downloaded ${n}. It holds donors' full ID numbers: keep it safe. Check it with your accountant before it is sent to SARS.`));
+        const result = await download(url, { method: "POST", body: data }, (n) => `Downloaded ${n}. It holds donors' full ID numbers: keep it safe. Check it with your accountant before it is sent to SARS. It is listed in your history below.`);
+        setStatus(result);
+        if (result.kind === "done") router.refresh();
       }}
     >
       <fieldset className="space-y-2">
@@ -141,4 +150,29 @@ export function FileDownload({ url, year, period, ready, notReady }: { url: stri
       <StatusLine status={status} />
     </form>
   );
+}
+
+/**
+ * The owner's own note that a download went to SARS: the date, and their eFiling reference if they want to keep it.
+ * Closed until asked for, so the history stays easy to read.
+ */
+export function MarkUploadedForm({ action, today }: { action: Action; today: string }) {
+  return (
+    <details className="group rounded-control border-2 border-border bg-surface">
+      <summary className="flex min-h-11 cursor-pointer items-center px-3 text-sm font-semibold text-brand">Mark as uploaded to SARS</summary>
+      <div className="border-t-2 border-border p-3">
+        <ActionForm action={action} submitLabel="Save" pendingLabel="Saving…">
+          <DateField name="uploaded_on" label="Date you uploaded it" required defaultValue={today} />
+          <TextField name="upload_reference" label="Your reference" maxLength={MAX_UPLOAD_REFERENCE}
+            hint="For example the reference eFiling gave you. Plain text, never a donor's name or number." />
+          <p className="text-xs text-muted">This is your own note. Givezy doesn&apos;t check it with SARS.</p>
+        </ActionForm>
+      </div>
+    </details>
+  );
+}
+
+/** Take the "uploaded" mark off again. The download itself stays in the history. */
+export function UnmarkUploadedForm({ action }: { action: Action }) {
+  return <ActionForm action={action} submitLabel="Undo" pendingLabel="Taking it back…" />;
 }

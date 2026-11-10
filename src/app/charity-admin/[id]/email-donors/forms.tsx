@@ -4,6 +4,7 @@ import { startTransition, useActionState, useState } from "react";
 import { ActionForm } from "@/components/forms/action-form";
 import { blueAction, field } from "@/components/dash";
 import { APPEAL_BODY_MAX, APPEAL_SUBJECT_MAX, APPEALS_PER_MONTH } from "@/lib/charity/appeals-rules";
+import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import type { FormState } from "@/lib/form";
 import type { AppealCheck } from "./actions";
 
@@ -109,6 +110,11 @@ export function AppealForm({
                 {preview.count ? `${preview.label}: ${preview.count} ${preview.count === 1 ? "donor" : "donors"}.` : `${preview.label}: nobody to send it to.`}
               </p>
               {preview.stopped ? <p className="text-muted">{preview.stopped} more {preview.stopped === 1 ? "is" : "are"} left out because they asked not to get emails.</p> : null}
+              {preview.thisWeek ? (
+                <p className="text-muted">
+                  {preview.thisWeek} more {preview.thisWeek === 1 ? "is" : "are"} left out because they already had a message from you this week. {WEEKLY_LIMIT}
+                </p>
+              ) : null}
               {preview.recordedOnly ? (
                 <p className="text-muted">
                   {preview.recordedOnly} {preview.recordedOnly === 1 ? "donor who has" : "donors who have"} only given by EFT, cash or a file you imported {preview.recordedOnly === 1 ? "is" : "are"} left out for now: we&apos;re checking with our lawyer that we may email them for you.

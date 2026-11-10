@@ -5,6 +5,8 @@ import { CHARITY_COLUMNS, markFeatured, raisingNow, weekStartJhb, toCampaigns, t
 import { supabase } from "./supabase";
 import { secureStorage } from "./secure-storage";
 import { newsKey, optOutIds } from "./charity-news";
+import { toFocus, toVideo, VIDEO_COLUMNS, type VideoRow } from "./charity-extras";
+import { FOCUS_COLUMNS, type FocusRow } from "@shared/charity/focus";
 
 /**
  * The charity directory. Live: approved charities from the database (row-level
@@ -183,10 +185,14 @@ async function loadCharity(slug: string): Promise<Charity | null> {
   if (error) throw error;
   if (!data) return null;
   const row = data as unknown as CharityRow;
-  const [photos, updates, campaigns] = await Promise.all([
+  const [photos, updates, campaigns, video, focus] = await Promise.all([
     db.from("charity_photos").select("id, storage_path, caption_en").eq("charity_id", row.id).order("created_at"),
     db.from("charity_updates").select("id, body_en, photo_path, created_at").eq("charity_id", row.id).order("created_at", { ascending: false }).limit(5),
     db.from("campaigns").select("id, title, description, target_cents, ends_at").eq("charity_id", row.id).eq("status", "active").order("created_at", { ascending: false }).limit(3),
+    // The video and the charity's own focus are bonuses, each asked for on its own: if one can't be read, the
+    // screen shows without it. Row-level security only returns a focus while its dates run.
+    db.from("charities").select(VIDEO_COLUMNS).eq("id", row.id).maybeSingle(),
+    db.from("charity_focus").select(FOCUS_COLUMNS).eq("charity_id", row.id).maybeSingle(),
   ]);
   const campaignRows = (campaigns.data ?? []) as CampaignRow[];
   const progress = campaignRows.length ? await db.rpc("campaign_progress", { p_campaign_ids: campaignRows.map((c) => c.id) }) : { data: [] };
@@ -195,6 +201,8 @@ async function loadCharity(slug: string): Promise<Charity | null> {
     photos: toPhotos((photos.data ?? []) as PhotoRow[], base),
     updates: toUpdates((updates.data ?? []) as UpdateRow[], base),
     campaigns: toCampaigns(campaignRows, (progress.data ?? []) as ProgressRow[]),
+    video: video.error ? null : toVideo(video.data as VideoRow | null),
+    focus: focus.error ? null : toFocus(focus.data as Partial<FocusRow> | null),
   };
 }
 

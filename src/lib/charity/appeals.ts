@@ -10,6 +10,7 @@ import { loadDonors, type DonorRow } from "./dashboard-queries";
 import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "./donor-care";
 import { donorGroup, donorGroupsFor } from "./insights";
 import { emailHash } from "./thank-you";
+import { messagedThisWeek } from "./weekly-limit";
 
 /**
  * Emails from a charity to its donors. Every call here comes after loadCharityForManager and the owner
@@ -24,6 +25,8 @@ export type AudiencePick = {
   donors: DonorRow[];
   /** Donors in the audience who asked not to get news and appeals (from this charity, or thank-yous from any). */
   stopped: number;
+  /** Donors left out because they already had a message from this charity this week (one a week, 09/11/2026). */
+  thisWeek: number;
   /**
    * Donors whose only gifts are ones the charity recorded (EFT, cash, an import): they never saw the "no news"
    * box at checkout, and the import confirmation covers receipts only, so they are left out until Yosef
@@ -91,8 +94,10 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
   const gaveOnGivezy = await donorsWhoGaveOnGivezy(charityId);
   const reachable = donors.filter((d) => gaveOnGivezy.has(d.donor_id));
   const stopped = await stoppedEmails(charityId, reachable.map((d) => d.email));
-  const kept = reachable.filter((d) => !stopped.has(d.email.trim().toLowerCase()));
-  return { donors: kept, stopped: reachable.length - kept.length, recordedOnly: donors.length - reachable.length, label };
+  const allowed = reachable.filter((d) => !stopped.has(d.email.trim().toLowerCase()));
+  const recent = await messagedThisWeek(charityId, allowed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) })), now);
+  const kept = allowed.filter((d) => !recent.has(d.donor_id));
+  return { donors: kept, stopped: reachable.length - allowed.length, thisWeek: allowed.length - kept.length, recordedOnly: donors.length - reachable.length, label };
 }
 
 /** Donors with at least one paid gift made on Givezy itself (not recorded by the charity). */
@@ -171,7 +176,8 @@ export type SendProgress = { sent: number; failed: number; skipped: number; wait
 /**
  * Send what is still waiting, until the time runs out (a web request can't run for ever). Each donor is
  * claimed in the database first, so pressing again, or two people pressing, never emails anyone twice.
- * Each email is looked up fresh: someone who said no in the meantime is skipped.
+ * Each email is looked up fresh: someone who said no in the meantime, or had another message from the charity this
+ * week, is skipped.
  */
 export async function sendAppeal(args: { charityId: string; appealId: string; charityName: string; replyTo: string | null; userId: string; budgetMs?: number }): Promise<SendProgress | null> {
   const started = Date.now();
@@ -190,11 +196,22 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
     if (!ids.length) break;
     donorsById ??= new Map((await loadDonors(args.charityId)).map((d) => [d.donor_id, d]));
     const stopped = await stoppedEmails(args.charityId, ids.map((id) => donorsById!.get(id)?.email ?? "").filter(Boolean));
+    // Checked again as each one goes ("Send the rest" can be days later): a donor who had another message from the
+    // charity this week (a thank-you, a reminder, another email) is left out of this one. This email's own claims don't count.
+    const recent = await messagedThisWeek(
+      args.charityId,
+      ids.flatMap((id) => {
+        const e = donorsById!.get(id)?.email;
+        return e ? [{ donorId: id, hash: emailHash(e) }] : [];
+      }),
+      new Date(),
+      { appealId: appeal.id as string },
+    );
     for (const id of ids) {
       const d = donorsById.get(id);
       const mark = (status: "sent" | "failed" | "skipped") =>
         db().from("charity_appeal_recipients").update({ status, ...(status === "sent" ? { sent_at: new Date().toISOString() } : {}) }).eq("appeal_id", appeal.id).eq("donor_id", id);
-      if (!d?.email || isErasedEmail(d.email) || stopped.has(d.email.trim().toLowerCase())) {
+      if (!d?.email || isErasedEmail(d.email) || stopped.has(d.email.trim().toLowerCase()) || recent.has(id)) {
         await mark("skipped");
         continue;
       }

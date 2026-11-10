@@ -1,4 +1,6 @@
 import type { ImpactUnit } from "@shared/charity/impact";
+import type { Focus } from "@shared/charity/focus";
+import type { ProfileVideo } from "@shared/charity/video";
 /**
  * SAMPLE CONTENT. Fictional organisations and gifts for mock screens only.
  * No real charity names, logos or people.
@@ -42,6 +44,10 @@ export type Charity = {
   impact?: string | null;
   /** What one gift pays for, in the charity's own figure ("R12 pays for one school breakfast"). Only ever from the charity. */
   impactUnit?: ImpactUnit | null;
+  /** The charity's video on YouTube or Vimeo: the site and the video's id only. */
+  video?: ProfileVideo | null;
+  /** The charity's own focus, only while its dates run. Only ever the charity's own words. */
+  focus?: Focus | null;
 };
 
 /** A charity's campaign: a goal in Rand and what has been given to it so far (paid gifts only). */

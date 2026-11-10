@@ -43,6 +43,8 @@ let failSend = false;
 let skipSend = false;
 let released = 0;
 let recordedOnly = false;
+/** The donor had a news email or appeal from the charity this week. */
+let appealThisWeek = false;
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/email", () => ({
   getEmailTransport: () => ({
@@ -58,7 +60,9 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
       const b: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "order", "limit", "in"]) b[m] = () => b;
+      for (const m of ["select", "eq", "order", "limit", "in", "gte"]) b[m] = () => b;
+      // Lists (the one-a-week check): an appeal this week when asked for, nothing else.
+      b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === "charity_appeal_recipients" && appealThisWeek ? [{ donor_id: "d1" }] : [], error: null }).then(ok);
       // Gifts the charity recorded itself are left out: "recordedOnly" means this donor has no other.
       b.neq = (col: string, val: string) => (table === "donations" && col === "gateway" && val === "recorded" && recordedOnly ? ((b.maybeSingle = async () => ({ data: null, error: null })), b) : b);
       b.maybeSingle = async () => (table === "donations" ? { data: gift, error: null } : { data: stopped ? { email_hash: "h" } : null, error: null });
@@ -83,6 +87,7 @@ beforeEach(() => {
   skipSend = false;
   released = 0;
   recordedOnly = false;
+  appealThisWeek = false;
   gift = details();
   process.env.SITE_URL = "https://g.test";
 });
@@ -104,8 +109,17 @@ describe("sending one donor a thank-you", () => {
   it("only once a week per donor", async () => {
     await sendDonorThankYou(args);
     const again = await sendDonorThankYou(args);
-    expect(again.ok === false && again.message).toMatch(/already thanked Sarah Cohen this week, so nothing was sent/);
+    expect(again.ok === false && again.message).toBe(
+      "Sarah Cohen already had a message from you this week, so nothing was sent. Givezy sends each donor at most one message a week from your charity. You can thank them from Monday.",
+    );
     expect(sent).toHaveLength(1);
+  });
+  it("a news email or appeal this week counts too: nothing is claimed or sent", async () => {
+    appealThisWeek = true;
+    const r = await sendDonorThankYou(args);
+    expect(r.ok === false && r.message).toMatch(/^Sarah Cohen already had a message from you this week, so nothing was sent\./);
+    expect(claimed).toBe(false);
+    expect(sent).toHaveLength(0);
   });
   it("never to an erased donor or someone who asked not to get them", async () => {
     gift = details({ erased_at: "2026-10-01" });

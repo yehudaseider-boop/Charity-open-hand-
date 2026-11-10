@@ -3,6 +3,8 @@ import { audit, xlsxResponse } from "@/lib/charity/export";
 import { loadIt3dCharity } from "@/lib/receipts/it3d-store";
 import { it3dPeriodRange } from "@/lib/receipts/it3d";
 import { it3dCaptureSheet } from "@/lib/receipts/it3d-sheet";
+import { it3dHistoryEntry } from "@/lib/receipts/it3d-history";
+import { recordIt3dDownload } from "@/lib/receipts/it3d-history-store";
 import { authoriseIt3d, prepareIt3d, readChoice } from "@/lib/receipts/it3d-request";
 import { taxYearName } from "@/lib/dates";
 
@@ -20,6 +22,14 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/charity-admin/[i
   const range = it3dPeriodRange(choice.taxYear, choice.period);
   const dates = `${range.start.split("-").reverse().join("/")} to ${range.end.split("-").reverse().join("/")}`;
   const period = `${choice.period === "first_half" ? "the first six months of the" : "the full"} ${taxYearName(choice.taxYear)} tax year (${dates})`;
+  // The charity's own history (owner only, on the SARS page): counts and the total, nothing about a donor.
+  // Written first, so the audit never says "downloaded" when nothing was.
+  try {
+    await recordIt3dDownload(it3dHistoryEntry({ charityId: id, userId: who.userId, taxYear: choice.taxYear, period: choice.period, kind: "sheet", result }));
+  } catch (e) {
+    console.error("[sars] history not recorded", e instanceof Error ? e.message : e);
+    return say("We couldn't record this download in your history, so nothing was downloaded. Please try again.", 503);
+  }
   await audit({
     actorUserId: who.userId,
     action: "charity.it3d_capture_sheet_downloaded",

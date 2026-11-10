@@ -22,6 +22,10 @@ import { formatRand } from "@/lib/money";
 import { JsonLd } from "@/components/json-ld";
 import { siteOrigin } from "@/lib/request-origin";
 import { charityData } from "@/lib/seo/structured-data";
+import { ProfileVideo } from "@/components/profile-video";
+import { focusCampaign, jhbToday } from "@/lib/charity/focus";
+import { loadPublicFocus, loadVideo } from "@/lib/charity/profile-extras";
+import { FocusCard } from "./focus-card";
 
 const loadCharity = cache(async (slug: string) => {
   const supabase = await createClient();
@@ -58,7 +62,11 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
   const receipts = canIssue18a(charity);
-  const [donatable, { photos, updates }, campaigns] = await Promise.all([loadDonatableCharity(charity.slug), loadStories(charity.id, 5), loadOpenCampaigns(charity.id)]);
+  const [donatable, { photos, updates }, campaigns, { video }, focus] = await Promise.all([
+    loadDonatableCharity(charity.slug), loadStories(charity.id, 5), loadOpenCampaigns(charity.id),
+    // The charity's video and its own focus are bonuses: if either can't be read, the page shows without it.
+    loadVideo(charity.id), loadPublicFocus(charity.id, jhbToday()),
+  ]);
   const accepting = donatable?.acceptingPayments ?? false;
   const categories = charity.charity_categories
     .map((cc) => cc.categories as unknown as { name_en: string } | null)
@@ -68,6 +76,9 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
   const monogram = initials(charity.name_en);
 
   const give = accepting ? withSource(`/c/${charity.slug}/donate`, src) : null;
+  // The focus's give button goes to its campaign while that campaign is still taking gifts, otherwise to general giving.
+  const focusFor = focus ? focusCampaign(focus, campaigns) : null;
+  const focusGive = !focus || !accepting ? null : focusFor ? withSource(`/c/${charity.slug}/donate?campaign=${focusFor.id}`, src) : give;
   let site = "";
   try {
     site = siteOrigin("");
@@ -133,6 +144,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
           <CharityBadges charity={charity} />
           {categories.map((c) => <Badge key={c.name_en}>{c.name_en}</Badge>)}
         </div>
+        {focus ? <div className="mt-6"><FocusCard focus={focus} giveHref={focusGive} toCampaign={Boolean(focusFor)} /></div> : null}
       </div>
 
       <div className={`mx-auto grid max-w-[75rem] grid-cols-1 gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-12 pb-20`}>
@@ -191,6 +203,12 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
           {charity.description_en ? (
             <Section title="What they do">
               <p className="whitespace-pre-line text-[17px] leading-relaxed">{charity.description_en}</p>
+            </Section>
+          ) : null}
+
+          {video ? (
+            <Section title="Watch our video">
+              <ProfileVideo video={video} charityName={charity.name_en} />
             </Section>
           ) : null}
 

@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { checkoutOrigins } from "./src/lib/gateway/checkout-origins";
+import { VIDEO_FRAME_ORIGINS } from "./src/lib/charity/video";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -25,6 +26,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' blob: data:${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
   "font-src 'self'",
+  // A charity's profile video plays in a frame, only after the visitor presses play: exactly these two players, nothing wider.
+  `frame-src ${VIDEO_FRAME_ORIGINS.join(" ")}`,
   `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",

@@ -17,6 +17,11 @@ import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 export type Undo =
   /** Put columns back as they were, if nobody has changed them again since. */
   | { type: "restore"; table: "charities" | "charity_private"; before: Record<string, unknown>; after: Record<string, unknown>; categories?: string[]; categoriesAfter?: string[]; dropFile?: { bucket: string; path: string } }
+  /**
+   * Put the charity's one focus back as it was (10/11/2026): the row before this action, or none. Only if it is
+   * still as this action left it.
+   */
+  | { type: "focus"; before: Record<string, unknown> | null; after: Record<string, unknown> | null }
   /** Remove a row this action added (and its file). */
   | { type: "delete"; table: "campaigns" | "charity_updates" | "charity_photos" | "charity_documents"; id: string; file?: { bucket: string; path: string } | null }
   /** Put back a row this action removed (its file was kept for this). */
@@ -167,6 +172,25 @@ async function apply(charityId: string, undo: Undo): Promise<UndoFailure | null>
         }
       }
       if (undo.dropFile && ownPath(undo.dropFile.path)) await db.storage.from(undo.dropFile.bucket).remove([undo.dropFile.path]);
+      return null;
+    }
+    case "focus": {
+      const cols = ["campaign_id", "title", "message", "starts_on", "ends_on"];
+      const pick = (r: Record<string, unknown> | null) => (r ? Object.fromEntries(cols.map((c) => [c, r[c] ?? null])) : null);
+      const { data: now, error } = await db.from("charity_focus").select(cols.join(", ")).eq("charity_id", charityId).maybeSingle();
+      if (error) throw error;
+      // Changed again since (by this person or another admin): don't overwrite their newer work.
+      if (!same(pick(now as Record<string, unknown> | null), pick(undo.after))) return "changed";
+      if (!undo.before) {
+        const { error: delError } = await db.from("charity_focus").delete().eq("charity_id", charityId);
+        if (delError) throw delError;
+        return null;
+      }
+      const row = { charity_id: charityId, ...pick(undo.before), updated_at: new Date().toISOString() };
+      let put = await db.from("charity_focus").upsert(row, { onConflict: "charity_id" });
+      // The campaign it pointed at was removed since: it comes back without one.
+      if (put.error && /charity_focus_campaign/.test(put.error.message)) put = await db.from("charity_focus").upsert({ ...row, campaign_id: null }, { onConflict: "charity_id" });
+      if (put.error) throw put.error;
       return null;
     }
     case "delete": {

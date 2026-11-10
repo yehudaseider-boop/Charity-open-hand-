@@ -15,7 +15,7 @@ import { hitRateLimit } from "@/lib/rate-limit";
 export type AppealCheck =
   | { state: "idle" }
   | { state: "refused"; message: string; fieldErrors?: Record<string, string> }
-  | { state: "checked"; count: number; stopped: number; recordedOnly: number; label: string; fingerprint: string };
+  | { state: "checked"; count: number; stopped: number; thisWeek: number; recordedOnly: number; label: string; fingerprint: string };
 
 const fingerprint = (subject: string, body: string, audience: string) => `${audience}|${subject.length}|${body.length}|${[...`${subject}\n${body}`].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)}`;
 
@@ -39,7 +39,7 @@ export async function checkAppealAudience(charityId: string, _prev: AppealCheck,
   if ("refused" in r) return { state: "refused", message: r.refused!, fieldErrors: "fieldErrors" in r ? (r.fieldErrors as Record<string, string>) : undefined };
   const pick = await pickAudience(charityId, r.audience);
   if (!pick) return { state: "refused", message: "That list, tag or campaign isn't there any more. Choose again." };
-  return { state: "checked", count: pick.donors.length, stopped: pick.stopped, recordedOnly: pick.recordedOnly, label: pick.label, fingerprint: fingerprint(r.subject, r.body, r.audienceValue) };
+  return { state: "checked", count: pick.donors.length, stopped: pick.stopped, thisWeek: pick.thisWeek, recordedOnly: pick.recordedOnly, label: pick.label, fingerprint: fingerprint(r.subject, r.body, r.audienceValue) };
 }
 
 /** A copy to the person writing it, exactly as donors will see it. Doesn't count towards anything. */
@@ -72,7 +72,7 @@ export async function sendAppealNow(charityId: string, _prev: FormState, formDat
   if (await hitRateLimit("appeal-send", [`charity:${charityId}`], 5, 24 * 60)) return { ok: false, message: "You've sent 5 emails today, the most for one day. Nothing was sent. Please send it tomorrow." };
   const pick = await pickAudience(charityId, r.audience);
   if (!pick) return { ok: false, message: "That list, tag or campaign isn't there any more. Nothing was sent. Choose again." };
-  if (!pick.donors.length) return { ok: false, message: "Nobody to send it to: everyone in this group asked not to get emails, or there's nobody in it yet. Nothing was sent." };
+  if (!pick.donors.length) return { ok: false, message: "Nobody to send it to: everyone in this group asked not to get emails or already had a message from you this week, or there's nobody in it yet. Nothing was sent." };
   const appealId = await createAppeal({ charityId, userId: viewer.userId, subject: r.subject, body: r.body, audience: r.audience, pick });
   const p = await sendAppeal({ charityId, appealId, charityName: r.charity.name_en, replyTo: r.priv?.contact_email ?? null, userId: viewer.userId });
   revalidatePath(`/charity-admin/${charityId}/email-donors`);

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { audit } from "@/lib/charity/export";
 import { it3dBytes, SOURCE_IDENTIFIER_LENGTH } from "@/lib/receipts/it3d";
+import { it3dHistoryEntry } from "@/lib/receipts/it3d-history";
+import { recordIt3dDownload } from "@/lib/receipts/it3d-history-store";
 import { authoriseIt3d, prepareIt3d, readChoice } from "@/lib/receipts/it3d-request";
 
 const say = (message: string, status: number) =>
@@ -48,6 +50,14 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/charity-admin/[
   if (result.nil) return say("No s18A receipts in this period. If SARS asks for a nil declaration, it is done on eFiling, not with this file.", 409);
   if (!result.fileReady) return say("There are problems to fix first: they are listed on this page. Nothing was downloaded. The capture sheet still downloads with them marked.", 409);
 
+  // The charity's own history (owner only, on the SARS page): counts and the total, nothing about a donor.
+  // Written first, so the audit never says "downloaded" when nothing was.
+  try {
+    await recordIt3dDownload(it3dHistoryEntry({ charityId: id, userId: who.userId, taxYear: choice.taxYear, period: choice.period, kind: "file", testData, result }));
+  } catch (e) {
+    console.error("[sars] history not recorded", e instanceof Error ? e.message : e);
+    return say("We couldn't record this download in your history, so nothing was downloaded. Please try again.", 503);
+  }
   await audit({
     actorUserId: who.userId,
     action: "charity.it3d_file_downloaded",

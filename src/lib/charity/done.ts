@@ -1,6 +1,8 @@
 import { plural } from "@/lib/text";
 import { reviewWithin } from "@/lib/charity/review-time";
 import { taxYearName } from "@/lib/dates";
+import { REMINDER_SKIPS, reminderOutcome } from "@/lib/charity/s18a-reminder";
+import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 
 /** "2026/27" from a stored tax year, or empty when it is missing. */
 const yearName = (y: unknown) => (Number.isInteger(Number(y)) && Number(y) > 2000 ? taxYearName(Number(y)) : "");
@@ -17,6 +19,10 @@ export type ActionKind =
   | "profile_saved"
   | "logo_changed"
   | "cover_changed"
+  | "video_saved"
+  | "video_removed"
+  | "focus_saved"
+  | "focus_removed"
   | "donation_emails_on"
   | "donation_emails_off"
   | "campaign_started"
@@ -33,6 +39,7 @@ export type ActionKind =
   | "document_removed"
   | "application_submitted"
   | "thank_you_sent"
+  | "thank_you_wording_saved"
   | "donor_thanked"
   | "receipts_approved"
   | "gift_recorded"
@@ -47,10 +54,11 @@ export type ActionKind =
   | "certificate_approved"
   | "certificate_edited"
   | "certificate_declined"
-  | "certificate_reopened";
+  | "certificate_reopened"
+  | "s18a_reminders_sent";
 
 /** Actions that can never be taken back: the dashboard asks first instead (Yehuda, 18/10/2026). */
-export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed", "certificate_declined"];
+export const ASK_FIRST: ActionKind[] = ["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed", "certificate_declined", "s18a_reminders_sent"];
 
 export type Details = Record<string, string | number | boolean | null | undefined>;
 export type Context = { base: string; publicUrl: string | null; approved: boolean };
@@ -71,10 +79,36 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         what: c.approved ? "Your public profile is saved. Donors see the changes now." : "Your public profile is saved. Donors see it once your application is approved.",
         next: seePage(c, { label: "Next: add photos and an update", href: `${c.base}/updates` }),
       };
+    case "thank_you_wording_saved":
+      return {
+        what: d.cleared
+          ? "Back to Givezy's wording. The thank-you email after each gift no longer carries a note from you."
+          : "Your thank-you note is saved. Donors see it in the thank-you email after each gift from now on, and wherever we thank them for a gift.",
+        next: { label: "See your donors", href: `${c.base}/donors` },
+      };
     case "logo_changed":
       return { what: "Your new logo is up.", next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }) };
     case "cover_changed":
       return { what: "Your new cover image is up.", next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }) };
+    case "video_saved":
+      return {
+        what: c.approved
+          ? `Your video is on your page. Nothing loads from ${String(d.site ?? "the video site")} until a visitor presses play.`
+          : "Your video is saved. Donors see it once your application is approved.",
+        next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }),
+      };
+    case "video_removed":
+      return { what: "Your video is removed from your page and from the app.", next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }) };
+    case "focus_saved": {
+      const days = `${String(d.from ?? "")} to ${String(d.to ?? "")}`;
+      const when = d.status === "showing" ? `It shows at the top of your page and in the Givezy app until ${String(d.to ?? "its last day")}.` : `It shows at the top of your page and in the Givezy app from ${days}.`;
+      return {
+        what: `${quote(d.title)} is your focus. ${c.approved ? when : `Donors see it from ${days}, once your application is approved.`} We don't send a notification about it.`,
+        next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }),
+      };
+    }
+    case "focus_removed":
+      return { what: `${quote(d.title)} is no longer your focus. It's off your page and out of the app.`, next: seePage(c, { label: "Back to your public profile", href: `${c.base}/profile` }) };
     case "donation_emails_on":
       return { what: "Donation emails are on. We'll email you each time a donation comes in.", next: { label: "Back to your overview", href: c.base } };
     case "donation_emails_off":
@@ -122,16 +156,18 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       const sent = Number(d.sent ?? 0);
       const failed = Number(d.failed ?? 0);
       const remaining = Number(d.remaining ?? 0);
+      const thisWeek = Number(d.thisWeek ?? 0);
+      const leftOut = thisWeek ? ` ${plural(thisWeek, "donor")} already had a message from you this week, so ${thisWeek === 1 ? "was" : "were"} left out of it. ${WEEKLY_LIMIT}` : "";
       if (remaining) {
         return {
-          what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: nobody gets it twice.`,
+          what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: nobody gets it twice.${leftOut}`,
           next: { label: "Send the rest", href: `${c.base}/thank-donors#unfinished` },
         };
       }
       return {
         what: sent
-          ? `Your thank-you for ${String(d.month ?? "that month")} went to ${plural(sent, "donor")}.${failed ? ` ${plural(failed, "email")} could not be sent.` : ""}`
-          : `Your thank-you for ${String(d.month ?? "that month")} is saved. Nobody was left to email.`,
+          ? `Your thank-you for ${String(d.month ?? "that month")} went to ${plural(sent, "donor")}.${failed ? ` ${plural(failed, "email")} could not be sent.` : ""}${leftOut}`
+          : `Your thank-you for ${String(d.month ?? "that month")} is saved. Nobody was left to email.${leftOut}`,
         next: { label: "See who gave", href: `${c.base}/donors` },
       };
     }
@@ -139,6 +175,17 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       return {
         what: `Your thank-you went to ${String(d.name ?? "your donor")}.${d.replyTo ? ` If they reply, it goes to ${String(d.replyTo)}.` : ""}`,
         next: { label: "Back to your donors", href: `${c.base}/donors` },
+      };
+    case "s18a_reminders_sent":
+      return {
+        what: reminderOutcome({
+          sent: Number(d.sent ?? 0),
+          failed: Number(d.failed ?? 0),
+          remaining: Number(d.remaining ?? 0),
+          skipped: Object.fromEntries(REMINDER_SKIPS.map((k) => [k, Number(d[`skipped_${k}`] ?? 0)])),
+          interrupted: Boolean(d.interrupted),
+        }),
+        next: { label: "See who still has details missing", href: `${c.base}/donors?s18a=details_missing` },
       };
     case "receipts_approved":
       return {
@@ -205,7 +252,7 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       const skipped = Number(d.skipped ?? 0);
       if (!sent && !waiting) {
         return {
-          what: `${quote(d.subject)} is saved, but nobody was emailed${skipped ? `: ${plural(skipped, "donor")} left out (they asked not to get emails, already had 4 from you this month, or email isn't switched on here)` : ""}.${Number(d.failed ?? 0) ? ` ${plural(Number(d.failed), "email")} could not be sent: tell us.` : ""}`,
+          what: `${quote(d.subject)} is saved, but nobody was emailed${skipped ? `: ${plural(skipped, "donor")} left out (they asked not to get emails, already had a message from you this week, already had 4 from you this month, or email isn't switched on here)` : ""}.${Number(d.failed ?? 0) ? ` ${plural(Number(d.failed), "email")} could not be sent: tell us.` : ""}`,
           next: { label: "See your donors", href: `${c.base}/donors` },
         };
       }
@@ -221,8 +268,13 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
 export function describeUndone(kind: ActionKind, d: Details): string {
   switch (kind) {
     case "profile_saved": return "Taken back. Your public profile is as it was before.";
+    case "thank_you_wording_saved": return "Taken back. The thank-you email after each gift is worded as it was before.";
     case "logo_changed": return "Taken back. Your previous logo is back.";
     case "cover_changed": return "Taken back. Your previous cover image is back.";
+    case "video_saved": return d.had ? "Taken back. Your previous video is back." : "Taken back. Your page has no video again.";
+    case "video_removed": return "Taken back. Your video is on your page again.";
+    case "focus_saved": return d.had ? "Taken back. Your previous focus is back as it was." : "Taken back. You have no focus set.";
+    case "focus_removed": return `Taken back. ${quote(d.title)} is your focus again, with the same dates.`;
     case "donation_emails_on": return "Taken back. Donation emails are off again.";
     case "donation_emails_off": return "Taken back. Donation emails are on again.";
     case "campaign_started": return `Taken back. ${quote(d.title)} is removed.`;
@@ -254,17 +306,18 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "member_removed":
     case "appeal_sent":
     case "certificate_declined":
+    case "s18a_reminders_sent":
       return "This can't be taken back.";
   }
 }
 
 /** The dashboard page an action's panel belongs on. */
 export function pageOf(kind: ActionKind): string {
-  if (["profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off"].includes(kind)) return "profile";
+  if (["profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off", "video_saved", "video_removed", "focus_saved", "focus_removed"].includes(kind)) return "profile";
   if (kind.startsWith("campaign_")) return "campaigns";
   if (kind.startsWith("update_") || kind.startsWith("photo_")) return "updates";
-  if (kind === "thank_you_sent") return "thank-donors";
-  if (kind === "donor_thanked" || kind === "contacts_imported" || kind === "contacts_removed") return "donors";
+  if (kind === "thank_you_sent" || kind === "thank_you_wording_saved") return "thank-donors";
+  if (kind === "donor_thanked" || kind === "contacts_imported" || kind === "contacts_removed" || kind === "s18a_reminders_sent") return "donors";
   if (kind === "receipts_approved" || kind === "sars_details_saved" || kind.startsWith("certificate_")) return "receipts";
   if (kind === "gift_recorded" || kind === "gifts_imported" || kind === "gifts_removed") return "donations";
   if (kind === "member_added" || kind === "member_removed") return "team";
@@ -280,11 +333,12 @@ export function isActionKind(s: unknown): s is ActionKind {
 }
 const KINDS = new Set<ActionKind>([
   "profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off", "campaign_started", "campaign_ended",
+  "video_saved", "video_removed", "focus_saved", "focus_removed",
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
-  "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked",
+  "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "thank_you_wording_saved", "donor_thanked",
   "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
   "contacts_imported", "contacts_removed", "sars_details_saved",
-  "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened",
+  "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened", "s18a_reminders_sent",
 ]);
 
 /** A planned s18A receipt's preview page. */

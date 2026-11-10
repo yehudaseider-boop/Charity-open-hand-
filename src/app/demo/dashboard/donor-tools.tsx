@@ -91,7 +91,7 @@ export function DemoEmailDonors({ audiences, groups }: { audiences: Audience[]; 
     const a = byValue.get(String(f.get("audience") ?? ""));
     if (!a) return { state: "refused", message: "Choose who it goes to.", fieldErrors: { audience: "Choose who it goes to" } };
     await pause(400);
-    return { state: "checked", count: a.count, stopped: a.stopped, recordedOnly: 0, label: a.label, fingerprint: `${a.value}|${typed.subject}|${typed.body.length}` };
+    return { state: "checked", count: a.count, stopped: a.stopped, thisWeek: 0, recordedOnly: 0, label: a.label, fingerprint: `${a.value}|${typed.subject}|${typed.body.length}` };
   };
   const test = async (): Promise<FormState> => {
     await pause();

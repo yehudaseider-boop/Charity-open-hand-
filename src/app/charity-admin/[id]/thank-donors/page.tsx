@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
 import { Card, Notice } from "@/components/card";
-import { DonePanel } from "@/components/done-panel";
+import { DonePanel, formKey } from "@/components/done-panel";
 import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { viewerRole } from "@/lib/charity/team";
 import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { thankYouRecipients } from "@/lib/charity/thank-you-send";
+import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
-import { sendRestOfThankYou, sendThankDonors } from "./actions";
+import { thankYouNoteToShow } from "@/lib/charity/thank-you-note";
+import { saveThankYouWording, sendRestOfThankYou, sendThankDonors } from "./actions";
 import { SendRestForm, ThankYouForm } from "./forms";
+import { WordingEditor } from "./wording-editor";
 
 export const metadata: Metadata = { title: "Thank donors" };
 
@@ -53,11 +56,32 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
           <>
             A short thank-you is the biggest reason people give again. Write it once and we email it to everyone who gave that month,
             with their first name. You don&apos;t need their addresses, and they can stop these emails at any time. One thank-you per month.
+            {" "}{WEEKLY_LIMIT} Anyone who already had one this week is left out, and the page tells you how many.
           </>
         }
       />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/thank-donors`} />
+
+      {/* The automatic email after each gift: the charity's own paragraph in it (10/11/2026). Anyone who manages the charity may edit it, as for the public profile. */}
+      <Card title="The thank-you email after each gift">
+        <div id="wording" className="space-y-4 text-sm">
+          <p className="text-muted">
+            Every donor gets this email from Givezy as soon as their gift is confirmed. You can add a short note of your own to it.
+            The same note shows on the thank-you page after they pay and in the Givezy app.
+          </p>
+          <WordingEditor
+            key={formKey(sp, "wording")}
+            action={saveThankYouWording.bind(null, id)}
+            charityName={charity.name_en}
+            saved={thankYouNoteToShow(charity.thank_you_en)}
+            sampleDate={new Date().toISOString()}
+            siteUrl={process.env.SITE_URL}
+          />
+        </div>
+      </Card>
+
+      <h2 className="font-display text-xl font-bold text-indigo">A thank-you for a whole month</h2>
 
       {charity.status !== "approved" ? (
         <Notice tone="warning">You can thank donors once your page is live.</Notice>

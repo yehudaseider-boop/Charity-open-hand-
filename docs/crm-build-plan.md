@@ -20,6 +20,10 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 2. **"Asked for an s18A receipt" filter and reminder button** (2.1).
    Filter the donor list by asked / not asked / details missing. Button to remind selected donors to add
    their details (uses the existing reminder, at most once a week per donor).
+   **Built 10/11/2026, not yet on the test site** (migration `20261110000002_s18a_details_reminder.sql` waits for
+   Yehuda's yes; details in `docs/decisions.md`). As built: counts per filter; the reminder is owner-only, asked
+   first, shares the one-a-week claim with the personal thank-you, and skips erased, opted-out, complete and
+   recorded-only donors. "Didn't ask" is a filter only (prompting them is step 6).
 3. **Charity's own logo and signatory on the certificate** (2.2). **Decision: Yosef** (already on his list).
 
 ## Phase 2: keeping donors

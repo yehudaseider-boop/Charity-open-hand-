@@ -166,6 +166,15 @@ describe("thanking for new donations", () => {
     const [gift] = toGifts([row({ charities: { slug: "m", name_en: "Meals Fund", thank_you_en: "Thank you from all of us." } })], []);
     expect(gift.thankYou).toBe("Thank you from all of us.");
   });
+
+  it("cleans the note as the website does, and leaves out one with a web address", () => {
+    const [clean] = toGifts([row({ charities: { slug: "m", name_en: "Meals Fund", thank_you_en: "  Thank you​ from us.\r\n\r\n\r\n\r\nTruly.  " } })], []);
+    expect(clean.thankYou).toBe("Thank you from us.\n\nTruly.");
+    const [linked] = toGifts([row({ charities: { slug: "m", name_en: "Meals Fund", thank_you_en: "Thank you. See www.example.org" } })], []);
+    expect(linked.thankYou).toBeUndefined();
+    const [blank] = toGifts([row({ charities: { slug: "m", name_en: "Meals Fund", thank_you_en: "   " } })], []);
+    expect(blank.thankYou).toBeUndefined();
+  });
 });
 
 describe("giving saved on the phone for offline use", () => {

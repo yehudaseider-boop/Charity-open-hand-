@@ -21,6 +21,9 @@ export type ContactPreview =
       fingerprint: string;
       good: number;
       bad: number;
+      /** Of the good rows: how many have a phone number, and how many an address. */
+      withPhone: number;
+      withAddress: number;
       problems: { line: number; messages: string[] }[];
       warnings: string[];
       unknownColumns: string[];
@@ -59,12 +62,17 @@ export async function checkContactImport(charityId: string, _prev: ContactPrevie
   if (!file.ok) return { state: "refused", message: file.message };
   const warnings: string[] = [];
   if (file.looksLikeGifts) warnings.push("This file has Amount or Date columns, which this import doesn't use. If these are gifts, use Import gifts on your Donations page instead.");
+  if (file.identityColumns.length) {
+    warnings.push(`${file.identityColumns.length === 1 ? `The column "${file.identityColumns[0].slice(0, 40)}" isn't` : "The ID and tax number columns aren't"} imported or kept. Givezy only needs an ID or tax number for an s18A receipt, and the donor gives it with their gift. You can leave ${file.identityColumns.length === 1 ? "that column" : "those columns"} out of the file.`);
+  }
   if (tooManyTags) warnings.push(`This file would add ${newTags.length} new ${newTags.length === 1 ? "tag" : "tags"}, which takes you over ${MAX_TAGS}. Use fewer tags, or delete tags you no longer need under Settings on your Donors page.`);
   return {
     state: "checked",
     fingerprint: fileFingerprint(text),
     good: file.good,
     bad: file.bad,
+    withPhone: file.withPhone,
+    withAddress: file.withAddress,
     problems: rowProblems(file.rows).slice(0, 100),
     warnings,
     unknownColumns: file.unknownColumns,

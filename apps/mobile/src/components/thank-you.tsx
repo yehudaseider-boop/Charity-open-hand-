@@ -75,7 +75,7 @@ export function ThankYou() {
           )}
           {one?.thankYou ? (
             <View style={styles.note}>
-              <Text variant="label">From {one.charityName}</Text>
+              <Text variant="label">A note from {one.charityName}</Text>
               <Text style={{ fontSize: 16, lineHeight: 24, fontStyle: "italic" }}>{one.thankYou}</Text>
             </View>
           ) : null}

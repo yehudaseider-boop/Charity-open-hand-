@@ -76,6 +76,11 @@ export function ImportContactsForm({
               ? `${preview.bad} of ${preview.good + preview.bad} ${preview.good + preview.bad === 1 ? "row needs" : "rows need"} fixing. Nothing will be imported until every row is right.`
               : `${preview.good} ${preview.good === 1 ? "donor" : "donors"} ready to import.`}
           </p>
+          {!preview.bad && preview.good ? (
+            <p className="text-muted">
+              {preview.withPhone} with a phone number, {preview.withAddress} with an address. Rows without them are imported as they are.
+            </p>
+          ) : null}
           {preview.warnings.map((w, i) => <p key={i} className="rounded-card bg-warning-soft p-3 text-warning">{w}</p>)}
           {preview.unknownColumns.length ? <p className="text-muted [overflow-wrap:anywhere]">Columns we didn&apos;t use: {preview.unknownColumns.join(", ")}.</p> : null}
           {preview.newTags.length ? <p className="text-muted [overflow-wrap:anywhere]">New tags this adds: {preview.newTags.join(", ")}.</p> : null}

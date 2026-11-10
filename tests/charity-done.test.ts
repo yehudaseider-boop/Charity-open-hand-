@@ -6,7 +6,7 @@ const ALL: ActionKind[] = [
   "profile_saved", "logo_changed", "cover_changed", "donation_emails_on", "donation_emails_off", "campaign_started", "campaign_ended",
   "update_posted", "update_removed", "photo_added", "photo_removed", "organisation_saved", "address_saved", "contact_saved", "bank_saved",
   "document_uploaded", "document_removed", "application_submitted", "thank_you_sent", "donor_thanked", "receipts_approved", "gift_recorded", "gifts_imported", "gifts_removed", "member_added", "member_removed", "appeal_sent",
-  "contacts_imported", "contacts_removed", "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened",
+  "contacts_imported", "contacts_removed", "certificate_approved", "certificate_edited", "certificate_declined", "certificate_reopened", "s18a_reminders_sent",
 ];
 const ctx = { base: "/charity-admin/c1", publicUrl: "/c/meals", approved: true };
 
@@ -42,7 +42,7 @@ describe("what just happened, and what next", () => {
 
   it("after Undo, every action says what is back; the ones that can't be taken back say so", () => {
     for (const kind of ALL) expect(describeUndone(kind, { title: "Roof" }).length, kind).toBeGreaterThan(10);
-    expect(ASK_FIRST).toEqual(["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed", "certificate_declined"]);
+    expect(ASK_FIRST).toEqual(["application_submitted", "thank_you_sent", "donor_thanked", "gifts_removed", "member_removed", "appeal_sent", "contacts_removed", "certificate_declined", "s18a_reminders_sent"]);
     for (const kind of ASK_FIRST) expect(describeUndone(kind, {})).toBe("This can't be taken back.");
   });
 });

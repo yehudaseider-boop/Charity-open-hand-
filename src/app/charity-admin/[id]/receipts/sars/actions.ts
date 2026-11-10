@@ -8,7 +8,10 @@ import { recordAction } from "@/lib/charity/charity-actions";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { isOwner } from "@/lib/charity/team";
 import type { FormState } from "@/lib/form";
+import { isUuid } from "@/lib/ids";
 import { isLegalForm } from "@/lib/receipts/it3d";
+import { checkUploadMark } from "@/lib/receipts/it3d-history";
+import { clearIt3dUploaded, loadIt3dHistoryEntry, markIt3dUploaded } from "@/lib/receipts/it3d-history-store";
 import { ENTITY_TAX_REFERENCE_FIRST_DIGITS, isValidCompanyRegistration, normaliseCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -60,4 +63,52 @@ export async function saveSarsDetails(charityId: string, year: number, period: s
   revalidatePath(`/charity-admin/${charityId}/receipts/sars`);
   const q = new URLSearchParams({ year: String(Number(year) || ""), period: period === "first_half" ? "first_half" : "full_year", done });
   redirect(`/charity-admin/${charityId}/receipts/sars?${q}#sars-details`);
+}
+
+/** Back to the SARS page's history, on the same tax year and period, saying what just happened. */
+function toHistory(charityId: string, year: number, period: string, what: Record<string, string>): never {
+  revalidatePath(`/charity-admin/${charityId}/receipts/sars`);
+  const q = new URLSearchParams({ year: String(Number(year) || ""), period: period === "first_half" ? "first_half" : "full_year", ...what });
+  redirect(`/charity-admin/${charityId}/receipts/sars?${q}#sars-history`);
+}
+
+/**
+ * The owner's own record that a downloaded file or sheet went to SARS (10/11/2026): a date and an optional short
+ * reference. Givezy can't check it with SARS, and the page says so. Owner only; Undo takes the mark off again.
+ */
+export async function markUploadedToSars(charityId: string, historyId: string, year: number, period: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const viewer = await requireViewer();
+  await loadCharityForManager(charityId);
+  if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can mark a SARS file as uploaded. Nothing was changed." };
+  const entry = isUuid(historyId) ? await loadIt3dHistoryEntry(charityId, historyId) : null;
+  if (!entry) return { ok: false, message: "We couldn't find that download in your history, so nothing was changed. Reload the page and try again." };
+  if (entry.uploadedOn) return { ok: false, message: "This one is already marked as uploaded, so nothing was changed. Reload the page to see it." };
+  const mark = checkUploadMark({ uploadedOn: formData.get("uploaded_on"), reference: formData.get("upload_reference"), producedAt: entry.createdAt });
+  if (!mark.ok) return { ok: false, message: "Please fix the highlighted fields. Nothing was saved, and what you typed is still here.", fieldErrors: mark.fieldErrors };
+  let saved: boolean;
+  try {
+    saved = await markIt3dUploaded({ charityId, id: historyId, userId: viewer.userId, uploadedOn: mark.uploadedOn, reference: mark.reference });
+  } catch (e) {
+    console.error("[it3d history]", e instanceof Error ? e.message : "mark failed");
+    return { ok: false, message: "That didn't save, so nothing was changed. What you typed is still here. Please try again." };
+  }
+  if (!saved) return { ok: false, message: "This one was marked as uploaded a moment ago, so nothing was changed. Reload the page to see it." };
+  toHistory(charityId, year, period, { marked: historyId });
+}
+
+/** Undo for the mark above: the entry goes back to "not marked". The download itself stays in the history. */
+export async function unmarkUploadedToSars(charityId: string, historyId: string, year: number, period: string, _prev: FormState, _formData: FormData): Promise<FormState> {
+  const viewer = await requireViewer();
+  await loadCharityForManager(charityId);
+  if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can change this. Nothing was changed." };
+  if (!isUuid(historyId)) return { ok: false, message: "We couldn't find that download in your history, so nothing was changed." };
+  let cleared: boolean;
+  try {
+    cleared = await clearIt3dUploaded({ charityId, id: historyId, userId: viewer.userId });
+  } catch (e) {
+    console.error("[it3d history]", e instanceof Error ? e.message : "unmark failed");
+    return { ok: false, message: "That didn't work, so the mark is still there. Please try again." };
+  }
+  if (!cleared) return { ok: false, message: "The mark has already been taken off. Reload the page to see it." };
+  toHistory(charityId, year, period, { unmarked: historyId });
 }

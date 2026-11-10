@@ -34,10 +34,25 @@ export default async function ImportDonorsPage({ params }: PageProps<"/charity-a
       <Card title="What the file needs">
         <ul className="list-disc space-y-1 pl-5 text-sm">
           <li>A <span className="font-medium">First name</span> and <span className="font-medium">Surname</span>, or an <span className="font-medium">Organisation</span>, on every row.</li>
-          <li>Optional: email, phone (a South African number), address, suburb, city, postal code (4 digits).</li>
+          <li>Optional: an <span className="font-medium">Email</span>. Each email only once.</li>
+          <li>
+            Optional: a <span className="font-medium">Phone</span> number. A South African number, written 082 123 4567 or +27 82 123 4567.
+            Spaces, brackets and dashes are fine.
+          </li>
+          <li>
+            Optional: a postal address, in the columns <span className="font-medium">Address</span>, <span className="font-medium">Address line 2</span>,{" "}
+            <span className="font-medium">Suburb</span>, <span className="font-medium">City</span> and <span className="font-medium">Postal code</span> (4 digits). Fill in as many as you have.
+          </li>
           <li>Optional: a <span className="font-medium">Note</span>, and <span className="font-medium">Tags</span> separated by semicolons, for example Volunteer; Newsletter. New tags are added to your tags.</li>
-          <li>Each email only once. Up to 1 000 people and 1 MB per file.</li>
+          <li>Up to 1 000 people and 1 MB per file.</li>
         </ul>
+        <p className="mt-3 text-sm text-muted">
+          Spreadsheets drop the 0 at the front of a phone number or postal code (082 123 4567 becomes 821234567, and 0157 becomes 157). Set those two columns
+          to Text before you save, or we&apos;ll point out the rows to fix.
+        </p>
+        <p className="mt-2 text-sm text-muted">
+          Leave ID and tax numbers out. Givezy only needs one for an s18A receipt, and the donor gives it with their gift, so a column of them isn&apos;t imported or kept.
+        </p>
         <div className="mt-4">
           <ActionLink href={`/charity-admin/${id}/donors/import/template`} download>Download the template (CSV)</ActionLink>
         </div>

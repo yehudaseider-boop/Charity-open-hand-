@@ -43,11 +43,11 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
   try {
     const { data: d, error } = await createAdminClient()
       .from("donations")
-      .select("id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_checkout_details(email, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
+      .select("id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en, thank_you_en), donation_checkout_details(email, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
       .eq("id", donationId)
       .single();
     if (error) throw error;
-    const charity = d.charities as unknown as { name_en: string };
+    const charity = d.charities as unknown as { name_en: string; thank_you_en: string | null };
     const details = d.donation_checkout_details as unknown as (S18aDetailsRow & { email: string }) | (S18aDetailsRow & { email: string })[] | null;
     const row = Array.isArray(details) ? details[0] : details;
     const email = row?.email;
@@ -70,6 +70,8 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
       manageUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
       id: d.id,
       charityName: charity.name_en,
+      // The charity's own thank-you paragraph, if it wrote one. Who gets this email is unchanged.
+      charityNote: charity.thank_you_en,
       amountCents: Number(d.amount_cents),
       contributionCents: Number(d.contribution_cents),
       cardChargeCents: Number(d.processing_charge_cents ?? 0),

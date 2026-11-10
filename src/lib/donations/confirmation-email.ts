@@ -1,5 +1,6 @@
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { noteHeading, thankYouNoteToShow } from "@/lib/charity/thank-you-note";
 import { donationReference } from "./reference";
 
 /**
@@ -27,11 +28,21 @@ export function confirmationEmail(d: {
   manageUrl?: string;
   /** "In memory of Chaim Cohen", if the donor dedicated the donation. */
   dedication?: string | null;
+  /**
+   * The charity's own thank-you paragraph, if it wrote one (10/11/2026). Plain text. It sits under its own
+   * "A note from <charity>" label; every other line here is Givezy's and is the same with or without it.
+   */
+  charityNote?: string | null;
 }) {
   const ref = donationReference(d.id);
+  const note = thankYouNoteToShow(d.charityNote);
+  const heading = `${noteHeading(d.charityName)}:`;
+  // In the plain-text version each line of the note is marked as quoted, so none of it can pass for a line of ours.
+  const inText = note ? [heading, ...note.split("\n").map((l) => (l ? `> ${l}` : ">"))].join("\n") : "";
   const lines = [
     `Thank you. Your donation to ${d.charityName} has gone through.`,
     "",
+    ...(note ? [inText, ""] : []),
     `Donation to ${d.charityName}: ${formatRand(d.amountCents)}`,
     ...(d.contributionCents > 0 ? [`Contribution to Givezy: ${formatRand(d.contributionCents)}`] : []),
     ...(d.cardChargeCents ? [`Card charge you covered, so ${d.charityName} gets the full donation: ${formatRand(d.cardChargeCents)}`] : []),
@@ -50,7 +61,12 @@ export function confirmationEmail(d: {
     "",
     "Givezy",
   ];
-  return { subject: `Your donation to ${d.charityName} (${ref})`, text: lines.join("\n") };
+  return {
+    subject: `Your donation to ${d.charityName} (${ref})`,
+    text: lines.join("\n"),
+    // The HTML email sets the note apart in its own box, and never turns anything in it into a link or a button.
+    ...(note ? { quoted: { heading, body: note, inText } } : {}),
+  };
 }
 
 function monthlyLines(d: { monthly?: Parameters<typeof confirmationEmail>[0]["monthly"]; manageUrl?: string; totalCents: number }): string[] {

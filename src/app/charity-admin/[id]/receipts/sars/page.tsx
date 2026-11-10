@@ -3,18 +3,24 @@ import Link from "next/link";
 import { Card, Notice } from "@/components/card";
 import { EmptyState, MiniStat, PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
+import { FocusOnArrive } from "@/components/done-panel-parts";
 import { SupportContact } from "@/components/legal";
 import { requireViewer } from "@/lib/auth";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { viewerRole } from "@/lib/charity/team";
-import { formatDate, formatDateTime, taxYearFor, taxYearName } from "@/lib/dates";
+import { formatDate, formatDateTime, isoDateInJhb, taxYearFor, taxYearName } from "@/lib/dates";
+import { firstParam } from "@/lib/form";
 import { formatRand } from "@/lib/money";
 import { it3dPeriodRange, PERIOD_LABELS, type It3dProblem } from "@/lib/receipts/it3d";
+import { HISTORY_KIND_LABELS } from "@/lib/receipts/it3d-history";
+import { HISTORY_SHOWN, loadIt3dHistory, type It3dHistoryRow } from "@/lib/receipts/it3d-history-store";
 import { prepareIt3d, readChoice } from "@/lib/receipts/it3d-request";
 import { it3dTaxYears } from "@/lib/receipts/it3d-store";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { saveSarsDetails } from "./actions";
-import { FileDownload, SarsDetailsForm, SheetDownload } from "./forms";
+import { plural } from "@/lib/text";
+import { showDay } from "@/lib/typed-date";
+import { markUploadedToSars, saveSarsDetails, unmarkUploadedToSars } from "./actions";
+import { FileDownload, MarkUploadedForm, SarsDetailsForm, SheetDownload, UnmarkUploadedForm } from "./forms";
 
 export const metadata: Metadata = { title: "SARS submission (IT3(d))" };
 
@@ -57,7 +63,22 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
   const choice = readChoice(first ?? years[0] ?? taxYearFor(now), typeof sp.period === "string" ? sp.period : "full_year", now)
     ?? { taxYear: years[0] ?? taxYearFor(now), period: "full_year" as const };
   const yearChoices = [...new Set([...years, choice.taxYear, taxYearFor(now), taxYearFor(now) - 1])].filter((y) => y >= 2022).sort((a, b) => b - a);
-  const result = await prepareIt3d(id, choice, { now });
+  // The history is read here, after the owner check above: the table is closed to every browser.
+  // A history that can't be read (a hiccup, or a database without its table yet) never takes the page down:
+  // the files still download, and the History card says plainly that it couldn't load.
+  const [result, historyRead] = await Promise.all([
+    prepareIt3d(id, choice, { now }),
+    loadIt3dHistory(id).catch((e: unknown) => {
+      console.error("[sars] history not loaded", e instanceof Error ? e.message : e);
+      return null;
+    }),
+  ]);
+  const history = historyRead ?? { rows: [], more: false };
+  const markedId = firstParam(sp.marked);
+  const justMarked = markedId ? history.rows.find((h) => h.id === markedId && h.uploadedOn) : undefined;
+  // Only while it is still true: an old link never claims a mark is on, or off, when it isn't.
+  const unmarkedId = firstParam(sp.unmarked);
+  const justUnmarked = !justMarked && Boolean(unmarkedId && history.rows.some((h) => h.id === unmarkedId && !h.uploadedOn));
   const range = it3dPeriodRange(choice.taxYear, choice.period);
   // The charity's own SARS details (never public). Read with the service role: the page has checked this is the owner.
   const { data: sars } = await createAdminClient().from("charity_private").select("tax_reference_number, legal_form, registration_number").eq("charity_id", id).maybeSingle();
@@ -160,6 +181,51 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
         </div>
       </Card>
 
+      <section id="sars-history" className="scroll-mt-4">
+        <Card title="History">
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Each time you download the capture sheet or the data file, it is listed here with its totals: no names or ID numbers are kept.
+              Givezy doesn&apos;t send anything to SARS and can&apos;t see what SARS received. &quot;Uploaded to SARS&quot; is your own note: Givezy doesn&apos;t check it with SARS.
+            </p>
+            {justMarked ? (
+              <FocusOnArrive label="What just happened" className="space-y-3 rounded-card border border-border bg-brand-soft p-4 text-sm">
+                <p className="flex items-start gap-2 font-medium text-navy">
+                  <span aria-hidden className="text-success">✓</span>
+                  <span>
+                    Marked as uploaded to SARS on {showDay(justMarked.uploadedOn)}. This is your own record, and Givezy hasn&apos;t checked it with SARS.
+                    Keep SARS&apos;s own confirmation with your records.
+                  </span>
+                </p>
+                <UnmarkUploadedForm action={unmarkUploadedToSars.bind(null, id, justMarked.id, choice.taxYear, choice.period)} />
+              </FocusOnArrive>
+            ) : justUnmarked ? (
+              <FocusOnArrive label="What just happened" className="rounded-card border border-border bg-honey-soft p-4 text-sm">
+                <p className="font-medium text-navy">Taken back. That download is no longer marked as uploaded. It is still in your history.</p>
+              </FocusOnArrive>
+            ) : null}
+            {historyRead === null ? (
+              <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">
+                We couldn&apos;t load your history just now. Your downloads above still work. Refresh the page in a minute to see it.
+              </p>
+            ) : history.rows.length ? (
+              <ul className="divide-y-2 divide-border">
+                {history.rows.map((h) => (
+                  <HistoryRow key={h.id} h={h} today={isoDateInJhb(now)}
+                    mark={markUploadedToSars.bind(null, id, h.id, choice.taxYear, choice.period)}
+                    unmark={unmarkUploadedToSars.bind(null, id, h.id, choice.taxYear, choice.period)} />
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-control bg-brand-soft p-3 text-sm text-indigo">
+                Nothing downloaded yet. When you download the capture sheet or the data file above, it shows here with the date, who downloaded it and its totals.
+              </p>
+            )}
+            {history.more ? <p className="text-xs text-muted">Showing your {HISTORY_SHOWN} most recent downloads. Need an older one? Tell us: <SupportContact />.</p> : null}
+          </div>
+        </Card>
+      </section>
+
       <section id="sars-details" className="scroll-mt-4">
         <Card title="Your charity's SARS details">
           <p className="mb-3 text-sm text-muted">
@@ -171,6 +237,39 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
         </Card>
       </section>
     </div>
+  );
+}
+
+type MarkAction = Parameters<typeof MarkUploadedForm>[0]["action"];
+
+/** One download in the history: when, who, what, its totals, and the owner's own "uploaded" note. */
+function HistoryRow({ h, today, mark, unmark }: { h: It3dHistoryRow; today: string; mark: MarkAction; unmark: MarkAction }) {
+  const period = `${h.period === "first_half" ? "First six months" : "Full tax year"}, ${taxYearName(h.taxYear)}`;
+  return (
+    <li className="space-y-2 py-4 text-sm first:pt-0 last:pb-0">
+      <p className="font-semibold text-indigo">
+        {HISTORY_KIND_LABELS[h.kind]}{h.testData ? " (test file)" : ""} <span className="font-normal text-navy">· {period}</span>
+      </p>
+      <p className="text-muted [overflow-wrap:anywhere]">
+        Downloaded {formatDateTime(h.createdAt)} by <span dir="auto">{h.who ?? "someone who no longer has a Givezy account"}</span>
+      </p>
+      <p className="tabular-nums [overflow-wrap:anywhere]">
+        {plural(h.receipts, "s18A receipt")} · {plural(h.donors, "donor")} · {plural(h.donations, "donation")} · <span className="font-semibold">{formatRand(h.totalCents)}</span>
+        {h.receiptsLeftOut ? <span className="text-muted"> · {plural(h.receiptsLeftOut, "receipt")} left out</span> : null}
+      </p>
+      {h.uploadedOn ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-control bg-success-soft p-3">
+          <p className="min-w-0 text-success [overflow-wrap:anywhere]">
+            <span className="font-semibold">Uploaded to SARS on {showDay(h.uploadedOn)}</span>
+            {h.uploadReference ? <> · Your reference: <span dir="auto">{h.uploadReference}</span></> : null}
+            <span className="block text-xs">Your own note, not checked with SARS.</span>
+          </p>
+          <UnmarkUploadedForm action={unmark} />
+        </div>
+      ) : (
+        <MarkUploadedForm action={mark} today={today} />
+      )}
+    </li>
   );
 }
 

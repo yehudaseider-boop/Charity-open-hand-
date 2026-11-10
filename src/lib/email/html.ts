@@ -109,16 +109,41 @@ function isCardBlock(lines: string[]): boolean {
  * blue button, labelled with the words already in front of it; every other address is a plain link.
  * The sign-off and the "you're getting this because" lines are set smaller, in slate.
  */
-export function textEmailHtml(args: { subject: string; text: string; siteUrl?: string }): string {
-  const blocks = args.text
-    .replace(/\r\n/g, "\n")
+export function textEmailHtml(args: { subject: string; text: string; siteUrl?: string; quoted?: { heading: string; body: string; inText: string } }): string {
+  const text = args.text.replace(/\r\n/g, "\n");
+  const state = { buttonUsed: false };
+  // Someone else's words inside our email (a charity's note): found exactly as the text has them, and set apart.
+  const marker = args.quoted ? args.quoted.inText.replace(/\r\n/g, "\n") : "";
+  const at = marker ? text.indexOf(marker) : -1;
+  const bodyHtml = at < 0 || !args.quoted
+    ? blocksHtml(text, state, args.siteUrl, true)
+    : [
+        blocksHtml(text.slice(0, at), state, args.siteUrl, false),
+        quotedHtml(args.quoted.heading, args.quoted.body),
+        blocksHtml(text.slice(at + marker.length), state, args.siteUrl, true),
+      ].filter(Boolean).join("\n");
+  return emailLayout({ title: args.subject, siteUrl: args.siteUrl, bodyHtml });
+}
+
+/**
+ * Words someone outside Givezy wrote, inside one of our emails: a white box with a lavender edge, under its
+ * own label. Escaped, line breaks kept, and nothing in it becomes a link, a button or a card of ours.
+ */
+export function quotedHtml(heading: string, body: string): string {
+  const lines = body.replace(/\r\n?/g, "\n").split("\n").map((l) => escHtml(l)).join("<br>");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;border-collapse:separate"><tr><td style="border:1px solid ${c.hairline};border-left:4px solid ${c.lilac};border-radius:12px;padding:14px 18px"><div dir="auto" style="margin:0 0 6px;font-size:14px;line-height:1.4;font-weight:700;color:${c.muted}">${escHtml(heading)}</div><div dir="auto" style="font-size:16px;line-height:1.55;color:${c.ink};word-break:break-word;overflow-wrap:anywhere">${lines}</div></td></tr></table>`;
+}
+
+function blocksHtml(text: string, state: { buttonUsed: boolean }, siteUrl: string | undefined, final: boolean): string {
+  const blocks = text
     .split(/\n\s*\n/)
     .map((b) => b.split("\n").map((l) => l.trimEnd()).filter((l) => l.trim() !== ""))
     .filter((b) => b.length > 0);
-  let buttonUsed = false;
+  const args = { siteUrl };
+  let buttonUsed = state.buttonUsed;
   const out: string[] = [];
   blocks.forEach((lines, bi) => {
-    const isLast = bi === blocks.length - 1;
+    const isLast = final && bi === blocks.length - 1;
     if (isLast && lines.length === 1 && lines[0].length <= 60 && /Givezy/.test(lines[0])) {
       out.push(paragraphHtml(escHtml(lines[0]), { muted: true }));
       return;
@@ -168,5 +193,6 @@ export function textEmailHtml(args: { subject: string; text: string; siteUrl?: s
     });
     flush();
   });
-  return emailLayout({ title: args.subject, siteUrl: args.siteUrl, bodyHtml: out.join("\n") });
+  state.buttonUsed = buttonUsed;
+  return out.join("\n");
 }

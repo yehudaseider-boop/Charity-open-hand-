@@ -1,3 +1,4 @@
+import { noteHeading, thankYouNoteToShow } from "@/lib/charity/thank-you-note";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SupportContact } from "@/components/legal";
@@ -76,7 +77,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // The donation id is not a secret (charity admins see it), so the donor's details
   // are read only for the signed-in donor (row-level security decides) or for
   // someone holding the credential that came with their payment link.
-  const select = "id, recurring_id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many)";
+  const select = "id, recurring_id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents, paid_at, wants_18a, dedication_kind, dedication_name, campaign_id, came_from, donation_giving_kinds(kind, label), charities(name_en, slug, thank_you_en, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many)";
   let d = null;
   if (ref && outcome !== "not_found") {
     if (holdsToken) {
@@ -85,7 +86,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       d = (await (await createClient()).from("donations").select(select).eq("gateway_ref", ref).maybeSingle()).data;
     }
   }
-  const charity = d?.charities as unknown as { name_en: string; slug: string; impact_en: string | null; impact_unit_cents: number | null; impact_unit_one: string | null; impact_unit_many: string | null } | undefined;
+  const charity = d?.charities as unknown as { name_en: string; slug: string; thank_you_en: string | null; impact_en: string | null; impact_unit_cents: number | null; impact_unit_one: string | null; impact_unit_many: string | null } | undefined;
   type LabelRow = { kind: string | null; label: string | null };
   const kindRow = d?.donation_giving_kinds as unknown as LabelRow | LabelRow[] | null | undefined;
   const givingLabel = labelOf(Array.isArray(kindRow) ? kindRow[0] : kindRow);
@@ -120,6 +121,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     const loaded = d.wants_18a && completer ? await loadS18aToComplete(d.id, completer).catch((e) => (console.error(e), "unavailable" as const)) : null;
     const toComplete = loaded === "unavailable" ? null : loaded;
     const s18aUnchecked = loaded === "unavailable";
+    const charityNote = thankYouNoteToShow(charity.thank_you_en);
     return (
       <Result
         tone="paid"
@@ -135,6 +137,13 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             {paysFor ? <p className="mt-1 font-display text-xl leading-snug text-navy">{paysFor}.</p> : null}
             {charity.impact_en?.trim() ? <p className={paysFor ? "mt-2 text-sm text-navy" : "mt-1 font-display text-xl leading-snug text-navy"}>{charity.impact_en.trim()}</p> : null}
             {paysFor && unit ? <p className="mt-2 text-xs text-muted">{impactSource(charity.name_en, unit)}</p> : null}
+          </div>
+        ) : null}
+        {/* The charity's own thank-you paragraph, under its own label: the same one the confirmation email and the app carry. */}
+        {charityNote ? (
+          <div className="mb-5 rounded-control border-2 border-border border-l-4 border-l-honey p-4">
+            <p className="text-sm font-semibold text-muted" dir="auto">{noteHeading(charity.name_en)}</p>
+            <p className="mt-1 whitespace-pre-line text-navy [overflow-wrap:anywhere]" dir="auto">{charityNote}</p>
           </div>
         ) : null}
         <dl className="space-y-1.5 rounded-control border-2 border-border p-4 text-[15px] tabular-nums">

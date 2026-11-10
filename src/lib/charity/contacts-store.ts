@@ -19,7 +19,12 @@ export type ContactRow = {
   organisation_name: string | null;
   email: string | null;
   phone: string | null;
+  /** The postal address, for one line on the donors list (contactAddress in contacts.ts). */
+  address_line1: string | null;
+  address_line2: string | null;
+  suburb: string | null;
   city: string | null;
+  postal_code: string | null;
   note: string | null;
   created_at: string;
   tag_ids: string[];
@@ -32,7 +37,7 @@ export async function loadContacts(charityId: string): Promise<ContactRow[]> {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from("charity_contacts")
-      .select("id, import_id, first_name, last_name, organisation_name, email, phone, city, note, created_at, charity_contact_tags(tag_id)")
+      .select("id, import_id, first_name, last_name, organisation_name, email, phone, address_line1, address_line2, suburb, city, postal_code, note, created_at, charity_contact_tags(tag_id)")
       .eq("charity_id", charityId)
       .order("created_at", { ascending: false })
       .order("id")

@@ -12,6 +12,13 @@ let recipients = new Map<string, string>();
 let statusSaveFails = false;
 const neqs: string[] = [];
 const tokens: Record<string, string>[] = [];
+/** Donors who already had a message from the charity this week, and what the check was asked. */
+let messaged = new Set<string>();
+const weekChecks: { donors: { donorId: string; hash: string }[]; except: unknown }[] = [];
+vi.mock("@/lib/charity/weekly-limit", () => ({
+  WEEKLY_LIMIT: "Givezy sends each donor at most one message a week from your charity.",
+  messagedThisWeek: async (_c: string, donors: { donorId: string; hash: string }[], _now: Date, except: unknown) => (weekChecks.push({ donors, except }), new Set(donors.map((d) => d.donorId).filter((id) => messaged.has(id)))),
+}));
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ send: async (m: { to: string; text: string }) => (sent.push(m), "sent") }) }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -65,7 +72,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 const { continueThankYou, sendThankYou } = await import("@/lib/charity/thank-you-send");
-const gift = (email: string, first: string | null, erased = false) => ({ id: email, donation_checkout_details: { email, first_name: first, erased_at: erased ? "2026-10-01" : null } });
+const gift = (email: string, first: string | null, erased = false) => ({ id: email, donor_id: `d-${email.toLowerCase()}`, donation_checkout_details: { email, first_name: first, erased_at: erased ? "2026-10-01" : null } });
 const args = { charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", body: "Thank you, truly.", userId: "u1" };
 
 beforeEach(() => {
@@ -75,6 +82,8 @@ beforeEach(() => {
   recipients = new Map();
   optedOut = [];
   statusSaveFails = false;
+  messaged = new Set();
+  weekChecks.length = 0;
   process.env.SITE_URL = "https://g.test";
 });
 
@@ -94,6 +103,28 @@ describe("sending a thank-you", () => {
     expect(month?.finished_at).not.toBeNull();
     // Only people who gave on Givezy: never an address a charity typed into a recorded gift.
     expect(neqs).toContain("donations.gateway!=recorded");
+  });
+
+  it("leaves out donors who already had a message from the charity this week, and says how many", async () => {
+    donations = [gift("sarah@x.co", "Sarah"), gift("david@x.co", "David")];
+    messaged = new Set(["d-sarah@x.co"]);
+    const r = await sendThankYou(args);
+    expect(r).toMatchObject({ ok: true, sent: 1, failed: 0, remaining: 0, thisWeek: 1 });
+    expect(sent.map((m) => m.to)).toEqual(["david@x.co"]);
+    // This thank-you's own claims never count against it.
+    expect(weekChecks[0].except).toEqual({ thankYouId: "t1" });
+    expect(weekChecks[0].donors).toEqual([{ donorId: "d-sarah@x.co", hash: emailHash("sarah@x.co") }, { donorId: "d-david@x.co", hash: emailHash("david@x.co") }]);
+  });
+
+  it("when everyone already had a message this week, nothing is sent and the month is handed back", async () => {
+    donations = [gift("sarah@x.co", "Sarah")];
+    messaged = new Set(["d-sarah@x.co"]);
+    const r = await sendThankYou(args);
+    expect(r).toEqual({
+      ok: false,
+      message: "Everyone who gave that month already had a message from you this week, so nothing was sent. Givezy sends each donor at most one message a week from your charity. You can send this thank-you from Monday.",
+    });
+    expect(sent).toHaveLength(0);
   });
 
   it("only once for a month", async () => {

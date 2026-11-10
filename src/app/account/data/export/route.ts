@@ -57,9 +57,9 @@ export async function GET(request: Request) {
     donations.push(...((data ?? []) as Record<string, unknown>[]));
     if (!data || data.length < 1000) break;
   }
-  // Charities' personal thank-you notes to this person (a server-only table).
+  // Charities' personal thank-you notes and s18A details reminders to this person (a server-only table; `kind` says which).
   const thanks = donorIds.length
-    ? await createAdminClient().from("charity_donor_thanks").select("body, sent_at, charities(name_en)").in("donor_id", donorIds).order("sent_at")
+    ? await createAdminClient().from("charity_donor_thanks").select("kind, body, sent_at, charities(name_en)").in("donor_id", donorIds).order("sent_at")
     : { data: [], error: null };
   if (thanks.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   const [myReceipts, monthly] = donorIds.length
