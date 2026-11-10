@@ -14,7 +14,9 @@ const GEN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CAMP = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const WIN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
+const reads: Record<string, number> = {};
 function from(table: string) {
+  reads[table] = (reads[table] ?? 0) + 1;
   const filters: ((r: Row) => boolean)[] = [];
   let op: { kind: "select" } | { kind: "update"; set: Row } | { kind: "upsert"; rows: Row[]; conflict: string[] } = { kind: "select" };
   let lim = Infinity;
@@ -84,6 +86,7 @@ const gift = (donor_id: string, paid_at: string, campaign_id: string | null = nu
 
 beforeEach(() => {
   forgetJourneysV2();
+  for (const k of Object.keys(reads)) delete reads[k];
   tables = {
     charity_journeys: [
       { id: GEN, kind: "general", campaign_id: null, charity_id: C, enabled: true, switched_on_at: "2026-11-01T00:00:00Z" },
@@ -111,6 +114,18 @@ describe("the daily run with campaign and win-back journeys", () => {
     expect(on(GEN)).toEqual(["new", "plain"]);
     expect(on(WIN)).toEqual([]);
     expect(tables.charity_journey_enrolments.every((e) => e.charity_id === C && e.source === "new_gift")).toBe(true);
+    // Every switched-on journey's emails come in one read, not one per journey.
+    expect(reads.charity_journey_steps).toBe(1);
+  });
+
+  it("finds a win-back donor who gave again however long the list is (it reads every page)", async () => {
+    for (let i = 0; i < 1500; i++) {
+      tables.charity_journey_enrolments.push({ id: `w${String(i).padStart(4, "0")}`, charity_id: C, journey_id: WIN, donor_id: `d${i}`, source: "winback", status: "active", enrolled_at: "2026-11-02T08:00:00Z", next_step: 1, next_due_at: "2026-11-30T08:00:00Z", attempts: 0 });
+    }
+    tables.donations.push(gift("d1499", "2026-11-08T08:00:00Z"));
+    const run = await runJourneys(new Date("2026-11-10T06:00:00Z"), Date.now() + 10_000);
+    expect(run.stopped).toBe(1);
+    expect(tables.charity_journey_enrolments.find((e) => e.donor_id === "d1499")).toMatchObject({ status: "stopped", stopped_reason: "gave_again" });
   });
 
   it("a win-back donor who gives again leaves it; one who hasn't stays", async () => {

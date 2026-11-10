@@ -247,6 +247,8 @@ export function gaveAgain(enrolledAt: Date, lastPaidAt: Date | null): boolean {
 
 /** The most donors one press of "Add to win-back journey" takes, and the presses a day. */
 export const WINBACK_PRESS_CAP = 100;
+/** The most donors on a list that are screened for one press (everyone left out is counted before the cap). */
+export const WINBACK_SCREEN_CAP = 5000;
 export const WINBACK_PRESSES_PER_DAY = 5;
 
 /** The donors chosen on a list, cleaned: real ids only, each once, at most the cap; how many were over it. */
@@ -255,16 +257,23 @@ export function chosenDonors(raw: unknown[], cap = WINBACK_PRESS_CAP): { ids: st
   return { ids: ids.slice(0, cap), over: Math.max(0, ids.length - cap) };
 }
 
-/** "Add to win-back journey": who joins and why each other donor doesn't, as for existing donors. */
-export function planWinback<T extends ExistingCandidate>(candidates: T[]) {
-  return planExisting(candidates);
+/**
+ * "Add to win-back journey": who joins and why each other donor doesn't, as for existing donors. Everyone is screened
+ * first (already on it, erased, turned off emails, only recorded gifts); only then are those who can join capped, so
+ * the left-out never use up places and the next press picks up where this one stopped. `left` are those who could
+ * join but are over the cap: they can be added with the next press.
+ */
+export function planWinback<T extends ExistingCandidate>(candidates: T[], cap = WINBACK_PRESS_CAP): { add: T[]; skipped: Record<ExistingSkip, number>; left: number } {
+  const plan = planExisting(candidates);
+  return { add: plan.add.slice(0, cap), skipped: plan.skipped, left: Math.max(0, plan.add.length - cap) };
 }
 
 /** What the page says after adding donors to the win-back journey. Counts only. */
-export function winbackOutcome(r: { added: number; skipped: Partial<Record<ExistingSkip, number>>; firstEmail: string | null }): string {
+export function winbackOutcome(r: { added: number; skipped: Partial<Record<ExistingSkip, number>>; firstEmail: string | null; left?: number }): string {
   return [
     r.added ? `${plural(r.added, "donor")} ${r.added === 1 ? "is" : "are"} on your win-back journey now.${r.firstEmail ? ` Their first email goes from ${r.firstEmail}, never more than one message from you a week. Anyone who gives again leaves it.` : ""}` : "Nobody new was added.",
     existingSkippedSentence(r.skipped),
+    r.left ? `${plural(r.left, "more donor")} on this list can join: press "Add everyone on this list" again to add the next ${WINBACK_PRESS_CAP}.` : "",
   ].filter(Boolean).join(" ");
 }
 

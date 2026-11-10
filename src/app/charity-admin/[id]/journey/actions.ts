@@ -10,6 +10,7 @@ import {
   JOURNEY_MAX_STEPS,
   WINBACK,
   WINBACK_PRESSES_PER_DAY,
+  WINBACK_SCREEN_CAP,
   checkJourneySteps,
   chosenDonors,
   existingOutcome,
@@ -26,6 +27,7 @@ import { formatDate } from "@/lib/dates";
 import type { FormState } from "@/lib/form";
 import { hitRateLimit, rateLimitReached } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { winbackListDonors, type WinbackSource } from "@/lib/charity/winback-lists";
 
 /**
  * The donor journeys (CRM steps 6a, 6b and 7, 10/11/2026): the general journey, one per campaign, and win-back.
@@ -153,7 +155,7 @@ export async function addExisting(charityId: string, _prev: FormState, _formData
  * asked first on the page with the count and who is left out. At most WINBACK_PRESS_CAP a press and
  * WINBACK_PRESSES_PER_DAY presses a day. Undo takes off those who haven't had an email yet.
  */
-export async function addWinback(charityId: string, donorIds: string[], _prev: FormState, _formData: FormData): Promise<FormState> {
+export async function addWinback(charityId: string, source: WinbackSource, donorIds: string[], _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
   if (!(await isOwner(charityId))) return { ok: false, message: "Only your charity's owner can add donors to the win-back journey. Nobody was added." };
@@ -161,8 +163,16 @@ export async function addWinback(charityId: string, donorIds: string[], _prev: F
   if (!(await journeysV2())) return { ok: false, message: "The win-back journey isn't switched on for your charity yet. Nobody was added." };
   const state = await readJourneyState(charityId, WINBACK);
   if (!state.enabled) return { ok: false, message: "Switch your win-back journey on first, then add donors. Nobody was added." };
-  const { ids } = chosenDonors(donorIds);
-  if (!ids.length) return { ok: false, message: "Choose at least one donor first. Nobody was added." };
+  // Only donors on the named list now (worked out again here, whatever ids the page sent), screened, then capped.
+  let onList: string[];
+  try {
+    onList = await winbackListDonors(charityId, source);
+  } catch (e) {
+    console.error("[journey] win-back list not read", e instanceof Error ? e.message : e);
+    return { ok: false, message: "We couldn't read that list just now, so nobody was added. Please try again in a moment." };
+  }
+  const { ids } = chosenDonors(donorIds.filter((d) => onList.includes(String(d).trim().toLowerCase())), WINBACK_SCREEN_CAP);
+  if (!ids.length) return { ok: false, message: "None of the donors chosen are on that list any more. Nobody was added." };
   const keys = [`charity:${charityId}`];
   if (await rateLimitReached("journey-winback", keys, WINBACK_PRESSES_PER_DAY, 24 * 60)) {
     return { ok: false, message: `You've added donors to the win-back journey ${WINBACK_PRESSES_PER_DAY} times today, the most for one day. Nobody was added. Please try again tomorrow.` };
@@ -176,13 +186,13 @@ export async function addWinback(charityId: string, donorIds: string[], _prev: F
     return { ok: false, message: "Something went wrong on our side. Anyone added before it stopped stays on, and nobody is added twice, so you can safely try again." };
   }
   const firstEmail = r.firstDue ? formatDate(r.firstDue) : null;
-  if (!r.ids.length) return { ok: false, message: winbackOutcome({ added: 0, skipped: r.skipped, firstEmail }) };
+  if (!r.ids.length) return { ok: false, message: winbackOutcome({ added: 0, skipped: r.skipped, firstEmail, left: r.left }) };
   await logAudit({ actorUserId: viewer.userId, action: "charity.journey_winback_added", entityType: "charity", entityId: charityId, details: { added: r.ids.length, ...r.skipped } });
   const done = await recordAction(
     charityId,
     viewer.userId,
     "journey_winback_added",
-    { added: r.ids.length, firstEmail, jkey: "winback", ...Object.fromEntries(EXISTING_SKIPS.map((k) => [`skipped_${k}`, r.skipped[k]])) },
+    { added: r.ids.length, firstEmail, jkey: "winback", left: r.left, ...Object.fromEntries(EXISTING_SKIPS.map((k) => [`skipped_${k}`, r.skipped[k]])) },
     r.ids.length <= UNDO_IDS ? { type: "journey_enrolments", ids: r.ids } : null,
   );
   revalidatePath(page(charityId, WINBACK));

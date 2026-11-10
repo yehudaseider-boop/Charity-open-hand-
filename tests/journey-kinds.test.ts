@@ -111,6 +111,18 @@ describe("choosing donors for the win-back journey", () => {
     );
     expect(winbackOutcome({ added: 0, skipped: { already: 2 }, firstEmail: null })).toBe("Nobody new was added. 2 aren't added: 2 already on your journey.");
   });
+
+  it("screens everyone first and only then caps who joins, so those left out never use up places", () => {
+    const list = Array.from({ length: 250 }, (_, i) => ({ donorId: id(i), already: i < 100, erased: i >= 100 && i < 110, email: i >= 110 && i < 115 ? null : `d${i}@example.org`, optedOut: false }));
+    const plan = planWinback(list);
+    // 100 already on it, 10 erased and 5 recorded-only are screened out; of the 135 who can join, 100 now, 35 next time.
+    expect(plan.skipped).toEqual({ already: 100, erased: 10, opted_out: 0, recorded_only: 5 });
+    expect(plan.add.map((c) => c.donorId)).toEqual(list.slice(115, 215).map((c) => c.donorId));
+    expect(plan.left).toBe(35);
+    expect(winbackOutcome({ added: 100, skipped: {}, firstEmail: null, left: 35 })).toBe(
+      `100 donors are on your win-back journey now. 35 more donors on this list can join: press "Add everyone on this list" again to add the next ${WINBACK_PRESS_CAP}.`,
+    );
+  });
 });
 
 describe("what just happened, and the activity log", () => {

@@ -57,9 +57,9 @@ describe("the charity's journeys", () => {
       await refused("insert into public.charity_journeys (charity_id, kind) values ($1, 'campaign')", [charity], /charity_journey_campaign/);
       await refused("insert into public.charity_journeys (charity_id, kind, campaign_id) values ($1, 'winback', $2)", [other, theirs], /charity_journey_campaign/);
       await refused("insert into public.charity_journeys (charity_id, kind) values ($1, 'newsletter')", [charity], /charity_journey_kind/);
-      // The campaign's journey goes with the campaign.
-      await run("delete from public.campaigns where id = $1", [mine]);
-      expect(Number((await run("select count(*) from public.charity_journeys where charity_id = $1 and kind = 'campaign'", [charity])).rows[0].count)).toBe(0);
+      // A campaign with a journey can't be deleted: its history is kept (the website ends it instead).
+      await refused("delete from public.campaigns where id = $1", [mine], /charity_journey_own_campaign/);
+      expect(Number((await run("select count(*) from public.charity_journeys where charity_id = $1 and kind = 'campaign'", [charity])).rows[0].count)).toBe(1);
     });
   });
 

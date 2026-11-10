@@ -275,13 +275,13 @@ export async function planWinbackDonors(charityId: string, donorIds: string[]) {
 }
 
 /** Adds them to the win-back journey (it must be on). Returns the new enrolments' ids (for Undo) and the counts. */
-export async function addWinbackDonors(charityId: string, donorIds: string[], now = new Date()): Promise<{ ids: string[]; skipped: Record<ExistingSkip, number>; firstDue: string | null }> {
+export async function addWinbackDonors(charityId: string, donorIds: string[], now = new Date()): Promise<{ ids: string[]; skipped: Record<ExistingSkip, number>; firstDue: string | null; left: number }> {
   const { journey, plan } = await planWinbackDonors(charityId, donorIds);
-  if (!journey.id || !journey.enabled || !journey.steps.length) return { ids: [], skipped: plan.skipped, firstDue: null };
+  if (!journey.id || !journey.enabled || !journey.steps.length) return { ids: [], skipped: plan.skipped, firstDue: null, left: 0 };
   const due = firstDue(now, journey.steps).toISOString();
   const ids = await insertEnrolments(charityId, journey, plan.add.map((c) => c.donorId), "winback", now, due);
   plan.skipped.already += plan.add.length - ids.length;
-  return { ids, skipped: plan.skipped, firstDue: due };
+  return { ids, skipped: plan.skipped, firstDue: due, left: plan.left };
 }
 
 export type JourneyRun = {
@@ -307,7 +307,7 @@ function failedForSure(e: unknown): boolean {
 }
 
 type Live = { charityId: string; id: string | null; kind: JourneyKind; campaignId: string | null; switchedOnAt: Date; name: string; slug: string; steps: JourneyStep[] };
-type DueRow = { id: string; charity_id: string; journey_id?: string | null; donor_id: string; next_step: number; attempts: number };
+type DueRow = { id: string; charity_id: string; journey_id?: string | null; donor_id: string; next_step: number; attempts: number; enrolled_at?: string | null };
 
 /**
  * The daily job's part (after collections, checks and the alert to Givezy): add new donors to switched-on journeys,
@@ -330,15 +330,41 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
     .eq("enabled", true);
   if (isMissingTable(error)) return { ...out, notSetUp: true };
   if (error) throw error;
-  const live: Live[] = [];
+  type Candidate = { charityId: string; row: JourneyRow; switchedOnAt: Date; name: string; slug: string };
+  const candidates: Candidate[] = [];
   for (const j of (journeys ?? []) as unknown as Record<string, unknown>[]) {
     const raw = j.charities as unknown;
     const c = (Array.isArray(raw) ? raw[0] : raw) as { status: string; name_en: string; slug: string } | null;
     // Only a charity whose page is live sends anything.
     if (!c || c.status !== "approved" || !j.switched_on_at) continue;
-    const row = rowOf(j);
-    const steps = await journeySteps(j.charity_id as string, row);
-    if (steps.length) live.push({ charityId: j.charity_id as string, id: row.id, kind: row.kind, campaignId: row.campaignId, switchedOnAt: new Date(j.switched_on_at as string), name: c.name_en, slug: c.slug, steps });
+    candidates.push({ charityId: j.charity_id as string, row: rowOf(j), switchedOnAt: new Date(j.switched_on_at as string), name: c.name_en, slug: c.slug });
+  }
+  // Every switched-on journey's emails in one read (by journey once they have ids, by charity before).
+  const stepsBy = new Map<string, JourneyStep[]>();
+  const keyOf = (charityId: string, row: Pick<JourneyRow, "id">) => row.id ?? `charity:${charityId}`;
+  const journeyIds = candidates.map((x) => x.row.id).filter((x): x is string => Boolean(x));
+  const charityIds = candidates.filter((x) => !x.row.id).map((x) => x.charityId);
+  for (const [col, list] of [["journey_id", journeyIds], ["charity_id", charityIds]] as const) {
+    for (let i = 0; i < list.length; i += 200) {
+      if (Date.now() >= deadline) return out;
+      const { data, error: e } = await db()
+        .from("charity_journey_steps")
+        .select(col === "journey_id" ? "journey_id, charity_id, position, subject, body, wait_days" : "charity_id, position, subject, body, wait_days")
+        .in(col, list.slice(i, i + 200))
+        .order("position");
+      if (e) throw e;
+      for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
+        const k = col === "journey_id" ? (r.journey_id as string) : `charity:${r.charity_id as string}`;
+        stepsBy.set(k, [...(stepsBy.get(k) ?? []), { subject: r.subject as string, body: r.body as string, waitDays: Number(r.wait_days), position: Number(r.position) } as JourneyStep & { position: number }]);
+      }
+    }
+  }
+  const live: Live[] = [];
+  for (const x of candidates) {
+    const steps = ((stepsBy.get(keyOf(x.charityId, x.row)) ?? []) as (JourneyStep & { position: number })[])
+      .sort((a, b) => a.position - b.position)
+      .map(({ subject, body, waitDays }) => ({ subject, body, waitDays }));
+    if (steps.length) live.push({ charityId: x.charityId, id: x.row.id, kind: x.row.kind, campaignId: x.row.campaignId, switchedOnAt: x.switchedOnAt, name: x.name, slug: x.slug, steps });
   }
   // Win-back donors who have given again leave it before anything is sent.
   out.stopped += await stopGaveAgain(live.filter((j) => j.kind === "winback"), now, deadline);
@@ -356,7 +382,7 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
     const ids = js.map((j) => j.id).filter((x): x is string => Boolean(x));
     let q = db()
       .from("charity_journey_enrolments")
-      .select(ids.length ? "id, charity_id, journey_id, donor_id, next_step, attempts" : "id, charity_id, donor_id, next_step, attempts")
+      .select(ids.length ? "id, charity_id, journey_id, donor_id, next_step, attempts, enrolled_at" : "id, charity_id, donor_id, next_step, attempts")
       .eq("charity_id", charityId)
       .eq("status", "active")
       .lte("next_due_at", now.toISOString());
@@ -378,6 +404,31 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
   return out;
 }
 
+async function stopGaveAgainRow(id: string, now: Date): Promise<void> {
+  const { error } = await db().from("charity_journey_enrolments").update({ status: "stopped", stopped_reason: "gave_again", updated_at: now.toISOString() }).eq("id", id).eq("status", "active");
+  if (error) throw error;
+}
+
+/** Of these win-back rows, the ids of those whose donor gave again (a gift that went through after they were added). */
+async function gaveAgainRows(charityId: string, rows: { id: string; donor_id: string; enrolled_at?: string | null }[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  const withDate = rows.filter((r) => r.enrolled_at);
+  for (let i = 0; i < withDate.length; i += 200) {
+    const chunk = withDate.slice(i, i + 200);
+    const earliest = new Date(Math.min(...chunk.map((r) => Date.parse(r.enrolled_at!)))).toISOString();
+    const { data, error } = await db().from("donations").select("donor_id, paid_at").eq("charity_id", charityId).eq("status", "paid").in("donor_id", chunk.map((r) => r.donor_id)).gt("paid_at", earliest);
+    if (error) throw error;
+    const last = new Map<string, Date>();
+    for (const g of data ?? []) {
+      const at = new Date(g.paid_at as string);
+      const had = last.get(g.donor_id as string);
+      if (!had || at > had) last.set(g.donor_id as string, at);
+    }
+    for (const r of chunk) if (gaveAgain(new Date(r.enrolled_at!), last.get(r.donor_id) ?? null)) out.add(r.id);
+  }
+  return out;
+}
+
 /**
  * Win-back donors who gave again (any gift that went through, after they were added) leave the win-back journey
  * ('gave_again'). Returns how many.
@@ -386,9 +437,20 @@ async function stopGaveAgain(winbacks: Live[], now: Date, deadline: number): Pro
   let stopped = 0;
   for (const j of winbacks) {
     if (!j.id || Date.now() >= deadline) continue;
-    const { data: rows, error } = await db().from("charity_journey_enrolments").select("id, donor_id, enrolled_at").eq("charity_id", j.charityId).eq("journey_id", j.id).eq("status", "active").limit(2000);
-    if (error) throw error;
-    const enrolled = new Map((rows ?? []).map((r) => [r.donor_id as string, { id: r.id as string, at: new Date(r.enrolled_at as string) }]));
+    const enrolled = new Map<string, { id: string; at: Date }>();
+    for (let from = 0; ; from += 1000) {
+      const { data: rows, error } = await db()
+        .from("charity_journey_enrolments")
+        .select("id, donor_id, enrolled_at")
+        .eq("charity_id", j.charityId)
+        .eq("journey_id", j.id)
+        .eq("status", "active")
+        .order("id")
+        .range(from, from + 999);
+      if (error) throw error;
+      for (const r of rows ?? []) enrolled.set(r.donor_id as string, { id: r.id as string, at: new Date(r.enrolled_at as string) });
+      if (!rows || rows.length < 1000 || Date.now() >= deadline) break;
+    }
     const ids = [...enrolled.keys()];
     const last = new Map<string, Date>();
     for (let i = 0; i < ids.length; i += 200) {
@@ -403,8 +465,7 @@ async function stopGaveAgain(winbacks: Live[], now: Date, deadline: number): Pro
     }
     for (const [donorId, e] of enrolled) {
       if (!gaveAgain(e.at, last.get(donorId) ?? null)) continue;
-      const { error: u } = await db().from("charity_journey_enrolments").update({ status: "stopped", stopped_reason: "gave_again", updated_at: now.toISOString() }).eq("id", e.id).eq("status", "active");
-      if (u) throw u;
+      await stopGaveAgainRow(e.id, now);
       stopped++;
     }
   }
@@ -483,6 +544,9 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
     return c ? [{ donorId: id, hash: emailHash(c.email) }] : [];
   });
   const [stopped, recent] = await Promise.all([optedOutHashes(charityId, withEmail.map((d) => d.hash)), messagedThisWeek(charityId, withEmail, now)]);
+  // A win-back donor who gave again since the morning's sweep read the list: they leave it here, never emailed.
+  const winbackIds = new Set(js.filter((x) => x.kind === "winback" && x.id).map((x) => x.id!));
+  const gaveAgainNow = await gaveAgainRows(charityId, list.filter((r) => r.journey_id && winbackIds.has(r.journey_id)));
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   const week = weekStart(now);
   const update = (id: string, set: Record<string, unknown>) => db().from("charity_journey_enrolments").update({ ...set, updated_at: new Date().toISOString() }).eq("id", id).eq("status", "active");
@@ -497,6 +561,11 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
     const j = journeyOf(r);
     // Its journey was switched off or emptied since the list was read: it waits.
     if (!j) continue;
+    if (gaveAgainNow.has(r.id)) {
+      await stopGaveAgainRow(r.id, now);
+      out.stopped++;
+      continue;
+    }
     const contact = who.byDonor.get(r.donor_id) ?? null;
     const decision = decideDue(
       { hasGift: who.found.has(r.donor_id), erased: who.erased.has(r.donor_id), email: contact?.email ?? null, optedOut: contact ? stopped.has(emailHash(contact.email)) : false, messagedThisWeek: recent.has(r.donor_id), nextStep: r.next_step },

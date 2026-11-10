@@ -205,6 +205,7 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
           added: Number(d.added ?? 0),
           skipped: Object.fromEntries(EXISTING_SKIPS.map((k) => [k, Number(d[`skipped_${k}`] ?? 0)])),
           firstEmail: d.firstEmail ? String(d.firstEmail) : null,
+          left: Number(d.left ?? 0),
         }),
         next: { label: "See who is on your win-back journey", href: `${c.base}/journey?j=winback#people` },
       };

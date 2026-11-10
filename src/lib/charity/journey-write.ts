@@ -85,15 +85,19 @@ export async function writeJourney(charityId: string, userId: string | null, sta
     return;
   }
   if (!(await journeysV2())) throw new Error("journeys_not_set_up");
-  const { error } = await db().rpc("save_journey", {
-    p_charity_id: charityId,
-    p_kind: ref.kind,
-    p_campaign_id: ref.kind === "campaign" ? ref.campaignId : null,
-    p_enabled: enabled,
-    p_switched_on_at: state.switched_on_at,
-    p_steps: steps,
-    p_user: userId,
-  });
+  const save = () =>
+    db().rpc("save_journey", {
+      p_charity_id: charityId,
+      p_kind: ref.kind,
+      p_campaign_id: ref.kind === "campaign" ? ref.campaignId : null,
+      p_enabled: enabled,
+      p_switched_on_at: state.switched_on_at,
+      p_steps: steps,
+      p_user: userId,
+    });
+  let { error } = await save();
+  // Two first saves of the same journey at once: one made it a moment ago, so the second saves onto it.
+  if (error?.code === "23505") ({ error } = await save());
   if (error) throw error;
 }
 

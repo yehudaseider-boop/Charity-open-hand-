@@ -5,12 +5,9 @@ import { Card, Notice } from "@/components/card";
 import { PageHeader, secondaryAction } from "@/components/dash";
 import { ActionForm } from "@/components/forms/action-form";
 import { requireViewer } from "@/lib/auth";
-import { WINBACK_PRESS_CAP, chosenDonors, existingSkippedSentence, firstDue } from "@/lib/charity/journey";
+import { WINBACK_PRESS_CAP, WINBACK_SCREEN_CAP, chosenDonors, existingSkippedSentence, firstDue } from "@/lib/charity/journey";
 import { journeysV2, planWinbackDonors } from "@/lib/charity/journey-store";
-import { keepingDetails, keepingListKey, keepingListRows, keepingWindow, keepingYearKey } from "@/lib/charity/keeping-donors";
-import { loadKeepingDonors } from "@/lib/charity/keeping-donors-queries";
-import { lapsedDetails, lapsedPeriod, lapsedPeriodKey } from "@/lib/charity/lapsed-monthly";
-import { loadLapsedMonthly } from "@/lib/charity/lapsed-monthly-queries";
+import { winbackListDonors, winbackSource } from "@/lib/charity/winback-lists";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { isOwner } from "@/lib/charity/team";
 import { formatDate } from "@/lib/dates";
@@ -30,7 +27,7 @@ export default async function WinbackPage({ params, searchParams }: PageProps<"/
   await requireViewer(`/charity-admin/${id}/journey/winback`);
   const { charity } = await loadCharityForManager(id);
   const base = `/charity-admin/${id}`;
-  const from = sp.list === "stopped" ? "stopped" : sp.list === "lybunt" || sp.list === "sybunt" ? "keeping" : "chosen";
+  const from = sp.list === "stopped" ? "stopped" : "keeping";
   const back =
     from === "stopped"
       ? { href: `${base}/monthly/stopped${typeof sp.period === "string" ? `?period=${encodeURIComponent(sp.period)}` : ""}`, label: "← Monthly donors who stopped" }
@@ -47,21 +44,22 @@ export default async function WinbackPage({ params, searchParams }: PageProps<"/
   if (charity.status !== "approved") return shell(<Notice tone="warning">You can add donors once your page is live. Nothing was changed.</Notice>);
   if (!(await journeysV2())) return shell(<Notice>The win-back journey isn&apos;t switched on for your charity yet. Nothing was changed.</Notice>);
 
-  // The donors: those ticked on the list, or everyone on it with a page (up to the cap), worked out again here.
+  // The list is worked out again here: only donors really on it can be added, whatever ids the link carries. Everyone
+  // on it (or everyone ticked) is screened first; only then is the number who join capped.
+  const source = winbackSource(sp);
   let raw: string[] = [];
+  let plan: Awaited<ReturnType<typeof planWinbackDonors>> | null = null;
   let readFailed = false;
-  try {
-    if (from === "stopped" && sp.all === "1") {
-      const rows = await loadLapsedMonthly(id, lapsedPeriod(lapsedPeriodKey(sp.period), new Date()));
-      raw = rows.map((r) => lapsedDetails(r).donorId).filter((x): x is string => Boolean(x));
-    } else if (from === "keeping" && sp.all === "1") {
-      const rows = await loadKeepingDonors(id, keepingWindow(keepingYearKey(sp.year), new Date()));
-      raw = keepingListRows(rows, keepingListKey(sp.list)).map((r) => keepingDetails(r).donorId).filter((x): x is string => Boolean(x));
-    } else {
-      raw = ([] as unknown[]).concat(sp.d ?? []).map(String);
+  if (source) {
+    try {
+      const onList = await winbackListDonors(id, source);
+      raw = sp.all === "1" ? onList : ([] as unknown[]).concat(sp.d ?? []).map(String).filter((x) => onList.includes(x.trim().toLowerCase()));
+      const { ids } = chosenDonors(raw, WINBACK_SCREEN_CAP);
+      plan = ids.length ? await planWinbackDonors(id, ids) : null;
+      raw = ids;
+    } catch {
+      readFailed = true;
     }
-  } catch {
-    readFailed = true;
   }
   if (readFailed) {
     return shell(
@@ -72,17 +70,15 @@ export default async function WinbackPage({ params, searchParams }: PageProps<"/
       </section>,
     );
   }
-  const { ids, over } = chosenDonors(raw);
-  if (!ids.length) {
+  if (!source || !plan) {
     return shell(
       <Card title="Nobody chosen">
-        <p className="text-sm text-muted">Tick the donors you&apos;d like to win back on the list, or choose &quot;Add everyone on this list&quot;. Donors whose details were erased can&apos;t be chosen.</p>
+        <p className="text-sm text-muted">Tick the donors you&apos;d like to win back on the list, or choose &quot;add everyone on this list&quot;. Donors whose details were erased can&apos;t be chosen.</p>
         <p className="mt-3"><Link href={back.href} className={secondaryAction}>Back to the list</Link></p>
       </Card>,
     );
   }
-
-  const { journey, plan } = await planWinbackDonors(id, ids);
+  const { journey, plan: p } = plan;
   if (!journey.enabled || !journey.steps.length) {
     return shell(
       <Card title="Switch your win-back journey on first">
@@ -91,31 +87,35 @@ export default async function WinbackPage({ params, searchParams }: PageProps<"/
       </Card>,
     );
   }
-  const notMine = ids.length - plan.add.length - Object.values(plan.skipped).reduce((a, b) => a + b, 0);
+  const notMine = raw.length - p.add.length - p.left - Object.values(p.skipped).reduce((a, b) => a + b, 0);
   const firstEmail = formatDate(firstDue(new Date(), journey.steps).toISOString());
 
   return shell(
-    <Card title={plan.add.length ? `Add ${plural(plan.add.length, "donor")}?` : "Nobody to add"}>
+    <Card title={p.add.length ? `Add ${plural(p.add.length, "donor")}?` : "Nobody to add"}>
       <div className="space-y-3 text-sm">
-        {over ? <p className="text-muted">You chose more than {WINBACK_PRESS_CAP}: the first {WINBACK_PRESS_CAP} are here. Add the rest afterwards.</p> : null}
-        {plan.add.length ? (
+        {p.left ? (
+          <p className="text-muted">
+            {plural(p.left + p.add.length, "donor")} on this list can join; {WINBACK_PRESS_CAP} are added at a time. After this, choose &quot;add everyone on this list&quot; again to add the next ones.
+          </p>
+        ) : null}
+        {p.add.length ? (
           <p>
-            {plural(plan.add.length, "donor")} will get your win-back emails, starting {firstEmail} at the earliest, never more than one message from you a week.{" "}
-            {existingSkippedSentence(plan.skipped)}
+            {plural(p.add.length, "donor")} will get your win-back emails, starting {firstEmail} at the earliest, never more than one message from you a week.{" "}
+            {existingSkippedSentence(p.skipped)}
             {notMine > 0 ? ` ${plural(notMine, "donor")} chosen ${notMine === 1 ? "isn't" : "aren't"} one of your donors and ${notMine === 1 ? "is" : "are"} left out.` : ""}
           </p>
         ) : (
           <p className="text-muted">
-            {existingSkippedSentence(plan.skipped) || "None of the donors chosen can be added."} Nothing was changed.
+            {existingSkippedSentence(p.skipped) || "None of the donors chosen can be added."} Nothing was changed.
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          {plan.add.length ? (
+          {p.add.length ? (
             <ActionForm
-              action={addWinback.bind(null, id, plan.add.map((c) => c.donorId))}
-              submitLabel={`Add ${plural(plan.add.length, "donor")}`}
+              action={addWinback.bind(null, id, source, p.add.map((c) => c.donorId))}
+              submitLabel={`Add ${plural(p.add.length, "donor")}`}
               pendingLabel="Adding…"
-              confirm={`Add ${plural(plan.add.length, "donor")} to your win-back journey? You can take this back for 30 minutes, and only for those who haven't had an email yet.`}
+              confirm={`Add ${plural(p.add.length, "donor")} to your win-back journey? You can take this back for 30 minutes, and only for those who haven't had an email yet.`}
               confirmLabel="Yes, add them"
             />
           ) : null}

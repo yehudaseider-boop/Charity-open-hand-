@@ -39,25 +39,37 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
   const v2 = await journeysV2();
   const base = `/charity-admin/${id}`;
 
-  // The charity's own campaigns (for their journeys), newest first.
-  const { data: campaignRows, error: campaignError } = v2
-    ? await createAdminClient().from("campaigns").select("id, title, status, ends_at").eq("charity_id", id).order("created_at", { ascending: false }).limit(50)
-    : { data: [], error: null };
-  if (campaignError) throw campaignError;
-  const campaigns = (campaignRows ?? []).map((c) => ({ id: c.id as string, title: c.title as string, status: c.status as string, endsAt: (c.ends_at as string | null) ?? null }));
-  const titleOf = (campaignId: string | null) => campaigns.find((c) => c.id === campaignId)?.title ?? null;
-
   const asked = parseRefKey(typeof sp.j === "string" ? sp.j : undefined);
   if (!asked) notFound();
-  // A journey other than the general one needs its migration, and a campaign must be this charity's own.
+  // A journey other than the general one needs its migration.
   if (asked.kind !== "general" && !v2) notFound();
+  const all = await listJourneys(id);
+
+  // The charity's own campaigns: the 50 newest (to offer a journey), every campaign that has one (however old), and
+  // the one the link asks for. Always only this charity's.
+  const admin = createAdminClient();
+  const wanted = [...new Set([...all.filter((j) => j.kind === "campaign" && j.campaignId).map((j) => j.campaignId!), ...(asked.kind === "campaign" ? [asked.campaignId] : [])])];
+  const [recent, named] = v2
+    ? await Promise.all([
+        admin.from("campaigns").select("id, title, status, ends_at").eq("charity_id", id).order("created_at", { ascending: false }).limit(50),
+        wanted.length ? admin.from("campaigns").select("id, title, status, ends_at").eq("charity_id", id).in("id", wanted) : Promise.resolve({ data: [], error: null }),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (recent.error) throw recent.error;
+  if (named.error) throw named.error;
+  const seen = new Set<string>();
+  const campaigns = [...(recent.data ?? []), ...(named.data ?? [])]
+    .filter((c) => !seen.has(c.id as string) && seen.add(c.id as string))
+    .map((c) => ({ id: c.id as string, title: c.title as string, status: c.status as string, endsAt: (c.ends_at as string | null) ?? null }));
+  const titleOf = (campaignId: string | null) => campaigns.find((c) => c.id === campaignId)?.title ?? null;
+  // A campaign must be this charity's own.
   if (asked.kind === "campaign" && !campaigns.some((c) => c.id === asked.campaignId)) notFound();
   const ref: JourneyRef = asked;
   const key = refKey(ref);
   const campaignTitle = ref.kind === "campaign" ? titleOf(ref.campaignId) : null;
   const name = journeyTitle(ref.kind, campaignTitle);
 
-  const [journey, all] = await Promise.all([loadJourney(id, ref), listJourneys(id)]);
+  const journey = await loadJourney(id, ref);
   // A journey not made yet has nobody on it (before the migration, the charity's one journey is keyed by the charity).
   const [states, people] = journey.id || (ref.kind === "general" && !v2) ? await Promise.all([enrolmentStates(id, journey), journeyPeople(id, journey)]) : [[], []];
   const counts = journeyCounts(states, journey.steps.length);

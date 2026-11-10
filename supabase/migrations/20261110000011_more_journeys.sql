@@ -22,9 +22,12 @@ alter table public.charity_journeys add column kind text not null default 'gener
   constraint charity_journey_kind check (kind in ('general', 'campaign', 'winback'));
 alter table public.charity_journeys add column campaign_id uuid;
 alter table public.charity_journeys add constraint charity_journey_campaign check ((kind = 'campaign') = (campaign_id is not null));
--- Only one of the charity's own campaigns; the campaign's journey goes with the campaign.
+-- Only one of the charity's own campaigns. A campaign with a journey can't be deleted (its emails, who was on it and
+-- what was sent are kept): the website ends a campaign instead, and removes an empty journey itself before removing a
+-- campaign nobody gave to. "No action" (checked at the end of the statement) so that removing a whole charity, which
+-- removes its campaigns and its journeys together, still works.
 alter table public.charity_journeys add constraint charity_journey_own_campaign
-  foreign key (campaign_id, charity_id) references public.campaigns (id, charity_id) on delete cascade;
+  foreign key (campaign_id, charity_id) references public.campaigns (id, charity_id) on delete no action;
 
 -- The other tables pointed at the journey by charity; from now they point at the charity itself and at the journey.
 alter table public.charity_journey_steps drop constraint charity_journey_steps_charity_id_fkey;

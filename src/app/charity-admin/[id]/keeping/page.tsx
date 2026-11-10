@@ -138,7 +138,7 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
                   <Link href={`${base}/journey/winback?list=${list}${w.key === "last" ? "&year=last" : ""}&all=1`} className="font-semibold text-brand underline">
                     add everyone on this list
                   </Link>{" "}
-                  (up to {WINBACK_PRESS_CAP} at a time). You&apos;ll see who joins before anything happens.
+                  (up to {WINBACK_PRESS_CAP} at a time). Ticks count for this page only. You&apos;ll see who joins before anything happens.
                 </p>
               ) : null}
               <form method="get" action={`${base}/journey/winback`} className="space-y-2">

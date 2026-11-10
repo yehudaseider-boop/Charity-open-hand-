@@ -112,7 +112,7 @@ export async function loadAction(charityId: string, id: string): Promise<ActionR
   return data as ActionRow;
 }
 
-export type UndoFailure = "gone" | "removed" | "late" | "changed" | "given" | "full" | "locked" | "ended" | "issued" | "owner" | "sent" | "emailed" | "error";
+export type UndoFailure = "gone" | "removed" | "late" | "changed" | "given" | "journeyed" | "full" | "locked" | "ended" | "issued" | "owner" | "sent" | "emailed" | "error";
 export type UndoResult = { ok: true; row: ActionRow } | { ok: false; why: UndoFailure; row: ActionRow | null };
 
 const editable = (status: string) => status === "draft" || status === "rejected";
@@ -247,6 +247,17 @@ async function apply(charityId: string, undo: Undo, extra: Details = {}): Promis
         // Abandoned or declined checkouts for it aren't gifts: let them go so the campaign can be removed.
         const { error: unlink } = await db.from("donations").update({ campaign_id: null }).eq("campaign_id", undo.id).in("status", ["pending", "failed"]);
         if (unlink) throw unlink;
+        // Its donor journey (CRM step 6b) keeps its history: a journey anyone is on stops the campaign being removed;
+        // an empty one goes with it. Before the journeys had campaigns (20261110000011) there is none.
+        const { data: js, error: jErr } = await db.from("charity_journeys").select("id").eq("charity_id", charityId).eq("campaign_id", undo.id);
+        if (jErr && !["42703", "PGRST204", "PGRST205", "42P01"].includes(jErr.code ?? "")) throw jErr;
+        for (const j of jErr ? [] : (js ?? [])) {
+          const { count: people, error: pErr } = await db.from("charity_journey_enrolments").select("id", { count: "exact", head: true }).eq("journey_id", j.id as string);
+          if (pErr) throw pErr;
+          if ((people ?? 0) > 0) return "journeyed";
+          const { error: dErr } = await db.from("charity_journeys").delete().eq("id", j.id as string).eq("charity_id", charityId);
+          if (dErr) throw dErr;
+        }
       }
       const { data, error } = await db.from(undo.table).delete().eq("id", undo.id).eq("charity_id", charityId).select("id");
       if (error) throw error;
@@ -379,6 +390,7 @@ export function undoFailureText(why: UndoFailure): string {
     case "late": return "It's been more than 30 minutes, so it can't be taken back here. You can change it again by hand.";
     case "changed": return "It was changed again since, so it can't be taken back here. Your newer changes are kept.";
     case "given": return "Donors have already given to it, so it can't be removed. You can end it instead.";
+    case "journeyed": return "Donors are on its journey, so it can't be removed and their emails are kept. You can end it instead.";
     case "full": return "There's no room for it: you're at the limit. Remove or end one first, then try again.";
     case "locked": return "Your application has been submitted, so your details are locked while we review them.";
     case "owner": return "Your role doesn't include taking this back. Nothing was changed. Ask your charity's owner, or someone whose role includes it.";

@@ -94,7 +94,7 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
               <Link href={`${base}/journey/winback?list=stopped&period=${period.key}&all=1`} className="font-semibold text-brand underline">
                 add everyone on this list
               </Link>{" "}
-              (up to {WINBACK_PRESS_CAP} at a time). You&apos;ll see who joins before anything happens.
+              (up to {WINBACK_PRESS_CAP} at a time). Ticks count for this page only. You&apos;ll see who joins before anything happens.
             </p>
           ) : null}
 
