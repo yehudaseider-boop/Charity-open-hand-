@@ -19,6 +19,7 @@ import { giftSourceLabel } from "@/lib/donations/source";
 import { formatDate, taxYearLabel, taxYearName, taxYearRange } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import { keepingLists, retentionSentence, type KeepingSummary, type KeepingWindow } from "@/lib/charity/keeping-donors";
 
 export type OverviewProps = {
   charityName: string;
@@ -48,6 +49,8 @@ export type OverviewProps = {
   unit: ReturnType<typeof impactUnitFrom>;
   receipts: boolean;
   todo: { key: string; text: string; href: string; link: string }[];
+  /** Keeping donors (step 16). Left out: no panel (not set up yet, or a preview). Null: it couldn't load. */
+  keeping?: { summary: KeepingSummary; window: KeepingWindow } | null;
 };
 
 /**
@@ -55,7 +58,7 @@ export type OverviewProps = {
  * drawn from sample figures too (tests, previews), with no sign-in or database.
  */
 export function OverviewView(p: OverviewProps) {
-  const { charityName, base, now, publicLink, month, prev, year, all, taxYear, chart, recurring, regular, sources, recent, campaigns, activeCampaigns, start, groups, donorGroups, insights, donorCount, top, giftsTotal, perDonor, unit, receipts, todo } = p;
+  const { charityName, base, now, publicLink, month, prev, year, all, taxYear, chart, recurring, regular, sources, recent, campaigns, activeCampaigns, start, groups, donorGroups, insights, donorCount, top, giftsTotal, perDonor, unit, receipts, todo, keeping } = p;
   const startDone = start.filter((i) => i.done).length;
   const today = saDate(now);
   // The figures' trends come from the same rows as the chart, so they always agree with it.
@@ -299,6 +302,30 @@ export function OverviewView(p: OverviewProps) {
             </>
           )}
         </Card>
+
+        {keeping === undefined || all.paid_count === 0 ? null : (
+          <Card lights title="Keeping donors" aside={<Link href={`${base}/keeping`} className="text-sm font-semibold text-brand underline">See who</Link>}>
+            {keeping === null ? (
+              <p className="text-sm text-muted">We couldn&apos;t load this just now. Nothing was changed; refresh the page in a moment to try again.</p>
+            ) : (
+              <>
+                <p className="text-sm">{retentionSentence(keeping.summary, keeping.window)}</p>
+                <ul className="mt-3 grid grid-cols-1 gap-2 min-[400px]:grid-cols-3">
+                  {keepingLists
+                    .filter((l) => l.key !== "less")
+                    .map((l) => (
+                      <li key={l.key}>
+                        <Link href={`${base}/keeping${l.key === "lybunt" ? "" : `?list=${l.key}`}`} className={`block h-full rounded-control border-2 border-border bg-surface p-3 ${glow}`}>
+                          <span className="block font-display text-2xl font-extrabold text-indigo">{keeping.summary.counts[l.key]}</span>
+                          <span className="block text-sm font-semibold leading-snug">{l.label}</span>
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              </>
+            )}
+          </Card>
+        )}
 
         <Card lights title="s18A receipts">
           {receipts ? (

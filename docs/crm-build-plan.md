@@ -47,6 +47,10 @@ Next after the donor journey, in this order, then roles (step 9) moved up behind
 16. **Keeping donors panel.** For the tax year: share of last year's donors who gave again, who gave last year but
     not this year (LYBUNT), who gave some earlier year but not since (SYBUNT), who gave more and who gave less. Worked
     out only from recorded gifts; nothing typed. Lists open with Call / Email / Say thank you, like the stopped list.
+    **Built 10/11/2026, not yet on the test site** (migration `20261110000008_keeping_donors.sql` waits for Yehuda's
+    yes). As built: a "Keeping donors" card on the overview and a Keeping donors page (People), this or last tax year;
+    the lists show contact details and open the donor's page, where the thank-you and follow-ups are (one message a
+    week still applies there). CSV download per list.
 17. **"This week" list on the overview.** One card: new donors to thank, declined monthly cards, stopped monthly
     donors, donors missing s18A details, each with its button.
 18. **The donor's whole story on the donor page.** Gifts plus every message the charity sent them (thank-yous,

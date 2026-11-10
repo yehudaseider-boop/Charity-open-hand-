@@ -17,6 +17,8 @@ import { formatDate, isoDateInJhb } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
 import { impactUnitFrom } from "@/lib/charity/impact";
+import { keepingSummary, keepingWindow } from "@/lib/charity/keeping-donors";
+import { KeepingNotSetUp, loadKeepingDonors } from "@/lib/charity/keeping-donors-queries";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -85,7 +87,14 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     loadRecentDonations(id, 7),
     loadGiftSources(id, taxYear),
   ]);
-  const [lapsedDays, due] = await Promise.all([lapsedDaysFor(id), dueReminders(id, isoDateInJhb(now))]);
+  const keepingYear = keepingWindow("this", now);
+  const [lapsedDays, due, keepingRows] = await Promise.all([
+    lapsedDaysFor(id),
+    dueReminders(id, isoDateInJhb(now)),
+    // A bonus panel: if it can't load, the overview still shows, with a plain line instead. Not set up yet: no panel.
+    loadKeepingDonors(id, keepingYear).catch((e) => (e instanceof KeepingNotSetUp ? undefined : null)),
+  ]);
+  const keeping = keepingRows === undefined ? undefined : keepingRows === null ? null : { summary: keepingSummary(keepingRows), window: keepingYear };
   const donorGroups = donorGroupsFor(lapsedDays);
   const activeCampaigns = campaigns.filter((c) => isRunning(c, now));
   const start = gettingStarted(charity, { updates: stories.updates.length, campaigns: campaigns.length }, base);
@@ -144,6 +153,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
       unit={unit}
       receipts={receipts}
       todo={todo}
+      keeping={keeping}
     />
   );
 }
