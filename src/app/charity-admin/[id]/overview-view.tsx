@@ -5,7 +5,8 @@ import { MonthlyTrend } from "./monthly-trend";
 import { DonationsChart } from "./month-bars";
 import { RecentDonations, type RecentRow } from "./recent-donations";
 import { GoalRing, Kpi, SourceBars } from "./overview-parts";
-import type { gettingStarted } from "@/lib/charity/checklist";
+import { startProgress, type gettingStarted } from "@/lib/charity/checklist";
+import { GettingStarted } from "./getting-started";
 import type { CampaignRow } from "@/lib/charity/campaign-queries";
 import { averageCents, donationStatus, donorName, ERASED_DONOR, isErasedEmail, repeatPercent, saDate, type MonthlyRow, type monthlySummary, type thisTaxYear } from "@/lib/charity/dashboard";
 import type { DonationRow, DonorRow, Insights, Overview } from "@/lib/charity/dashboard-queries";
@@ -63,7 +64,7 @@ export type OverviewProps = {
  */
 export function OverviewView(p: OverviewProps) {
   const { charityName, base, now, publicLink, month, prev, year, all, taxYear, chart, recurring, regular, sources, recent, campaigns, activeCampaigns, start, groups, donorGroups, insights, donorCount, top, giftsTotal, perDonor, unit, receipts, todo, todoUnavailable, keeping } = p;
-  const startDone = start.filter((i) => i.done).length;
+  const progress = startProgress(start);
   const today = saDate(now);
   // The figures' trends come from the same rows as the chart, so they always agree with it.
   const taxStart = taxYearRange(taxYear.taxYear).start;
@@ -105,22 +106,9 @@ export function OverviewView(p: OverviewProps) {
         </div>
       </div>
 
-      {/* Shown until everything is done: what helps donors find you and give. */}
-      {startDone < start.length ? (
-        <Card title={`Getting started: ${startDone} of ${start.length} done`}>
-          <ul className="space-y-2 text-sm">
-            {start.map((i) => (
-              <li key={i.key} className="flex items-start gap-2">
-                <span aria-hidden className={i.done ? "text-success" : "text-muted"}>{i.done ? "✓" : "○"}</span>
-                {i.done || !i.href ? (
-                  <span className={i.done ? "text-muted line-through" : ""}>{i.label}</span>
-                ) : (
-                  <Link href={i.href} className="text-brand underline">{i.label}</Link>
-                )}
-                {i.done ? <span className="sr-only"> (done)</span> : null}
-              </li>
-            ))}
-          </ul>
+      {/* Getting started: ticks itself off; once all is set it says so once and can be put away. */}
+      {start.length ? (
+        <GettingStarted items={start} progress={progress} storageKey={`gz_start_done_${base}`}>
           <div className="mt-4 border-t border-border pt-3 text-sm">
             <p className="mb-2">Share your Givezy page with your supporters:</p>
             <ShareLinks url={publicLink} message={`Give to ${charityName} on Givezy:`} />
@@ -128,7 +116,7 @@ export function OverviewView(p: OverviewProps) {
             <Link href={`${base}/poster#link-builder`} className="mt-2 block text-brand underline">Make a give link or QR code with an amount</Link>
             <Link href={`${base}/website-button`} className="mt-2 block text-brand underline">Add a &quot;Give with Givezy&quot; button to your website</Link>
           </div>
-        </Card>
+        </GettingStarted>
       ) : null}
 
       {/* What needs a person this week, near the top (CRM step 17). Shown once the first donation is in. */}

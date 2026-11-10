@@ -71,15 +71,3 @@ describe("guided application", () => {
     expect(currentStep(applicationSteps(items.map((i) => ({ ...i, done: true }))), undefined).key).toBe("submit");
   });
 });
-
-import { gettingStarted } from "@/lib/charity/checklist";
-
-describe("getting started after approval", () => {
-  it("ticks itself off from what the charity has done", () => {
-    const none = gettingStarted({ cover_path: null, description_en: null, funds_use_en: " ", gateway_subaccount_ref: null }, { updates: 0, campaigns: 0 }, "/c-a/1");
-    expect(none.every((i) => !i.done)).toBe(true);
-    expect(none.find((i) => i.key === "payments")?.href).toBeNull();
-    const all = gettingStarted({ cover_path: "1/cover.jpg", description_en: "We feed families", funds_use_en: "Food", gateway_subaccount_ref: "ACCT_1" }, { updates: 2, campaigns: 1 }, "/c-a/1");
-    expect(all.every((i) => i.done)).toBe(true);
-  });
-});

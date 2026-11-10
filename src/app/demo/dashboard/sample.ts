@@ -1,4 +1,5 @@
 import type { OverviewProps } from "@/app/charity-admin/[id]/overview-view";
+import { gettingStarted } from "@/lib/charity/checklist";
 import { monthlySummary, thisTaxYear } from "@/lib/charity/dashboard";
 import { countDonorGroups, donorGroupsFor, giftsPerDonor, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
 import { taxYearRange } from "@/lib/dates";
@@ -77,7 +78,19 @@ export function demoOverview(now: Date = new Date(), data: DemoData = demoData(n
     recent: data.gifts.slice(0, 7).map((g) => asDonationRow(data, g)),
     campaigns: data.campaigns,
     activeCampaigns: data.campaigns,
-    start: [],
+    // A sample charity part way through getting started, so the demo shows the card (owner's view, all buttons).
+    start: gettingStarted(
+      {
+        charity: { logo_path: "demo/logo.png", cover_path: "demo/cover.jpg", description_en: "Hot meals every weekday", funds_use_en: "Ingredients", thank_you_en: null, gateway_subaccount_ref: "DEMO" },
+        bank: { saved: true, checked: true },
+        s18a: { issues: true, sarsDetails: false },
+        journeyOn: false,
+        updates: 1,
+        teamSize: 1,
+      },
+      base,
+      () => true,
+    ),
     groups: countDonorGroups(facts, now, DEMO_LAPSED_DAYS),
     donorGroups: donorGroupsFor(DEMO_LAPSED_DAYS),
     insights: { newDonors, returningDonors: 0, repeatDonors: repeat, allDonors: facts.length, monthlyActive: monthlySummary(data.monthly).runningCount, monthlyActiveCents: monthlySummary(data.monthly).runningCentsPerMonth },

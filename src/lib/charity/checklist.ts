@@ -90,19 +90,152 @@ export function currentStep(steps: ApplicationStep[], asked: string | undefined)
   return steps.find((s) => s.key === asked) ?? steps.find((s) => !s.done) ?? steps[steps.length - 1];
 }
 
-/** After approval: the few things that help donors find a charity and give. Each ticks itself off. */
-export type StartItem = { key: string; label: string; done: boolean; href: string | null };
+/**
+ * After approval: "Getting started" on the overview (extended 10/11/2026, Yehuda "go"). The few things that help
+ * donors find a charity, give and come back. Every step ticks itself off from real data; nothing is ticked by hand.
+ * `can` says whether the signed-in person's role may do the step (src/lib/charity/permissions.ts): others see it
+ * read-only with `who` saying who does it. Optional steps never hold up "all set". Matches the onboarding pack
+ * (docs/charity-onboarding): logo and photos, bank checked, s18A receipt details, team logins.
+ */
+export type StartItem = {
+  key: string;
+  label: string;
+  /** Why it matters, in one plain line. */
+  why: string;
+  done: boolean;
+  /** Where it is done; null when Givezy does it. */
+  href: string | null;
+  /** May this person do it? */
+  can: boolean;
+  /** Who does it, when this person can't (or Givezy does it). */
+  who: string | null;
+  optional?: boolean;
+};
 
-export function gettingStarted(
-  c: { cover_path: string | null; description_en: string | null; funds_use_en: string | null; gateway_subaccount_ref: string | null },
-  counts: { updates: number; campaigns: number },
-  base: string,
-): StartItem[] {
-  return [
-    { key: "payments", label: "Connected to receive online donations (we do this for you)", done: Boolean(c.gateway_subaccount_ref), href: null },
-    { key: "cover", label: "Add a cover photo", done: Boolean(c.cover_path), href: `${base}/profile` },
-    { key: "story", label: "Tell donors what you do and where gifts go", done: Boolean(c.description_en?.trim() && c.funds_use_en?.trim()), href: `${base}/profile` },
-    { key: "update", label: "Post your first update", done: counts.updates > 0, href: `${base}/updates` },
-    { key: "campaign", label: "Start a campaign, if you're raising for something specific", done: counts.campaigns > 0, href: `${base}/campaigns` },
+export type StartFacts = {
+  charity: {
+    logo_path: string | null;
+    cover_path: string | null;
+    description_en: string | null;
+    funds_use_en: string | null;
+    thank_you_en: string | null;
+    gateway_subaccount_ref: string | null;
+  };
+  /** Bank details saved, and checked by Givezy (bank_verified_at). Never the account itself. */
+  bank: { saved: boolean; checked: boolean };
+  /** The charity issues s18A receipts; then its SARS details (income tax reference) are needed for the IT3(d) file. */
+  s18a: { issues: boolean; sarsDetails: boolean };
+  /** A donor journey is switched on. Null: couldn't be checked (not set up yet), so the step is left out. */
+  journeyOn: boolean | null;
+  updates: number;
+  /** People on the team, the owner included. Null: couldn't be checked, so the step is left out. */
+  teamSize: number | null;
+};
+
+/** What a role may do, as `can(role, permission)` from ./permissions (passed in so this stays pure). */
+export type StartCan = (permission: "profile" | "message" | "bank_edit" | "owner") => boolean;
+
+const OWNER = "Your charity's owner does this.";
+const TEAM_PAGE_ROLES = "Your charity's owner, an admin or a fundraiser does this.";
+
+export function gettingStarted(f: StartFacts, base: string, may: StartCan): StartItem[] {
+  const c = f.charity;
+  const items: StartItem[] = [
+    {
+      key: "payments",
+      label: "Connected to receive online donations",
+      why: "We do this for you once you're approved, so gifts go straight to your bank account.",
+      done: Boolean(c.gateway_subaccount_ref),
+      href: null,
+      can: false,
+      who: "Givezy does this for you.",
+    },
+    {
+      key: "bank",
+      label: "Bank details saved and checked",
+      why: "Donations are paid into this account, so we check it is in your charity's name.",
+      done: f.bank.saved && f.bank.checked,
+      href: `${base}/application?step=bank`,
+      can: may("bank_edit"),
+      who: OWNER,
+    },
+    {
+      key: "look",
+      label: "Add your logo and a cover photo",
+      why: "Donors recognise you faster, and your page looks like yours.",
+      done: Boolean(c.logo_path && c.cover_path),
+      href: `${base}/profile`,
+      can: may("profile"),
+      who: TEAM_PAGE_ROLES,
+    },
+    {
+      key: "story",
+      label: "Tell donors what you do and where gifts go",
+      why: "People give more readily when they can see what a gift does.",
+      done: Boolean(c.description_en?.trim() && c.funds_use_en?.trim()),
+      href: `${base}/profile`,
+      can: may("profile"),
+      who: TEAM_PAGE_ROLES,
+    },
+    {
+      key: "thanks",
+      label: "Write your thank-you note",
+      why: "It goes with every gift's confirmation, in your own words.",
+      done: Boolean(c.thank_you_en?.trim()),
+      href: `${base}/thank-donors#wording`,
+      can: may("profile"),
+      who: TEAM_PAGE_ROLES,
+    },
   ];
+  if (f.s18a.issues) {
+    items.push({
+      key: "sars",
+      label: "Add your SARS details for s18A receipts",
+      why: "Your income tax reference goes in the IT3(d) file you send SARS each year.",
+      done: f.s18a.sarsDetails,
+      href: `${base}/receipts/sars`,
+      can: may("owner"),
+      who: OWNER,
+    });
+  }
+  if (f.journeyOn !== null) {
+    items.push({
+      key: "journey",
+      label: "Switch on your donor journey",
+      why: "A few short emails you write, sent to new donors over the first weeks, so they hear from you again.",
+      done: f.journeyOn,
+      href: `${base}/journey`,
+      can: may("message"),
+      who: TEAM_PAGE_ROLES,
+    });
+  }
+  items.push({
+    key: "update",
+    label: "Post your first update",
+    why: "A short note or photo shows donors their gifts are at work.",
+    done: f.updates > 0,
+    href: `${base}/updates`,
+    can: may("profile"),
+    who: TEAM_PAGE_ROLES,
+  });
+  if (f.teamSize !== null) {
+    items.push({
+      key: "team",
+      label: "Give your team their own logins",
+      why: "Each person gets the access their job needs, and you see who did what.",
+      done: f.teamSize > 1,
+      href: `${base}/team`,
+      can: may("owner"),
+      who: OWNER,
+      optional: true,
+    });
+  }
+  return items;
+}
+
+/** "3 of 7 done": optional steps don't count. */
+export function startProgress(items: StartItem[]): { done: number; total: number; allSet: boolean } {
+  const needed = items.filter((i) => !i.optional);
+  const done = needed.filter((i) => i.done).length;
+  return { done, total: needed.length, allSet: done === needed.length };
 }

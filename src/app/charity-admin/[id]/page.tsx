@@ -6,6 +6,9 @@ import { OverviewView } from "./overview-view";
 import { requireViewer } from "@/lib/auth";
 import { canIssue18a } from "@/lib/charities";
 import { gettingStarted } from "@/lib/charity/checklist";
+import { loadStartFacts } from "@/lib/charity/start-facts";
+import { can } from "@/lib/charity/permissions";
+import { viewerRole } from "@/lib/charity/team";
 import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
 import { allTime, lastMonth, monthlySummary, saDate, thisMonth, thisTaxYear } from "@/lib/charity/dashboard";
 import { countDonorGroups, donorGroupsFor, endsWithinAWeek, giftsPerDonor, lapsedPeriodText, lastMonths, monthlyAttention, topDonors } from "@/lib/charity/insights";
@@ -115,7 +118,9 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const keeping = keepingRows === undefined ? undefined : keepingRows === null ? null : { summary: keepingRows, window: keepingYear };
   const donorGroups = donorGroupsFor(lapsedDays);
   const activeCampaigns = campaigns.filter((c) => isRunning(c, now));
-  const start = gettingStarted(charity, { updates: stories.updates.length, campaigns: campaigns.length }, base);
+  // "Getting started" ticks itself off from real data; each step's button only for roles that may do it.
+  const [startFacts, role] = await Promise.all([loadStartFacts(id, charity, stories.updates.length), viewerRole(id)]);
+  const start = gettingStarted(startFacts, base, (p) => can(role, p));
   const publicLink = `${(process.env.SITE_URL ?? "").replace(/\/+$/, "")}/c/${charity.slug}`;
   const regular = monthlySummary(recurring);
   const receipts = canIssue18a(charity);
