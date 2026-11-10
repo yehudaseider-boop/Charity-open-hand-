@@ -52,9 +52,9 @@ async function gift(c: string, d: string, amount: number, paidAt: string, o: { s
   const { id } = await one(
     recorded
       ? `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway, status, paid_at, tax_year, recorded_method, came_from)
-         values ($1, $2, $3, 0, 0, $3, 'recorded', $4, $5, 2027, 'eft', 'recorded') returning id`
+         values ($1, $2, $3::bigint, 0, 0, $3::bigint, 'recorded', $4, $5, 2027, 'eft', 'recorded') returning id`
       : `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway, gateway_ref, status, paid_at, tax_year)
-         values ($1, $2, $3, 400, 100, $3 + 500, 'test', gen_random_uuid()::text, $4, $5, 2027) returning id`,
+         values ($1, $2, $3::bigint, 400, 100, $3::bigint + 500, 'test', gen_random_uuid()::text, $4, $5, 2027) returning id`,
     [d, c, amount, o.status ?? "paid", paidAt],
   );
   await run(
