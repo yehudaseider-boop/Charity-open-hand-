@@ -12,7 +12,8 @@ export function SmoothSectionLinks() {
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as Element | null)?.closest?.("a[href*='#']") as HTMLAnchorElement | null;
-      if (!a || (a.target && a.target !== "_self")) return;
+      // A link that works as a button (the landing page's doors) handles its own press.
+      if (!a || (a.target && a.target !== "_self") || a.getAttribute("role") === "button") return;
       const url = new URL(a.href, location.href);
       if (url.origin !== location.origin || url.pathname !== location.pathname || url.search !== location.search || !url.hash) return;
       const id = decodeURIComponent(url.hash.slice(1));

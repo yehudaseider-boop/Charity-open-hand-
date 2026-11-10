@@ -128,6 +128,12 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     }
   }
   // If they were on a charity's team, their address goes from the team rows of "what just happened" as well.
+  // Their email on the landing page's launch list (10/11/2026), if they left it there. Until that migration has run
+  // there is no such table, and that must never stop an erasure.
+  if (email) {
+    const { error: listError } = await db.from("launch_list").delete().eq("email", email);
+    if (listError && listError.code !== "PGRST205" && listError.code !== "42P01") throw new Error(`Could not erase: ${listError.message}`);
+  }
   if (email) {
     const exact = email.replace(/[\\%_]/g, (ch) => `\\${ch}`);
     const teamRows = await allPages((from) =>

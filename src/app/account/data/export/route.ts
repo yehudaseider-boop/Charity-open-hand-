@@ -117,6 +117,12 @@ export async function GET(request: Request) {
     }
   };
 
+  // Their place on the landing page's launch list (10/11/2026), found by the account's email; nothing before that
+  // migration has run.
+  const accountEmail = (profile.data?.email as string | undefined)?.toLowerCase() ?? user.email?.toLowerCase();
+  const launch = accountEmail ? await createAdminClient().from("launch_list").select("email, consent_version, source, created_at").eq("email", accountEmail) : null;
+  const launchList = launch && !launch.error ? (launch.data ?? []) : [];
+
   // The saved card, as brand, last four digits and expiry only. The stored token is never included.
   const savedCard = await loadSavedCardInfo(user.id).catch(() => null);
 
@@ -147,6 +153,7 @@ export async function GET(request: Request) {
     })),
     giving_elsewhere: external.data ?? [],
     private_notes: notes.data ?? [],
+    launch_list: launchList,
   };
 
   await logAudit({ actorUserId: user.id, action: "privacy.data_downloaded", entityType: "user", entityId: user.id });

@@ -38,10 +38,9 @@ describe("public pages stay cacheable", () => {
     }
   });
 
-  it("the home page uses public data only and is rebuilt every few minutes", () => {
+  it("the home page (the two-door landing page, 10/11/2026) reads no data at all, so it is built once and served from cache", () => {
     const src = readFileSync("src/app/page.tsx", "utf8");
-    expect(src).toMatch(/export const revalidate = \d+/);
-    expect(src).not.toMatch(/supabase\/server|getViewer|next\/headers/);
+    expect(src).not.toMatch(/supabase|getViewer|next\/headers|cookies\(|searchParams/);
   });
 });
 

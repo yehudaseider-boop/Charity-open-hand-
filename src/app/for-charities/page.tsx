@@ -4,6 +4,7 @@ import { BlueBand, BlueCards, Bubbles, Confetti, FeatureCard, Floating, Icon, Ke
 import { platformConfig } from "@/config/platform";
 import { LiveWindow } from "@/components/live-window";
 import { Reveal } from "@/components/reveal";
+import { AudienceSwitch } from "@/components/audience-switch";
 import { Splash } from "@/components/splash";
 import { Illustration } from "@/components/illustration";
 import { reviewWithin } from "@/lib/charity/review-time";
@@ -147,8 +148,8 @@ export default function ForCharitiesPage() {
             { c: "max-md:hidden right-[20%] top-80 h-12 w-12 border-[5px] border-honey", anim: "bob" },
           ]}
         />
-      <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
-        <p className="rounded-full bg-honey-soft px-4 py-1.5 text-[14px] font-bold text-brand">For charities</p>
+      <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-8 text-center sm:px-6 sm:pt-12">
+        <AudienceSwitch current="charity" />
         <h1 className="max-w-[46rem] text-[clamp(2.375rem,4.6vw,3.5rem)] font-bold! leading-[1.12] text-balance">
           Let your supporters give to you in <Key>a few taps</Key>
         </h1>
@@ -187,7 +188,7 @@ export default function ForCharitiesPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border" aria-hidden><div className="h-2.5 w-[68%] rounded-full bg-sage" /></div>
               <p className="mt-2 flex justify-between text-[12px]"><span className="font-bold">R34 000</span><span className="text-muted">of R50 000</span></p>
             </Floating>
-            <Illustration name="checklist" sparkle="stars" className="absolute -left-60 bottom-0 z-20 hidden w-52 xl:-left-72 xl:w-60 lg:block" />
+            {/* One illustration, on the right: the one on the left stood over the "New donation" card (removed 10/11/2026). */}
             <Illustration name="boxes" float="bob" className="absolute -right-60 bottom-0 z-20 hidden w-52 xl:-right-72 xl:w-60 lg:block" />
             <p className="mt-3 text-right text-xs text-muted">Sample screens. Tap the menu to look around.</p>
           </div>
@@ -273,6 +274,21 @@ export default function ForCharitiesPage() {
             <FeatureCard icon="receipt" title="s18A receipts in one list" body="See every receipt issued in your name. We send them to your donors for you." />
           </ul>
         </div>
+      </Reveal>
+
+      {/* What the dashboard does for you (10/11/2026): only what is built today. */}
+      <Reveal as="section" id="dashboard" className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 py-24 sm:px-6">
+        <SectionHead title={<>Keep your donors, <Key>year after year</Key>.</>}>
+          Your dashboard does the follow-up for you, one message a week at most, so donors never feel chased.
+        </SectionHead>
+        <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <FeatureCard icon="receipt" title="s18A receipts you check first" body="Preview each donor's receipt, then approve, correct or decline it. The SARS IT3(d) file is made for you." />
+          <FeatureCard icon="repeat" title="See who to win back" body="Who gave last year but not since, who gave more or less, and monthly donors who stopped." />
+          <FeatureCard icon="mail" title="Donor journeys" body="Up to five emails you write, sent to new donors, to a campaign's donors, or to donors you'd like back." />
+          <FeatureCard icon="heart" title="Thank-yous in your words" body="Change the thank-you that goes with every gift, and send a personal one with a click." />
+          <FeatureCard icon="user" title="Team roles" body="Owner, Admin, Finance, Fundraiser and Viewer. Each person sees and does only what their role allows." />
+          <FeatureCard icon="download" title="Bring your donors with you" body="Import your existing donors from a spreadsheet, with their phone and address." />
+        </ul>
       </Reveal>
 
       {/* Coloured band with cards over its edge */}
