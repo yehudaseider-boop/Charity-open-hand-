@@ -102,7 +102,7 @@ async function team() {
   }
   const g = await gift(c);
   const { id: imp } = await one(
-    `insert into public.charity_contact_imports (charity_id, file_name, file_fingerprint, contacts, confirmed_at) values ($1, 'list.csv', md5($2), 1, now()) returning id`,
+    `insert into public.charity_contact_imports (charity_id, file_name, file_fingerprint, contacts, confirmed_at, confirmation_version) values ($1, 'list.csv', md5($2), 1, now(), 'contacts-2026-11-02') returning id`,
     [c, stamp()],
   );
   await run(`insert into public.charity_contacts (charity_id, import_id, first_name, email, phone) values ($1, $2, 'Sipho', 'sipho@x.test', '0831234567')`, [c, imp]);
