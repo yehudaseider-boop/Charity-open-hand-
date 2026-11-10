@@ -89,7 +89,7 @@ Also added to the go-live checklist: load-test the busy times (end of February r
     its profile and in the app. Push to its donors only after step 10, with a limit (suggest once a month).
     Givezy's own cause of the week stays as it is.
 14. **Videos in updates and journeys** (1.3). After 12, same rules.
-    **Built 10/11/2026, not yet on the test site** (migration `20261110000010_update_video.sql` waits for Yehuda's
+    **Built 10/11/2026, on the test project** (migration `20261110000010_update_video.sql` applied 10/11/2026; was waiting for Yehuda's
     yes). As built: an optional YouTube or Vimeo link on a new update (links only, decided 10/11/2026), kept as the site
     and id only; plays with the update on the charity's page and in the app only after the donor presses play; "Email
     this to your donors" points to the charity's page ("Watch the video with this update on our page"), never the
