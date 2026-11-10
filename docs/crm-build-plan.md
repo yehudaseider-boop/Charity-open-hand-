@@ -40,6 +40,22 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
    In-app messages come after push notifications (step 10).
 7. **Win-back from the lapsed list** (3): add lapsed donors to a journey from step 4's list. Needs 6.
 
+## Phase 2b: from the CRM guidance doc (added 10/11/2026, Yehuda's yes)
+
+Next after the donor journey, in this order, then roles (step 9) moved up behind them.
+
+16. **Keeping donors panel.** For the tax year: share of last year's donors who gave again, who gave last year but
+    not this year (LYBUNT), who gave some earlier year but not since (SYBUNT), who gave more and who gave less. Worked
+    out only from recorded gifts; nothing typed. Lists open with Call / Email / Say thank you, like the stopped list.
+17. **"This week" list on the overview.** One card: new donors to thank, declined monthly cards, stopped monthly
+    donors, donors missing s18A details, each with its button.
+18. **The donor's whole story on the donor page.** Gifts plus every message the charity sent them (thank-yous,
+    reminders, appeals, journey emails) and the charity's own notes, in one timeline.
+
+Then step 9 (roles). Not taken from the doc: religious features such as maaser tracking (no religious features,
+decided 30/10/2026), and its statistics, which are vendor or second-hand figures and never go on Givezy pages.
+Also added to the go-live checklist: load-test the busy times (end of February receipts, campaign days).
+
 ## Phase 3: donors and team
 
 8. **Import template with phone and address** (4.1). Decided 10/11/2026: ID and tax numbers are not taken on import (donors add their own). Built 10/11/2026.
