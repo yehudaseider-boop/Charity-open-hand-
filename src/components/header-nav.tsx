@@ -90,14 +90,19 @@ export function HeaderNav() {
       <MobileMenu
         items={[
           { href: "/", label: "Home" },
+          { href: "/#how", label: "How it works" },
           { href: "/charities", label: "Find a charity" },
           { href: "/for-charities", label: "For charities" },
+          { href: "/#trust", label: "Why trust us" },
           ...dashboards.map((d) => ({ href: d.href, label: d.label })),
           ...(signedIn ? [{ href: "/account", label: "Account" }] : []),
         ]}
       />
+      {/* The landing page's sections (10/11/2026): from tablet width; on phones they are in the Menu. */}
+      <NavLink href="/#how" className="max-lg:hidden">How it works</NavLink>
       <NavLink href="/charities" className="max-sm:hidden">Charities</NavLink>
       <NavLink href="/for-charities" className="max-sm:hidden">For charities</NavLink>
+      <NavLink href="/#trust" className="max-lg:hidden">Why trust us</NavLink>
       {/* A charity admin or Givezy staff can always get back to their area from any public page. */}
       {dashboards.map((d) => (
         <NavLink key={d.href} href={d.href} className="max-sm:hidden">{d.label}</NavLink>

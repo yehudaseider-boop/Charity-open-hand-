@@ -2,6 +2,7 @@
 
 ## Decided
 
+- **Landing page: "I give | I run a charity" (10/11/2026, Yehuda).** The home page is the donor side and /for-charities the charity side, with a switch at the top of both (plain links, so each stays a cached page; a shared `?for=charity` or `?for=give` link is redirected to the right one in `src/proxy.ts`). The header adds "How it works" (/#how) and "Why trust us" (/#trust) from laptop width, and both are in the phone menu. Donor main action: get the app; store links live in `src/config/app-links.ts` and are null, so the page says "Coming soon to the App Store and Google Play" and the button is "Give on the website now" (no dead link). Launch line "Launching in South Africa, January 2027." confirmed by Yehuda 10/11/2026, kept in that config. "Why trust us" lists only true things: cards entered on the payment provider's page, a gift counts once the provider confirms it, charities checked, ID private, notes private, POPIA download or delete. For charities adds the built CRM features (receipt preview and IT3(d), win-back lists, journeys, thank-yous, roles, import). Brand kit only: existing logo, colour variables, fonts, icon set and illustrations; no new icons or colours.
 - **Campaign journeys and win-back (CRM steps 6b and 7, built 10/11/2026; Yehuda: "do this").** Each journey now has its own id
   and kind: the general journey (as before), one per campaign (only the charity's own campaign; it goes with the
   campaign) and one win-back journey per charity. Migration `20261110000011_more_journeys.sql` keeps every existing

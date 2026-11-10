@@ -16,9 +16,13 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { Chevron } from "@/components/chevron";
 import { LiveWindow } from "@/components/live-window";
 import { Reveal } from "@/components/reveal";
+import { AudienceSwitch } from "@/components/audience-switch";
+import { appLinks } from "@/config/app-links";
+import { appCta } from "@/lib/audience";
 import { BlueBand, Bubbles, FeatureCard, Floating, Icon, Key, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 
-// Home page, direction B (preview, 29/10/2026), laid out after the Deupload landing page Yehuda liked: see
+// Home page: the "I give" side of the landing page (10/11/2026), with the "I give | I run a charity" switch on top; the
+// charity side is /for-charities. Direction B (preview, 29/10/2026), laid out after the Deupload landing page Yehuda liked: see
 // components/marketing.tsx. Every figure in a picture is a labelled sample; every claim is one we can back today.
 
 const min = formatRand(platformConfig.minDonationCents);
@@ -146,6 +150,42 @@ function CharitiesScreen() {
   );
 }
 
+/**
+ * The donor's main action (10/11/2026): get the app. Until the store links are set (src/config/app-links.ts) it says
+ * the app is coming soon, never a dead link, and giving on the website is the button.
+ */
+function AppButtons() {
+  const cta = appCta(appLinks);
+  return (
+    <div className="mt-2 flex flex-col items-center gap-3">
+      {cta.kind === "stores" ? (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {cta.stores.map((s, i) => (
+            <a key={s.href} href={s.href} className={i === 0 ? "pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy" : "rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand"}>
+              {i === 0 ? `Get the app on ${s.label}` : `Also on ${s.label}`}
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p className="inline-flex items-center gap-2 rounded-full bg-peach px-4 py-2 text-[14px] font-semibold text-navy">
+          <Icon name="bolt" className="stroke-brand" size={18} />
+          {cta.text}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Link
+          href="/charities"
+          className={cta.kind === "soon" ? "pressable rounded-control bg-brand px-6 py-3.5 font-bold text-white" : "inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4 hover:text-navy"}
+        >
+          Give on the website now
+        </Link>
+        <Link href="#how" className="rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand">How it works</Link>
+      </div>
+      {appLinks.launchMonth ? <p className="text-[14px] text-muted">Launching in South Africa, {appLinks.launchMonth}.</p> : null}
+    </div>
+  );
+}
+
 // Built once and served from cache near the visitor, then rebuilt at most every 5 minutes, so a new charity or the
 // week's cause shows within minutes (09/11/2026). Public data only: the page never knows who is looking.
 export const revalidate = 300;
@@ -183,17 +223,15 @@ export default async function Home() {
             { c: "-right-32 top-24 h-80 w-80 bg-peach" },
           ]}
         />
-      <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-14 text-center sm:px-6 sm:pt-20">
+      <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-8 text-center sm:px-6 sm:pt-12">
+        <AudienceSwitch current="give" />
         <h1 className="max-w-[46rem] text-[clamp(2.375rem,4.6vw,3.5rem)] font-bold! leading-[1.12] text-balance">
           <Key>Good</Key> starts here.
         </h1>
         <p className="max-w-[36rem] text-[17px] leading-relaxed text-muted">
           Find a charity you care about, give once or every month, and keep every gift and s18A receipt in one place.
         </p>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/charities" className="pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Find a charity</Link>
-          <Link href="#how" className="rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand">How it works</Link>
-        </div>
+        <AppButtons />
         <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px] font-semibold text-navy" aria-label="Why Givezy">
           {["Every charity checked", "s18A receipts", `No ${platformConfig.appName} fee`].map((t) => (
             <li key={t} className="flex items-center gap-1.5"><Tick />{t}</li>
@@ -339,18 +377,21 @@ export default async function Home() {
         </div>
       </Reveal>
 
-      {/* Soft section: words on the left, stacked white cards on the right */}
-      <Reveal as="section" className="relative mb-24 overflow-hidden bg-honey-soft md:mb-36">
+      {/* Why trust us: how money and details are handled. Every line is true today. */}
+      <Reveal as="section" id="trust" className="relative mb-24 overflow-hidden bg-honey-soft md:mb-36">
         <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, "-right-12 -top-12 h-32 w-32 bg-honey md:-right-24 md:-top-24 md:h-72 md:w-72"]} />
-        <div className="relative mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2 md:py-32">
-          <div className="flex flex-col gap-5">
-            <h2 className={h2Class}>Your details, kept <Key>private</Key>.</h2>
+        <div className="relative mx-auto flex max-w-[75rem] flex-col gap-10 px-4 py-24 sm:px-6 md:py-32">
+          <div className="flex max-w-[40rem] flex-col gap-5">
+            <h2 className={h2Class}>Why you can <Key>trust</Key> {platformConfig.appName}.</h2>
             <p className="text-[17px] leading-relaxed text-muted">The charity sees what it needs to thank you and record your gift. The rest stays between you and {platformConfig.appName}. You can also give anonymously.</p>
           </div>
-          <ul className="flex flex-col gap-4">
+          <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <FeatureCard icon="lock" title="We never see your card" body={`You pay on the payment provider's secure page. ${platformConfig.appName} never sees or stores your card details.`} />
+            <FeatureCard icon="check" title="A gift counts once it's confirmed" body="A gift only shows as paid after the payment provider confirms it to us, not because a page said so." />
+            <FeatureCard icon="shield" title="Every charity checked" body="Charities are checked before they're listed. s18A receipts come only from charities approved to issue them." />
             <FeatureCard icon="user" title="Your ID number stays private" body="Charities don't see it on their dashboard. It goes only into the report the charity must send to SARS for your s18A receipt." />
             <FeatureCard icon="heart" title="Your notes stay yours" body="Any label or note you add to a gift, like Work giving or Family, is private to you. Charities don't see it." />
+            <FeatureCard icon="download" title="Your data, your choice" body="From your account, download what we hold about you or ask us to delete it. That's your right under POPIA." />
           </ul>
         </div>
       </Reveal>

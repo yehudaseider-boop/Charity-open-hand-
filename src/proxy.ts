@@ -4,6 +4,7 @@ import { CURRENT_PATH_HEADER } from "@/lib/current-path";
 import { SOURCE_PARAM } from "@/lib/donations/source";
 import { FOCUS_COOKIE, FOCUS_SECONDS, focusChange } from "@/lib/focus";
 import { canonicalRedirect } from "@/lib/canonical-host";
+import { audienceRedirect } from "@/lib/audience";
 import { hasSignInCookie } from "@/lib/header-viewer";
 
 /** Keeps the Supabase login session fresh on every page request. */
@@ -12,6 +13,9 @@ export async function proxy(request: NextRequest) {
   const moveTo = canonicalRedirect(request.nextUrl, request.method, process.env.SITE_URL, process.env.VERCEL_ENV === "production");
   // Temporary (307), so browsers do not remember it if SITE_URL later moves to our own domain.
   if (moveTo) return NextResponse.redirect(moveTo, 307);
+  // A shared "?for=charity" or "?for=give" link opens the right side of the site (home or For charities).
+  const side = audienceRedirect(request.nextUrl, request.method);
+  if (side) return NextResponse.redirect(side, 307);
   // Tell the page which path (with its query) was asked for, so a detour via sign-in or the second
   // step can come back to it. Set here, never trusted from the browser.
   request.headers.set(CURRENT_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
