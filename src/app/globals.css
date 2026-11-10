@@ -249,7 +249,8 @@ input[type="radio"] {
   display: none;
 }
 body:has([data-chrome="focus"]) .chrome-full,
-body:has([data-chrome="demo"]) .chrome-full {
+body:has([data-chrome="demo"]) .chrome-full,
+body:has([data-chrome="landing"]) .chrome-full {
   display: none;
 }
 @media screen {
@@ -337,3 +338,61 @@ body:has([data-chrome="demo"]) .chrome-full {
 /* A row that scrolls sideways without a visible scrollbar (the blue cards on a phone). */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/*
+ * The landing page (10/11/2026): two doors, "I give" and "I run a charity", that open in place. Each door's story is
+ * in the page from the start (search engines and no-script visitors get it; #give or #charity opens one through
+ * :target). Once the page's script is running (data-ready), it opens and closes them instead, so going back and
+ * forth between the doors never jumps the page.
+ */
+.door-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 480ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 320ms ease;
+}
+.door-panel > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.door-panel[data-open],
+.doors:not([data-ready]) .door-panel:target {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.door {
+  transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 260ms ease, box-shadow 260ms ease;
+}
+.door:hover {
+  transform: translateY(-4px);
+}
+.doors[data-chosen] .door:not([aria-expanded="true"]) {
+  opacity: 0.82;
+}
+.door-plus {
+  transition: transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.door[aria-expanded="true"] .door-plus {
+  transform: rotate(45deg);
+}
+/* The logo's splash, breathing slowly beside the headline: the one thing that moves without being asked. */
+@keyframes splash-breathe {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(-2deg); }
+}
+.splash-breathe {
+  animation: splash-breathe 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .door-panel,
+  .door,
+  .door-plus {
+    transition: none;
+  }
+  .door:hover {
+    transform: none;
+  }
+  .splash-breathe {
+    animation: none;
+  }
+}

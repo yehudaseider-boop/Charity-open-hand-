@@ -1,36 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ChromeMark } from "@/components/chrome-mark";
 import { JsonLd } from "@/components/json-ld";
+import { Doors } from "@/components/landing/doors";
+import { NotifyForm } from "@/components/landing/notify-form";
+import { Icon, type IconName } from "@/components/marketing";
+import { Splash } from "@/components/splash";
+import { appLinks } from "@/config/app-links";
+import { legalConfig } from "@/config/legal";
+import { platformConfig } from "@/config/platform";
+import { appCta } from "@/lib/audience";
 import { siteOrigin } from "@/lib/request-origin";
 import { organisationData } from "@/lib/seo/structured-data";
-import { Info } from "@/components/info";
-import { platformConfig } from "@/config/platform";
-import { Splash } from "@/components/splash";
-import { Illustration } from "@/components/illustration";
-import { TryGiving } from "@/components/try-giving";
-import { initials } from "@/lib/charity/initials";
-import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
-import { weekStart } from "@/lib/charity/thank-you";
-import { formatRand } from "@/lib/money";
-import { createPublicClient } from "@/lib/supabase/public";
-import { Chevron } from "@/components/chevron";
-import { LiveWindow } from "@/components/live-window";
-import { Reveal } from "@/components/reveal";
-import { AudienceSwitch } from "@/components/audience-switch";
-import { appLinks } from "@/config/app-links";
-import { appCta } from "@/lib/audience";
-import { BlueBand, Bubbles, FeatureCard, Floating, Icon, Key, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 
-// Home page: the "I give" side of the landing page (10/11/2026), with the "I give | I run a charity" switch on top; the
-// charity side is /for-charities. Direction B (preview, 29/10/2026), laid out after the Deupload landing page Yehuda liked: see
-// components/marketing.tsx. Every figure in a picture is a labelled sample; every claim is one we can back today.
+// The landing page (Yehuda, 10/11/2026): Givezy is coming, and a visitor picks one of two doors, "I give" or "I run a
+// charity". Nothing else competes with them. Each door opens its short story in place (components/landing/doors.tsx).
+// Every other public page (charities, a charity's page, For charities, FAQ, the demo) still works by link. Every
+// claim here is one we can back today; the pictures are labelled samples.
 
-const min = formatRand(platformConfig.minDonationCents);
-
-// What Google shows for the home page: the name tied to what Givezy is, so "Givezy" isn't mistaken for a similar name abroad.
 export const metadata: Metadata = {
-  title: { absolute: `${platformConfig.appName}: give to South African charities online` },
-  description: `${platformConfig.appName} is a South African giving platform. Find a registered, checked charity, give from ${min} once or every month, and keep every s18A receipt in one place. No ${platformConfig.appName} fee.`,
+  title: { absolute: `${platformConfig.appName}: giving, made easy` },
+  description: `${platformConfig.appName} is a South African giving platform, launching ${appLinks.launchMonth ?? "soon"}. Give to checked charities and keep every s18A receipt in one place. For charities: s18A receipts, thank-yous and the tools to keep their donors.`,
 };
 
 /** The site's address for structured data, or nothing before SITE_URL is set (local development). */
@@ -41,416 +31,216 @@ function origin(): string {
     return "";
   }
 }
-const minContribution = formatRand(platformConfig.minContributionCents);
 
-function Tick({ className = "stroke-sage" }: { className?: string }) {
+function Point({ icon, title, body, tone }: { icon: IconName; title: string; body: string; tone: "brand" | "lilac" }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`mt-0.5 shrink-0 ${className}`}>
-      <path d="M5 12l5 5L20 7" />
-    </svg>
+    <li className="flex gap-4">
+      <span aria-hidden className={`mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tone === "brand" ? "bg-brand-soft" : "bg-honey-soft"}`}>
+        <Icon name={icon} className="stroke-brand" size={22} />
+      </span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="font-display text-[1.25rem] font-bold leading-tight">{title}</span>
+        <span className="text-[16px] leading-relaxed text-muted">{body}</span>
+      </span>
+    </li>
+  );
+}
+
+/** One door's story: a title, three points and one button, with a sample picture beside it. */
+function Story({ title, points, action, picture, tone }: { title: string; points: { icon: IconName; title: string; body: string }[]; action: React.ReactNode; picture: React.ReactNode; tone: "brand" | "lilac" }) {
+  return (
+    <div className="grid items-center gap-10 pb-6 pt-8 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] md:gap-14 md:pt-14">
+      <div className="flex min-w-0 flex-col gap-7">
+        <h2 data-panel-title tabIndex={-1} className="font-display text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.02em] text-balance outline-none">{title}</h2>
+        <ul className="flex flex-col gap-5">
+          {points.map((p) => <Point key={p.title} {...p} tone={tone} />)}
+        </ul>
+        <div>{action}</div>
+      </div>
+      <div className="min-w-0">{picture}</div>
+    </div>
   );
 }
 
 const gifts = [
-  { date: "02/10/2026", name: "A food parcel charity", tag: "s18A receipt", amount: "R500", tone: "bg-peach" },
-  { date: "28/09/2026", name: "A school charity", tag: "Once-off", amount: "R250", tone: "bg-brand-soft" },
-  { date: "19/09/2026", name: "An old-age home", tag: "Monthly", amount: "R180", tone: "bg-honey-soft" },
-  { date: "05/09/2026", name: "A medical support charity", tag: "s18A receipt", amount: "R360", tone: "bg-peach" },
-  { date: "19/08/2026", name: "An old-age home", tag: "Monthly", amount: "R180", tone: "bg-honey-soft" },
+  { date: "02/10/2026", name: "A food parcel charity", tag: "s18A receipt", amount: "R500" },
+  { date: "28/09/2026", name: "A school charity", tag: "once-off", amount: "R250" },
+  { date: "19/09/2026", name: "An old-age home", tag: "monthly", amount: "R180" },
+  { date: "05/09/2026", name: "A medical support charity", tag: "s18A receipt", amount: "R360" },
 ];
 
-/** The hero picture: the donor's giving history, as a sample. */
-function HeroScreen() {
+/** The giver's picture: a phone with a sample giving history. */
+function PhonePicture() {
   return (
-    <div className="flex flex-col gap-4 text-left">
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-display text-[1.25rem] font-bold">Giving history</p>
-      </div>
-      <ul className="flex flex-col">
-        {gifts.map((g, i) => (
-          <li key={i} className="flex items-center gap-3 border-b border-border py-2.5 last:border-0">
-            <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-[13px] font-bold text-brand ${g.tone}`}>{initials(g.name.replace(/^An? /, ""))}</span>
-            <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[14px] font-semibold">{g.name}</span><span className="text-[12px] text-muted">{g.date} · {g.tag}</span></span>
-            <span className="shrink-0 text-[14px] font-bold">{g.amount}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** The donor's monthly donations, as a sample. */
-function MonthlyScreen() {
-  return (
-    <div className="flex flex-col gap-4 text-left">
-      <p className="font-display text-[1.25rem] font-bold">Monthly donations</p>
-      <div className="rounded-xl border-[1.5px] border-border p-4">
-        <div className="flex items-center gap-3">
-          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-honey-soft font-display text-[13px] font-bold text-brand">OH</span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold">An old-age home</span><span className="text-[12px] text-muted">Next gift 19/11/2026</span></span>
-          <span className="shrink-0 font-display text-[1.125rem] font-bold">R180</span>
+    <figure className="relative mx-auto w-full max-w-[22rem]">
+      <span aria-hidden className="absolute -left-8 top-10 -z-10 h-40 w-40 rounded-full bg-peach" />
+      <span aria-hidden className="absolute -right-6 bottom-6 -z-10 h-24 w-24 rounded-full bg-honey" />
+      <div className="rounded-[2.5rem] border-[10px] border-navy bg-white p-5 shadow-[0_40px_80px_rgba(14,27,61,0.18)]">
+        <div className="flex items-center justify-between">
+          <p className="font-display text-[1.25rem] font-bold">Your giving</p>
+          <span className="rounded-full bg-honey-soft px-2.5 py-1 text-[12px] font-semibold text-brand">Sample</span>
         </div>
-        <div className="mt-3 flex gap-2 text-[12px] font-semibold" aria-hidden>
-          <span className="rounded-full border-[1.5px] border-border px-3 py-1">Pause</span>
-          <span className="rounded-full border-[1.5px] border-border px-3 py-1">Change amount</span>
+        <div className="mt-4 rounded-[1.25rem] bg-brand p-4 text-white">
+          <p className="text-[13px] opacity-80">This tax year</p>
+          <p className="font-display text-[2rem] font-extrabold leading-tight">R1 290</p>
+          <p className="text-[13px] opacity-80">2 s18A receipts ready</p>
         </div>
-      </div>
-      <p className="rounded-xl bg-honey-soft p-3 text-[13px] text-muted">Pause, change or stop any monthly donation yourself, any time.</p>
-    </div>
-  );
-}
-
-/** The donor's s18A receipts, as a sample: one for each charity each tax year. */
-function ReceiptsScreen() {
-  const rows = [
-    { name: "A food parcel charity", total: "R500", state: "After 28/02/2027" },
-    { name: "A medical support charity", total: "R360", state: "After 28/02/2027" },
-  ];
-  return (
-    <div className="flex flex-col gap-4 text-left">
-      <p className="font-display text-[1.25rem] font-bold">s18A receipts</p>
-      <p className="text-[12px] font-semibold text-muted">This tax year, 01/03/2026 to 28/02/2027</p>
-      <ul className="flex flex-col">
-        {rows.map((r) => (
-          <li key={r.name} className="flex items-center gap-3 border-b border-border py-2.5 last:border-0">
-            <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold">{r.name}</span><span className="text-[12px] text-muted">Ready {r.state.toLowerCase()}</span></span>
-            <span className="shrink-0 text-[14px] font-bold">{r.total}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="flex items-center justify-between rounded-xl bg-honey-soft px-4 py-3 text-[13px]">
-        <span><span className="font-semibold">Last tax year</span><span className="block text-[12px] text-muted">A food parcel charity</span></span>
-        <span className="rounded-full bg-brand px-3 py-1 text-[12px] font-bold text-white">Download</span>
-      </div>
-    </div>
-  );
-}
-
-/** The charities the donor follows, as a sample. */
-function CharitiesScreen() {
-  const list = [
-    { name: "A food parcel charity", tone: "bg-peach" },
-    { name: "A school charity", tone: "bg-brand-soft" },
-    { name: "An old-age home", tone: "bg-honey-soft" },
-    { name: "A medical support charity", tone: "bg-peach" },
-  ];
-  return (
-    <div className="flex flex-col gap-4 text-left">
-      <p className="font-display text-[1.25rem] font-bold">Your charities</p>
-      <ul className="grid gap-2.5 sm:grid-cols-2">
-        {list.map((c) => (
-          <li key={c.name} className="flex items-center gap-3 rounded-xl border-[1.5px] border-border p-3">
-            <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-[13px] font-bold text-brand ${c.tone}`}>{initials(c.name.replace(/^An? /, ""))}</span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{c.name}</span>
-            <span aria-hidden className="shrink-0 rounded-full bg-coral px-2.5 py-1 text-[11px] font-bold text-navy">Give</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/**
- * The donor's main action (10/11/2026): get the app. Until the store links are set (src/config/app-links.ts) it says
- * the app is coming soon, never a dead link, and giving on the website is the button.
- */
-function AppButtons() {
-  const cta = appCta(appLinks);
-  return (
-    <div className="mt-2 flex flex-col items-center gap-3">
-      {cta.kind === "stores" ? (
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          {cta.stores.map((s, i) => (
-            <a key={s.href} href={s.href} className={i === 0 ? "pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy" : "rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand"}>
-              {i === 0 ? `Get the app on ${s.label}` : `Also on ${s.label}`}
-            </a>
-          ))}
-        </div>
-      ) : (
-        <p className="inline-flex items-center gap-2 rounded-full bg-peach px-4 py-2 text-[14px] font-semibold text-navy">
-          <Icon name="bolt" className="stroke-brand" size={18} />
-          {cta.text}
-        </p>
-      )}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/charities"
-          className={cta.kind === "soon" ? "pressable rounded-control bg-brand px-6 py-3.5 font-bold text-white" : "inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4 hover:text-navy"}
-        >
-          Give on the website now
-        </Link>
-        <Link href="#how" className="rounded-control border-2 border-navy/15 bg-white px-6 py-3 font-bold text-navy hover:border-brand">How it works</Link>
-      </div>
-      {appLinks.launchMonth ? <p className="text-[14px] text-muted">Launching in South Africa, {appLinks.launchMonth}.</p> : null}
-    </div>
-  );
-}
-
-// Built once and served from cache near the visitor, then rebuilt at most every 5 minutes, so a new charity or the
-// week's cause shows within minutes (09/11/2026). Public data only: the page never knows who is looking.
-export const revalidate = 300;
-
-export default async function Home() {
-  // A few approved charities to show (row-level security shows only approved ones).
-  const supabase = createPublicClient();
-  const { data: charities } = await supabase
-    .from("charities")
-    .select("id, slug, name_en, description_en, logo_path, suburb, city")
-    .eq("status", "approved")
-    .order("approved_at", { ascending: false })
-    .limit(4);
-  // Cause of the week, chosen by Givezy (Admin, Cause of the week). None chosen, or it can't load: no big card.
-  const { data: pick } = await supabase
-    .from("featured_charities")
-    .select("charities(slug, name_en, description_en, cover_path)")
-    .eq("week_start", weekStart(new Date()))
-    .maybeSingle();
-  const featured = (pick?.charities ?? null) as unknown as { slug: string; name_en: string; description_en: string | null; cover_path: string | null } | null;
-  const cover = featured ? publicImageUrl(featured.cover_path) : null;
-  const others = (charities ?? []).filter((c) => c.slug !== featured?.slug).slice(0, 3);
-  // Cause chips: the same categories as the Charities page. If they can't load, the page shows without them.
-  const categories = await loadCategories().catch(() => []);
-
-  return (
-    // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
-    <div className="full-bleed overflow-x-clip">
-      {origin() ? <JsonLd data={organisationData(origin())} /> : null}
-      {/* Hero: centred words, then the product window with floating cards */}
-      <section className="relative">
-        <Bubbles
-          items={[
-            { c: "-left-40 -top-40 h-[26rem] w-[26rem] bg-honey-soft" },
-            { c: "-right-32 top-24 h-80 w-80 bg-peach" },
-          ]}
-        />
-      <div className="relative mx-auto flex max-w-[75rem] flex-col items-center gap-5 px-4 pb-24 pt-8 text-center sm:px-6 sm:pt-12">
-        <AudienceSwitch current="give" />
-        <h1 className="max-w-[46rem] text-[clamp(2.375rem,4.6vw,3.5rem)] font-bold! leading-[1.12] text-balance">
-          <Key>Good</Key> starts here.
-        </h1>
-        <p className="max-w-[36rem] text-[17px] leading-relaxed text-muted">
-          Find a charity you care about, give once or every month, and keep every gift and s18A receipt in one place.
-        </p>
-        <AppButtons />
-        <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px] font-semibold text-navy" aria-label="Why Givezy">
-          {["Every charity checked", "s18A receipts", `No ${platformConfig.appName} fee`].map((t) => (
-            <li key={t} className="flex items-center gap-1.5"><Tick />{t}</li>
+        <ul className="mt-3 flex flex-col">
+          {gifts.map((g) => (
+            <li key={g.date} className="flex items-center gap-3 border-b border-border py-2.5 last:border-0">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[14px] font-semibold">{g.name}</span>
+                <span className="text-[12px] text-muted">{g.date}, {g.tag}</span>
+              </span>
+              <span className="shrink-0 text-[14px] font-bold">{g.amount}</span>
+            </li>
           ))}
         </ul>
-        {/* Try it: type an amount and see what it adds up to. Nothing is sent anywhere. */}
-        <div className="mt-2 w-full max-w-[24rem] rounded-[1.25rem] border-2 border-honey bg-white p-5 text-left shadow-[0_10px_30px_rgba(23,73,181,0.10)]">
-          <TryGiving minCents={platformConfig.minDonationCents} />
-        </div>
+      </div>
+      <figcaption className="sr-only">A sample of the giving history in the Givezy app.</figcaption>
+    </figure>
+  );
+}
 
-        <div className="relative mt-14 w-full max-w-[60rem]">
-          <Splash className="absolute -top-24 left-[6%] z-10 hidden h-auto w-32 md:block" />
-          <div className="relative mx-auto max-w-[48rem]">
-            <LiveWindow
-              label="Sample screens of a donor's account"
-              tabs={[
-                { label: "Giving", screen: <HeroScreen /> },
-                { label: "Monthly", screen: <MonthlyScreen /> },
-                { label: "Receipts", screen: <ReceiptsScreen /> },
-                { label: "Charities", screen: <CharitiesScreen /> },
-              ]}
-            />
-            {/* Left: the goal ring */}
-            <Floating className="-left-24 bottom-8 w-60">
-              <p className="text-[12px] font-semibold text-muted">Your goal this tax year</p>
-              <div className="mt-2 flex items-center gap-3">
-                <svg width="64" height="64" viewBox="0 0 124 124" aria-hidden className="shrink-0">
-                  <circle cx="62" cy="62" r="50" fill="none" stroke="var(--border)" strokeWidth="16" />
-                  <circle cx="62" cy="62" r="50" fill="none" stroke="var(--coral)" strokeWidth="16" strokeLinecap="round" strokeDasharray="223 314" transform="rotate(-90 62 62)" />
-                </svg>
-                <div><p className="font-display text-[1.5rem] font-bold leading-none">R4 250</p><p className="mt-1 text-[12px] text-muted">71% of R6 000</p></div>
-              </div>
-            </Floating>
-            {/* Right: a gift just made */}
-            <Floating className="-right-24 -top-10 w-64">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-success-soft"><Icon name="check" className="stroke-success" size={16} /></span>
-                <p className="text-[14px] font-bold">Thank you, Sarah</p>
-              </div>
-              <p className="mt-2 text-[13px] text-muted">R500 to a food parcel charity</p>
-              <div className="mt-3 flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2 text-[12px]"><span className="text-muted">s18A receipt</span><span className="font-bold text-brand">Requested</span></div>
-            </Floating>
-            <Illustration name="loveIt" className="absolute -left-56 bottom-0 z-20 hidden w-40 xl:-left-64 xl:w-44 lg:block" />
-            <Illustration name="dreamGift" sparkle="stars" float="bob" className="absolute -right-64 bottom-0 z-20 hidden w-60 xl:-right-80 xl:w-72 lg:block" />
-            <p className="mt-3 text-right text-xs text-muted">Sample screens. Tap the menu to look around.</p>
-          </div>
+const needs: { icon: IconName; text: string }[] = [
+  { icon: "heart", text: "3 new donors to thank" },
+  { icon: "receipt", text: "2 donors need to add s18A details" },
+  { icon: "repeat", text: "1 monthly card was declined" },
+];
+
+/** The charity's picture: a sample "Needs you this week" card from the dashboard. */
+function DashboardPicture() {
+  return (
+    <figure className="relative mx-auto w-full max-w-[28rem]">
+      <span aria-hidden className="absolute -right-8 -top-8 -z-10 h-36 w-36 rounded-full bg-brand" />
+      <span aria-hidden className="absolute -bottom-6 left-6 -z-10 h-20 w-20 rounded-full bg-peach" />
+      <div className="rounded-[1.75rem] border-[1.5px] border-border bg-white p-6 shadow-[0_40px_80px_rgba(14,27,61,0.14)]">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-display text-[1.25rem] font-bold">Needs you this week</p>
+          <span className="rounded-full bg-honey-soft px-2.5 py-1 text-[12px] font-semibold text-brand">Sample</span>
+        </div>
+        <ul className="mt-4 flex flex-col gap-2.5">
+          {needs.map((n) => (
+            <li key={n.text} className="flex items-center gap-3 rounded-[1rem] bg-honey-soft px-4 py-3">
+              <Icon name={n.icon} className="shrink-0 stroke-brand" size={20} />
+              <span className="min-w-0 flex-1 text-[15px] font-semibold">{n.text}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-[1rem] border-[1.5px] border-border px-4 py-3">
+          <span className="text-[14px] text-muted">s18A receipts for 2027</span>
+          <span className="text-[14px] font-bold text-success">Ready to approve</span>
         </div>
       </div>
+      <figcaption className="sr-only">A sample of the charity dashboard on Givezy.</figcaption>
+    </figure>
+  );
+}
+
+function GiveAction() {
+  if (appLinks.launchListOpen) return <NotifyForm />;
+  const app = appCta(appLinks);
+  return (
+    <div className="flex flex-col items-start gap-3">
+      {app.kind === "stores" ? (
+        <p className="flex flex-wrap gap-3">
+          {app.stores.map((s) => (
+            <a key={s.href} href={s.href} className="pressable inline-flex min-h-14 items-center rounded-[1.125rem] bg-coral px-7 text-[17px] font-bold text-navy">Get it on {s.label}</a>
+          ))}
+        </p>
+      ) : (
+        <>
+          <p className="text-[17px] font-semibold">{appLinks.launchMonth ? `The app is coming to the App Store and Google Play in ${appLinks.launchMonth}.` : app.text}</p>
+          <Link href="/charities" className="pressable inline-flex min-h-14 items-center rounded-[1.125rem] bg-brand px-7 text-[17px] font-bold text-brand-contrast">Give on the website now</Link>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function Home() {
+  const contact = legalConfig.supportEmail;
+  return (
+    <div className="full-bleed overflow-x-clip">
+      <ChromeMark kind="landing" />
+      {origin() ? <JsonLd data={organisationData(origin())} /> : null}
+
+      <header className="mx-auto flex h-16 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-20 sm:px-6">
+        <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 rounded-lg p-1.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-10" />
+        </Link>
+        <Link href="/login" className="inline-flex min-h-11 items-center rounded-full px-4 text-[15px] font-semibold text-navy underline-offset-4 hover:underline">Sign in</Link>
+      </header>
+
+      <section className="relative">
+        <span aria-hidden className="pointer-events-none absolute -left-40 -top-24 -z-10 h-[30rem] w-[30rem] rounded-full bg-honey-soft" />
+        <span aria-hidden className="pointer-events-none absolute -right-24 top-40 -z-10 h-72 w-72 rounded-full bg-peach max-md:hidden" />
+        <div className="mx-auto grid max-w-[75rem] items-center gap-6 px-4 pb-10 pt-6 sm:px-6 md:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] md:pb-16 md:pt-10">
+          <div className="flex min-w-0 flex-col gap-5">
+            <h1 className="font-display text-[clamp(3.25rem,10vw,7.5rem)] font-extrabold leading-[0.92] tracking-[-0.04em] text-balance">Giving, made easy.</h1>
+            <p className="max-w-[34rem] text-[clamp(1.125rem,2vw,1.375rem)] leading-relaxed text-muted">One place to give to South African charities, and for charities to look after the people who give.</p>
+            {appLinks.launchMonth ? (
+              <p className="inline-flex w-fit items-center gap-2.5 rounded-full bg-honey-soft px-3.5 py-2 text-[14px] font-semibold text-navy sm:px-4 sm:text-[15px]">
+                <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-coral" />
+                Launching in South Africa, {appLinks.launchMonth}.
+              </p>
+            ) : null}
+          </div>
+          <Splash className="splash-breathe order-first mx-auto w-[11rem] sm:w-[14rem] md:order-none md:w-full md:max-w-[22rem]" />
+        </div>
       </section>
 
-      {/* How it works */}
-      <Reveal as="section" id="how" className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6 md:pb-36">
-        <SectionHead title="How it works">Three steps. Come back any time.</SectionHead>
-        <Steps
-          steps={[
-            { icon: "search", title: "Pick a charity", body: "Search by name, cause or area." },
-            { icon: "heart", title: `Give from ${min}`, body: "Once, or every month. You pay on the payment provider's secure page." },
-            { icon: "receipt", title: "Keep track", body: "Every gift lands in your account, with your s18A receipts ready at tax time." },
-          ]}
+      <section aria-label="Choose your side" className="pb-16 md:pb-24">
+        <Doors
+          give={
+            <Story
+              tone="brand"
+              title="Give in a few taps. Keep every receipt."
+              points={[
+                { icon: "repeat", title: "Once or every month", body: "Pick a charity and an amount. Pause or stop a monthly gift whenever you like." },
+                { icon: "receipt", title: "Every s18A receipt in one place", body: "One s18A receipt a year from each charity that issues them, ready for your tax return." },
+                { icon: "lock", title: "Your card stays private", body: "You type it on a secure payment page. Givezy never sees or stores it." },
+              ]}
+              action={<GiveAction />}
+              picture={<PhonePicture />}
+            />
+          }
+          charity={
+            <Story
+              tone="lilac"
+              title="Get found, get given to, keep your donors."
+              points={[
+                { icon: "receipt", title: "s18A receipts, done for you", body: "Preview and approve each one. The SARS IT3(d) file is ready when you are." },
+                { icon: "heart", title: "Donors who come back", body: "Thank-you notes, short email journeys, and a clear list of who stopped giving." },
+                { icon: "user", title: "Your team, each with the right access", body: "Owner, admin, finance, fundraiser or viewer." },
+              ]}
+              action={
+                <div className="flex flex-col items-start gap-3">
+                  <Link href="/apply" className="pressable inline-flex min-h-14 items-center rounded-[1.125rem] bg-coral px-7 text-[17px] font-bold text-navy">Apply to list your charity</Link>
+                  <p className="text-[15px] text-muted">Listing your charity is free.</p>
+                </div>
+              }
+              picture={<DashboardPicture />}
+            />
+          }
         />
-      </Reveal>
+      </section>
 
-      {/* Two pastel cards and a wide lilac card */}
-      <Reveal as="section" className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6 md:pb-36">
-        <h2 className={`max-w-[34rem] ${h2Class}`}>One account for all your giving, ready at <Key>tax time</Key>.</h2>
-        <div className="grid gap-5 md:grid-cols-2">
-          <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation. Pause or stop it yourself, any time.">
-            <Screen>
-              <p className="text-[13px] font-semibold text-muted">Your monthly donations</p>
-              <ul className="mt-2 flex flex-col gap-2 text-[14px]">
-                <li className="flex items-center justify-between gap-3 rounded-lg bg-honey-soft px-3 py-2">
-                  <span className="min-w-0"><span className="block font-semibold">An old-age home</span><span className="block text-[12px] text-muted">R180 every month · next gift 19/11/2026</span></span>
-                  <span className="shrink-0 rounded-full border-[1.5px] border-honey bg-white px-3 py-1 text-[12px] font-bold text-brand">Pause</span>
-                </li>
-              </ul>
-              <p className="mt-3 text-[13px] font-bold text-brand">Stop any time, from your account</p>
-            </Screen>
-          </PastelCard>
-          <PastelCard tone="sky" title="s18A receipts, done" body="If the charity issues them, you get one receipt per charity for the whole tax year, all in your account.">
-            <Screen>
-              <p className="text-[13px] font-semibold text-muted">Your s18A receipts</p>
-              <ul className="mt-2 flex flex-col gap-2 text-[14px]">
-                <li className="flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2"><span>Food parcel charity</span><span className="font-bold">R2 160</span></li>
-                <li className="flex items-center justify-between rounded-lg bg-honey-soft px-3 py-2"><span>Medical support</span><span className="font-bold">R1 590</span></li>
-              </ul>
-              <p className="mt-3 text-[13px] font-bold text-brand">Download tax pack</p>
-            </Screen>
-          </PastelCard>
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-[75rem] flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-6 text-[14px] text-muted sm:px-6">
+          <p>© {new Date().getFullYear()} {platformConfig.appName}</p>
+          <nav aria-label="About Givezy" className="flex flex-wrap gap-x-5">
+            <Link href="/privacy" className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Privacy</Link>
+            <Link href="/terms" className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Terms</Link>
+            {contact ? (
+              <a href={`mailto:${contact}`} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Contact</a>
+            ) : (
+              <Link href="/faq" className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Questions</Link>
+            )}
+          </nav>
         </div>
-        <div id="discover" className="grid items-center gap-8 rounded-[1.25rem] bg-honey-soft p-7 sm:p-10 md:grid-cols-2">
-          <div className="flex flex-col items-start gap-4">
-            <h3 className="font-display text-[clamp(1.625rem,2.6vw,2.125rem)] font-bold leading-tight"><Key>Find a cause</Key> that feels close to home.</h3>
-            <p className="text-[16px] leading-relaxed text-muted">Food parcels, schools, animal care, medical help and more, from registered South African charities.</p>
-            {categories.length > 0 ? (
-              <ul className="flex flex-wrap gap-2" aria-label="Causes">
-                {categories.map((c) => (
-                  <li key={c.id}><Link href={`/charities?category=${c.slug}`} className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-honey bg-white px-4 text-[14px] font-semibold text-navy hover:border-brand">{c.name_en}</Link></li>
-                ))}
-              </ul>
-            ) : null}
-            <div className="mt-2 flex flex-wrap gap-3">
-              <Link href="/charities" className="pressable rounded-control bg-brand px-5 py-3 font-bold text-white">See all charities</Link>
-            </div>
-          </div>
-          {featured || others.length > 0 ? (
-            <ul className="flex flex-col gap-3">
-              {featured ? (
-                <li>
-                  <Link href={`/c/${featured.slug}`} className="relative flex min-h-[9rem] flex-col justify-end gap-1 overflow-hidden rounded-[1.125rem] bg-brand p-5 text-white">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {cover ? <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
-                    {cover ? <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-navy/90 to-navy/10" /> : null}
-                    <span className="relative text-[13px] font-bold text-honey">Cause of the week</span>
-                    <span className="relative font-display text-[1.375rem] font-bold">{featured.name_en}</span>
-                  </Link>
-                </li>
-              ) : null}
-              {others.map((c, i) => {
-                const logo = publicImageUrl(c.logo_path);
-                const place = [c.suburb, c.city].filter(Boolean).join(", ");
-                return (
-                  <li key={c.id}>
-                    <Link href={`/c/${c.slug}`} className="flex items-center gap-4 rounded-[1.125rem] bg-white p-4 shadow-[0_12px_30px_rgba(14,27,61,0.06)] hover:ring-2 hover:ring-brand">
-                      {logo ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={logo} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
-                      ) : (
-                        <span aria-hidden className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl font-display font-bold text-brand ${i % 2 ? "bg-brand-soft" : "bg-peach"}`}>{initials(c.name_en)}</span>
-                      )}
-                      <span className="flex min-w-0 flex-1 flex-col"><span className="font-bold text-navy">{c.name_en}</span>{place ? <span className="text-sm text-muted">{place}</span> : null}</span>
-                      <Chevron />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="flex flex-col items-start gap-2 rounded-[1.125rem] bg-white p-6">
-              <p className="font-display text-xl font-bold text-brand">The first charities are joining now</p>
-              <p className="text-muted">Check back soon, or tell a charity you love about {platformConfig.appName}.</p>
-            </div>
-          )}
-        </div>
-      </Reveal>
-
-      {/* Why trust us: how money and details are handled. Every line is true today. */}
-      <Reveal as="section" id="trust" className="relative mb-24 overflow-hidden bg-honey-soft md:mb-36">
-        <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, "-right-12 -top-12 h-32 w-32 bg-honey md:-right-24 md:-top-24 md:h-72 md:w-72"]} />
-        <div className="relative mx-auto flex max-w-[75rem] flex-col gap-10 px-4 py-24 sm:px-6 md:py-32">
-          <div className="flex max-w-[40rem] flex-col gap-5">
-            <h2 className={h2Class}>Why you can <Key>trust</Key> {platformConfig.appName}.</h2>
-            <p className="text-[17px] leading-relaxed text-muted">The charity sees what it needs to thank you and record your gift. The rest stays between you and {platformConfig.appName}. You can also give anonymously.</p>
-          </div>
-          <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <FeatureCard icon="lock" title="We never see your card" body={`You pay on the payment provider's secure page. ${platformConfig.appName} never sees or stores your card details.`} />
-            <FeatureCard icon="check" title="A gift counts once it's confirmed" body="A gift only shows as paid after the payment provider confirms it to us, not because a page said so." />
-            <FeatureCard icon="shield" title="Every charity checked" body="Charities are checked before they're listed. s18A receipts come only from charities approved to issue them." />
-            <FeatureCard icon="user" title="Your ID number stays private" body="Charities don't see it on their dashboard. It goes only into the report the charity must send to SARS for your s18A receipt." />
-            <FeatureCard icon="heart" title="Your notes stay yours" body="Any label or note you add to a gift, like Work giving or Family, is private to you. Charities don't see it." />
-            <FeatureCard icon="download" title="Your data, your choice" body="From your account, download what we hold about you or ask us to delete it. That's your right under POPIA." />
-          </ul>
-        </div>
-      </Reveal>
-
-      {/* Coloured band with cards hanging over its edge */}
-      <Reveal as="section" id="pricing" className="pb-24 md:pb-36">
-        <BlueBand className="pb-48 pt-20">
-          <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-3 px-4 text-center sm:px-6">
-            <h2 className="font-display text-[clamp(1.875rem,3.2vw,2.75rem)] font-bold leading-[1.12] text-white!">No {platformConfig.appName} fee, <span className="text-honey">for anyone</span>.</h2>
-            <p className="text-[17px] leading-relaxed text-honey-soft">Donors and charities pay {platformConfig.appName} nothing. The card provider&apos;s fee comes off each donation, and that&apos;s the only cost.</p>
-          </div>
-        </BlueBand>
-        <div className="relative z-10 mx-auto -mt-36 grid max-w-[56rem] gap-0 px-4 sm:px-6 md:grid-cols-2">
-          <div className="flex flex-col items-center gap-3 rounded-[1.25rem] bg-white p-8 text-center shadow-[0_30px_60px_rgba(14,27,61,0.12)] md:rounded-r-none">
-            <p className="text-[18px] font-bold">For donors</p>
-            <p className="text-[14px] text-muted">Give to any listed charity</p>
-            <p className="mt-2 font-display text-[3rem] font-bold leading-none">R0</p>
-            <p className="text-[13px] text-muted">{platformConfig.appName} fee on your gift</p>
-            <Link href="/charities" className="pressable mt-3 w-full rounded-control bg-brand px-5 py-3 font-bold text-white">Find a charity</Link>
-            <ul className="mt-3 flex flex-col gap-2 self-stretch text-left text-[14px]">
-              <li className="flex gap-2"><Tick />An optional contribution to {platformConfig.appName} from {minContribution}, separate from your gift, or No thanks</li>
-            </ul>
-          </div>
-          <div className="flex flex-col gap-5 rounded-[1.25rem] bg-navy p-8 text-white shadow-[0_30px_60px_rgba(14,27,61,0.25)] md:mt-8 md:rounded-l-none">
-            <p className="text-[18px] font-bold">For charities</p>
-            <p className="text-[14px] text-honey-soft">Everything you need to receive gifts online</p>
-            <div className="border-t border-white/20 pt-4">
-              <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">Listing</span>
-              <p className="mt-2 font-display text-[2.25rem] font-bold leading-none">R0 <span className="text-[14px] font-normal text-honey-soft">sign-up and monthly</span></p>
-            </div>
-            <div className="border-t border-white/20 pt-4">
-              <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[12px] font-bold text-honey">Card fee</span>
-              <p className="mt-2 text-[15px] leading-relaxed text-honey-soft">The card provider&apos;s fee comes off each donation. The rest goes straight to your bank account.</p>
-            </div>
-            <Link href="/for-charities" className="mt-auto inline-flex min-h-11 items-center gap-1 font-bold text-white hover:underline">How it works for charities</Link>
-          </div>
-        </div>
-        <div className="mx-auto mt-10 flex max-w-[40rem] flex-col items-center gap-4 px-4 text-center">
-          <p className="text-[16px] leading-relaxed text-muted">No hidden fees and no subscriptions. You only ever pay what you choose to give.</p>
-          <Info terms={["s18a"]} label="an s18A receipt" />
-        </div>
-      </Reveal>
-
-      {/* Start with one charity */}
-      <Reveal as="section" className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6 md:pb-36">
-        <Ready
-          title="Start with one charity."
-          button={{ href: "/charities", label: "Find a charity" }}
-          small={{ icon: "user", title: "Want to give?", body: "Find a registered charity and give once or every month. Every gift lands in one list.", href: "/charities", link: "Start giving" }}
-          wide={{
-            icon: "building",
-            title: "Run a charity?",
-            body: "Listing is free. Donations go straight to your own bank account, and your donors' s18A receipts are made for you.",
-            href: "/for-charities",
-            link: "How it works for charities",
-            picture: <Illustration name="mobilePay" sparkle="stars" className="mx-auto w-full max-w-[18rem]" />,
-          }}
-        />
-      </Reveal>
+      </footer>
     </div>
   );
 }

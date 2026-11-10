@@ -98,6 +98,8 @@ describe("erasing a donor by their account", () => {
     expect(rpcIds?.sort()).toEqual(["d1", "d2"]);
     expect(calls).toEqual([
       "rpc",
+      // Their email on the landing page's launch list goes too (10/11/2026).
+      "launch_list:deleted:email=erin@example.co.za",
       "email",
       ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"].map((t) => `${t}:deleted:user_id=${USER}`),
       "consents:kind=account",
