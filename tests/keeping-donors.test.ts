@@ -14,6 +14,7 @@ import {
   keepingYearKey,
   retentionSentence,
   toKeepingRow,
+  toKeepingSummary,
   wholePercent,
   type KeepingRow,
 } from "@/lib/charity/keeping-donors";
@@ -24,6 +25,7 @@ const row = (o: Partial<KeepingRow> = {}): KeepingRow => ({
   this_cents: 0,
   last_cents: 0,
   earlier_cents: 0,
+  after_cents: 0,
   last_paid_at: "2026-01-10T08:00:00Z",
   recorded_only: false,
   erased: false,
@@ -64,6 +66,7 @@ describe("the tax-year windows", () => {
     expect(w.running).toBe(false);
     expect(w.thisFrom).toBe("2025-03-01T00:00:00+02:00");
     expect(w.thisTo).toBe("2026-03-01T00:00:00+02:00");
+    expect(w.now).toBe("2026-11-10T08:00:00.000Z");
   });
 
   it("reads only the choices it knows from the address", () => {
@@ -132,6 +135,26 @@ describe("the lists", () => {
     expect(inList({ last_cents: 100, this_cents: 100, earlier_cents: 0 }, "less")).toBe(false);
   });
 
+  it("'not since' means no gift since the start of the chosen year, up to now (looking at a past year)", () => {
+    // Gave in an earlier year and again after the chosen year ended: they came back, so they're in neither list.
+    const cameBack = row({ earlier_cents: 5_000, after_cents: 2_000 });
+    expect(inList(cameBack, "sybunt")).toBe(false);
+    expect(inList(row({ last_cents: 5_000, after_cents: 2_000 }), "lybunt")).toBe(false);
+    expect(inList(row({ earlier_cents: 5_000 }), "sybunt")).toBe(true);
+    const s = keepingSummary([cameBack, row({ last_cents: 5_000, after_cents: 1 }), row({ last_cents: 7_000 })]);
+    expect(s.counts).toMatchObject({ lybunt: 1, sybunt: 0 });
+    expect(s.lybuntLastYearCents).toBe(7_000);
+    // Retention is about the chosen year itself: a gift after it doesn't count as giving again in it.
+    expect(s).toMatchObject({ lastYearDonors: 2, gaveAgain: 0 });
+  });
+
+  it("reads the overview's one-row counts, with odd values as zero", () => {
+    const s = toKeepingSummary({ last_year_donors: "4", gave_again: "3", lybunt: "1", sybunt: "2", gave_more: "1", gave_less: "0", lybunt_last_cents: "30000" });
+    expect(s).toEqual({ lastYearDonors: 4, gaveAgain: 3, percent: 75, counts: { lybunt: 1, sybunt: 2, more: 1, less: 0 }, lybuntLastYearCents: 30_000 });
+    expect(toKeepingSummary(null)).toEqual({ lastYearDonors: 0, gaveAgain: 0, percent: null, counts: { lybunt: 0, sybunt: 0, more: 0, less: 0 }, lybuntLastYearCents: 0 });
+    expect(toKeepingSummary({ last_year_donors: "2", gave_again: "9" }).gaveAgain).toBe(2);
+  });
+
   it("sorts the biggest first, then the most recent gift", () => {
     const rows = [
       row({ donor_id: "a", last_cents: 5_000, last_paid_at: "2025-05-01T08:00:00Z" }),
@@ -160,6 +183,6 @@ describe("the lists", () => {
 
   it("writes a download with Rand amounts and the recorded-only flag", () => {
     const [csv] = keepingCsvRows([row({ last_cents: 125_000, this_cents: 0, earlier_cents: 3_457, recorded_only: true })], "lybunt");
-    expect(csv).toEqual(["Thandi Mokoena", "thandi@x.test", "082 123 4567", "10/01/2026", "0.00", "1250.00", "34.57", "Yes"]);
+    expect(csv).toEqual(["Thandi Mokoena", "thandi@x.test", "082 123 4567", "10/01/2026", "0.00", "1250.00", "34.57", "0.00", "Yes"]);
   });
 });

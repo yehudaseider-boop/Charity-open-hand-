@@ -33,6 +33,8 @@ export type KeepingWindow = {
   thisFrom: string;
   /** End of the chosen year (not included). */
   thisTo: string;
+  /** The moment of asking: a gift after the chosen year, up to now, means the donor came back ("not since" is false). */
+  now: string;
   /** Whether the chosen year is still running, so its totals are "so far". */
   running: boolean;
   /** "the 2027 tax year (01/03/2026 to 28/02/2027)" */
@@ -54,6 +56,7 @@ export function keepingWindow(key: KeepingYearKey, now: Date): KeepingWindow {
     lastFrom: saMidnight(range(taxYear - 1).start),
     thisFrom: saMidnight(range(taxYear).start),
     thisTo: saMidnight(nextStart),
+    now: now.toISOString(),
     running: taxYear === current,
     words: `the ${taxYearLabel(taxYear)}`,
     thisName: taxYearName(taxYear),
@@ -67,6 +70,8 @@ export type KeepingRow = {
   this_cents: number;
   last_cents: number;
   earlier_cents: number;
+  /** Given after the chosen tax year, up to now (only when looking at a past year). */
+  after_cents: number;
   last_paid_at: string | null;
   recorded_only: boolean;
   erased: boolean;
@@ -88,6 +93,7 @@ export function toKeepingRow(r: Record<string, unknown>): KeepingRow {
     this_cents: cents(r.this_cents),
     last_cents: cents(r.last_cents),
     earlier_cents: cents(r.earlier_cents),
+    after_cents: cents(r.after_cents),
     last_paid_at: text(r.last_paid_at),
     recorded_only: r.recorded_only === true,
     erased: r.erased === true,
@@ -101,7 +107,7 @@ export function toKeepingRow(r: Record<string, unknown>): KeepingRow {
 export type KeepingList = "lybunt" | "sybunt" | "more" | "less";
 
 export const keepingLists: { key: KeepingList; label: string; empty: string }[] = [
-  { key: "lybunt", label: "Gave last tax year, not this one", empty: "Everyone who gave last tax year has given again." },
+  { key: "lybunt", label: "Gave last tax year, not since", empty: "Everyone who gave last tax year has given again." },
   { key: "sybunt", label: "Gave in an earlier year, not since", empty: "Nobody from an earlier year is missing." },
   { key: "more", label: "Gave more than last year", empty: "Nobody has given more than last tax year." },
   { key: "less", label: "Gave less than last year", empty: "Nobody has given less than last tax year." },
@@ -111,13 +117,20 @@ export function keepingListKey(value: unknown): KeepingList {
   return keepingLists.find((l) => l.key === value)?.key ?? "lybunt";
 }
 
-/** Which list a row belongs to. A donor is in at most one of "last year but not this" and "some year but not since". */
-export function inList(r: Pick<KeepingRow, "this_cents" | "last_cents" | "earlier_cents">, list: KeepingList): boolean {
+type Amounts = Pick<KeepingRow, "this_cents" | "last_cents" | "earlier_cents"> & Partial<Pick<KeepingRow, "after_cents">>;
+
+/**
+ * Which list a row belongs to. "Not since" means no paid gift from the start of the chosen year up to now, so a
+ * donor who came back after a past chosen year is in neither of the first two lists. The same rules are in
+ * charity_keeping_summary (migration 20261110000008); change both together.
+ */
+export function inList(r: Amounts, list: KeepingList): boolean {
+  const since = r.this_cents + (r.after_cents ?? 0);
   switch (list) {
     case "lybunt":
-      return r.last_cents > 0 && r.this_cents === 0;
+      return r.last_cents > 0 && since === 0;
     case "sybunt":
-      return r.earlier_cents > 0 && r.last_cents === 0 && r.this_cents === 0;
+      return r.earlier_cents > 0 && r.last_cents === 0 && since === 0;
     case "more":
       return r.last_cents > 0 && r.this_cents > r.last_cents;
     case "less":
@@ -144,18 +157,35 @@ export function wholePercent(part: number, of: number): number | null {
   return Math.floor((p * 100 + Math.floor(of / 2)) / of);
 }
 
-export function keepingSummary(rows: Pick<KeepingRow, "this_cents" | "last_cents" | "earlier_cents">[]): KeepingSummary {
+export function keepingSummary(rows: Amounts[]): KeepingSummary {
   let lastYearDonors = 0, gaveAgain = 0, lybuntLastYearCents = 0;
   const counts: Record<KeepingList, number> = { lybunt: 0, sybunt: 0, more: 0, less: 0 };
   for (const r of rows) {
     if (r.last_cents > 0) {
       lastYearDonors += 1;
       if (r.this_cents > 0) gaveAgain += 1;
-      else lybuntLastYearCents += r.last_cents;
     }
+    if (inList(r, "lybunt")) lybuntLastYearCents += r.last_cents;
     for (const l of keepingLists) if (inList(r, l.key)) counts[l.key] += 1;
   }
   return { lastYearDonors, gaveAgain, percent: wholePercent(gaveAgain, lastYearDonors), counts, lybuntLastYearCents };
+}
+
+/** One row from charity_keeping_summary, as a summary. Bigints come back as text. */
+export function toKeepingSummary(r: Record<string, unknown> | null | undefined): KeepingSummary {
+  const n = (v: unknown) => {
+    const x = Number(v ?? 0);
+    return Number.isFinite(x) && x > 0 ? Math.trunc(x) : 0;
+  };
+  const lastYearDonors = n(r?.last_year_donors);
+  const gaveAgain = Math.min(n(r?.gave_again), lastYearDonors);
+  return {
+    lastYearDonors,
+    gaveAgain,
+    percent: wholePercent(gaveAgain, lastYearDonors),
+    counts: { lybunt: n(r?.lybunt), sybunt: n(r?.sybunt), more: n(r?.gave_more), less: n(r?.gave_less) },
+    lybuntLastYearCents: n(r?.lybunt_last_cents),
+  };
 }
 
 /** The retention line, in plain words, with the counts it comes from. */
@@ -180,11 +210,11 @@ export function keepingListRows(rows: KeepingRow[], list: KeepingList): KeepingR
     .sort((a, b) => key(b) - key(a) || (b.last_paid_at ?? "").localeCompare(a.last_paid_at ?? "") || (a.donor_id ?? "").localeCompare(b.donor_id ?? ""));
 }
 
-export const KEEPING_CSV_HEADER = ["Donor", "Email", "Phone", "Last donation", "This tax year (R)", "Last tax year (R)", "Earlier years (R)", "Only gifts you recorded"];
+export const KEEPING_CSV_HEADER = ["Donor", "Email", "Phone", "Last donation", "Chosen tax year (R)", "Tax year before (R)", "Earlier years (R)", "Since the chosen year (R)", "Only gifts you recorded"];
 
 export function keepingCsvRows(rows: KeepingRow[], list: KeepingList): (string | null)[][] {
   return keepingListRows(rows, list).map((r) => {
     const d = keepingDetails(r);
-    return [d.name, d.email, csvPhone(d.phone), d.lastPaidAt ? formatDate(d.lastPaidAt) : "", centsToPlain(r.this_cents), centsToPlain(r.last_cents), centsToPlain(r.earlier_cents), r.recorded_only ? "Yes" : "No"];
+    return [d.name, d.email, csvPhone(d.phone), d.lastPaidAt ? formatDate(d.lastPaidAt) : "", centsToPlain(r.this_cents), centsToPlain(r.last_cents), centsToPlain(r.earlier_cents), centsToPlain(r.after_cents), r.recorded_only ? "Yes" : "No"];
   });
 }

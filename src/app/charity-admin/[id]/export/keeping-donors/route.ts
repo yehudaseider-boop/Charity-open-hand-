@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
+import { audit, authoriseExport, csvResponse, refusal } from "@/lib/charity/export";
 import { KEEPING_CSV_HEADER, keepingCsvRows, keepingListKey, keepingWindow, keepingYearKey } from "@/lib/charity/keeping-donors";
 import { KeepingNotSetUp, loadKeepingDonors } from "@/lib/charity/keeping-donors-queries";
 import { toCsv } from "@/lib/csv";
@@ -17,8 +17,9 @@ export async function GET(request: Request, ctx: RouteContext<"/charity-admin/[i
   try {
     rows = await loadKeepingDonors(id, w);
   } catch (e) {
-    const msg = e instanceof KeepingNotSetUp ? "This list isn't switched on yet. Nothing was downloaded." : "Could not read this list. Nothing was downloaded. Please try again.";
-    return new NextResponse(msg, { status: e instanceof KeepingNotSetUp ? 503 : 500 });
+    const back = `/charity-admin/${id}/keeping`;
+    if (e instanceof KeepingNotSetUp) return refusal("This list isn't switched on yet. Nothing was downloaded, and nothing is wrong with your donors or donations.", 503, back, "Back to keeping donors");
+    return refusal("We couldn't read this list, so nothing was downloaded. It's usually a dropped connection: go back and try the download again in a moment.", 500, back, "Back to keeping donors");
   }
   const out = keepingCsvRows(rows, list);
   await audit({ actorUserId: who.userId, action: "charity.keeping_donors_exported", entityType: "charity", entityId: id, details: { rows: out.length, list, taxYear: w.taxYear } });

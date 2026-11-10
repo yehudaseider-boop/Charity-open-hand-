@@ -33,7 +33,8 @@ export async function authoriseExport(id: string): Promise<{ userId: string } | 
  * A download that can't go ahead opens a small page in the Givezy look with one way on (30/10/2026),
  * not a bare line of text with no way back. Plain HTML (these are file routes, not pages), coloured from brand-colors.ts.
  */
-function refusal(message: string, status: number, href: string, label: string) {
+/** A plain page for a download that can't go ahead: what happened, and one way back. */
+export function refusal(message: string, status: number, href: string, label: string) {
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Download not available · Givezy</title></head>
 <body style="margin:0;background:${brandColors.surface};color:${brandColors.ink};font-family:system-ui,-apple-system,'Segoe UI',sans-serif">

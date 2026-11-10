@@ -74,7 +74,9 @@ const reset = () => run("reset role");
 const LAST_FROM = "2025-03-01T00:00:00+02:00";
 const THIS_FROM = "2026-03-01T00:00:00+02:00";
 const THIS_TO = "2027-03-01T00:00:00+02:00";
-const list = (c: string, a = LAST_FROM, b = THIS_FROM, e = THIS_TO) => run("select * from public.charity_keeping_donors($1, $2, $3, $4)", [c, a, b, e]).then((r) => r.rows);
+const NOW = "2026-11-10T10:00:00+02:00";
+const list = (c: string, a = LAST_FROM, b = THIS_FROM, e = THIS_TO, now = NOW) => run("select * from public.charity_keeping_donors($1, $2, $3, $4, $5)", [c, a, b, e, now]).then((r) => r.rows);
+const summary = (c: string, a = LAST_FROM, b = THIS_FROM, e = THIS_TO, now = NOW) => run("select * from public.charity_keeping_summary($1, $2, $3, $4, $5)", [c, a, b, e, now]).then((r) => r.rows);
 
 describe("keeping donors", () => {
   it("splits each donor's paid gifts into this tax year, last tax year and earlier", async () => {
@@ -97,6 +99,7 @@ describe("keeping donors", () => {
       expect(by(lapsed)).toMatchObject({ this_cents: "0", last_cents: "30000", earlier_cents: "0" });
       expect(by(older)).toMatchObject({ this_cents: "0", last_cents: "0", earlier_cents: "5000" });
       expect(by(newOnly)).toBeUndefined();
+      expect(by(again).after_cents).toBe("0");
       // No ID, tax or payment details come back.
       for (const hidden of ["id_number", "tax_number", "gateway_ref", "contribution_cents", "platform_fee_cents"]) expect(Object.keys(rows[0])).not.toContain(hidden);
     });
@@ -147,14 +150,50 @@ describe("keeping donors", () => {
     });
   });
 
+  it("looking at a past year, a gift after it (up to now) comes back as after_cents, so 'not since' is true", async () => {
+    await tx(async () => {
+      const a = await user();
+      const c = await charity(a);
+      const cameBack = await donor(), gone = await donor();
+      await gift(c, cameBack, 4_000, "2023-06-01T10:00:00Z");
+      await gift(c, cameBack, 6_000, "2026-06-01T10:00:00Z");
+      await gift(c, gone, 4_000, "2023-06-01T10:00:00Z");
+      await asUser(a);
+      // The 2025/26 tax year, asked on 10/11/2026.
+      const rows = await list(c, "2024-03-01T00:00:00+02:00", "2025-03-01T00:00:00+02:00", "2026-03-01T00:00:00+02:00");
+      expect(rows.find((r) => r.donor_id === cameBack)).toMatchObject({ this_cents: "0", last_cents: "0", earlier_cents: "4000", after_cents: "6000" });
+      expect(rows.find((r) => r.donor_id === gone)).toMatchObject({ earlier_cents: "4000", after_cents: "0" });
+      const [s] = await summary(c, "2024-03-01T00:00:00+02:00", "2025-03-01T00:00:00+02:00", "2026-03-01T00:00:00+02:00");
+      expect(s.sybunt).toBe("1");
+    });
+  });
+
+  it("the overview's counts agree with the lists, in one row", async () => {
+    await tx(async () => {
+      const a = await user();
+      const c = await charity(a);
+      const again = await donor(), less = await donor(), lapsed = await donor(), older = await donor();
+      await gift(c, again, 10_000, "2025-06-01T10:00:00Z");
+      await gift(c, again, 25_000, "2026-08-01T10:00:00Z");
+      await gift(c, less, 10_000, "2025-06-01T10:00:00Z");
+      await gift(c, less, 4_000, "2026-08-01T10:00:00Z");
+      await gift(c, lapsed, 30_000, "2025-12-01T10:00:00Z");
+      await gift(c, older, 5_000, "2024-05-01T10:00:00Z");
+      await asUser(a);
+      expect(await summary(c)).toEqual([{ last_year_donors: "3", gave_again: "2", lybunt: "1", sybunt: "1", gave_more: "1", gave_less: "1", lybunt_last_cents: "30000" }]);
+      const empty = await charity(a);
+      expect(await summary(empty)).toEqual([{ last_year_donors: "0", gave_again: "0", lybunt: "0", sybunt: "0", gave_more: "0", gave_less: "0", lybunt_last_cents: "0" }]);
+    });
+  });
+
   it("needs a proper period", async () => {
     await tx(async () => {
       const a = await user();
       const c = await charity(a);
       await asUser(a);
-      for (const args of [[c, null, THIS_FROM, THIS_TO], [c, THIS_FROM, LAST_FROM, THIS_TO], [c, LAST_FROM, THIS_TO, THIS_FROM]]) {
+      for (const args of [[c, null, THIS_FROM, THIS_TO, NOW], [c, THIS_FROM, LAST_FROM, THIS_TO, NOW], [c, LAST_FROM, THIS_TO, THIS_FROM, NOW], [c, LAST_FROM, THIS_FROM, THIS_TO, null], [c, LAST_FROM, THIS_FROM, THIS_TO, LAST_FROM]]) {
         await run("savepoint s");
-        await expect(run("select * from public.charity_keeping_donors($1, $2, $3, $4)", args)).rejects.toThrow(/period/);
+        await expect(run("select * from public.charity_keeping_donors($1, $2, $3, $4, $5)", args)).rejects.toThrow(/period/);
         await run("rollback to savepoint s");
       }
     });
@@ -169,9 +208,11 @@ describe("keeping donors", () => {
       await gift(cb, await donor(), 1_000, "2025-06-01T10:00:00Z");
 
       const refused = async (c: string, pattern: RegExp) => {
-        await run("savepoint s");
-        await expect(list(c)).rejects.toThrow(pattern);
-        await run("rollback to savepoint s");
+        for (const ask of [list, summary]) {
+          await run("savepoint s");
+          await expect(ask(c)).rejects.toThrow(pattern);
+          await run("rollback to savepoint s");
+        }
       };
 
       await asUser(a);
@@ -193,6 +234,7 @@ describe("keeping donors", () => {
       await reset();
       await asUser(admin);
       expect((await list(ca)).map((r) => r.donor_id)).toEqual([mine]);
+      expect((await summary(ca))[0].last_year_donors).toBe("1");
 
       await reset();
       await run("set local role anon");

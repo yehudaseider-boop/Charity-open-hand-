@@ -114,7 +114,7 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
             ))}
           </ul>
 
-          <h2 className="font-display text-lg font-bold text-indigo">{meta.label}{w.running && (list === "lybunt" || list === "sybunt") ? " (so far)" : ""}</h2>
+          <h2 className="font-display text-lg font-bold text-indigo">{meta.label}{w.running ? " (so far)" : ""}</h2>
 
           {listed.length === 0 ? (
             <p className="rounded-card border-2 border-border bg-surface p-4 text-sm text-muted">{meta.empty}</p>

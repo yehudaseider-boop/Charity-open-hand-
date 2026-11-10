@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
+import { audit, authoriseExport, csvResponse, refusal } from "@/lib/charity/export";
 import { LAPSED_CSV_HEADER, lapsedCsvRows, lapsedPeriod, lapsedPeriodKey } from "@/lib/charity/lapsed-monthly";
 import { loadLapsedMonthly } from "@/lib/charity/lapsed-monthly-queries";
 import { toCsv } from "@/lib/csv";
@@ -15,7 +15,7 @@ export async function GET(request: Request, ctx: RouteContext<"/charity-admin/[i
   try {
     rows = await loadLapsedMonthly(id, period);
   } catch {
-    return new NextResponse("Could not read the monthly donors who stopped. Nothing was downloaded. Please try again.", { status: 500 });
+    return refusal("We couldn't read the monthly donors who stopped, so nothing was downloaded. It's usually a dropped connection: go back and try the download again in a moment.", 500, `/charity-admin/${id}/monthly/stopped`, "Back to the list");
   }
   await audit({ actorUserId: who.userId, action: "charity.stopped_monthly_exported", entityType: "charity", entityId: id, details: { rows: rows.length, period: period.key } });
   return csvResponse(toCsv(LAPSED_CSV_HEADER, lapsedCsvRows(rows)), `monthly-donors-who-stopped-${period.key}.csv`);
