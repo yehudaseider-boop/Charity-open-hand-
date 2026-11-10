@@ -54,7 +54,8 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 
 ## Phase 4: public profile
 
-12. **Profile video** (7.1). Link a YouTube or Vimeo video first (no storage cost); uploads later if needed.
+12. **Profile video** (7.1). Link a YouTube or Vimeo video (no storage cost). Decided 10/11/2026: links only, no uploads
+    (if uploads are ever revisited, at most 2 minutes); in the app it plays inside the charity's screen.
     Decided 09/11/2026: link first.
 13. **Charity's own "focus right now"** (7.2). Charity picks a campaign, dates and a short message; shown on
     its profile and in the app. Push to its donors only after step 10, with a limit (suggest once a month).
@@ -83,4 +84,4 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
 | POPIA wording for invited donors | Yosef | Needed before step 11 |
 | Most messages per donor per week | Decided 09/11/2026 | One |
 | Netflorist | Yehuda | Parked |
-| Video limits | Decided 09/11/2026 | Links first |
+| Video limits | Decided 10/11/2026 | Links only (YouTube or Vimeo); plays inside the app |

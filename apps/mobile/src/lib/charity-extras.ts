@@ -1,8 +1,8 @@
 import { activeFocus, focusCampaign, focusDay, jhbToday, type Focus, type FocusRow } from "@shared/charity/focus";
-import { VIDEO_PROVIDER_NAME, videoFrom, videoWatchUrl, type ProfileVideo } from "@shared/charity/video";
+import { VIDEO_FRAME_ORIGINS, VIDEO_PROVIDER_NAME, videoEmbedUrl, videoFrom, videoWatchUrl, type ProfileVideo } from "@shared/charity/video";
 
 /**
- * The extras on a charity's screen (10/11/2026): its video (a "Watch our video" button) and its own focus
+ * The extras on a charity's screen (10/11/2026): its video (played inside the screen, decided 10/11/2026) and its own focus
  * ("What we're focused on right now"). Both are bonuses read on their own: if either can't load, the screen
  * shows without it. Pure functions (no React Native), so the website's test suite can check them.
  */
@@ -15,14 +15,65 @@ export function toVideo(row: VideoRow | null | undefined): ProfileVideo | null {
   return videoFrom(row);
 }
 
-/** The address the in-app browser opens: the video's own page, built from the site and id only. */
+/** The video's own page on YouTube or Vimeo, built from the site and id only: "Open in browser" and the player's own links. */
 export function videoLink(video: ProfileVideo): string {
   return videoWatchUrl(video);
 }
 
-/** The line under the button, so nobody is surprised where it opens. */
+/** The line under the player, so nobody is surprised where the video comes from. */
 export function videoNote(video: ProfileVideo): string {
-  return `Opens ${VIDEO_PROVIDER_NAME[video.provider]} in a sheet, here in the app.`;
+  const site = VIDEO_PROVIDER_NAME[video.provider];
+  return `The video plays from ${site}. Nothing loads from ${site} until you press play.`;
+}
+
+/**
+ * The player shown inside the charity's screen (decided 10/11/2026), only after the donor presses play: the same
+ * privacy-friendly player the website uses, built from the site and id only, never from a typed link, with
+ * `playsinline` so it plays in the card rather than jumping to full screen on iPhone.
+ */
+export function videoPlayerUrl(video: ProfileVideo): string {
+  return `${videoEmbedUrl(video)}&playsinline=1`;
+}
+
+/** The only two places the in-app player may load from (the same two the website's frame allows). */
+export const VIDEO_PLAYER_ORIGINS: readonly string[] = VIDEO_FRAME_ORIGINS;
+
+/** The video sites' own pages: a tap on the player's logo or title opens these in the phone's browser, not in the card. */
+const WATCH_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"]);
+
+export type PlayerNavigation = "allow" | "browser" | "block";
+
+/**
+ * What the in-app player does with a page it is asked to load. The card itself may only show the two players
+ * (exact origins, https, no name or password before the host). Inside the player, its own embedded frames may load
+ * over https. A tap through to the video site's own page opens the phone's browser instead. Anything else
+ * (another site, http, javascript:, data:, file:, intent:) is refused.
+ */
+export function playerNavigation(raw: string, isTopFrame: boolean): PlayerNavigation {
+  if (!isTopFrame && (raw === "about:blank" || raw === "about:srcdoc")) return "allow";
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return "block";
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return "block";
+  if (VIDEO_PLAYER_ORIGINS.includes(url.origin)) return "allow";
+  if (WATCH_HOSTS.has(url.hostname.toLowerCase())) return isTopFrame ? "browser" : "block";
+  return isTopFrame ? "block" : "allow";
+}
+
+/** The page the player says it came from. YouTube refuses to play in an app that sends none. */
+export function playerReferrer(siteUrl: string | undefined): string {
+  try {
+    if (siteUrl) {
+      const u = new URL(siteUrl);
+      if (u.protocol === "https:") return `${u.origin}/`;
+    }
+  } catch {
+    // Fall through to the public address.
+  }
+  return "https://givezy.co.za/";
 }
 
 /** The focus to show today (Johannesburg date, wherever the phone is), or null outside its dates. */

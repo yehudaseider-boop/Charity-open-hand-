@@ -1,15 +1,17 @@
-/** The app's charity screen extras: the "Watch our video" link and the charity's own focus card. */
+/** The app's charity screen extras: the video that plays inside the screen, and the charity's own focus card. */
 import { describe, expect, it } from "vitest";
-import { focusGive, focusUntil, toFocus, toVideo, videoLink, videoNote } from "../apps/mobile/src/lib/charity-extras";
+import { focusGive, focusUntil, playerNavigation, playerReferrer, toFocus, toVideo, videoLink, videoNote, videoPlayerUrl } from "../apps/mobile/src/lib/charity-extras";
 
-describe("the video button in the app", () => {
-  it("opens the video's own page, built only from the stored site and id", () => {
+describe("the video in the app", () => {
+  it("plays the privacy-friendly player and falls back to the video's own page, both built only from the stored site and id", () => {
     const y = toVideo({ video_provider: "youtube", video_id: "dQw4w9WgXcQ" })!;
     const v = toVideo({ video_provider: "vimeo", video_id: "76979871" })!;
     expect(videoLink(y)).toBe("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     expect(videoLink(v)).toBe("https://vimeo.com/76979871");
-    expect(videoNote(y)).toBe("Opens YouTube in a sheet, here in the app.");
-    expect(videoNote(v)).toBe("Opens Vimeo in a sheet, here in the app.");
+    expect(videoPlayerUrl(y)).toBe("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0&playsinline=1");
+    expect(videoPlayerUrl(v)).toBe("https://player.vimeo.com/video/76979871?autoplay=1&dnt=1&playsinline=1");
+    expect(videoNote(y)).toBe("The video plays from YouTube. Nothing loads from YouTube until you press play.");
+    expect(videoNote(v)).toBe("The video plays from Vimeo. Nothing loads from Vimeo until you press play.");
   });
 
   it("shows no button for a row with no video, or one that isn't a known site and a well-formed id", () => {
@@ -38,5 +40,56 @@ describe("the focus card in the app", () => {
     expect(focusGive(focus, undefined)).toEqual({ label: "Give", campaignId: null });
     expect(focusGive({ ...focus, campaignId: null }, [{ id: "c-1" }])).toEqual({ label: "Give", campaignId: null });
     expect(focusUntil(focus)).toBe("Until 30/11/2026");
+  });
+});
+
+describe("what the in-app player may load", () => {
+  it("lets the card show only the two players", () => {
+    expect(playerNavigation("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1", true)).toBe("allow");
+    expect(playerNavigation("https://player.vimeo.com/video/76979871", true)).toBe("allow");
+  });
+
+  it("sends a tap through to the video site's own page to the phone's browser", () => {
+    expect(playerNavigation("https://www.youtube.com/watch?v=dQw4w9WgXcQ", true)).toBe("browser");
+    expect(playerNavigation("https://youtu.be/dQw4w9WgXcQ", true)).toBe("browser");
+    expect(playerNavigation("https://vimeo.com/76979871", true)).toBe("browser");
+  });
+
+  it("refuses everything else in the card", () => {
+    for (const url of [
+      "https://www.youtube-nocookie.com.evil.com/embed/x",
+      "https://evil.com/?https://www.youtube-nocookie.com",
+      "https://www.youtube-nocookie.com@evil.com/embed/x",
+      "https://user:pw@www.youtube-nocookie.com/embed/x",
+      "https://www.youtube-nocookie.com:8443/embed/x",
+      "http://www.youtube-nocookie.com/embed/x",
+      "http://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "file:///etc/passwd",
+      "intent://scan/#Intent;scheme=zxing;end",
+      "about:blank",
+      "https://accounts.google.com/",
+      "not a url",
+      "",
+    ]) {
+      expect(playerNavigation(url, true), url).toBe("block");
+    }
+  });
+
+  it("inside the player, allows its own https frames but never a script, file or plain http address", () => {
+    expect(playerNavigation("about:blank", false)).toBe("allow");
+    expect(playerNavigation("https://www.youtube-nocookie.com/embed/x", false)).toBe("allow");
+    expect(playerNavigation("https://static.doubleclick.net/instream/ad_status.js", false)).toBe("allow");
+    for (const url of ["javascript:alert(1)", "data:text/html,x", "file:///x", "http://example.com/", "https://www.youtube.com/watch?v=x"]) {
+      expect(playerNavigation(url, false), url).toBe("block");
+    }
+  });
+
+  it("says it came from our website, and only ever an https address", () => {
+    expect(playerReferrer("https://test.givezy.co.za/some/path")).toBe("https://test.givezy.co.za/");
+    expect(playerReferrer(undefined)).toBe("https://givezy.co.za/");
+    expect(playerReferrer("http://insecure.example")).toBe("https://givezy.co.za/");
+    expect(playerReferrer("not a url")).toBe("https://givezy.co.za/");
   });
 });
