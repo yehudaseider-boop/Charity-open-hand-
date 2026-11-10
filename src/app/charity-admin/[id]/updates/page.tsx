@@ -12,6 +12,7 @@ import { MAX_PHOTOS } from "@/lib/charity/validation";
 import { formatDate } from "@/lib/dates";
 import { addPhoto, postUpdate, removePhoto, removeUpdate } from "./actions";
 import { PhotoForm, UpdateForm } from "./forms";
+import { ProfileVideo } from "@/components/profile-video";
 import { refusedFor } from "@/lib/charity/permissions";
 
 export const metadata: Metadata = { title: "Photos and updates" };
@@ -63,6 +64,7 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
                   <p className="whitespace-pre-line text-[0.95rem] text-navy [overflow-wrap:anywhere]">{u.body_en}</p>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border-2 border-border object-cover" /> : null}
+                  {u.video ? <div className="max-w-sm"><ProfileVideo video={u.video} charityName={charity.name_en} /></div> : null}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     {canEmail ? <Link href={`/charity-admin/${id}/email-donors?update=${u.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline hover:text-indigo">Email this to your donors</Link> : null}
                     {canEdit ? (

@@ -188,6 +188,7 @@ export default function CharityDetail() {
                   {u.photoUrl ? (
                     <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />
                   ) : null}
+                  {u.video ? <ProfileVideo video={u.video} charityName={charity.nameEn} /> : null}
                 </View>
               ))}
             </View>

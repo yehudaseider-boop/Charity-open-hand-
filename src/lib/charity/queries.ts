@@ -9,6 +9,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import type { DocumentType } from "./validation";
 import { can } from "./permissions";
 import { viewerRole } from "./team";
+import { UPDATE_VIDEO_COLUMNS, withUpdateVideos, type ProfileVideo } from "./video";
 
 export const CHARITY_FIELDS =
   "id, slug, quickgive_code, name_en, legal_name_en, description_en, funds_use_en, thank_you_en, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many, suggested_amounts_cents, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, address_line1, address_line2, suburb, city, postal_code, status, rejection_reason, is_verified, verified_at, is_s18a, s18a_confirmed_at, mandate_signed_at, mandate_document_path, gateway, gateway_subaccount_ref, approved_at, created_at, updated_at";
@@ -123,7 +124,7 @@ export function publicImageUrl(path: string | null): string | null {
 }
 
 export type CharityPhoto = { id: string; storage_path: string; caption_en: string | null; created_at: string };
-export type CharityUpdate = { id: string; body_en: string; photo_path: string | null; created_at: string };
+export type CharityUpdate = { id: string; body_en: string; photo_path: string | null; created_at: string; video: ProfileVideo | null };
 
 /** A charity's photos (oldest first) and latest updates, read under row-level security. */
 export async function loadStories(charityId: string, updatesLimit = 20) {
@@ -132,5 +133,11 @@ export async function loadStories(charityId: string, updatesLimit = 20) {
     supabase.from("charity_photos").select("id, storage_path, caption_en, created_at").eq("charity_id", charityId).order("created_at"),
     supabase.from("charity_updates").select("id, body_en, photo_path, created_at").eq("charity_id", charityId).order("created_at", { ascending: false }).limit(updatesLimit),
   ]);
-  return { photos: (photos.data ?? []) as CharityPhoto[], updates: (updates.data ?? []) as CharityUpdate[] };
+  const rows = (updates.data ?? []) as Omit<CharityUpdate, "video">[];
+  // An update's video is a bonus, read on its own: before its database change runs (or if it can't be read), every
+  // update still shows, without one.
+  const videos = rows.length
+    ? await supabase.from("charity_updates").select(UPDATE_VIDEO_COLUMNS).in("id", rows.map((u) => u.id))
+    : { data: [], error: null };
+  return { photos: (photos.data ?? []) as CharityPhoto[], updates: withUpdateVideos(rows, videos.error ? null : videos.data) as CharityUpdate[] };
 }

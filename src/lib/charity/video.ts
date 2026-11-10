@@ -99,3 +99,29 @@ export function videoEmbedUrl(v: ProfileVideo): string {
     ? `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`
     : `https://player.vimeo.com/video/${v.id}?autoplay=1&dnt=1`;
 }
+
+/** The columns a charity update's video is read from (CRM step 14, 10/11/2026). Read on their own, so updates still show where they don't exist yet. */
+export const UPDATE_VIDEO_COLUMNS = "id, video_provider, video_id";
+
+/**
+ * A video on each update, from rows read on their own (id, video_provider, video_id). An update with no row, or
+ * an odd one, has no video. If the video columns couldn't be read at all, pass null: every update shows without one.
+ */
+export function withUpdateVideos<T extends { id: string }>(updates: T[], rows: unknown[] | null | undefined): (T & { video: ProfileVideo | null })[] {
+  const byId = new Map<string, ProfileVideo | null>();
+  for (const r of rows ?? []) {
+    const row = r as { id?: unknown; video_provider?: unknown; video_id?: unknown } | null;
+    if (row && typeof row.id === "string") byId.set(row.id, videoFrom(row));
+  }
+  return updates.map((u) => ({ ...u, video: byId.get(u.id) ?? null }));
+}
+
+/** The stored columns for a video picked on a new update: both null for none. */
+export function updateVideoColumns(v: ProfileVideo | null): { video_provider: VideoProvider | null; video_id: string | null } {
+  return { video_provider: v?.provider ?? null, video_id: v?.id ?? null };
+}
+
+/** A column the code asks for isn't in the database yet (its change hasn't run): PostgREST's or Postgres's "no such column". */
+export function isMissingColumn(error: { code?: string | null } | null | undefined): boolean {
+  return error?.code === "PGRST204" || error?.code === "42703";
+}

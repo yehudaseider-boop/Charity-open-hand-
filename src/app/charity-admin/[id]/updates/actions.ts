@@ -15,6 +15,7 @@ import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { cleanImage } from "@/lib/charity/clean-image";
 import { refusal } from "@/lib/charity/team";
+import { isMissingColumn, parseVideoLink, updateVideoColumns } from "@/lib/charity/video";
 
 function revalidate(charityId: string, slug: string) {
   revalidatePath(`/charity-admin/${charityId}/updates`);
@@ -54,6 +55,10 @@ export async function postUpdate(charityId: string, _prev: FormState, formData: 
   if (refused) return { ok: false, message: refused };
   const parsed = updateSchema.safeParse(formToObject(formData));
   if (!parsed.success) return zodErrors(parsed.error);
+  // An optional video link (decided 10/11/2026: YouTube or Vimeo links only). Read here, on the server; only the
+  // site and the video's id are kept, never the link.
+  const read = parseVideoLink(formData.get("video_url"));
+  if (!read.ok) return { ok: false, message: "That update wasn't posted.", fieldErrors: { video_url: read.message } };
   if (await hitRateLimit("charity-update", [`charity:${charityId}`], 20, 24 * 60)) {
     return { ok: false, message: "That's a lot of updates for one day. Please post again tomorrow." };
   }
@@ -61,9 +66,17 @@ export async function postUpdate(charityId: string, _prev: FormState, formData: 
   if ("error" in photo) return photo.error!;
 
   const supabase = await createClient();
-  const { data: made, error } = await supabase.from("charity_updates").insert({ charity_id: charityId, body_en: parsed.data.body_en, photo_path: photo.path }).select("id").single();
+  const { data: made, error } = await supabase
+    .from("charity_updates")
+    // The video columns only when there is a video, so updates without one post as before.
+    .insert({ charity_id: charityId, body_en: parsed.data.body_en, photo_path: photo.path, ...(read.video ? updateVideoColumns(read.video) : {}) })
+    .select("id")
+    .single();
   if (error) {
     await removeFile(charityId, photo.path);
+    if (read.video && isMissingColumn(error)) {
+      return { ok: false, message: "Videos on updates aren't switched on yet. Nothing was posted. Remove the video link to post your update now.", fieldErrors: { video_url: "Videos on updates aren't switched on yet" } };
+    }
     return { ok: false, message: "We couldn't post that. Please try again." };
   }
   await logAudit({ actorUserId: viewer.userId, action: "charity.update_posted", entityType: "charity", entityId: charityId });

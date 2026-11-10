@@ -12,6 +12,8 @@ export function UpdateForm({ action }: { action: Action }) {
       <TextArea name="body_en" label="Your update" required rows={4} maxLength={500}
         hint="What you did with donations lately, in your own words. Up to 500 characters. Real numbers only." />
       <FileField name="file" label="Photo (optional)" accept="image/jpeg,image/png,image/webp" hint="JPG, PNG or WebP, up to 4 MB." />
+      <TextField name="video_url" label="Video link (optional)" type="url" inputMode="url" autoComplete="off" maxLength={300}
+        hint="A public video on YouTube or Vimeo, for example https://youtu.be/… Donors press play to watch it with your update. We don't store the video itself." />
     </ActionForm>
   );
 }

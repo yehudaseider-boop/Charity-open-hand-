@@ -7,6 +7,7 @@ import { secureStorage } from "./secure-storage";
 import { newsKey, optOutIds } from "./charity-news";
 import { toFocus, toVideo, VIDEO_COLUMNS, type VideoRow } from "./charity-extras";
 import { FOCUS_COLUMNS, type FocusRow } from "@shared/charity/focus";
+import { UPDATE_VIDEO_COLUMNS, withUpdateVideos } from "@shared/charity/video";
 
 /**
  * The charity directory. Live: approved charities from the database (row-level
@@ -195,11 +196,16 @@ async function loadCharity(slug: string): Promise<Charity | null> {
     db.from("charity_focus").select(FOCUS_COLUMNS).eq("charity_id", row.id).maybeSingle(),
   ]);
   const campaignRows = (campaigns.data ?? []) as CampaignRow[];
-  const progress = campaignRows.length ? await db.rpc("campaign_progress", { p_campaign_ids: campaignRows.map((c) => c.id) }) : { data: [] };
+  const updateRows = (updates.data ?? []) as UpdateRow[];
+  // Each update's video is a bonus too, read on its own: if it can't be read, the updates show without videos.
+  const [progress, updateVideos] = await Promise.all([
+    campaignRows.length ? db.rpc("campaign_progress", { p_campaign_ids: campaignRows.map((c) => c.id) }) : Promise.resolve({ data: [] }),
+    updateRows.length ? db.from("charity_updates").select(UPDATE_VIDEO_COLUMNS).in("id", updateRows.map((u) => u.id)) : Promise.resolve({ data: [], error: null }),
+  ]);
   return {
     ...toCharity(row, base),
     photos: toPhotos((photos.data ?? []) as PhotoRow[], base),
-    updates: toUpdates((updates.data ?? []) as UpdateRow[], base),
+    updates: withUpdateVideos(toUpdates(updateRows, base), updateVideos.error ? null : updateVideos.data),
     campaigns: toCampaigns(campaignRows, (progress.data ?? []) as ProgressRow[]),
     video: video.error ? null : toVideo(video.data as VideoRow | null),
     focus: focus.error ? null : toFocus(focus.data as Partial<FocusRow> | null),

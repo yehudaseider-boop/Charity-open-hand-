@@ -230,6 +230,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
                       <p className="whitespace-pre-line leading-relaxed">{u.body_en}</p>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {photo ? <img src={photo} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-control object-cover" /> : null}
+                      {u.video ? <ProfileVideo video={u.video} charityName={charity.name_en} /> : null}
                     </li>
                   );
                 })}

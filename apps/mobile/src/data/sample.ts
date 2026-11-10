@@ -54,7 +54,8 @@ export type Charity = {
 export type Campaign = { id: string; title: string; description: string | null; targetCents: number | null; raisedCents: number; giftCount: number; endsAt: Date | null };
 
 export type CharityPhoto = { id: string; url: string; caption: string | null };
-export type CharityUpdate = { id: string; date: Date; body: string; photoUrl: string | null };
+/** An update; `video` is a YouTube or Vimeo link the charity added to it (site and id only), or none. */
+export type CharityUpdate = { id: string; date: Date; body: string; photoUrl: string | null; video?: ProfileVideo | null };
 
 /**
  * DUMMY PHOTOS, made with an image generator, so the sample charities look as

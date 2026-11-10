@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { videoFrom } from "@/lib/charity/video";
 import { Card, Notice } from "@/components/card";
 import { DonePanel } from "@/components/done-panel";
 import { PageHeader } from "@/components/dash";
@@ -51,8 +52,15 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
   const update = typeof sp.update === "string" && /^[0-9a-f-]{36}$/i.test(sp.update)
     ? (await createAdminClient().from("charity_updates").select("body_en").eq("id", sp.update).eq("charity_id", id).maybeSingle()).data
     : null;
+  // Whether that update has a video (read on its own: before the video change runs, the update still prefills).
+  const updateVideo = update && typeof sp.update === "string"
+    ? videoFrom((await createAdminClient().from("charity_updates").select("video_provider, video_id").eq("id", sp.update).eq("charity_id", id).maybeSingle()).data)
+    : null;
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
-  const initialBody = update ? `${update.body_en as string}\n\nSee more on our page: ${site}/c/${charity.slug}`.slice(0, 5000) : "";
+  // Never the video's own link: donors watch it on the charity's page, where it plays only after they press play.
+  const initialBody = update
+    ? `${update.body_en as string}\n\n${updateVideo ? "Watch the video with this update on our page" : "See more on our page"}: ${site}/c/${charity.slug}`.slice(0, 5000)
+    : "";
   const initialSubject = update ? `News from ${charity.name_en}`.slice(0, 120) : "";
 
   return (
