@@ -1807,3 +1807,15 @@ Built from Yossi's notes (1.1) as step 6a of `docs/crm-build-plan.md`. Migration
   once. A search or a cause is still built per visit (`src/app/charities/page.tsx`), because the words typed change
   the answer. Both use one view (`src/app/charities/view.tsx`) reading public data as an anonymous visitor.
   Leaving a charity's own link for the list still ends the focus, as before.
+
+## A more hands-on website (Yehuda, 10/11/2026: "make the website interactive")
+
+- **Product windows you can click.** The sample windows on Home and For charities are now real tab lists
+  (`src/components/live-window.tsx`): Home shows a donor's Giving, Monthly, Receipts and Charities; For charities shows
+  the dashboard's Overview, Donations, Donors and s18A receipts. On a phone the tabs sit above the screen and scroll
+  sideways. Every screen is made-up sample content, labelled "Sample screens". Arrow keys move between tabs.
+- **Sections glide in as you scroll** (`src/components/reveal.tsx`), on iPhones too. Nothing is hidden before the page
+  is ready: only a section that starts below the screen waits, so it shows at once without script, with "reduce
+  motion" or in print.
+- The floating sample cards beside the windows moved down so they never cover the menu.
+- For charities already links to the working dashboard demo ("Try the dashboard with sample data").

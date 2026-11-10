@@ -14,7 +14,9 @@ import { weekStart } from "@/lib/charity/thank-you";
 import { formatRand } from "@/lib/money";
 import { createPublicClient } from "@/lib/supabase/public";
 import { Chevron } from "@/components/chevron";
-import { AppWindow, BlueBand, Bubbles, FeatureCard, Floating, Icon, Key, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
+import { LiveWindow } from "@/components/live-window";
+import { Reveal } from "@/components/reveal";
+import { BlueBand, Bubbles, FeatureCard, Floating, Icon, Key, PastelCard, Ready, Screen, SectionHead, Steps, h2Class } from "@/components/marketing";
 
 // Home page, direction B (preview, 29/10/2026), laid out after the Deupload landing page Yehuda liked: see
 // components/marketing.tsx. Every figure in a picture is a labelled sample; every claim is one we can back today.
@@ -66,6 +68,77 @@ function HeroScreen() {
             <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-[13px] font-bold text-brand ${g.tone}`}>{initials(g.name.replace(/^An? /, ""))}</span>
             <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[14px] font-semibold">{g.name}</span><span className="text-[12px] text-muted">{g.date} · {g.tag}</span></span>
             <span className="shrink-0 text-[14px] font-bold">{g.amount}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The donor's monthly donations, as a sample. */
+function MonthlyScreen() {
+  return (
+    <div className="flex flex-col gap-4 text-left">
+      <p className="font-display text-[1.25rem] font-bold">Monthly donations</p>
+      <div className="rounded-xl border-[1.5px] border-border p-4">
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-honey-soft font-display text-[13px] font-bold text-brand">OH</span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold">An old-age home</span><span className="text-[12px] text-muted">Next gift 19/11/2026</span></span>
+          <span className="shrink-0 font-display text-[1.125rem] font-bold">R180</span>
+        </div>
+        <div className="mt-3 flex gap-2 text-[12px] font-semibold" aria-hidden>
+          <span className="rounded-full border-[1.5px] border-border px-3 py-1">Pause</span>
+          <span className="rounded-full border-[1.5px] border-border px-3 py-1">Change amount</span>
+        </div>
+      </div>
+      <p className="rounded-xl bg-honey-soft p-3 text-[13px] text-muted">Pause, change or stop any monthly donation yourself, any time.</p>
+    </div>
+  );
+}
+
+/** The donor's s18A receipts, as a sample: one for each charity each tax year. */
+function ReceiptsScreen() {
+  const rows = [
+    { name: "A food parcel charity", total: "R500", state: "After 28/02/2027" },
+    { name: "A medical support charity", total: "R360", state: "After 28/02/2027" },
+  ];
+  return (
+    <div className="flex flex-col gap-4 text-left">
+      <p className="font-display text-[1.25rem] font-bold">s18A receipts</p>
+      <p className="text-[12px] font-semibold text-muted">This tax year, 01/03/2026 to 28/02/2027</p>
+      <ul className="flex flex-col">
+        {rows.map((r) => (
+          <li key={r.name} className="flex items-center gap-3 border-b border-border py-2.5 last:border-0">
+            <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold">{r.name}</span><span className="text-[12px] text-muted">Ready {r.state.toLowerCase()}</span></span>
+            <span className="shrink-0 text-[14px] font-bold">{r.total}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center justify-between rounded-xl bg-honey-soft px-4 py-3 text-[13px]">
+        <span><span className="font-semibold">Last tax year</span><span className="block text-[12px] text-muted">A food parcel charity</span></span>
+        <span className="rounded-full bg-brand px-3 py-1 text-[12px] font-bold text-white">Download</span>
+      </div>
+    </div>
+  );
+}
+
+/** The charities the donor follows, as a sample. */
+function CharitiesScreen() {
+  const list = [
+    { name: "A food parcel charity", tone: "bg-peach" },
+    { name: "A school charity", tone: "bg-brand-soft" },
+    { name: "An old-age home", tone: "bg-honey-soft" },
+    { name: "A medical support charity", tone: "bg-peach" },
+  ];
+  return (
+    <div className="flex flex-col gap-4 text-left">
+      <p className="font-display text-[1.25rem] font-bold">Your charities</p>
+      <ul className="grid gap-2.5 sm:grid-cols-2">
+        {list.map((c) => (
+          <li key={c.name} className="flex items-center gap-3 rounded-xl border-[1.5px] border-border p-3">
+            <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-[13px] font-bold text-brand ${c.tone}`}>{initials(c.name.replace(/^An? /, ""))}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{c.name}</span>
+            <span aria-hidden className="shrink-0 rounded-full bg-coral px-2.5 py-1 text-[11px] font-bold text-navy">Give</span>
           </li>
         ))}
       </ul>
@@ -134,9 +207,17 @@ export default async function Home() {
         <div className="relative mt-14 w-full max-w-[60rem]">
           <Splash className="absolute -top-24 left-[6%] z-10 hidden h-auto w-32 md:block" />
           <div className="relative mx-auto max-w-[48rem]">
-            <AppWindow nav={["Home", "Giving", "Receipts", "Charities", "Account"]} active={1}><HeroScreen /></AppWindow>
+            <LiveWindow
+              label="Sample screens of a donor's account"
+              tabs={[
+                { label: "Giving", screen: <HeroScreen /> },
+                { label: "Monthly", screen: <MonthlyScreen /> },
+                { label: "Receipts", screen: <ReceiptsScreen /> },
+                { label: "Charities", screen: <CharitiesScreen /> },
+              ]}
+            />
             {/* Left: the goal ring */}
-            <Floating className="-left-24 top-24 w-60">
+            <Floating className="-left-24 bottom-8 w-60">
               <p className="text-[12px] font-semibold text-muted">Your goal this tax year</p>
               <div className="mt-2 flex items-center gap-3">
                 <svg width="64" height="64" viewBox="0 0 124 124" aria-hidden className="shrink-0">
@@ -157,14 +238,14 @@ export default async function Home() {
             </Floating>
             <Illustration name="loveIt" className="absolute -left-56 bottom-0 z-20 hidden w-40 xl:-left-64 xl:w-44 lg:block" />
             <Illustration name="dreamGift" sparkle="stars" float="bob" className="absolute -right-64 bottom-0 z-20 hidden w-60 xl:-right-80 xl:w-72 lg:block" />
-            <p className="mt-3 text-right text-xs text-muted">Sample screens</p>
+            <p className="mt-3 text-right text-xs text-muted">Sample screens. Tap the menu to look around.</p>
           </div>
         </div>
       </div>
       </section>
 
       {/* How it works */}
-      <section id="how" className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6 md:pb-36">
+      <Reveal as="section" id="how" className="mx-auto flex max-w-[75rem] flex-col gap-14 px-4 pb-24 sm:px-6 md:pb-36">
         <SectionHead title="How it works">Three steps. Come back any time.</SectionHead>
         <Steps
           steps={[
@@ -173,10 +254,10 @@ export default async function Home() {
             { icon: "receipt", title: "Keep track", body: "Every gift lands in your account, with your s18A receipts ready at tax time." },
           ]}
         />
-      </section>
+      </Reveal>
 
       {/* Two pastel cards and a wide lilac card */}
-      <section className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6 md:pb-36">
+      <Reveal as="section" className="mx-auto flex max-w-[75rem] flex-col gap-10 px-4 pb-24 sm:px-6 md:pb-36">
         <h2 className={`max-w-[34rem] ${h2Class}`}>One account for all your giving, ready at <Key>tax time</Key>.</h2>
         <div className="grid gap-5 md:grid-cols-2">
           <PastelCard tone="peach" title="Once or monthly" body="Give once, or set up a monthly donation. Pause or stop it yourself, any time.">
@@ -256,10 +337,10 @@ export default async function Home() {
             </div>
           )}
         </div>
-      </section>
+      </Reveal>
 
       {/* Soft section: words on the left, stacked white cards on the right */}
-      <section className="relative mb-24 overflow-hidden bg-honey-soft md:mb-36">
+      <Reveal as="section" className="relative mb-24 overflow-hidden bg-honey-soft md:mb-36">
         <Bubbles items={[{ c: "-left-20 bottom-10 h-56 w-56 bg-peach", anim: "bob-slow" }, "-right-12 -top-12 h-32 w-32 bg-honey md:-right-24 md:-top-24 md:h-72 md:w-72"]} />
         <div className="relative mx-auto grid max-w-[75rem] items-center gap-12 px-4 py-24 sm:px-6 md:grid-cols-2 md:py-32">
           <div className="flex flex-col gap-5">
@@ -272,10 +353,10 @@ export default async function Home() {
             <FeatureCard icon="heart" title="Your notes stay yours" body="Any label or note you add to a gift, like Work giving or Family, is private to you. Charities don't see it." />
           </ul>
         </div>
-      </section>
+      </Reveal>
 
       {/* Coloured band with cards hanging over its edge */}
-      <section id="pricing" className="pb-24 md:pb-36">
+      <Reveal as="section" id="pricing" className="pb-24 md:pb-36">
         <BlueBand className="pb-48 pt-20">
           <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-3 px-4 text-center sm:px-6">
             <h2 className="font-display text-[clamp(1.875rem,3.2vw,2.75rem)] font-bold leading-[1.12] text-white!">No {platformConfig.appName} fee, <span className="text-honey">for anyone</span>.</h2>
@@ -311,10 +392,10 @@ export default async function Home() {
           <p className="text-[16px] leading-relaxed text-muted">No hidden fees and no subscriptions. You only ever pay what you choose to give.</p>
           <Info terms={["s18a"]} label="an s18A receipt" />
         </div>
-      </section>
+      </Reveal>
 
       {/* Start with one charity */}
-      <section className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6 md:pb-36">
+      <Reveal as="section" className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6 md:pb-36">
         <Ready
           title="Start with one charity."
           button={{ href: "/charities", label: "Find a charity" }}
@@ -328,7 +409,7 @@ export default async function Home() {
             picture: <Illustration name="mobilePay" sparkle="stars" className="mx-auto w-full max-w-[18rem]" />,
           }}
         />
-      </section>
+      </Reveal>
     </div>
   );
 }

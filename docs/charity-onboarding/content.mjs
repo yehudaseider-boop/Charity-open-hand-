@@ -6,13 +6,7 @@
 
 export const PAGES = 9;
 
-export function body({ cfg, logo, splash, today, art }) {
-  const rand = (cents) => {
-    const r = Math.floor(cents / 100);
-    const c = cents % 100;
-    return `R${String(r).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}${c ? "." + String(c).padStart(2, "0") : ""}`;
-  };
-  const minGift = rand(cfg.minDonationCents);
+export function body({ logo, splash, today, art }) {
 
   // Soft colour splashes bleeding off the page edges, three arrangements in turn (the logo's own shapes and colours).
   const bg = (c, w, pos) => `<i class="bg ${c}" style="width:${w}mm;height:${w}mm;${pos}"></i>`;
