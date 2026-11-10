@@ -121,10 +121,16 @@ export type StartFacts = {
     thank_you_en: string | null;
     gateway_subaccount_ref: string | null;
   };
-  /** Bank details saved, and checked by Givezy (bank_verified_at). Never the account itself. */
-  bank: { saved: boolean; checked: boolean };
-  /** The charity issues s18A receipts; then its SARS details (income tax reference) are needed for the IT3(d) file. */
-  s18a: { issues: boolean; sarsDetails: boolean };
+  /**
+   * Bank details saved, and checked by Givezy (bank_verified_at). Never the account itself. Null: couldn't be read,
+   * so the step is left out.
+   */
+  bank: { saved: boolean; checked: boolean } | null;
+  /**
+   * The charity issues s18A receipts; then its SARS details (income tax reference) are needed for the IT3(d) file.
+   * sarsDetails null: couldn't be read, so the step is left out.
+   */
+  s18a: { issues: boolean; sarsDetails: boolean | null };
   /** A donor journey is switched on. Null: couldn't be checked (not set up yet), so the step is left out. */
   journeyOn: boolean | null;
   updates: number;
@@ -149,15 +155,6 @@ export function gettingStarted(f: StartFacts, base: string, may: StartCan): Star
       href: null,
       can: false,
       who: "Givezy does this for you.",
-    },
-    {
-      key: "bank",
-      label: "Bank details saved and checked",
-      why: "Donations are paid into this account, so we check it is in your charity's name.",
-      done: f.bank.saved && f.bank.checked,
-      href: `${base}/application?step=bank`,
-      can: may("bank_edit"),
-      who: OWNER,
     },
     {
       key: "look",
@@ -187,7 +184,21 @@ export function gettingStarted(f: StartFacts, base: string, may: StartCan): Star
       who: TEAM_PAGE_ROLES,
     },
   ];
-  if (f.s18a.issues) {
+  if (f.bank) {
+    // An approved charity can't change its own bank account (the application is closed once approved): Givezy does,
+    // with the bank's confirmation letter. So this step never has a button, only what is happening.
+    const saved = f.bank.saved;
+    items.splice(1, 0, {
+      key: "bank",
+      label: "Bank details saved and checked",
+      why: "Donations are paid into this account, so we check it is in your charity's name.",
+      done: saved && f.bank.checked,
+      href: null,
+      can: false,
+      who: saved ? "Saved. Givezy is checking it." : "Givezy adds or changes your bank account for you, with your bank's confirmation letter. Contact us to do it.",
+    });
+  }
+  if (f.s18a.issues && f.s18a.sarsDetails !== null) {
     items.push({
       key: "sars",
       label: "Add your SARS details for s18A receipts",

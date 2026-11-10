@@ -35,9 +35,15 @@ describe("getting started", () => {
     expect(startProgress(all)).toEqual({ done: all.length - 1, total: all.length - 1, allSet: true });
   });
 
-  it("counts the bank as done only when saved and checked, and a blank thank-you note as not written", () => {
+  it("counts the bank as done only when saved and checked, and never offers to edit it (Givezy changes it)", () => {
     const saved = gettingStarted({ ...everything, bank: { saved: true, checked: false } }, "/c", as("owner"));
-    expect(saved.find((i) => i.key === "bank")?.done).toBe(false);
+    expect(saved.find((i) => i.key === "bank")).toMatchObject({ done: false, href: null, can: false, who: "Saved. Givezy is checking it." });
+    const none = gettingStarted({ ...everything, bank: { saved: false, checked: false } }, "/c", as("owner"));
+    expect(none.find((i) => i.key === "bank")).toMatchObject({ done: false, href: null, can: false });
+    expect(none.find((i) => i.key === "bank")?.who).toMatch(/Givezy adds or changes your bank account/);
+  });
+
+  it("counts a blank thank-you note as not written, and needs both logo and cover", () => {
     const blank = gettingStarted({ ...everything, charity: { ...everything.charity, thank_you_en: "   " } }, "/c", as("owner"));
     expect(blank.find((i) => i.key === "thanks")?.done).toBe(false);
     const logoOnly = gettingStarted({ ...everything, charity: { ...everything.charity, cover_path: null } }, "/c", as("owner"));
@@ -53,6 +59,11 @@ describe("getting started", () => {
     const k = keys({ ...everything, journeyOn: null, teamSize: null });
     expect(k).not.toContain("journey");
     expect(k).not.toContain("team");
+    // The private row couldn't be read: no bank or SARS step, and the rest still shows.
+    const unread = keys({ ...everything, bank: null, s18a: { issues: true, sarsDetails: null } });
+    expect(unread).not.toContain("bank");
+    expect(unread).not.toContain("sars");
+    expect(unread).toContain("thanks");
   });
 
   it("never lets the optional team step hold up all set", () => {
@@ -65,9 +76,6 @@ describe("getting started", () => {
 
   it("gives each step's button only to roles that may do it, and says who does it otherwise", () => {
     const step = (role: Role, key: string) => gettingStarted(nothing, "/c", as(role)).find((i) => i.key === key)!;
-    expect(step("owner", "bank").can).toBe(true);
-    expect(step("finance", "bank")).toMatchObject({ can: false, who: "Your charity's owner does this." });
-    expect(step("admin", "bank").can).toBe(false);
     expect(step("fundraiser", "look").can).toBe(true);
     expect(step("viewer", "look")).toMatchObject({ can: false, who: "Your charity's owner, an admin or a fundraiser does this." });
     expect(step("fundraiser", "journey").can).toBe(true);
@@ -79,7 +87,7 @@ describe("getting started", () => {
   it("links each step to the exact page", () => {
     const hrefs = Object.fromEntries(gettingStarted({ ...nothing, s18a: { issues: true, sarsDetails: false } }, "/c", as("owner")).map((i) => [i.key, i.href]));
     expect(hrefs).toMatchObject({
-      bank: "/c/application?step=bank",
+      bank: null,
       look: "/c/profile",
       story: "/c/profile",
       thanks: "/c/thank-donors#wording",

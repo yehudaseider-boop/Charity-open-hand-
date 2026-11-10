@@ -15,7 +15,10 @@ export async function loadStartFacts(charityId: string, charity: CharityFacts, u
   const db = createAdminClient();
   const issues = canIssue18a(charity);
   const [priv, journeyOn, teamSize] = await Promise.all([
-    db.from("charity_private").select("bank_account_last4, bank_branch_code, bank_verified_at, tax_reference_number").eq("charity_id", charityId).maybeSingle(),
+    db.from("charity_private").select("bank_account_last4, bank_branch_code, bank_verified_at, tax_reference_number").eq("charity_id", charityId).maybeSingle().then(
+      (r) => r,
+      (e: unknown) => ({ data: null, error: { message: e instanceof Error ? e.message : String(e) } }),
+    ),
     listJourneys(charityId).then(
       (js) => js.some((j) => j.enabled),
       () => null,
@@ -25,8 +28,9 @@ export async function loadStartFacts(charityId: string, charity: CharityFacts, u
       () => null,
     ),
   ]);
-  if (priv.error) throw priv.error;
-  const p = priv.data;
+  // If the private row can't be read, the bank and SARS steps are left out rather than the overview failing.
+  const p = priv.error ? undefined : priv.data;
+  if (priv.error) console.error("[getting started] private details couldn't load", priv.error.message);
   return {
     charity: {
       logo_path: charity.logo_path,
@@ -36,8 +40,8 @@ export async function loadStartFacts(charityId: string, charity: CharityFacts, u
       thank_you_en: charity.thank_you_en,
       gateway_subaccount_ref: charity.gateway_subaccount_ref,
     },
-    bank: { saved: Boolean(p?.bank_account_last4 && p?.bank_branch_code), checked: Boolean(p?.bank_verified_at) },
-    s18a: { issues, sarsDetails: Boolean((p?.tax_reference_number as string | null)?.trim()) },
+    bank: p === undefined ? null : { saved: Boolean(p?.bank_account_last4 && p?.bank_branch_code), checked: Boolean(p?.bank_verified_at) },
+    s18a: { issues, sarsDetails: p === undefined ? null : Boolean((p?.tax_reference_number as string | null)?.trim()) },
     journeyOn,
     updates,
     teamSize,

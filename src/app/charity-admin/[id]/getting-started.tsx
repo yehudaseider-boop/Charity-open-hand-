@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Card } from "@/components/card";
 import { Icon } from "@/components/marketing";
 import type { StartItem } from "@/lib/charity/checklist";
@@ -9,8 +9,9 @@ import type { StartItem } from "@/lib/charity/checklist";
 /**
  * "Getting started" on the charity overview (extended 10/11/2026). Each step ticks itself off from real data; a step's
  * button shows only to roles that may do it, others read who does it. Once every step that counts is done, it says so
- * once ("You're all set") and can be put away; that choice is kept in this browser only and never hides anything
- * that isn't done.
+ * once ("You're all set"): on the visit it first appears, with "Hide this" to put it away at once. After that visit it
+ * doesn't come back (remembered in this browser only; with storage blocked it shows until hidden). It never hides a
+ * step that isn't done.
  */
 export function GettingStarted({
   items,
@@ -29,16 +30,25 @@ export function GettingStarted({
   const stored = useSyncExternalStore(subscribe, () => readHidden(storageKey), () => null);
   const [hiddenNow, setHiddenNow] = useState(false);
   const hidden = hiddenNow || stored;
+  const showingAllSet = progress.allSet && hidden === false;
+
+  // Shown once: when this visit ends (leaving the page, or closing or reloading the tab), remember it was seen. Not
+  // while it's on screen, so it doesn't vanish as soon as it appears.
+  useEffect(() => {
+    if (!showingAllSet) return;
+    const seen = () => remember(storageKey, "seen");
+    window.addEventListener("pagehide", seen);
+    return () => {
+      window.removeEventListener("pagehide", seen);
+      seen();
+    };
+  }, [showingAllSet, storageKey]);
 
   if (progress.allSet) {
     if (hidden !== false) return null;
     const hide = () => {
       setHiddenNow(true);
-      try {
-        window.localStorage.setItem(storageKey, "hidden");
-      } catch {
-        // Kept for this visit only.
-      }
+      remember(storageKey, "hidden");
     };
     return (
       <section aria-label="Getting started" className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-success/30 bg-success-soft px-4 py-3">
@@ -117,11 +127,20 @@ function subscribe(): () => void {
   return () => {};
 }
 
-/** Whether this browser put the "all set" moment away. Storage blocked (private browsing): not hidden. */
+/** Whether this browser has already seen or put away the "all set" moment. Storage blocked (private browsing): not. */
 function readHidden(key: string): boolean {
   try {
-    return window.localStorage.getItem(key) === "hidden";
+    const v = window.localStorage.getItem(key);
+    return v === "hidden" || v === "seen";
   } catch {
     return false;
+  }
+}
+
+function remember(key: string, value: "seen" | "hidden"): void {
+  try {
+    if (window.localStorage.getItem(key) !== "hidden") window.localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked: kept for this visit only.
   }
 }
