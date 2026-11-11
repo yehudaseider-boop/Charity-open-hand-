@@ -34,8 +34,17 @@ flying to 14 donors, a 3D wall of the real screens, and sound effects on every m
 
 1. `node docs/dashboard-video/build.mjs v2.html` (after capture.mjs).
 2. `node docs/dashboard-video/render.mjs Givezy-dashboard-demo-v2-silent.mp4 --page v2.built.html`
-3. `python3 mix2.py` in the folder with that MP4, `vo.mp3`, `vo2.mp3` (the four new lines) and `music.mp3`. It makes
-   the sound effects from the cue list in v2.html (`window.SFX`), so moving a cue there moves its sound.
+3. In the folder with that MP4, `music.mp3` and the voice takes (`takeA.mp3`, `takeB.mp3`, `takeC.mp3`, each all ten
+   lines read in one go so the accent stays the same): `python3 cuts.py` finds where each line starts and ends,
+   `python3 mix2.py A` mixes take A (voice, ducked music, and sound effects made from the cue list in v2.html,
+   `window.SFX`), and `python3 check.py A` checks the result.
+4. `check.py` must pass before a file goes out. It checks length, frame size, loudness and peaks, that no line is
+   clipped or drops words, that lines don't overlap or run past the end, that the finale's words land on their slams,
+   that whooshes stay at the level Yehuda approved, and that the WhatsApp copy is under 5 MB. It was tested by
+   breaking a cut on purpose three ways. It cannot hear the accent: a person listens to every new take before it is used.
+
+Lesson (11/11/2026): the first v2 mix joined three separate recordings and the accent drifted near the end. Always
+record the whole script as one take, with `[strong South African accent]` on every line and stability 0.8.
 
 The phone screens in v2 are drawn for the video in the app's look (give screen, thank-you, the thank-you email); the
 app itself needs its server to show real screens. Everything on the dashboard side is the demo's real data.

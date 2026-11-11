@@ -1,8 +1,10 @@
-# Version 2 sound: voice lines, a music bed that dips under the voice, and sound effects made here from the cue list
-# in v2.html (window.SFX), so each whoosh and pop lands on its motion. Run from this folder with these files beside it:
-#   Givezy-dashboard-demo-v2-silent.mp4, vo.mp3 (first take), vo2.mp3 (the four new lines), music.mp3,
-#   vo3.mp3 (closing line re-read so "co dot za" ends in "za", 11/11/2026)
-#   python3 mix2.py
+# Version 2 sound: one complete voice take (all ten lines read in one go, so the accent stays the same throughout),
+# a music bed that dips under the voice, and sound effects made here from the cue list in v2.html (window.SFX), so each
+# whoosh and pop lands on its motion. Run from the folder holding:
+#   Givezy-dashboard-demo-v2-silent.mp4, take<X>.mp3, cuts.json (where each line starts and ends in each take), music.mp3
+#   python3 mix2.py A        (then python3 check.py A)
+# History (11/11/2026): the first mix joined three separate recordings and Yehuda heard her accent drift near the end,
+# so every line now comes from one take. Whooshes were turned down twice.
 import re, subprocess, wave
 import numpy as np
 
@@ -63,31 +65,38 @@ fx = np.clip(fx * 0.5, -1, 1)
 with wave.open("sfx.wav", "wb") as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((fx * 32767).astype(np.int16).tobytes())
 
-# Voice lines: (input index: 1 = vo.mp3, 2 = vo2.mp3, 5 = vo3.mp3; start; end; where it plays), seconds. Cut points from Whisper word timings.
-LINES = [
-    (2, 0.00, 3.65, 0.1),     # Bank references. Spreadsheets. Receipts by hand.
-    (2, 4.00, 7.95, 4.4),     # Meet Givezy. Your charity's giving, all in one place.
-    (2, 8.05, 13.45, 9.3),    # Follow one gift. Aisha gives from her phone, and it lands in your dashboard as soon as it's paid.
-    (1, 13.9, 18.45, 16.4),   # Open any donor to see their gifts, with your notes, tags and follow-ups.
-    (1, 18.75, 24.0, 22.2),   # Write one thank-you, and everyone who gave that month gets it, with their own first name.
-    (1, 24.25, 29.1, 28.9),   # Monthly donations look after themselves. A declined card is tried again, automatically.
-    (1, 29.65, 33.55, 34.8),  # Raise for something specific, and show donors how close you are.
-    (1, 33.85, 38.2, 40.4),   # And your section eighteen A receipt list? It builds itself, all year.
-    (2, 13.60, 19.75, 46.5),  # Donations, donors, thank-yous, campaigns and receipts. All of it, in one dashboard.
-    (5, 0.00, 6.11, 53.6),    # Givezy. Giving, made easy. Try the demo dashboard at givezy dot co dot za.
+TAKE = __import__("sys").argv[1] if len(__import__("sys").argv) > 1 else "A"
+import json
+CUTS = json.load(open("cuts.json"))[TAKE]
+# Where each line plays in the video, seconds (each must finish before the next starts; check.py proves it).
+PLACE = [0.1, 4.4, 9.3, 16.4, 22.2, 28.9, 34.8, 40.4, 46.5, 53.6]
+# The finale's words slam on screen as she says them, so line 9 is placed per take: "Donations" lands at 46.70 s.
+PLACE[8] = {"A": 46.52, "B": 46.56, "C": 46.45}[TAKE]
+SCRIPT = [
+    "Bank references. Spreadsheets. Receipts by hand.",
+    "Meet Givezy. Your charity's giving, all in one place.",
+    "Follow one gift. Aisha gives from her phone, and it lands in your dashboard as soon as it's paid.",
+    "Open any donor to see their gifts, with your notes, tags and follow-ups.",
+    "Write one thank-you, and everyone who gave that month gets it, with their own first name.",
+    "Monthly donations look after themselves. A declined card is tried again, automatically.",
+    "Raise for something specific, and show donors how close you are.",
+    "And your section eighteen A receipt list? It builds itself, all year.",
+    "Donations, donors, thank-yous, campaigns and receipts. All of it, in one dashboard.",
+    "Givezy. Giving, made easy. Try the demo dashboard at givezy dot co dot za.",
 ]
 parts, labels = [], []
-for i, (src, a, b, at) in enumerate(LINES):
+for i, ((a, b), at) in enumerate(zip(CUTS, PLACE)):
     d = int(at * 1000)
-    parts.append(f"[{src}:a]atrim={a}:{b},asetpts=PTS-STARTPTS,afade=t=in:d=0.03,afade=t=out:st={b - a - 0.06:.2f}:d=0.06,adelay={d}|{d}[v{i}]")
+    parts.append(f"[1:a]atrim={a}:{b},asetpts=PTS-STARTPTS,afade=t=in:d=0.03,afade=t=out:st={b - a - 0.06:.2f}:d=0.06,adelay={d}|{d}[v{i}]")
     labels.append(f"[v{i}]")
-fc = ";".join(parts) + ";" + "".join(labels) + f"amix=inputs={len(LINES)}:normalize=0,apad=whole_dur=60,atrim=0:60,asplit=2[vo][key];"
-fc += "[3:a]atrim=0:60,volume=0.5,afade=t=in:d=0.4,afade=t=out:st=57.5:d=2.5[mus];"
+fc = ";".join(parts) + ";" + "".join(labels) + f"amix=inputs={len(CUTS)}:normalize=0,apad=whole_dur=60,atrim=0:60,asplit=2[vo][key];"
+fc += "[2:a]atrim=0:60,volume=0.5,afade=t=in:d=0.4,afade=t=out:st=57.5:d=2.5[mus];"
 fc += "[mus][key]sidechaincompress=threshold=0.04:ratio=5:attack=20:release=350[duck];"
-fc += "[4:a]atrim=0:60,volume=0.85,pan=stereo|c0=c0|c1=c0[fx];"
+fc += "[3:a]atrim=0:60,volume=0.85,pan=stereo|c0=c0|c1=c0[fx];"
 fc += "[duck][vo][fx]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]"
-subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "Givezy-dashboard-demo-v2-silent.mp4", "-i", "vo.mp3", "-i", "vo2.mp3", "-i", "music.mp3", "-i", "sfx.wav", "-i", "vo3.mp3",
-                "-filter_complex", fc, "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", "Givezy-dashboard-demo-v2.mp4"], check=True)
-subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "Givezy-dashboard-demo-v2.mp4", "-vf", "scale=1280:720:flags=lanczos", "-c:v", "libx264", "-preset", "slow",
-                "-b:v", "560k", "-maxrate", "800k", "-bufsize", "1600k", "-c:a", "aac", "-b:a", "80k", "-movflags", "+faststart", "Givezy-dashboard-demo-v2-WhatsApp.mp4"], check=True)
-print("written Givezy-dashboard-demo-v2.mp4 and Givezy-dashboard-demo-v2-WhatsApp.mp4")
+full, small = f"Givezy-dashboard-demo-v2-take{TAKE}.mp4", f"Givezy-dashboard-demo-v2-take{TAKE}-WhatsApp.mp4"
+subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "Givezy-dashboard-demo-v2-silent.mp4", "-i", f"take{TAKE}.mp3", "-i", "music.mp3", "-i", "sfx.wav",
+                "-filter_complex", fc, "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", full], check=True)
+subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", full, "-vf", "scale=1280:720:flags=lanczos", "-c:v", "libx264", "-preset", "slow",
+                "-b:v", "560k", "-maxrate", "800k", "-bufsize", "1600k", "-c:a", "aac", "-b:a", "80k", "-movflags", "+faststart", small], check=True)
+print("written", full, "and", small)
