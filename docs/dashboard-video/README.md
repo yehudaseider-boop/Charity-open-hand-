@@ -43,6 +43,9 @@ flying to 14 donors, a 3D wall of the real screens, and sound effects on every m
    that whooshes stay at the level Yehuda approved, and that the WhatsApp copy is under 5 MB. It was tested by
    breaking a cut on purpose three ways. It cannot hear the accent: a person listens to every new take before it is used.
 
+Final (11/11/2026): Yehuda chose take C (Higgsfield job 12507d86-3290-4c8c-81a0-31f79494a7bb, voice Zoe). Rebuild with
+`python3 mix2.py C` and `python3 check.py C`.
+
 Lesson (11/11/2026): the first v2 mix joined three separate recordings and the accent drifted near the end. Always
 record the whole script as one take, with `[strong South African accent]` on every line and stability 0.8.
 

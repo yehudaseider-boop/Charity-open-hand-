@@ -6,7 +6,7 @@
 import json, re, subprocess, sys, wave
 import numpy as np
 
-TAKE = sys.argv[1] if len(sys.argv) > 1 else "A"
+TAKE = sys.argv[1] if len(sys.argv) > 1 else "C"
 full, small = f"Givezy-dashboard-demo-v2-take{TAKE}.mp4", f"Givezy-dashboard-demo-v2-take{TAKE}-WhatsApp.mp4"
 problems, notes = [], []
 def bad(msg): problems.append(msg)

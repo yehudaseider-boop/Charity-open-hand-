@@ -65,7 +65,7 @@ fx = np.clip(fx * 0.5, -1, 1)
 with wave.open("sfx.wav", "wb") as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((fx * 32767).astype(np.int16).tobytes())
 
-TAKE = __import__("sys").argv[1] if len(__import__("sys").argv) > 1 else "A"
+TAKE = __import__("sys").argv[1] if len(__import__("sys").argv) > 1 else "C"  # C chosen by Yehuda, 11/11/2026
 import json
 CUTS = json.load(open("cuts.json"))[TAKE]
 # Where each line plays in the video, seconds (each must finish before the next starts; check.py proves it).
