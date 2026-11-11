@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en-ZA"><head><meta charset="utf-8"><title>Givezy charity dashboard</title>
+<style>
+/*FONTS*/
+:root { --ink:#0E1B3D; --blue:#1749B5; --blue-edge:#0F358A; --orange:#FF8A3D; --orange-edge:#D9621C; --lavender:#C9B4FA; --purple:#E5D9FF; --line:#ECE8F6; --lilac:#F4F1FF; --peach:#FFEBDD; --slate:#4A5878; --sage:#3E8E6A; --sage-soft:#E3F2EA; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #fff; }
+body { font-family: "DM Sans", Arial, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--lilac); }
+.abs { position: absolute; }
+.d { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; letter-spacing: -0.015em; }
+.circle { position: absolute; border-radius: 50%; }
+.ring { position: absolute; border-radius: 50%; border-style: solid; }
+.word { display: inline-block; }
+
+/* The browser window that holds the real dashboard screens. */
+#win { position: absolute; left: 0; top: 0; width: 1440px; height: 956px; transform-origin: 0 0; border-radius: 26px; background: #fff; box-shadow: 0 50px 120px rgba(14,27,61,.28), 0 0 0 2px rgba(14,27,61,.06); overflow: hidden; }
+#bar { height: 56px; background: #fff; border-bottom: 2px solid var(--line); display: flex; align-items: center; padding: 0 22px; gap: 10px; }
+#bar i { width: 15px; height: 15px; border-radius: 50%; display: block; }
+#bar .addr { margin-left: 330px; width: 520px; height: 34px; border-radius: 17px; background: var(--lilac); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; color: var(--slate); }
+#page { position: relative; width: 1440px; height: 900px; overflow: hidden; background: #F6F4FD; }
+#page img.shot { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; opacity: 0; }
+.cover { position: absolute; background: #fff; }
+#typed { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; }
+#caret { position: absolute; width: 2px; height: 24px; background: var(--ink); }
+#sent { position: absolute; border-radius: 16px; background: var(--sage-soft); color: #1E6B47; font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: 12px; padding: 0 24px; opacity: 0; }
+.hi { position: absolute; border: 4px solid var(--orange); border-radius: 18px; opacity: 0; box-shadow: 0 0 0 8px rgba(255,138,61,.18); }
+.lift { position: absolute; border-radius: 18px; opacity: 0; background-repeat: no-repeat; box-shadow: 0 30px 70px rgba(14,27,61,.30); }
+#cursor { position: absolute; left: 0; top: 0; width: 34px; height: 44px; transform-origin: 4px 3px; }
+#ripple { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; background: rgba(23,73,181,.25); border: 3px solid rgba(23,73,181,.55); opacity: 0; }
+
+/* Words on the stage. */
+#cap { position: absolute; left: 70px; bottom: 64px; width: 780px; background: #fff; border-radius: 32px; padding: 34px 40px 36px; box-shadow: 0 30px 80px rgba(14,27,61,.22); border: 3px solid var(--line); opacity: 0; }
+#cap .h { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 54px; line-height: 1.04; letter-spacing: -0.015em; }
+#cap .s { font-size: 28px; line-height: 1.35; color: var(--slate); margin-top: 12px; }
+#cap .h b { color: var(--blue); font-weight: 800; }
+#sample { position: absolute; right: 40px; bottom: 34px; font-size: 20px; font-weight: 700; color: var(--slate); background: #fff; border: 2px solid var(--line); border-radius: 30px; padding: 8px 20px; opacity: 0; }
+#stamp { position: absolute; width: 250px; height: 250px; border-radius: 50%; border: 8px solid var(--sage); color: var(--sage); background: rgba(255,255,255,.94); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-family: "Bricolage Grotesque", sans-serif; font-size: 40px; line-height: 1; opacity: 0; box-shadow: 0 20px 50px rgba(14,27,61,.2); }
+#stamp small { font-family: "DM Sans", sans-serif; font-size: 20px; font-weight: 700; margin-top: 10px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; border-radius: 22px; }
+.btn-orange { background: var(--orange); color: var(--ink); box-shadow: 0 7px 0 var(--orange-edge); }
+</style></head>
+<body><div id="stage">
+
+<!-- Lilac stage behind the window, with soft brand shapes. -->
+<div class="circle" id="bgc1" style="width:900px;height:900px;left:-380px;top:-420px;background:var(--peach)"></div>
+<div class="circle" id="bgc2" style="width:1000px;height:1000px;right:-420px;bottom:-520px;background:var(--purple)"></div>
+<div class="ring" id="bgr" style="width:260px;height:260px;right:120px;top:40px;border-width:30px;border-color:var(--lavender)"></div>
+<div class="circle" id="bgd" style="width:36px;height:36px;left:120px;bottom:180px;background:var(--orange)"></div>
+
+<div id="win">
+  <div id="bar"><i style="background:var(--lavender)"></i><i style="background:var(--orange)"></i><i style="background:var(--blue)"></i><div class="addr">Your Givezy charity dashboard</div></div>
+  <div id="page">
+    %SHOT_IMGS%
+    <div id="covers"></div>
+    <img id="typed" src="%SHOT_thank-typed%" alt="">
+    <div id="caret"></div>
+    <div id="sent"><span style="font-size:24px">&#10003;</span>Sent to 14 donors.</div>
+    <div class="hi" id="hi"></div>
+    <div class="lift" id="lift"></div>
+    <div id="ripple"></div>
+    <svg id="cursor" viewBox="0 0 34 44"><path d="M4 3 L4 35 L12 27 L18 40 L24 37 L18 25 L29 25 Z" fill="#0E1B3D" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
+  </div>
+</div>
+
+<div id="sample">Sample charity, made-up figures</div>
+<div id="stamp">s18A<small>receipts, ready</small></div>
+<div id="cap"><div class="h" id="caph"></div><div class="s" id="caps"></div></div>
+
+<!-- Opening: blue colour block. -->
+<section id="open" class="abs" style="inset:0;background:var(--blue);overflow:hidden">
+  <div class="ring" id="o-r" style="width:700px;height:700px;right:-220px;top:-260px;border-width:80px;border-color:var(--lavender)"></div>
+  <div class="circle" id="o-c" style="width:420px;height:420px;left:-140px;bottom:-160px;background:var(--orange)"></div>
+  <div class="circle" style="width:40px;height:40px;left:300px;top:180px;background:var(--orange)"></div>
+  <img id="o-splash" class="abs" src="%SPLASH%" style="width:190px;left:865px;top:200px" alt="">
+  <div class="abs d" style="left:0;right:0;top:430px;text-align:center;font-size:118px;line-height:1.02;color:#fff">
+    <div><span class="word" id="o1">Your</span> <span class="word" id="o2">charity&apos;s</span> <span class="word" id="o3">giving,</span></div>
+    <div style="color:var(--lavender)"><span class="word" id="o4">all</span> <span class="word" id="o5">in</span> <span class="word" id="o6">one</span> <span class="word" id="o7">place.</span></div>
+  </div>
+</section>
+
+<!-- Close. -->
+<section id="close" class="abs" style="inset:0;background:#fff;overflow:hidden">
+  <div class="circle" style="width:900px;height:900px;left:-320px;bottom:-460px;background:var(--lilac)"></div>
+  <div class="circle" style="width:760px;height:760px;right:-280px;top:-340px;background:var(--peach)"></div>
+  <div class="ring" style="width:220px;height:220px;right:250px;bottom:110px;border-width:26px;border-color:var(--lavender)"></div>
+  <div class="circle" style="width:34px;height:34px;left:330px;top:210px;background:var(--orange)"></div>
+  <img id="c-splash" class="abs" src="%SPLASH%" style="width:170px;left:875px;top:120px" alt="">
+  <img id="c-logo" class="abs" src="%LOGO%" style="height:130px;left:762px;top:330px" alt="">
+  <div id="c-tag" class="abs d" style="left:0;right:0;top:500px;text-align:center;font-size:96px;color:var(--ink)">Giving made <span style="color:var(--blue)">easy.</span></div>
+  <div id="c-btn" class="abs" style="left:0;right:0;top:680px;text-align:center"><span class="btn btn-orange" style="font-size:42px;height:104px;padding:0 56px">Try the demo dashboard</span></div>
+  <div id="c-url" class="abs" style="left:0;right:0;top:830px;text-align:center;font-size:40px;font-weight:700;color:var(--blue)">givezy.co.za</div>
+</section>
+
+</div>
+<script>
+const R = %SHOTS_JSON%;
+const DURATION = 60;
+window.DURATION = DURATION;
+const BAR = 56;
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const out = (x) => 1 - Math.pow(1 - x, 3);
+const back = (x) => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const mid = (shot, name) => { const r = R[shot][name]; return [r.x + r.w / 2, r.y + r.h / 2]; };
+const navAt = (name) => { const r = R.overview[name]; return [r.x + 60, r.y + r.h / 2]; };
+
+// Keyframe tracks: [time, ...values]. Values ease between keys and hold after the last.
+function track(keys, t) {
+  if (t <= keys[0][0]) return keys[0].slice(1);
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [a, b] = [keys[i], keys[i + 1]];
+    if (t < b[0]) { const p = ease((t - a[0]) / (b[0] - a[0])); return a.slice(1).map((v, j) => v + (b[j + 1] - v) * p); }
+  }
+  return keys[keys.length - 1].slice(1);
+}
+
+// Camera: [time, scale, focus x, focus y] in page pixels; the focus sits at screen point C.
+const C = [1110, 470];
+const cam = [
+  [3.4, 0.82, 903, 337], [5.6, 1.0, 870, 352],
+  [6.8, 1.0, 870, 352], [8.0, 1.45, 830, 520], [10.6, 1.45, 830, 520], [11.2, 1.25, 760, 480], [12.6, 1.25, 760, 480],
+  [13.4, 1.05, 560, 400], [14.6, 1.05, 560, 400], [15.6, 1.4, 900, 600], [17.2, 1.4, 900, 600], [18.2, 1.35, 1050, 420], [19.6, 1.35, 1050, 420],
+  [20.4, 1.0, 620, 470], [22.2, 1.0, 620, 470], [23.0, 1.4, 820, 330], [24.2, 1.4, 820, 330], [24.9, 1.3, 760, 430], [26.6, 1.3, 760, 430],
+  [27.2, 1.0, 620, 470], [28.0, 1.0, 620, 470], [28.8, 1.45, 760, 540], [33.6, 1.45, 760, 600], [34.6, 1.0, 620, 470],
+  [35.6, 1.0, 620, 470], [36.6, 1.55, 640, 330], [40.4, 1.55, 640, 330],
+  [41.0, 1.0, 620, 470], [41.8, 1.0, 620, 470], [42.8, 1.8, 560, 360], [46.4, 1.8, 560, 400],
+  [47.0, 1.0, 620, 470], [47.8, 1.0, 620, 470], [48.8, 1.45, 820, 400], [52.4, 1.45, 820, 430], [53.4, 1.2, 720, 452],
+];
+
+// Which real screen is showing: [time, shot]. A click on the menu swaps the screen, as the dashboard does.
+const SHOTS = [
+  [0, "overview"], [10.9, "overview-chart"], [14.0, "donations"], [20.9, "donors"], [22.3, "donor"], [24.6, "donor-care"],
+  [27.7, "thank"], [31.25, "thank-confirm"], [35.9, "monthly"], [42.0, "campaigns"], [47.9, "receipts"],
+];
+
+// Cursor path in page pixels, and the moments it clicks.
+const P = {
+  donations: navAt("navDonations"), donors: navAt("navDonors"), thank: navAt("navThank"), monthly: navAt("navMonthly"),
+  campaigns: navAt("navCampaigns"), receipts: navAt("navReceipts"),
+  aisha: [440, mid("donors", "aisha")[1]], send: mid("thank", "send"), yes: mid("thank-confirm", "yes"), record: mid("donations", "recordGift"),
+};
+const cur = [
+  [5.6, 1100, 640], [8.0, 1000, 700], [10.6, 900, 820], [12.4, 760, 700], [13.6, ...P.donations], [15.2, ...P.donations], [17.0, 1100, 380], [17.9, ...P.record], [19.2, ...P.record],
+  [20.6, ...P.donors], [21.2, ...P.donors], [22.1, ...P.aisha], [23.0, 760, 360], [26.6, 760, 360],
+  [27.5, ...P.thank], [28.4, 760, 640], [30.6, 760, 660], [31.1, ...P.send], [31.8, ...P.send], [32.4, ...P.yes], [32.55, ...P.yes], [33.1, P.yes[0] + 300, P.yes[1] + 150], [34.6, 700, 560],
+  [35.7, ...P.monthly], [37.0, 760, 420], [41.0, 700, 520],
+  [41.8, ...P.campaigns], [43.0, 700, 470], [46.6, 700, 470],
+  [47.7, ...P.receipts], [48.8, 900, 500], [52.6, 900, 500],
+];
+const CLICKS = [13.7, 18.0, 20.7, 22.2, 27.6, 31.15, 32.5, 35.8, 41.9, 47.8];
+
+// Words: [from, to, headline (HTML), small line].
+const CAPS = [
+  [6.2, 12.7, "See your month<br><b>at a glance.</b>", "What came in, from whom, and from where."],
+  [13.7, 19.8, "Every gift in <b>one list.</b>", "Website, app, QR poster and WhatsApp. Add EFT and cash gifts yourself."],
+  [20.6, 26.8, "Know <b>every donor.</b>", "Their gifts, with your notes, tags and follow-ups."],
+  [27.6, 34.8, "Thank everyone <b>in one go.</b>", "Each donor sees their own first name."],
+  [35.8, 40.8, "Monthly donations <b>look after themselves.</b>", "A declined card is tried again automatically."],
+  [41.9, 46.8, "Raise for something<br><b>specific.</b>", "Donors see how close you are to the goal."],
+  [47.8, 53.2, "Your s18A receipt list<br><b>builds itself.</b>", "Check and approve it when the tax year ends."],
+];
+
+// Orange rings around what matters: [from, to, shot, rect name or [x,y,w,h]].
+const HI = [
+  [18.0, 19.6, "donations", "recordGift"],
+  [32.0, 32.6, "thank-confirm", "yes"],
+];
+// Cards that lift off the page: [from, to, shot, [x,y,w,h]].
+const LIFT = [
+  [8.2, 10.6, "overview", [288, 430, 270, 154]],
+  [23.2, 24.4, "donor", [288, 269, 270, 112]],
+  [37.0, 40.4, "monthly", [288, 261, 556, 112]],
+  [49.0, 52.4, "receipts", [288, 261, 556, 112]],
+];
+
+// Build the screen images' cover rows (donations arriving one by one).
+const rows = [0, 1, 2, 3, 4].map((i) => R.donations["row" + i]);
+const covers = rows.map((r) => { const d = document.createElement("div"); d.className = "cover"; Object.assign(d.style, { left: r.x - 4 + "px", top: r.y + "px", width: r.w + 8 + "px", height: r.h + "px" }); $("covers").append(d); return d; });
+
+function shotAt(t) { let s = SHOTS[0][1], since = 0, prev = null; for (const [at, name] of SHOTS) if (t >= at) { prev = s; s = name; since = at; } return { s, since, prev }; }
+
+function words(t, ids, start, gap) {
+  ids.forEach((id, i) => { const p = prog(t, start + i * gap, start + i * gap + 0.45); const el = $(id); el.style.opacity = p; el.style.transform = `translateY(${(1 - back(p)) * 70}px) scale(${0.8 + 0.2 * back(p)})`; });
+}
+
+function renderAt(t) {
+  // Opening.
+  const op = $("open");
+  op.style.display = t < 4.5 ? "block" : "none";
+  // The blue block closes into a dot, uncovering the dashboard rising behind it.
+  op.style.clipPath = `circle(${(1 - ease(prog(t, 3.3, 4.4))) * 1200}px at 960px 560px)`;
+  if (t < 4.5) {
+    words(t, ["o1", "o2", "o3"], 0.3, 0.22);
+    words(t, ["o4", "o5", "o6", "o7"], 1.3, 0.18);
+    const sp = prog(t, 0.1, 0.8); $("o-splash").style.transform = `scale(${back(sp)}) rotate(${(1 - sp) * -20}deg)`; $("o-splash").style.opacity = sp;
+    $("o-r").style.transform = `rotate(${t * 12}deg) scale(${0.9 + 0.1 * out(prog(t, 0, 1))})`;
+    $("o-c").style.transform = `translate(${Math.sin(t) * 20}px, ${-out(prog(t, 0, 1.2)) * 60}px)`;
+  }
+
+  // Background drift.
+  $("bgc1").style.transform = `translate(${Math.sin(t / 5) * 40}px, ${Math.cos(t / 6) * 30}px)`;
+  $("bgc2").style.transform = `translate(${Math.cos(t / 5) * 40}px, ${Math.sin(t / 7) * 30}px)`;
+  $("bgr").style.transform = `rotate(${t * 8}deg) translateY(${Math.sin(t / 3) * 16}px)`;
+
+  // Window and camera.
+  const [s, fx, fy] = track(cam, t);
+  const rise = out(prog(t, 3.3, 5.0));
+  const tilt = (1 - rise) * 24;
+  const tx = C[0] - s * fx, ty = C[1] - s * (fy + BAR) + (1 - rise) * 500;
+  $("win").style.transform = `translate(${tx}px, ${ty}px) perspective(2400px) rotateX(${tilt}deg) scale(${s})`;
+  $("win").style.transformOrigin = "0 0";
+
+  // Screens.
+  const { s: cur0, since, prev } = shotAt(t);
+  const fade = prog(t, since, since + 0.18);
+  document.querySelectorAll("img.shot").forEach((img) => { const n = img.dataset.n; img.style.opacity = n === cur0 ? 1 : n === prev ? 1 - fade : 0; img.style.zIndex = n === cur0 ? 2 : 1; });
+
+  // Donations arriving.
+  covers.forEach((c, i) => { const on = cur0 === "donations"; const p = prog(t, 14.2 + i * 0.16, 14.5 + i * 0.16); c.style.opacity = on ? 1 - p : 0; c.style.zIndex = 3; });
+
+  // Typing the thank-you.
+  const box = R.thank.box;
+  const typing = cur0 === "thank";
+  const tp = prog(t, 28.6, 30.8);
+  const textL = box.x + 14, textR = box.x + 700;
+  const edge = textL + (textR - textL) * tp;
+  $("typed").style.display = typing ? "block" : "none";
+  $("typed").style.clipPath = `inset(${box.y}px ${1440 - edge}px ${900 - box.y - box.h}px ${box.x}px)`;
+  $("typed").style.zIndex = 3;
+  $("caret").style.display = typing && t > 28.3 ? "block" : "none";
+  Object.assign($("caret").style, { left: edge + 1 + "px", top: box.y + 12 + "px", opacity: Math.floor(t * 3) % 2 || tp < 1 ? 1 : 0, zIndex: 4 });
+
+  // "Sent to 14 donors." in the dashboard's own words, after the confirm.
+  const sp = prog(t, 32.6, 32.95);
+  const ask = R["thank-confirm"].ask;
+  Object.assign($("sent").style, { left: "314px", top: ask.y - 22 + "px", width: "1076px", height: "142px", opacity: cur0 === "thank-confirm" ? sp : 0, transform: `scale(${0.96 + 0.04 * back(sp)})`, zIndex: 5 });
+
+  // Orange highlight ring.
+  const hi = HI.find(([a, b]) => t >= a && t < b);
+  if (hi) { const r = R[hi[2]][hi[3]]; const p = Math.min(prog(t, hi[0], hi[0] + 0.3), 1 - prog(t, hi[1] - 0.25, hi[1])); Object.assign($("hi").style, { left: r.x - 10 + "px", top: r.y - 10 + "px", width: r.w + 20 + "px", height: r.h + 20 + "px", opacity: p, zIndex: 6, transform: `scale(${1.1 - 0.1 * out(prog(t, hi[0], hi[0] + 0.35))})` }); } else $("hi").style.opacity = 0;
+
+  // Lifted card.
+  const lf = LIFT.find(([a, b]) => t >= a && t < b);
+  if (lf) {
+    const [x, y, w, h] = lf[3]; const img = document.querySelector(`img.shot[data-n="${lf[2]}"]`);
+    const p = Math.min(out(prog(t, lf[0], lf[0] + 0.4)), 1 - prog(t, lf[1] - 0.3, lf[1]));
+    Object.assign($("lift").style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px", backgroundImage: `url(${img.src})`, backgroundSize: "1440px 900px", backgroundPosition: `${-x}px ${-y}px`, opacity: p > 0 ? 1 : 0, zIndex: 6, transform: `translate(${-p * 6}px, ${-p * 14}px) scale(${1 + p * 0.07})`, boxShadow: `0 ${30 * p}px ${70 * p}px rgba(14,27,61,${0.3 * p})` });
+  } else $("lift").style.opacity = 0;
+
+  // Cursor and clicks.
+  const [cx, cy] = track(cur, t);
+  const showCur = t > 5.6 && t < 52.8;
+  const click = CLICKS.find((c) => t >= c - 0.08 && t < c + 0.45);
+  const press = click !== undefined && t < click + 0.12 ? 0.85 : 1;
+  Object.assign($("cursor").style, { transform: `translate(${cx - 4}px, ${cy - 3}px) scale(${press * 1.0})`, opacity: showCur ? 1 : 0, zIndex: 10 });
+  if (click !== undefined && t >= click) { const p = prog(t, click, click + 0.45); Object.assign($("ripple").style, { left: cx + "px", top: cy + "px", opacity: 1 - p, transform: `scale(${0.4 + p * 1.4})`, zIndex: 9 }); } else $("ripple").style.opacity = 0;
+
+  // Words.
+  const cap = CAPS.find(([a, b]) => t >= a && t < b);
+  if (cap) {
+    const p = out(prog(t, cap[0], cap[0] + 0.45)); const q = prog(t, cap[1] - 0.3, cap[1]);
+    $("caph").innerHTML = cap[2]; $("caps").textContent = cap[3];
+    Object.assign($("cap").style, { opacity: Math.min(p, 1 - q), transform: `translateY(${(1 - p) * 60 + q * 20}px)` });
+  } else $("cap").style.opacity = 0;
+  $("sample").style.opacity = Math.min(prog(t, 5.6, 6.2), 1 - prog(t, 53.0, 53.4));
+
+  // s18A stamp.
+  const st = prog(t, 49.6, 50.0);
+  Object.assign($("stamp").style, { left: "1530px", top: "560px", opacity: t < 53 ? st : 0, transform: `rotate(${-12 + (1 - st) * -30}deg) scale(${1.6 - 0.6 * back(st)})` });
+
+  // Close.
+  const cl = $("close");
+  cl.style.display = t >= 53.2 ? "block" : "none";
+  if (t >= 53.2) {
+    const w = ease(prog(t, 53.2, 53.9));
+    cl.style.clipPath = `circle(${w * 1200}px at 960px 540px)`;
+    const sp2 = prog(t, 53.7, 54.3); $("c-splash").style.transform = `scale(${back(sp2)}) rotate(${(1 - sp2) * 20}deg)`; $("c-splash").style.opacity = sp2;
+    const lg = prog(t, 54.0, 54.6); $("c-logo").style.opacity = lg; $("c-logo").style.transform = `translateY(${(1 - out(lg)) * 40}px)`;
+    const tg = prog(t, 54.6, 55.2); $("c-tag").style.opacity = tg; $("c-tag").style.transform = `translateY(${(1 - back(tg)) * 50}px)`;
+    const bt = prog(t, 55.4, 55.9); $("c-btn").style.opacity = bt; $("c-btn").style.transform = `scale(${0.7 + 0.3 * back(bt)})`;
+    const ur = prog(t, 56.0, 56.5); $("c-url").style.opacity = ur;
+  }
+}
+window.renderAt = renderAt;
+renderAt(0);
+</script>
+</body></html>
