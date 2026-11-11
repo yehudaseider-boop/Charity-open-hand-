@@ -58,3 +58,11 @@ export const charityFaqs: Faq[] = [
 ];
 
 export const allFaqs: Faq[] = [...donorFaqs, ...charityFaqs];
+
+/**
+ * The questions without any that talk about cost or fees (Yehuda, 11/11/2026: say nothing about fees on the For donors,
+ * For charities and home pages until the fees are settled). The FAQ page still shows them all.
+ */
+export function withoutCostQuestions(faqs: Faq[]): Faq[] {
+  return faqs.filter((f) => !/\b(cost|costs|fee|fees|free)\b/i.test(`${f.q} ${f.a}`));
+}

@@ -1,11 +1,12 @@
 /**
  * The two sides of the public site (10/11/2026). The landing page (/) has two doors, "I give" (#give) and "I run a
- * charity" (#charity); /for-charities is the longer charity page, still there by link. Dependency-free.
+ * charity" (#charity); each leads on to its full page, /for-donors and /for-charities (11/11/2026), which the
+ * "I give | I run a charity" switch on those pages links between. Dependency-free.
  */
 
 export type Audience = "give" | "charity";
 
-export const AUDIENCE_PATHS: Record<Audience, string> = { give: "/#give", charity: "/for-charities" };
+export const AUDIENCE_PATHS: Record<Audience, string> = { give: "/for-donors", charity: "/for-charities" };
 
 export const AUDIENCE_LABELS: Record<Audience, string> = { give: "I give", charity: "I run a charity" };
 

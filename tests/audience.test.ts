@@ -24,7 +24,7 @@ describe("a shared ?for= link", () => {
   });
   it("has one label and place per side", () => {
     expect(AUDIENCE_LABELS).toEqual({ give: "I give", charity: "I run a charity" });
-    expect(AUDIENCE_PATHS).toEqual({ give: "/#give", charity: "/for-charities" });
+    expect(AUDIENCE_PATHS).toEqual({ give: "/for-donors", charity: "/for-charities" });
   });
 });
 

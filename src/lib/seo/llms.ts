@@ -22,6 +22,7 @@ export function llmsText(origin: string, charities: { slug: string; name_en: str
     "",
     `- [Home](${base}/): what ${platformConfig.appName} is and how giving works`,
     `- [Find a charity](${base}/charities): every listed charity, by name, cause or area`,
+    `- [For donors](${base}/for-donors): how giving works, monthly gifts, s18A receipts and card privacy`,
     `- [For charities](${base}/for-charities): how a South African charity joins, free`,
     `- [Questions](${base}/faq): costs, safety, s18A receipts and privacy`,
     `- [Privacy Policy](${base}/privacy) and [Terms](${base}/terms)`,

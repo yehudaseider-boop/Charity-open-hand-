@@ -91,12 +91,14 @@ export function HeaderNav() {
         items={[
           { href: "/", label: "Home" },
           { href: "/charities", label: "Find a charity" },
+          { href: "/for-donors", label: "For donors" },
           { href: "/for-charities", label: "For charities" },
           ...dashboards.map((d) => ({ href: d.href, label: d.label })),
           ...(signedIn ? [{ href: "/account", label: "Account" }] : []),
         ]}
       />
       <NavLink href="/charities" className="max-sm:hidden">Charities</NavLink>
+      <NavLink href="/for-donors" className="max-md:hidden">For donors</NavLink>
       <NavLink href="/for-charities" className="max-sm:hidden">For charities</NavLink>
       {/* A charity admin or Givezy staff can always get back to their area from any public page. */}
       {dashboards.map((d) => (

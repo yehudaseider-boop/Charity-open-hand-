@@ -8,6 +8,7 @@ describe("the site map", () => {
     expect(urls).toEqual([
       "https://givezy.test/",
       "https://givezy.test/charities",
+      "https://givezy.test/for-donors",
       "https://givezy.test/for-charities",
       "https://givezy.test/faq",
       "https://givezy.test/privacy",
