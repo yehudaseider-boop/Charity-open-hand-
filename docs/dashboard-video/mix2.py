@@ -1,6 +1,7 @@
 # Version 2 sound: voice lines, a music bed that dips under the voice, and sound effects made here from the cue list
 # in v2.html (window.SFX), so each whoosh and pop lands on its motion. Run from this folder with these files beside it:
-#   Givezy-dashboard-demo-v2-silent.mp4, vo.mp3 (first take), vo2.mp3 (the four new lines), music.mp3
+#   Givezy-dashboard-demo-v2-silent.mp4, vo.mp3 (first take), vo2.mp3 (the four new lines), music.mp3,
+#   vo3.mp3 (closing line re-read so "co dot za" ends in "za", 11/11/2026)
 #   python3 mix2.py
 import re, subprocess, wave
 import numpy as np
@@ -42,10 +43,10 @@ def make(kind):
         n = int(0.5 * SR); u = np.linspace(0, 1, n)
         shape = np.sin(np.pi * u) ** 2 if kind == "whoosh" else u ** 3
         k = 0.02 + 0.25 * shape
-        return 0.6 * lowpass(noise(n), k) * shape * 3
+        return 0.6 * lowpass(noise(n), k) * shape * 1.0  # whooshes kept soft (Yehuda, 11/11/2026: too loud at 3x)
     if kind == "riser":
         n = int(1.2 * SR); u = np.linspace(0, 1, n)
-        return 0.25 * (lowpass(noise(n), 0.02 + 0.2 * u) * 2 + 0.4 * sweep(200, 900, 1.2)) * u ** 2
+        return 0.12 * (lowpass(noise(n), 0.02 + 0.2 * u) * 2 + 0.4 * sweep(200, 900, 1.2)) * u ** 2
     if kind == "type":
         out = np.zeros(int(2.3 * SR)); t = 0.0
         while t < 2.2:
@@ -62,7 +63,7 @@ fx = np.clip(fx * 0.5, -1, 1)
 with wave.open("sfx.wav", "wb") as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((fx * 32767).astype(np.int16).tobytes())
 
-# Voice lines: (input index: 1 = vo.mp3, 2 = vo2.mp3; start; end; where it plays), seconds. Cut points from Whisper word timings.
+# Voice lines: (input index: 1 = vo.mp3, 2 = vo2.mp3, 5 = vo3.mp3; start; end; where it plays), seconds. Cut points from Whisper word timings.
 LINES = [
     (2, 0.00, 3.65, 0.1),     # Bank references. Spreadsheets. Receipts by hand.
     (2, 4.00, 7.95, 4.4),     # Meet Givezy. Your charity's giving, all in one place.
@@ -73,7 +74,7 @@ LINES = [
     (1, 29.65, 33.55, 34.8),  # Raise for something specific, and show donors how close you are.
     (1, 33.85, 38.2, 40.4),   # And your section eighteen A receipt list? It builds itself, all year.
     (2, 13.60, 19.75, 46.5),  # Donations, donors, thank-yous, campaigns and receipts. All of it, in one dashboard.
-    (1, 38.65, 44.85, 53.6),  # Givezy. Giving, made easy. Try the demo dashboard at givezy dot co dot za.
+    (5, 0.00, 6.11, 53.6),    # Givezy. Giving, made easy. Try the demo dashboard at givezy dot co dot za.
 ]
 parts, labels = [], []
 for i, (src, a, b, at) in enumerate(LINES):
@@ -85,7 +86,7 @@ fc += "[3:a]atrim=0:60,volume=0.5,afade=t=in:d=0.4,afade=t=out:st=57.5:d=2.5[mus
 fc += "[mus][key]sidechaincompress=threshold=0.04:ratio=5:attack=20:release=350[duck];"
 fc += "[4:a]atrim=0:60,volume=0.85,pan=stereo|c0=c0|c1=c0[fx];"
 fc += "[duck][vo][fx]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]"
-subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "Givezy-dashboard-demo-v2-silent.mp4", "-i", "vo.mp3", "-i", "vo2.mp3", "-i", "music.mp3", "-i", "sfx.wav",
+subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "Givezy-dashboard-demo-v2-silent.mp4", "-i", "vo.mp3", "-i", "vo2.mp3", "-i", "music.mp3", "-i", "sfx.wav", "-i", "vo3.mp3",
                 "-filter_complex", fc, "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", "Givezy-dashboard-demo-v2.mp4"], check=True)
 subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", "Givezy-dashboard-demo-v2.mp4", "-vf", "scale=1280:720:flags=lanczos", "-c:v", "libx264", "-preset", "slow",
                 "-b:v", "560k", "-maxrate", "800k", "-bufsize", "1600k", "-c:a", "aac", "-b:a", "80k", "-movflags", "+faststart", "Givezy-dashboard-demo-v2-WhatsApp.mp4"], check=True)
