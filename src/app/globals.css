@@ -144,6 +144,13 @@ input[type="radio"] {
   outline-offset: 3px;
 }
 
+/* A field that draws its own focus ring (or sits in a box that does) says outline-none: that must win over the ring above,
+   or a square orange outline shows inside its rounded box (found 11/11/2026, on the give page's amount). Typing fields
+   are always "focus-visible", so without this every one of them showed both rings. */
+.outline-none:focus-visible {
+  outline: none;
+}
+
 /* Bubbles on the marketing pages drift gently up and down (decoration only; still for reduced motion). */
 @keyframes bob {
   0%, 100% { transform: translateY(0); }
