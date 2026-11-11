@@ -4,13 +4,31 @@ import { CURRENT_PATH_HEADER } from "@/lib/current-path";
 import { SOURCE_PARAM } from "@/lib/donations/source";
 import { FOCUS_COOKIE, FOCUS_SECONDS, focusChange } from "@/lib/focus";
 import { canonicalRedirect } from "@/lib/canonical-host";
+import { COMING_SOON_ROUTE, comingSoonAction } from "@/lib/coming-soon";
 import { audienceRedirect } from "@/lib/audience";
 import { hasSignInCookie } from "@/lib/header-viewer";
 
 /** Keeps the Supabase login session fresh on every page request. */
 export async function proxy(request: NextRequest) {
+  const deployed = process.env.VERCEL_ENV === "production";
+  // "Coming soon" addresses (COMING_SOON_HOSTS, 11/11/2026) show one landing page and nothing else. First, so such an
+  // address is never moved on to SITE_URL below. Unset, or on any other address, this does nothing.
+  const soon = comingSoonAction(request.nextUrl, request.method, process.env.COMING_SOON_HOSTS, deployed);
+  if (soon === "not-found") return new NextResponse("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (soon === "redirect-home") {
+    const home = request.nextUrl.clone();
+    home.pathname = "/";
+    home.search = "";
+    return NextResponse.redirect(home, 307);
+  }
+  if (soon === "serve") {
+    const to = request.nextUrl.clone();
+    to.pathname = COMING_SOON_ROUTE;
+    to.search = "";
+    return NextResponse.rewrite(to);
+  }
   // Every page on one address, so a sign-in link always lands where it was asked for.
-  const moveTo = canonicalRedirect(request.nextUrl, request.method, process.env.SITE_URL, process.env.VERCEL_ENV === "production");
+  const moveTo = canonicalRedirect(request.nextUrl, request.method, process.env.SITE_URL, deployed);
   // Temporary (307), so browsers do not remember it if SITE_URL later moves to our own domain.
   if (moveTo) return NextResponse.redirect(moveTo, 307);
   // A shared "?for=charity" or "?for=give" link opens the right side of the site (home or For charities).
