@@ -28,7 +28,8 @@ export default function TermsPage() {
 
       <Section title="Donating">
         <ul className="list-disc space-y-1 pl-5">
-          <li>Your donation goes to the charity you choose. {name} does not charge a fee on donations.</li>
+          {/* The "no fee" sentence is on hold until fees are decided (11/11/2026): wording for Yehuda and the attorney. */}
+          <li>Your donation goes to the charity you choose. Any charge is shown before you pay.</li>
           <li>The minimum donation is {formatRand(platformConfig.minDonationCents)}.</li>
           <li>You may add a separate contribution to {name} (minimum {formatRand(platformConfig.minContributionCents)}). It is optional, is not a donation to the charity, and does not appear on any s18A receipt.</li>
           <li>Payments are taken by our payment provider on our website, never inside the app.</li>

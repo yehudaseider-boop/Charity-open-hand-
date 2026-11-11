@@ -25,8 +25,8 @@ export const donorFaqs: Faq[] = [
     a: `A person looks at each charity's registration documents and bank details before it can take a gift. You pay on the payment provider's secure page: ${appName} never sees your card and never holds your money.`,
   },
   {
-    q: `What does ${appName} cost?`,
-    a: `There is no ${appName} fee on your gift. The card provider's fee comes off before the gift reaches the charity. The give form also offers a separate contribution to ${appName}, which keeps it running: ${defaultContribution} is preselected, you can type your own amount from ${minContribution}, or choose No thanks to give nothing extra. The total shows it on its own line before you pay.`,
+    q: "What do I pay?",
+    a: `Your gift, and anything you choose to add. The give form also offers a separate contribution to ${appName}, which keeps it running: ${defaultContribution} is preselected, you can type your own amount from ${minContribution}, or choose No thanks to give nothing extra. The total shows every line before you pay.`,
   },
   {
     q: "How much can I give?",
@@ -51,17 +51,13 @@ export const charityFaqs: Faq[] = [
     q: `How does a charity join ${appName}?`,
     a: `Apply online in one sitting, or save and come back. We check every application by hand within ${reviewDays} working days and email you the outcome.`,
   },
-  {
-    q: `What does ${appName} cost a charity?`,
-    a: `Listing is free, with no sign-up or monthly fee. The card provider's fee comes off each donation, and the rest goes straight to the charity's own bank account. Your donors' s18A receipts are made for you.`,
-  },
 ];
 
 export const allFaqs: Faq[] = [...donorFaqs, ...charityFaqs];
 
 /**
  * The questions without any that talk about cost or fees (Yehuda, 11/11/2026: say nothing about fees on the For donors,
- * For charities and home pages until the fees are settled). The FAQ page still shows them all.
+ * For charities and home pages until the fees are settled). The cost questions themselves were taken out the same day.
  */
 export function withoutCostQuestions(faqs: Faq[]): Faq[] {
   return faqs.filter((f) => !/\b(cost|costs|fee|fees|free)\b/i.test(`${f.q} ${f.a}`));

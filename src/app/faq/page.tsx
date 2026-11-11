@@ -64,7 +64,7 @@ export default function FaqPage() {
         <Group title="For charities" faqs={charityFaqs} />
         <section className="flex flex-col items-start gap-3 rounded-[1.5rem] bg-peach p-6">
           <h2 className="font-display text-[1.375rem] font-bold">Ready when you are</h2>
-          <p className="text-muted">Find a charity and give in a minute, or list your charity for free.</p>
+          <p className="text-muted">Find a charity and give in a minute, or list your charity.</p>
           <div className="flex flex-wrap gap-3">
             <Link href="/charities" className="pressable rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Find a charity</Link>
             <Link href="/for-charities" className="pressable rounded-control bg-brand px-5 py-3.5 font-bold text-white">For charities</Link>

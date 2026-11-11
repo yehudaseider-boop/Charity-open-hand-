@@ -64,7 +64,7 @@ export default function HowItWorks() {
             ]}
           />
           <View style={styles.promiseTick}><CheckIcon color={colors.blue} /></View>
-          <Text style={styles.promiseText}>Givezy charges no fee on donations. You can add a contribution to Givezy, separate from your gift, or choose No thanks.</Text>
+          <Text style={styles.promiseText}>You see every line before you pay. You can add a contribution to Givezy, separate from your gift, or choose No thanks.</Text>
         </View>
 
         <Button variant="cta" label="Find a charity" onPress={() => router.dismissTo("/discover")} />

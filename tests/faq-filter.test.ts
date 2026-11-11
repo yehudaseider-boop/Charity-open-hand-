@@ -17,10 +17,18 @@ describe("questions without cost or fees", () => {
     expect(withoutCostQuestions([{ q: "Freedom Day?", a: "A coffee morning." }])).toHaveLength(1);
   });
 
-  it("keeps the real donor and charity questions that aren't about money", () => {
+  it("keeps the real donor and charity questions (the cost questions were taken out on 11/11/2026)", () => {
     const donor = withoutCostQuestions(donorFaqs).map((f) => f.q);
     expect(donor.some((q) => /cost/i.test(q))).toBe(false);
-    expect(donor.length).toBe(donorFaqs.length - 1);
+    expect(donor.length).toBe(donorFaqs.length);
     expect(withoutCostQuestions(charityFaqs).map((f) => f.q)).toEqual([charityFaqs[0].q]);
+  });
+});
+
+describe("no fee claims in the questions (fees hidden until Yehuda decides, 11/11/2026)", () => {
+  it("no question or answer says free, no fee or what Givezy costs", () => {
+    for (const f of [...donorFaqs, ...charityFaqs]) {
+      expect(`${f.q} ${f.a}`).not.toMatch(/\bfree\b|no \w* ?fee|\bcost\b/i);
+    }
   });
 });

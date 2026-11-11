@@ -10,7 +10,7 @@ import { COMMA_THOUSANDS_MESSAGE, formatRand, parseRandToCents, usesCommaThousan
 export type ContributionChoice = number | "other" | "none";
 
 /** The one line under the heading, the same on the website and in the app. */
-export const CONTRIBUTION_EXPLAINER = "Givezy is free for charities. A contribution keeps it running. It's separate from your gift.";
+export const CONTRIBUTION_EXPLAINER = "A contribution helps keep Givezy running. It's separate from your gift.";
 
 /** What the form shows after "No thanks", with the way back to an amount. */
 export const NO_CONTRIBUTION_NOTE = "No contribution this time. Choose an amount above to add one.";

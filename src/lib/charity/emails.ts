@@ -201,7 +201,7 @@ export function inviteEmail(to: string, charityName: string, link: string): Emai
     text: [
       `We'd like to invite ${charityName} to join Givezy, where people give to local charities in a few taps.`,
       "",
-      "Listing is free. Donations go straight to your bank account, and if you have s18A approval we issue your donors' tax receipts for you.",
+      "Donations go straight to your bank account, and if you have s18A approval we issue your donors' tax receipts for you.",
       "",
       `Start your application (your name is already filled in): ${link}`,
       "",

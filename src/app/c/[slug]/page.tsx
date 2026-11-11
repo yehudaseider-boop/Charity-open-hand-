@@ -183,7 +183,6 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
                     : "This organisation is not s18A-approved, so gifts don't get a tax receipt."}
                 </span>
               </li>
-              <li className="flex gap-2"><Tick yes />No Givezy fee on your gift.</li>
               <li className="flex gap-2"><Tick yes />You pay on the payment provider&apos;s page. We never see your card.</li>
             </ul>
             <Info terms={["s18a"]} label="an s18A receipt" />

@@ -251,7 +251,7 @@ export function DonateFlow({
           </p>
         ) : null}
         {/* While the amount has a problem, its message says what to do; the hint comes back once it is fixed. */}
-        {amountError ? null : <p id="amount-hint" className="text-sm text-muted">Minimum {minimumLabel}. No Givezy fee.</p>}
+        {amountError ? null : <p id="amount-hint" className="text-sm text-muted">Minimum {minimumLabel}.</p>}
 
         {/* Gift amount, then the card charge, then the contribution, then the total (decided 09/11/2026). */}
         {cardChargeAvailable ? (

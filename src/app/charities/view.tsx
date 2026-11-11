@@ -147,7 +147,7 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
           </ul>
         ) : null}
         <p className="pt-4 text-muted">
-          Run a charity? <Link href="/apply" className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">List it here for free</Link>
+          Run a charity? <Link href="/apply" className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">List it here</Link>
         </p>
       </section>
     </div>

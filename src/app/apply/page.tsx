@@ -51,7 +51,7 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
           <div className="space-y-5">
             <p className="inline-block rounded-full bg-honey-soft px-4 py-1.5 text-[14px] font-bold text-brand">For charities</p>
             <h1 className="max-w-[36rem] text-[clamp(2.25rem,4.4vw,3.25rem)] font-bold! leading-[1.1] text-balance">
-              List your charity on {platformConfig.appName}. <Key>It&apos;s free</Key>.
+              <Key>List your charity</Key> on {platformConfig.appName}.
             </h1>
             <p className="max-w-[34rem] text-[17px] leading-relaxed text-muted">
               Apply in one sitting or save and come back any time. We check every application by hand and review it within {reviewWithin()}.
