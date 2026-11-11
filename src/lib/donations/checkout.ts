@@ -7,7 +7,7 @@ import { getGateway, GatewayError, isGatewayRefusal } from "@/lib/gateway";
 import { savedAddress, savedIdNumber } from "./saved-id";
 import { savedCardsOpen } from "./app-api";
 import { loadSavedCardToken, requestCardSave } from "./saved-card";
-import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
+import { checkGivingAllowed, rememberGiftStart } from "./giving-guard";
 import { linkDonorsToUser } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -33,7 +33,7 @@ export type StartResult =
    */
   | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
   /** `savedCardDeclined`: the provider refused the saved card, so the app should offer the payment page with another card. */
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean; attemptMismatch?: boolean; providerDown?: boolean; campaignEnded?: boolean };
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean; attemptMismatch?: boolean; providerDown?: boolean; campaignEnded?: boolean; limited?: boolean };
 
 /**
  * Record a pending donation and hand the donor to the gateway.
@@ -123,12 +123,10 @@ export async function startDonation(args: {
   if (!checked.ok) return checked.quote ? { ok: false, message: checked.message, quote: checked.quote } : { ok: false, message: checked.message };
   const fees = checked.quote;
 
-  // Only attempts that would reach the payment page count. One email gets 5 tries in 10 minutes;
-  // one address gets more, because an office's Wi-Fi or a mobile network puts many donors behind it.
-  const limited =
-    (await hitRateLimit("checkout", [`email:${input.email.toLowerCase()}`], 5, 10)) ||
-    (await hitRateLimit("checkout-ip", ipKeys(args.ip), 30, 10));
-  if (limited) return { ok: false, message: "Too many attempts. Please wait 10 minutes and try again." };
+  // Card-testing protection: only attempts that would reach the payment page count (limits per email and per
+  // address, a wait after several declined cards). See giving-guard.ts; the values are in platformConfig.givingGuard.
+  const refused = await checkGivingAllowed({ email: input.email, ip: args.ip, charityId: charity.id });
+  if (refused) return { ok: false, message: refused.message, limited: true };
 
   const v = input;
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
@@ -321,6 +319,8 @@ export async function startDonation(args: {
 
   // Sent only to the donor, in the address the gateway returns them to.
   const confirmationToken = await issueConfirmationToken(donationId);
+  // So a declined card reported later counts against whoever started this gift (card-testing protection).
+  await rememberGiftStart(donationId, v.email, args.ip);
 
   if (savedToken) return chargeSavedCard({ donationId, savedToken, v, fees, charity, token: confirmationToken, resumed: false });
 

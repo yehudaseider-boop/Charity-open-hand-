@@ -4,6 +4,7 @@ import { taxYearFor } from "@/lib/dates";
 import { gatewayByName, getGateway } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyDonationPaid } from "./notify";
+import { recordDecline } from "./giving-guard";
 import { cardSaveWaitingFor, finishCardSave } from "./saved-card";
 import { finishNewCard, newCardWaitingFor } from "./new-card";
 import { activateMonthlyDonation, cancelMonthlyBeforeStart, FIRST_PAYMENT_FAILED, monthlyHandledElsewhere, monthlyWaitingFor } from "./recurring";
@@ -136,6 +137,8 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (error) throw new PersistenceError("save the failed donation", error);
     if (updated?.length) {
       if (donation.recurring_id) await cancelMonthlyBeforeStart(donation.id, FIRST_PAYMENT_FAILED);
+      // Card-testing protection: count the decline against whoever started this gift (never throws).
+      await recordDecline(donation.id);
       return "failed";
     }
     const now = await currentStatus(donation.id);

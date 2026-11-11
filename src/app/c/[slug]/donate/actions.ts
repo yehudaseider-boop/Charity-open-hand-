@@ -10,6 +10,8 @@ import { getViewer } from "@/lib/auth";
 import { formToObject } from "@/lib/form";
 import { platformConfig } from "@/config/platform";
 import { SOURCE_PARAM } from "@/lib/donations/source";
+import { botCheck, PRESS_AGAIN_MESSAGE } from "@/lib/donations/giving-guard-rules";
+import { recordBlocked } from "@/lib/donations/giving-guard";
 
 export type CheckoutState = {
   ok: boolean;
@@ -33,8 +35,14 @@ export async function submitDonation(
   _prev: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
-  // Bots fill in every field, including this hidden one.
-  if (formData.get("website")) return { ok: false, message: "Something went wrong. Please try again." };
+  // Quiet bot checks (card-testing protection): bots fill in every field, including the hidden one, and send the
+  // form the instant the page opens. A real person caught by either simply presses Give again; what they typed stays.
+  const bot = botCheck({ honeypot: formData.get("website"), openMs: formData.get("form_open_ms"), minFillSeconds: platformConfig.givingGuard.minFillSeconds });
+  formData.delete("form_open_ms");
+  if (bot !== "ok") {
+    await recordBlocked("bot");
+    return { ok: false, message: PRESS_AGAIN_MESSAGE };
+  }
 
   // One agreement tick or two (platformConfig.checkout.singleAgreementTick): the same agreements are recorded either way.
   const single = platformConfig.checkout.singleAgreementTick;

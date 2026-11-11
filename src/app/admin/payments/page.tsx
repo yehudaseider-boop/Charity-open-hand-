@@ -7,6 +7,8 @@ import { formatRand } from "@/lib/money";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { markDonation, releaseHold } from "./actions";
+import { givingGuardSummary } from "@/lib/donations/giving-guard";
+import { GUARD_REASON_LABEL } from "@/lib/donations/giving-guard-rules";
 
 const HELD = Object.keys(heldLabel);
 
@@ -75,6 +77,16 @@ export default async function PaymentsPage() {
     })),
     now,
   );
+  // Card-testing protection: refused gift starts today and recent alarms. A failure here never hides the rest of the page.
+  const guard = await givingGuardSummary(now).catch((e) => (console.error("[admin/payments] guard summary", e), null));
+  const alarmNames = new Map<string, string>();
+  const alarmIds = [...new Set((guard?.alarms ?? []).map((a) => a.charityId).filter((id): id is string => Boolean(id)))];
+  if (alarmIds.length) {
+    const { data: names } = await db.from("charities").select("id, name_en").in("id", alarmIds);
+    for (const n of names ?? []) alarmNames.set(n.id as string, n.name_en as string);
+  }
+  const blockedTotal = (guard?.blocked ?? []).reduce((sum, b) => sum + b.count, 0);
+
   const needsAttention = stuckPayments.length + stuckEvents.length + (review.data?.length ?? 0) + health.failed.length + health.overdue;
 
   return (
@@ -90,6 +102,24 @@ export default async function PaymentsPage() {
           <Row key={p.reference} left={`${p.reference} · ${p.charity}`} right={`${formatRand(p.totalCents)} · ${ageText(p.minutes)}`} />
         ))}
       </Section>
+
+      <section className="space-y-1 rounded-card border border-border bg-surface p-4 text-sm">
+        <h2 className="font-semibold">Card-testing protection</h2>
+        <p className="mb-2 text-xs text-muted">Gift starts refused in the last 24 hours, by reason, and alarms from the last 7 days. An alarm never blocks anyone: it means one charity had far more gift starts or declined cards than usual, which can be someone trying stolen cards. Check the payment provider&apos;s dashboard when one shows.</p>
+        {guard === null ? <p className="text-warning">Couldn&apos;t load this just now. Refresh the page to try again.</p> : null}
+        {guard && blockedTotal === 0 ? <p className="text-muted">No gift starts refused in the last 24 hours.</p> : null}
+        {(guard?.blocked ?? []).map((b) => (
+          <Row key={b.reason} left={GUARD_REASON_LABEL[b.reason]} right={`${b.count}`} />
+        ))}
+        {guard && guard.alarms.length === 0 ? <p className="text-muted">No alarms in the last 7 days.</p> : null}
+        {(guard?.alarms ?? []).map((a) => (
+          <Row
+            key={`${a.at}-${a.charityId}-${a.kind}`}
+            left={`${a.kind === "declines" ? "Many declined cards" : "Many gift starts"} · ${(a.charityId && alarmNames.get(a.charityId)) || "Charity"}`}
+            right={formatDateTime(a.at)}
+          />
+        ))}
+      </section>
 
       <Section title="Gateway messages not finished" empty="None." count={stuckEvents.length}>
         <p className="mb-2 text-xs text-muted">The gateway told us about a payment and we could not finish handling it. It is tried again whenever the gateway re-sends it.</p>

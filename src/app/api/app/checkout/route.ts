@@ -55,5 +55,5 @@ export async function POST(request: NextRequest) {
     useSavedCardOf: body.data.useSavedCard ? account : undefined,
     attemptId: body.data.attemptId,
   });
-  return NextResponse.json(result, { status: result.ok ? 200 : result.fieldErrors ? 422 : 409 });
+  return NextResponse.json(result, { status: result.ok ? 200 : result.limited ? 429 : result.fieldErrors ? 422 : 409 });
 }

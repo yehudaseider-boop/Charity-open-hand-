@@ -116,12 +116,19 @@ export function DonateFlow({
   // A signed-in donor can reuse the ID number from their last s18A gift. Only its last four digits
   // reach the browser; the server fills in the number.
   const [useSavedId, setUseSavedId] = useState(Boolean(account?.savedIdLast4));
+  // When this form opened in the browser (set after the page loads, never on the server).
+  const openedAt = useRef<number | null>(null);
+  useEffect(() => {
+    openedAt.current = Date.now();
+  }, []);
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData): Promise<CheckoutState> => {
       const shown = fd.get("$shown");
       if (!shown) return prev;
       const q = JSON.parse(String(shown)) as Quote;
       fd.delete("$shown");
+      // How long the form has been open, for the server's quiet bot check (bots send the form the instant it opens).
+      if (openedAt.current !== null) fd.set("form_open_ms", String(Math.max(0, Date.now() - openedAt.current)));
       try {
         const next = await submitDonation(slug, q.amountCents, q.contributionCents, q.cardChargeCents > 0, q.totalCents, fromApp, campaign?.id, prev, fd);
         if (next.quote) setServerQuote(next.quote);

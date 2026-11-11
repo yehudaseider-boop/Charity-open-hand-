@@ -80,6 +80,28 @@ export const platformConfig = {
     minimumAge: 18,
   },
 
+  /**
+   * Card-testing protection on every way a gift starts: the website's give form, monthly sign-up and the phone app
+   * (built 11/11/2026). STARTING VALUES, for Yehuda to confirm before launch (go-live list). "tries" is how many are
+   * allowed in "minutes"; the next one is refused with a plain "too many tries" message (nothing is charged).
+   * An address is shared by many donors (an office, a school hall, a mobile network), so it gets more than an email.
+   */
+  givingGuard: {
+    /** Gift starts per email address. */
+    perEmail: { tries: 5, minutes: 10 },
+    perEmailDay: { tries: 20, minutes: 1_440 },
+    /** Gift starts per internet address. */
+    perAddress: { tries: 30, minutes: 10 },
+    perAddressDay: { tries: 150, minutes: 1_440 },
+    /** Declined cards from one email or address: this many, and new gifts wait until the oldest is this old. */
+    declines: { tries: 3, minutes: 60 },
+    /** Alarms for the Givezy team (an email and Admin, Payments); these never stop anyone giving. */
+    charityStartsAlarm: { tries: 60, minutes: 10 },
+    charityDeclinesAlarm: { tries: 10, minutes: 60 },
+    /** A give form sent sooner than this after the page opened is asked to press Give again (bots fill forms instantly). */
+    minFillSeconds: 3,
+  },
+
   checkout: {
     /**
      * One tick on the website's give form instead of two: "I'm 18 or older and I agree to the Terms and Privacy

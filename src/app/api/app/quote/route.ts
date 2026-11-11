@@ -4,6 +4,8 @@ import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { appGivingOpen, appQuoteSchema } from "@/lib/donations/app-api";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { quoteDonation } from "@/lib/donations/checkout";
+import { tooManyTriesMessage } from "@/lib/donations/giving-guard-rules";
+import { legalConfig } from "@/config/legal";
 
 /** What a gift comes to, for the phone app. Nothing is recorded. */
 export async function POST(request: NextRequest) {
@@ -11,7 +13,7 @@ export async function POST(request: NextRequest) {
   // A generous allowance per address (many donors share one: a school hall, an office). A broken limit store never
   // stops someone giving: this check only reads, and checkout has its own stricter limit.
   if (await hitRateLimit("app-quote", ipKeys(clientIp(request.headers)), 60, 10).catch(() => false)) {
-    return NextResponse.json({ ok: false, message: "Too many tries from this connection. Please wait a few minutes, then try again." }, { status: 429 });
+    return NextResponse.json({ ok: false, message: tooManyTriesMessage(10, legalConfig.supportEmail) }, { status: 429 });
   }
   const body = appQuoteSchema.safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, message: "Check the amount and try again." }, { status: 400 });

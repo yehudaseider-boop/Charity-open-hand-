@@ -35,7 +35,9 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { g
 const limits: { bucket: string; keys: string[]; limit: number }[] = [];
 vi.mock("@/lib/rate-limit", () => ({
   hitRateLimit: async (bucket: string, keys: string[], limit: number) => (limits.push({ bucket, keys, limit }), false),
+  rateLimitReached: async () => false,
   ipKeys: (ip: string) => [`ip:${ip}`],
+  hashedKey: (kind: string, value: string) => `${kind}#${value}`,
 }));
 vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
 let signedIn: { userId: string; email: string } | null = null;
@@ -122,11 +124,17 @@ describe("app checkout endpoint", () => {
     expect(checkouts[0]).toMatchObject({ saveCard: false });
   });
 
-  it("counts only tries that would reach the payment page: 5 per email, 30 per address", async () => {
+  it("counts only tries that would reach the payment page: per email and per address, short and daily", async () => {
     await call({ ...gift, giftCents: 100, shownTotalCents: 1_100, details });
     expect(limits).toHaveLength(0);
     await call({ ...gift, details });
-    expect(limits.map((l) => [l.keys[0].split(":")[0], l.limit])).toEqual([["email", 5], ["ip", 30]]);
+    expect(limits.map((l) => [l.bucket, l.limit])).toEqual([
+      ["checkout", 5],
+      ["checkout-ip", 30],
+      ["checkout-day", 20],
+      ["checkout-ip-day", 150],
+      ["checkout-charity", 60],
+    ]);
   });
 
   it("fills in the saved ID number for the signed-in donor giving with their own email", async () => {

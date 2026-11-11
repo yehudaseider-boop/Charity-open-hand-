@@ -1,13 +1,28 @@
 import "server-only";
+import { createHash, createHmac } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * The rate-limit key for a visitor's address. No address (the hosting header is missing) gives no key,
- * so everyone is not counted together under one "unknown" address; the other keys still apply.
+ * A one-way stand-in for an address or email in the limits table, so the table never holds the address itself
+ * (POPIA: kept only as long as a limit needs it). Keyed with ENCRYPTION_KEY when it is set, so the stand-in
+ * can't be worked back by trying every address; a plain hash otherwise (local development).
+ */
+export function hashedKey(kind: "ip" | "email", value: string): string {
+  const secret = process.env.ENCRYPTION_KEY;
+  const clean = kind === "email" ? value.trim().toLowerCase() : value.trim();
+  const digest = secret
+    ? createHmac("sha256", Buffer.from(secret, "base64")).update(`limit|${kind}|${clean}`).digest("base64url")
+    : createHash("sha256").update(`limit|${kind}|${clean}`).digest("base64url");
+  return `${kind}#${digest.slice(0, 32)}`;
+}
+
+/**
+ * The rate-limit key for a visitor's address (hashed: see hashedKey). No address (the hosting header is missing)
+ * gives no key, so everyone is not counted together under one "unknown" address; the other keys still apply.
  * Many donors share one address (a school hall, an office), so an address gets a wider allowance.
  */
 export function ipKeys(ip: string): string[] {
-  return ip && ip !== "unknown" ? [`ip:${ip}`] : [];
+  return ip && ip !== "unknown" ? [hashedKey("ip", ip)] : [];
 }
 
 /**
@@ -31,7 +46,7 @@ export async function hitRateLimit(bucket: string, keys: string[], limit: number
     if (countError) throw countError;
     if ((count ?? 0) > limit) return true;
   }
-  // IP addresses and emails here are kept for about a day (Privacy Policy).
+  // Emails and address stand-ins here are kept for about a day (Privacy Policy).
   await db.from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString());
   return false;
 }
