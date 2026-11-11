@@ -31,8 +31,12 @@ export function buttonTarget(site: string, slug: string, campaignId?: string | n
   return withSource(campaignId ? `${base}/donate?campaign=${encodeURIComponent(campaignId)}` : base, "button");
 }
 
-/** The HTML a charity pastes into its website. */
-export function buttonHtml(args: { site: string; slug: string; charityName: string; style: ButtonStyle; label: ButtonLabel; campaignId?: string | null }): string {
+/**
+ * The HTML a charity pastes into its website. `imageBase` is where the logo picture is loaded from: the site address
+ * (the default, for the pasted code), or "" for the dashboard's own preview, so the picture comes from whatever address
+ * the dashboard is open on (the site's picture rules only allow its own address).
+ */
+export function buttonHtml(args: { site: string; slug: string; charityName: string; style: ButtonStyle; label: ButtonLabel; campaignId?: string | null; imageBase?: string }): string {
   const site = args.site.replace(/\/+$/, "");
   const href = escapeHtml(buttonTarget(site, args.slug, args.campaignId));
   const text = BUTTON_LABELS[args.label];
@@ -63,7 +67,7 @@ export function buttonHtml(args: { site: string; slug: string; charityName: stri
   ].join(";");
   return (
     `<a href="${href}" target="_blank" rel="noopener" title="${title}" style="${link}">` +
-    `<span style="${mark}"><img src="${escapeHtml(site)}/brand/splash.png" alt="" width="31" height="22" style="display:block;width:31px;height:22px;border:0"></span>` +
+    `<span style="${mark}"><img src="${escapeHtml(args.imageBase === undefined ? site : args.imageBase.replace(/\/+$/, ""))}/brand/splash.png" alt="" width="31" height="22" style="display:block;width:31px;height:22px;border:0"></span>` +
     `${escapeHtml(text)}</a>`
   );
 }

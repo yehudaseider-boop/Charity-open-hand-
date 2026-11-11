@@ -53,6 +53,11 @@ describe("website button", () => {
     expect(html).toContain("background:#1749B5");
     expect(html).not.toContain("<script");
   });
+  it("the dashboard preview loads the logo from its own address, the pasted code from the site", () => {
+    const preview = buttonHtml({ site, slug: "x", charityName: "X", style: "blue", label: "give", imageBase: "" });
+    expect(preview).toContain('src="/brand/splash.png"');
+    expect(preview).toContain('href="https://charity-open-hand.vercel.app/c/x?src=button"');
+  });
   it("escapes the charity's name", () => {
     const html = buttonHtml({ site, slug: "x", charityName: `A "B" <C> & D's`, style: "white", label: "donate" });
     expect(html).toContain('title="Give to A &quot;B&quot; &lt;C&gt; &amp; D&#39;s with Givezy"');

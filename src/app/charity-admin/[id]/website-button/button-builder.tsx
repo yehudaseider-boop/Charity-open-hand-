@@ -20,7 +20,9 @@ export function ButtonBuilder({ site, slug, charityName, campaigns, previewHref 
   const [campaignId, setCampaignId] = useState("");
   const html = buttonHtml({ site, slug, charityName, style, label, campaignId: campaignId || null });
   const link = buttonTarget(site, slug, campaignId || null);
-  const preview = previewHref ? html.replace(/href="[^"]*"/, `href="${escapeHtml(previewHref)}"`) : html;
+  // The preview loads the logo picture from this address, not the site's, so it shows on any address the dashboard is open on.
+  const previewBase = buttonHtml({ site, slug, charityName, style, label, campaignId: campaignId || null, imageBase: "" });
+  const preview = previewHref ? previewBase.replace(/href="[^"]*"/, `href="${escapeHtml(previewHref)}"`) : previewBase;
 
   return (
     <div className="space-y-6">
