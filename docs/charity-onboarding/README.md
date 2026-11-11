@@ -1,6 +1,6 @@
 # Charity onboarding pack (draft 10/11/2026)
 
-A 9-page fillable PDF for a charity joining Givezy, cut to what a charity needs (Yehuda, 10/11/2026: "as simple and straightforward as possible, but clear"): what Givezy does, the 7 steps, the documents to send (with tick boxes), four pages of boxes the charity types into on screen, and a short go-live list with a sign-off. Draft for Yehuda to review; words in square brackets (the contact email and number) are still to be filled in.
+A 5-page fillable PDF for a charity joining Givezy, cut to what a charity needs (Yehuda, 11/11/2026: "do we need so many pages?"): the cover; one page with what Givezy is and the five steps (live within 5 working days); one page of documents to tick off; two pages of boxes the charity types into on screen, ending with sign-off and where to send it back. Draft for Yehuda to review; words in square brackets (the contact email and number) are still to be filled in.
 
 Source: Yossi's "Givezy Charity Onboarding Process" document (10/11/2026), checked against what the product does today.
 
