@@ -91,7 +91,7 @@ export default function ForDonorsPage() {
           { icon: "lock", title: "Your card stays private", body: `You type it on the provider's own page. ${appName} never sees or stores it.` },
           { icon: "eye", title: "Charities see only what they need", body: "Enough to thank you and record your gift. They never see your ID number." },
           { icon: "user", title: "Give anonymously", body: "Your name then won't appear on public pages, campaign lists or live totals." },
-          { icon: "shield", title: "Two-step sign-in", body: "Charity teams sign in with an authenticator code, so your details stay safe with them." },
+          { icon: "shield", title: "Your information is yours", body: "See and download everything we hold about you, and ask us to correct or delete it." },
         ]}
       >
         <div className="max-w-[24rem]"><SecurePagePicture /></div>
