@@ -1876,3 +1876,7 @@ provider. Fixed the same day:
 Not fixed yet (on the go-live list): s18A receipt PDFs inside the app, package updates and push, Face ID and crash
 reporting (all need a new app build); shared-phone and reinstall clean-up; the checkout limit by email; saved cards
 before they are switched on.
+
+## Find a charity page in the landing page's look (11/11/2026)
+
+Yehuda asked for the Find a charity page to meet the Givezy design standard. The page now follows the landing page: a big Bricolage headline ("Find a charity", "charity" in blue) over lilac and peach splashes, a larger search that still updates as you type, and 44 px cause chips. The cause of the week (the same pick as the app, Admin, Cause of the week) shows on the plain list only, as a blue colour block with the page's one orange "Give" button (to the charity's give page, which says plainly if it isn't taking gifts yet); if it can't be read, the list shows without it. Charity cards are photo-led: the cover photo, or a soft colour block when there is none, with the logo (or initials) over the edge, the name (`dir="auto"`, long names wrap), area, one or two lines about it, the s18A badge and causes, and "View and give". Empty searches get "No charities match that yet" with Clear the search / See all charities; a failed load gets a plain message and Try again. Searches, causes, caching (`/browse-charities`) and the only-approved rule are unchanged. Words and links live in `src/lib/charity/browse.ts` (tested).

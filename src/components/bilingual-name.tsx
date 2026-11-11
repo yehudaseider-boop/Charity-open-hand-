@@ -8,5 +8,5 @@ export function BilingualName({
   as?: "span" | "h1" | "h2" | "h3";
   className?: string;
 }) {
-  return <Tag className={className}>{en}</Tag>;
+  return <Tag dir="auto" className={className}>{en}</Tag>;
 }
