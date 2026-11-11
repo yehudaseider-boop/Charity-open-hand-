@@ -42,11 +42,11 @@ def make(kind):
     if kind in ("whoosh", "suck"):
         n = int(0.5 * SR); u = np.linspace(0, 1, n)
         shape = np.sin(np.pi * u) ** 2 if kind == "whoosh" else u ** 3
-        k = 0.02 + 0.25 * shape
-        return 0.6 * lowpass(noise(n), k) * shape * 1.0  # whooshes kept soft (Yehuda, 11/11/2026: too loud at 3x)
+        k = 0.01 + 0.08 * shape  # darker, so it reads as air moving, not hiss
+        return 0.6 * lowpass(noise(n), k) * shape * 0.35  # kept well under the voice (Yehuda, 11/11/2026: too loud twice)
     if kind == "riser":
         n = int(1.2 * SR); u = np.linspace(0, 1, n)
-        return 0.12 * (lowpass(noise(n), 0.02 + 0.2 * u) * 2 + 0.4 * sweep(200, 900, 1.2)) * u ** 2
+        return 0.06 * (lowpass(noise(n), 0.02 + 0.2 * u) * 2 + 0.4 * sweep(200, 900, 1.2)) * u ** 2
     if kind == "type":
         out = np.zeros(int(2.3 * SR)); t = 0.0
         while t < 2.2:
