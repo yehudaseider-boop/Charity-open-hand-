@@ -8,6 +8,7 @@ import { formatDate, taxYearFor, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyButton } from "./monthly-button";
+import { isMonthlyChange, monthlyResult as monthlyResultFor } from "@/lib/donations/monthly-result";
 import { MonthlyIdForm } from "./monthly-id-form";
 import { needsIdNudge, type SourceDetails } from "@/lib/donations/monthly-id-nudge";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,7 +23,7 @@ export const metadata: Metadata = { title: "Account", robots: { index: false, fo
 
 export default async function AccountPage({ searchParams }: PageProps<"/account">) {
   const viewer = await requireViewer();
-  const { denied, monthly: monthlyResult, receipt: receiptResult } = await searchParams;
+  const { denied, monthly: monthlyResult, m: changedId, receipt: receiptResult } = await searchParams;
 
   // Only the receipts that belong to this person as a donor (not every receipt
   // of a charity they manage).
@@ -99,6 +100,22 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       </header>
       <div className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
       {monthlyResult === "done" ? <p role="status" className="rounded-control bg-success-soft p-3 text-sm text-success">Your monthly donation has been updated.</p> : null}
+      {isMonthlyChange(monthlyResult) ? (() => {
+        // What just happened, the way to take it back, and what happens next (the dashboard's pattern).
+        const changed = typeof changedId === "string" ? (monthlyGifts ?? []).find((g) => g.id === changedId) : undefined;
+        const changedCharity = changed ? ((Array.isArray(changed.charities) ? changed.charities[0] : changed.charities) as { name_en: string } | null) : null;
+        const r = monthlyResultFor(monthlyResult, changed?.status === "active" && changed.next_charge_at ? formatDate(changed.next_charge_at) : null);
+        // Only offer the way back while the donation is in the state this change left it in.
+        const canUndo = r.undo && changed && changed.status === (monthlyResult === "paused" ? "paused" : "active") && !changed.held_reason;
+        return (
+          <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-control bg-success-soft p-3 text-sm text-success">
+            <p className="min-w-0">
+              <span className="font-semibold">{r.lead}{changedCharity ? <> to <bdi>{changedCharity.name_en}</bdi></> : null}{r.end}</span> {r.next}
+            </p>
+            {canUndo && r.undo && changed ? <MonthlyButton id={changed.id} status={r.undo.status} label={r.undo.label} /> : null}
+          </div>
+        );
+      })() : null}
       {receiptResult === "unavailable" ? <p role="status" className="rounded-control bg-warning-soft p-3 text-sm text-warning">That s18A receipt isn&apos;t available. It may have been withdrawn or not be ready yet. Your receipts are listed below.</p> : null}
       {monthlyResult === "error" ? <p role="status" className="rounded-control bg-danger-soft p-3 text-sm text-danger">We couldn&apos;t change that monthly donation. Please try again.</p> : null}
       {denied ? (
@@ -214,7 +231,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                     {m.status === "active" ? <MonthlyButton id={m.id} status="paused" label="Pause" /> : null}
                     {m.status === "paused" && !m.held_reason ? <MonthlyButton id={m.id} status="active" label="Resume" /> : null}
                     {m.status === "failed" ? (
-                      <MonthlyButton id={m.id} status="cancelled" label="Remove" confirmText="Remove this stopped monthly donation? You won't be able to put in a new card for it afterwards." />
+                      <MonthlyButton id={m.id} status="cancelled" from="failed" label="Remove" confirmText="Remove this stopped monthly donation? You won't be able to put in a new card for it afterwards." />
                     ) : (
                       <MonthlyButton id={m.id} status="cancelled" label="Cancel for good" danger confirmText="Cancel this monthly donation for good? We will forget your card and collect nothing more." />
                     )}

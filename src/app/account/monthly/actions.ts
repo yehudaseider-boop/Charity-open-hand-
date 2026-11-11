@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { monthlyChangeFor } from "@/lib/donations/monthly-result";
 
 const allowed = new Set(["paused", "active", "cancelled"]);
 
@@ -16,5 +17,7 @@ export async function changeMonthly(formData: FormData) {
   const { error } = await (await createClient()).rpc("set_my_recurring_status", { p_id: id, p_status: status });
   if (error) redirect("/account?monthly=error");
   revalidatePath("/account");
-  redirect("/account?monthly=done");
+  // Back with what changed and which one, so the page can say what happened and offer to take it back.
+  const change = monthlyChangeFor(status, String(formData.get("from") ?? "") === "failed");
+  redirect(change ? `/account?monthly=${change}&m=${id}` : "/account?monthly=error");
 }

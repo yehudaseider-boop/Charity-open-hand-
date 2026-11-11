@@ -259,7 +259,7 @@ export default function Giving() {
     setOpen(null);
     const name = which?.charityName ?? "this charity";
     if (status === "paused") setUndo({ text: `Paused your monthly donation to ${name}. Nothing more is collected until you resume it.`, label: "Undo", run: () => void changeRecurring(id, "active") });
-    else if (status === "active") setUndo({ text: `Resumed your monthly donation to ${name}.` });
+    else if (status === "active") setUndo({ text: `Resumed your monthly donation to ${name}.`, label: "Undo", run: () => void changeRecurring(id, "paused") });
     else if (which?.status === "failed") setUndo({ text: `Removed the stopped monthly donation to ${name} from your list.` });
     else setUndo({ text: `Cancellation of your monthly donation to ${name} is requested. Nothing more is collected once the payment provider confirms.` });
   };

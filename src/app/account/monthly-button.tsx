@@ -4,7 +4,7 @@ import { changeMonthly } from "./monthly/actions";
 import { PendingButton } from "@/components/forms/pending-button";
 
 /** Pause, resume, cancel or remove a monthly donation. Cancelling asks first: it cannot be undone. */
-export function MonthlyButton({ id, status, label, danger, confirmText }: { id: string; status: string; label: string; danger?: boolean; confirmText?: string }) {
+export function MonthlyButton({ id, status, from, label, danger, confirmText }: { id: string; status: string; from?: string; label: string; danger?: boolean; confirmText?: string }) {
   return (
     <form
       action={changeMonthly}
@@ -14,6 +14,7 @@ export function MonthlyButton({ id, status, label, danger, confirmText }: { id: 
     >
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="status" value={status} />
+      {from ? <input type="hidden" name="from" value={from} /> : null}
       <PendingButton pendingLabel="Saving…" className={`min-h-11 rounded-full border-2 px-4 py-1.5 text-sm font-semibold transition ${danger ? "border-danger-soft text-danger hover:border-danger" : "border-border text-brand hover:border-brand"}`}>{label}</PendingButton>
     </form>
   );
