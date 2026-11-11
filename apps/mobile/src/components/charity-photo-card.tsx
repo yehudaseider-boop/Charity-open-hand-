@@ -11,12 +11,12 @@ import { PressableScale } from "./pressable-scale";
 import { LiveBar } from "./live-bar";
 import { Text } from "./text";
 
-/** "Checked · s18A" on the photo, or "Checked by Givezy" when the charity doesn't issue s18A receipts. */
+/** "Checked · s18A receipts" on the photo, or "Checked by Givezy" when the charity doesn't issue s18A receipts. */
 export function CheckedBadge({ issues18a, style }: { issues18a: boolean; style?: object }) {
   return (
     <View style={[styles.badge, style]}>
       <CheckIcon size={14} color={colors.sage} />
-      <Text style={styles.badgeText}>{issues18a ? "Checked · s18A" : "Checked by Givezy"}</Text>
+      <Text style={styles.badgeText}>{issues18a ? "Checked · s18A receipts" : "Checked by Givezy"}</Text>
     </View>
   );
 }

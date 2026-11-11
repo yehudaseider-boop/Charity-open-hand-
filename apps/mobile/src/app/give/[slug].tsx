@@ -218,10 +218,27 @@ export default function Give() {
     if (done && arrived.length) dismissArrived();
   }, [done, arrived, dismissArrived]);
 
+  // Remembered details, once we know who is signed in (never the signed-out copy for a signed-in person). When the
+  // person changes (sign-out on this screen) and has none of their own, the last person's details are taken off again.
+  const accountKnown = account.status !== "loading";
+  const filledFrom = useRef<RememberedDetails | null>(null);
   useEffect(() => {
+    if (!accountKnown) return;
     let live = true;
     loadDetails(account.userId).then((d) => {
-      if (!live || !d) return;
+      if (!live) return;
+      if (!d) {
+        const was = filledFrom.current;
+        if (!was) return;
+        filledFrom.current = null;
+        setRemembered(null);
+        setRemember(false);
+        setFirst((v) => (v === was.first_name ? "" : v));
+        setLast((v) => (v === was.last_name ? "" : v));
+        setEmail((v) => (v === was.email ? null : v));
+        return;
+      }
+      filledFrom.current = d;
       setRemembered(d);
       setRemember(true);
       setFirst(d.first_name);
@@ -231,7 +248,7 @@ export default function Give() {
     return () => {
       live = false;
     };
-  }, [account.userId]);
+  }, [account.userId, accountKnown]);
 
   const { accessToken } = account;
   useEffect(() => {
@@ -369,7 +386,15 @@ export default function Give() {
   const contribution = extraResult.ok ? extraResult.cents : null;
   // "Cover the card charge": shown only when the server sent the provider's rates (never a made-up figure).
   const rates = server?.cardChargeRates ?? null;
-  const cardCharge = coverCharge && rates && gift !== null && gift > 0 && contribution !== null ? cardChargeToCover(rates.coverGiftOnly ? gift : gift + contribution, rates) : 0;
+  // Never lets a silly figure crash the screen: the server checks the real total again before any payment.
+  const cardCharge = (() => {
+    if (!(coverCharge && rates && gift !== null && gift > 0 && contribution !== null)) return 0;
+    try {
+      return cardChargeToCover(rates.coverGiftOnly ? gift : gift + contribution, rates);
+    } catch {
+      return 0;
+    }
+  })();
   const total = gift !== null && contribution !== null ? gift + contribution + cardCharge : null;
   // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
   const isMonthly = monthly && !campaignId && !heldAttempt;
@@ -733,6 +758,8 @@ export default function Give() {
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
                 maxLength={AMOUNT_MAX_LENGTH}
+                // Lets a sideways slide across the digits nudge the amount (AmountSwipe); iOS otherwise keeps the touch.
+                rejectResponderTermination={false}
                 placeholder="0"
                 placeholderTextColor={colors.lilac}
                 accessibilityLabel="Amount in Rand"
@@ -883,7 +910,7 @@ export default function Give() {
                 })}
               </View>
               {extraChoice === "other" ? (
-                <Field label={isMonthly ? "Your contribution each month" : "Your contribution"} prefix="R" keyboardType="decimal-pad" editable={!locked} value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `Any amount from ${rand(minExtra)}.` : undefined} />
+                <Field label={isMonthly ? "Your contribution each month" : "Your contribution"} prefix="R" keyboardType="decimal-pad" maxLength={AMOUNT_MAX_LENGTH} editable={!locked} value={extraAmount} onChangeText={setExtraAmount} error={err("extra")} placeholder="0" helper={minExtra ? `Any amount from ${rand(minExtra)}.` : undefined} />
               ) : null}
               <Pressable
                 disabled={locked}

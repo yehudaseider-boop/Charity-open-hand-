@@ -16,7 +16,7 @@ const steps = [
     ? { title: "Give in the app", body: "Tap Give and choose the amount. You pay on the payment provider's secure page. We never see or store your card details." }
     : { title: "Give on our website", body: "Tap Give and choose the amount. You pay on a secure payment page. We never see or store your card details." },
   { title: "Back in the app", body: "Sign in with the email you gave with. Every donation, and how you are doing against your giving goal, shows up here." },
-  { title: "Get your receipt", body: "If the charity issues s18A receipts, you get one annual receipt covering all your donations to it." },
+  { title: "Get your s18A receipt", body: "If the charity issues s18A receipts, you get one annual receipt covering all your donations to it." },
 ];
 
 /** How it works: four plain steps, then the fee promise, in the For charities page's look (30/10/2026). */

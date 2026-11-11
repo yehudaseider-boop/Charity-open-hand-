@@ -15,7 +15,7 @@ import { GoalRing } from "@/components/goal-ring";
 import { CalendarIcon, ChevronIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { useStatusCover } from "@/components/status-cover";
 import { Logo } from "@/components/logo";
-import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
 import { useScreenState } from "@/lib/screen-state";
 import { Text } from "@/components/text";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, receipts as sampleReceipts, recurring as sampleRecurring, sampleGoals } from "@/data/giving";
@@ -120,6 +120,13 @@ export default function Home() {
             <Text style={styles.avatarText}>{initial}</Text>
           </Pressable>
         </View>
+
+        {/* Offline or the refresh failed: say these are the numbers saved last time, as Progress and Receipts do. */}
+        {!preview && account.live?.fromCache && account.loadError ? (
+          <View style={styles.gutter}><OfflineNote savedAt={account.live.loadedAt} /></View>
+        ) : !preview && directory.offlineSince ? (
+          <View style={styles.gutter}><OfflineNote savedAt={directory.offlineSince} /></View>
+        ) : null}
 
         {/* The hello, in the For charities page's look (30/10/2026): a soft card, the key word in blue,
             people giving, and dots and rings drifting round them. */}
@@ -237,7 +244,7 @@ export default function Home() {
             <View style={styles.gutter}><SkeletonBlock height={260} /></View>
           ) : !causes.length ? (
             <View style={styles.gutter}>
-              <EmptyState title="No charities here yet" body="New charities join Givezy every week. Have a look again soon." action={{ label: "Go to Discover", onPress: () => router.push("/discover") }} />
+              <EmptyState title="No charities here yet" body="Charities are joining Givezy. Have a look again soon." action={{ label: "Go to Discover", onPress: () => router.push("/discover") }} />
             </View>
           ) : causes.length ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingHorizontal: space.gutter }}>

@@ -1849,3 +1849,30 @@ Giving should feel as quick as paying for coffee, and as good as a thank-you not
   permission). Both stay on the ideas list.
 - Checked in the web preview (laptop and phone width) and with new tests (`tests/app-amount-steps.test.ts`). Real-phone
   checks are on the go-live list.
+
+## Full check of the app and what it talks to (Yehuda as CTO check, 11/11/2026)
+
+Four separate reviews (sign-in and what the phone keeps; the server and database the app uses; the give flow; every
+screen). Nothing found that charges twice, shows one person another's giving, or marks a gift paid without the payment
+provider. Fixed the same day:
+
+- **Hold to give:** a tap or second tap now counts only when the finger lifts on the button. Sliding off, a cancelled
+  touch, or the app going to the background only stop the fill (the review found a cancelled touch could count as the
+  second tap). The button comes straight back when nothing started. Enter on a keyboard gives at once.
+- **"Use my ID ending 1234"** comes only from a paid gift: anyone can start a gift with someone else's email and an ID
+  number, and an unpaid one must never be offered to the email's owner (`saved-id.ts`, test `saved-id-paid-only`).
+- **Rate limits** on the app's `ready` and `quote` (60 per 10 minutes per address; a broken limit store never blocks).
+- **Amount dial:** from below the smallest gift, up goes to the smallest; from above the largest, down goes to the largest.
+  Sliding across the digits works on iPhone too (the amount field lets the swipe have the touch).
+- **Links from outside the app** open a give screen but never with an amount or "every month" chosen.
+- **Give screen:** remembered name and email only once we know who is signed in, and taken off again when that person
+  signs out; a contribution with too many digits can't crash the screen.
+- **Home** says when it shows saved numbers (offline), as Progress and Receipts do. **Fonts** that fail to load no
+  longer leave the app on the splash screen.
+- **Wording:** "s18A receipt" everywhere it was only "s18A"; the invented "New charities join Givezy every week" and the
+  religious sample search ("Bnei Akiva") are gone; the thank-you no longer promises a streak on Progress.
+- **Story cards:** Save and Give are reachable with a screen reader.
+
+Not fixed yet (on the go-live list): s18A receipt PDFs inside the app, package updates and push, Face ID and crash
+reporting (all need a new app build); shared-phone and reinstall clean-up; the checkout limit by email; saved cards
+before they are switched on.

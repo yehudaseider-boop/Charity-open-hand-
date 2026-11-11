@@ -151,7 +151,7 @@ export function GiftSent({
         {gift.confirming ? (
           <View style={styles.streak}>
             <Text style={{ flex: 1, color: colors.navy, fontSize: 16, lineHeight: 22 }}>
-              Your gift shows in Progress, with your goal and streak, as soon as it&apos;s confirmed. If no confirmation email comes, the payment didn&apos;t go through: you can give again from the charity&apos;s page.
+              Your gift shows in Progress, with your goal, as soon as it&apos;s confirmed. If no confirmation email comes, the payment didn&apos;t go through: you can give again from the charity&apos;s page.
             </Text>
           </View>
         ) : null}

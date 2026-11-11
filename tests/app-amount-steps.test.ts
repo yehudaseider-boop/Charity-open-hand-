@@ -1,6 +1,6 @@
 /** The give screen's amount dial, "Same as last time", and the hello in the thank-you. */
 import { describe, expect, it } from "vitest";
-import { amountFromParam, lastGiftTo, stepAmount, stepSize } from "../apps/mobile/src/lib/amount-steps";
+import { amountFromParam, lastGiftTo, stepAmount, stepSize, stripGivePrefill } from "../apps/mobile/src/lib/amount-steps";
 import { firstNameOf, yourCampaigns } from "../apps/mobile/src/lib/campaign-feed";
 import type { Campaign, Charity } from "../apps/mobile/src/data/sample";
 
@@ -40,6 +40,14 @@ describe("stepping an amount", () => {
     expect(stepAmount(99_999_999, 1, MIN, MAX)).toBe(100_000_000);
     expect(stepAmount(100_000_000, 1, MIN, MAX)).toBeNull();
     expect(stepAmount(5_000, 1, MIN, 5_000)).toBeNull();
+  });
+
+  it("from below the smallest gift, up goes to the smallest; from above the largest, down goes to the largest", () => {
+    expect(stepAmount(500, 1, MIN, MAX)).toBe(3_000); // typed R5, minimum R30
+    expect(stepAmount(500, -1, MIN, MAX)).toBeNull();
+    expect(stepAmount(200_000_000, -1, MIN, MAX)).toBe(MAX);
+    expect(stepAmount(200_000_000, 1, MIN, MAX)).toBeNull();
+    expect(stepAmount(500, 1, 3_000, 2_000)).toBeNull(); // a nonsense range never produces an amount
   });
 
   it("works when the smallest gift isn't known yet (0), without going to nothing", () => {
@@ -101,5 +109,19 @@ describe("the name in the thank-you", () => {
     expect(firstNameOf("   ")).toBeNull();
     expect(firstNameOf(null)).toBeNull();
     expect(firstNameOf("x".repeat(41))).toBeNull();
+  });
+});
+
+describe("links from outside the app", () => {
+  it("never choose the amount or make a gift monthly", () => {
+    expect(stripGivePrefill("/give/meals?monthly=1&amount=999999999")).toBe("/give/meals");
+    expect(stripGivePrefill("nedivlev://give/meals?amount=5000&label=Family")).toBe("nedivlev://give/meals?label=Family");
+    expect(stripGivePrefill("/give/meals?campaign=abc&monthly=1")).toBe("/give/meals?campaign=abc");
+  });
+  it("leave everything else alone", () => {
+    expect(stripGivePrefill("/give/meals?label=Family")).toBe("/give/meals?label=Family");
+    expect(stripGivePrefill("/give/meals")).toBe("/give/meals");
+    expect(stripGivePrefill("/charity/meals?amount=5000")).toBe("/charity/meals?amount=5000");
+    expect(stripGivePrefill("/donate/return?reference=x")).toBe("/donate/return?reference=x");
   });
 });

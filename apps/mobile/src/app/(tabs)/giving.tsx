@@ -705,7 +705,7 @@ export default function Giving() {
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
                             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                              {ddmmyyyy(gift.date)}{gift.label ? ` · ${gift.label}` : ""}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No s18A"}
+                              {ddmmyyyy(gift.date)}{gift.label ? ` · ${gift.label}` : ""}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No s18A receipt"}
                             </Text>
                           </View>
                           <Text style={{ fontSize: 17 }}>{rand(gift.cents)}</Text>

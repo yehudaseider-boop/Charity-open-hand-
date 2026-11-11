@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
+import { Animated, AppState, Easing, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { haptic } from "@/lib/haptics";
 import { colors, radius, type } from "@/theme/tokens";
@@ -20,17 +20,20 @@ const CIRC = 2 * Math.PI * RING;
 /**
  * The Give button, held rather than tapped (11/11/2026): press and hold, a ring fills and the button fills with it,
  * soft ticks along the way and a firm thump at the end, and then it gives. Letting go early takes it back, so a
- * gift is never an accident. Everyone can still give without holding: a screen reader's double tap, the keyboard's
- * Enter, and a second quick tap after the hint all give at once.
+ * gift is never an accident: lifting, sliding off, a cancelled touch or the app going to the background only stop
+ * it. Everyone can still give without holding: a screen reader's double tap, the keyboard's Enter, and a second quick
+ * tap after the hint (a release inside the button) all give at once.
  */
-export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { label: string; busyLabel: string; busy: boolean; disabled?: boolean; onConfirm: () => void }) {
+export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { label: string; busyLabel: string; busy: boolean; disabled?: boolean; onConfirm: () => void | Promise<unknown> }) {
   const [progress] = useState(() => new Animated.Value(0));
   const [phase, setPhase] = useState<"idle" | "holding" | "done">("idle");
   const [hint, setHint] = useState(false);
   const run = useRef<Animated.CompositeAnimation | null>(null);
   const done = useRef(false);
-  const sawIn = useRef(false);
+  const mounted = useRef(true);
   const downAt = useRef(0);
+  /** The press came from a keyboard (Enter or Space), not a finger: it gives at once, like a screen reader. */
+  const byKey = useRef(false);
   const ticks = useRef(0);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const busyNow = useRef(busy);
@@ -51,14 +54,6 @@ export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { la
     });
     return () => progress.removeListener(id);
   }, [progress]);
-  // Leaving the screen mid-hold never goes on to give: the fill stops and nothing is confirmed.
-  useEffect(() => {
-    const animation = run;
-    return () => {
-      animation.current?.stop();
-      if (hintTimer.current) clearTimeout(hintTimer.current);
-    };
-  }, []);
 
   const reset = () => {
     done.current = false;
@@ -66,6 +61,28 @@ export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { la
     setPhase("idle");
     Animated.timing(progress, { toValue: 0, duration: 160, useNativeDriver: false }).start();
   };
+  const stopHolding = () => {
+    run.current?.stop();
+    if (!done.current) reset();
+  };
+
+  // Leaving the screen mid-hold never goes on to give: the fill stops and nothing is confirmed.
+  useEffect(() => {
+    const animation = run;
+    return () => {
+      mounted.current = false;
+      animation.current?.stop();
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    };
+  }, []);
+  // The app going to the background mid-hold (a call, the home swipe) stops the hold too.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") stopHolding();
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Once the payment attempt ends (busy goes back to false) the button is ready again.
   useEffect(() => {
     if (!busy && done.current) reset();
@@ -79,15 +96,21 @@ export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { la
     setPhase("done");
     setHint(false);
     haptic.firm();
-    confirmNow.current();
-    // If nothing started (for example a field needs fixing first), the button comes back.
-    setTimeout(() => !busyNow.current && reset(), 900);
+    // When the give step finishes without starting a payment (a field to fix, no connection), the button comes
+    // straight back; while a payment is under way it waits for busy to end.
+    void Promise.resolve()
+      .then(() => confirmNow.current())
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted.current && !busyNow.current) reset();
+      });
   };
 
-  const pressIn = () => {
-    sawIn.current = true;
+  const pressIn = (e: GestureResponderEvent) => {
+    const kind = (e?.nativeEvent as { type?: string } | undefined)?.type ?? "";
+    byKey.current = kind.startsWith("key");
     downAt.current = Date.now();
-    if (off || done.current) return;
+    if (byKey.current || off || done.current) return;
     ticks.current = 0;
     setPhase("holding");
     haptic.soft();
@@ -95,23 +118,26 @@ export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { la
     run.current = Animated.timing(progress, { toValue: 1, duration: HOLD_MS, easing: Easing.linear, useNativeDriver: false });
     run.current.start(({ finished }) => finished && complete());
   };
+  // Lifting the finger, sliding it off, or the phone cancelling the touch: never gives, only stops the fill.
   const pressOut = () => {
-    if (off || done.current) return;
-    run.current?.stop();
-    if (Date.now() - downAt.current < TAP_MS) {
-      // A tap: say how it works. A second tap soon after gives, for anyone who can't hold.
-      if (hint) return void complete();
-      setHint(true);
-      hintTimer.current && clearTimeout(hintTimer.current);
-      hintTimer.current = setTimeout(() => setHint(false), SECOND_TAP_MS);
-    }
-    reset();
+    if (byKey.current || off || done.current) return;
+    stopHolding();
   };
-  // Screen reader double tap, keyboard Enter or Space, and switch control arrive as a press with no touch before it.
+  // Only a release inside the button arrives here. A short one is a tap: the first explains, a second gives (for
+  // anyone who can't hold). A screen reader's double tap, Enter and switch control arrive with no touch just before.
   const press = () => {
-    const touched = sawIn.current;
-    sawIn.current = false;
-    if (!touched) complete();
+    if (off || done.current) return;
+    if (byKey.current) {
+      byKey.current = false;
+      return complete();
+    }
+    const sinceDown = Date.now() - downAt.current;
+    if (sinceDown > 1500) return complete();
+    if (sinceDown >= TAP_MS) return;
+    if (hint) return complete();
+    setHint(true);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHint(false), SECOND_TAP_MS);
   };
 
   const face = off && phase !== "done" ? { bg: colors.lilacSoft, text: colors.muted, edge: colors.hairline } : { bg: colors.orange, text: colors.navy, edge: colors.navy };

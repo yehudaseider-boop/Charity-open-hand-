@@ -1,3 +1,4 @@
+import { stripGivePrefill } from "@/lib/amount-steps";
 import { isSheetReturn } from "@/lib/give-flow";
 
 /**
@@ -6,7 +7,8 @@ import { isSheetReturn } from "@/lib/give-flow";
  */
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }): string | null {
   try {
-    return isSheetReturn(path, initial) ? null : path;
+    // A link from outside may open a give screen, but never with an amount or "every month" already chosen.
+    return isSheetReturn(path, initial) ? null : stripGivePrefill(path);
   } catch {
     return path;
   }

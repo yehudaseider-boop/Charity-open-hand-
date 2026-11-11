@@ -221,6 +221,16 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 
 - [ ] **Try the app's new touch moves on a real iPhone and Android phone (added 11/11/2026):** hold to give (the fill, the ticks and the firm thump at the end, and that letting go early gives nothing), sliding across the amount, the swipeable stories on Discover, the drops on pull to refresh (iPhone), and the thank-you's burst. Then check them with VoiceOver and TalkBack on (double tap must give at once), with "reduce motion" on, and with the text size turned up. These were built and checked in the web preview only, which has no vibration and no real touch.
 
+- [ ] **From the app check of 11/11/2026 (see decisions.md), still to do:**
+  - **s18A receipt PDFs in the app** (share to an accountant, the whole tax year in one): needs a small server route that hands the PDF to a signed-in app, and two Expo packages, so a new app build.
+  - **App packages:** `npm audit` lists 12 (3 high) in Expo's build tools, and 13 Expo packages are a patch behind. Update with the next app build (not an over-the-air update: native code changes).
+  - **Shared phones and reinstalls:** goals, income and saved charities made while signed out move silently to whoever signs in next; deleting the app on iPhone doesn't sign out (the Keychain survives). Ask before moving, and clear on first launch after a reinstall.
+  - **Checkout limit by email** can be used to lock one donor out for 10 minutes; a missing address header means no address limit. Add an overall ceiling and confirm `CLIENT_IP_HEADER` on the live site.
+  - **Donor record blanks** (name, phone, address) are filled from a checkout before it is paid. Fill them only once paid.
+  - **Before switching saved cards on:** a card saved during a checkout belongs to whoever started it, even if someone else paid from the shared link. Don't share save-card links, and email the account holder when a card is saved.
+  - **`new-card` route** is not behind the in-app giving switch: confirm the app opens it in the phone's browser in store builds, or put it behind the switch.
+  - **Sign-in code lifetime:** the local setting is an hour while the screen says "expires soon"; set about 10 minutes on the hosted project and confirm its limits.
+
 ## C. First live day
 
 - [ ] One small real donation with Yehuda's own card. Check: the thank-you page, the confirmation email, the donation shows as paid, the charity sees it without the donor's private choice, and the s18A flow behaves as agreed.

@@ -22,6 +22,7 @@ vi.mock("@/lib/donations/confirm", () => ({
 vi.mock("@/lib/donations/confirmation-access", () => ({ confirmationTokenMatches: async (_r: string, t: string) => t === "a".repeat(43) }));
 let limitBroken = false;
 vi.mock("@/lib/rate-limit", () => ({
+  ipKeys: (ip: string) => (ip && ip !== "unknown" ? [`ip:${ip}`] : []),
   hitRateLimit: async () => {
     if (limitBroken) throw new Error("rate limit store down");
     return false;

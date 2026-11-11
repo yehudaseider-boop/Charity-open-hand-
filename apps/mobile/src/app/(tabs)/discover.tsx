@@ -41,7 +41,7 @@ export default function Discover() {
   const state = !live ? demoState : directory.data ? "ready" : directory.failed ? "error" : "loading";
   const charities = useMemo(() => directory.data?.charities ?? [], [directory.data]);
   const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
-  const [query, setQuery] = useState(state === "empty" ? "Bnei Akiva" : "");
+  const [query, setQuery] = useState(state === "empty" ? "Moon base" : "");
   const [cause, setCause] = useState("all");
   // The charity whose "Give" was tapped in the list: the same give sheet as on its page.
   const [giveTo, setGiveTo] = useState<Charity | null>(null);

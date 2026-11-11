@@ -15,7 +15,9 @@ async function latest(userId: string): Promise<{ encrypted: string; last4: strin
   const { data: donors } = await db.from("donors").select("id").eq("user_id", userId).eq("donor_type", "individual").is("erased_at", null);
   const donorIds = (donors ?? []).map((d) => d.id as string);
   if (!donorIds.length) return null;
-  const { data: gifts } = await db.from("donations").select("id").in("donor_id", donorIds).eq("wants_18a", true).order("created_at", { ascending: false }).limit(20);
+  // Paid gifts only: anyone can start a gift with someone else's email and an ID number of their choosing, so an
+  // unpaid one must never become "Use my ID ending 1234" for the real owner of that email (review of 11/11/2026).
+  const { data: gifts } = await db.from("donations").select("id").in("donor_id", donorIds).eq("wants_18a", true).eq("status", "paid").order("created_at", { ascending: false }).limit(20);
   const giftIds = (gifts ?? []).map((g) => g.id as string);
   if (!giftIds.length) return null;
   const { data: details } = await db

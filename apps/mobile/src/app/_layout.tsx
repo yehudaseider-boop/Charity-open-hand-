@@ -23,7 +23,7 @@ SplashScreen.preventAutoHideAsync();
 void secureStorage.removeItem("nediv-lev.jewish-mode").catch(() => undefined);
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     // Headlines and amounts: Bricolage Grotesque, as on the website (v2.1, the app's font pass of 30/10/2026).
     // Two weights only, shipped with the app (assets/fonts, Open Font Licence) rather than another package.
     BricolageGrotesque_700Bold: require("../../assets/fonts/BricolageGrotesque-Bold.ttf"),
@@ -35,6 +35,8 @@ export default function RootLayout() {
   });
 
 
+  // A font that fails to load never leaves the app stuck on the splash screen: it carries on with the phone's own fonts.
+  const loaded = fontsLoaded || Boolean(fontError);
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync();
   }, [loaded]);

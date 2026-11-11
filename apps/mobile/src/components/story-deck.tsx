@@ -58,7 +58,23 @@ export function StoryDeck({ charities, live, onGive }: { charities: Charity[]; l
           const cause = causeList().find((x) => x.id === c.causeId)?.label;
           const kicker = [cause, c.area].filter(Boolean).join(" · ");
           return (
-            <PressableScale key={c.slug} onPress={() => router.push(`/charity/${c.slug}`)} accessibilityRole="button" accessibilityLabel={`${c.nameEn}. ${c.cause}`} style={{ ...styles.card, width: cardW }} to={0.98}>
+            <PressableScale
+              key={c.slug}
+              onPress={() => router.push(`/charity/${c.slug}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`${c.nameEn}. ${c.cause}`}
+              // The Save and Give buttons inside the card are offered as actions on it, so screen readers reach them.
+              accessibilityActions={[
+                { name: "save", label: on ? `Remove ${c.nameEn} from your saved charities` : `Save ${c.nameEn}` },
+                { name: "give", label: `Give to ${c.nameEn}` },
+              ]}
+              onAccessibilityAction={(e) => {
+                if (e.nativeEvent.actionName === "save") void saved.toggle(c.slug);
+                if (e.nativeEvent.actionName === "give") onGive(c);
+              }}
+              style={{ ...styles.card, width: cardW }}
+              to={0.98}
+            >
               <CharityImage charity={c} live={live} rounded={false} bare veil style={StyleSheet.absoluteFill} />
               <LinearGradient colors={[colors.inkClear, colors.inkVeil]} locations={[0.35, 1]} style={StyleSheet.absoluteFill} pointerEvents="none" />
               <CheckedBadge issues18a={c.issues18a} style={styles.badge} />

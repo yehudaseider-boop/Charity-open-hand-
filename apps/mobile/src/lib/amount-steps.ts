@@ -20,6 +20,10 @@ export function stepSize(cents: number): number {
 export function stepAmount(cents: number | null, dir: 1 | -1, min: number, max: number | null): number | null {
   if (cents === null || !Number.isFinite(cents) || cents <= 0) return null;
   const c = Math.round(cents);
+  const floor = Math.max(min, 1);
+  // Typed below the smallest gift, up goes to the smallest; typed above the largest, down goes to the largest.
+  if (dir === 1 && c < floor) return max === null || floor <= max ? floor : null;
+  if (dir === -1 && max !== null && c > max) return max;
   let next: number;
   if (dir === 1) {
     const s = stepSize(c);
@@ -29,7 +33,7 @@ export function stepAmount(cents: number | null, dir: 1 | -1, min: number, max: 
     const s = stepSize(c - 1);
     next = (Math.ceil(c / s) - 1) * s;
   }
-  if (next < Math.max(min, 1)) return null;
+  if (next < floor) return null;
   if (max !== null && next > max) return null;
   return next;
 }
@@ -48,4 +52,20 @@ export function amountFromParam(v: unknown): number | null {
   if (typeof s !== "string" || !/^[0-9]{1,9}$/.test(s)) return null;
   const n = Number(s);
   return n > 0 ? n : null;
+}
+
+/**
+ * A link from outside the app (a web page, a message) must not choose the amount or make a gift monthly: only the
+ * app's own "Make it monthly?" passes those, and it does so inside the app, not through a link (review of 11/11/2026).
+ * Takes the path a system link opens and returns it without `amount` and `monthly` on give screens.
+ */
+export function stripGivePrefill(path: string): string {
+  const q = path.indexOf("?");
+  if (q === -1 || !/(^|\/)give\//.test(path.slice(0, q))) return path;
+  const params = new URLSearchParams(path.slice(q + 1));
+  if (!params.has("amount") && !params.has("monthly")) return path;
+  params.delete("amount");
+  params.delete("monthly");
+  const rest = params.toString();
+  return rest ? `${path.slice(0, q)}?${rest}` : path.slice(0, q);
 }

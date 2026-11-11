@@ -295,7 +295,7 @@ function Habits({ gifts }: { gifts: Gift[] }) {
   const pct = (n: number) => (s.total > 0 ? Math.round((n * 100) / s.total) : 0);
   return (
     <View style={styles.card}>
-      <Text variant="h2" accessibilityRole="header" style={styles.cardTitle}>s18A and habits</Text>
+      <Text variant="h2" accessibilityRole="header" style={styles.cardTitle}>s18A receipts and habits</Text>
       <View style={styles.tiles}>
         <View style={styles.tile}>
           <Text variant="label">With an s18A receipt</Text>

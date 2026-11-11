@@ -124,7 +124,7 @@ export default function Account() {
             {/* The two places people come back to, as big tiles rather than list rows. */}
             <View style={styles.tiles}>
               <Tile label="Your progress" icon={<GivingIcon color={colors.blue} size={26} />} tint={colors.lilacSoft} onPress={() => router.push("/giving")} />
-              <Tile label="Receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.peach} onPress={() => router.push("/receipts")} />
+              <Tile label="s18A receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.peach} onPress={() => router.push("/receipts")} />
             </View>
             <InsightsLink />
             {account.demo ? (
