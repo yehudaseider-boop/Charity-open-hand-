@@ -56,7 +56,7 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
         title="Annual report"
         intro={
           <>
-            <span className="[overflow-wrap:anywhere]">{charity.name_en}</span> · {taxYearLabel(year)}
+            <span className="[overflow-wrap:anywhere]"><bdi>{charity.name_en}</bdi></span> · {taxYearLabel(year)}
             {r.running ? `, so far (to ${formatDate(now)})` : ""}
           </>
         }
@@ -155,7 +155,7 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
       )}
 
       <p className="text-xs text-muted">
-        From Givezy&apos;s records of donations paid to {charity.name_en} through Givezy, on {formatDate(now)}. Donations made outside Givezy are not included.
+        From Givezy&apos;s records of donations paid to <bdi>{charity.name_en}</bdi> through Givezy, on {formatDate(now)}. Donations made outside Givezy are not included.
       </p>
     </div>
   );

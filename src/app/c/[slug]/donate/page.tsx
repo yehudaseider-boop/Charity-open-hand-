@@ -53,12 +53,12 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="space-y-2">
-        <Link href={withSource(`/c/${charity.slug}`, sourceTag(sp.src))} className="inline-flex min-h-11 max-w-full items-center text-sm font-semibold text-brand underline underline-offset-4"><span className="truncate">← {charity.name_en}</span></Link>
-        <h1 className="text-[clamp(2rem,5vw,2.75rem)] leading-[1.05] text-balance">Give to {charity.name_en}</h1>
+        <Link href={withSource(`/c/${charity.slug}`, sourceTag(sp.src))} className="inline-flex min-h-11 max-w-full items-center text-sm font-semibold text-brand underline underline-offset-4"><span className="truncate">← <bdi>{charity.name_en}</bdi></span></Link>
+        <h1 className="text-[clamp(2rem,5vw,2.75rem)] leading-[1.05] text-balance">Give to <bdi>{charity.name_en}</bdi></h1>
       </div>
       {campaign && charity.acceptingPayments ? <CampaignProgress campaign={campaign} compact /> : null}
       {typeof sp.campaign === "string" && !campaign ? (
-        <Card><p className="text-sm">That campaign has ended. You can still give to {charity.name_en} below.</p></Card>
+        <Card><p className="text-sm">That campaign has ended. You can still give to <bdi>{charity.name_en}</bdi> below.</p></Card>
       ) : null}
       {charity.acceptingPayments ? (
         <DonateFlow
@@ -80,7 +80,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           singleAgreementTick={platformConfig.checkout.singleAgreementTick}
         />
       ) : (
-        <Card><p className="text-sm">{charity.name_en} isn&apos;t taking online donations yet.</p></Card>
+        <Card><p className="text-sm"><bdi>{charity.name_en}</bdi> isn&apos;t taking online donations yet.</p></Card>
       )}
     </div>
   );

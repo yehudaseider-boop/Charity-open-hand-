@@ -111,7 +111,7 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
                       <input type="checkbox" name="d" value={d.donorId} aria-label={`Choose ${d.name} for the win-back journey`} className="mt-1 size-5 shrink-0 accent-brand" />
                     ) : null}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-indigo" dir="auto">{d.name}</p>
+                      <p className="truncate font-semibold text-indigo" dir="auto"><bdi>{d.name}</bdi></p>
                       {d.email ? <p className="break-all text-muted">{d.email}</p> : null}
                       {d.phone ? <p className="text-muted">{d.phone}</p> : null}
                     </div>
@@ -127,7 +127,7 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
                   {d.donorId ? (
                     <p className="mt-3">
                       <Link href={`${base}/donors/${d.donorId}`} className="font-semibold text-brand underline-offset-2 hover:underline focus-visible:underline">
-                        Open this donor&apos;s page<span className="sr-only">: <span dir="auto">{d.name}</span></span> →
+                        Open this donor&apos;s page<span className="sr-only">: <span dir="auto"><bdi>{d.name}</bdi></span></span> →
                       </Link>
                     </p>
                   ) : null}

@@ -174,7 +174,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{r.reference}</p>
-                  <p>{r.charity_name}</p>
+                  <p><bdi>{r.charity_name}</bdi></p>
                   <p className="text-muted">Donor: {r.donor_name}</p>
                   <p className="text-muted">{taxYearLabel(r.tax_year)}</p>
                   <p className="text-muted">Issued {formatDate(r.issued_at)}</p>

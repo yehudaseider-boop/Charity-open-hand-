@@ -92,7 +92,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
     <div className="space-y-4">
       <div>
         <Link href="/admin/charities" className="text-sm text-muted">← Charities</Link>
-        <h1 className="mt-1 font-display text-2xl text-indigo">{charity.name_en}</h1>
+        <h1 className="mt-1 font-display text-2xl text-indigo"><bdi>{charity.name_en}</bdi></h1>
         <div className="mt-2 flex flex-wrap gap-2">
           <Badge tone={status.tone}>{status.label}</Badge>
           {badges.verified ? <Badge tone="brand">Verified</Badge> : null}
@@ -158,7 +158,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
                 <img src={publicImageUrl(charity.cover_path)!} alt="Cover" className="h-16 w-28 rounded-control border border-border object-cover" />
               ) : <span className="text-muted">No cover photo.</span>}
             </div>
-            <div><p className="font-medium">Public name</p><p>{charity.name_en}</p></div>
+            <div><p className="font-medium">Public name</p><p><bdi>{charity.name_en}</bdi></p></div>
             {charity.description_en ? <div><p className="font-medium">About</p><p className="whitespace-pre-line">{charity.description_en}</p></div> : null}
             {charity.funds_use_en ? <div><p className="font-medium">How donations are used</p><p className="whitespace-pre-line">{charity.funds_use_en}</p></div> : null}
             {charity.website ? <div><p className="font-medium">Website</p><p className="break-all">{charity.website}</p></div> : null}

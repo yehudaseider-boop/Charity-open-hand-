@@ -87,7 +87,7 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
         Nothing was charged.
       </p>
       <dl className="mt-4 space-y-1.5 rounded-control border-2 border-border p-4 text-[15px] tabular-nums">
-        <div className="flex justify-between gap-3"><dt className="min-w-0">Monthly donation to {offer.charityName}</dt><dd className="whitespace-nowrap font-semibold">{formatRand(offer.amountCents)}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="min-w-0">Monthly donation to <bdi>{offer.charityName}</bdi></dt><dd className="whitespace-nowrap font-semibold">{formatRand(offer.amountCents)}</dd></div>
         {offer.contributionCents > 0 ? (
           <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(offer.contributionCents)}</dd></div>
         ) : null}

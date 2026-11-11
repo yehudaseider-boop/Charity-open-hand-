@@ -102,7 +102,7 @@ function Peek({ donor, href }: { donor: DonorPeek; href: string }) {
   return (
     <>
       <div>
-        <h2 className="font-display text-2xl font-bold text-indigo [overflow-wrap:anywhere]">{donor.name}</h2>
+        <h2 className="font-display text-2xl font-bold text-indigo [overflow-wrap:anywhere]"><bdi>{donor.name}</bdi></h2>
         {donor.email ? <p className="break-all text-muted">{donor.email}</p> : null}
         {donor.phone ? <p className="text-muted">{donor.phone}</p> : null}
         <div className="mt-2 flex flex-wrap gap-1.5">

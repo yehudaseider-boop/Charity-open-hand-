@@ -96,7 +96,7 @@ export function ReminderForm({ action, allIds, charityName, max }: { action: Act
       <div className="space-y-1">
         <h2 className="font-display text-lg font-bold text-indigo">Remind to add their details</h2>
         <p className="text-muted">
-          Each chosen donor gets one email from {charityName}, sent by Givezy, saying what is still needed and where to add it. You never see their ID or registration number.
+          Each chosen donor gets one email from <bdi>{charityName}</bdi>, sent by Givezy, saying what is still needed and where to add it. You never see their ID or registration number.
           {WEEKLY_LIMIT} Anyone who had a message from you this week, turned off your emails or has added their details since is skipped.
         </p>
       </div>

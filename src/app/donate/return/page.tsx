@@ -126,7 +126,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
       <Result
         tone="paid"
         title="Thank you"
-        lead={<>{formatRand(d.amount_cents)} to {charity.name_en}{d.recurring_id ? ", every month" : ""}</>}
+        lead={<>{formatRand(d.amount_cents)} to <bdi>{charity.name_en}</bdi>{d.recurring_id ? ", every month" : ""}</>}
       >
         {/* The gift is confirmed: forget the kept form details, so the next person at this computer starts blank. */}
         <ClearFormDraft formKey={`donate:${charity.slug}`} />
@@ -147,7 +147,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           </div>
         ) : null}
         <dl className="space-y-1.5 rounded-control border-2 border-border p-4 text-[15px] tabular-nums">
-          <div className="flex justify-between gap-3"><dt>Donation to {charity.name_en}</dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
+          <div className="flex justify-between gap-3"><dt>Donation to <bdi>{charity.name_en}</bdi></dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
             <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
           ) : null}
@@ -204,7 +204,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             // A first-time donor isn't signed in: show where this gift is kept, the same way the account page puts it.
             <Link href="/login?next=%2Faccount" className="inline-flex min-h-12 items-center rounded-full bg-brand px-5 font-semibold text-brand-contrast transition-colors hover:bg-navy">See this gift in your account</Link>
           )}
-          <Link href={`/c/${charity.slug}`} className="inline-flex min-h-12 max-w-full items-center rounded-full border-2 border-border px-5 font-semibold text-brand transition-colors hover:border-brand"><span className="truncate">Back to {charity.name_en}</span></Link>
+          <Link href={`/c/${charity.slug}`} className="inline-flex min-h-12 max-w-full items-center rounded-full border-2 border-border px-5 font-semibold text-brand transition-colors hover:border-brand"><span className="truncate">Back to <bdi>{charity.name_en}</bdi></span></Link>
         </p>
         {viewer ? null : <p className="mt-2 text-sm text-muted">Sign in with the same email address you gave with.</p>}
       </Result>
@@ -263,7 +263,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Result tone="neutral" title="This donation was refunded">
         <p>The money went back to your card, so nothing is owed on this donation. The confirmation email you got for it no longer applies.</p>
-        {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Back to {charity.name_en}</Link> : <Link href={elsewhere.href} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>}
+        {charity ? <Link href={`/c/${charity.slug}`} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">Back to <bdi>{charity.name_en}</bdi></Link> : <Link href={elsewhere.href} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>}
         <p className="mt-4 text-sm text-muted">Questions: <HelpLine /></p>
       </Result>
     );

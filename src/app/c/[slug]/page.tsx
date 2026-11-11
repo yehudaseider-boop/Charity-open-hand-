@@ -136,13 +136,13 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
             </div>
           )}
           <div className="min-w-0 flex-[1_1_16rem] pt-2">
-            <h1 className="text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.05] text-balance">{charity.name_en}</h1>
+            <h1 className="text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.05] text-balance"><bdi>{charity.name_en}</bdi></h1>
             {area ? <p className="mt-1 text-muted">{area}</p> : null}
           </div>
         </header>
         <div className="mt-4 flex flex-wrap gap-2 px-4 sm:px-8">
           <CharityBadges charity={charity} />
-          {categories.map((c) => <Badge key={c.name_en}>{c.name_en}</Badge>)}
+          {categories.map((c) => <Badge key={c.name_en}><bdi>{c.name_en}</bdi></Badge>)}
         </div>
         {focus ? <div className="mt-6"><FocusCard focus={focus} giveHref={focusGive} toCampaign={Boolean(focusFor)} /></div> : null}
       </div>
@@ -167,11 +167,11 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
               <Link id="give-button" href={give} aria-label={`Give to ${charity.name_en}`} className="pressable flex w-full min-w-0 flex-col items-center rounded-control bg-coral px-4 py-3.5 text-center text-navy">
                 {/* "Give" stays big; the name sits on one smaller line, so a long name never makes a giant button. */}
                 <span className="text-lg font-bold leading-tight">Give</span>
-                <span className="block w-full min-w-0 truncate text-sm font-semibold">to {charity.name_en}</span>
+                <span className="block w-full min-w-0 truncate text-sm font-semibold">to <bdi>{charity.name_en}</bdi></span>
               </Link>
             ) : (
               <p className="rounded-control bg-honey-soft p-4 text-center text-muted">
-                Online giving to {charity.name_en} opens soon.
+                Online giving to <bdi>{charity.name_en}</bdi> opens soon.
               </p>
             )}
             <ul className="space-y-2 text-sm">

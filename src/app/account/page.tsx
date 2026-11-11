@@ -214,7 +214,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
               const charity = (Array.isArray(m.charities) ? m.charities[0] : m.charities) as { name_en: string; slug: string } | null;
               return (
                 <li key={m.id} className="rounded-control border-2 border-border p-3 text-sm">
-                  <p className="font-medium">{charity ? <Link href={`/c/${charity.slug}`} className="underline underline-offset-4">{charity.name_en}</Link> : "Charity"}: {formatRand(Number(m.amount_cents) + Number(m.contribution_cents))} a month</p>
+                  <p className="font-medium">{charity ? <Link href={`/c/${charity.slug}`} className="underline underline-offset-4"><bdi>{charity.name_en}</bdi></Link> : "Charity"}: {formatRand(Number(m.amount_cents) + Number(m.contribution_cents))} a month</p>
                   <p className="text-muted">
                     {m.status === "active" && m.failed_attempts > 0 ? "Your card was declined this month. We'll try it again, or you can put in a new card. " : null}
                     {m.status === "active" && m.next_charge_at ? `${m.failed_attempts > 0 ? "Next try" : "Next payment"} on ${formatDate(m.next_charge_at)}` : null}
@@ -255,7 +255,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{r.reference}</p>
-                    <p className="text-muted">{r.charity_name}</p>
+                    <p className="text-muted"><bdi>{r.charity_name}</bdi></p>
                     <p className="text-muted">{taxYearLabel(r.tax_year)}</p>
                     <p className="text-muted">Issued {formatDate(r.issued_at)}</p>
                   </div>

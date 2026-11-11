@@ -96,7 +96,7 @@ export async function PosterView({ name, slug, issues18a, sp, backHref, demoHref
       {/* The poster itself: what prints. */}
       <section className="mx-auto max-w-md space-y-5 rounded-card border border-border bg-surface p-8 text-center print:max-w-none print:border-0 print:p-0">
         <p className="text-base font-semibold text-muted print:text-xl">{ask}</p>
-        <h2 className="text-3xl font-semibold leading-tight text-indigo print:text-5xl">{charity.name_en}</h2>
+        <h2 className="text-3xl font-semibold leading-tight text-indigo print:text-5xl"><bdi>{charity.name_en}</bdi></h2>
         <div
           className="mx-auto w-64 print:w-[11cm]"
           role="img"

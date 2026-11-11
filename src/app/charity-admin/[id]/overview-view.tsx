@@ -97,7 +97,7 @@ export function OverviewView(p: OverviewProps) {
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div>
           <h1 className="font-display text-3xl font-bold text-indigo">Overview</h1>
-          <p className="mt-1 text-sm text-muted">{weekday} {formatDate(now.toISOString())}. Here is what is happening at {charityName}.</p>
+          <p className="mt-1 text-sm text-muted">{weekday} {formatDate(now.toISOString())}. Here is what is happening at <bdi>{charityName}</bdi>.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`${base}/poster`} className={pill}>Print a QR poster</Link>

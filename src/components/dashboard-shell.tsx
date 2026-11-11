@@ -46,7 +46,7 @@ export function DashboardShell({
         <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain print:hidden">
           <div className="rounded-card border-2 border-border bg-surface p-4">
             <p className="text-xs font-bold text-muted">Charity dashboard</p>
-            <p className="mt-0.5 font-display text-lg font-bold leading-snug text-indigo [overflow-wrap:anywhere]">{charity.name_en}</p>
+            <p className="mt-0.5 font-display text-lg font-bold leading-snug text-indigo [overflow-wrap:anywhere]"><bdi>{charity.name_en}</bdi></p>
             <span className={`mt-2 inline-block rounded-full border-2 px-2.5 py-0.5 text-xs font-semibold ${statusChip[status.tone]}`}>{status.label}</span>
           </div>
           <div className="lg:rounded-card lg:border-2 lg:border-border lg:bg-surface lg:p-3">
@@ -80,7 +80,7 @@ export function DashboardShell({
           </div>
           {asGivezy ? (
             <p role="note" className="rounded-card border-2 border-honey bg-honey-soft p-4 text-sm text-navy print:hidden">
-              You&apos;re looking at {charity.name_en}&apos;s dashboard as Givezy, with the owner&apos;s powers. Anything you save, send or remove here is real.{" "}
+              You&apos;re looking at <bdi>{charity.name_en}</bdi>&apos;s dashboard as Givezy, with the owner&apos;s powers. Anything you save, send or remove here is real.{" "}
               <Link href={`/admin/charities/${id}`} className="font-semibold underline">Back to Givezy admin</Link>
             </p>
           ) : null}

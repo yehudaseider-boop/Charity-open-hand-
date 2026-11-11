@@ -161,7 +161,7 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
                       <td className={`${table.td} whitespace-nowrap`}><Badge tone={st.tone}>{st.label}</Badge></td>
                       <td className={table.td}>
                         <Link href={`${base}/donations/${g.id}`} className="flex min-w-0 items-center gap-2.5 font-semibold text-indigo after:absolute after:inset-0 group-hover:text-brand group-hover:underline">
-                          <Avatar name={d.name} i={i} /><span className="truncate">{d.name}</span>
+                          <Avatar name={d.name} i={i} /><span className="truncate"><bdi>{d.name}</bdi></span>
                         </Link>
                       </td>
                       <td className={`${table.td} max-w-[11rem] truncate`}>{campaignTitle(data, g.campaignId)}{g.recurringId ? <span className="block text-xs text-muted">Monthly donation</span> : null}</td>
@@ -206,7 +206,7 @@ export function DemoDonation({ data, id }: { data: DemoData; id: string }) {
       <PageHeader
         back={<Link href={`${base}/donations`} className="font-semibold text-muted hover:text-brand">← Donations</Link>}
         title={formatRand(g.amountCents)}
-        intro={<span className="inline-flex flex-wrap items-center gap-2"><Badge tone={st.tone}>{st.label}</Badge>from {d.name} on {formatDate(g.paidAt)}</span>}
+        intro={<span className="inline-flex flex-wrap items-center gap-2"><Badge tone={st.tone}>{st.label}</Badge>from <bdi>{d.name}</bdi> on {formatDate(g.paidAt)}</span>}
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Donation">
@@ -223,7 +223,7 @@ export function DemoDonation({ data, id }: { data: DemoData; id: string }) {
         </Card>
         <Card lights title="Donor">
           <Link href={`${base}/donors/${d.id}`} className={rowLink}>
-            <span className="flex min-w-0 items-center gap-3"><Avatar name={d.name} i={0} /><span className="min-w-0"><span className="block truncate font-semibold text-indigo group-hover:text-brand">{d.name}</span><span className="block truncate text-xs text-muted">{d.email}</span></span></span>
+            <span className="flex min-w-0 items-center gap-3"><Avatar name={d.name} i={0} /><span className="min-w-0"><span className="block truncate font-semibold text-indigo group-hover:text-brand"><bdi>{d.name}</bdi></span><span className="block truncate text-xs text-muted">{d.email}</span></span></span>
             <span className="shrink-0 text-sm font-semibold text-brand">Open <span aria-hidden>→</span></span>
           </Link>
         </Card>

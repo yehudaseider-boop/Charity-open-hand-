@@ -267,7 +267,7 @@ export function DonateFlow({
                   changed();
                 }}
               />
-              <span>Cover the card charge, so {charityName} gets your full donation. Optional. The total below includes it.</span>
+              <span>Cover the card charge, so <bdi>{charityName}</bdi> gets your full donation. Optional. The total below includes it.</span>
             </label>
           </div>
         ) : null}
@@ -394,7 +394,7 @@ export function DonateFlow({
             {/* Hidden, not removed, so unticking and ticking again keeps what was typed. Disabled, it isn't sent. */}
             <fieldset hidden={!want18a} disabled={!want18a} className="space-y-3">
               <p className="text-sm text-muted">
-                You&apos;ll get one s18A receipt for all your donations to {charityName} each tax year. SARS needs {org ? "the registration number" : "your SA ID number"} and {org ? "the registered" : "your"} address on it.
+                You&apos;ll get one s18A receipt for all your donations to <bdi>{charityName}</bdi> each tax year. SARS needs {org ? "the registration number" : "your SA ID number"} and {org ? "the registered" : "your"} address on it.
               </p>
               <fieldset className="space-y-1 text-sm">
                 <legend className="sr-only">When to add your s18A details</legend>
@@ -462,7 +462,7 @@ export function DonateFlow({
           </div>
         ) : (
           <p className="rounded-control bg-warning-soft p-4 text-sm font-semibold text-warning">
-            {charityName} is not s18A-approved, so this donation won&apos;t get a tax receipt.
+            <bdi>{charityName}</bdi> is not s18A-approved, so this donation won&apos;t get a tax receipt.
           </p>
         )}
 
@@ -524,14 +524,14 @@ export function DonateFlow({
         <div className="space-y-3">
           <Check name="is_anonymous">
             Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
-            <span className="text-muted">{charityName} still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
+            <span className="text-muted"><bdi>{charityName}</bdi> still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
           </Check>
           <Check name="no_news">
-            Don&apos;t send me news or appeals from {charityName}. <span className="text-muted">You&apos;ll still get your confirmation{receiptsAvailable ? " and s18A receipt" : ""}.</span>
+            Don&apos;t send me news or appeals from <bdi>{charityName}</bdi>. <span className="text-muted">You&apos;ll still get your confirmation{receiptsAvailable ? " and s18A receipt" : ""}.</span>
           </Check>
           {singleAgreementTick ? (
             <Check name="agreement" error={state.fieldErrors?.agreement}>
-              I&apos;m 18 or older{org ? " and allowed to give on behalf of this organisation," : ""} and I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they
+              I&apos;m 18 or older{org ? " and allowed to give on behalf of this organisation," : ""} and I agree to <TermsAndPrivacyLinks />, and that my details are shared with <bdi>{charityName}</bdi> so they
               can record my donation.
             </Check>
           ) : (
@@ -540,7 +540,7 @@ export function DonateFlow({
                 I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
               </Check>
               <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
-                I agree to <TermsAndPrivacyLinks />, and that my details are shared with {charityName} so they can record my
+                I agree to <TermsAndPrivacyLinks />, and that my details are shared with <bdi>{charityName}</bdi> so they can record my
                 donation. Givezy keeps any label I give it privately, for my own records.
               </Check>
             </>
@@ -574,7 +574,7 @@ export function DonateFlow({
             {state.failedToStart ? <p className="text-muted">If it keeps happening: <SupportContact />.</p> : null}
             {state.campaignEnded && quote ? (
               <a href={`/c/${slug}/donate?${new URLSearchParams({ cents: String(quote.amountCents), ...(fromApp ? { from: "app" } : {}), ...(source ? { [SOURCE_PARAM]: source } : {}), ...(initialLabel ? { label: initialLabel } : {}) }).toString()}`} className="inline-block font-bold text-brand underline underline-offset-4">
-                Give {formatRand(quote.amountCents)} to {charityName} instead
+                Give {formatRand(quote.amountCents)} to <bdi>{charityName}</bdi> instead
               </a>
             ) : null}
           </div>
@@ -589,10 +589,10 @@ export function DonateFlow({
 function Breakdown({ q, charityName, monthly }: { q: Quote; charityName: string; monthly: boolean }) {
   return (
     <dl className="space-y-1.5 rounded-control bg-honey-soft p-4 text-[15px] tabular-nums">
-      <div className="flex justify-between gap-3"><dt className="min-w-0">Donation to {charityName}</dt><dd className="shrink-0">{formatRand(q.amountCents)}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="min-w-0">Donation to <bdi>{charityName}</bdi></dt><dd className="shrink-0">{formatRand(q.amountCents)}</dd></div>
       <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd className="shrink-0">{contributionLabel(q.contributionCents, monthly)}</dd></div>
       {q.cardChargeCents > 0 ? (
-        <div className="flex justify-between gap-3"><dt className="min-w-0">Card charge, so {charityName} gets the full {formatRand(q.amountCents)}</dt><dd className="shrink-0">{formatRand(q.cardChargeCents)}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="min-w-0">Card charge, so <bdi>{charityName}</bdi> gets the full {formatRand(q.amountCents)}</dt><dd className="shrink-0">{formatRand(q.cardChargeCents)}</dd></div>
       ) : null}
       <div className="flex justify-between gap-3 border-t-2 border-border pt-2 text-lg font-bold"><dt>{monthly ? "Total each month" : "Total"}</dt><dd className="shrink-0">{formatRand(q.totalCents)}</dd></div>
     </dl>

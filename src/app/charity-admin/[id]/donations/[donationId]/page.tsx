@@ -83,7 +83,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
 
       <Card title="Donor">
         <dl>
-          <Row label="Name">{donorName(d)}</Row>
+          <Row label="Name"><bdi>{donorName(d)}</bdi></Row>
           {d.is_anonymous ? <Row label="Anonymous">Not shown on public pages. You see the details because you need them to record the donation.</Row> : null}
           {d.contact_person ? <Row label="Contact person">{d.contact_person}</Row> : null}
           {d.registration_number ? <Row label="Registration number">{d.registration_number}</Row> : null}

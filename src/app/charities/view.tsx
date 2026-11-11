@@ -241,7 +241,7 @@ function CauseOfTheWeek({ charity: c, causes }: { charity: Row; causes: string[]
               <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-coral" />
               Cause of the week
             </p>
-            <h2 id="cause-of-the-week" dir="auto" className="font-display text-[clamp(1.875rem,4.4vw,3rem)] font-extrabold leading-[1.04] text-white!">{c.name_en}</h2>
+            <h2 id="cause-of-the-week" dir="auto" className="font-display text-[clamp(1.875rem,4.4vw,3rem)] font-extrabold leading-[1.04] text-white!"><bdi>{c.name_en}</bdi></h2>
             {c.description_en ? <p dir="auto" className="line-clamp-3 max-w-[34rem] text-[17px] leading-relaxed text-white/90">{c.description_en}</p> : null}
             <div className="flex flex-wrap gap-2">
               <CharityBadges charity={c} />

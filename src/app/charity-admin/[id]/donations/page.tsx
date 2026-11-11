@@ -192,7 +192,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
                 <li key={d.id} className="py-1 first:pt-0 last:pb-0">
                   <Link href={`${base}/${d.id}`} className={`${rowLink} items-start text-sm`}>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-indigo group-hover:text-brand group-hover:underline">{donorName(d)}</p>
+                      <p className="truncate font-semibold text-indigo group-hover:text-brand group-hover:underline"><bdi>{donorName(d)}</bdi></p>
                       <p className="text-muted">{formatDate(d.paid_at ?? d.created_at)}</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         <Badge tone={s.tone}>{s.label}</Badge>
