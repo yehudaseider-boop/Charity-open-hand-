@@ -1,5 +1,7 @@
 video.built.html
+v2.built.html
 *.mp4
 *.mp3
+*.wav
 still-*.png
 shots/

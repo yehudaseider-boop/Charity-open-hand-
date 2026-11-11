@@ -1,6 +1,6 @@
 // Builds docs/dashboard-video/video.built.html: video.html with the fonts, logo and the captured dashboard screens
 // embedded, so the browser needs nothing from the network. Run from the repo root, after capture.mjs:
-//   node docs/dashboard-video/build.mjs   then   node docs/dashboard-video/render.mjs
+//   node docs/dashboard-video/build.mjs [v2.html]   then   node docs/dashboard-video/render.mjs [out.mp4] [--page v2.built.html]
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -15,11 +15,13 @@ const fonts = [
 
 const shots = readdirSync(join(dir, "shots")).filter((f) => f.endsWith(".png")).map((f) => f.replace(".png", ""));
 const src = (n) => `data:image/png;base64,${b64(`docs/dashboard-video/shots/${n}.png`)}`;
-let html = readFileSync(join(dir, "video.html"), "utf8")
+// Which page: video.html (first cut) by default, or another, e.g. node build.mjs v2.html
+const page = process.argv[2] ?? "video.html";
+let html = readFileSync(join(dir, page), "utf8")
   .replace("/*FONTS*/", fonts)
   .replace("%SHOTS_JSON%", readFileSync(join(dir, "shots", "shots.json"), "utf8"))
   .replace("%SHOT_IMGS%", shots.filter((n) => n !== "thank-typed").map((n) => `<img class="shot" data-n="${n}" src="${src(n)}" alt="">`).join("\n"))
-  .replaceAll("%SHOT_thank-typed%", src("thank-typed"))
+  .replace(/%SHOT_([a-z-]+)%/g, (_, n) => src(n))
   .replaceAll("%LOGO%", `data:image/png;base64,${b64("public/logo.png")}`)
   .replaceAll("%SPLASH%", `data:image/png;base64,${b64("public/brand/splash.png")}`);
 if (/%[A-Za-z_-]+%/.test(html)) throw new Error("A placeholder was not filled: " + html.match(/%[A-Za-z_-]+%/)[0]);
@@ -30,5 +32,6 @@ const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const said = [...script.matchAll(/"([^"]*<b>[^"]*|[A-Z][^"]{12,})"/g)].map((m) => m[1]).join(" ");
 if (/—/.test(words + said)) throw new Error("An em dash slipped in.");
 if (/!/.test(words.replace(/<!doctype html>/i, "") + said)) throw new Error("An exclamation mark slipped in.");
-writeFileSync(join(dir, "video.built.html"), html);
-console.log("video.built.html written,", (html.length / 1e6).toFixed(2), "MB");
+const outName = page.replace(".html", ".built.html");
+writeFileSync(join(dir, outName), html);
+console.log(outName, "written,", (html.length / 1e6).toFixed(2), "MB");

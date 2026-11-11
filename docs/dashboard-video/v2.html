@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en-ZA"><head><meta charset="utf-8"><title>Givezy dashboard, v2</title>
+<style>
+/*FONTS*/
+:root { --ink:#0E1B3D; --blue:#1749B5; --blue-edge:#0F358A; --orange:#FF8A3D; --orange-edge:#D9621C; --lavender:#C9B4FA; --purple:#E5D9FF; --line:#ECE8F6; --lilac:#F4F1FF; --peach:#FFEBDD; --slate:#4A5878; --sage:#3E8E6A; --sage-soft:#E3F2EA; --amber:#FBEFD2; --amber-ink:#7A5A12; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #fff; }
+body { font-family: "DM Sans", Arial, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #fff; }
+.sc { position: absolute; inset: 0; overflow: hidden; display: none; perspective: 2200px; }
+.a { position: absolute; left: 0; top: 0; will-change: transform; }
+.d { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.dot { border-radius: 50%; }
+.ring { border-radius: 50%; border-style: solid; background: transparent; }
+.card { background: #fff; border-radius: 28px; box-shadow: 0 40px 90px rgba(14,27,61,.20), 0 0 0 2px rgba(14,27,61,.04); }
+.pill { display: inline-flex; align-items: center; gap: 10px; border-radius: 40px; font-weight: 700; white-space: nowrap; }
+.ov { background-image: url(%SHOT_overview%); background-size: 1440px 900px; background-repeat: no-repeat; }
+.av { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--blue); flex: none; }
+.badge { font-size: 17px; font-weight: 700; border-radius: 20px; padding: 4px 12px; }
+.hl { white-space: nowrap; }
+.w { display: inline-block; }
+.mask { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: 0.08em; }
+.phone { width: 400px; height: 840px; border-radius: 62px; background: var(--ink); padding: 14px; box-shadow: 0 60px 120px rgba(14,27,61,.35); }
+.screen { width: 372px; height: 812px; border-radius: 50px; background: #fff; overflow: hidden; position: relative; }
+.row { display: flex; align-items: center; gap: 18px; height: 78px; padding: 0 28px; border-bottom: 2px solid var(--line); background: #fff; font-size: 21px; }
+.chip { font-size: 18px; font-weight: 700; border-radius: 16px; padding: 10px 18px; background: var(--lilac); color: var(--blue); border: 2px solid var(--purple); }
+.btn { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; border-radius: 20px; }
+.btn-blue { background: var(--blue); color: #fff; box-shadow: 0 6px 0 var(--blue-edge); }
+.btn-orange { background: var(--orange); color: var(--ink); box-shadow: 0 7px 0 var(--orange-edge); }
+.shot { background-size: cover; border-radius: 22px; box-shadow: 0 30px 70px rgba(0,0,0,.35); }
+</style></head>
+<body><div id="stage">
+
+<!-- 1 Hook: the old way -->
+<section class="sc" id="s1" style="background:var(--blue)">
+  <div class="a ring" id="h-ring" style="width:900px;height:900px;border-width:110px;border-color:rgba(201,180,250,.35)"></div>
+  <div class="a dot" id="h-dot" style="width:520px;height:520px;background:var(--orange)"></div>
+  <div id="h-pills"></div>
+  <div class="a d hl" id="h-w1" style="font-size:150px;color:#fff">Bank references.</div>
+  <div class="a d hl" id="h-w2" style="font-size:150px;color:#fff">Spreadsheets.</div>
+  <div class="a d hl" id="h-w3" style="font-size:150px;color:#fff">Receipts by hand.</div>
+  <div class="a dot" id="h-wipe" style="width:60px;height:60px;background:#fff"></div>
+</section>
+
+<!-- 2 Reveal: the dashboard assembles -->
+<section class="sc" id="s2" style="background:#fff">
+  <div class="a dot" id="r-b1" style="width:1100px;height:1100px;background:var(--lilac)"></div>
+  <div class="a dot" id="r-b2" style="width:700px;height:700px;background:var(--peach)"></div>
+  <img class="a" id="r-splash" src="%SPLASH%" style="width:260px" alt="">
+  <img class="a" id="r-logo" src="%LOGO%" style="height:120px" alt="">
+  <div class="a d hl" id="r-title" style="font-size:84px"><span class="mask"><span class="w" id="r-t1">Meet</span></span> <span class="mask"><span class="w" id="r-t2">your</span></span> <span class="mask"><span class="w" id="r-t3" style="color:var(--blue)">dashboard.</span></span></div>
+  <div class="a" id="r-world" style="width:1440px;height:900px;transform-style:preserve-3d">
+    <div class="a ov" id="r-base" style="width:1440px;height:900px;border-radius:26px;box-shadow:0 60px 140px rgba(14,27,61,.30)"></div>
+    <div class="a ov" id="r-l1" style="width:232px;height:800px;border-radius:24px;box-shadow:0 30px 60px rgba(14,27,61,.25)"></div>
+    <div class="a ov" id="r-l2" style="width:1128px;height:154px;border-radius:24px;box-shadow:0 30px 60px rgba(14,27,61,.25)"></div>
+    <div class="a ov" id="r-l3" style="width:1128px;height:203px;border-radius:24px;box-shadow:0 30px 60px rgba(14,27,61,.25)"></div>
+    <div class="a ov" id="r-l4" style="width:1128px;height:236px;border-radius:24px;box-shadow:0 30px 60px rgba(14,27,61,.25)"></div>
+  </div>
+</section>
+
+<!-- 3 One gift: phone to dashboard -->
+<section class="sc" id="s3" style="background:var(--lilac)">
+  <div class="a dot" id="g-b1" style="width:900px;height:900px;background:var(--peach)"></div>
+  <div class="a ring" id="g-r1" style="width:320px;height:320px;border-width:40px;border-color:var(--lavender)"></div>
+  <div class="a pill" id="g-kick" style="font-size:28px;padding:12px 26px;background:var(--orange);color:var(--ink);box-shadow:0 5px 0 var(--orange-edge)">Follow one gift</div>
+  <div class="a phone" id="g-phone"><div class="screen">
+    <div id="g-give" style="position:absolute;inset:0;padding:64px 28px 0">
+      <div style="font-size:17px;color:var(--slate);font-weight:600">Give to</div>
+      <div class="d" style="font-size:34px;margin-top:4px">Sample Charity</div>
+      <div class="d" id="g-amt" style="font-size:96px;margin-top:40px;color:var(--blue)">R350</div>
+      <div style="display:flex;gap:10px;margin-top:22px"><span class="chip" style="padding:10px 14px">R100</span><span class="chip" style="padding:10px 14px">R200</span><span class="chip" style="padding:10px 14px;background:var(--blue);color:#fff;border-color:var(--blue)">R350</span><span class="chip" style="padding:10px 14px">R500</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:34px;padding:20px 22px;border-radius:22px;background:var(--lilac)"><span style="font-size:20px;font-weight:700">Give every month</span><span style="width:62px;height:36px;border-radius:20px;background:var(--blue);position:relative"><span style="position:absolute;right:4px;top:4px;width:28px;height:28px;border-radius:50%;background:#fff"></span></span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:20px;font-size:18px;color:var(--slate)"><span style="width:26px;height:26px;border-radius:8px;background:var(--sage);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">&#10003;</span>s18A receipt for my tax</div>
+      <div style="position:absolute;left:28px;right:28px;bottom:54px;height:96px;border-radius:26px;background:var(--orange);box-shadow:0 7px 0 var(--orange-edge);overflow:hidden">
+        <div id="g-fill" style="position:absolute;left:0;top:0;bottom:0;width:0;background:#FFB27E"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800">Hold to give R350</div>
+      </div>
+    </div>
+    <div id="g-done" style="position:absolute;inset:0;background:var(--blue);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#fff;opacity:0">
+      <img src="%SPLASH%" style="width:150px" alt="">
+      <div class="d" style="font-size:46px">Thank you, Aisha.</div>
+      <div style="font-size:22px;color:var(--lavender)">R350 every month to Sample Charity</div>
+    </div>
+    <div id="g-mail" style="position:absolute;inset:0;background:#fff;padding:66px 28px 0;opacity:0">
+      <div style="font-size:16px;color:var(--slate);font-weight:600">Inbox</div>
+      <div style="margin-top:16px;padding:22px;border-radius:24px;background:var(--lilac);border:2px solid var(--purple)">
+        <div style="font-size:17px;color:var(--slate)">From Sample Charity</div>
+        <div class="d" style="font-size:30px;margin-top:14px">Dear Aisha,</div>
+        <div style="font-size:21px;line-height:1.45;margin-top:12px">Thank you for giving to us this month. It means a great deal to the whole team.</div>
+        <div style="font-size:19px;font-weight:700;margin-top:16px;color:var(--blue)">Sample Charity</div>
+      </div>
+    </div>
+  </div></div>
+  <div class="a dot" id="g-thumb" style="width:120px;height:120px;background:rgba(14,27,61,.18);border:4px solid rgba(14,27,61,.35)"></div>
+  <div id="g-burst"></div>
+  <div class="a pill" id="g-coin" style="font-size:30px;padding:16px 28px;background:var(--orange);color:var(--ink);box-shadow:0 0 0 10px rgba(255,138,61,.25),0 20px 40px rgba(217,98,28,.4)">R350</div>
+  <div class="a card" id="g-stat" style="width:560px;height:180px;background:var(--blue);color:#fff;padding:30px 36px;overflow:hidden">
+    <div class="a dot" style="width:200px;height:200px;left:420px;top:-60px;background:#6B7FE0;opacity:.7"></div>
+    <div style="font-size:22px;font-weight:600;position:relative">This month so far</div>
+    <div class="d" id="g-statn" style="font-size:72px;margin-top:10px;position:relative">R5 680</div>
+    <div id="g-stats" style="font-size:20px;margin-top:8px;color:var(--lavender);position:relative">13 donations · last month R9 730</div>
+  </div>
+  <div class="a card" id="g-list" style="width:820px;height:470px;overflow:hidden">
+    <div style="height:74px;display:flex;align-items:center;padding:0 28px;font-weight:700;font-size:24px;border-bottom:2px solid var(--line)">Donations</div>
+    <div id="g-rows" style="position:relative"></div>
+  </div>
+  <div class="a d hl" id="g-head" style="font-size:72px"><span class="mask"><span class="w" id="g-h1">Every</span></span> <span class="mask"><span class="w" id="g-h2">gift</span></span> <span class="mask"><span class="w" id="g-h3" style="color:var(--blue)">lands here.</span></span></div>
+</section>
+
+<!-- 4 Donor -->
+<section class="sc" id="s4" style="background:#fff">
+  <div class="a dot" id="d-b1" style="width:1000px;height:1000px;background:var(--lilac)"></div>
+  <div class="a ring" id="d-r1" style="width:260px;height:260px;border-width:34px;border-color:var(--lavender)"></div>
+  <div class="a d" id="d-head" style="font-size:96px;width:600px;line-height:1.02"><span class="mask"><span class="w" id="d-h1">Know</span></span><br><span class="mask"><span class="w" id="d-h2" style="color:var(--blue)">every</span></span><br><span class="mask"><span class="w" id="d-h3" style="color:var(--blue)">donor.</span></span></div>
+  <div class="a card" id="d-card" style="width:1000px;height:640px;padding:44px 48px;transform-style:preserve-3d">
+    <div style="display:flex;align-items:center;gap:26px">
+      <div class="av" style="width:110px;height:110px;font-size:40px;background:var(--purple)">AE</div>
+      <div><div class="d" style="font-size:58px">Aisha Example</div>
+        <div style="display:flex;gap:10px;margin-top:12px"><span class="badge" style="background:var(--sage-soft);color:var(--sage)">Running</span><span class="badge" style="background:var(--purple);color:var(--blue)">Asks for s18A receipts</span></div></div>
+    </div>
+    <div style="display:flex;gap:18px;margin-top:36px">
+      <div style="flex:1.2;border-radius:24px;background:var(--blue);color:#fff;padding:24px 28px"><div style="font-size:20px">Given in all</div><div class="d" id="d-given" style="font-size:56px;margin-top:8px">R0</div><div style="font-size:18px;color:var(--lavender);margin-top:4px">12 donations</div></div>
+      <div style="flex:1;border-radius:24px;border:2px solid var(--line);padding:24px 28px"><div style="font-size:20px;color:var(--slate)">First gift</div><div class="d" style="font-size:40px;margin-top:12px">11/12/2025</div></div>
+      <div style="flex:1;border-radius:24px;border:2px solid var(--line);padding:24px 28px"><div style="font-size:20px;color:var(--slate)">Latest gift</div><div class="d" style="font-size:40px;margin-top:12px">11/11/2026</div></div>
+    </div>
+    <div style="margin-top:34px;font-size:20px;font-weight:700;color:var(--slate)">Tags and follow-ups</div>
+    <div style="display:flex;gap:14px;margin-top:14px;align-items:center;flex-wrap:nowrap" id="d-chips">
+      <span class="chip" id="d-c1" style="font-size:22px">Volunteer</span>
+      <span class="chip" id="d-c2" style="font-size:22px">Monthly donor</span>
+      <span class="pill" id="d-c3" style="font-size:22px;padding:12px 20px;background:var(--amber);color:var(--amber-ink);border:2px solid #E7C873">Call to say thank you · due 11/11/2026</span>
+    </div>
+  </div>
+</section>
+
+<!-- 5 Thank everyone -->
+<section class="sc" id="s5" style="background:var(--lilac)">
+  <div class="a dot" id="t-b1" style="width:820px;height:820px;background:var(--peach)"></div>
+  <div class="a d hl" id="t-head" style="font-size:80px"><span class="mask"><span class="w" id="t-h1">Thank</span></span> <span class="mask"><span class="w" id="t-h2">everyone.</span></span> <span class="mask"><span class="w" id="t-h3" style="color:var(--blue)">By name.</span></span></div>
+  <div class="a card" id="t-card" style="width:900px;height:470px;padding:40px 44px">
+    <div style="font-size:20px;font-weight:700;color:var(--slate)">Thank donors</div>
+    <div class="d" style="font-size:44px;margin-top:8px">November 2026: 14 donors</div>
+    <div style="margin-top:24px;height:150px;border-radius:20px;border:2px solid var(--line);padding:20px 22px;font-size:25px;line-height:1.45" id="t-text"></div>
+    <div class="btn btn-blue" id="t-send" style="margin-top:28px;height:70px;padding:0 34px;font-size:24px">Send thank-you</div>
+  </div>
+  <div id="t-avs"></div>
+  <div class="a pill" id="t-sent" style="font-size:26px;padding:16px 28px;background:var(--sage-soft);color:#1E6B47;border:2px solid #BFE0CF">&#10003; Sent to 14 donors.</div>
+</section>
+
+<!-- 6 Monthly -->
+<section class="sc" id="s6" style="background:var(--blue)">
+  <div class="a ring" id="m-r1" style="width:760px;height:760px;border-width:90px;border-color:rgba(201,180,250,.4)"></div>
+  <div class="a dot" id="m-d1" style="width:300px;height:300px;background:var(--orange)"></div>
+  <div class="a" id="m-k" style="font-size:30px;font-weight:700;color:var(--lavender)">Monthly donations</div>
+  <div class="a d" id="m-n" style="font-size:200px;color:#fff">R0</div>
+  <div class="a" id="m-s" style="font-size:34px;color:#fff;font-weight:600">every month, from 14 monthly donors</div>
+  <div class="a" id="m-bars" style="width:1000px;height:300px"></div>
+  <div class="a card" id="m-dec" style="width:560px;height:120px;display:flex;align-items:center;gap:20px;padding:0 28px">
+    <div class="av" style="width:64px;height:64px;font-size:22px;background:#E3F2EA">LE</div>
+    <div style="flex:1"><div style="font-size:24px;font-weight:700">Lerato Example</div><div style="font-size:18px;color:var(--slate)">R350 · on the 25th</div></div>
+    <span class="badge" style="background:var(--amber);color:var(--amber-ink);font-size:18px;display:flex;gap:8px;align-items:center"><span id="m-spin" style="display:inline-block">&#8635;</span> Card declined, trying again</span>
+  </div>
+</section>
+
+<!-- 7 Campaigns -->
+<section class="sc" id="s7" style="background:#fff">
+  <div class="a dot" id="c-b1" style="width:1000px;height:1000px;background:var(--peach)"></div>
+  <div class="a dot" id="c-b2" style="width:700px;height:700px;background:var(--lilac)"></div>
+  <div class="a d hl" id="c-head" style="font-size:80px"><span class="mask"><span class="w" id="c-h1">Raise</span></span> <span class="mask"><span class="w" id="c-h2">for</span></span> <span class="mask"><span class="w" id="c-h3" style="color:var(--blue)">something specific.</span></span></div>
+  <div class="a" id="c-g1" style="width:520px;height:620px;text-align:center">
+    <svg width="400" height="400" viewBox="0 0 400 400" style="display:block;margin:0 auto"><circle cx="200" cy="200" r="160" fill="none" stroke="#ECE8F6" stroke-width="44"/><circle id="c-a1" cx="200" cy="200" r="160" fill="none" stroke="#FF8A3D" stroke-width="44" stroke-linecap="round" transform="rotate(-90 200 200)" stroke-dasharray="1005.3" stroke-dashoffset="1005.3"/></svg>
+    <div class="a d" id="c-p1" style="left:0;width:520px;top:150px;font-size:96px">0%</div>
+    <div class="d" style="font-size:40px;margin-top:20px">Winter food parcels</div>
+    <div id="c-v1" style="font-size:26px;color:var(--slate);margin-top:8px">R0 of R50 000 · 20 gifts</div>
+  </div>
+  <div class="a" id="c-g2" style="width:520px;height:620px;text-align:center">
+    <svg width="400" height="400" viewBox="0 0 400 400" style="display:block;margin:0 auto"><circle cx="200" cy="200" r="160" fill="none" stroke="#ECE8F6" stroke-width="44"/><circle id="c-a2" cx="200" cy="200" r="160" fill="none" stroke="#1749B5" stroke-width="44" stroke-linecap="round" transform="rotate(-90 200 200)" stroke-dasharray="1005.3" stroke-dashoffset="1005.3"/></svg>
+    <div class="a d" id="c-p2" style="left:0;width:520px;top:150px;font-size:96px">0%</div>
+    <div class="d" style="font-size:40px;margin-top:20px">School shoes</div>
+    <div id="c-v2" style="font-size:26px;color:var(--slate);margin-top:8px">R0 of R20 000 · 7 gifts</div>
+  </div>
+  <div id="c-drops"></div>
+</section>
+
+<!-- 8 s18A receipts -->
+<section class="sc" id="s8" style="background:var(--lilac)">
+  <div class="a dot" id="x-b1" style="width:900px;height:900px;background:var(--purple)"></div>
+  <div class="a d" id="x-head" style="font-size:88px;width:720px;line-height:1.04"><span class="mask"><span class="w" id="x-h1">Your s18A</span></span><br><span class="mask"><span class="w" id="x-h2">receipt list</span></span><br><span class="mask"><span class="w" id="x-h3" style="color:var(--blue)">builds itself.</span></span></div>
+  <div id="x-cards" style="position:absolute;inset:0;transform-style:preserve-3d"></div>
+  <div class="a" id="x-stamp" style="width:250px;height:250px;border-radius:50%;border:9px solid var(--sage);color:var(--sage);background:rgba(255,255,255,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 20px 50px rgba(14,27,61,.2)"><div class="d" style="font-size:62px">s18A</div><div style="font-size:21px;font-weight:700;margin-top:6px">tax year 2026/27</div></div>
+  <div class="a pill" id="x-count" style="font-size:30px;padding:18px 30px;background:#fff;border:2px solid var(--line);box-shadow:0 20px 40px rgba(14,27,61,.12)"><span class="d" style="font-size:40px;color:var(--blue)" id="x-n">0</span> donors, one receipt each</div>
+</section>
+
+<!-- 9 Everything, one dashboard -->
+<section class="sc" id="s9" style="background:var(--ink)">
+  <div class="a" id="w-wall" style="width:2600px;height:1500px;transform-style:preserve-3d"></div>
+  <div class="a" id="w-veil" style="left:0;top:0;width:1920px;height:1080px;background:radial-gradient(ellipse 900px 420px at 960px 540px, rgba(14,27,61,.88), rgba(14,27,61,.25) 75%, rgba(14,27,61,0))"></div>
+  <div class="a d hl" id="w-l0" style="font-size:150px;color:#fff;text-shadow:0 20px 60px rgba(0,0,0,.6)">Donations.</div>
+  <div class="a d hl" id="w-l1" style="font-size:150px;color:#fff;text-shadow:0 20px 60px rgba(0,0,0,.6)">Donors.</div>
+  <div class="a d hl" id="w-l2" style="font-size:150px;color:#fff;text-shadow:0 20px 60px rgba(0,0,0,.6)">Thank-yous.</div>
+  <div class="a d hl" id="w-l3" style="font-size:150px;color:#fff;text-shadow:0 20px 60px rgba(0,0,0,.6)">Campaigns.</div>
+  <div class="a d hl" id="w-l4" style="font-size:150px;color:#fff;text-shadow:0 20px 60px rgba(0,0,0,.6)">Receipts.</div>
+  <div class="a d hl" id="w-head" style="font-size:150px;color:#fff;text-shadow:0 20px 60px rgba(0,0,0,.5)">All of it.</div>
+  <div class="a d hl" id="w-head2" style="font-size:96px;color:var(--orange);text-shadow:0 20px 60px rgba(0,0,0,.5)">One dashboard.</div>
+</section>
+
+<!-- 10 Close -->
+<section class="sc" id="s10" style="background:#fff">
+  <div class="a dot" id="z-b1" style="width:900px;height:900px;background:var(--lilac)"></div>
+  <div class="a dot" id="z-b2" style="width:760px;height:760px;background:var(--peach)"></div>
+  <div class="a ring" id="z-r" style="width:220px;height:220px;border-width:26px;border-color:var(--lavender)"></div>
+  <img class="a" id="z-splash" src="%SPLASH%" style="width:180px" alt="">
+  <img class="a" id="z-logo" src="%LOGO%" style="height:130px" alt="">
+  <div class="a d hl" id="z-tag" style="font-size:100px">Giving made <span style="color:var(--blue)">easy.</span></div>
+  <div class="a btn btn-orange" id="z-btn" style="font-size:42px;height:104px;padding:0 56px">Try the demo dashboard</div>
+  <div class="a" id="z-url" style="font-size:40px;font-weight:700;color:var(--blue)">givezy.co.za</div>
+</section>
+
+<div class="a pill" id="sample" style="font-size:19px;padding:8px 18px;background:rgba(255,255,255,.92);color:var(--slate);border:2px solid var(--line)">Sample charity, made-up figures</div>
+<div class="a" id="flash" style="width:1920px;height:1080px;background:#fff;pointer-events:none"></div>
+
+</div>
+<script>
+const SHOTS = { overview: "%SHOT_overview%", donations: "%SHOT_donations%", donors: "%SHOT_donors%", monthly: "%SHOT_monthly%", campaigns: "%SHOT_campaigns%", receipts: "%SHOT_receipts%", donor: "%SHOT_donor%", thank: "%SHOT_thank-typed%" };
+const DURATION = 60; window.DURATION = DURATION;
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const E = {
+  lin: (x) => x,
+  io: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+  out: (x) => 1 - Math.pow(1 - x, 4),
+  expo: (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x)),
+  in: (x) => x * x * x,
+  back: (x) => { const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); },
+};
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const DEF = { x: 0, y: 0, z: 0, s: 1, sx: 1, sy: 1, r: 0, rx: 0, ry: 0, o: 1, b: 0 };
+// Keyframes: [[time, {props}, ease into this key]]. Props hold until changed.
+function kf(t, keys) {
+  let cur = { ...DEF, ...keys[0][1] };
+  if (t <= keys[0][0]) return cur;
+  for (let i = 1; i < keys.length; i++) {
+    const [t0] = keys[i - 1], [t1, p1, e = "io"] = keys[i];
+    const next = { ...cur, ...p1 };
+    if (t < t1) { const p = E[e]((t - t0) / (t1 - t0)); const o = {}; for (const k in next) o[k] = cur[k] + (next[k] - cur[k]) * p; return o; }
+    cur = next;
+  }
+  return cur;
+}
+function put(el, p) {
+  if (typeof el === "string") el = $(el);
+  el.style.transform = `translate3d(${p.x}px,${p.y}px,${p.z}px) translate(-50%,-50%) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotate(${p.r}deg) scale(${p.s * p.sx},${p.s * p.sy})`;
+  el.style.opacity = p.o;
+  el.style.filter = p.b > 0.05 ? `blur(${p.b}px)` : "none";
+}
+const A = (el, t, keys) => put(el, kf(t, keys));
+const rand = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const rands = (v) => "R" + Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+// Word rise inside a mask.
+function rise(id, t, at, d = 0.45) { const p = E.expo(prog(t, at, at + d)); $(id).style.transform = `translateY(${(1 - p) * 110}%)`; }
+
+const SCENES = [["s1", 0, 4.2], ["s2", 4.2, 9.0], ["s3", 9.0, 16.2], ["s4", 16.2, 21.8], ["s5", 21.8, 28.6], ["s6", 28.6, 34.4], ["s7", 34.4, 39.8], ["s8", 39.8, 46.4], ["s9", 46.4, 53.0], ["s10", 53.0, 60.1]];
+
+// Sound cues for the mix: [time, kind]. Read by render.mjs and mix.py.
+window.SFX = [
+  [0.1, "hit"], [1.45, "hit"], [2.6, "hit"], [3.35, "suck"], [3.95, "whoosh"],
+  [4.4, "pop"], [4.75, "pop"], [5.05, "pop"], [6.0, "whoosh"], [6.35, "whoosh"], [6.7, "whoosh"], [7.05, "whoosh"], [7.7, "thump"],
+  [8.75, "whoosh"], [9.2, "whoosh"], [10.0, "riser"], [11.3, "ding"], [11.4, "whoosh"], [12.35, "pop"], [12.4, "tick"],
+  [15.9, "whoosh"], [17.0, "tick"], [18.4, "pop"], [18.7, "pop"], [19.0, "pop"],
+  [21.6, "whoosh"], [22.4, "type"], [25.1, "click"], [25.25, "whoosh"], [26.4, "ding"], [26.6, "whoosh"],
+  [28.4, "whoosh"], [28.9, "tick"], [31.4, "pop"],
+  [34.2, "whoosh"], [35.0, "riser"], [36.6, "pop"],
+  [39.6, "whoosh"], [40.2, "whoosh"], [41.9, "thump"], [42.5, "tick"],
+  [46.2, "whoosh"], [46.72, "hit"], [47.66, "hit"], [48.54, "hit"], [49.3, "hit"], [50.08, "hit"], [51.1, "thump"], [51.76, "hit"],
+  [52.8, "whoosh"], [53.6, "pop"], [54.0, "pop"], [55.8, "pop"],
+];
+
+// Build repeated bits once.
+(function build() {
+  const pills = ["EFT ref: SC-0045", "Donors_FINAL_v3.xlsx", "Who paid in March?", "Receipt 17 of 46", "Copy, paste, repeat", "Cash, R200, no name", "Which card bounced?", "Thank-you list (old)"];
+  $("h-pills").innerHTML = pills.map((p, i) => `<div class="a pill" id="hp${i}" style="font-size:30px;padding:16px 28px;background:#fff;color:var(--ink);box-shadow:0 18px 40px rgba(0,0,0,.25)">${p}</div>`).join("");
+  const rows = [
+    ["AE", "Aisha Example", "General · Monthly", "App", "R350", "#E5D9FF"],
+    ["AS", "Ari Sample", "Winter food parcels", "QR poster", "R180", "#FFEBDD"],
+    ["LE", "Leah Example", "General · Monthly", "Website", "R250", "#E5D9FF"],
+    ["DP", "David Placeholder", "School shoes", "Shared link", "R2 000", "#E3F2EA"],
+    ["LT", "Leah Testcase", "General", "Website", "R200", "#E5D9FF"],
+    ["TE", "Thabo Example", "General · Monthly", "App", "R350", "#FFEBDD"],
+  ];
+  $("g-rows").innerHTML = rows.map((r, i) => `<div class="row a" id="gr${i}" style="width:820px;left:410px"><div class="av" style="width:48px;height:48px;font-size:17px;background:${r[5]}">${r[0]}</div><div style="flex:1.3;font-weight:700">${r[1]}</div><div style="flex:1.2;color:var(--slate);font-size:18px">${r[2]}</div><div style="flex:.8"><span class="badge" style="background:var(--lilac);color:var(--blue);font-size:16px">${r[3]}</span></div><div style="width:110px;text-align:right;font-weight:800">${r[4]}</div></div>`).join("");
+  const burst = [];
+  for (let i = 0; i < 14; i++) burst.push(`<div class="a dot" id="gb${i}" style="width:${18 + rand(i) * 22}px;height:${18 + rand(i) * 22}px;background:${["#FF8A3D", "#C9B4FA", "#1749B5"][i % 3]}"></div>`);
+  $("g-burst").innerHTML = burst.join("");
+  const ini = ["NE", "TE", "SE", "PE", "DE", "AE", "JE", "LE", "ME", "ZE", "RE", "SE", "LE", "PE"];
+  $("t-avs").innerHTML = ini.map((n, i) => `<div class="a av" id="ta${i}" style="width:96px;height:96px;font-size:30px;background:${["#E5D9FF", "#FFEBDD", "#E3F2EA"][i % 3]};box-shadow:0 14px 30px rgba(14,27,61,.18);border:4px solid #fff">${n}</div><div class="a" id="te${i}" style="width:54px;height:40px;border-radius:8px;background:#fff;border:3px solid var(--blue);box-shadow:0 10px 20px rgba(14,27,61,.2)"><svg width="48" height="34" viewBox="0 0 48 34"><path d="M3 4 L24 20 L45 4" fill="none" stroke="#1749B5" stroke-width="3"/></svg></div>`).join("");
+  const vals = [2800, 3150, 3350, 3550, 3550, 3800, 3650, 3900, 3700, 3950, 4200, 4200];
+  const mon = ["12", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11"];
+  $("m-bars").innerHTML = vals.map((v, i) => `<div style="position:absolute;bottom:40px;left:${i * 84}px;width:62px;height:${(v / 4200) * 240}px;border-radius:14px 14px 4px 4px;background:${i === 11 ? "var(--orange)" : "#fff"};transform-origin:bottom" id="mb${i}"></div><div style="position:absolute;bottom:0;left:${i * 84}px;width:62px;text-align:center;font-size:20px;color:var(--lavender);font-weight:600">${mon[i]}</div>`).join("");
+  const drops = [];
+  for (let i = 0; i < 16; i++) drops.push(`<div class="a dot" id="cd${i}" style="width:26px;height:26px;background:${i % 2 ? "#1749B5" : "#FF8A3D"}"></div>`);
+  $("c-drops").innerHTML = drops.join("");
+  const rc = [["Aisha Example", "R3 150", 9], ["Thabo Example", "R3 150", 9], ["David Example", "R3 150", 9], ["Priya Testcase", "R2 930", 3], ["Michael Placeholder", "R2 860", 3], ["David Placeholder", "R2 800", 3], ["Lerato Example", "R2 800", 8], ["Sarah Example", "R2 800", 8]];
+  $("x-cards").innerHTML = rc.map((r, i) => `<div class="a card" id="xc${i}" style="width:520px;height:330px;padding:34px 38px;border-radius:24px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:19px;font-weight:700;color:var(--slate)">s18A receipt</span><span class="badge" style="background:var(--sage-soft);color:var(--sage)">2026/27</span></div><div class="d" style="font-size:42px;margin-top:22px">${r[0]}</div><div style="font-size:20px;color:var(--slate);margin-top:6px">${r[2]} donations to Sample Charity</div><div class="d" style="font-size:64px;margin-top:24px;color:var(--blue)">${r[1]}</div></div>`).join("");
+  const wall = ["overview", "donations", "donors", "monthly", "campaigns", "receipts", "donor", "thank", "overview"];
+  $("w-wall").innerHTML = wall.map((s, i) => `<div class="a shot" id="ws${i}" style="width:780px;height:488px;background-image:url(${SHOTS[s]})"></div>`).join("");
+})();
+
+function renderAt(t) {
+  for (const [id, a, b] of SCENES) $(id).style.display = t >= a && t < b ? "block" : "none";
+  const flash = Math.max(0, 1 - Math.abs(t - 46.4) / 0.12) * 0.0; $("flash").style.opacity = flash;
+
+  // 1. Hook ---------------------------------------------------------------
+  if (t < 4.2) {
+    A("h-ring", t, [[0, { x: 1500, y: 260, s: 0.6, r: 0 }], [4.2, { s: 1.1, r: 90 }, "lin"]]);
+    A("h-dot", t, [[0, { x: 280, y: 980, s: 0.2 }], [0.6, { s: 1 }, "back"], [3.3, { s: 1.15 }, "lin"], [3.8, { x: 960, y: 540, s: 0 }, "in"]]);
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + 0.3, R = 430 + rand(i) * 80;
+      const x0 = 960 + Math.cos(ang) * R * 1.55, y0 = 540 + Math.sin(ang) * R * 0.95;
+      const shake = t > 2.6 && t < 3.3 ? Math.sin(t * 70 + i) * 7 : 0;
+      A("hp" + i, t, [[0.2 + i * 0.12, { x: x0 + (rand(i + 9) - 0.5) * 300, y: y0 + 200, s: 0.4, o: 0, r: (rand(i + 3) - 0.5) * 40 }], [0.75 + i * 0.12, { x: x0, y: y0, s: 1, o: 1, r: (rand(i + 3) - 0.5) * 14 }, "back"], [3.3, { x: x0 + shake, y: y0 + Math.sin(t * 2 + i) * 12 }, "lin"], [3.8, { x: 960, y: 540, s: 0, o: 0, r: 180 }, "in"]]);
+    }
+    const word = (id, a, b) => A(id, t, [[a, { x: 960, y: 540, s: 2.6, o: 0, b: 12 }], [a + 0.22, { s: 1, o: 1, b: 0 }, "expo"], [b - 0.15, { s: 1.06 }, "lin"], [b, { y: 380, s: 0.8, o: 0, b: 8 }, "in"]]);
+    word("h-w1", 0.1, 1.45); word("h-w2", 1.45, 2.6); word("h-w3", 2.6, 3.55);
+    A("h-wipe", t, [[3.7, { x: 960, y: 540, s: 0 }], [4.2, { s: 46 }, "in"]]);
+  }
+
+  // 2. Reveal -------------------------------------------------------------
+  if (t >= 4.2 && t < 9.0) {
+    A("r-b1", t, [[4.2, { x: 300, y: 980, s: 0.8 }], [9, { x: 360, y: 900, s: 1 }, "lin"]]);
+    A("r-b2", t, [[4.2, { x: 1700, y: 120, s: 0.8 }], [9, { x: 1640, y: 160, s: 1 }, "lin"]]);
+    A("r-splash", t, [[4.3, { x: 960, y: -200, s: 1.3, r: -30 }], [4.75, { y: 420, r: 0, s: 1 }, "back"], [5.6, {}], [6.1, { x: 960, y: 90, s: 0.38 }, "io"]]);
+    A("r-logo", t, [[4.7, { x: 960, y: 640, s: 0.7, o: 0 }], [5.05, { s: 1, o: 1 }, "back"], [5.6, {}], [6.0, { y: 560, o: 0, s: 0.8 }, "in"]]);
+    A("r-title", t, [[0, { x: 960, y: 150 }]]);
+    rise("r-t1", t, 5.9); rise("r-t2", t, 6.0); rise("r-t3", t, 6.1);
+    // The real dashboard, in exploded layers that fly in and land.
+    const world = kf(t, [[5.7, { x: 960, y: 1500, s: 0.62, rx: 52, r: -14, o: 1 }], [6.4, { y: 700, rx: 42, r: -10 }, "expo"], [7.6, { y: 690, rx: 36, r: -8 }, "lin"], [8.2, { y: 650, rx: 0, r: 0, s: 0.66 }, "io"], [9.0, { x: 1350, y: 650, s: 1.25 }, "in"]]);
+    put("r-world", world);
+    $("r-world").style.transform += "";
+    $("r-base").style.cssText += ";left:0;top:0;";
+    put("r-base", { ...DEF, x: 720, y: 450, o: t < 5.7 ? 0 : 1 });
+    const L = [["r-l1", 24, 96, 232, 800, 6.0], ["r-l2", 288, 430, 1128, 154, 6.35], ["r-l3", 288, 697, 1128, 203, 6.7], ["r-l4", 288, 96, 1128, 300, 7.05]];
+    $("r-l4").style.height = "300px";
+    for (const [id, x, y, w, h, at] of L) {
+      const el = $(id); el.style.backgroundPosition = `${-x}px ${-y}px`;
+      const land = 7.6;
+      const p = kf(t, [[at - 0.35, { x: x + w / 2 + 200, y: y + h / 2 - 500, z: 900, o: 0 }], [at, { x: x + w / 2, y: y + h / 2, z: 260, o: 1 }, "expo"], [land, { z: 220 }, "lin"], [land + 0.12, { z: 0 }, "in"]]);
+      put(el, p);
+    }
+  }
+
+  // 3. One gift -------------------------------------------------------------
+  if (t >= 9.0 && t < 16.2) {
+    A("g-b1", t, [[9, { x: 420, y: 760, s: 0.9 }], [16.2, { s: 1.05, x: 460 }, "lin"]]);
+    A("g-r1", t, [[9, { x: 1760, y: 960, r: 0 }], [16.2, { r: 120 }, "lin"]]);
+    A("g-kick", t, [[9.15, { x: 200, y: 110, s: 0, o: 0 }], [9.5, { x: 260, y: 110, s: 1, o: 1 }, "back"]]);
+    A("g-phone", t, [[9.0, { x: 480, y: 1500, ry: 30, r: 8 }], [9.6, { y: 580, ry: 14, r: -3 }, "expo"], [11.2, { y: 570, ry: 10, r: -2 }, "lin"], [11.5, { ry: 4, r: 0, s: 0.98 }, "io"], [15.6, { y: 560 }, "lin"], [16.2, { x: 480, y: 1500, o: 1 }, "in"]]);
+    // Thumb holds the button; the fill runs; a burst; thank-you.
+    const hold = prog(t, 10.0, 11.2);
+    $("g-fill").style.width = hold * 100 + "%";
+    A("g-thumb", t, [[9.7, { x: 620, y: 1050, o: 0, s: 1.3 }], [10.0, { x: 520, y: 900, o: 1, s: 1 }, "out"], [11.2, { s: 0.9 }, "lin"], [11.35, { o: 0, s: 1.4 }, "out"]]);
+    $("g-done").style.opacity = prog(t, 11.2, 11.4);
+    for (let i = 0; i < 14; i++) {
+      const ang = (i / 14) * Math.PI * 2, d = 200 + rand(i + 4) * 160;
+      A("gb" + i, t, [[11.2, { x: 480, y: 500, s: 0, o: 1 }], [11.9, { x: 480 + Math.cos(ang) * d, y: 500 + Math.sin(ang) * d, s: 1, o: 1 }, "expo"], [12.3, { o: 0, s: 0.4 }, "in"]]);
+    }
+    // The gift travels into the dashboard.
+    const cp = E.io(prog(t, 11.4, 12.35));
+    const bx = (1 - cp) * (1 - cp) * 560 + 2 * (1 - cp) * cp * 950 + cp * cp * 1350, by = (1 - cp) * (1 - cp) * 520 + 2 * (1 - cp) * cp * 60 + cp * cp * 560;
+    put("g-coin", { ...DEF, x: bx, y: by, s: t < 11.4 ? 0 : t > 12.35 ? Math.max(0, 1 - (t - 12.35) * 6) : 1 + Math.sin(cp * Math.PI) * 0.3, o: t >= 11.4 && t < 12.55 ? 1 : 0, r: cp * 360 });
+    A("g-stat", t, [[9.3, { x: 1310, y: 1300, rx: -30 }], [9.9, { x: 1310, y: 250, rx: 0 }, "expo"], [12.35, { s: 1 }], [12.5, { s: 1.08 }, "out"], [12.9, { s: 1 }, "io"], [15.7, {}], [16.2, { y: -300 }, "in"]]);
+    A("g-list", t, [[9.5, { x: 1310, y: 1500, rx: -30 }], [10.1, { x: 1310, y: 640, rx: 0 }, "expo"], [15.7, {}], [16.0, { x: 1310, y: 640, s: 1.06 }, "io"]]);
+    const n = Math.round(5680 + 350 * E.out(prog(t, 12.4, 13.2)));
+    $("g-statn").textContent = rands(n);
+    $("g-stats").textContent = (t >= 12.4 ? "14" : "13") + " donations · last month R9 730";
+    // Rows: Aisha's slides in at the top and pushes the rest down.
+    const sp = E.back(prog(t, 12.35, 12.85));
+    for (let i = 0; i < 6; i++) {
+      const el = $("gr" + i);
+      if (i === 0) { el.style.transform = `translate(-50%,0) translateX(${(1 - sp) * -900}px)`; el.style.top = "0px"; el.style.opacity = t >= 12.35 ? 1 : 0; el.style.background = t > 12.35 ? `rgba(255,235,221,${Math.max(0, 1 - (t - 12.9) / 1.6)})` : "#fff"; }
+      else { const y = (i - 1) * 78 + 78 * sp; el.style.top = y + "px"; el.style.transform = "translate(-50%,0)"; el.style.opacity = 1; }
+    }
+    A("g-head", t, [[0, { x: 1310, y: 1000 }]]);
+    $("g-head").style.display = t > 12.6 ? "block" : "none";
+    rise("g-h1", t, 12.7); rise("g-h2", t, 12.8); rise("g-h3", t, 12.9);
+  }
+
+  // 4. Donor ----------------------------------------------------------------
+  if (t >= 16.2 && t < 21.8) {
+    A("d-b1", t, [[16.2, { x: 1500, y: 300, s: 0.7 }], [21.8, { s: 1 }, "lin"]]);
+    A("d-r1", t, [[16.2, { x: 210, y: 900, r: 0 }], [21.8, { r: 120 }, "lin"]]);
+    A("d-card", t, [[16.2, { x: 1210, y: 640, sx: 0.82, sy: 0.12, o: 0.9 }], [16.7, { sx: 1, sy: 1, y: 560, o: 1 }, "expo"], [21.2, { y: 548, ry: -6 }, "lin"], [21.8, { ry: -90, x: 1100 }, "in"]]);
+    $("d-given").textContent = rands(4200 * E.out(prog(t, 16.9, 18.0)));
+    ["d-c1", "d-c2", "d-c3"].forEach((id, i) => { const p = kf(t, [[18.3 + i * 0.3, { s: 0, o: 0 }], [18.65 + i * 0.3, { s: 1, o: 1 }, "back"]]); $(id).style.transform = `scale(${p.s})`; $(id).style.opacity = p.o; });
+    A("d-head", t, [[0, { x: 360, y: 300 }]]);
+    rise("d-h1", t, 16.5); rise("d-h2", t, 16.62); rise("d-h3", t, 16.74);
+  }
+
+  // 5. Thank everyone ---------------------------------------------------------
+  if (t >= 21.8 && t < 28.6) {
+    A("t-b1", t, [[21.8, { x: 1600, y: 860, s: 0.8 }], [28.6, { s: 1 }, "lin"]]);
+    A("t-head", t, [[0, { x: 960, y: 120 }]]);
+    rise("t-h1", t, 22.0); rise("t-h2", t, 22.12); rise("t-h3", t, 26.5);
+    A("t-card", t, [[21.8, { x: 960, y: 560, ry: 90 }], [22.3, { ry: 0 }, "out"], [25.2, { s: 1 }], [25.35, { s: 0.97 }, "out"], [25.7, { y: 650, s: 0.78 }, "io"], [26.6, {}], [27.0, { x: 620, y: 560, s: 0.8 }, "io"]]);
+    const msg = "Thank you for giving to us this month. It means a great deal to the whole team.";
+    const k = Math.floor(msg.length * prog(t, 22.4, 24.6));
+    $("t-text").innerHTML = msg.slice(0, k) + (t < 25 && Math.floor(t * 3) % 2 === 0 ? '<span style="border-left:3px solid #0E1B3D;margin-left:2px"></span>' : "");
+    $("t-send").style.transform = t > 25.0 && t < 25.25 ? "translateY(5px)" : "none";
+    $("t-send").style.boxShadow = t > 25.0 && t < 25.25 ? "0 1px 0 var(--blue-edge)" : "";
+    // Fourteen thank-yous fly to fourteen donors.
+    for (let i = 0; i < 14; i++) {
+      const ang = Math.PI * (0.06 + (i / 13) * 0.88), R = 470;
+      const ax = 960 + Math.cos(ang) * R * 1.85, ay = 1080 - Math.sin(ang) * R * 1.7;
+      const at = 25.25 + i * 0.05;
+      A("ta" + i, t, [[at + 0.25, { x: ax, y: ay, s: 0, o: 0 }], [at + 0.6, { s: 1.15, o: 1 }, "back"], [26.6, {}], [27.0, { s: 0, o: 0 }, "in"]]);
+      A("te" + i, t, [[at, { x: 960, y: 690, s: 0.3, o: 0, r: -20 }], [at + 0.05, { o: 1 }], [at + 0.5, { x: ax, y: ay, s: 1, r: 0 }, "io"], [at + 0.62, { s: 0, o: 0 }, "in"]]);
+    }
+    A("t-sent", t, [[26.0, { x: 960, y: 980, s: 0, o: 0 }], [26.3, { s: 1, o: 1 }, "back"], [26.8, { x: 620, y: 860 }, "io"]]);
+    // Aisha's phone gets it.
+    const ph = $("g-phone");
+    if (t >= 26.4) {
+      $("s3").style.display = "block"; for (const c of $("s3").children) c.style.visibility = c.id === "g-phone" ? "visible" : "hidden"; $("s3").style.background = "transparent"; $("s3").style.zIndex = 5;
+      $("g-give").style.opacity = 0; $("g-done").style.opacity = 0; $("g-mail").style.opacity = 1;
+      A(ph, t, [[26.4, { x: 1450, y: 1500, ry: -24, r: 6 }], [27.0, { y: 560, ry: -10, r: 2 }, "expo"], [28.6, { y: 550 }, "lin"]]);
+    }
+  } else { $("s3").style.zIndex = ""; $("s3").style.background = "var(--lilac)"; for (const c of $("s3").children) c.style.visibility = "visible"; $("g-give").style.opacity = 1; $("g-mail").style.opacity = 0; }
+
+  // 6. Monthly --------------------------------------------------------------
+  if (t >= 28.6 && t < 34.4) {
+    A("m-r1", t, [[28.6, { x: 1650, y: 200, s: 0.8, r: 0 }], [34.4, { s: 1, r: 60 }, "lin"]]);
+    A("m-d1", t, [[28.6, { x: 160, y: 1000, s: 0 }], [29.1, { s: 1 }, "back"]]);
+    A("m-k", t, [[28.75, { x: 520, y: 200, o: 0, y0: 0 }], [29.1, { o: 1 }, "out"]]);
+    A("m-n", t, [[28.7, { x: 520, y: 340, s: 1.6, o: 0, b: 10 }], [29.0, { s: 1, o: 1, b: 0 }, "expo"]]);
+    $("m-n").textContent = rands(4200 * E.out(prog(t, 28.9, 30.0)));
+    A("m-s", t, [[29.3, { x: 560, y: 480, o: 0 }], [29.7, { o: 1 }, "out"]]);
+    $("m-k").style.textAlign = "left";
+    A("m-bars", t, [[0, { x: 1300, y: 640 }]]);
+    for (let i = 0; i < 12; i++) $("mb" + i).style.transform = `scaleY(${E.back(prog(t, 29.5 + i * 0.09, 30.0 + i * 0.09))})`;
+    A("m-dec", t, [[31.3, { x: 1300, y: 900, s: 0, o: 0 }], [31.7, { s: 1, o: 1 }, "back"], [34.0, {}], [34.4, { y: 1300 }, "in"]]);
+    $("m-spin").style.transform = `rotate(${Math.max(0, t - 31.5) * 400}deg)`;
+  }
+
+  // 7. Campaigns ------------------------------------------------------------
+  if (t >= 34.4 && t < 39.8) {
+    A("c-b1", t, [[34.4, { x: 200, y: 900, s: 0.8 }], [39.8, { s: 1 }, "lin"]]);
+    A("c-b2", t, [[34.4, { x: 1750, y: 200, s: 0.8 }], [39.8, { s: 1 }, "lin"]]);
+    A("c-head", t, [[0, { x: 960, y: 140 }]]);
+    rise("c-h1", t, 34.6); rise("c-h2", t, 34.7); rise("c-h3", t, 34.8);
+    A("c-g1", t, [[34.5, { x: 620, y: 1500 }], [35.0, { y: 640 }, "expo"]]);
+    A("c-g2", t, [[34.65, { x: 1300, y: 1500 }], [35.15, { y: 640 }, "expo"]]);
+    const f1 = E.out(prog(t, 35.2, 37.0)), f2 = E.out(prog(t, 35.4, 37.2));
+    $("c-a1").setAttribute("stroke-dashoffset", 1005.3 * (1 - 0.16 * f1)); $("c-a2").setAttribute("stroke-dashoffset", 1005.3 * (1 - 0.23 * f2));
+    $("c-p1").textContent = Math.round(16 * f1) + "%"; $("c-p2").textContent = Math.round(23 * f2) + "%";
+    $("c-v1").textContent = `${rands(8480 * f1)} of R50 000 · 20 gifts`; $("c-v2").textContent = `${rands(4610 * f2)} of R20 000 · 7 gifts`;
+    for (let i = 0; i < 16; i++) {
+      const g = i % 2, at = 35.1 + i * 0.1, tx = g ? 1300 : 620, ty = 470;
+      A("cd" + i, t, [[at, { x: tx + (rand(i) - 0.5) * 900, y: -60, s: 1, o: 1 }], [at + 0.6, { x: tx, y: ty, s: 0.3, o: 0.2 }, "in"], [at + 0.65, { o: 0 }]]);
+    }
+  }
+
+  // 8. s18A receipts --------------------------------------------------------
+  if (t >= 39.8 && t < 46.4) {
+    A("x-b1", t, [[39.8, { x: 1350, y: 560, s: 0.8 }], [46.4, { s: 1 }, "lin"]]);
+    A("x-head", t, [[0, { x: 460, y: 360 }]]);
+    rise("x-h1", t, 40.0); rise("x-h2", t, 40.15); rise("x-h3", t, 40.3);
+    for (let i = 7; i >= 0; i--) {
+      const fan = i - 3.5, at = 40.2 + (7 - i) * 0.09;
+      A("xc" + i, t, [[at, { x: 1340, y: 1400, r: fan * 12, s: 0.9, ry: -20 }], [at + 0.5, { x: 1340 + fan * 26, y: 560 + Math.abs(fan) * 10, r: fan * 7, s: 1, ry: -10 }, "expo"], [44.2, { ry: -4 }, "lin"], [45.0, { x: 1340 + fan * 70, r: fan * 9 }, "io"]]);
+      $("xc" + i).style.zIndex = 10 - i;
+    }
+    A("x-stamp", t, [[41.85, { x: 1560, y: 400, s: 3, o: 0, r: -40 }], [42.05, { s: 1, o: 1, r: -14 }, "out"]]);
+    $("x-stamp").style.zIndex = 30;
+    A("x-count", t, [[42.4, { x: 1340, y: 930, s: 0, o: 0 }], [42.75, { s: 1, o: 1 }, "back"]]);
+    $("x-count").style.zIndex = 31;
+    $("x-n").textContent = Math.round(46 * E.out(prog(t, 42.5, 43.5)));
+  }
+
+  // 9. Everything, one dashboard -----------------------------------------------
+  if (t >= 46.4 && t < 53.0) {
+    const wall = kf(t, [[46.4, { x: 960, y: 900, s: 0.62, rx: 50, r: -18 }], [53.0, { y: 700, s: 0.8, rx: 40, r: -10 }, "lin"]]);
+    put("w-wall", wall);
+    for (let i = 0; i < 9; i++) {
+      const col = i % 3, row = Math.floor(i / 3), x = 450 + col * 850, y = 260 + row * 540;
+      A("ws" + i, t, [[46.4 + i * 0.07, { x, y: y + 300, z: 600, o: 0 }], [46.9 + i * 0.07, { y, z: 0, o: 1 }, "expo"], [53.0, { z: Math.sin(i) * 40 }, "lin"]]);
+    }
+    const said = [46.72, 47.66, 48.54, 49.3, 50.08, 51.1];
+    for (let i = 0; i < 5; i++) A("w-l" + i, t, [[said[i] - 0.05, { x: 960, y: 540, s: 2.2, o: 0, b: 12 }], [said[i] + 0.15, { s: 1, o: 1, b: 0 }, "expo"], [said[i + 1] - 0.12, { s: 1.05 }, "lin"], [said[i + 1], { s: 0.7, o: 0, b: 8 }, "in"]]);
+    A("w-head", t, [[51.05, { x: 960, y: 470, s: 2.2, o: 0, b: 12 }], [51.25, { s: 1, o: 1, b: 0 }, "expo"], [53.0, { s: 1.05 }, "lin"]]);
+    A("w-head2", t, [[51.7, { x: 960, y: 630, s: 2, o: 0, b: 10 }], [51.95, { s: 1, o: 1, b: 0 }, "expo"], [53.0, { s: 1.04 }, "lin"]]);
+  }
+
+  // 10. Close ---------------------------------------------------------------
+  if (t >= 53.0) {
+    const w = E.io(prog(t, 53.0, 53.6)); $("s10").style.clipPath = `circle(${w * 1200}px at 960px 540px)`;
+    A("z-b1", t, [[53, { x: 200, y: 1000 }]]); A("z-b2", t, [[53, { x: 1760, y: 80 }]]);
+    A("z-r", t, [[53, { x: 1560, y: 880, r: 0 }], [60, { r: 140 }, "lin"]]);
+    A("z-splash", t, [[53.5, { x: 960, y: 170, s: 0, r: 30 }], [53.9, { s: 1, r: 0 }, "back"]]);
+    A("z-logo", t, [[53.9, { x: 960, y: 360, o: 0, s: 0.8 }], [54.3, { o: 1, s: 1 }, "back"]]);
+    A("z-tag", t, [[54.4, { x: 960, y: 550, o: 0, y0: 0, s: 1.3, b: 8 }], [54.8, { o: 1, s: 1, b: 0 }, "expo"]]);
+    A("z-btn", t, [[55.7, { x: 960, y: 740, s: 0, o: 0 }], [56.1, { s: 1, o: 1 }, "back"], [57.3, { s: 1 }], [57.55, { s: 1.06 }, "io"], [57.8, { s: 1 }, "io"]]);
+    A("z-url", t, [[56.6, { x: 960, y: 880, o: 0 }], [57.0, { o: 1 }, "out"]]);
+  }
+
+  // Sample label: on every product scene.
+  const showSample = t > 8.2 && t < 52.4 && !(t > 28.6 && t < 34.4) && !(t > 46.4 && t < 53.0);
+  put("sample", { ...DEF, x: 1740, y: 44, o: showSample ? 1 : 0 });
+}
+window.renderAt = renderAt;
+renderAt(0);
+</script>
+</body></html>

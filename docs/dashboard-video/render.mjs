@@ -15,7 +15,9 @@ const FPS = 30;
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-await page.goto("file://" + join(dir, "video.built.html"), { waitUntil: "load" });
+const pageArg = process.argv.indexOf("--page");
+const built = pageArg > 0 ? process.argv[pageArg + 1] : "video.built.html";
+await page.goto("file://" + join(dir, built), { waitUntil: "load" });
 await page.evaluate(() => document.fonts.ready);
 const duration = await page.evaluate(() => window.DURATION);
 
