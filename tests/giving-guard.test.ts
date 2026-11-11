@@ -7,6 +7,8 @@ const calls: { fn: string; bucket: string; keys: string[]; limit: number; minute
 let over = new Set<string>();
 let reached = new Set<string>();
 let storeDown = false;
+// Recent declines per stand-in key, for the read-only decline check.
+let declines: Record<string, number> = {};
 vi.mock("@/lib/rate-limit", () => ({
   hitRateLimit: async (bucket: string, keys: string[], limit: number, minutes: number) => {
     if (storeDown) throw new Error("store down");
@@ -16,7 +18,7 @@ vi.mock("@/lib/rate-limit", () => ({
   rateLimitReached: async (bucket: string, keys: string[], limit: number, minutes: number) => {
     if (storeDown) throw new Error("store down");
     calls.push({ fn: "reached", bucket, keys, limit, minutes });
-    return reached.has(bucket);
+    return reached.has(bucket) || keys.some((k) => (declines[k] ?? 0) >= limit);
   },
   ipKeys: (ip: string) => (ip && ip !== "unknown" ? [`ip#${ip}`] : []),
   hashedKey: (kind: string, value: string) => `${kind}#${value.trim().toLowerCase()}`,
@@ -26,17 +28,31 @@ vi.mock("@/lib/rate-limit", () => ({
 const inserts: { table: string; rows: unknown }[] = [];
 let startRows: { key: string }[] = [];
 let insertFails = false;
+// Alarm claims: each claim gets the next id; `earlierClaim` stands for another request that claimed first.
+let nextId = 1;
+let earlierClaim = false;
+const myClaims: number[] = [];
 function table(name: string) {
   const b: Record<string, unknown> = {};
-  b.insert = async (rows: unknown) => {
-    if (insertFails) return { error: new Error("insert failed") };
-    inserts.push({ table: name, rows });
-    return { error: null };
+  let bucket = "";
+  b.insert = (rows: unknown) => {
+    const result = insertFails ? { error: new Error("insert failed") } : (inserts.push({ table: name, rows }), { error: null });
+    const id = nextId++;
+    return {
+      then: (ok: (v: unknown) => unknown) => Promise.resolve(result).then(ok),
+      select: () => ({ single: async () => (myClaims.push(id), { data: { id }, error: result.error }) }),
+    };
   };
   b.select = () => b;
-  b.eq = () => b;
+  b.eq = (col: string, v: string) => ((col === "bucket" ? (bucket = v) : null), b);
+  b.gte = () => b;
+  b.order = () => b;
+  b.limit = () => b;
   b.like = async () => ({ data: startRows, error: null });
-  b.maybeSingle = async () => ({ data: name === "donations" ? { charity_id: "c1" } : { name_en: "Sample Kitchen" }, error: null });
+  b.maybeSingle = async () => {
+    if (name === "rate_limit_events" && bucket === "giving-alarm") return { data: { id: earlierClaim ? 0 : myClaims[0] }, error: null };
+    return { data: name === "donations" ? { charity_id: "c1" } : { name_en: "Sample Kitchen" }, error: null };
+  };
   return b;
 }
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: table }) }));
@@ -44,6 +60,18 @@ const audits: unknown[] = [];
 vi.mock("@/lib/audit", () => ({ logAudit: async (e: unknown) => void audits.push(e) }));
 const alerts: { subject: string; lines: string[] }[] = [];
 vi.mock("@/lib/ops/alert", () => ({ alertGivezy: async (subject: string, lines: string[]) => (alerts.push({ subject, lines }), "sent") }));
+// after(): the email waits for the response. `outsideRequest` stands for a scheduled job, where after() can't be used.
+const later: (() => Promise<void>)[] = [];
+let outsideRequest = false;
+vi.mock("next/server", () => ({
+  after: (fn: () => Promise<void>) => {
+    if (outsideRequest) throw new Error("after() was called outside a request scope");
+    later.push(fn);
+  },
+}));
+const runLater = async () => {
+  for (const fn of later.splice(0)) await fn();
+};
 
 const { checkGivingAllowed, recordDecline, rememberGiftStart, recordBlocked } = await import("@/lib/donations/giving-guard");
 
@@ -55,8 +83,14 @@ beforeEach(() => {
   over = new Set();
   reached = new Set();
   storeDown = false;
+  declines = {};
   insertFails = false;
   startRows = [];
+  nextId = 1;
+  earlierClaim = false;
+  myClaims.length = 0;
+  later.length = 0;
+  outsideRequest = false;
 });
 
 const start = { email: " Donor@Example.com ", ip: "196.1.2.3", charityId: "c1" };
@@ -66,6 +100,7 @@ describe("checkGivingAllowed", () => {
     expect(await checkGivingAllowed(start)).toBeNull();
     expect(calls.map((c) => [c.fn, c.bucket, c.limit, c.minutes])).toEqual([
       ["reached", "checkout-declined", 3, 60],
+      ["reached", "checkout-declined", 15, 60],
       ["hit", "checkout", 5, 10],
       ["hit", "checkout-ip", 30, 10],
       ["hit", "checkout-day", 20, 1_440],
@@ -73,8 +108,9 @@ describe("checkGivingAllowed", () => {
       ["hit", "checkout-charity", 60, 10],
     ]);
     // The email is compared without spaces or capitals; addresses only ever as stand-ins.
-    expect(calls[1].keys).toEqual(["email:donor@example.com"]);
-    expect(calls[0].keys).toEqual(["email#donor@example.com", "ip#196.1.2.3"]);
+    expect(calls[2].keys).toEqual(["email:donor@example.com"]);
+    expect(calls[0].keys).toEqual(["email#donor@example.com"]);
+    expect(calls[1].keys).toEqual(["ip#196.1.2.3"]);
   });
 
   it.each([
@@ -100,18 +136,44 @@ describe("checkGivingAllowed", () => {
     expect(calls.filter((c) => c.fn === "hit")).toHaveLength(0);
   });
 
-  it("raises an alarm (once) when one charity gets a rush of gift starts, and never blocks the donor", async () => {
+  it("raises an alarm when one charity gets a rush of gift starts, after the response, and never blocks the donor", async () => {
     over.add("checkout-charity");
     expect(await checkGivingAllowed(start)).toBeNull();
+    // Nothing is sent while the donor waits.
+    expect(alerts).toHaveLength(0);
+    await runLater();
     expect(alerts).toHaveLength(1);
     expect(alerts[0].subject).toMatch(/Sample Kitchen/);
     expect(alerts[0].lines.join(" ")).toMatch(/Nobody has been blocked/);
     expect(audits).toEqual([expect.objectContaining({ action: "giving.alarm", entityId: "c1", details: expect.objectContaining({ kind: "starts" }) })]);
-    // Within the hour, no second alarm.
-    alerts.length = 0;
-    reached.add("giving-alarm");
+  });
+
+  it("sends only one alarm an hour, even when two requests trip it at once (the earliest claim wins)", async () => {
+    over.add("checkout-charity");
+    earlierClaim = true;
     expect(await checkGivingAllowed(start)).toBeNull();
+    await runLater();
     expect(alerts).toHaveLength(0);
+    // Its claim is still recorded, so the hour's other requests see it too.
+    expect(inserts.some((i) => (i.rows as { bucket?: string }).bucket === "giving-alarm")).toBe(true);
+  });
+
+  it("outside a request (the daily job), the alarm is sent straight away", async () => {
+    over.add("checkout-charity");
+    outsideRequest = true;
+    await checkGivingAllowed(start);
+    expect(alerts).toHaveLength(1);
+  });
+
+  it("an address shared by many donors needs far more declines than one email before anyone waits", async () => {
+    // 5 declines on a shared address: the email limit (3) would stop them, the address limit (15) doesn't.
+    declines = { "ip#196.1.2.3": 5 };
+    expect(await checkGivingAllowed(start)).toBeNull();
+    declines = { "ip#196.1.2.3": 15 };
+    expect((await checkGivingAllowed(start))?.reason).toBe("declines");
+    // 3 declines on one email: that email waits.
+    declines = { "email#donor@example.com": 3 };
+    expect((await checkGivingAllowed(start))?.reason).toBe("declines");
   });
 
   it("lets the gift go ahead when the limits store is down (our outage never stops a donor)", async () => {
@@ -157,6 +219,7 @@ describe("declined cards", () => {
     startRows = [{ key: "d1|email#a" }];
     over.add("charity-declines");
     await recordDecline("d1");
+    await runLater();
     expect(alerts[0].lines[0]).toMatch(/more than 10 declined cards in 60 minutes/);
   });
 

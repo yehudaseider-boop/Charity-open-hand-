@@ -123,10 +123,6 @@ export async function startDonation(args: {
   if (!checked.ok) return checked.quote ? { ok: false, message: checked.message, quote: checked.quote } : { ok: false, message: checked.message };
   const fees = checked.quote;
 
-  // Card-testing protection: only attempts that would reach the payment page count (limits per email and per
-  // address, a wait after several declined cards). See giving-guard.ts; the values are in platformConfig.givingGuard.
-  const refused = await checkGivingAllowed({ email: input.email, ip: args.ip, charityId: charity.id });
-  if (refused) return { ok: false, message: refused.message, limited: true };
 
   const v = input;
   const want18a = charity.receiptsAvailable && v.wants_18a === "on";
@@ -187,6 +183,11 @@ export async function startDonation(args: {
       return { ok: true, charged: true, reference: attemptId, token: await reissueConfirmationToken(attemptId) };
     }
   }
+  // Card-testing protection: only new attempts that would reach the payment page count (limits per email and per
+  // address, a wait after several declined cards). Asking again about an attempt already recorded (above) is never
+  // refused: that gift may already be charged. See giving-guard.ts; the values are in platformConfig.givingGuard.
+  const refused = await checkGivingAllowed({ email: v.email, ip: args.ip, charityId: charity.id });
+  if (refused) return { ok: false, message: refused.message, limited: true };
   const donorId = await findOrCreateDonor(v, detailsNow);
   // Signed in with this same (confirmed) email: the donation joins their account now,
   // not at their next sign-in. Never for a different address.

@@ -3,13 +3,42 @@ import { createHash, createHmac } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * A one-way stand-in for an address or email in the limits table, so the table never holds the address itself
- * (POPIA: kept only as long as a limit needs it). Keyed with ENCRYPTION_KEY when it is set, so the stand-in
- * can't be worked back by trying every address; a plain hash otherwise (local development).
+ * The part of an internet address that stands for one visitor. A phone or home on IPv6 gets a whole /64 block and can
+ * change the rest at will, so an IPv6 address counts by its first four groups; an IPv4 address (or one written as
+ * "::ffff:1.2.3.4") counts as itself. Pure, exported for tests.
  */
-export function hashedKey(kind: "ip" | "email", value: string): string {
+export function addressForLimits(ip: string): string {
+  const raw = ip.trim().replace(/%.*$/, "").replace(/^\[|\]$/g, "");
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(raw);
+  if (mapped) return mapped[1];
+  if (!raw.includes(":")) return raw;
+  const [head, tail] = raw.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail === undefined ? [] : tail ? tail.split(":") : [];
+  // A trailing IPv4 part ("…:1.2.3.4") takes two groups; it is past the /64 anyway.
+  const width = (groups: string[]) => groups.reduce((n, g) => n + (g.includes(".") ? 2 : 1), 0);
+  const groups = tail === undefined ? left : [...left, ...Array(Math.max(0, 8 - width(left) - width(right))).fill("0"), ...right];
+  return `${groups.slice(0, 4).map((g) => (g.replace(/^0+(?=.)/, "") || "0")).join(":")}::/64`;
+}
+
+let warnedNoSecret = false;
+
+/**
+ * A one-way stand-in for an address or email in the limits table, so the table never holds the address itself
+ * (POPIA: kept only as long as a limit needs it). Keyed with ENCRYPTION_KEY, so the stand-in can't be worked back by
+ * trying every address. Without the key: a plain hash on a developer's machine, and no key at all on the live or test
+ * site (null: that limit is skipped and the server log says so once), never an unkeyed hash of real addresses.
+ */
+export function hashedKey(kind: "ip" | "email", value: string): string | null {
   const secret = process.env.ENCRYPTION_KEY;
-  const clean = kind === "email" ? value.trim().toLowerCase() : value.trim();
+  const clean = kind === "email" ? value.trim().toLowerCase() : addressForLimits(value);
+  if (!secret && process.env.NODE_ENV === "production") {
+    if (!warnedNoSecret) {
+      warnedNoSecret = true;
+      console.error("[rate-limit] ENCRYPTION_KEY is not set: limits by internet address and by email stand-in are skipped");
+    }
+    return null;
+  }
   const digest = secret
     ? createHmac("sha256", Buffer.from(secret, "base64")).update(`limit|${kind}|${clean}`).digest("base64url")
     : createHash("sha256").update(`limit|${kind}|${clean}`).digest("base64url");
@@ -22,7 +51,8 @@ export function hashedKey(kind: "ip" | "email", value: string): string {
  * Many donors share one address (a school hall, an office), so an address gets a wider allowance.
  */
 export function ipKeys(ip: string): string[] {
-  return ip && ip !== "unknown" ? [hashedKey("ip", ip)] : [];
+  const key = ip && ip !== "unknown" ? hashedKey("ip", ip) : null;
+  return key ? [key] : [];
 }
 
 /**

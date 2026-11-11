@@ -93,8 +93,12 @@ export const platformConfig = {
     /** Gift starts per internet address. */
     perAddress: { tries: 30, minutes: 10 },
     perAddressDay: { tries: 150, minutes: 1_440 },
-    /** Declined cards from one email or address: this many, and new gifts wait until the oldest is this old. */
-    declines: { tries: 3, minutes: 60 },
+    /**
+     * Declined cards: this many, and new gifts wait until the oldest is this old. An address gets far more than an
+     * email, so a few declines on a shared office or mobile network address don't stop everyone behind it.
+     */
+    declinesPerEmail: { tries: 3, minutes: 60 },
+    declinesPerAddress: { tries: 15, minutes: 60 },
     /** Alarms for the Givezy team (an email and Admin, Payments); these never stop anyone giving. */
     charityStartsAlarm: { tries: 60, minutes: 10 },
     charityDeclinesAlarm: { tries: 10, minutes: 60 },

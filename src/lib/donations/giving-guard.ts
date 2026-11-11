@@ -3,6 +3,7 @@ import { platformConfig } from "@/config/platform";
 import { legalConfig } from "@/config/legal";
 import { logAudit } from "@/lib/audit";
 import { alertGivezy } from "@/lib/ops/alert";
+import { after } from "next/server";
 import { hashedKey, hitRateLimit, ipKeys, rateLimitReached } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tooManyTriesMessage, type GuardReason } from "./giving-guard-rules";
@@ -23,21 +24,27 @@ const guard = platformConfig.givingGuard;
 
 export type GuardRefusal = { reason: GuardReason; message: string };
 
+const keysOf = (key: string | null): string[] => (key ? [key] : []);
+
 /** One gift start: allowed (null) or refused with the plain message to show. Counts this start. */
 export async function checkGivingAllowed(args: { email: string; ip: string; charityId: string }): Promise<GuardRefusal | null> {
   try {
     const email = args.email.trim().toLowerCase();
     const addressKeys = ipKeys(args.ip);
-    const signalKeys = [hashedKey("email", email), ...addressKeys];
+    const emailKeys = keysOf(hashedKey("email", email));
 
     // Several declined cards lately: wait before trying again. Read only, so waiting doesn't extend the wait.
-    if (await rateLimitReached("checkout-declined", signalKeys, guard.declines.tries, guard.declines.minutes)) {
-      return refuse("declines", guard.declines.minutes);
+    // Email and address each have their own threshold (an address is shared by many donors).
+    if (await rateLimitReached("checkout-declined", emailKeys, guard.declinesPerEmail.tries, guard.declinesPerEmail.minutes)) {
+      return refuse("declines", guard.declinesPerEmail.minutes);
+    }
+    if (await rateLimitReached("checkout-declined", addressKeys, guard.declinesPerAddress.tries, guard.declinesPerAddress.minutes)) {
+      return refuse("declines", guard.declinesPerAddress.minutes);
     }
     // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it).
     if (await hitRateLimit("checkout", [`email:${email}`], guard.perEmail.tries, guard.perEmail.minutes)) return refuse("email", guard.perEmail.minutes);
     if (await hitRateLimit("checkout-ip", addressKeys, guard.perAddress.tries, guard.perAddress.minutes)) return refuse("address", guard.perAddress.minutes);
-    if (await hitRateLimit("checkout-day", [hashedKey("email", email)], guard.perEmailDay.tries, guard.perEmailDay.minutes)) return refuse("email-day", guard.perEmailDay.minutes);
+    if (await hitRateLimit("checkout-day", emailKeys, guard.perEmailDay.tries, guard.perEmailDay.minutes)) return refuse("email-day", guard.perEmailDay.minutes);
     if (await hitRateLimit("checkout-ip-day", addressKeys, guard.perAddressDay.tries, guard.perAddressDay.minutes)) return refuse("address-day", guard.perAddressDay.minutes);
 
     // A sudden rush on one charity (attackers change addresses and emails): tell the team, never block donors.
@@ -72,7 +79,8 @@ export async function recordBlocked(reason: GuardReason): Promise<void> {
  */
 export async function rememberGiftStart(donationId: string, email: string, ip: string): Promise<void> {
   try {
-    const keys = [hashedKey("email", email), ...ipKeys(ip)];
+    const keys = [...keysOf(hashedKey("email", email)), ...ipKeys(ip)];
+    if (!keys.length) return;
     const { error } = await createAdminClient().from("rate_limit_events").insert(keys.map((k) => ({ bucket: "checkout-start", key: `${donationId}|${k}` })));
     if (error) throw error;
   } catch (e) {
@@ -105,22 +113,44 @@ export async function recordDecline(donationId: string): Promise<void> {
   }
 }
 
-/** At most one alarm an hour per charity and kind: an audit entry (Admin, Payments) and an email to the team. */
+/**
+ * At most one alarm an hour per charity and kind: an audit entry (Admin, Payments) and an email to the team.
+ * Race-safe: every caller records its claim first, and only the earliest claim of the hour sends. The email goes after
+ * the donor's response (Next's after()), so it never slows a gift; outside a request (the daily job) it is sent now.
+ */
 async function raiseAlarm(kind: "starts" | "declines", charityId: string, limit: { tries: number; minutes: number }): Promise<void> {
+  const db = createAdminClient();
   const key = `${kind}:${charityId}`;
-  if (await rateLimitReached("giving-alarm", [key], 1, 60)) return;
-  await hitRateLimit("giving-alarm", [key], 1, 60);
-  const { data } = await createAdminClient().from("charities").select("name_en").eq("id", charityId).maybeSingle();
-  const name = (data?.name_en as string | undefined) ?? "a charity";
-  const what = kind === "starts" ? `more than ${limit.tries} gift starts` : `more than ${limit.tries} declined cards`;
-  await logAudit({ actorUserId: null, action: "giving.alarm", entityType: "charity", entityId: charityId, details: { kind, tries: limit.tries, minutes: limit.minutes } }).catch((e) =>
-    console.error("[giving-guard] could not log an alarm", e),
-  );
-  await alertGivezy(`unusual giving activity for ${name}`, [
-    `${name} had ${what} in ${limit.minutes} minutes.`,
-    "This can be card testing: someone trying stolen card numbers with small gifts.",
-    "Nobody has been blocked by this alarm. Check Admin, Payments, and the payment provider's dashboard for declines.",
-  ]);
+  const since = new Date(Date.now() - 60 * 60_000).toISOString();
+  const claim = await db.from("rate_limit_events").insert({ bucket: "giving-alarm", key }).select("id").single();
+  if (claim.error) throw claim.error;
+  const { data: first, error } = await db.from("rate_limit_events").select("id").eq("bucket", "giving-alarm").eq("key", key).gte("created_at", since).order("id").limit(1).maybeSingle();
+  if (error) throw error;
+  if (!first || first.id !== claim.data.id) return;
+
+  const send = async () => {
+    try {
+      const { data } = await db.from("charities").select("name_en").eq("id", charityId).maybeSingle();
+      const name = (data?.name_en as string | undefined) ?? "a charity";
+      const what = kind === "starts" ? `more than ${limit.tries} gift starts` : `more than ${limit.tries} declined cards`;
+      await logAudit({ actorUserId: null, action: "giving.alarm", entityType: "charity", entityId: charityId, details: { kind, tries: limit.tries, minutes: limit.minutes } }).catch((e) =>
+        console.error("[giving-guard] could not log an alarm", e),
+      );
+      await alertGivezy(`unusual giving activity for ${name}`, [
+        `${name} had ${what} in ${limit.minutes} minutes.`,
+        "This can be card testing: someone trying stolen card numbers with small gifts.",
+        "Nobody has been blocked by this alarm. Check Admin, Payments, and the payment provider's dashboard for declines.",
+      ]);
+    } catch (e) {
+      console.error("[giving-guard] could not raise an alarm", e);
+    }
+  };
+  try {
+    after(send);
+  } catch {
+    // Not inside a request (a scheduled job, a test): send it now.
+    await send();
+  }
 }
 
 export type GuardSummary = { blocked: { reason: GuardReason; count: number }[]; alarms: { at: string; kind: string; charityId: string | null }[] };

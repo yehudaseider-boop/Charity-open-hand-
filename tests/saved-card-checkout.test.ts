@@ -32,7 +32,14 @@ function builder(table: string) {
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: builder }) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) }));
-vi.mock("@/lib/rate-limit", () => ({ hitRateLimit: async () => false, ipKeys: (ip: string) => [`ip:${ip}`] }));
+/** Every attempt limit used up (card-testing protection): a retry of a recorded attempt must still get its answer. */
+let limitsUsedUp = false;
+vi.mock("@/lib/rate-limit", () => ({
+  hitRateLimit: async () => limitsUsedUp,
+  rateLimitReached: async () => limitsUsedUp,
+  ipKeys: (ip: string) => [`ip:${ip}`],
+  hashedKey: (kind: string, value: string) => `${kind}#${value}`,
+}));
 vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
@@ -86,6 +93,7 @@ beforeEach(() => {
   chargeResult = async () => ({ status: "pending" });
   refusal = false;
   prior = null;
+  limitsUsedUp = false;
   providerHas = "yes";
   verified.length = 0;
   stored = { code: "AUTH_SECRET", gateway: "test" };
@@ -225,6 +233,24 @@ describe("asking twice about the same saved-card gift", () => {
 
   const longAgo = new Date(Date.now() - 10 * 60_000).toISOString();
   const pendingPrior = (createdAt = longAgo) => ({ status: "pending", charity_id: "c1", total_charged_cents: 10_000, created_at: createdAt, donation_checkout_details: { email: "a@example.com" } });
+
+  it("a retry of an attempt already recorded is never refused by the attempt limits (it may already be charged)", async () => {
+    prior = pendingPrior();
+    limitsUsedUp = true;
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId });
+    expect(charges).toHaveLength(0);
+  });
+
+  it("a new attempt with every limit used up is refused plainly, before anything is recorded or charged", async () => {
+    limitsUsedUp = true;
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(res.status).toBe(429);
+    expect((await res.json()).message).toMatch(/^Too many tries .*Nothing was charged\./);
+    expect(charges).toHaveLength(0);
+    expect(ops.filter((o) => o.table === "donations" && o.op === "insert")).toHaveLength(0);
+  });
 
   it("never charges again: the first answer comes back once the provider has the charge", async () => {
     prior = pendingPrior();
