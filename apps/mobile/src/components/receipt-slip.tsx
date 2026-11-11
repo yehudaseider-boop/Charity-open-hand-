@@ -11,7 +11,7 @@ const DOTS = 28;
  * One issued s18A receipt, drawn as a paper slip: the charity, the amount and the receipt number on
  * top, a torn-ticket line (two notches and a dotted rule), then Download and Share underneath.
  */
-export function ReceiptSlip({ receipt, onDownload, onShare }: { receipt: Receipt; onDownload: () => void; onShare: () => void }) {
+export function ReceiptSlip({ receipt, onDownload, onShare, downloading = false }: { receipt: Receipt; onDownload: () => void; onShare: () => void; downloading?: boolean }) {
   return (
     <View style={styles.slip}>
       <View style={styles.top} accessible accessibilityLabel={`s18A receipt from ${receipt.charityName}, ${rand(receipt.cents)}, issued ${ddmmyyyy(receipt.issued)}`}>
@@ -41,9 +41,9 @@ export function ReceiptSlip({ receipt, onDownload, onShare }: { receipt: Receipt
       </View>
 
       <View style={styles.actions}>
-        <Pressable onPress={onDownload} accessibilityRole="button" accessibilityLabel={`Download receipt from ${receipt.charityName}`} style={({ pressed }) => [styles.btn, styles.btnMain, pressed && { opacity: 0.8 }]}>
+        <Pressable onPress={onDownload} disabled={downloading} accessibilityRole="button" accessibilityState={{ busy: downloading, disabled: downloading }} accessibilityLabel={`Download receipt from ${receipt.charityName}`} style={({ pressed }) => [styles.btn, styles.btnMain, pressed && { opacity: 0.8 }]}>
           <DownloadIcon color={colors.onInk} />
-          <Text style={[styles.btnText, { color: colors.onInk }]}>Download</Text>
+          <Text style={[styles.btnText, { color: colors.onInk }]}>{downloading ? "Opening…" : "Download"}</Text>
         </Pressable>
         <Pressable onPress={onShare} accessibilityRole="button" accessibilityLabel={`Share receipt from ${receipt.charityName}`} style={({ pressed }) => [styles.btn, styles.btnQuiet, pressed && { opacity: 0.7 }]}>
           <ShareIcon color={colors.blue} />

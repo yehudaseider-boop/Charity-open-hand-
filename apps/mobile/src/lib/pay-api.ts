@@ -241,6 +241,17 @@ export async function requestNewCardPage(site: string, recurringId: string, toke
   return { ok: false, message: r.ok ? NETWORK : (r.message ?? NETWORK) };
 }
 
+/**
+ * A short-lived download link for one of the signed-in donor's own s18A receipts (11/11/2026). Our server checks the
+ * receipt is theirs and hands back a link to that one PDF that works for 60 seconds, so the donor isn't asked to sign
+ * in again on the website. Only an https link is accepted.
+ */
+export async function requestReceiptLink(site: string, receiptId: string, token: string, post: Post = fetchPost): Promise<NewCardReply> {
+  const r = await call<{ ok: boolean; url?: unknown; message?: string }>(post, api(site, "receipt"), { id: receiptId }, token);
+  if (r.ok && typeof r.url === "string" && /^https:\/\//.test(r.url)) return { ok: true, url: r.url };
+  return { ok: false, message: r.ok ? NETWORK : (r.message ?? NETWORK) };
+}
+
 export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /**

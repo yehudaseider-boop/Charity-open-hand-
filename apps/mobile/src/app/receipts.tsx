@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { router } from "expo-router";
 import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,7 +16,9 @@ import { jhbToday, rand } from "@/lib/format";
 import { Button } from "@/components/button";
 import { InfoButton } from "@/components/info-button";
 import { useAccount } from "@/lib/account";
-import { notify, openSite } from "@/lib/open-site";
+import { notify, openSite, openUrl } from "@/lib/open-site";
+import { requestReceiptLink } from "@/lib/pay-api";
+import { SITE_URL } from "@/lib/website";
 import { useDirectory } from "@/lib/directory";
 import { useScreenState } from "@/lib/screen-state";
 import { taxYearFor, taxYearName, taxYearRangeLabel } from "@/lib/tax-year";
@@ -40,6 +43,21 @@ export default function Receipts() {
           ? "loading"
           : "ready";
   const directory = useDirectory();
+  // Download: our server checks the receipt is this donor's and hands back a 60-second link to the PDF, so the
+  // donor isn't asked to sign in again on the website (11/11/2026). If that can't be done, the website's own
+  // receipt link is the fallback (it asks them to sign in there).
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const download = async (id: string) => {
+    if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF.");
+    if (downloading) return;
+    const token = await account.accessToken();
+    if (!SITE_URL || !token) return openSite(`/receipts/${encodeURIComponent(id)}`);
+    setDownloading(id);
+    const r = await requestReceiptLink(SITE_URL, id, token).catch(() => ({ ok: false as const, message: "We couldn't reach Givezy. Please check your connection and try again." }));
+    setDownloading(null);
+    if (!r.ok) return notify("Couldn't open the receipt", r.message);
+    openUrl(r.url);
+  };
   const current = taxYearFor(jhbToday());
   const currentEnd = taxYearRangeLabel(current).split(" to ")[1];
 
@@ -147,11 +165,8 @@ export default function Receipts() {
                               notify("Couldn't share", "Sharing isn't available here."),
                             )
                           }
-                          onDownload={() => {
-                            // The PDF is handed out by the website, after it checks who is asking.
-                            if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF on our website.");
-                            openSite(`/receipts/${encodeURIComponent(r.id)}`);
-                          }}
+                          onDownload={() => void download(r.id)}
+                          downloading={downloading === r.id}
                         />
                       ))}
                     </View>
