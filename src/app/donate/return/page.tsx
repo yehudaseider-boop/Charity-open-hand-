@@ -178,7 +178,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
               token={holdsToken ? t : undefined}
               donorType={toComplete.donorType}
               missing={toComplete.missing}
-              intro={`Your gift is paid. For your s18A receipt we still need ${missingWords(toComplete.missing)}. Add ${toComplete.missing.length > 1 ? "them" : "it"} now, or later from your account${d.recurring_id ? ". They are used for your future monthly gifts too" : ""}. Until then this gift can't go on your s18A receipt.`}
+              intro={`Your gift is paid. For your s18A receipt we still need ${missingWords(toComplete.missing)}. Add ${toComplete.missing.length > 1 ? "them" : "it"} now, or later from your account${d.recurring_id ? ". They are used for your future monthly donations too" : ""}. Until then this gift can't go on your s18A receipt.`}
             />
           </section>
         ) : null}

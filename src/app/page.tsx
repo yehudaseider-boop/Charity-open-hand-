@@ -177,7 +177,7 @@ export default function Home() {
               tone="brand"
               title="Give in a few taps. Keep every receipt."
               points={[
-                { icon: "repeat", title: "Once or every month", body: "Pick a charity and an amount. Pause or stop a monthly gift whenever you like." },
+                { icon: "repeat", title: "Once or every month", body: "Pick a charity and an amount. Pause or stop a monthly donation whenever you like." },
                 { icon: "receipt", title: "Every s18A receipt in one place", body: "One s18A receipt a year from each charity that issues them, ready for your tax return." },
                 { icon: "lock", title: "Your card stays private", body: "You type it on a secure payment page. Givezy never sees or stores it." },
               ]}
