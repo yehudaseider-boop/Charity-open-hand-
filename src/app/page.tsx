@@ -179,7 +179,7 @@ export default function Home() {
               points={[
                 { icon: "repeat", title: "Once or every month", body: "Pick a charity and an amount. Pause or stop a monthly donation whenever you like." },
                 { icon: "receipt", title: "Every s18A receipt in one place", body: "One s18A receipt a year from each charity that issues them, ready for your tax return." },
-                { icon: "lock", title: "Your card stays private", body: "You type it on a secure payment page. Givezy never sees or stores it." },
+                { icon: "chart", title: "Goals, streaks and a record", body: "Set a giving goal for the tax year, watch your ring fill, and see your months in a row of giving." },
               ]}
               more={{ href: "/for-donors", label: "See how giving works" }}
               after={
