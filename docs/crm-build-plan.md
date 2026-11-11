@@ -36,7 +36,7 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
      details in `docs/decisions.md`). As built: new donors join on their first gift after it is switched on; the owner can
      add existing donors (asked first); no typed links; at most 5 emails; daily sending shares the one-a-week claim.
    - 6b. Campaign journeys: donating to a campaign enrols the donor.
-     **Built 10/11/2026, not yet on the test site** (migration `20261110000011_more_journeys.sql` waits for Yehuda's yes).
+     **Built 10/11/2026, on the test project** (migration `20261110000011_more_journeys.sql` applied 11/11/2026).
      As built: each campaign can have its own journey (Donor journeys, "Give a campaign its own journey", or "Emails for
      this campaign's donors" on Campaigns). A donor joins on their first gift to that campaign after its journey is
      switched on; people who gave to the campaign before aren't added. A donor can be on the general and a campaign's
@@ -44,7 +44,7 @@ test site, and checked by Yehuda before the next starts. Steps marked **Decision
    - 6c. One limit across all journeys and thank-yous. Decided 09/11/2026: at most one message a week per donor.
    In-app messages come after push notifications (step 10).
 7. **Win-back from the lapsed list** (3): add lapsed donors to a journey from step 4's list. Needs 6.
-   **Built 10/11/2026, not yet on the test site** (same migration, `20261110000011`). As built: one win-back journey per
+   **Built 10/11/2026, on the test project** (same migration, `20261110000011`). As built: one win-back journey per
    charity. The owner ticks donors on Monthly donors who stopped or on Keeping donors ("gave last tax year, not since",
    "gave in an earlier year, not since"), or chooses "Add everyone on this list"; a page then says how many join and who
    is left out and why (erased, turned off emails, only recorded gifts, already on it), asked first. At most 100 a press
