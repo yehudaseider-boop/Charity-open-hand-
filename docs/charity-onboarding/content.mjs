@@ -74,15 +74,13 @@ export function body({ logo, splash, today, art }) {
   // ---- 3. the steps
   const step = (title, what, when) => `<li><b>${title}</b> <span class="when">${when}</span><span class="what">${what}</span></li>`;
   const steps = page("", `
-    ${head("The steps", "Seven steps, about 10 working days", "From your signed agreement to your first gift, in about two weeks.")}
+    ${head("The steps", "Five steps, live within 5 working days", "From approval to going live in a week.")}
     <ol class="st big">
-      ${step("Meet and demo", "We show you Givezy and check it is a fit for your charity.", "Before you start")}
-      ${step("Agreement and kickoff", "A director or trustee signs our agreements. A 30-minute call sets your dates.", "Day 1")}
-      ${step("Send your details and documents", "Fill in pages 5 to 8 and send the documents on page 4. We check them against the official registers and your bank, and send anything missing back as one list.", "Days 1 to 5")}
-      ${step("We set up your account", "Your profile, logins, s18A receipt and bank account. You approve your public profile.", "Days 3 to 6")}
-      ${step("Your donor list", "If you want your donors on Givezy, we send a simple template and import it for you.", "Days 2 to 7")}
-      ${step("Training and a test gift", "One hour with your team, then one small real gift from start to finish to make sure it all works.", "Days 7 to 9")}
-      ${step("Go live", "Your charity goes live. We give you a launch message and a QR code to share with your donors.", "Day 10")}
+      ${step("Meet and demo", "We show you Givezy and check it's a fit.", "Before you start")}
+      ${step("Quick approval", "Send us your PBO number and SARS s18A approval. We check them with SARS and confirm by email, usually the same day.", "Day 1")}
+      ${step("Your details and training", "Once approved, you add the rest of your details, your bank account and your s18A receipt template, so we can automate your receipts and IT3(d) reporting. At the same time you get short training videos to watch at your own pace.", "Days 1 to 3")}
+      ${step("Team training", "A one-hour session with your team to answer questions and walk through your dashboard.", "Day 3 or 4")}
+      ${step("Pre-launch", "We set up your account, import your donors, and send them an email inviting them to download the Givezy app and give through it.", "Days 4 and 5")}
     </ol>
     <div class="soft" style="max-width:118mm"><h3>After go-live</h3><p>We check in after 30 days. After the tax year ends (end of February), we make your donors' s18A receipts for the year.</p></div>
     ${pic("checklist", "right:16mm;bottom:22mm;width:44mm;")}`);
@@ -156,8 +154,8 @@ export function body({ logo, splash, today, art }) {
   const go = page("", `
     ${head("Last step", "Before you go live", "We go through this list with you. When it is all done, your charity goes live.")}
     <ul class="golist">
-      <li>Agreements signed</li><li>Documents checked</li><li>Bank account checked</li><li>Your profile approved by you</li>
-      <li>Your s18A receipt approved, if you issue them</li><li>Donors imported, if you want them</li><li>Logins made and training done</li><li>A test gift worked, with the right receipt</li>
+      <li>Approval confirmed by email</li><li>Your details added</li><li>Bank account checked</li><li>Your s18A receipt template added</li>
+      <li>Training videos watched</li><li>Team training done</li><li>Donors imported</li><li>Invitation to your donors ready</li>
     </ul>
     <h2>Sign off</h2>
     <p class="muted small">By typing your name you confirm the details in this pack are correct.</p>
