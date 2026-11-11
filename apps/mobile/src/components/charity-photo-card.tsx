@@ -8,6 +8,7 @@ import { colors, fonts, radius } from "@/theme/tokens";
 import { CharityImage } from "./charity-image";
 import { CheckIcon } from "./icons";
 import { PressableScale } from "./pressable-scale";
+import { LiveBar } from "./live-bar";
 import { Text } from "./text";
 
 /** "Checked · s18A" on the photo, or "Checked by Givezy" when the charity doesn't issue s18A receipts. */
@@ -41,6 +42,9 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
   return (
     <PressableScale
       onPress={() => router.push(`/charity/${charity.slug}`)}
+      // Press and hold a card to give without opening it.
+      onLongPress={give ? () => { haptic.firm(); give(); } : undefined}
+      delayLongPress={450}
       accessibilityRole="button"
       accessibilityLabel={`${charity.nameEn}. ${charity.cause}`}
       accessibilityActions={give ? [{ name: "give", label: `Give to ${charity.nameEn}` }] : undefined}
@@ -60,7 +64,7 @@ export function CharityPhotoCard({ charity, live, width, onGive }: { charity: Ch
         <Text variant="bodyMuted" numberOfLines={2} style={styles.line}>{charity.cause}</Text>
         {pct !== null ? (
           <View style={styles.progress}>
-            <View style={styles.track}><View style={[styles.fill, { width: `${Math.max(pct, 3)}%` }]} /></View>
+            <LiveBar percent={pct} trackStyle={styles.track} fillStyle={styles.fill} />
             <View style={styles.footer}>
               <Text style={styles.progressText} numberOfLines={1}>{campaign!.title} · {pct}% of goal</Text>
               {give ? <SmallGive charity={charity} onGive={give} /> : null}

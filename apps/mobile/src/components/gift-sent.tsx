@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -6,6 +7,7 @@ import { rand } from "@/lib/format";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 import type { Goal } from "@/lib/goals";
 import { Button, TextLink } from "./button";
+import { DropBurst } from "./drop-burst";
 import { GoalEditor } from "./goal-editor";
 import { GoalRing } from "./goal-ring";
 import { Bubbles, People } from "./people";
@@ -54,7 +56,28 @@ const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
  * charity hasn't written one), the goal ring, the streak, a few honest badges, and sharing the cause
  * without the amount.
  */
-export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gift: SentGift; charityName: string; impact: string | null; shareText: string | null; onDone: () => void }) {
+export function GiftSent({
+  gift,
+  charityName,
+  impact,
+  shareText,
+  onDone,
+  firstName = null,
+  hero = null,
+  monthlyOffer = null,
+}: {
+  gift: SentGift;
+  charityName: string;
+  impact: string | null;
+  shareText: string | null;
+  onDone: () => void;
+  /** The donor's first name, for "Thank you, Sarah." */
+  firstName?: string | null;
+  /** The charity's own photo, filling the top of the thank-you. */
+  hero?: React.ReactNode;
+  /** After a once-off gift: one calm invitation to make it monthly. Never shown with the goal invitation, or while confirming. */
+  monthlyOffer?: { amount: string; onPress: () => void } | null;
+}) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const invite = gift.confirming ? null : (gift.invite ?? null);
@@ -70,10 +93,37 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
     }
   }, [shown]);
   const progress = made && invite ? invite.progressFor(made) : null;
+  const kickerLine = gift.monthly
+    ? gift.confirming
+      ? `Confirming your monthly donation · ${rand(gift.cents)} a month`
+      : `${rand(gift.cents)} a month to ${charityName}, set up`
+    : gift.confirming
+      ? `Confirming your gift · ${rand(gift.cents)} to ${charityName}`
+      : `${rand(gift.cents)} to ${charityName}, done`;
+  const emailLine = gift.confirming ? `Your confirmation goes to ${gift.email} in a minute. Please don't pay again.` : `A confirmation is on its way to ${gift.email}.`;
+  const contributionLine = gift.contributionCents > 0 ? `And ${rand(gift.contributionCents)} to Givezy${gift.monthly ? " a month" : ""}. Thank you.` : null;
+  // The one question after a gift: the goal invitation (first gift) comes before the monthly one, and sharing steps aside for it.
+  const offer = !invite && !gift.confirming ? monthlyOffer : null;
+  const celebrate = !gift.confirming && hero !== null;
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.cream }} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
       {/* The thank-you moment, in the For charities page's look (30/10/2026): white, people giving,
           soft bubbles drifting round them, the words in deep ink with the amount line in blue. */}
+      {celebrate ? (
+        <View style={[styles.hero, { minHeight: 380 + insets.top }]}>
+          {hero}
+          <LinearGradient colors={[colors.inkClear, colors.inkVeil]} locations={[0.15, 0.9]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+          <DropBurst />
+          <View style={[styles.heroText, { paddingTop: insets.top + 24 }]}>
+            <View style={styles.heroTick}><CheckIcon size={30} color={colors.onInk} /></View>
+            <Text style={styles.heroKicker}>{kickerLine}</Text>
+            <Text style={styles.heroBig} accessibilityRole="header">{firstName ? `Thank you, ${firstName}.` : "Thank you."}</Text>
+            <Text style={styles.heroSub}>{impact ?? `${charityName} is grateful for your gift.`}</Text>
+            {contributionLine ? <Text style={styles.heroSub}>{contributionLine}</Text> : null}
+            <Text style={styles.heroSub}>{emailLine}</Text>
+          </View>
+        </View>
+      ) : (
       <View style={[styles.top, { paddingTop: insets.top + 20 }]}>
         <Bubbles
           items={[
@@ -88,25 +138,14 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
           <People name={gift.confirming ? "mailSent" : "loveIt"} width={gift.confirming ? Math.min(190, width - 140) : Math.min(120, width - 200)} />
           {gift.confirming ? null : <View style={styles.tick}><CheckIcon size={24} color={colors.onInk} /></View>}
         </View>
-        <Text style={styles.kicker} accessibilityRole="header">
-          {gift.monthly
-            ? gift.confirming
-              ? `Confirming your monthly donation · ${rand(gift.cents)} a month`
-              : `${rand(gift.cents)} a month to ${charityName}, set up`
-            : gift.confirming
-              ? `Confirming your gift · ${rand(gift.cents)} to ${charityName}`
-              : `${rand(gift.cents)} to ${charityName}, done`}
-        </Text>
-        {gift.contributionCents > 0 ? <Text style={styles.sub}>And {rand(gift.contributionCents)} to Givezy{gift.monthly ? " a month" : ""}. Thank you.</Text> : null}
+        <Text style={styles.kicker} accessibilityRole="header">{kickerLine}</Text>
+        {contributionLine ? <Text style={styles.sub}>{contributionLine}</Text> : null}
         <Text style={styles.big}>
           {gift.confirming ? "Waiting for the payment provider to confirm. This usually takes a minute." : (impact ?? `Thank you for giving to ${charityName}.`)}
         </Text>
-        <Text style={styles.sub}>
-          {gift.confirming
-            ? `Your confirmation goes to ${gift.email} in a minute. Please don't pay again.`
-            : `A confirmation is on its way to ${gift.email}.`}
-        </Text>
+        <Text style={styles.sub}>{emailLine}</Text>
       </View>
+      )}
 
       <View style={styles.body}>
         {gift.confirming ? (
@@ -146,6 +185,15 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
             {gift.badges.map((b) => (
               <View key={b} style={styles.badge}><Text style={styles.badgeText}>{b}</Text></View>
             ))}
+          </View>
+        ) : null}
+
+        {offer ? (
+          <View style={styles.invite}>
+            <Bubbles items={[{ size: 120, color: colors.peach, at: { right: -44, top: -50 } }, { size: 12, color: colors.orange, float: true, at: { right: 30, top: 24 } }]} />
+            <Text variant="h2" accessibilityRole="header">Make it <Text variant="h2" style={styles.key}>monthly</Text>?</Text>
+            <Text variant="bodyMuted">{offer.amount} a month to {charityName}. Next you check the details and confirm. You can pause or stop it any time.</Text>
+            <Button variant="cta" label={`Give ${offer.amount} every month`} onPress={offer.onPress} />
           </View>
         ) : null}
 
@@ -209,10 +257,10 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
           </View>
         ) : null}
 
-        <View style={styles.shareSpot}>
+        {offer ? null : <View style={styles.shareSpot}>
           <ShareButton text={shareText} label={`Share ${charityName} on WhatsApp`} />
           <Text variant="label">Share the cause. Your amount stays private.</Text>
-        </View>
+        </View>}
 
         <Button label="Done" onPress={invite ? invite.goHome : onDone} />
         {/* Straight to the gift history, with the giving screens closed behind it. */}
@@ -224,6 +272,12 @@ export function GiftSent({ gift, charityName, impact, shareText, onDone }: { gif
 
 const styles = StyleSheet.create({
   top: { paddingHorizontal: space.gutter, paddingBottom: 28, gap: 10, overflow: "hidden" },
+  hero: { backgroundColor: colors.blue, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: "hidden", justifyContent: "flex-end", marginBottom: 24 },
+  heroText: { paddingHorizontal: space.gutter, paddingBottom: 28, gap: 8 },
+  heroTick: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.sage, borderWidth: 4, borderColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  heroKicker: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 22, color: colors.lilac },
+  heroBig: { fontFamily: fonts.displayBold, fontSize: 40, lineHeight: 44, letterSpacing: -0.6, color: colors.onInk },
+  heroSub: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft },
   art: { alignItems: "center", justifyContent: "center", marginBottom: 8 },
   tick: { position: "absolute", left: "50%", bottom: 0, marginLeft: 38, width: 44, height: 44, borderRadius: 22, backgroundColor: colors.sage, borderWidth: 4, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
   kicker: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 22, color: colors.blue },

@@ -37,6 +37,8 @@ export const colors = {
   scrim: "rgba(14,27,61,0.45)", // deep ink veil behind pop-ups
   scrimSoft: "rgba(14,27,61,0.35)", // lighter veil behind bottom sheets
   creamClear: "rgba(255,255,255,0)", // the page colour, see-through: where a fade to the page starts
+  inkClear: "rgba(14,27,61,0)", // deep ink, see-through: where a veil over a photo starts
+  inkVeil: "rgba(14,27,61,0.82)", // deep ink veil at the foot of a photo, so white words on it stay readable
 } as const;
 
 export const fonts = {

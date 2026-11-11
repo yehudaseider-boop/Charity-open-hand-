@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { rand } from "@/lib/format";
 import { campaignPercent, type RaisingNow } from "@/lib/live-charities";
 import { colors, fonts, radius, space } from "@/theme/tokens";
+import { LiveBar } from "./live-bar";
 import { Text } from "./text";
 
 /**
@@ -36,9 +37,7 @@ export function RaisingNowRow({ items }: { items: RaisingNow[] }) {
               <Text style={styles.raised} numberOfLines={1} adjustsFontSizeToFit>{rand(c.raisedCents)}</Text>
               <Text style={styles.figures} numberOfLines={1}>{c.targetCents ? `of ${rand(c.targetCents)}` : "raised"}</Text>
               {c.targetCents ? (
-                <View style={styles.track}>
-                  <View style={[styles.fill, { width: `${Math.max(pct, 3)}%` }]} />
-                </View>
+                <LiveBar percent={pct} trackStyle={styles.track} fillStyle={styles.fill} />
               ) : null}
             </Pressable>
           );

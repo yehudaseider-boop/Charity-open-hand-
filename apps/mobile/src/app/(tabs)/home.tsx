@@ -1,6 +1,9 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { RaisingNowRow } from "@/components/raising-now";
+import { pullToRefresh, RefreshDrops } from "@/components/refresh-drops";
+import { yourCampaigns } from "@/lib/campaign-feed";
 import { bigAmountSize } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Blob } from "@/components/blob";
@@ -99,10 +102,18 @@ export default function Home() {
   const gaveTo = charitiesGivenTo(gifts, monthlyList);
   const charityNews = useCharityNews(gaveTo.map((c) => c.slug));
   const news = charityNews.news && !(preview && demoState !== "ready") ? newsFeed(gaveTo, charityNews.news, jhbToday(), charityNews.live ? undefined : Infinity) : [];
+  // Live campaign bars from the charities they gave to or saved (11/11/2026): real campaigns only, and only when there are some.
+  const raising = preview && demoState !== "ready" ? [] : yourCampaigns(all, gaveTo.map((c) => c.slug), saved.map((c) => c.slug));
+  const refreshing = directory.refreshing || account.refreshing;
+  const refresh = () => {
+    void directory.refresh();
+    void account.refresh();
+  };
 
   return (
     <>
-      <ScrollView style={styles.screen} onScroll={status.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, gap: space.block }}>
+      <RefreshDrops active={refreshing} top={insets.top + 6} />
+      <ScrollView style={styles.screen} onScroll={status.onScroll} scrollEventThrottle={16} refreshControl={preview ? undefined : pullToRefresh(refreshing, refresh)} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 40, gap: space.block }}>
         <View style={[styles.gutter, styles.top]}>
           <Logo width={104} />
           <Pressable onPress={() => router.push("/account")} accessibilityRole="button" accessibilityLabel="Your account" style={styles.avatar}>
@@ -201,6 +212,8 @@ export default function Home() {
             </View>
           </View>
         ) : null}
+
+        {raising.length ? <RaisingNowRow items={raising} /> : null}
 
         {news.length ? (
           <View style={[styles.gutter, { gap: 12 }]}>

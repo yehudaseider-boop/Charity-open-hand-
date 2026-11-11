@@ -219,6 +219,8 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 
 - [ ] **Search and chatbots (built 03/11/2026):** on the live site only, set `SITE_INDEXING=yes` in Vercel (Production), so Google may list it; the test site stays hidden. Then add givezy.co.za to Google Search Console and send it `https://givezy.co.za/sitemap.xml`. Check a shared link on WhatsApp shows the Givezy picture, and `https://givezy.co.za/llms.txt` opens. FAQ wording approved 03/11/2026 (`src/lib/seo/faq.ts`).
 
+- [ ] **Try the app's new touch moves on a real iPhone and Android phone (added 11/11/2026):** hold to give (the fill, the ticks and the firm thump at the end, and that letting go early gives nothing), sliding across the amount, the swipeable stories on Discover, the drops on pull to refresh (iPhone), and the thank-you's burst. Then check them with VoiceOver and TalkBack on (double tap must give at once), with "reduce motion" on, and with the text size turned up. These were built and checked in the web preview only, which has no vibration and no real touch.
+
 ## C. First live day
 
 - [ ] One small real donation with Yehuda's own card. Check: the thank-you page, the confirmation email, the donation shows as paid, the charity sees it without the donor's private choice, and the s18A flow behaves as agreed.

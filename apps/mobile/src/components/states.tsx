@@ -1,4 +1,6 @@
-import { StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Animated, Easing, StyleSheet, View } from "react-native";
+import { reduceMotion } from "@/lib/motion";
 import { colors, radius, space } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
 import { ddmmyyyy, hhmm, jhbDay } from "@/lib/format";
@@ -6,9 +8,21 @@ import { People } from "./people";
 import type { PeopleName } from "./people-art";
 import { Text } from "./text";
 
-/** Loading: quiet placeholder blocks in the hairline colour, no spinners. */
+/** Loading: soft lilac blocks that breathe gently, no spinners. Still for anyone who asks for less motion. */
 export function SkeletonBlock({ height, width = "100%", style }: { height: number; width?: number | `${number}%`; style?: object }) {
-  return <View style={[{ height, width, borderRadius: radius.card, backgroundColor: colors.hairline, opacity: 0.6 }, style]} />;
+  const [v] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (reduceMotion()) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  return <Animated.View style={[{ height, width, borderRadius: radius.card, backgroundColor: colors.lightPurple, opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.75] }) }, style]} />;
 }
 
 export function LoadingList({ count = 3, imageHeight = 120 }: { count?: number; imageHeight?: number }) {

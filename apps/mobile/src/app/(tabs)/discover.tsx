@@ -1,6 +1,8 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { pullToRefresh, RefreshDrops } from "@/components/refresh-drops";
+import { StoryDeck } from "@/components/story-deck";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStatusCover } from "@/components/status-cover";
 import { RaisingNowRow } from "@/components/raising-now";
@@ -67,16 +69,20 @@ export default function Discover() {
   const sortedByCauses = !searching && cause === "all" && results.some((c) => picked.some((p) => inCause(c, p)));
   const noneYet = live && charities.length === 0;
   const rest = results.filter((c) => c !== featured);
+  // Swipeable stories first (when not searching and there are enough to swipe through); the list carries on after them.
+  const deck = !searching && cause === "all" && rest.length >= 3 ? rest.slice(0, 8) : [];
+  const list = deck.length ? rest.slice(deck.length) : rest;
 
   return (
     <>
+      <RefreshDrops active={directory.refreshing} top={insets.top + 6} />
       <ScrollView
         style={styles.screen}
         onScroll={status.onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
-        refreshControl={live ? <RefreshControl refreshing={directory.refreshing} onRefresh={directory.refresh} /> : undefined}
+        refreshControl={live ? pullToRefresh(directory.refreshing, directory.refresh) : undefined}
       >
         <View style={[styles.gutter, { gap: 14 }]}>
           <View style={styles.hero}>
@@ -150,9 +156,14 @@ export default function Discover() {
                   <CauseOfTheWeek charity={featured} live={live} />
                 </FadeUp>
               ) : null}
+              {deck.length ? (
+                <View style={{ marginHorizontal: -space.gutter }}>
+                  <StoryDeck charities={deck} live={live} onGive={onGive} />
+                </View>
+              ) : null}
               <View style={{ gap: 14 }}>
-                {rest.length ? <Text style={styles.listHead} accessibilityRole="header">{cause === "all" && !searching ? (sortedByCauses ? "Charities for the causes you chose, first" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
-                {rest.map((c, i) => (
+                {list.length ? <Text style={styles.listHead} accessibilityRole="header">{cause === "all" && !searching ? (sortedByCauses && !deck.length ? "Charities for the causes you chose, first" : deck.length ? "More charities" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
+                {list.map((c, i) => (
                   <FadeUp key={c.slug} index={i + 1}>
                     <CharityPhotoCard charity={c} live={live} onGive={onGive} />
                   </FadeUp>

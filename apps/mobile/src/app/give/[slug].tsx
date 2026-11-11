@@ -8,9 +8,12 @@ import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AmountSwipe } from "@/components/amount-swipe";
 import { Button, TextLink } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
+import { CharityImage } from "@/components/charity-image";
 import { Field } from "@/components/field";
+import { HoldToGive } from "@/components/hold-to-give";
 import { GiftSent, type GoalInvite, type SentGift } from "@/components/gift-sent";
 import { CheckIcon, ChevronIcon } from "@/components/icons";
 import { Segmented } from "@/components/segmented";
@@ -25,6 +28,8 @@ import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
 import { cleanLabel } from "@shared/donations/labels";
 import { useAccount } from "@/lib/account";
+import { amountFromParam, lastGiftTo } from "@/lib/amount-steps";
+import { firstNameOf } from "@/lib/campaign-feed";
 import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
 import { jhbToday, rand } from "@/lib/format";
@@ -80,7 +85,7 @@ type Snapshot = { cents: number; contributionCents: number; email: string; month
 export default function Give() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { slug, label: labelParam, campaign: rawCampaign, demo } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string }>();
+  const { slug, label: labelParam, campaign: rawCampaign, demo, monthly: monthlyParam, amount: amountParam } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string; monthly?: string; amount?: string }>();
   // A link with a broken campaign id gives to the charity itself, rather than failing every check.
   const campaignParam = typeof rawCampaign === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawCampaign) ? rawCampaign : undefined;
   const { charity, failed, retry } = useCharity(slug);
@@ -91,6 +96,8 @@ export default function Give() {
   const history = preview ? sampleGifts : (account.live?.gifts ?? []);
   const elsewhere = preview ? sampleElsewhere : (account.live?.elsewhere ?? []);
   const pastAmounts = slug ? quickAmounts(history, slug) : [];
+  // "Same as last time": the donor's own most recent gift to this charity, one tap away.
+  const lastGift = slug ? lastGiftTo(history, slug) : null;
   const owner = account.status === "signed-in" ? account.userId : null;
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   const goals = useStoredRecord<Goal[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadGoals, initial: preview ? sampleGoals : noGoals });
@@ -115,14 +122,18 @@ export default function Give() {
   // never suggests a figure of its own, so a new donor at a charity that chose none types the amount.
   const quick = tapAmounts(pastAmounts, ready?.ok ? ready.suggestedCents : []);
   const [readyAttempt, setReadyAttempt] = useState(0);
-  const [amount, setAmount] = useState("");
+  // Starts empty, or with the amount from "Make it monthly" after a gift (the donor's own figure, never ours).
+  const [amount, setAmount] = useState(() => {
+    const c = amountFromParam(amountParam);
+    return c ? centsToInput(c) : "";
+  });
   // Starts from the label passed in, else the one used last time at this charity (an older link's ?kind= is ignored).
   const startLabel = cleanLabel(labelParam) || (slug ? lastLabel(history, slug) : null);
   const [label, setLabel] = useState<string | null>(startLabel);
   // The optional extras (monthly, label, anonymous, message, dedication, save card), closed unless something is already chosen.
   const [more, setMore] = useState(Boolean(startLabel));
   const labelSuggestions = useLabelSuggestions();
-  const [monthly, setMonthly] = useState(false);
+  const [monthly, setMonthly] = useState(monthlyParam === "1");
   // The contribution to Givezy the donor picked; null until they pick, so the server's preselected amount shows.
   const [extraPick, setExtraPick] = useState<ContributionChoice | null>(null);
   const [coverCharge, setCoverCharge] = useState(false);
@@ -317,7 +328,29 @@ export default function Give() {
   };
   if (done) {
     const paidFor = charity.impactUnit ? impactLine(done.cents, charity.impactUnit, { you: true, monthly: done.monthly }) : null;
-    return <GiftSent gift={done} charityName={charity.nameEn} impact={paidFor ? `${paidFor}.` : (charity.impact ?? null)} shareText={charityShareText(SITE_URL, charity)} onDone={finish} />;
+    return (
+      <GiftSent
+        gift={done}
+        charityName={charity.nameEn}
+        impact={paidFor ? `${paidFor}.` : (charity.impact ?? null)}
+        shareText={charityShareText(SITE_URL, charity)}
+        onDone={finish}
+        firstName={firstNameOf(first)}
+        hero={<CharityImage charity={charity} live={!preview} rounded={false} bare veil style={StyleSheet.absoluteFill} />}
+        // One calm next step after a once-off gift (not for a campaign gift, which can't be monthly): make it monthly, with the same amount.
+        monthlyOffer={
+          !done.monthly && !done.confirming && !campaignParam && slug
+            ? {
+                amount: rand(done.cents),
+                onPress: () => {
+                  dismissArrived();
+                  router.replace({ pathname: "/give/[slug]", params: { slug, monthly: "1", amount: String(done.cents) } });
+                },
+              }
+            : null
+        }
+      />
+    );
   }
 
   // The campaign counts only once the server says it is still running (so a gift never quietly
@@ -690,6 +723,7 @@ export default function Give() {
               ]}
             />
             <Text style={styles.amountKicker}>Your gift</Text>
+            <AmountSwipe cents={gift} min={minGift} max={maxGift} disabled={locked} onChange={(c) => setAmount(centsToInput(c))}>
             <View style={styles.amountRow}>
               <Text style={styles.amountR}>R</Text>
               <TextInput
@@ -705,6 +739,7 @@ export default function Give() {
                 style={[styles.amountInput, amount.length > 9 ? { fontSize: 34, lineHeight: 44 } : amount.length > 6 ? { fontSize: 44, lineHeight: 54 } : null]}
               />
             </View>
+            </AmountSwipe>
             {/* What this amount pays for, by the charity's own figure; otherwise its own impact line. */}
             {amountImpact && charity.impactUnit ? (
               <>
@@ -714,8 +749,24 @@ export default function Give() {
             ) : charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
           </View>
           {err("amount") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert">{err("amount")}</Text> : minGift ? <Text variant="label">At least {rand(minGift)}.</Text> : null}
+          {lastGift ? (
+            <Pressable
+              disabled={locked}
+              onPress={() => {
+                haptic.tap();
+                setAmount(centsToInput(lastGift.cents));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Same as last time: ${rand(lastGift.cents)}`}
+              accessibilityState={{ selected: gift === lastGift.cents, disabled: locked }}
+              style={({ pressed }) => [styles.again, gift === lastGift.cents && styles.againOn, locked && styles.chipOff, pressed && { opacity: 0.8 }]}
+            >
+              {gift === lastGift.cents ? <CheckIcon size={16} color={colors.onInk} /> : null}
+              <Text style={[styles.againText, gift === lastGift.cents && { color: colors.onInk }]}>Same as last time · {rand(lastGift.cents)}</Text>
+            </Pressable>
+          ) : null}
           <View style={styles.chips} accessibilityLabel={!quick.length ? "Amount" : pastAmounts.length ? "Amounts you gave before" : `Amounts suggested by ${charity.nameEn}`}>
-            {quick.map((c) => {
+            {quick.filter((c) => c !== lastGift?.cents).map((c) => {
               const on = gift === c;
               return (
                 <Pressable key={c} disabled={locked} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Set the amount to ${rand(c)}`} accessibilityState={{ selected: on, disabled: locked }} style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}>
@@ -1088,7 +1139,7 @@ export default function Give() {
                 )}
               </>
             ) : (
-              <Button variant="cta" label={buttonLabel} disabled={busy !== false} onPress={give} />
+              <HoldToGive label={total ? `Hold to give ${rand(total)}${isMonthly ? " every month" : ""}` : "Hold to give"} busyLabel={busy ? buttonLabel : "Giving…"} busy={busy !== false} onConfirm={give} />
             )}
             <Text variant="label" style={styles.footerLine}>
               {total !== null ? `${rand(gift ?? 0)} to ${charity.nameEn}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. Contribution to Givezy: ${contributionLabel(contribution ?? 0, isMonthly)}. ` : ""}
@@ -1106,6 +1157,9 @@ const styles = StyleSheet.create({
   safeBox: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.peach },
   safeDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center", marginTop: 1 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  again: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lilac },
+  againOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  againText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.blue },
   chip: { minHeight: 46, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lilacSoft, justifyContent: "center", backgroundColor: colors.lilacSoft },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipRow: { flexDirection: "row", alignItems: "center", gap: 6 },

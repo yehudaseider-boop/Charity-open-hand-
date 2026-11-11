@@ -6,6 +6,7 @@ import { colors, fonts, radius } from "@/theme/tokens";
 import { Button } from "./button";
 import { Bubbles } from "./people";
 import { ShareButton } from "./share-button";
+import { LiveBar } from "./live-bar";
 import { Text } from "./text";
 
 /**
@@ -34,9 +35,7 @@ export function CampaignCard({ campaign, onGive, shareText, charityName, compact
           {c.targetCents ? ` of ${rand(c.targetCents)}` : " raised"}
         </Text>
         {c.targetCents ? (
-          <View style={styles.track} accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: pct }} accessibilityLabel={`${pct} per cent of the goal`}>
-            <View style={[styles.fill, { width: `${Math.max(pct, 3)}%` }]} />
-          </View>
+          <LiveBar percent={pct} trackStyle={styles.track} fillStyle={styles.fill} accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: pct }} accessibilityLabel={`${pct} per cent of the goal`} />
         ) : null}
         <Text variant="label">
           {c.giftCount} {c.giftCount === 1 ? "gift" : "gifts"}{/* The last day in South Africa, wherever the phone is. */}

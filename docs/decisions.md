@@ -1824,3 +1824,28 @@ Built from Yossi's notes (1.1) as step 6a of `docs/crm-build-plan.md`. Migration
   motion" or in print.
 - The floating sample cards beside the windows moved down so they never cover the menu.
 - For charities already links to the working dashboard demo ("Try the dashboard with sample data").
+
+## The app, nicer to use (Yehuda, 11/11/2026: "love them all, build")
+
+Giving should feel as quick as paying for coffee, and as good as a thank-you note. What was built (all in `apps/mobile`):
+
+- **Hold to give.** The Give button is pressed and held for a moment (a ring and the button fill, soft ticks, a firm thump
+  at the end), then it gives. Letting go early takes it back. Nobody is shut out: a screen reader's double tap, the
+  keyboard's Enter and a second quick tap after the hint all give at once. If a field needs fixing, the button comes back.
+- **The amount dial.** Slide across the big amount, or use minus and plus: R10 steps under R100, R50 under R500, R100
+  under R2 000, R500 above. It only moves an amount that is already there, so Givezy still never suggests a figure of its
+  own, and it stops at the smallest and largest gift (`lib/amount-steps.ts`).
+- **Same as last time.** One tap puts back the donor's own most recent gift to that charity.
+- **The thank-you.** The charity's photo fills the top, the logo's own drops burst once, "Thank you, Sarah." Then one calm
+  question, never two: the goal invitation on a first gift, else "Make it monthly?" (same amount, nothing chosen for them,
+  not offered after a campaign gift), else sharing. No burst for anyone who asks for less motion.
+- **Home is a feed from your charities.** "Raising now" shows the live campaigns of charities they gave to or saved, in
+  front of the news, with bars that glide to the new amount (real campaigns only, nothing invented).
+- **Discover.** "Swipe to explore": a deck of tall story cards (photo, name, one line, Save and Give), then the list.
+  Pressing and holding any charity card gives without opening it.
+- **Small touches.** Our drops for pull to refresh on iPhone (Android keeps its own spinner, in our blue), lilac loading
+  blocks that breathe, firmer and softer haptics (`lib/haptics.ts`), live bars everywhere a campaign shows.
+- **Not built:** dark mode (a whole colour system of its own) and "near you" (needs the phone's location, a new
+  permission). Both stay on the ideas list.
+- Checked in the web preview (laptop and phone width) and with new tests (`tests/app-amount-steps.test.ts`). Real-phone
+  checks are on the go-live list.
