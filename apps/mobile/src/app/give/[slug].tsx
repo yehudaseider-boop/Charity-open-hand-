@@ -801,8 +801,10 @@ export default function Give() {
       return;
     }
     haptic.success();
-    // Paid, or back from a finished payment page: the thank-you shows now and the history catches up.
-    void dropPendingGift(owner, charity!.slug);
+    // Paid, or back from a finished payment page: the thank-you shows now and the history catches up. A gift the
+    // server still calls pending stays kept on the phone, so Progress keeps checking it until it is paid, didn't go
+    // through, or isn't found: a late decline is then still shown (review 12/11/2026).
+    if (outcome === "paid") void dropPendingGift(owner, charity!.slug);
     void refreshAfterGiving(account.refresh);
     setDone(sentSummary(sent, outcome !== "paid", r.reference));
   }

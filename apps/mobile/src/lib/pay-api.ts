@@ -268,7 +268,9 @@ export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, sa
   // Johannesburg time (UTC+2, no daylight saving).
   const jhb = checkedAt ? new Date(checkedAt.getTime() + 2 * 3_600_000) : null;
   const last = jhb ? ` Last checked at ${String(jhb.getUTCHours()).padStart(2, "0")}:${String(jhb.getUTCMinutes()).padStart(2, "0")}.` : "";
-  if (outcome === "failed") return "Your card was declined and nothing was charged. Your details are still here: tap Give to try again, or use another card.";
+  // The same words as the website's return page: a "failed" payment may be a declined card or a payment page that
+  // was closed (an old checkout is closed after 48 hours), so it never claims which (review 12/11/2026).
+  if (outcome === "failed") return "This payment didn't go through, so nothing was charged. This usually means the card was declined or the payment page was closed. Your details are still here: tap Give to try again, or use another card.";
   if (outcome === "reversed") return "This donation was refunded, so nothing is owed on it. Your details are still here if you'd like to give again.";
   if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: tap Give to try again.";
   if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.${last}`;

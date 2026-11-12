@@ -24,7 +24,7 @@ type Shown =
  * A gift we haven't heard the end of (see lib/pending-gift.ts), shown at the top of Progress. This is where the
  * payment page's return link lands when the phone closed the app while the page was open: without it the donor
  * would see no thank-you and no way to check. When Progress opens, each waiting gift is asked about once, and again
- * on "Check again", until the server says paid, declined or not found; then it is forgotten. A gift kept while
+ * on "Check again", until the server says paid, didn't go through, or not found; then it is forgotten. A gift kept while
  * Progress is already open is being handled by the give screen, so it isn't asked about twice: it waits for "Check again".
  */
 export function PendingGifts() {
@@ -33,7 +33,7 @@ export function PendingGifts() {
   const known = !preview && account.status !== "loading" && account.status !== "agreeing";
   const owner = account.status === "signed-in" ? account.userId : null;
   const [gifts, setGifts] = useState<PendingGift[]>([]);
-  // What each gift shows, by charity. A settled one stays on screen (paid, declined) until dismissed.
+  // What each gift shows, by charity. A settled one stays on screen (paid, didn't go through) until dismissed.
   const [shown, setShown] = useState<Record<string, Shown>>({});
   const [settled, setSettled] = useState<PendingGift[]>([]);
   const asked = useRef(new Set<string>());
@@ -108,7 +108,7 @@ export function PendingGifts() {
             s.outcome === "paid"
               ? `Your gift of ${total} to ${g.charityName} went through. Thank you.`
               : s.outcome === "failed"
-                ? `Your gift of ${total} to ${g.charityName} was declined, and nothing was charged.`
+                ? `Your gift of ${total} to ${g.charityName} didn't go through, so nothing was charged.`
                 : s.outcome === "reversed"
                   ? `Your gift of ${total} to ${g.charityName} was refunded, so nothing is owed on it.`
                   : `We couldn't find a payment for your gift of ${total} to ${g.charityName}, so nothing was charged.`;
