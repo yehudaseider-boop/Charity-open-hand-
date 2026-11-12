@@ -247,6 +247,17 @@ export async function requestReceiptLink(site: string, receiptId: string, token:
   return { ok: false, message: r.ok ? NETWORK : (r.message ?? NETWORK) };
 }
 
+/**
+ * The signed-in donor's gifts still waiting for their s18A details (given with "Add my details after paying", on any
+ * phone or the website), from our server (12/11/2026). null when there is no usable answer (offline, an error): the
+ * Receipts screen then falls back to the gifts given that way on this phone.
+ */
+export async function requestS18aWaiting(site: string, token: string, post: Post = fetchPost): Promise<Set<string> | null> {
+  const r = await call<{ ok: boolean; waiting?: unknown }>(post, api(site, "s18a-waiting"), {}, token);
+  if (!r.ok || !Array.isArray(r.waiting) || !r.waiting.every((id) => typeof id === "string")) return null;
+  return new Set(r.waiting as string[]);
+}
+
 export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /**

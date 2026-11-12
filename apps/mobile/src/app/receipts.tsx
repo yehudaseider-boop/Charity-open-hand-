@@ -17,7 +17,7 @@ import { Button, TextLink } from "@/components/button";
 import { InfoButton } from "@/components/info-button";
 import { useAccount } from "@/lib/account";
 import { notify, openSite, openUrl } from "@/lib/open-site";
-import { requestReceiptLink } from "@/lib/pay-api";
+import { requestReceiptLink, requestS18aWaiting } from "@/lib/pay-api";
 import { countsTowardsReceipts } from "@/lib/live-giving";
 import { clearDetailsLater, loadDetailsLater } from "@/lib/pending-gift-store";
 import { SITE_URL } from "@/lib/website";
@@ -67,18 +67,41 @@ export default function Receipts() {
       setDownloading(null);
     }
   };
-  // Gifts given on this phone with "Add my details after paying": they can't go on a receipt until the details are added.
+  // Gifts given with "Add my details after paying" can't go on a receipt until the details are added. Our server
+  // knows them all, wherever they were given and whether the details have since been added (12/11/2026); when it
+  // can't be reached, the gifts given that way on this phone stand in.
   const owner = signedIn ? account.userId : null;
-  const [detailsLater, setDetailsLater] = useState<ReadonlySet<string>>(new Set());
+  const [localLater, setLocalLater] = useState<ReadonlySet<string>>(new Set());
+  const [serverLater, setServerLater] = useState<ReadonlySet<string> | null>(null);
   const [laterRead, setLaterRead] = useState(0);
+  const loadedAt = account.live?.loadedAt;
   useEffect(() => {
     if (!signedIn) return;
     let live = true;
-    loadDetailsLater(owner).then((ids) => live && setDetailsLater(ids));
+    loadDetailsLater(owner).then((ids) => live && setLocalLater(ids));
     return () => {
       live = false;
     };
   }, [signedIn, owner, laterRead]);
+  useEffect(() => {
+    if (!signedIn || !SITE_URL) return;
+    let live = true;
+    (async () => {
+      const token = await account.accessToken().catch(() => null);
+      const waiting = token ? await requestS18aWaiting(SITE_URL, token).catch(() => null) : null;
+      if (!live || !waiting) return;
+      setServerLater(waiting);
+      // This phone's own list forgets gifts whose details have since been added.
+      const done = [...localLater].filter((id) => !waiting.has(id));
+      if (done.length) void clearDetailsLater(owner, done).then(() => live && setLaterRead((n) => n + 1));
+    })();
+    return () => {
+      live = false;
+    };
+    // Asked again whenever the giving history is refreshed (pull to refresh, coming back online).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn, owner, loadedAt]);
+  const detailsLater = serverLater ?? localLater;
   const current = taxYearFor(jhbToday());
   const currentEnd = taxYearRangeLabel(current).split(" to ")[1];
 
@@ -157,10 +180,13 @@ export default function Receipts() {
                   </Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 18 }}>
                     <TextLink label="Add them on our website" onPress={() => openSite("/account#s18a-needed")} />
-                    <TextLink
-                      label="I've added them"
-                      onPress={() => void clearDetailsLater(owner, waitingDetails.map((g) => g.id)).then(() => setLaterRead((n) => n + 1))}
-                    />
+                    {/* Only needed when our server couldn't be asked: otherwise added details show on the next refresh. */}
+                    {serverLater ? null : (
+                      <TextLink
+                        label="I've added them"
+                        onPress={() => void clearDetailsLater(owner, waitingDetails.map((g) => g.id)).then(() => setLaterRead((n) => n + 1))}
+                      />
+                    )}
                   </View>
                 </View>
               </View>

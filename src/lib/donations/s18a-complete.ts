@@ -16,6 +16,7 @@ import {
   monthlyGiftsToComplete,
   s18aDetailsMissing,
   sameRegistration,
+  waitingForS18aDetails,
   type S18aCompletion,
   type S18aDetailsRow,
 } from "./s18a-details";
@@ -391,4 +392,34 @@ export async function listS18aToComplete(userId: string, now = new Date()): Prom
       registrationNumber: r.details!.registration_number,
       missing: s18aDetailsMissing(r.details!),
     }));
+}
+
+/**
+ * The signed-in donor's paid gifts (this tax year and the one before) that asked for an s18A receipt and are still
+ * waiting for its details, every gift (not one line per monthly donation): the ids the phone app leaves out of
+ * "Counts towards your s18A receipts". Read with the server's own access; no new grants (12/11/2026).
+ */
+export async function giftsWaitingForS18aDetails(userId: string, now = new Date()): Promise<string[]> {
+  const db = createAdminClient();
+  const { data: donors, error: donorsError } = await db.from("donors").select("id").eq("user_id", userId);
+  if (donorsError) throw donorsError;
+  const donorIds = (donors ?? []).map((d) => d.id as string);
+  if (!donorIds.length) return [];
+  const year = completionWindow(now).taxYear;
+  const { data, error } = await db
+    .from("donations")
+    .select(`id, status, wants_18a, donation_checkout_details(${DETAILS_COLUMNS})`)
+    .in("donor_id", donorIds)
+    .eq("status", "paid")
+    .eq("wants_18a", true)
+    .in("tax_year", [year, year - 1])
+    .order("paid_at", { ascending: false })
+    .limit(1000);
+  if (error) throw error;
+  const rows = (data ?? []).map((g) => {
+    const d = g.donation_checkout_details as unknown as S18aDetailsRow | S18aDetailsRow[] | null;
+    return { gift: { id: g.id as string, status: g.status as string, wants_18a: g.wants_18a as boolean }, details: Array.isArray(d) ? (d[0] ?? null) : d };
+  });
+  const issued = await onIssuedReceipt(db, rows.map((r) => r.gift.id));
+  return rows.filter((r) => waitingForS18aDetails(r.gift, r.details, issued)).map((r) => r.gift.id);
 }
