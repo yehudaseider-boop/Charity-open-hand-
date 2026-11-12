@@ -105,7 +105,7 @@ export default function Discover() {
               <TextInput
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Search by name, cause or area"
+                placeholder="Name, cause or area"
                 placeholderTextColor={colors.muted}
                 accessibilityLabel="Search charities"
                 returnKeyType="search"

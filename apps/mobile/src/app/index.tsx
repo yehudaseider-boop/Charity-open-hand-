@@ -28,7 +28,7 @@ const STEPS = 2;
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const directory = useDirectory();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
   const forced = p.welcome === "1";
@@ -73,15 +73,17 @@ export default function Welcome() {
             { size: 300, color: colors.lilacSoft, at: { left: -140, top: insets.top - 60 } },
             { size: 240, color: colors.peach, at: { right: -110, top: insets.top + 200 } },
             { size: 18, color: colors.orange, float: true, at: { left: 40, top: insets.top + 120 } },
-            { size: 34, color: colors.blue, ring: true, float: true, at: { left: 26, top: insets.top + 300 } },
+            // On short phones the rings move clear of the headline and the button.
+            { size: 34, color: colors.blue, ring: true, float: true, at: { left: 26, top: insets.top + (height < 760 ? 190 : 300) } },
             { size: 26, color: colors.blue, float: true, at: { right: 46, top: insets.top + 90 } },
             { size: 12, color: colors.orange, float: true, at: { right: 34, top: insets.top + 360 } },
-            { size: 44, color: colors.lilac, ring: true, float: true, at: { right: -12, top: insets.top + 470 } },
+            { size: 44, color: colors.lilac, ring: true, float: true, at: height < 760 ? { right: -12, top: height - insets.bottom - 70 } : { right: -12, top: insets.top + 470 } },
           ]}
         />
         <View style={styles.gutter}><Logo width={130} /></View>
         <View style={styles.welcomeArt}>
-          <People name="mobilePay" width={Math.min(280, width - 80)} />
+          {/* Smaller on short phones (iPhone SE), so it never runs into the logo or the headline (12/11/2026). */}
+          <People name="mobilePay" width={Math.min(280, width - 80, height < 760 ? Math.round(height * 0.27) : 280)} />
         </View>
         <FadeUp style={[styles.gutter, { gap: 14 }]}>
           <Text style={styles.welcomeTitle} accessibilityRole="header">
@@ -236,7 +238,7 @@ export default function Welcome() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   whiteScreen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
-  welcomeArt: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+  welcomeArt: { flex: 1, minHeight: 0, overflow: "hidden", alignItems: "center", justifyContent: "center", paddingVertical: 12 },
   gutter: { paddingHorizontal: space.gutter },
   welcomeTitle: { fontFamily: fonts.displayBold, fontSize: 46, lineHeight: 50, letterSpacing: -0.5, color: colors.navy },
   welcomeLine: { fontFamily: fonts.bodyMedium, fontSize: 19, lineHeight: 27, color: colors.muted },
