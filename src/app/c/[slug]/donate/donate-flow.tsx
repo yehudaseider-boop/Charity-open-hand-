@@ -5,10 +5,12 @@ import { startTransition, useActionState, useEffect, useRef, useState, useSyncEx
 import { useFormDraft } from "@/components/forms/use-form-draft";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
-import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
+import { SupportContact } from "@/components/legal";
 import { ErrorMark, TextArea, TextField, useFieldId } from "@/components/forms/fields";
 import { formatRand, parseRandToCents } from "@/lib/money";
 import { submitDonation, type CheckoutState } from "./actions";
+import { BeforeYouGive } from "./before-you-give";
+import { Check } from "./check";
 import { impactLine, impactSource, type ImpactUnit } from "@/lib/charity/impact";
 import { platformConfig } from "@/config/platform";
 import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
@@ -527,32 +529,13 @@ export function DonateFlow({
           ) : null}
         </div>}
 
-        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-bold">Before you give</h2>
-        <div className="space-y-3">
-          <Check name="is_anonymous">
-            Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
-            <span className="text-muted"><bdi>{charityName}</bdi> still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
-          </Check>
-          <Check name="no_news">
-            Don&apos;t send me news or appeals from <bdi>{charityName}</bdi>. <span className="text-muted">You&apos;ll still get your confirmation{receiptsAvailable ? " and s18A receipt" : ""}.</span>
-          </Check>
-          {singleAgreementTick ? (
-            <Check name="agreement" error={state.fieldErrors?.agreement}>
-              I&apos;m 18 or older{org ? " and allowed to give on behalf of this organisation," : ""} and I agree to <TermsAndPrivacyLinks />, and that my details are shared with <bdi>{charityName}</bdi> so they
-              can record my donation.
-            </Check>
-          ) : (
-            <>
-              <Check name="age_confirmed" error={state.fieldErrors?.age_confirmed}>
-                I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
-              </Check>
-              <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
-                I agree to <TermsAndPrivacyLinks />, and that my details are shared with <bdi>{charityName}</bdi> so they can record my
-                donation. Givezy keeps any label I give it privately, for my own records.
-              </Check>
-            </>
-          )}
-        </div>
+        <BeforeYouGive
+          charityName={charityName}
+          receiptsAvailable={receiptsAvailable}
+          org={org}
+          singleAgreementTick={singleAgreementTick}
+          fieldErrors={state.fieldErrors}
+        />
 
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
@@ -603,38 +586,6 @@ function Breakdown({ q, charityName, monthly }: { q: Quote; charityName: string;
       ) : null}
       <div className="flex justify-between gap-3 border-t-2 border-border pt-2 text-lg font-bold"><dt>{monthly ? "Total each month" : "Total"}</dt><dd className="shrink-0">{formatRand(q.totalCents)}</dd></div>
     </dl>
-  );
-}
-
-/**
- * A consent box. `children` is the label (clicking it ticks the box); `detail` follows it in the same
- * sentence but outside the label, so links in it can be clicked without toggling the box.
- */
-function Check({ name, children, detail, error }: { name: string; children: React.ReactNode; detail?: React.ReactNode; error?: string }) {
-  const [checked, setChecked] = useState(false);
-  const id = useFieldId(name);
-  const showError = Boolean(error) && !checked;
-  const describedBy = [detail ? `${id}-detail` : null, showError ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
-  return (
-    <div>
-      <div className="flex min-h-11 items-start gap-3 py-1 text-sm leading-relaxed">
-        <input
-          id={id}
-          type="checkbox"
-          name={name}
-          className="mt-0.5"
-          checked={checked}
-          onChange={(e) => setChecked(e.target.checked)}
-          aria-invalid={showError || undefined}
-          aria-describedby={describedBy}
-        />
-        <span>
-          <label htmlFor={id}>{children}</label>
-          {detail ? <span id={`${id}-detail`}> {detail}</span> : null}
-        </span>
-      </div>
-      {showError ? <p id={`${id}-error`} role="alert" className="ml-[2.125rem] flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{error}</span></p> : null}
-    </div>
   );
 }
 

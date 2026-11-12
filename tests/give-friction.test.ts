@@ -85,8 +85,8 @@ const person = { donor_type: "individual", email: "a@example.com", first_name: "
 const parse = (raw: Record<string, string | undefined>) => checkoutSchema.parse(raw);
 
 describe("one agreement tick or two (platformConfig.checkout.singleAgreementTick)", () => {
-  it("is off until the wording is approved", () => {
-    expect(platformConfig.checkout.singleAgreementTick).toBe(false);
+  it("is on for the test site (12/11/2026); Yosef must approve the wording before launch", () => {
+    expect(platformConfig.checkout.singleAgreementTick).toBe(true);
   });
   it("switched on, the one tick records both agreements; without it, one plain problem on the one box", () => {
     const on = applyAgreementTick({ ...person, agreement: "on" }, true);

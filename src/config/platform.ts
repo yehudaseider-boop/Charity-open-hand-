@@ -131,9 +131,10 @@ export const platformConfig = {
      * One tick on the website's give form instead of two: "I'm 18 or older and I agree to the Terms and Privacy
      * Policy, and that my details are shared with {charity} so they can record my donation." It records the same
      * agreements as the two ticks (decided 04/11/2026).
-     * Turn on once Yosef approves the wording (go-live list).
+     * ON for the test site since 12/11/2026 (Yehuda: the form felt like too many ticks). Yosef must still approve the
+     * wording before launch (go-live list); switch off to go back to the two ticks.
      */
-    singleAgreementTick: false as boolean,
+    singleAgreementTick: true as boolean,
   },
 } as const;
 

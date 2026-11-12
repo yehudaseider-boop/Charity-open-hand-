@@ -1921,3 +1921,10 @@ From the security review of 12/11/2026 (confirmed findings). Two database change
 
 - Yehuda: the app icon must carry the logo's third (blue) shape. The icon is now the logo's own "g" with the lilac, orange and blue shapes, cut from `apps/mobile/assets/logo.png` and not redrawn, on white (the blue shape disappears on a blue ground, which is why the first version had two). Android uses a white adaptive background (`app.json`), the same artwork in the foreground and a one-colour silhouette for themed icons.
 
+## Fewer ticks on the website give form (12/11/2026)
+
+- Yehuda looked at the give page on his phone: four tick boxes under "Before you give" felt overwhelming. The website now matches what the app already does.
+- `platformConfig.checkout.singleAgreementTick` is ON for the test site: one tick, "I'm 18 or older and I agree to the Terms and Privacy Policy, and that my details are shared with {charity} so they can record my donation" (a company or trust adds that they may give on its behalf). The server records the same two confirmations as before (age and Terms/sharing/POPIA); one tick on the page stands for both. The line about labels being kept privately is not in the single wording (the label field says it). **Yosef must still approve the wording before launch.**
+- "Give anonymously" and "Don't send me news or appeals" move into one folded row, "Your choices (optional)": unticked, wording unchanged, still sent when the row is closed, the closed row names what was chosen ("Anonymous · No news"), and a refusal reopens it when something was chosen. Field names and server behaviour are unchanged. **For Yosef:** the news opt-out is less prominent (POPIA direct marketing); it is still an unticked opt-out, as before.
+- Code: `before-you-give.tsx`, `check.tsx` (the consent box, now able to be held by the page), `choices-summary.ts`; tests `give-before-you-give.test.ts` and the on/off tests updated.
+
