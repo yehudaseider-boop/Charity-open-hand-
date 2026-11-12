@@ -80,7 +80,9 @@ describe("a charity's profile written straight to the database", () => {
       await refused("name_en", "", /charity_name_length/);
       await refused("name_en", "N".repeat(121), /charity_name_length/);
       await refused("description_en", "d".repeat(3001), /charity_description_length/);
-      await refused("funds_use_en", "f".repeat(1501), /charity_funds_use_length/);
+      // The same 1 500 limit was already on this column from the first "funds use" migration (09/10/2026), under
+      // its automatic name, so that older check answers first. Either name means the text was refused.
+      await refused("funds_use_en", "f".repeat(1501), /charity_funds_use_length|charities_funds_use_en_check/);
       // Legal details and the address of an approved charity are locked to platform admins and the server (older
       // rules), so the checks on those columns are tried as the server.
       await as("server");
