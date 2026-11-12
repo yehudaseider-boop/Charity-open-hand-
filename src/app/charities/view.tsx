@@ -25,6 +25,16 @@ export function cleanQuery(q: unknown): string {
   return typeof q === "string" ? q.replace(/[^\p{L}\p{N}\s']/gu, " ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
 }
 
+/**
+ * The pattern searched for: the words with "anything" between them, so a name written with a hyphen, an "&" or
+ * other signs between its words is still found ("Save a Life" finds "Save-a-Life", "Boys Girls" finds
+ * "Boys & Girls"). Only what cleanQuery kept goes in. (An accent typed or left out still matters: "Cafe" does not
+ * find "Café"; that needs the database's unaccent, a go-live decision.)
+ */
+export function searchPattern(search: string): string {
+  return `%${search.split(" ").filter(Boolean).join("%")}%`;
+}
+
 type Row = {
   id: string;
   slug: string;
@@ -60,7 +70,7 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
     .order("name_en");
   if (search) {
     // Quoted so spaces are safe; cleanQuery has already removed quotes, commas, % and _.
-    const like = `"%${search}%"`;
+    const like = `"${searchPattern(search)}"`;
     query = query.or(`name_en.ilike.${like},legal_name_en.ilike.${like},description_en.ilike.${like},suburb.ilike.${like},city.ilike.${like}`);
   }
   if (category) {
