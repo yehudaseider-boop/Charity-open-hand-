@@ -67,10 +67,12 @@ export async function submitDonation(
 
   const h = await headers();
   const ip = clientIp(h);
-  // "Use my ID ending 1234": only for the signed-in person, checked here on the server.
-  const viewer = formData.get("use_saved_id") === "on" ? await getViewer() : null;
-  const useSavedIdOf = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
-  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, coverCardCharge, shownTotalCents, fromApp, campaignId, sourceTag: sourceTagged, input: parsed.data, ip, useSavedIdOf });
+  // Who is signed in, checked here on the server: the gift counts as theirs (and can later give "Use my ID ending
+  // 1234") only when it is given with their own email. "Use my ID ending 1234" itself only when ticked.
+  const viewer = await getViewer();
+  const signedInAs = viewer?.email ? { userId: viewer.userId, email: viewer.email } : undefined;
+  const useSavedIdOf = formData.get("use_saved_id") === "on" ? signedInAs : undefined;
+  const result = await startDonation({ charitySlug: slug, giftCents, contributionCents, coverCardCharge, shownTotalCents, fromApp, campaignId, sourceTag: sourceTagged, input: parsed.data, ip, signedInAs, useSavedIdOf });
   if (!result.ok) {
     const { providerDown, ...rest } = result;
     if (rest.message === "Please check the highlighted fields." && rest.fieldErrors) {

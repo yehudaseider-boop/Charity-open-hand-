@@ -56,6 +56,12 @@ export async function startDonation(args: {
   input: CheckoutInput;
   ip: string;
   /**
+   * Who is signed in (checked by the caller: the website's session, or the app's token), whether or not they use
+   * anything saved. When it is the same email as the gift, the gift is marked as started by that account, so only
+   * then can it later give "Use my ID ending 1234", and only then may it fill in that account's donor details.
+   */
+  signedInAs?: { userId: string; email: string };
+  /**
    * The donor ticked "use my ID ending 1234": the signed-in account (checked by the caller) whose
    * last s18A gift holds the number. Used only with that account's own email address.
    */
@@ -188,7 +194,11 @@ export async function startDonation(args: {
   // refused: that gift may already be charged. See giving-guard.ts; the values are in platformConfig.givingGuard.
   const refused = await checkGivingAllowed({ email: v.email, ip: args.ip, charityId: charity.id });
   if (refused) return { ok: false, message: refused.message, limited: true };
-  const donorId = await findOrCreateDonor(v, detailsNow);
+  // The account that started this gift: one signed in with this same email (checked by the caller), else none.
+  // Guest gifts and gifts given with another email are never a source for that account's saved ID or address.
+  const sameEmail = (a?: { email: string }) => Boolean(a?.email) && a!.email.trim().toLowerCase() === v.email.trim().toLowerCase();
+  const startedBy = [args.signedInAs, args.useSavedIdOf, args.saveCardFor, args.useSavedCardOf].find(sameEmail)?.userId ?? null;
+  const donorId = await findOrCreateDonor(v, detailsNow, startedBy);
   // Signed in with this same (confirmed) email: the donation joins their account now,
   // not at their next sign-in. Never for a different address.
   try {
@@ -270,6 +280,8 @@ export async function startDonation(args: {
     registration_number: v.registration_number ?? null,
     contact_person: v.contact_person ?? null,
     phone: v.phone ?? null,
+    // Only set when started by that account (signed in with this email): see saved-id.ts.
+    ...(startedBy ? { started_by_user: startedBy } : {}),
     ...(detailsNow
       ? {
           receipt_identity: receiptIdentity({
@@ -446,8 +458,12 @@ async function chargeSavedCard(a: {
  * An existing identity is never overwritten from a guest checkout (anyone can
  * type any email); only empty fields are filled. The details exactly as typed
  * are kept with the donation itself.
+ *
+ * A record that belongs to an account (someone signed in with that email) is not filled in at all unless this gift
+ * was started by that same account (`startedBy`): otherwise anyone could plant a name, phone, ID ending or address
+ * on another person's details by giving with their email (security review, 12/11/2026).
  */
-async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<string> {
+async function findOrCreateDonor(v: CheckoutInput, want18a: boolean, startedBy: string | null): Promise<string> {
   const db = createAdminClient();
   const reg = v.donor_type === "individual" ? null : (v.registration_number ?? null);
   const now = new Date().toISOString();
@@ -482,6 +498,8 @@ async function findOrCreateDonor(v: CheckoutInput, want18a: boolean): Promise<st
     const existing = matches?.length === 1 ? matches[0] : (matches ?? []).find((m) => m.registration_number === reg);
 
     if (existing) {
+      const owner = (existing as { user_id?: string | null }).user_id ?? null;
+      if (owner && owner !== startedBy) return existing.id;
       const blanks: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(fields)) {
         if (val !== null && (existing as Record<string, unknown>)[k] == null) blanks[k] = val;
