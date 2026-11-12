@@ -45,6 +45,7 @@ import { charityShareText } from "@/lib/share";
 import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow";
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
+import { celebrates, stageLabel, TICK_MS, type GiveStage } from "@/lib/give-stage";
 import { confirmThen, openSite, openUrl } from "@/lib/open-site";
 import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
@@ -200,7 +201,11 @@ export default function Give() {
     const y = e.nativeEvent.layout.y;
     setSectionY((was) => (was[key] === y ? was : { ...was, [key]: y }));
   };
-  const [busy, setBusy] = useState<false | "opening" | "checking">(false);
+  // What the Give button is really doing: securing (our server makes the payment, or charges the saved card), opening
+  // (the payment page), checking (asking the provider). The words and the sweep on the button follow it.
+  const [busy, setBusy] = useState<GiveStage>(false);
+  // Shown for a moment, on the button, once the provider has confirmed the gift as paid.
+  const [confirmed, setConfirmed] = useState(false);
   // Where "Back" goes when there is no screen behind this one (opened cold from a link).
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/discover"));
   // Two taps in the same frame both see busy as false; the ref stops the second at once.
@@ -627,7 +632,7 @@ export default function Give() {
       setMessage(`This is the demo, so no payment is taken. In the real app this opens the secure payment page for ${rand(total)}.`, "info");
       return;
     }
-    setBusy("opening");
+    setBusy("securing");
     const details = {
       donor_type: "individual" as const,
       email: email.trim(),
@@ -747,6 +752,8 @@ export default function Give() {
       if (r.quote) setAuthorisedTotal(null);
       return;
     }
+    // Our server has made the payment: the payment page is next (a saved-card gift has no page, only the check below).
+    if (!r.charged) setBusy("opening");
     // Kept on the phone before the payment page opens, so a phone that closes the app meanwhile still asks about it
     // when the donor comes back (Progress, and this screen when it opens again).
     await keepPendingGift(owner, {
@@ -810,12 +817,20 @@ export default function Give() {
       setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date()), afterPaymentTone(o), true);
       return;
     }
-    haptic.success();
+    // The success moment (buzz, tick and burst on the button) is only for a gift the provider confirmed as paid. A gift
+    // we only believe went through (back from the page, provider still catching up) opens the thank-you quietly.
+    if (celebrates(outcome)) haptic.success();
+    else haptic.tap();
     // Paid, or back from a finished payment page: the thank-you shows now and the history catches up. A gift the
     // server still calls pending stays kept on the phone, so Progress keeps checking it until it is paid, didn't go
     // through, or isn't found: a late decline is then still shown (review 12/11/2026).
     if (outcome === "paid") void dropPendingGift(owner, charity!.slug);
     void refreshAfterGiving(account.refresh);
+    if (celebrates(outcome)) {
+      setConfirmed(true);
+      await new Promise((ok) => setTimeout(ok, TICK_MS));
+      setConfirmed(false);
+    }
     setDone(sentSummary(sent, outcome !== "paid", r.reference));
   }
 
@@ -851,7 +866,7 @@ export default function Give() {
   }
 
   const err = (k: string) => errors[k];
-  const locked = busy !== false || heldAttempt !== null;
+  const locked = busy !== false || confirmed || heldAttempt !== null;
   const chosenExtras = [
     label ? `Label: ${label}` : null,
     anonymous ? "Anonymous" : null,
@@ -861,7 +876,7 @@ export default function Give() {
     saveCard ? "Save card" : null,
   ].filter((x): x is string => Boolean(x));
   const moreSummary = chosenExtras.length ? `On: ${chosenExtras.join(", ")}` : `label, message, anonymous, dedication`;
-  const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card…" : "Opening the payment page…") : busy === "checking" ? "Checking your payment…" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
+  const buttonLabel = busy ? stageLabel(busy, payWithSaved) : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
   // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
   const goalLabel = goal?.counts?.[0] ?? null;
   const counting = goal ? counts(goal, cleanLabel(label)) : false;
@@ -1309,7 +1324,7 @@ export default function Give() {
                 )}
               </>
             ) : (
-              <HoldToGive label={total ? `Hold to give ${rand(total)}${isMonthly ? " every month" : ""}` : "Hold to give"} busyLabel={busy ? buttonLabel : "Giving…"} busy={busy !== false} onConfirm={give} />
+              <HoldToGive label={total ? `Hold to give ${rand(total)}${isMonthly ? " every month" : ""}` : "Hold to give"} busyLabel={busy ? buttonLabel : "Giving…"} busy={busy !== false} confirmed={confirmed} onConfirm={give} />
             )}
             {keyboardUp ? null : (
             <Text variant="label" style={styles.footerLine}>

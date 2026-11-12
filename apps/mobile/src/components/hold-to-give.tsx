@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, AppState, Easing, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { AccessibilityInfo, Animated, AppState, Easing, Pressable, StyleSheet, View, type GestureResponderEvent, type LayoutChangeEvent } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { haptic } from "@/lib/haptics";
+import { labelWait } from "@/lib/give-stage";
+import { reduceMotion } from "@/lib/motion";
 import { colors, radius, type } from "@/theme/tokens";
+import { DropBurst } from "./drop-burst";
 import { CheckIcon } from "./icons";
 import { Text } from "./text";
 
@@ -17,14 +20,102 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const RING = 12;
 const CIRC = 2 * Math.PI * RING;
 
+/** The words of the current stage, each kept up at least LABEL_MIN_MS so a quick stage doesn't flicker past unread. */
+function useHeldLabel(wanted: string, active: boolean): string {
+  // `since` is null until the stage's clock has been stamped (just after it first shows).
+  const [held, setHeld] = useState<{ label: string; since: number | null }>({ label: wanted, since: 0 });
+  const [wasActive, setWasActive] = useState(active);
+  // Starting a new gift shows its first stage at once (set while rendering, the way React asks for a reset).
+  if (active !== wasActive) {
+    setWasActive(active);
+    setHeld({ label: wanted, since: active ? null : 0 });
+  }
+  useEffect(() => {
+    if (!active) return;
+    if (held.since === null) {
+      const id = setTimeout(() => setHeld((h) => ({ ...h, since: Date.now() })), 0);
+      return () => clearTimeout(id);
+    }
+    if (held.label === wanted) return;
+    const id = setTimeout(() => setHeld({ label: wanted, since: Date.now() }), labelWait(held.since, Date.now()));
+    return () => clearTimeout(id);
+  }, [wanted, active, held]);
+  return active ? held.label : wanted;
+}
+
+/** A soft lighter band that slides across the working button, over and over (transform only). Left out when the phone asks for less motion. */
+function Sweep({ width }: { width: number }) {
+  const [x] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(x, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [x]);
+  const band = Math.max(80, Math.round(width * 0.4));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: band,
+        backgroundColor: colors.orange,
+        opacity: 0.55,
+        transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [-band, width] }) }],
+      }}
+    />
+  );
+}
+
+/** A small arc that turns while the gift goes through; a still arc when the phone asks for less motion. */
+function Working() {
+  const [turn] = useState(() => new Animated.Value(0));
+  const [calm] = useState(() => reduceMotion());
+  useEffect(() => {
+    if (calm) return;
+    const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [turn, calm]);
+  return (
+    <Animated.View style={{ width: 30, height: 30, transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] }}>
+      <Svg width={30} height={30} viewBox="0 0 30 30">
+        <Circle cx={15} cy={15} r={RING} stroke={colors.navy} strokeOpacity={0.22} strokeWidth={3.5} fill="none" />
+        <Circle cx={15} cy={15} r={RING} stroke={colors.navy} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeDasharray={`${CIRC * 0.28} ${CIRC}`} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** The tick, which pops in once (still when the phone asks for less motion). */
+function Tick() {
+  const [pop] = useState(() => new Animated.Value(reduceMotion() ? 1 : 0.4));
+  useEffect(() => {
+    if (reduceMotion()) return;
+    Animated.spring(pop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }).start();
+  }, [pop]);
+  return (
+    <Animated.View style={{ transform: [{ scale: pop }] }}>
+      <CheckIcon size={26} color={colors.navy} />
+    </Animated.View>
+  );
+}
+
 /**
  * The Give button, held rather than tapped (11/11/2026): press and hold, a ring fills and the button fills with it,
  * soft ticks along the way and a firm thump at the end, and then it gives. Letting go early takes it back, so a
  * gift is never an accident: lifting, sliding off, a cancelled touch or the app going to the background only stop
  * it. Everyone can still give without holding: a screen reader's double tap, the keyboard's Enter, and a second quick
  * tap after the hint (a release inside the button) all give at once.
+ *
+ * After the thump the button shows what is really happening (12/11/2026): a calm sweep across it and the words of the
+ * current stage (busyLabel changes with the stage; each stays up at least a moment). The tick and the small burst show
+ * only when `confirmed` is true, which the caller sets only once the payment provider has said the gift is paid. A
+ * phone set to reduce motion gets the same words with a still arc and a still tick.
  */
-export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { label: string; busyLabel: string; busy: boolean; disabled?: boolean; onConfirm: () => void | Promise<unknown> }) {
+export function HoldToGive({ label, busyLabel, busy, disabled, confirmed, onConfirm }: { label: string; busyLabel: string; busy: boolean; disabled?: boolean; confirmed?: boolean; onConfirm: () => void | Promise<unknown> }) {
   const [progress] = useState(() => new Animated.Value(0));
   const [phase, setPhase] = useState<"idle" | "holding" | "done">("idle");
   const [hint, setHint] = useState(false);
@@ -89,7 +180,7 @@ export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { la
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy]);
 
-  const off = Boolean(disabled) || busy;
+  const off = Boolean(disabled) || busy || Boolean(confirmed);
   const complete = () => {
     if (done.current || off) return;
     done.current = true;
@@ -140,36 +231,57 @@ export function HoldToGive({ label, busyLabel, busy, disabled, onConfirm }: { la
     hintTimer.current = setTimeout(() => setHint(false), SECOND_TAP_MS);
   };
 
-  const face = off && phase !== "done" ? { bg: colors.lilacSoft, text: colors.muted, edge: colors.hairline } : { bg: colors.orange, text: colors.navy, edge: colors.navy };
+  const working = busy && phase === "done";
+  const face = confirmed || (off && phase !== "done") ? (confirmed ? { bg: colors.orange, text: colors.navy, edge: colors.navy } : { bg: colors.lilacSoft, text: colors.muted, edge: colors.hairline }) : { bg: colors.orange, text: colors.navy, edge: colors.navy };
   const holding = phase === "holding";
-  const text = busy ? busyLabel : holding ? "Keep holding…" : phase === "done" ? busyLabel : label;
+  const stageWords = useHeldLabel(busyLabel, busy);
+  const text = confirmed ? "Gift confirmed" : busy ? stageWords : holding ? "Keep holding…" : phase === "done" ? stageWords : label;
+  const [width, setWidth] = useState(0);
+  const calm = reduceMotion();
+  // Said aloud by a screen reader at each step, and when the gift is confirmed (iOS needs the announcement; Android reads the live region).
+  useEffect(() => {
+    if (confirmed) AccessibilityInfo.announceForAccessibility("Gift confirmed");
+    else if (busy) AccessibilityInfo.announceForAccessibility(stageWords);
+  }, [confirmed, busy, stageWords]);
   return (
     <View style={{ gap: 6 }}>
+      <View>
       <Pressable
         onPressIn={pressIn}
         onPressOut={pressOut}
         onPress={press}
         accessibilityRole="button"
-        accessibilityLabel={busy ? busyLabel : label}
+        accessibilityLabel={confirmed ? "Gift confirmed" : busy ? stageWords : label}
         accessibilityHint="Press and hold for a moment to give. With a screen reader, double tap to give at once."
-        accessibilityState={{ disabled: off, busy }}
+        accessibilityState={{ disabled: off, busy: busy && !confirmed }}
         accessibilityActions={[{ name: "activate", label }]}
         onAccessibilityAction={() => complete()}
+        onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
         style={[styles.base, { backgroundColor: face.bg, borderBottomColor: face.edge, borderBottomWidth: holding ? 2 : 5, marginTop: holding ? 3 : 0 }]}
       >
-        {off && phase !== "done" ? null : <Animated.View pointerEvents="none" style={[styles.fill, { transform: [{ scaleX: busy || phase === "done" ? 1 : progress }] }]} />}
+        {confirmed || !(off && phase !== "done") ? <Animated.View pointerEvents="none" style={[styles.fill, { transform: [{ scaleX: busy || phase === "done" || confirmed ? 1 : progress }] }]} /> : null}
+        {working && !calm && width > 0 ? <Sweep width={width} /> : null}
         <View style={styles.inner} pointerEvents="none">
-          {off && phase !== "done" ? null : phase === "done" ? (
-            <CheckIcon size={24} color={colors.navy} />
+          {confirmed ? (
+            <Tick />
+          ) : off && phase !== "done" ? null : working ? (
+            <Working />
           ) : (
             <Svg width={30} height={30} viewBox="0 0 30 30" style={{ transform: [{ rotate: "-90deg" }] }}>
               <Circle cx={15} cy={15} r={RING} stroke={colors.navy} strokeOpacity={0.22} strokeWidth={3.5} fill="none" />
               <AnimatedCircle cx={15} cy={15} r={RING} stroke={colors.navy} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={progress.interpolate({ inputRange: [0, 1], outputRange: [CIRC, 0] })} />
             </Svg>
           )}
-          <Text style={[type.button, { color: face.text }]}>{text}</Text>
+          <Text style={[type.button, { color: face.text }]} accessibilityLiveRegion="polite">{text}</Text>
         </View>
       </Pressable>
+      {/* The drops rise from the button's top edge, clear of its words. */}
+      {confirmed ? (
+        <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, height: 1 }}>
+          <DropBurst compact />
+        </View>
+      ) : null}
+      </View>
       {hint ? (
         <Text variant="label" style={styles.hint} accessibilityLiveRegion="polite">
           Press and hold the button to give. Or tap it twice.
