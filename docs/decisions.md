@@ -1916,3 +1916,8 @@ From the security review of 12/11/2026 (confirmed findings). Two database change
 - **A payment that didn't go through** is worded the same in the app as on the website: it may be a declined card or a payment page that was closed, so it never claims which.
 - **Charity search** finds words with anything between them ("Save a Life" finds "Save-a-Life").
 - **The app keeps a still-pending gift** after its thank-you until the server says paid, didn't go through, or not found, so a late decline still shows.
+
+## App icon with all three shapes (12/11/2026)
+
+- Yehuda: the app icon must carry the logo's third (blue) shape. The icon is now the logo's own "g" with the lilac, orange and blue shapes, cut from `apps/mobile/assets/logo.png` and not redrawn, on white (the blue shape disappears on a blue ground, which is why the first version had two). Android uses a white adaptive background (`app.json`), the same artwork in the foreground and a one-colour silhouette for themed icons.
+
