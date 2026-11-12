@@ -80,12 +80,34 @@ const HOUR = 3_600_000;
  */
 export const ABANDONED_AFTER_HOURS = 48;
 
-export async function runDailyChecks(now = new Date(), deadline = Infinity): Promise<DailyChecks> {
+/** What the email retries, run on their own first (see runImportantEmailRetries), hand to the checks. */
+export type RetriesDone = Pick<DailyChecks, "confirmations" | "emailRetries"> & { incomplete: boolean };
+
+const emptyChecks = (): DailyChecks => ({ incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, abandonedClosed: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} });
+
+/**
+ * The important emails that failed (owed confirmations, s18A receipts, declined-card notices), tried again on their
+ * own, at the very start of the daily job: a long collection day can then never leave them for tomorrow
+ * (review 12/11/2026). The checks are then told it is done (runDailyChecks' `retries`).
+ */
+export async function runImportantEmailRetries(now = new Date(), deadline = Infinity): Promise<RetriesDone> {
+  const out = emptyChecks();
+  await retryImportantEmails(createAdminClient(), now, deadline, out);
+  return { incomplete: out.incomplete, confirmations: out.confirmations, emailRetries: out.emailRetries };
+}
+
+export async function runDailyChecks(now = new Date(), deadline = Infinity, opts: { retries?: RetriesDone } = {}): Promise<DailyChecks> {
   const db = createAdminClient();
-  const out: DailyChecks = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, abandonedClosed: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+  const out: DailyChecks = emptyChecks();
+  if (opts.retries) {
+    out.confirmations = opts.retries.confirmations;
+    if (opts.retries.emailRetries) out.emailRetries = opts.retries.emailRetries;
+    if (opts.retries.incomplete) out.incomplete = true;
+  }
   const closeAbandonedBefore = new Date(now.getTime() - ABANDONED_AFTER_HOURS * HOUR);
   const check = async (ref: string) => {
-    const o = await confirmPayment(ref, { closeAbandonedBefore });
+    // Counted only when the check itself closed an abandoned or never-received checkout, never for a decline.
+    const o = await confirmPayment(ref, { closeAbandonedBefore, onClosed: () => (out.abandonedClosed = (out.abandonedClosed ?? 0) + 1) });
     if (o === "paid") out.pending.paid += 1;
     else if (o === "failed") out.pending.failed += 1;
     else out.pending.still += 1;
@@ -115,13 +137,16 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     }
     out.pending.checked += 1;
     try {
-      const o = await check(p.gateway_ref as string);
-      if (o === "failed" && new Date(p.created_at as string) < closeAbandonedBefore) out.abandonedClosed! += 1;
+      await check(p.gateway_ref as string);
     } catch {
       // The provider couldn't be reached, or never heard of a recent one (the donor closed the page before paying).
       out.pending.errors += 1;
     }
   }
+  // 2. Important emails that failed (owed confirmations, receipts, declined-card notices): right after the recent
+  // payments, before the older checkouts, so a long collection day never leaves them for tomorrow (review 12/11/2026).
+  if (!opts.retries) await retryImportantEmails(db, now, deadline, out);
+
   // 1a. Older checkouts (a week to 30 days, the rest of the "pending more than 3 days" window), oldest first: the
   // ones the provider says were abandoned or never received are closed, so they stop lighting that alert.
   const { data: older, error: oErr } = await db
@@ -141,7 +166,7 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     }
     out.pending.checked += 1;
     try {
-      if ((await check(p.gateway_ref as string)) === "failed") out.abandonedClosed! += 1;
+      await check(p.gateway_ref as string);
     } catch {
       out.pending.errors += 1;
     }
@@ -179,35 +204,6 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     }
   }
 
-  // 2. Important emails that failed: tried again an hour later (the next run), then a day, then three days, then
-  // Givezy is told once. Nothing at all while email is off: a "sent" must mean a real email left.
-  if (emailIsOn()) {
-    const since = new Date(now.getTime() - 7 * 24 * HOUR).toISOString();
-    // Its own catch: a problem with the list to try again never stops the checks below or the daily email.
-    try {
-      const retries = await runEmailRetries({ store: supabaseRetryStore(db), handlers: retryHandlers, now, deadline, audit: auditRetry });
-      if (retries.notSetUp) await resendConfirmationsOldWay(db, since, deadline, out);
-      else {
-        if (retries.incomplete) out.incomplete = true;
-        out.emailRetries = {
-          resent: retries.resent,
-          skipped: retries.skipped,
-          gone: retries.gone,
-          failedAgain: retries.failedAgain,
-          gaveUp: retries.gaveUp,
-          expired: retries.expired,
-          unknown: retries.unknown,
-        };
-        // Confirmations that failed before the table existed (only in the audit log): put them on the list once,
-        // in one write. Skipped on a run that is out of time: tomorrow's run does it.
-        if (!retries.incomplete && Date.now() < deadline) await queueAuditOnlyFailures(db, since);
-      }
-    } catch (e) {
-      console.error("[daily] trying failed emails again did not run", e);
-      out.emailRetries = { resent: 0, skipped: 0, gone: 0, failedAgain: 0, gaveUp: 0, expired: 0, unknown: 0, broken: true };
-    }
-  }
-
   // 3. Provider messages not handled after an hour.
   const { count: events } = await db
     .from("gateway_events")
@@ -242,6 +238,39 @@ async function queueAuditOnlyFailures(db: ReturnType<typeof createAdminClient>, 
   const ids = [...new Set((failedMail ?? []).map((r) => r.entity_id as string))].filter((id) => id && !done.has(id));
   // One write, and an existing row is kept as it is, so this never resets a row's tries.
   await recordFailedConfirmations(ids);
+}
+
+/** Step 2 of the daily checks: important emails that failed, tried again (rules in @/lib/email/retry-plan). */
+async function retryImportantEmails(db: ReturnType<typeof createAdminClient>, now: Date, deadline: number, out: DailyChecks): Promise<void> {
+  // Important emails that failed: tried again an hour later (the next run), then a day, then three days, then
+  // Givezy is told once. Nothing at all while email is off: a "sent" must mean a real email left.
+  if (emailIsOn()) {
+    const since = new Date(now.getTime() - 7 * 24 * HOUR).toISOString();
+    // Its own catch: a problem with the list to try again never stops the checks below or the daily email.
+    try {
+      const retries = await runEmailRetries({ store: supabaseRetryStore(db), handlers: retryHandlers, now, deadline, audit: auditRetry });
+      if (retries.notSetUp) await resendConfirmationsOldWay(db, since, deadline, out);
+      else {
+        if (retries.incomplete) out.incomplete = true;
+        out.emailRetries = {
+          resent: retries.resent,
+          skipped: retries.skipped,
+          gone: retries.gone,
+          failedAgain: retries.failedAgain,
+          gaveUp: retries.gaveUp,
+          expired: retries.expired,
+          unknown: retries.unknown,
+        };
+        // Confirmations that failed before the table existed (only in the audit log): put them on the list once,
+        // in one write. Skipped on a run that is out of time: tomorrow's run does it.
+        if (!retries.incomplete && Date.now() < deadline) await queueAuditOnlyFailures(db, since);
+      }
+    } catch (e) {
+      console.error("[daily] trying failed emails again did not run", e);
+      out.emailRetries = { resent: 0, skipped: 0, gone: 0, failedAgain: 0, gaveUp: 0, expired: 0, unknown: 0, broken: true };
+    }
+  }
+
 }
 
 /**

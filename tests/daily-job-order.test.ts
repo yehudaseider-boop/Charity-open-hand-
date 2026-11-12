@@ -27,8 +27,9 @@ vi.mock("@/lib/ops/daily", async (orig) => {
   const real = await orig<typeof import("@/lib/ops/daily")>();
   return {
     ...real,
-    runDailyChecks: async () => (
-      steps.push("checks"),
+    runImportantEmailRetries: async () => (steps.push("email retries"), { incomplete: false, confirmations: { resent: 0, failedAgain: 0 } }),
+    runDailyChecks: async (_now: Date, _deadline: number, opts?: { retries?: unknown }) => (
+      steps.push(opts?.retries ? "checks (retries done)" : "checks"),
       { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 1, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} }
     ),
   };
@@ -48,9 +49,10 @@ describe("the daily job's order", () => {
   it("checks and emails the team before reading payouts, and gives the payouts a deadline", async () => {
     const before = Date.now();
     await call();
-    expect(steps.slice(0, 4)).toEqual(["monthly", "checks", "alert: 1 thing needs a person today", "payouts"]);
+    // The important emails first, so a long collection day never leaves them for tomorrow; the checks don't run them again.
+    expect(steps.slice(0, 5)).toEqual(["email retries", "monthly", "checks (retries done)", "alert: 1 thing needs a person today", "payouts"]);
     expect(payoutsOpts?.deadline).toBeGreaterThan(before);
-    expect(payoutsOpts!.deadline! - before).toBeLessThanOrEqual(46_000 + 1_000);
+    expect(payoutsOpts!.deadline! - before).toBeLessThanOrEqual(48_000 + 1_000);
     expect(steps.some((s) => s.startsWith("alert: the deposit report"))).toBe(false);
   });
 
@@ -108,5 +110,19 @@ describe("monthly donations held for the payment provider, in the daily email", 
 
   it("a month paid twice is a line for a person", () => {
     expect(dailyDigest({ ...quiet, held: { "monthly.paid_twice": 1 } }, fine)).toEqual(["A monthly donation was paid twice for one month: refund one of the two payments: 1"]);
+  });
+});
+
+describe("the payment provider's wait inside the daily job", () => {
+  it("is shortened for the whole job, so one slow call can't push it past its minute", async () => {
+    const { DAILY_GATEWAY_TIMEOUT_MS } = await import("@/app/api/jobs/daily/route");
+    const { gatewayTimeoutOverride, withGatewayTimeout } = await import("@/lib/gateway/timeout");
+    expect(DAILY_GATEWAY_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
+    expect(gatewayTimeoutOverride()).toBeUndefined();
+    await withGatewayTimeout(8_000, async () => {
+      await Promise.resolve();
+      expect(gatewayTimeoutOverride()).toBe(8_000);
+    });
+    expect(gatewayTimeoutOverride()).toBeUndefined();
   });
 });

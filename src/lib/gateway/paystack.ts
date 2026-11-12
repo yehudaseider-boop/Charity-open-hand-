@@ -1,4 +1,5 @@
 import "server-only";
+import { gatewayTimeoutOverride } from "./timeout";
 import { createHash, createHmac } from "node:crypto";
 import { sameSecret } from "@/lib/secret-compare";
 import { GatewayError, type BankAccountCheck, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
@@ -57,10 +58,12 @@ function secretKey(): string {
  * Paystack's words, on a refused request, for a card that was declined or can no longer be charged. Only these make a
  * refusal a declined card (GatewayError.declined). Paystack mostly answers a declined charge_authorization with a 200
  * and data.status "failed", which the payment check reads as failed; these cover the refusals that name the card.
+ * A saved card Paystack no longer knows ("Invalid authorization code") is a card that can't be charged again, so it
+ * counts too: the donor is asked to put in a new card, under the usual retry and stop rules (review 12/11/2026).
  * A refusal for anything else (a field, the amount, the split, the subaccount, our key) is never the donor's card.
  * VERIFY in test mode with Paystack's declined, insufficient-funds and expired test cards, and widen if needed.
  */
-const CARD_DECLINED = /declined|insufficient funds|do not hono(u)?r|authori[sz]ation (code )?(is )?not (active|reusable)|expired card|card (has )?expired|lost card|stolen card|restricted card|pick ?up card/i;
+const CARD_DECLINED = /declined|insufficient funds|do not hono(u)?r|authori[sz]ation (code )?(is )?not (active|reusable|valid|found)|invalid authori[sz]ation|authori[sz]ation (code )?(is )?invalid|expired card|card (has )?expired|lost card|stolen card|restricted card|pick ?up card/i;
 
 /** How long to wait for Paystack before giving up on a call (it is then treated as unreachable, never as refused). */
 const TIMEOUT_MS = 20_000;
@@ -76,7 +79,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
         ...init?.headers,
       },
       cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(gatewayTimeoutOverride() ?? TIMEOUT_MS),
     });
   } catch (e) {
     // Network failure or timeout: the outcome is unknown, so it is neither "not found" nor "refused".

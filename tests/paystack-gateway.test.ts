@@ -508,13 +508,13 @@ describe("which charge answers are a declined card", () => {
   };
 
   it("a refusal that names the card is a decline", async () => {
-    for (const message of ["Declined", "Insufficient Funds", "Do not honor", "Authorization is not active", "This authorization is not reusable", "Expired card"]) {
+    for (const message of ["Declined", "Insufficient Funds", "Do not honor", "Authorization is not active", "This authorization is not reusable", "Expired card", "Invalid authorization code", "Authorization code not found"]) {
       expect(await charge(400, { status: false, message })).toMatchObject({ refused: true, declined: true });
     }
   });
 
   it("any other 400 or 422 is turned down but never a declined card (the donor is not told so, the card is kept)", async () => {
-    for (const message of ["Invalid split configuration", "Invalid amount", "Subaccount not found", "Currency not supported by merchant", "Invalid authorization code"]) {
+    for (const message of ["Invalid split configuration", "Invalid amount", "Subaccount not found", "Currency not supported by merchant", "Invalid key"]) {
       expect(await charge(400, { status: false, message })).toMatchObject({ refused: true, declined: false });
       expect(await charge(422, { status: false, message })).toMatchObject({ refused: true, declined: false });
     }

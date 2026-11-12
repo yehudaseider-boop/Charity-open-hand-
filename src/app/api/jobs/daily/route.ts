@@ -2,8 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { runMonthlyGiving } from "@/lib/donations/monthly-store";
 import { syncPayouts } from "@/lib/donations/payouts";
 import { alertGivezy, cronAllowed } from "@/lib/ops/alert";
-import { collectMonthlyWithin, dailyDigest, payoutsAlertLines, runDailyChecks } from "@/lib/ops/daily";
+import { collectMonthlyWithin, dailyDigest, payoutsAlertLines, runDailyChecks, runImportantEmailRetries, type RetriesDone } from "@/lib/ops/daily";
 import { runJourneys } from "@/lib/charity/journey-store";
+import { withGatewayTimeout } from "@/lib/gateway/timeout";
+
+/** Each call to the payment provider inside this job waits at most this long, so one slow call can't push the job past its minute. */
+export const DAILY_GATEWAY_TIMEOUT_MS = 10_000;
 
 /**
  * Everything that runs once a day, in order: collect the monthly donations that are due, the safety net (pending
@@ -16,21 +20,32 @@ import { runJourneys } from "@/lib/charity/journey-store";
 export const maxDuration = 60;
 
 async function handle(request: NextRequest) {
+  return withGatewayTimeout(DAILY_GATEWAY_TIMEOUT_MS, () => run(request));
+}
+
+async function run(request: NextRequest) {
   const allowed = cronAllowed(request);
   if (allowed === null) return new NextResponse("Switched off", { status: 503 });
   if (!allowed) return new NextResponse("Not allowed", { status: 401 });
 
-  // The function is allowed 60 seconds: up to 35 for the monthly collection (it goes run after run while donations
-  // are due, and stops starting new ones at its deadline), the checks stop at 42, then the day's email. The payouts
-  // start nothing new after 46 and the journeys after 45 (each step only starts if there is time).
+  // The function is allowed 60 seconds. First the important emails that failed (owed confirmations, receipts,
+  // declined-card notices), started only in the first 10 seconds so a collection day never starves them. Then up to
+  // 30 seconds of monthly collection (it goes run after run while donations are due, and stops starting new ones at
+  // its deadline); the checks stop at 45, then the day's email. The payouts start nothing new after 48 and the journeys after
+  // 46. Every call to the payment provider waits at most 10 seconds (DAILY_GATEWAY_TIMEOUT_MS).
   const started = Date.now();
-  const monthly = await collectMonthlyWithin((deadline) => runMonthlyGiving(new Date(), deadline), 35_000).catch((e) => {
+  // Each email try needs its send plus reads and writes (a 12-second margin), so a deadline at 22 lets them start until 10.
+  const retries: RetriesDone | undefined = await runImportantEmailRetries(new Date(), started + 22_000).catch((e) => {
+    console.error("[daily] email retries failed", e);
+    return undefined;
+  });
+  const monthly = await collectMonthlyWithin((deadline) => runMonthlyGiving(new Date(), deadline), 30_000).catch((e) => {
     console.error("[daily] monthly collection failed", e);
     return null;
   });
   let checks;
   try {
-    checks = await runDailyChecks(new Date(), started + 42_000);
+    checks = await runDailyChecks(new Date(), started + 45_000, retries ? { retries } : {});
   } catch (e) {
     console.error("[daily] checks failed", e);
     await alertGivezy("the daily check could not run", ["The daily safety check stopped with an error (see the job log). Nothing was charged by it. It runs again tomorrow."]);
@@ -49,19 +64,19 @@ async function handle(request: NextRequest) {
   // The day's alert to Givezy goes first, so nothing after it can hold it up.
   if (lines.length) await alertGivezy(`${lines.length} ${lines.length === 1 ? "thing needs" : "things need"} a person today`, lines);
   // The deposit report, in a time budget: it stops cleanly (only payouts read in full are kept) and carries on tomorrow.
-  const payoutsStarted = Date.now() < started + 46_000;
+  const payoutsStarted = Date.now() < started + 48_000;
   const payouts = payoutsStarted
-    ? await syncPayouts(new Date(), { deadline: started + 46_000 }).catch((e) => {
+    ? await syncPayouts(new Date(), { deadline: started + 48_000 }).catch((e) => {
         console.error("[daily] payouts failed", e);
         return null;
       })
     : null;
   const payoutLines = payoutsAlertLines(payouts, { started: payoutsStarted });
-  // Last, in what time is left: charities' donor journeys (CRM step 6a). No new email starts after 45 seconds, and each
+  // Last, in what time is left: charities' donor journeys (CRM step 6a). No new email starts after 46 seconds, and each
   // has an 8-second limit, so the job ends inside its minute. Capped per run; the rest go tomorrow. Nothing is marked
   // sent unless it went. Before the journey's migration has run there is nothing to do and nothing is said.
-  const journeys = Date.now() < started + 45_000
-    ? await runJourneys(new Date(), started + 45_000).catch((e) => {
+  const journeys = Date.now() < started + 46_000
+    ? await runJourneys(new Date(), started + 46_000).catch((e) => {
         console.error("[daily] journeys failed", e instanceof Error ? e.message : e);
         return null;
       })
