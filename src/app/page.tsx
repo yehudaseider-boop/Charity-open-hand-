@@ -8,6 +8,7 @@ import { TryDemo } from "@/components/landing/try-demo";
 import { ArrowRight, BlueBlock, Questions, arrowLink, chapterTitle } from "@/components/landing/sections";
 import { DashboardPicture, PhonePicture } from "@/components/landing/pictures";
 import { Icon, Key, type IconName } from "@/components/marketing";
+import { MobileMenu } from "@/components/mobile-menu";
 import { Reveal } from "@/components/reveal";
 import { Splash } from "@/components/splash";
 import { appLinks } from "@/config/app-links";
@@ -145,6 +146,15 @@ export default function Home() {
           <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-10" />
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1 whitespace-nowrap text-[15px] sm:gap-2">
+          {/* Phones: the same Menu as every other page, so Home isn't the one page without it. */}
+          <MobileMenu
+            items={[
+              { href: "/", label: "Home" },
+              { href: "/charities", label: "Find a charity" },
+              { href: "/for-donors", label: "For donors" },
+              { href: "/for-charities", label: "For charities" },
+            ]}
+          />
           <Link href="/for-donors" className="inline-flex min-h-11 items-center rounded-full px-3 font-semibold text-navy underline-offset-4 hover:underline max-md:hidden">For donors</Link>
           <Link href="/for-charities" className="inline-flex min-h-11 items-center rounded-full px-3 font-semibold text-navy underline-offset-4 hover:underline max-md:hidden">For charities</Link>
           <Link href="/charities" className="inline-flex min-h-11 items-center rounded-full px-3 font-semibold text-navy underline-offset-4 hover:underline max-sm:hidden">Find a charity</Link>
