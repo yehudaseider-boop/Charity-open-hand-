@@ -130,15 +130,20 @@ vi.mock("server-only", () => ({}));
 const sent: { to: string; text: string }[] = [];
 const audits: { action: string; details?: Record<string, unknown> }[] = [];
 let failSend = false;
+let dropSend = false;
+const { RefusedError } = vi.hoisted(() => ({ RefusedError: class RefusedError extends Error {} }));
 /** Claims of the week that go through before the database "goes down" (Infinity: never). */
 let claimsBeforeOutage = Infinity;
 const records: { kind: string; details: Record<string, unknown> }[] = [];
 vi.mock("@/lib/charity/charity-actions", () => ({ recordAction: async (_c: string, _u: string, kind: string, details: Record<string, unknown>) => (records.push({ kind, details }), `act${records.length}`) }));
 vi.mock("@/lib/audit", () => ({ logAudit: async (e: { action: string; details?: Record<string, unknown> }) => void audits.push(e) }));
 vi.mock("@/lib/email", () => ({
+  EmailError: RefusedError,
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string }) => {
-      if (failSend) throw new Error("down");
+      // A refusal from the email service (sure not to have gone), or a dropped connection (may have gone).
+      if (failSend) throw new RefusedError("refused");
+      if (dropSend) throw new TypeError("fetch failed");
       sent.push(m);
       return "sent";
     },
@@ -152,16 +157,23 @@ let nextId = 1;
 /** Just enough of the query builder: eq, neq, in, gte, is, order, limit, range, maybeSingle, single, insert, delete. */
 function query(table: string) {
   const filters: ((r: Row) => boolean)[] = [];
-  let sort: { col: string; asc: boolean } | null = null;
+  const sorts: { col: string; asc: boolean }[] = [];
   let slice: [number, number] | null = null;
   let op: "select" | "delete" = "select";
   const rows = () => {
     let out = (tables[table] ?? []).filter((r) => filters.every((f) => f(r)));
-    if (sort) {
-      const { col, asc } = sort;
-      out = [...out].sort((a, b) => (String(a[col]) < String(b[col]) ? -1 : String(a[col]) > String(b[col]) ? 1 : 0) * (asc ? 1 : -1));
+    if (sorts.length) {
+      const by = (a: Row, b: Row) => {
+        for (const { col, asc } of sorts) {
+          const c = String(a[col]) < String(b[col]) ? -1 : String(a[col]) > String(b[col]) ? 1 : 0;
+          if (c) return c * (asc ? 1 : -1);
+        }
+        return 0;
+      };
+      out = [...out].sort(by);
     }
-    return slice ? out.slice(slice[0], slice[1] + 1) : out;
+    // Like the real database (max_rows = 1000): never more than 1 000 rows in one answer, without an error.
+    return (slice ? out.slice(slice[0], slice[1] + 1) : out).slice(0, 1000);
   };
   const b: Record<string, unknown> = {};
   b.select = () => b;
@@ -170,7 +182,7 @@ function query(table: string) {
   b.in = (col: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[col])), b);
   b.gte = (col: string, v: string) => (filters.push((r) => new Date(String(r[col])).getTime() >= new Date(v).getTime()), b);
   b.is = (col: string, v: unknown) => (filters.push((r) => (r[col] ?? null) === v), b);
-  b.order = (col: string, o?: { ascending?: boolean }) => ((sort = { col, asc: o?.ascending !== false }), b);
+  b.order = (col: string, o?: { ascending?: boolean }) => (sorts.push({ col, asc: o?.ascending !== false }), b);
   b.limit = () => b;
   b.range = (from: number, to: number) => ((slice = [from, to]), b);
   b.maybeSingle = async () => ({ data: rows()[0] ?? null, error: null });
@@ -201,7 +213,7 @@ function query(table: string) {
 }
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: query }) }));
 
-const { sendS18aReminders, loadS18aMissing } = await import("@/lib/charity/s18a-reminder-send");
+const { sendS18aReminders, loadS18aMissing, contacts } = await import("@/lib/charity/s18a-reminder-send");
 const { sendDonorThankYou } = await import("@/lib/charity/thank-you-send");
 
 const NOW = new Date("2026-11-10T10:00:00+02:00");
@@ -220,6 +232,7 @@ beforeEach(() => {
   audits.length = 0;
   records.length = 0;
   failSend = false;
+  dropSend = false;
   claimsBeforeOutage = Infinity;
   nextId = 1;
   process.env.SITE_URL = "https://g.test";
@@ -253,7 +266,7 @@ describe("sending reminders", () => {
     expect(sent.map((m) => m.to)).toEqual(["sarah@x.co"]);
     expect(sent[0].text).toContain("https://g.test/account#s18a-details");
     expect(sent[0].text).toMatch(/https:\/\/g\.test\/news\/stop\?t=[A-Za-z0-9_-]{43}/);
-    expect(r).toEqual({ sent: 1, failed: 0, remaining: 0, skipped: { not_found: 1, erased: 1, complete: 2, recorded_only: 1, opted_out: 1, this_week: 0 }, interrupted: false, done: "act1" });
+    expect(r).toEqual({ sent: 1, failed: 0, unknown: 0, remaining: 0, skipped: { not_found: 1, erased: 1, complete: 2, recorded_only: 1, opted_out: 1, this_week: 0 }, interrupted: false, done: "act1" });
     // The dashboard's "what just happened", written by the sender itself.
     expect(records).toEqual([{ kind: "s18a_reminders_sent", details: { sent: 1, failed: 0, remaining: 0, skipped_not_found: 1, skipped_erased: 1, skipped_complete: 2, skipped_recorded_only: 1, skipped_opted_out: 1, skipped_this_week: 0 } }]);
     // Counts only in the audit log: no names, addresses or numbers.
@@ -287,11 +300,43 @@ describe("sending reminders", () => {
     expect((await sendS18aReminders(args(["sarah"]))).sent).toBe(1);
   });
 
-  it("a failed send hands the week back, so the donor can be reminded later", async () => {
+  it("a send the email service refused hands the week back, so the donor can be reminded later", async () => {
     failSend = true;
     const r = await sendS18aReminders(args(["sarah"]));
-    expect(r).toMatchObject({ sent: 0, failed: 1 });
+    expect(r).toMatchObject({ sent: 0, failed: 1, unknown: 0 });
     expect(tables.charity_donor_thanks ?? []).toHaveLength(0);
+  });
+
+  it("a dropped connection may have sent it: the week stays claimed, it isn't counted as failed, and the words say so", async () => {
+    dropSend = true;
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await sendS18aReminders(args(["sarah"]));
+    err.mockRestore();
+    expect(r).toMatchObject({ sent: 0, failed: 0, unknown: 1, done: "act1" });
+    expect(tables.charity_donor_thanks).toHaveLength(1);
+    expect(records[0].details).toMatchObject({ unknown: 1 });
+    // Pressing again the same week never sends it a second time.
+    dropSend = false;
+    expect((await sendS18aReminders(args(["sarah"]))).skipped.this_week).toBe(1);
+    expect(sent).toHaveLength(0);
+    expect(reminderOutcome({ sent: 0, failed: 0, unknown: 1, remaining: 0, skipped: {} })).toBe(
+      "The connection dropped while sending 1 reminder, so it may or may not have gone. To be safe, it isn't sent again this week, so nobody gets two.",
+    );
+  });
+
+  it("finds every donor's latest gift even past the 1 000 rows one read returns", async () => {
+    // A long-standing donor with 1 500 paid gifts read in the same batch as Sarah: without paging, Sarah's gift could
+    // fall off the end and she'd look like someone with no paid gift.
+    for (let i = 0; i < 1500; i++) tables.donations.push(gift(`old${String(i).padStart(4, "0")}`, "loyal", { wants_18a: false, paid_at: "2026-11-01T10:00:00+02:00" }, { email: "loyal@x.co" }));
+    const who = await contacts("c1", ["loyal", "sarah"]);
+    expect([...who.found].sort()).toEqual(["loyal", "sarah"]);
+    expect(who.byDonor.get("sarah")?.email).toBe("sarah@x.co");
+  });
+
+  it("a donor's address and greeting come from their latest gift", async () => {
+    tables.donations.push(gift("g0", "sarah", { paid_at: "2026-11-05T10:00:00+02:00" }, { email: "sarah.new@x.co", first_name: "Sal" }));
+    const who = await contacts("c1", ["sarah"]);
+    expect(who.byDonor.get("sarah")).toEqual({ email: "sarah.new@x.co", greeting: "Sal" });
   });
 
   it("stopped part way by a database problem: what was sent is still recorded, and the rest are still to send", async () => {
@@ -324,7 +369,7 @@ describe("sending reminders", () => {
     vi.setSystemTime(NOW);
     const thanks = await sendDonorThankYou({ charityId: "c1", charityName: "Meals Fund", donorId: "sarah", body: "Thank you, truly.", userId: "u1", replyTo: null });
     expect(thanks.ok === false && thanks.message).toBe(
-      "Sarah Cohen already had a message from you this week, so nothing was sent. Givezy sends each donor at most one message a week from your charity. You can thank them from Monday.",
+      "⁨Sarah Cohen⁩ already had a message from you this week, so nothing was sent. Givezy sends each donor at most one message a week from your charity. You can thank them from Monday.",
     );
     vi.useRealTimers();
     expect(sent).toHaveLength(0);

@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { EmailError, getEmailTransport } from "@/lib/email";
+import { getEmailTransport } from "@/lib/email";
+import { mayHaveSent } from "@/lib/email/retry-plan";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -34,6 +35,8 @@ import { findJourney, journeySteps, journeysV2, rowOf, type JourneyRow, type Jou
 import { contacts, optedOutHashes } from "./s18a-reminder-send";
 import { emailHash, weekStart } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
+import { readPages } from "./paged";
+import { inboxKey } from "./one-per-address";
 
 /**
  * The donor journey's database side (CRM step 6a, 10/11/2026). The tables are server-only: every call here comes after
@@ -151,15 +154,18 @@ export async function journeyPeople(charityId: string, j: Pick<Journey, "id">, l
 async function donorNames(charityId: string, donorIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (let i = 0; i < donorIds.length; i += 200) {
-    const { data, error } = await db()
-      .from("donations")
-      .select("donor_id, paid_at, donation_checkout_details(donor_type, first_name, last_name, organisation_name, erased_at)")
-      .eq("charity_id", charityId)
-      .eq("status", "paid")
-      .in("donor_id", donorIds.slice(i, i + 200))
-      .order("paid_at", { ascending: false });
-    if (error) throw error;
-    for (const g of data ?? []) {
+    const data = await readPages<{ donor_id: string; paid_at: string; donation_checkout_details: unknown }>((from, to) =>
+      db()
+        .from("donations")
+        .select("donor_id, paid_at, donation_checkout_details(donor_type, first_name, last_name, organisation_name, erased_at)")
+        .eq("charity_id", charityId)
+        .eq("status", "paid")
+        .in("donor_id", donorIds.slice(i, i + 200))
+        .order("paid_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    );
+    for (const g of data) {
       const id = g.donor_id as string;
       if (out.has(id)) continue;
       const raw = g.donation_checkout_details as unknown;
@@ -301,10 +307,6 @@ export type JourneyRun = {
 /** The table isn't there (PostgREST's "not in the schema cache", or Postgres's "no such table"). */
 export const isMissingTable = (e: { code?: string } | null | undefined) => e?.code === "PGRST205" || e?.code === "42P01";
 
-/** Did a send that threw maybe go? A refusal from the email service didn't; a time-out or a broken connection may have. */
-function failedForSure(e: unknown): boolean {
-  return e instanceof EmailError;
-}
 
 type Live = { charityId: string; id: string | null; kind: JourneyKind; campaignId: string | null; switchedOnAt: Date; name: string; slug: string; steps: JourneyStep[] };
 type DueRow = { id: string; charity_id: string; journey_id?: string | null; donor_id: string; next_step: number; attempts: number; enrolled_at?: string | null };
@@ -416,10 +418,11 @@ async function gaveAgainRows(charityId: string, rows: { id: string; donor_id: st
   for (let i = 0; i < withDate.length; i += 200) {
     const chunk = withDate.slice(i, i + 200);
     const earliest = new Date(Math.min(...chunk.map((r) => Date.parse(r.enrolled_at!)))).toISOString();
-    const { data, error } = await db().from("donations").select("donor_id, paid_at").eq("charity_id", charityId).eq("status", "paid").in("donor_id", chunk.map((r) => r.donor_id)).gt("paid_at", earliest);
-    if (error) throw error;
+    const data = await readPages<{ donor_id: string; paid_at: string }>((from, to) =>
+      db().from("donations").select("donor_id, paid_at").eq("charity_id", charityId).eq("status", "paid").in("donor_id", chunk.map((r) => r.donor_id)).gt("paid_at", earliest).order("id").range(from, to),
+    );
     const last = new Map<string, Date>();
-    for (const g of data ?? []) {
+    for (const g of data) {
       const at = new Date(g.paid_at as string);
       const had = last.get(g.donor_id as string);
       if (!had || at > had) last.set(g.donor_id as string, at);
@@ -455,9 +458,10 @@ async function stopGaveAgain(winbacks: Live[], now: Date, deadline: number): Pro
     const last = new Map<string, Date>();
     for (let i = 0; i < ids.length; i += 200) {
       const earliest = new Date(Math.min(...ids.slice(i, i + 200).map((id) => enrolled.get(id)!.at.getTime()))).toISOString();
-      const { data, error: e } = await db().from("donations").select("donor_id, paid_at").eq("charity_id", j.charityId).eq("status", "paid").in("donor_id", ids.slice(i, i + 200)).gt("paid_at", earliest);
-      if (e) throw e;
-      for (const g of data ?? []) {
+      const data = await readPages<{ donor_id: string; paid_at: string }>((from, to) =>
+        db().from("donations").select("donor_id, paid_at").eq("charity_id", j.charityId).eq("status", "paid").in("donor_id", ids.slice(i, i + 200)).gt("paid_at", earliest).order("id").range(from, to),
+      );
+      for (const g of data) {
         const at = new Date(g.paid_at as string);
         const had = last.get(g.donor_id as string);
         if (!had || at > had) last.set(g.donor_id as string, at);
@@ -492,7 +496,7 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
         .gte("paid_at", since);
       // A campaign's journey: gifts to that campaign only.
       if (j.kind === "campaign" && j.campaignId) q = q.eq("campaign_id", j.campaignId);
-      const { data, error: e } = await q.order("paid_at").range(from, from + 999);
+      const { data, error: e } = await q.order("paid_at").order("id").range(from, from + 999);
       if (e) throw e;
       for (const r of data ?? []) if (!first.has(r.donor_id as string)) first.set(r.donor_id as string, new Date(r.paid_at as string));
       if (!data || data.length < 1000) break;
@@ -502,18 +506,21 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
     // A gift before the switch (or a recorded one) means they were already a donor: "Add my existing donors" covers them.
     // For a campaign's journey, a gift to that campaign before the switch: donors who gave to it before aren't added.
     const earlier = new Set<string>();
+    // Page by page: a long-standing donor's many earlier gifts must never push another donor's off the end of the read
+    // (they would then be enrolled as new).
     for (let i = 0; i < ids.length; i += 200) {
-      let q = db()
-        .from("donations")
-        .select("donor_id")
-        .eq("charity_id", j.charityId)
-        .in("status", ["paid", "refunded", "charged_back"])
-        .in("donor_id", ids.slice(i, i + 200))
-        .lt("paid_at", j.switchedOnAt.toISOString());
-      if (j.kind === "campaign" && j.campaignId) q = q.eq("campaign_id", j.campaignId);
-      const { data, error: e } = await q;
-      if (e) throw e;
-      for (const r of data ?? []) earlier.add(r.donor_id as string);
+      const data = await readPages<{ donor_id: string }>((from, to) => {
+        let q = db()
+          .from("donations")
+          .select("donor_id")
+          .eq("charity_id", j.charityId)
+          .in("status", ["paid", "refunded", "charged_back"])
+          .in("donor_id", ids.slice(i, i + 200))
+          .lt("paid_at", j.switchedOnAt.toISOString());
+        if (j.kind === "campaign" && j.campaignId) q = q.eq("campaign_id", j.campaignId);
+        return q.order("id").range(from, to);
+      });
+      for (const r of data) earlier.add(r.donor_id);
     }
     for (const id of earlier) first.delete(id);
     if (!first.size) continue;
@@ -550,6 +557,9 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   const week = weekStart(now);
   const update = (id: string, set: Record<string, unknown>) => db().from("charity_journey_enrolments").update({ ...set, updated_at: new Date().toISOString() }).eq("id", id).eq("status", "active");
+  // Addresses this run has emailed (or may have): someone who is two donors (themselves and their company) gets one
+  // email from the charity, and their other place waits a week, as any second message would.
+  const inbox = new Set<string>();
 
   for (let at = 0; at < list.length; at++) {
     const r = list[at];
@@ -581,7 +591,7 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
       out.finished++;
       continue;
     }
-    if (decision.kind === "wait_week") {
+    if (decision.kind === "wait_week" || inbox.has(inboxKey(contact!.email))) {
       await update(r.id, { next_due_at: nextWeekStart(now).toISOString() });
       out.waiting++;
       continue;
@@ -639,6 +649,7 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
     }
     // 3. The email, with a time limit (never past the job's own end).
     let outcome: "sent" | "skipped" | "maybe" | "refused";
+    inbox.add(inboxKey(contact!.email));
     try {
       outcome = await transport.send({
         ...journeyEmail(contact!.email, {
@@ -655,9 +666,12 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
       });
     } catch (e) {
       console.error("[journey] not sent", e instanceof Error ? e.message : e);
-      outcome = failedForSure(e) ? "refused" : "maybe";
+      // A refusal from the email service didn't go; a time-out or a broken connection may have.
+      outcome = mayHaveSent(e) ? "maybe" : "refused";
     }
     if (outcome === "skipped" || outcome === "refused") {
+      // Nothing reached this inbox: their other place may still go today.
+      inbox.delete(inboxKey(contact!.email));
       await release();
       await notSent();
       continue;

@@ -14,13 +14,15 @@ import {
   checkJourneySteps,
   chosenDonors,
   existingOutcome,
+  middleStepWords,
   parseRefKey,
+  partWay,
   refKey,
   winbackOutcome,
   type JourneyRef,
 } from "@/lib/charity/journey";
-import { addExistingDonors, addWinbackDonors } from "@/lib/charity/journey-store";
-import { journeysV2, readJourneyState, writeJourney } from "@/lib/charity/journey-write";
+import { addExistingDonors, addWinbackDonors, enrolmentStates } from "@/lib/charity/journey-store";
+import { findJourney, journeysV2, readJourneyState, writeJourney } from "@/lib/charity/journey-write";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { isOwner, refusal } from "@/lib/charity/team";
 import { formatDate } from "@/lib/dates";
@@ -67,6 +69,13 @@ export async function saveJourney(charityId: string, key: string, _prev: FormSta
   if (notAllowed) return { ok: false, message: notAllowed };
   const which = await journeyFor(charityId, key);
   if (!which) return UNKNOWN;
+  // An email removed from the middle moves the ones after it to new numbers, and each donor's place goes by number:
+  // refused while anyone is part way through (the page offers only the last email's Remove then).
+  if (formData.get("shifted") === "yes") {
+    const row = await findJourney(charityId, which.ref);
+    const onIt = row ? partWay(await enrolmentStates(charityId, row)) : 0;
+    if (onIt) return { ok: false, message: `${middleStepWords(onIt)} Nothing was saved.` };
+  }
   const count = Math.min(JOURNEY_MAX_STEPS + 1, Math.max(0, Number(formData.get("steps") ?? 0) || 0));
   const raw = Array.from({ length: count }, (_, i) => ({ subject: formData.get(`subject_${i + 1}`), body: formData.get(`body_${i + 1}`), waitDays: formData.get(`wait_${i + 1}`) }));
   const checked = checkJourneySteps(raw);

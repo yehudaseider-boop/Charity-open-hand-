@@ -46,6 +46,14 @@ export const isErasedEmail = (email: string | null | undefined): boolean => Bool
 export const shownEmail = (email: string | null | undefined): string | null => (email && !isErasedEmail(email) ? email : null);
 export const ERASED_DONOR = "Erased at the donor's request";
 
+/**
+ * Does a donor match the search box (name or email; `needle` already lower case)? The email is null for a role that
+ * can't see contact details (a Viewer, charity_contact_or_null): then only the name is searched.
+ */
+export function donorMatches(d: { display_name: string | null; email: string | null }, needle: string): boolean {
+  return !needle || (d.display_name ?? "").toLowerCase().includes(needle) || (d.email ?? "").toLowerCase().includes(needle);
+}
+
 /** The name to show for a donor: person, or organisation. */
 export function donorName(d: { donor_type: string | null; first_name: string | null; last_name: string | null; organisation_name: string | null; email?: string | null }): string {
   if (isErasedEmail(d.email)) return ERASED_DONOR;

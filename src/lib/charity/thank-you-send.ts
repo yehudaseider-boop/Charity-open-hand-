@@ -7,6 +7,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
 import { emailHash, monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
 import { WEEKLY_LIMIT, messagedThisWeek } from "./weekly-limit";
+import { mayHaveSent } from "@/lib/email/retry-plan";
+import { isolate } from "@/lib/text";
+import { formatDate } from "@/lib/dates";
+import { nextWeekStart } from "./journey";
 
 /** One address that gave in the month, with the donors it belongs to (for the one-message-a-week rule). */
 export type Recipient = { email: string; firstName: string | null; donorIds: string[] };
@@ -59,7 +63,17 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
 }
 
 export type SendResult =
-  | { ok: true; sent: number; failed: number; remaining: number; sentThisRun?: number; /** Left out this run: they already had a message from the charity this week. */ thisWeek?: number }
+  | {
+      ok: true;
+      sent: number;
+      failed: number;
+      remaining: number;
+      sentThisRun?: number;
+      /** Left out this run: they already had a message from the charity this week. The thank-you stays unfinished for them. */
+      thisWeek?: number;
+      /** When "Send the rest" can reach those left out (the next Monday, dd/mm/yyyy), when any were. */
+      from?: string;
+    }
   | { ok: false; message: string };
 
 /**
@@ -154,17 +168,22 @@ async function runThankYou(args: { charityId: string; charityName: string; month
       await mark(outcome === "sent" ? "sent" : "failed");
     } catch (e) {
       console.error("[thank-you] not sent", e instanceof Error ? e.message : e);
-      await mark("failed");
+      // Cut off or a dropped connection: it may have gone, so it stays "sending" (counted as not sent, but still this
+      // donor's message for the week, and never sent again). Only a refusal is marked failed.
+      if (!mayHaveSent(e)) await mark("failed");
     }
   }
   const counts = await thankYouCounts(args.thankYouId);
   const remaining = stoppedEarly ? recipients.filter((r) => !claimed.has(emailHash(r.email)) && !leftOut.has(emailHash(r.email))).length : 0;
+  // Donors left out because they had a message this week haven't had it yet: the thank-you stays unfinished, so
+  // "Send the rest" can reach them once their week has passed (it must never use up the month).
+  const finished = remaining === 0 && leftOut.size === 0;
   await db
     .from("charity_thank_yous")
-    .update({ recipient_count: counts.sent, ...(remaining === 0 ? { finished_at: new Date().toISOString() } : {}) })
+    .update({ recipient_count: counts.sent, ...(finished ? { finished_at: new Date().toISOString() } : {}) })
     .eq("id", args.thankYouId);
   await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining, thisWeek: leftOut.size } });
-  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun, thisWeek: leftOut.size };
+  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun, thisWeek: leftOut.size, ...(leftOut.size ? { from: formatDate(nextWeekStart(new Date())) } : {}) };
 }
 
 /** Addresses (as hashes) already claimed for this thank-you, in pages. */
@@ -236,8 +255,9 @@ export async function sendDonorThankYou(args: {
   const hash = emailHash(d.email);
   const { data: stopped, error: stopError } = await db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", hash).maybeSingle();
   if (stopError) throw stopError;
-  if (stopped) return { ok: false, message: `${name} asked not to get thank-you emails from charities, so nothing was sent.` };
-  const thisWeek = `${name} already had a message from you this week, so nothing was sent. ${WEEKLY_LIMIT} You can thank them from Monday.`;
+  // The name sits in a sentence on the page: isolated, so a right-to-left name doesn't reorder the words around it.
+  if (stopped) return { ok: false, message: `${isolate(name)} asked not to get thank-you emails from charities, so nothing was sent.` };
+  const thisWeek = `${isolate(name)} already had a message from you this week, so nothing was sent. ${WEEKLY_LIMIT} You can thank them from Monday.`;
   // A news email, appeal or the monthly thank-you this week counts too, not only a thank-you or reminder.
   if ((await messagedThisWeek(args.charityId, [{ donorId: args.donorId, hash }])).has(args.donorId)) return { ok: false, message: thisWeek };
 
@@ -269,6 +289,11 @@ export async function sendDonorThankYou(args: {
     }
   } catch (e) {
     console.error("[thank-you] personal thank-you not sent", e instanceof Error ? e.message : e);
+    if (mayHaveSent(e)) {
+      // Cut off or a dropped connection: it may have reached them. The week stays claimed, so it is never sent twice.
+      await logAudit({ actorUserId: args.userId, action: "charity.donor_thanked", entityType: "charity", entityId: args.charityId, details: { donorId: args.donorId, unknown: true } }).catch(() => undefined);
+      return { ok: false, message: `The connection dropped while sending, so we can't tell whether your thank-you reached ${isolate(name)}. To be safe it won't be sent again this week, so they never get two. You can thank them again from Monday.` };
+    }
     await release();
     return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
   }
