@@ -4,6 +4,7 @@
  * run), then a day later, then three days after that. After three more tries it stops and Givezy is told once.
  * Pure rules, no database: the daily job (./retry) applies them.
  */
+import { EmailError } from "./index";
 
 /** The emails tried again. Marketing-type sends (appeals, journeys, thank-yous) have their own handling. */
 export const RETRY_KINDS = ["donation_confirmation", "s18a_receipt", "monthly_declined"] as const;
@@ -24,7 +25,7 @@ export const RETRY_MAX_AGE_DAYS = 7;
  * - "gone": there is nothing to send any more (the gift was refunded, the receipt was emailed another way, the
  *   donor already put in a new card).
  * - "busy": another run is sending it right now: look again later, without using up a try.
- * - "unknown": the send was cut off (a time limit, or a run that stopped mid-send): it may have gone. Never tried
+ * - "unknown": the send was cut off (a time limit, a dropped connection, or a run that stopped mid-send): it may have gone. Never tried
  *   again by itself, so the donor never gets two; a person checks it.
  * - "failed": the send did not work.
  */
@@ -67,11 +68,19 @@ export function tooOld(createdAt: Date, now: Date): boolean {
   return now.getTime() - createdAt.getTime() > RETRY_MAX_AGE_DAYS * 24 * HOUR;
 }
 
-/** A send that was cut off by a time limit or an abort: it may still have gone. */
+/**
+ * A send that threw: may it still have gone? Only a refusal from the email service (EmailError: it answered and said
+ * no, or the set-up is wrong) is sure not to have sent anything. A time limit, an abort, a dropped connection (fetch's
+ * "fetch failed"), or anything else that went wrong around the send may have come after the provider accepted it, so
+ * it counts as "may have gone": never sent again by itself, flagged for a person. The same rule as the journeys'
+ * (review 12/11/2026), so every sender treats an unclear send the same way.
+ */
 export function wasCutOff(e: unknown): boolean {
-  const name = e && typeof e === "object" && "name" in e ? String((e as { name: unknown }).name) : "";
-  return name === "AbortError" || name === "TimeoutError";
+  return !(e instanceof EmailError);
 }
+
+/** The same rule, by the name the marketing-type senders use. */
+export const mayHaveSent = wasCutOff;
 
 /** A failure message as kept with the row: one line, short, and never an email address. */
 export function safeErrorText(e: unknown): string {

@@ -11,7 +11,7 @@ import { thankOneDonor } from "./actions";
 import { ThankOneForm } from "./thank-form";
 import { DonorPeekLink } from "./donor-peek";
 import { requireViewer } from "@/lib/auth";
-import { ERASED_DONOR, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
+import { ERASED_DONOR, donorMatches, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
 import { loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
@@ -80,7 +80,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
     (d) =>
       (!group || donorGroup(d, now, lapsedDays) === group) &&
       (!tag || (byDonor.get(d.donor_id) ?? []).includes(tag)) &&
-      (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
+      donorMatches(d, needle),
   );
   // Counts for the s18A filters, within the group, tag and search chosen.
   const counts = s18aCounts(matching, missing);
@@ -91,12 +91,12 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const contactLines: Line[] = group || s18a
     ? []
     : contacts
-        .filter((c) => (!tag || c.tag_ids.includes(tag)) && (!needle || contactName(c).toLowerCase().includes(needle) || (c.email ?? "").includes(needle)))
+        .filter((c) => (!tag || c.tag_ids.includes(tag)) && (!needle || contactName(c).toLowerCase().includes(needle) || (c.email ?? "").toLowerCase().includes(needle)))
         .map((c) => ({ kind: "contact", id: c.id, name: contactName(c), totalCents: 0, firstAt: null, lastAt: null, c }));
   const donors = sortDonors([...donorLines, ...contactLines], sort);
   const contactsShown = contactLines.length;
   // Someone imported who has since given through Givezy (the same email): both lines show, not merged.
-  const gaveEmails = new Set(all.map((d) => d.email.trim().toLowerCase()));
+  const gaveEmails = new Set(all.flatMap((d) => (d.email ? [d.email.trim().toLowerCase()] : [])));
   const pages = Math.max(1, Math.ceil(donors.length / PAGE));
   // A page past the end (an old link, a typed number) shows the last page, never "No donors yet".
   const page = Math.min(asked, pages);
@@ -109,7 +109,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   // "Say thank you": only once the page is live, never to erased donors or anyone who asked not to get them.
   const canThank = charity.status === "approved";
   const shownDonors = shown.flatMap((l) => (l.kind === "donor" ? [l.d] : []));
-  const emailed = shownDonors.filter((d) => shownEmail(d.email));
+  const emailed = shownDonors.flatMap((d) => (shownEmail(d.email) ? [{ ...d, email: d.email! }] : []));
   // One message a week per donor from the charity (09/11/2026): anyone who had any this week (a thank-you, a
   // reminder, a news email or appeal, the monthly thank-you) isn't offered "Say thank you" until Monday.
   const [thanked, stopped, thisWeek] = canThank
@@ -263,7 +263,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                   {line.c.note ? <p dir="auto" className="mt-1 line-clamp-2 whitespace-pre-line text-navy [overflow-wrap:anywhere]">{line.c.note}</p> : null}
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     <Badge>Imported, no gifts yet</Badge>
-                    {line.c.email && gaveEmails.has(line.c.email) ? <Badge tone="success">Has now given</Badge> : null}
+                    {line.c.email && gaveEmails.has(line.c.email.trim().toLowerCase()) ? <Badge tone="success">Has now given</Badge> : null}
                     {line.c.tag_ids.map((t) => (tagName.has(t) ? <Badge key={t}>{tagName.get(t)}</Badge> : null))}
                   </div>
                 </div>
@@ -298,7 +298,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                 {reminding && reminded.get(d.donor_id) ? <p className="mt-1 text-xs text-muted">Last reminded on {formatDate(reminded.get(d.donor_id)!)}.</p> : null}
                 {canRemind && missing.has(d.donor_id) ? <ReminderTick key={`tick-${d.donor_id}-${key}`} donorId={d.donor_id} name={isErasedEmail(d.email) ? ERASED_DONOR : d.display_name || "this donor"} /> : null}
                 {canThank && shownEmail(d.email) ? (
-                  stopped.has(d.email.trim().toLowerCase()) ? (
+                  stopped.has((d.email ?? "").trim().toLowerCase()) ? (
                     <p className="mt-2 text-xs text-muted">Asked not to get thank-you emails from charities.</p>
                   ) : (
                     <>

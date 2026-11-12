@@ -10,6 +10,7 @@ import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { thankYouRecipients } from "@/lib/charity/thank-you-send";
 import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import { formatDate } from "@/lib/dates";
+import { nextWeekStart } from "@/lib/charity/journey";
 import { createClient } from "@/lib/supabase/server";
 import { thankYouNoteToShow } from "@/lib/charity/thank-you-note";
 import { saveThankYouWording, sendRestOfThankYou, sendThankDonors } from "./actions";
@@ -96,7 +97,8 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
         <Card key={`rest-${month}`} title={`${monthLabel(month)}: not finished`}>
           <div id="unfinished" className="space-y-3 text-sm">
             <p>
-              Your thank-you went to {done} {done === 1 ? "donor" : "donors"} before it stopped. About {Math.max(0, total - done)} still to go. Nobody gets it twice.
+              Your thank-you has gone to {done} {done === 1 ? "donor" : "donors"} so far. About {Math.max(0, total - done)} haven&apos;t had it yet: the send stopped part way, or they
+              already had a message from you this week. Anyone who had one this week can get it from Monday {formatDate(nextWeekStart(new Date()))}. Nobody gets it twice.
             </p>
             <SendRestForm action={sendRestOfThankYou.bind(null, id, month)} confirm={`Send the same thank-you to the donors in ${monthLabel(month)} who haven't had it yet?`} />
           </div>

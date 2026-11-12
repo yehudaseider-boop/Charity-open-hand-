@@ -118,7 +118,7 @@ export const TO_THANK_DAYS = 7;
  * address we can email (not erased, not a gift the charity only recorded), not thanked personally since that gift and
  * not someone who asked not to get thank-you emails. Pure, so the store only reads the facts.
  */
-export function donorsToThank<T extends { donor_id: string; first_paid_at: string; email: string }>(
+export function donorsToThank<T extends { donor_id: string; first_paid_at: string; email: string | null }>(
   donors: T[],
   now: Date,
   facts: { canEmail: (email: string) => boolean; lastThankedAt: ReadonlyMap<string, string>; optedOut: ReadonlySet<string> },
@@ -127,7 +127,8 @@ export function donorsToThank<T extends { donor_id: string; first_paid_at: strin
   return donors.filter((d) => {
     const first = new Date(d.first_paid_at).getTime();
     if (!(first >= since && first <= now.getTime())) return false;
-    if (!facts.canEmail(d.email)) return false;
+    // No address: erased, or the viewer's role can't see contact details.
+    if (!d.email || !facts.canEmail(d.email)) return false;
     if (facts.optedOut.has(d.email.trim().toLowerCase())) return false;
     const thanked = facts.lastThankedAt.get(d.donor_id);
     return !(thanked && new Date(thanked).getTime() >= first);

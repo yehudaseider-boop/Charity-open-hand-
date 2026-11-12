@@ -53,7 +53,8 @@ export type DonorRow = {
   donor_id: string;
   donor_type: string;
   display_name: string;
-  email: string;
+  /** Null when the viewer's role can't see contact details (charity_contact_or_null). */
+  email: string | null;
   phone: string | null;
   donation_count: number;
   total_cents: number;

@@ -28,8 +28,10 @@ describe("the personal thank-you email", () => {
     expect(ASK_FIRST).toContain("donor_thanked");
     expect(pageOf("donor_thanked")).toBe("donors");
     expect(describeDone("donor_thanked", { name: "Sarah Cohen", replyTo: "office@meals.org" }, { base: "/b", publicUrl: null, approved: true }).what).toBe(
-      "Your thank-you went to Sarah Cohen. If they reply, it goes to office@meals.org.",
+      // The name is isolated (the plain-string <bdi>), so a right-to-left name can't reorder the sentence.
+      "Your thank-you went to ⁨Sarah Cohen⁩. If they reply, it goes to office@meals.org.",
     );
+    expect(describeDone("donor_thanked", {}, { base: "/b", publicUrl: null, approved: true }).what).toBe("Your thank-you went to your donor.");
     expect(describeUndone("donor_thanked", {})).toBe("This can't be taken back.");
   });
 });
@@ -40,6 +42,8 @@ let gift: unknown = null;
 let stopped = false;
 let claimed = false;
 let failSend = false;
+let dropSend = false;
+const { RefusedError } = vi.hoisted(() => ({ RefusedError: class RefusedError extends Error {} }));
 let skipSend = false;
 let released = 0;
 let recordedOnly = false;
@@ -47,9 +51,12 @@ let recordedOnly = false;
 let appealThisWeek = false;
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/email", () => ({
+  EmailError: RefusedError,
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string; replyTo?: string }) => {
-      if (failSend) throw new Error("down");
+      // A refusal from the email service (sure not to have gone), or a dropped connection (may have gone).
+      if (failSend) throw new RefusedError("refused");
+      if (dropSend) throw new TypeError("fetch failed");
       if (skipSend) return "skipped";
       sent.push(m);
       return "sent";
@@ -84,6 +91,7 @@ beforeEach(() => {
   claimed = false;
   stopped = false;
   failSend = false;
+  dropSend = false;
   skipSend = false;
   released = 0;
   recordedOnly = false;
@@ -110,14 +118,14 @@ describe("sending one donor a thank-you", () => {
     await sendDonorThankYou(args);
     const again = await sendDonorThankYou(args);
     expect(again.ok === false && again.message).toBe(
-      "Sarah Cohen already had a message from you this week, so nothing was sent. Givezy sends each donor at most one message a week from your charity. You can thank them from Monday.",
+      "⁨Sarah Cohen⁩ already had a message from you this week, so nothing was sent. Givezy sends each donor at most one message a week from your charity. You can thank them from Monday.",
     );
     expect(sent).toHaveLength(1);
   });
   it("a news email or appeal this week counts too: nothing is claimed or sent", async () => {
     appealThisWeek = true;
     const r = await sendDonorThankYou(args);
-    expect(r.ok === false && r.message).toMatch(/^Sarah Cohen already had a message from you this week, so nothing was sent\./);
+    expect(r.ok === false && r.message).toMatch(/^⁨Sarah Cohen⁩ already had a message from you this week, so nothing was sent\./);
     expect(claimed).toBe(false);
     expect(sent).toHaveLength(0);
   });
@@ -130,11 +138,23 @@ describe("sending one donor a thank-you", () => {
     expect(r.ok === false && r.message).toMatch(/asked not to get thank-you emails/);
     expect(sent).toHaveLength(0);
   });
-  it("a failed send hands the week back, so the charity can try again", async () => {
+  it("a send the email service refused hands the week back, so the charity can try again", async () => {
     failSend = true;
     const r = await sendDonorThankYou(args);
     expect(r.ok === false && r.message).toMatch(/Nothing went out/);
     expect(released).toBe(1);
+  });
+  it("a dropped connection may have sent it: the week stays used, so the donor never gets two, and the page says so plainly", async () => {
+    dropSend = true;
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await sendDonorThankYou(args);
+    err.mockRestore();
+    expect(released).toBe(0);
+    expect(r).toEqual({
+      ok: false,
+      message: "The connection dropped while sending, so we can't tell whether your thank-you reached ⁨Sarah Cohen⁩. To be safe it won't be sent again this week, so they never get two. You can thank them again from Monday.",
+    });
+    expect(r.ok === false && r.message).not.toMatch(/Nothing went out/);
   });
   it("a send the email service skipped is reported as not sent, and the week is handed back", async () => {
     skipSend = true;

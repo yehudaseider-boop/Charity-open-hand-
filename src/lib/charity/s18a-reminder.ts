@@ -125,11 +125,13 @@ export function skippedSentence(skipped: Partial<Record<ReminderSkip, number>>):
 }
 
 /** What the page says after a send. Counts only. */
-export function reminderOutcome(r: { sent: number; failed: number; remaining: number; skipped: Partial<Record<ReminderSkip, number>>; interrupted?: boolean }): string {
+export function reminderOutcome(r: { sent: number; failed: number; unknown?: number; remaining: number; skipped: Partial<Record<ReminderSkip, number>>; interrupted?: boolean }): string {
+  const unknown = r.unknown ?? 0;
   const lines = [
-    r.sent ? `Reminders to add their s18A details went to ${plural(r.sent, "donor")}.` : "No reminders were sent.",
+    r.sent ? `Reminders to add their s18A details went to ${plural(r.sent, "donor")}.` : unknown ? "" : "No reminders were sent.",
     skippedSentence(r.skipped),
     r.failed ? `${plural(r.failed, "email")} couldn't be sent just now. Choose ${r.failed === 1 ? "that donor" : "them"} again later: nobody gets it twice.` : "",
+    unknown ? `The connection dropped while sending ${unknown === 1 ? "1 reminder, so it" : `${unknown} reminders, so they`} may or may not have gone. To be safe, ${unknown === 1 ? "it isn't" : "they aren't"} sent again this week, so nobody gets two.` : "",
     r.interrupted ? "Sending stopped part way because of a problem on our side, not anything you did." : "",
     r.remaining ? `${plural(r.remaining, "donor")} still to send to: choose them again and press Send. Nobody gets it twice.` : "",
   ];

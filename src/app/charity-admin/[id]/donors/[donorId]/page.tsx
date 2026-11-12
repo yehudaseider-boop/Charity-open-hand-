@@ -203,7 +203,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
         )}
         {(gifts ?? []).length === 100 && shownEmail(donor.email) ? (
           <p className="mt-2 text-xs text-muted">
-            The latest 100 gifts. <Link href={`${base}/donations?q=${encodeURIComponent(donor.email)}`} className="text-brand underline">See them all on Donations</Link>
+            The latest 100 gifts. <Link href={`${base}/donations?q=${encodeURIComponent(donor.email ?? "")}`} className="text-brand underline">See them all on Donations</Link>
           </p>
         ) : null}
       </Card>

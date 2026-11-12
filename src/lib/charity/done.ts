@@ -1,4 +1,4 @@
-import { plural } from "@/lib/text";
+import { isolate, plural } from "@/lib/text";
 import { reviewWithin } from "@/lib/charity/review-time";
 import { taxYearName } from "@/lib/dates";
 import { REMINDER_SKIPS, reminderOutcome } from "@/lib/charity/s18a-reminder";
@@ -8,6 +8,8 @@ import { ROLE_LABEL } from "./permissions";
 
 /** "2026/27" from a stored tax year, or empty when it is missing. */
 const yearName = (y: unknown) => (Number.isInteger(Number(y)) && Number(y) > 2000 ? taxYearName(Number(y)) : "");
+/** A donor's name as typed, isolated in the sentence (the plain-string <bdi>), or the words to use without one. */
+const nameOf = (d: Details, otherwise: string) => (d.name ? isolate(String(d.name)) : otherwise);
 /**
  * The charity dashboard's core flow (18/10/2026, Yehuda): after every action, say what just happened,
  * offer to take it back, and point to what to do next. All the words live here, so they can be
@@ -165,7 +167,12 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       const failed = Number(d.failed ?? 0);
       const remaining = Number(d.remaining ?? 0);
       const thisWeek = Number(d.thisWeek ?? 0);
-      const leftOut = thisWeek ? ` ${plural(thisWeek, "donor")} already had a message from you this week, so ${thisWeek === 1 ? "was" : "were"} left out of it. ${WEEKLY_LIMIT}` : "";
+      // Those left out haven't had it yet: the thank-you stays open for them, and "Send the rest" reaches them once
+      // their week has passed (from the Monday after, `from`).
+      const when = d.from ? `from Monday ${String(d.from)}` : "from Monday";
+      const leftOut = thisWeek
+        ? ` ${plural(thisWeek, "donor")} already had a message from you this week, so ${thisWeek === 1 ? "hasn't" : "haven't"} had it yet. ${WEEKLY_LIMIT} Press Send the rest ${when} to reach ${thisWeek === 1 ? "them" : "them all"}.`
+        : "";
       if (remaining) {
         return {
           what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: nobody gets it twice.${leftOut}`,
@@ -175,13 +182,13 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       return {
         what: sent
           ? `Your thank-you for ${String(d.month ?? "that month")} went to ${plural(sent, "donor")}.${failed ? ` ${plural(failed, "email")} could not be sent.` : ""}${leftOut}`
-          : `Your thank-you for ${String(d.month ?? "that month")} is saved. Nobody was left to email.${leftOut}`,
-        next: { label: "See who gave", href: `${c.base}/donors` },
+          : `Your thank-you for ${String(d.month ?? "that month")} is saved. ${thisWeek ? "Nobody else could be emailed this week." : "Nobody was left to email."}${leftOut}`,
+        next: thisWeek ? { label: `Send the rest ${when}`, href: `${c.base}/thank-donors#unfinished` } : { label: "See who gave", href: `${c.base}/donors` },
       };
     }
     case "donor_thanked":
       return {
-        what: `Your thank-you went to ${String(d.name ?? "your donor")}.${d.replyTo ? ` If they reply, it goes to ${String(d.replyTo)}.` : ""}`,
+        what: `Your thank-you went to ${nameOf(d, "your donor")}.${d.replyTo ? ` If they reply, it goes to ${String(d.replyTo)}.` : ""}`,
         next: { label: "Back to your donors", href: `${c.base}/donors` },
       };
     case "journey_saved":
@@ -223,6 +230,7 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         what: reminderOutcome({
           sent: Number(d.sent ?? 0),
           failed: Number(d.failed ?? 0),
+          unknown: Number(d.unknown ?? 0),
           remaining: Number(d.remaining ?? 0),
           skipped: Object.fromEntries(REMINDER_SKIPS.map((k) => [k, Number(d[`skipped_${k}`] ?? 0)])),
           interrupted: Boolean(d.interrupted),
@@ -236,12 +244,12 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       };
     case "certificate_approved":
       return {
-        what: `You approved the s18A receipt for ${String(d.name ?? "this donor")}, ${String(d.total ?? "")} for the ${yearName(d.taxYear)} tax year. It's issued with your list once Givezy has signed it off.`,
+        what: `You approved the s18A receipt for ${nameOf(d, "this donor")}, ${String(d.total ?? "")} for the ${yearName(d.taxYear)} tax year. It's issued with your list once Givezy has signed it off.`,
         next: nextCertificate(c, d),
       };
     case "certificate_edited":
       return {
-        what: `You corrected the donor's ${String(d.changed ?? "details")} and approved the s18A receipt for ${String(d.name ?? "this donor")}. The receipt and your SARS file will both show the corrected details.`,
+        what: `You corrected the donor's ${String(d.changed ?? "details")} and approved the s18A receipt for ${nameOf(d, "this donor")}. The receipt and your SARS file will both show the corrected details.`,
         next: nextCertificate(c, d),
       };
     case "certificate_declined": {
@@ -251,18 +259,18 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         : emailed === "no_address" ? "We have no email address for them, so please contact them yourself."
         : "The email to them hasn't gone yet: open the receipt and press Send the email again, or contact them yourself.";
       return {
-        what: `You declined the s18A receipt for ${String(d.name ?? "this donor")}. It's left out of your list. ${told}`,
+        what: `You declined the s18A receipt for ${nameOf(d, "this donor")}. It's left out of your list. ${told}`,
         next: emailed === "sent" || emailed === "no_address" || !d.key ? nextCertificate(c, d) : { label: "Open the receipt", href: certificateHref(c, d.taxYear, d.key) },
       };
     }
     case "certificate_reopened":
       return {
-        what: `The s18A receipt for ${String(d.name ?? "this donor")} is back to "To check".${d.was === "declined" ? " We haven't emailed the donor about it." : ""}`,
+        what: `The s18A receipt for ${nameOf(d, "this donor")} is back to "To check".${d.was === "declined" ? " We haven't emailed the donor about it." : ""}`,
         next: d.key ? { label: "Open the receipt", href: certificateHref(c, d.taxYear, d.key) } : { label: "Back to your list", href: `${c.base}/receipts` },
       };
     case "gift_recorded":
       return {
-        what: `${String(d.amount ?? "The gift")} from ${String(d.name ?? "your donor")} on ${String(d.date ?? "")} is recorded${d.s18a ? ". It goes on their s18A receipt for the tax year" : ""}.`,
+        what: `${String(d.amount ?? "The gift")} from ${nameOf(d, "your donor")} on ${String(d.date ?? "")} is recorded${d.s18a ? ". It goes on their s18A receipt for the tax year" : ""}.`,
         next: { label: "Record another gift", href: `${c.base}/donations/record` },
       };
     case "gifts_imported":
@@ -338,9 +346,9 @@ export function describeUndone(kind: ActionKind, d: Details): string {
     case "document_uploaded": return `Taken back. ${quote(d.fileName)} is removed.`;
     case "document_removed": return `Taken back. ${quote(d.fileName)} is back.`;
     case "gift_recorded": return "Taken back. The gift is removed and no longer counts anywhere.";
-    case "certificate_approved": return `Taken back. The s18A receipt for ${String(d.name ?? "this donor")} is as it was before you approved it.`;
+    case "certificate_approved": return `Taken back. The s18A receipt for ${nameOf(d, "this donor")} is as it was before you approved it.`;
     case "certificate_edited": return `Taken back. The donor's name and address are as they were before, and the s18A receipt is as it was before you corrected it.`;
-    case "certificate_reopened": return `Taken back. The s18A receipt for ${String(d.name ?? "this donor")} is ${d.was === "declined" ? "declined" : "approved"} again. We haven't emailed the donor.`;
+    case "certificate_reopened": return `Taken back. The s18A receipt for ${nameOf(d, "this donor")} is ${d.was === "declined" ? "declined" : "approved"} again. We haven't emailed the donor.`;
     case "member_added": return `Taken back. ${String(d.email ?? "They")} no longer ${d.email ? "has" : "have"} access to your dashboard.`;
     case "role_changed": return `Taken back. ${String(d.email ?? "They")} ${d.email ? "is" : "are"} ${roleWord(d.from)} again.`;
     case "gifts_imported": return `Taken back. The ${plural(Number(d.gifts ?? 0), "gift")} from ${quote(d.file)} ${Number(d.gifts ?? 0) === 1 ? "is" : "are"} removed.`;

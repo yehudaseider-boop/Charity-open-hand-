@@ -10,7 +10,8 @@ chain.then = (ok: (v: unknown) => unknown) => ok({ data: [], error: null });
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => chain }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(async () => undefined) }));
 
-const { afterTry, nextTryAt, safeErrorText, emailIsOn, retryDigestLines, tooOld, wasCutOff, MAX_TRIES } = await import("@/lib/email/retry-plan");
+const { afterTry, nextTryAt, safeErrorText, emailIsOn, retryDigestLines, tooOld, wasCutOff, mayHaveSent, MAX_TRIES } = await import("@/lib/email/retry-plan");
+const { EmailError } = await import("@/lib/email");
 const { runEmailRetries, markRetryGone, recordFailedConfirmations } = await import("@/lib/email/retry");
 const { declinedNoticeStillTrue, declinedInfoFrom } = await import("@/lib/donations/monthly-declined-retry");
 const { DECLINED_REASON } = await import("@/lib/donations/monthly-reasons");
@@ -158,7 +159,8 @@ describe("the daily run of tries", () => {
     const s = await runEmailRetries({
       store: f.store,
       handlers: handlers(async () => {
-        throw new Error("timeout talking to sipho@example.test");
+        // The email service answered and refused it: sure not to have gone, so it is tried again.
+        throw new EmailError("timeout talking to sipho@example.test");
       }),
       now: T0,
       deadline: Infinity,
@@ -199,7 +201,20 @@ describe("the daily run of tries", () => {
     expect(f.finished.a).toMatchObject({ status: "unknown", tries: 2, nextTryAt: null });
     expect(audit).toHaveBeenCalledWith("email.retry_unknown", expect.objectContaining({ id: "a" }), expect.objectContaining({ kind: "s18a_receipt", try: 2 }));
     expect(wasCutOff(Object.assign(new Error("x"), { name: "AbortError" }))).toBe(true);
-    expect(wasCutOff(new Error("Resend 500"))).toBe(false);
+    expect(wasCutOff(new EmailError("Resend refused the email (500)."))).toBe(false);
+  });
+
+  it("a dropped connection after the provider may have accepted it is 'unknown' too: flagged, never resent", async () => {
+    // What fetch throws when the connection drops: not a refusal, so it may have gone.
+    expect(wasCutOff(new TypeError("fetch failed"))).toBe(true);
+    expect(wasCutOff(Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }))).toBe(true);
+    expect(mayHaveSent).toBe(wasCutOff);
+    const f = fakeStore([row("a", { kind: "donation_confirmation" })]);
+    const audit = vi.fn(async () => undefined);
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(async () => Promise.reject(new TypeError("fetch failed"))), now: T0, deadline: Infinity, emailOn: true, audit });
+    expect(s).toMatchObject({ unknown: 1, failedAgain: 0, resent: 0 });
+    expect(f.finished.a).toMatchObject({ status: "unknown", nextTryAt: null });
+    expect(audit).toHaveBeenCalledWith("email.retry_unknown", expect.objectContaining({ id: "a" }), expect.anything());
   });
 
   it("doesn't send a row taken over from a run that stopped mid-way: that run may have sent it", async () => {

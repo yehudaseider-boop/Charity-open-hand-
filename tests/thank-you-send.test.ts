@@ -20,7 +20,17 @@ vi.mock("@/lib/charity/weekly-limit", () => ({
   messagedThisWeek: async (_c: string, donors: { donorId: string; hash: string }[], _now: Date, except: unknown) => (weekChecks.push({ donors, except }), new Set(donors.map((d) => d.donorId).filter((id) => messaged.has(id)))),
 }));
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
-vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ send: async (m: { to: string; text: string }) => (sent.push(m), "sent") }) }));
+/** Addresses whose send throws as a dropped connection would. */
+let dropFor = new Set<string>();
+vi.mock("@/lib/email", () => ({
+  EmailError: class EmailError extends Error {},
+  getEmailTransport: () => ({
+    send: async (m: { to: string; text: string }) => {
+      if (dropFor.has(m.to)) throw new TypeError("fetch failed");
+      return (sent.push(m), "sent");
+    },
+  }),
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
@@ -83,6 +93,7 @@ beforeEach(() => {
   optedOut = [];
   statusSaveFails = false;
   messaged = new Set();
+  dropFor = new Set();
   weekChecks.length = 0;
   process.env.SITE_URL = "https://g.test";
 });
@@ -114,6 +125,40 @@ describe("sending a thank-you", () => {
     // This thank-you's own claims never count against it.
     expect(weekChecks[0].except).toEqual({ thankYouId: "t1" });
     expect(weekChecks[0].donors).toEqual([{ donorId: "d-sarah@x.co", hash: emailHash("sarah@x.co") }, { donorId: "d-david@x.co", hash: emailHash("david@x.co") }]);
+  });
+
+  it("those left out don't use up the month: it stays unfinished, and Send the rest reaches them once their week has passed", async () => {
+    donations = [gift("sarah@x.co", "Sarah"), gift("david@x.co", "David")];
+    messaged = new Set(["d-sarah@x.co"]);
+    const r = await sendThankYou(args);
+    expect(r).toMatchObject({ ok: true, sent: 1, remaining: 0, thisWeek: 1 });
+    // When Send the rest can reach them: the next Monday, dd/mm/yyyy.
+    expect(r.ok && r.from).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+    expect(month?.finished_at).toBeNull();
+    // Still the same week: nothing more goes, and it stays open.
+    const sameWeek = await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" });
+    expect(sameWeek).toMatchObject({ ok: true, sent: 1, thisWeek: 1 });
+    expect(month?.finished_at).toBeNull();
+    // The week after: Sarah gets it, David isn't emailed twice, and it is finished.
+    messaged = new Set();
+    const later = await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" });
+    expect(later).toMatchObject({ ok: true, sent: 2, remaining: 0, thisWeek: 0 });
+    expect(later.ok && later.from).toBeUndefined();
+    expect(sent.map((m) => m.to)).toEqual(["david@x.co", "sarah@x.co"]);
+    expect(month?.finished_at).not.toBeNull();
+  });
+
+  it("a dropped connection may have sent it: the address stays 'sending' (counted as not sent), never marked failed or sent again", async () => {
+    donations = [gift("a@x.co", "A"), gift("b@x.co", "B")];
+    dropFor = new Set(["a@x.co"]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await sendThankYou(args);
+    err.mockRestore();
+    expect(recipients.get(emailHash("a@x.co"))).toBe("sending");
+    expect(r).toMatchObject({ ok: true, sent: 1, failed: 1 });
+    dropFor = new Set();
+    expect(await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" })).toEqual({ ok: false, message: "This thank-you has already reached everyone." });
+    expect(sent.map((m) => m.to)).toEqual(["b@x.co"]);
   });
 
   it("when everyone already had a message this week, nothing is sent and the month is handed back", async () => {
