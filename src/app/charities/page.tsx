@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CharitiesView, cleanQuery } from "./view";
+import { CharitiesView, typedQuery } from "./view";
 
 export const metadata: Metadata = { title: "Charities" };
 
@@ -9,5 +9,5 @@ export const metadata: Metadata = { title: "Charities" };
  */
 export default async function CharitiesPage({ searchParams }: PageProps<"/charities">) {
   const params = await searchParams;
-  return <CharitiesView q={cleanQuery(params.q)} categorySlug={typeof params.category === "string" ? params.category : ""} />;
+  return <CharitiesView q={typedQuery(params.q)} categorySlug={typeof params.category === "string" ? params.category : ""} />;
 }

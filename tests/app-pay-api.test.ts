@@ -1,22 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { requestQuote, startPayment } from "../apps/mobile/src/lib/pay-api";
+import { startPayment } from "../apps/mobile/src/lib/pay-api";
 
 describe("app pay api", () => {
   it("posts to the server and returns its answer", async () => {
     const seen: { url: string; body: unknown }[] = [];
     const post = async (url: string, body: unknown) => {
       seen.push({ url, body });
-      return { status: 200, json: { ok: true, quote: { amountCents: 1800, contributionCents: 0, totalCents: 1800 } } };
+      return { status: 200, json: { ok: true, redirectUrl: "https://pay.test/x", reference: "ref", token: "tok" } };
     };
-    const r = await requestQuote("https://x.test/", "learning-centre", 1800, 0, post);
-    expect(r.ok && r.quote.totalCents).toBe(1800);
-    expect(seen[0]).toEqual({ url: "https://x.test/api/app/quote", body: { slug: "learning-centre", giftCents: 1800, contributionCents: 0 } });
+    const args = { slug: "learning-centre", giftCents: 1800, contributionCents: 0, shownTotalCents: 1800, details: {} as never };
+    const r = await startPayment("https://x.test/", args, post);
+    expect(r.ok && r.reference).toBe("ref");
+    expect(seen[0]).toEqual({ url: "https://x.test/api/app/checkout", body: args });
   });
 
   it("turns a network failure or a garbled reply into a plain message", async () => {
     const down = await startPayment("https://x.test", {} as never, async () => { throw new Error("offline"); });
     expect(!down.ok && down.message).toMatch(/connection/);
-    const junk = await requestQuote("https://x.test", "a", 1, 0, async () => ({ status: 502, json: "<html>" }));
+    const junk = await startPayment("https://x.test", {} as never, async () => ({ status: 502, json: "<html>" }));
     expect(junk.ok).toBe(false);
   });
 });
@@ -169,7 +170,7 @@ describe("a stalled network", () => {
 
   it("shows the plain no-reply message to the give screen, so it never hangs", async () => {
     const post = (url: string, body: unknown) => fetchWithTimeout(url, { method: "POST", body: JSON.stringify(body) }, 20, stalled);
-    expect(await requestQuote("https://givezy.example", "meals", 10_000, 0, post)).toMatchObject({ ok: false, noReply: true });
+    expect(await startPayment("https://givezy.example", { slug: "meals", giftCents: 10_000, contributionCents: 0, shownTotalCents: 10_000, details: {} as never }, post)).toMatchObject({ ok: false, noReply: true });
     expect(await checkReady("https://givezy.example", "meals", undefined, post)).toMatchObject({ ok: false });
     expect(await paymentStatus("https://givezy.example", "ref", "tok", post)).toBe("unknown");
   });

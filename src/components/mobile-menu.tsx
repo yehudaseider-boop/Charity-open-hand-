@@ -9,7 +9,8 @@ export type MenuItem = { href: string; label: string };
 /**
  * The phone's menu (30/10/2026): every part of the site one tap away, so no page is a dead end. On a
  * phone the header only has room for the logo, this button and Sign in; the donor side (Home, Find a
- * charity) and the charity side (For charities) both live here. Closes on a choice, Escape or a tap outside.
+ * charity) and the charity side (For charities) both live here. Closes on a choice, Escape (the keyboard goes back
+ * to the Menu button), a tap outside, or tabbing on past the last item.
  */
 export function MobileMenu({ items }: { items: MenuItem[] }) {
   const path = usePathname();
@@ -19,9 +20,14 @@ export function MobileMenu({ items }: { items: MenuItem[] }) {
   if (openOn !== null && openOn !== path) setOpenOn(null);
   const open = openOn === path;
   const box = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenOn(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpenOn(null);
+      button.current?.focus();
+    };
     const onDown = (e: PointerEvent) => box.current && !box.current.contains(e.target as Node) && setOpenOn(null);
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onDown);
@@ -34,8 +40,16 @@ export function MobileMenu({ items }: { items: MenuItem[] }) {
   const here = (href: string) => path === href || (href !== "/" && path.startsWith(`${href}/`)) || (href === "/charities" && path.startsWith("/c/"));
 
   return (
-    <div ref={box} className="relative sm:hidden">
+    <div
+      ref={box}
+      className="relative sm:hidden"
+      // Tabbing out of the menu (past the last item, or back before the button) closes it.
+      onBlur={(e) => {
+        if (open && e.relatedTarget instanceof Node && !e.currentTarget.contains(e.relatedTarget)) setOpenOn(null);
+      }}
+    >
       <button
+        ref={button}
         type="button"
         aria-expanded={open}
         aria-controls="phone-menu"

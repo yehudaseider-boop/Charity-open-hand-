@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
 import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,11 +13,13 @@ import { Text } from "@/components/text";
 import { charities } from "@/data/sample";
 import { gifts, receipts } from "@/data/giving";
 import { jhbToday, rand } from "@/lib/format";
-import { Button } from "@/components/button";
+import { Button, TextLink } from "@/components/button";
 import { InfoButton } from "@/components/info-button";
 import { useAccount } from "@/lib/account";
 import { notify, openSite, openUrl } from "@/lib/open-site";
 import { requestReceiptLink } from "@/lib/pay-api";
+import { countsTowardsReceipts } from "@/lib/live-giving";
+import { clearDetailsLater, loadDetailsLater } from "@/lib/pending-gift-store";
 import { SITE_URL } from "@/lib/website";
 import { useDirectory } from "@/lib/directory";
 import { useScreenState } from "@/lib/screen-state";
@@ -47,17 +49,36 @@ export default function Receipts() {
   // donor isn't asked to sign in again on the website (11/11/2026). If that can't be done, the website's own
   // receipt link is the fallback (it asks them to sign in there).
   const [downloading, setDownloading] = useState<string | null>(null);
+  // Two taps in the same frame both see `downloading` as null: the ref, set before anything is awaited, stops the second.
+  const downloadingRef = useRef(false);
   const download = async (id: string) => {
     if (preview) return notify("Sample receipt", "In the live app this opens the receipt PDF.");
-    if (downloading) return;
-    const token = await account.accessToken();
-    if (!SITE_URL || !token) return openSite(`/receipts/${encodeURIComponent(id)}`);
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
     setDownloading(id);
-    const r = await requestReceiptLink(SITE_URL, id, token).catch(() => ({ ok: false as const, message: "We couldn't reach Givezy. Please check your connection and try again." }));
-    setDownloading(null);
-    if (!r.ok) return notify("Couldn't open the receipt", r.message);
-    openUrl(r.url);
+    try {
+      const token = await account.accessToken().catch(() => null);
+      if (!SITE_URL || !token) return openSite(`/receipts/${encodeURIComponent(id)}`);
+      const r = await requestReceiptLink(SITE_URL, id, token).catch(() => ({ ok: false as const, message: "We couldn't reach Givezy. Please check your connection and try again." }));
+      if (!r.ok) return notify("Couldn't open the receipt", r.message);
+      openUrl(r.url);
+    } finally {
+      downloadingRef.current = false;
+      setDownloading(null);
+    }
   };
+  // Gifts given on this phone with "Add my details after paying": they can't go on a receipt until the details are added.
+  const owner = signedIn ? account.userId : null;
+  const [detailsLater, setDetailsLater] = useState<ReadonlySet<string>>(new Set());
+  const [laterRead, setLaterRead] = useState(0);
+  useEffect(() => {
+    if (!signedIn) return;
+    let live = true;
+    loadDetailsLater(owner).then((ids) => live && setDetailsLater(ids));
+    return () => {
+      live = false;
+    };
+  }, [signedIn, owner, laterRead]);
   const current = taxYearFor(jhbToday());
   const currentEnd = taxYearRangeLabel(current).split(" to ")[1];
 
@@ -66,8 +87,11 @@ export default function Receipts() {
   const myGifts = preview ? gifts : (account.live?.gifts ?? []);
   const years = [...new Set(myReceipts.map((r) => r.taxYear))].sort((a, b) => b - a);
   // This tax year so far: the gifts that will go on next year's s18A receipts.
-  const thisYear = empty ? [] : myGifts.filter((g) => g.with18a && taxYearFor(g.date) === current);
+  const thisYear = empty ? [] : myGifts.filter((g) => countsTowardsReceipts(g, detailsLater) && taxYearFor(g.date) === current);
   const thisYearCents = thisYear.reduce((t, g) => t + g.cents, 0);
+  // This tax year's gifts still waiting for their s18A details, shown apart (the website's rule).
+  const waitingDetails = empty ? [] : myGifts.filter((g) => g.with18a && detailsLater.has(g.id) && taxYearFor(g.date) === current);
+  const waitingCents = waitingDetails.reduce((t, g) => t + g.cents, 0);
   const thisYearCharities = new Set(thisYear.map((g) => g.charitySlug)).size;
 
   // Charities in the donor's history that never issue s18A receipts.
@@ -123,6 +147,23 @@ export default function Receipts() {
                   : `Nothing towards s18A receipts yet this tax year. Receipts come once a year, one per charity, after ${currentEnd}.`}
               </Text>
             </View>
+            ) : null}
+            {waitingCents ? (
+              <View style={styles.infoRow}>
+                <View style={{ marginTop: 2 }}><InfoIcon /></View>
+                <View style={{ flex: 1, gap: 8 }}>
+                  <Text variant="bodyMuted" style={{ fontSize: 16 }}>
+                    {`${rand(waitingCents)} isn't counted yet: you chose to add your s18A details after paying, and until you do, ${waitingDetails.length === 1 ? "that gift" : "those gifts"} can't go on a receipt.`}
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 18 }}>
+                    <TextLink label="Add them on our website" onPress={() => openSite("/account#s18a-needed")} />
+                    <TextLink
+                      label="I've added them"
+                      onPress={() => void clearDetailsLater(owner, waitingDetails.map((g) => g.id)).then(() => setLaterRead((n) => n + 1))}
+                    />
+                  </View>
+                </View>
+              </View>
             ) : null}
   
             {account.status === "agreeing" ? (

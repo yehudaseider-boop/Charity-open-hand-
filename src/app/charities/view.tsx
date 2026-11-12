@@ -11,7 +11,16 @@ import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
 import { createPublicClient } from "@/lib/supabase/public";
 
-/** Keep only letters, digits, spaces and apostrophes. */
+/** What was typed, as typed (spaces tidied, at most 60 characters): kept in the search box and shown in the results line. */
+export function typedQuery(q: unknown): string {
+  return typeof q === "string" ? q.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+}
+
+/**
+ * What is searched for: letters, digits, spaces and apostrophes only. Anything else (%, _, quotes, commas, brackets)
+ * would mean something to the database filter, so it is never sent. A search of only such signs ("%%%") searches
+ * for nothing and finds nothing; it never turns into the whole list.
+ */
 export function cleanQuery(q: unknown): string {
   return typeof q === "string" ? q.replace(/[^\p{L}\p{N}\s']/gu, " ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
 }
@@ -41,6 +50,7 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
   const supabase = createPublicClient();
   const categories = await loadCategories();
   const category = categories.find((c) => c.slug === categorySlug);
+  const search = cleanQuery(q);
 
   // Row-level security only returns approved charities to the public.
   let query = supabase
@@ -48,16 +58,17 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
     .select("id, slug, name_en, description_en, logo_path, cover_path, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(category_id)")
     .eq("status", "approved")
     .order("name_en");
-  if (q) {
-    // Quoted so spaces are safe; cleanQuery has already removed quotes and commas.
-    const like = `"%${q}%"`;
+  if (search) {
+    // Quoted so spaces are safe; cleanQuery has already removed quotes, commas, % and _.
+    const like = `"%${search}%"`;
     query = query.or(`name_en.ilike.${like},legal_name_en.ilike.${like},description_en.ilike.${like},suburb.ilike.${like},city.ilike.${like}`);
   }
   if (category) {
     const { data: links } = await supabase.from("charity_categories").select("charity_id").eq("category_id", category.id);
     query = query.in("id", (links ?? []).map((l) => l.charity_id));
   }
-  const { data, error } = await query;
+  // Typed something, but nothing in it can be searched for: nothing matches (and there's no need to ask).
+  const { data, error } = q && !search ? { data: [], error: null } : await query;
   if (error) throw error;
   const charities = data as Row[];
 
