@@ -8,6 +8,7 @@ import { Button, TextLink } from "@/components/button";
 import { BlueHeader } from "@/components/backdrop";
 import { GoalRing } from "@/components/goal-ring";
 import { InsightsLink } from "@/components/insights-link";
+import { PendingGifts } from "@/components/pending-gifts";
 import { FadeUp } from "@/components/fade-up";
 import { Bubbles, People } from "@/components/people";
 import { ChevronIcon } from "@/components/icons";
@@ -369,6 +370,8 @@ export default function Giving() {
           )}
         </BlueHeader>
         <View style={{ paddingHorizontal: space.gutter, gap: space.block }} onLayout={(e) => setBodyY(e.nativeEvent.layout.y)}>
+        {/* A gift still waiting for its answer (the app was closed while paying): first, whatever else is loading. */}
+        <PendingGifts />
         {state === "loading" ? (
           <View style={{ gap: space.block }}>
             <SkeletonBlock height={190} />

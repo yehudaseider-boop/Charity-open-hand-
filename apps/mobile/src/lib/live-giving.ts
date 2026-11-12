@@ -77,6 +77,15 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
 /** When a gift was paid, to the moment where known (live), else its day. */
 const momentOf = (g: Gift) => (g.at ?? g.date).getTime();
 
+/**
+ * Whether a gift counts towards the donor's s18A receipts, as the website says it: asked for one, and not paid with
+ * "Add my details after paying" while those details are still to come (such a gift can't go on a receipt yet).
+ * `detailsLater`: the gifts given on this phone that way (lib/pending-gift-store).
+ */
+export function countsTowardsReceipts(g: Pick<Gift, "id" | "with18a">, detailsLater: ReadonlySet<string>): boolean {
+  return g.with18a && !detailsLater.has(g.id);
+}
+
 export function toRecurring(rows: RecurringRow[]): Recurring[] {
   return rows
     // Cancelled ones only show while the payment provider hasn't yet stopped them. A failed one stays so the donor sees why it stopped.

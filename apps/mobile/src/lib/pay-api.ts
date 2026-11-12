@@ -7,7 +7,6 @@
 import type { CardChargeRates } from "@shared/fees";
 
 export type Pricing = { amountCents: number; contributionCents: number; cardChargeCents?: number; totalCents: number };
-export type QuoteReply = { ok: true; quote: Pricing } | { ok: false; message: string };
 export type CheckoutReply =
   | { ok: true; redirectUrl: string; charged?: undefined; reference: string; token: string }
   /** Paid with the saved card: no payment page. Ask for the outcome (the charge is only a first indication). */
@@ -98,10 +97,6 @@ export const fetchPost: Post = async (url, body, token) => {
   if (token) headers.authorization = `Bearer ${token}`;
   return fetchWithTimeout(url, { method: "POST", headers, body: JSON.stringify(body) });
 };
-
-export function requestQuote(site: string, slug: string, giftCents: number, contributionCents: number, post: Post = fetchPost) {
-  return call<QuoteReply>(post, api(site, "quote"), { slug, giftCents, contributionCents });
-}
 
 export function startPayment(
   site: string,
