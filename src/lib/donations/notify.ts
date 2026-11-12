@@ -7,7 +7,7 @@ import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
 import { s18aDetailsMissing, type S18aDetailsRow } from "./s18a-details";
 import { NOT_REUSABLE } from "./recurring";
-import { recordFailedEmail } from "@/lib/email/retry";
+import { markRetryGone, recordFailedEmail } from "@/lib/email/retry";
 
 /**
  * Called once, when a donation is confirmed paid (by the webhook or the
@@ -15,8 +15,20 @@ import { recordFailedEmail } from "@/lib/email/retry";
  * undoes the payment: it is logged for the team to resend.
  */
 export async function notifyDonationPaid(donationId: string, opts: { monthly?: "activated" | "not_reusable" | "none" } = {}) {
-  await sendDonorConfirmation(donationId, opts);
+  // Sent (or nothing to send): the note that it is owed (see oweDonorConfirmation) is closed, so it never goes twice.
+  // Failed: the note stays, and the daily job tries again.
+  if (await sendDonorConfirmation(donationId, opts)) await markRetryGone("donation_confirmation", donationId);
   await notifyCharityOfDonation(donationId);
+}
+
+/**
+ * Called just before a gift is saved as paid: note the donor's confirmation as owed, on the same list as a failed
+ * one (email_retries, kind donation_confirmation). If the process stops after the gift is saved and before the email
+ * goes, the daily job's email retries send it; once notifyDonationPaid has sent it, the note is closed. There is no
+ * other "confirmation sent" marker. Never throws, and does nothing before the email_retries table exists.
+ */
+export async function oweDonorConfirmation(donationId: string): Promise<void> {
+  await recordFailedEmail("donation_confirmation", donationId);
 }
 
 /**

@@ -3,7 +3,8 @@ import { logAudit } from "@/lib/audit";
 import { taxYearFor } from "@/lib/dates";
 import { gatewayByName, getGateway } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notifyDonationPaid } from "./notify";
+import { isGatewayNotFound, type VerifiedTransaction } from "@/lib/gateway/types";
+import { notifyDonationPaid, oweDonorConfirmation } from "./notify";
 import { recordDecline } from "./giving-guard";
 import { cardSaveWaitingFor, finishCardSave } from "./saved-card";
 import { finishNewCard, newCardWaitingFor } from "./new-card";
@@ -43,12 +44,22 @@ export async function savedOutcome(reference: string): Promise<ConfirmOutcome> {
   return "pending";
 }
 
-export async function confirmPayment(reference: string): Promise<ConfirmOutcome> {
+export type ConfirmOptions = {
+  /**
+   * The daily check only: a checkout started before this time that the provider says was abandoned (the donor
+   * left its payment page) or never received is closed as failed, so it stops counting as a stuck payment. It can
+   * still become paid later if the provider says so. Never a monthly collection or a new card: those have their own
+   * rules (the monthly job sends a never-received collection again).
+   */
+  closeAbandonedBefore?: Date;
+};
+
+export async function confirmPayment(reference: string, opts: ConfirmOptions = {}): Promise<ConfirmOutcome> {
   if (!/^[0-9a-f-]{36}$/i.test(reference)) return "not_found";
   const db = createAdminClient();
   const { data: donation, error: readError } = await db
     .from("donations")
-    .select("id, status, gateway, total_charged_cents, recurring_id")
+    .select("id, status, gateway, total_charged_cents, recurring_id, created_at")
     .eq("gateway_ref", reference)
     .maybeSingle();
   if (readError) throw new PersistenceError("read the donation", readError);
@@ -74,17 +85,27 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     });
     return "review";
   }
-  const tx = await gatewayByName(donation.gateway).verifyTransaction(reference);
+  let tx: VerifiedTransaction;
+  try {
+    tx = await gatewayByName(donation.gateway).verifyTransaction(reference);
+  } catch (e) {
+    // The provider never received it: an old checkout the donor never paid is closed (daily check only).
+    if (isGatewayNotFound(e) && (await closableCheckout(donation, opts))) return closeCheckout(donation, "never_received");
+    throw e;
+  }
 
   if (tx.status === "success") {
     if (tx.currency !== "ZAR" || tx.amountCents !== Number(donation.total_charged_cents)) {
-      await logAudit({
-        actorUserId: null,
-        action: "donation.amount_mismatch",
-        entityType: "donation",
-        entityId: donation.id,
-        details: { expected: donation.total_charged_cents, got: tx.amountCents, currency: tx.currency },
-      });
+      // Held for a person once: every later check (webhook, return page, daily) finds it already noted.
+      if (!(await alreadyNoted("donation.amount_mismatch", donation.id))) {
+        await logAudit({
+          actorUserId: null,
+          action: "donation.amount_mismatch",
+          entityType: "donation",
+          entityId: donation.id,
+          details: { expected: donation.total_charged_cents, got: tx.amountCents, currency: tx.currency },
+        });
+      }
       return "review";
     }
     let paidAt = tx.paidAt ? new Date(tx.paidAt) : new Date();
@@ -92,6 +113,9 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
       console.warn(`[confirm] unreadable paid_at from the gateway for ${donation.id}: ${String(tx.paidAt)}`);
       paidAt = new Date();
     }
+    // The donor's confirmation is noted as owed before the gift is saved as paid: if this call stops between the
+    // two, the daily job's email retries send it (and a sent confirmation closes the note, so it never goes twice).
+    await oweDonorConfirmation(donation.id);
     const { data: updated, error } = await db
       .from("donations")
       .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt) })
@@ -146,6 +170,8 @@ export async function confirmPayment(reference: string): Promise<ConfirmOutcome>
     if (now === "pending") throw new PersistenceError("save the failed donation");
     return now as ConfirmOutcome; // paid (or later) by a concurrent confirmation
   }
+  // An old checkout the donor left on the provider's page: closed as failed (daily check only).
+  if (tx.status === "pending" && tx.abandoned && (await closableCheckout(donation, opts))) return closeCheckout(donation, "abandoned");
   // A monthly charge we marked as turned down that the provider is still working on is not settled: saying
   // "failed" would let the monthly job charge the donor again for the same month.
   if (donation.status === "failed" && donation.recurring_id && tx.status === "pending") return "pending";
@@ -185,6 +211,59 @@ async function finishCardUpdate(donation: { id: string; gateway: string; recurri
   const done = await finishNewCard(donation.id, again);
   // Only the call that really finished it sends the confirmation the first call never got to send.
   if (done.finishedHere) await notifyDonationPaid(donation.id);
+}
+
+/** Is there already an audit row of this kind for this donation? If the check itself fails, says no (noted twice beats never). */
+async function alreadyNoted(action: string, donationId: string): Promise<boolean> {
+  try {
+    const { data, error } = await createAdminClient().from("audit_log").select("id").eq("action", action).eq("entity_id", donationId).limit(1);
+    return !error && (data ?? []).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+type Closable = { id: string; status: string; recurring_id: string | null; created_at?: string | null };
+
+/**
+ * May the daily check close this payment as an abandoned checkout? Only a pending one started before the cut-off,
+ * and only a checkout: a once-off gift, or the first payment of a monthly donation. Never a monthly collection or a
+ * new card (their own jobs settle them).
+ */
+async function closableCheckout(d: Closable, opts: ConfirmOptions): Promise<boolean> {
+  if (!opts.closeAbandonedBefore || d.status !== "pending" || !d.created_at) return false;
+  const created = new Date(d.created_at).getTime();
+  if (!Number.isFinite(created) || created >= opts.closeAbandonedBefore.getTime()) return false;
+  if (!d.recurring_id) return true;
+  const { data, error } = await createAdminClient().from("recurring_donations").select("id").eq("id", d.recurring_id).eq("first_donation_id", d.id).maybeSingle();
+  if (error) throw new PersistenceError("read the monthly donation", error);
+  return Boolean(data);
+}
+
+/**
+ * Close an abandoned checkout as failed. Not a declined card (it isn't counted against the donor), and failed can
+ * still become paid if the provider later says it was paid. A monthly donation whose first payment this was is
+ * closed the way a failed first payment is, so it still starts if that payment goes through after all.
+ */
+async function closeCheckout(d: Closable, why: "abandoned" | "never_received"): Promise<ConfirmOutcome> {
+  const db = createAdminClient();
+  const { data: updated, error } = await db
+    .from("donations")
+    .update({ status: "failed", failed_at: new Date().toISOString() })
+    .eq("id", d.id)
+    .eq("status", "pending")
+    .select("id");
+  if (error) throw new PersistenceError("close the abandoned checkout", error);
+  if (!updated?.length) {
+    const now = await currentStatus(d.id);
+    if (now === "pending") throw new PersistenceError("close the abandoned checkout");
+    return now === "refunded" || now === "charged_back" ? "reversed" : (now as ConfirmOutcome);
+  }
+  if (d.recurring_id) await cancelMonthlyBeforeStart(d.id, FIRST_PAYMENT_FAILED);
+  await logAudit({ actorUserId: null, action: "donation.checkout_closed", entityType: "donation", entityId: d.id, details: { why } }).catch((e) =>
+    console.error("[confirm] could not note a closed checkout", e),
+  );
+  return "failed";
 }
 
 async function currentStatus(donationId: string): Promise<string> {
