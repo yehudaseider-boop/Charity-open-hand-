@@ -100,11 +100,11 @@ describe("checkGivingAllowed", () => {
     expect(await checkGivingAllowed(start)).toBeNull();
     expect(calls.map((c) => [c.fn, c.bucket, c.limit, c.minutes])).toEqual([
       ["reached", "checkout-declined", 3, 60],
-      ["reached", "checkout-declined", 15, 60],
+      ["reached", "checkout-declined", 30, 60],
       ["hit", "checkout", 5, 10],
-      ["hit", "checkout-ip", 30, 10],
+      ["hit", "checkout-ip", 60, 10],
       ["hit", "checkout-day", 20, 1_440],
-      ["hit", "checkout-ip-day", 150, 1_440],
+      ["hit", "checkout-ip-day", 300, 1_440],
       ["hit", "checkout-charity", 60, 10],
     ]);
     // The email is compared without spaces or capitals; addresses only ever as stand-ins.
@@ -166,10 +166,10 @@ describe("checkGivingAllowed", () => {
   });
 
   it("an address shared by many donors needs far more declines than one email before anyone waits", async () => {
-    // 5 declines on a shared address: the email limit (3) would stop them, the address limit (15) doesn't.
-    declines = { "ip#196.1.2.3": 5 };
-    expect(await checkGivingAllowed(start)).toBeNull();
+    // 15 declines on a shared address (a mobile network): the email limit (3) would stop them, the address limit (30) doesn't.
     declines = { "ip#196.1.2.3": 15 };
+    expect(await checkGivingAllowed(start)).toBeNull();
+    declines = { "ip#196.1.2.3": 30 };
     expect((await checkGivingAllowed(start))?.reason).toBe("declines");
     // 3 declines on one email: that email waits.
     declines = { "email#donor@example.com": 3 };
