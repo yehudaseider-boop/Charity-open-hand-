@@ -63,6 +63,9 @@ describe("a charity's profile written straight to the database", () => {
       expect((await save("name_en", "N".repeat(120))).rowCount).toBe(1);
       expect((await save("description_en", "d".repeat(3000))).rowCount).toBe(1);
       expect((await save("funds_use_en", "f".repeat(1500))).rowCount).toBe(1);
+      // The address of a submitted or approved charity is locked to platform admins and the server (older rule,
+      // 20261026000002), so these two are saved as the server: only the new length and shape checks apply.
+      await as("server");
       expect((await save("postal_code", "2001")).rowCount).toBe(1);
       expect((await save("city", "c".repeat(80))).rowCount).toBe(1);
     });
@@ -76,9 +79,12 @@ describe("a charity's profile written straight to the database", () => {
       }
       await refused("name_en", "", /charity_name_length/);
       await refused("name_en", "N".repeat(121), /charity_name_length/);
-      await refused("legal_name_en", "L".repeat(201), /charity_legal_name_length/);
       await refused("description_en", "d".repeat(3001), /charity_description_length/);
       await refused("funds_use_en", "f".repeat(1501), /charity_funds_use_length/);
+      // Legal details and the address of an approved charity are locked to platform admins and the server (older
+      // rules), so the checks on those columns are tried as the server.
+      await as("server");
+      await refused("legal_name_en", "L".repeat(201), /charity_legal_name_length/);
       await refused("npo_number", "1".repeat(41), /charity_numbers_length/);
       await refused("address_line1", "a".repeat(201), /charity_address_length/);
       await refused("suburb", "s".repeat(81), /charity_address_length/);
