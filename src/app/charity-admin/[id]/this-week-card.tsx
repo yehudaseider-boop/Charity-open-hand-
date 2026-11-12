@@ -13,8 +13,8 @@ export function ThisWeekCard({ items, unavailable = [], base }: { items: WeekIte
       {items.length ? (
         <ul className="divide-y divide-border text-sm">
           {items.map((t) => (
-            <li key={t.key} className="py-1 first:pt-0 last:pb-0">
-              <Link href={t.href} className="group -mx-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-control px-2 py-1.5 transition hover:bg-honey-soft focus-visible:bg-honey-soft">
+            <li key={t.key} className="py-0.5 first:pt-0 last:pb-0">
+              <Link href={t.href} className="group -mx-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-control px-2 py-3 transition hover:bg-honey-soft focus-visible:bg-honey-soft">
                 <span dir="auto" className="min-w-0 text-navy">{t.text}</span>
                 <span className="shrink-0 font-semibold text-brand underline group-hover:no-underline">{t.link} <span aria-hidden className="inline-block transition-transform motion-safe:group-hover:translate-x-1">→</span></span>
               </Link>

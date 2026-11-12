@@ -117,7 +117,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
                   key={s.key}
                   href={href(s.key)}
                   aria-current={s.key === step.key ? "step" : undefined}
-                  className={`inline-flex min-h-9 shrink-0 items-center rounded-full border-2 px-3.5 font-semibold transition ${s.key === step.key ? "border-brand bg-brand text-white" : s.done ? "border-border bg-surface text-navy hover:border-brand hover:text-brand" : "border-border bg-surface text-muted hover:border-brand hover:text-brand"}`}
+                  className={`inline-flex min-h-11 shrink-0 items-center rounded-full border-2 px-3.5 font-semibold transition ${s.key === step.key ? "border-brand bg-brand text-white" : s.done ? "border-border bg-surface text-navy hover:border-brand hover:text-brand" : "border-border bg-surface text-muted hover:border-brand hover:text-brand"}`}
                 >
                   <span aria-hidden className="mr-1">{s.done ? "✓" : `${i + 1}.`}</span>
                   {s.label}

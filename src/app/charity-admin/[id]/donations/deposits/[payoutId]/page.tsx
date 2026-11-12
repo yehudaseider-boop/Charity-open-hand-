@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/badge";
 import { Card, Notice } from "@/components/card";
-import { ActionLink, PageHeader, table } from "@/components/dash";
+import { ActionLink, PageHeader, TableScroll, table } from "@/components/dash";
 import { SupportContact } from "@/components/legal";
 import { requireViewer } from "@/lib/auth";
 import { loadDeposit } from "@/lib/charity/deposit-queries";
@@ -62,7 +62,7 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
         </Notice>
       )}
       <Card>
-        <div className={table.wrap}>
+        <TableScroll label="Gifts in this deposit">
           <table className={`${table.table} min-w-[32rem]`}>
             <thead>
               <tr className={table.headRow}>
@@ -95,7 +95,7 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
               </tr>
             </tfoot>
           </table>
-        </div>
+        </TableScroll>
       </Card>
       <p className="text-xs text-muted">Fees are the payment provider&apos;s own, as it reports them. Each s18A receipt is for the full gift, not what reached the bank.</p>
     </div>

@@ -84,7 +84,8 @@ export function demoOverview(now: Date = new Date(), data: DemoData = demoData(n
         charity: { logo_path: "demo/logo.png", cover_path: "demo/cover.jpg", description_en: "Hot meals every weekday", funds_use_en: "Ingredients", thank_you_en: null, gateway_subaccount_ref: "DEMO" },
         bank: { saved: true, checked: true },
         s18a: { issues: true, sarsDetails: false },
-        journeyOn: false,
+        // No donor journey step: that page is left out of the demo (see DEMO_HIDDEN_TABS), so "Open" would lead nowhere.
+        journeyOn: null,
         updates: 1,
         teamSize: 1,
       },

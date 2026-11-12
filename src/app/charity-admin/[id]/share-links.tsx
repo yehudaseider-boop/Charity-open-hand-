@@ -10,7 +10,7 @@ export function ShareLinks({ url, message }: { url: string; message: string }) {
   return (
     <div className="space-y-2">
       <CopyLink url={withSource(url, "link")} />
-      <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-block text-brand underline">Share on WhatsApp</a>
+      <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-brand underline">Share on WhatsApp</a>
     </div>
   );
 }

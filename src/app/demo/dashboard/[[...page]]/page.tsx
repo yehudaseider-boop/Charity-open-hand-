@@ -7,6 +7,12 @@ import { DemoAbout, DemoApplicationPage, DemoCampaigns, DemoDeposit, DemoDeposit
 import { DemoImport, DemoProfile, DemoTeam, DemoUpdates } from "../charity-tools";
 import { DemoReset } from "../reset";
 
+/**
+ * Pages the demo leaves out of its menu: they work from a charity's own records over time (who is drifting away,
+ * the emails new donors get, who on the team did what), so made-up figures would show nothing true about them.
+ */
+const DEMO_HIDDEN_TABS = ["/keeping", "/journey", "/activity"];
+
 export const metadata: Metadata = { title: "Charity dashboard demo", robots: { index: false, follow: false } };
 
 /**
@@ -45,7 +51,7 @@ export default async function DemoDashboard({ params, searchParams }: PageProps<
   else body = <DemoAbout path={first === "donations" ? `donations/${second}` : path} />;
 
   return (
-    <DashboardShell id="demo" charity={DEMO_CHARITY} asGivezy={false} base={DEMO_BASE} publicHref={null}>
+    <DashboardShell id="demo" charity={DEMO_CHARITY} asGivezy={false} base={DEMO_BASE} publicHref={null} hiddenTabs={DEMO_HIDDEN_TABS}>
       <p role="note" className="rounded-card border-2 border-honey bg-honey-soft p-4 text-sm text-navy">
         This is a demonstration with made-up donors and figures. Nothing here is real, and nothing you do is sent: what you add stays in your own browser. <DemoReset />
       </p>

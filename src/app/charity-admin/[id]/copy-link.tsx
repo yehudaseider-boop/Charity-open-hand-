@@ -19,7 +19,7 @@ export function CopyLink({ url }: { url: string }) {
             setCopied(false);
           }
         }}
-        className="rounded-control border border-border px-3 py-2"
+        className="inline-flex min-h-11 items-center rounded-control border border-border px-3"
       >
         {copied ? "Copied" : "Copy link"}
       </button>
