@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
   if (!details.ok) return NextResponse.json({ ok: false, message: "Please check the highlighted fields.", fieldErrors: details.fieldErrors }, { status: 422 });
 
   // Saved cards: only for the signed-in donor, checked from their token (and only when switched on, which startDonation checks).
-  const account = body.data.saveCard || body.data.useSavedCard || body.data.useSavedId ? ((await appAccount(request, { forMoney: true })) ?? undefined) : undefined;
+  // Always asked when the app sends a token: a gift given with the signed-in donor's own email counts as theirs (and
+  // can later give "Use my ID ending 1234"); a guest gift never does.
+  const account = (await appAccount(request, { forMoney: true })) ?? undefined;
   if ((body.data.saveCard || body.data.useSavedCard) && !account) {
     return NextResponse.json({ ok: false, message: "Please sign in again to use a saved card." }, { status: 401 });
   }
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
     campaignId: body.data.campaignId,
     input: details.input,
     ip: clientIp(request.headers),
+    signedInAs: account,
     // "Use my ID ending 1234": only for the donor signed in to the app, checked from their token.
     useSavedIdOf: body.data.useSavedId ? account : undefined,
     saveCardFor: body.data.saveCard ? account : undefined,

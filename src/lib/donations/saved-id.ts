@@ -7,6 +7,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Read on the server from the encrypted copy kept for that gift's receipt: the full number is
  * never sent to the browser or the phone, only its last four digits. Only for the person whose
  * account (confirmed by signing in with an emailed code) the earlier gifts belong to.
+ *
+ * Only from a gift this same account started while signed in (`started_by_user`, security review of 12/11/2026):
+ * never from a guest gift, a gift a charity recorded, or one started while signed in with another email. A donor
+ * record is found by email, so anyone could otherwise pay a small gift with someone else's email and an ID number
+ * of their choosing and have it offered to that person as "Use my ID ending 1234", with its address.
  */
 export type SavedAddress = { address_line1: string; address_line2: string | null; suburb: string | null; city: string; postal_code: string };
 
@@ -24,6 +29,7 @@ async function latest(userId: string): Promise<{ encrypted: string; last4: strin
     .from("donation_checkout_details")
     .select("donation_id, id_number_encrypted, id_number_last4, address_line1, address_line2, suburb, city, postal_code")
     .in("donation_id", giftIds)
+    .eq("started_by_user", userId)
     .not("id_number_encrypted", "is", null)
     .is("erased_at", null);
   // The newest gift that has one.
