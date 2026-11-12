@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { platformConfig } from "@/config/platform";
 import { clientIp } from "@/lib/client-ip";
-import { hitRateLimit, rateLimitReached } from "@/lib/rate-limit";
+import { forgetAttempts, hitRateLimit, takeAttempt } from "@/lib/rate-limit";
 import { siteOrigin } from "@/lib/request-origin";
 import { safeNextPath } from "@/lib/safe-path";
 import { looksLikeEmail, sentPageUrl, signInKeys } from "@/lib/sign-in";
@@ -85,12 +85,20 @@ export async function verifyLoginCode(formData: FormData) {
   const back = (error: "code" | "tries") => sentPageUrl(email, next, { error }, proof);
   if (email.length > 254 || !looksLikeEmail(email) || !/^\d{6,10}$/.test(code)) redirect(back("code"));
   const keys = signInKeys(email, clientIp(await headers()));
-  let limited: boolean;
+  // Counted before the code is checked, so parallel guesses can't all slip under the limit; a right code takes its
+  // count back below, so only wrong codes use up the allowance (review 12/11/2026).
+  const counted: string[] = [];
+  let limited = false;
   try {
-    limited =
-      (await rateLimitReached("login-code-pair", keys.pair, guard.wrongCodesPerEmailAndAddress.tries, guard.wrongCodesPerEmailAndAddress.minutes)) ||
-      (await rateLimitReached("login-code-email", keys.email, guard.wrongCodesPerEmail.tries, guard.wrongCodesPerEmail.minutes)) ||
-      (await rateLimitReached("login-code", keys.address, guard.wrongCodesPerAddress.tries, guard.wrongCodesPerAddress.minutes));
+    for (const [bucket, k, rule] of [
+      ["login-code-pair", keys.pair, guard.wrongCodesPerEmailAndAddress],
+      ["login-code-email", keys.email, guard.wrongCodesPerEmail],
+      ["login-code", keys.address, guard.wrongCodesPerAddress],
+    ] as const) {
+      const taken = await takeAttempt(bucket, k, rule.tries, rule.minutes);
+      counted.push(...taken.ids);
+      if (taken.limited) limited = true;
+    }
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
     redirect(back("code"));
@@ -98,17 +106,9 @@ export async function verifyLoginCode(formData: FormData) {
   if (limited) redirect(back("tries"));
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
-  if (error || !data.user) {
-    // A wrong code: counted now (a right one never is). A failed count never stops the message.
-    try {
-      await hitRateLimit("login-code-pair", keys.pair, guard.wrongCodesPerEmailAndAddress.tries, guard.wrongCodesPerEmailAndAddress.minutes);
-      await hitRateLimit("login-code-email", keys.email, guard.wrongCodesPerEmail.tries, guard.wrongCodesPerEmail.minutes);
-      await hitRateLimit("login-code", keys.address, guard.wrongCodesPerAddress.tries, guard.wrongCodesPerAddress.minutes);
-    } catch (e) {
-      console.error(e instanceof Error ? e.message : e);
-    }
-    redirect(back("code"));
-  }
+  if (error || !data.user) redirect(back("code"));
+  // A right code: its count is taken back, so it never uses up the allowance.
+  await forgetAttempts(counted);
   // Signing in proves they own this email address: attach their past donations.
   try {
     if (data.user.email) await linkDonorsToUser(data.user.id, data.user.email);

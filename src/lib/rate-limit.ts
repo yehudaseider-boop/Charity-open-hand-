@@ -96,3 +96,34 @@ export async function rateLimitReached(bucket: string, keys: string[], limit: nu
   }
   return false;
 }
+
+/**
+ * Count this attempt first (so parallel requests can't all slip under the limit), and hand back the rows written,
+ * so an attempt that turns out fine can be taken back with forgetAttempts (sign-in codes: only wrong ones count,
+ * review 12/11/2026). Limited when any key is over its allowance, this attempt included.
+ */
+export async function takeAttempt(bucket: string, keys: string[], limit: number, windowMinutes: number): Promise<{ limited: boolean; ids: string[] }> {
+  if (keys.length === 0) return { limited: false, ids: [] };
+  const db = createAdminClient();
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  const { data, error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key }))).select("id");
+  if (error) throw error;
+  const ids = (data ?? []).map((r) => String(r.id));
+  for (const key of keys) {
+    const { count, error: countError } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
+    if (countError) throw countError;
+    if ((count ?? 0) > limit) return { limited: true, ids };
+  }
+  return { limited: false, ids };
+}
+
+/** Take back attempts counted with takeAttempt (a right code). Never throws: an attempt left counted only costs a try. */
+export async function forgetAttempts(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  try {
+    const { error } = await createAdminClient().from("rate_limit_events").delete().in("id", ids);
+    if (error) console.error(`[rate-limit] could not take back attempts: ${error.message}`);
+  } catch (e) {
+    console.error("[rate-limit] could not take back attempts", e);
+  }
+}

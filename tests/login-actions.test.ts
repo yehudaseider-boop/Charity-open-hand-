@@ -16,7 +16,8 @@ vi.mock("@/lib/client-ip", () => ({ clientIp: () => ip }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw Object.assign(new Error("NEXT_REDIRECT"), { url }); } }));
 
 /** An in-memory limits table, counting the same way as lib/rate-limit.ts. */
-const events: { bucket: string; key: string }[] = [];
+const events: { bucket: string; key: string; id?: string }[] = [];
+let nextId = 0;
 const count = (bucket: string, key: string) => events.filter((e) => e.bucket === bucket && e.key === key).length;
 vi.mock("@/lib/rate-limit", () => ({
   hashedKey: (kind: string, v: string) => `${kind}#${v.trim().toLowerCase()}`,
@@ -26,6 +27,21 @@ vi.mock("@/lib/rate-limit", () => ({
     return keys.some((key) => count(bucket, key) > limit);
   },
   rateLimitReached: async (bucket: string, keys: string[], limit: number) => keys.some((key) => count(bucket, key) >= limit),
+  takeAttempt: async (bucket: string, keys: string[], limit: number) => {
+    const ids: string[] = [];
+    for (const key of keys) {
+      const id = `e${++nextId}`;
+      events.push({ bucket, key, id });
+      ids.push(id);
+    }
+    return { limited: keys.some((key) => count(bucket, key) > limit), ids };
+  },
+  forgetAttempts: async (ids: string[]) => {
+    for (const id of ids) {
+      const i = events.findIndex((e) => e.id === id);
+      if (i >= 0) events.splice(i, 1);
+    }
+  },
 }));
 
 const sentTo: string[] = [];
@@ -108,6 +124,12 @@ describe("typing the code", () => {
     codeIsRight = true;
     for (let i = 0; i < 15; i++) expect(await tryCode("dana@example.com")).toBe("/account");
     expect(events).toEqual([]);
+  });
+
+  it("counts a try before checking the code, so guesses sent all at once can't slip past the limit", async () => {
+    ip = "203.0.113.77";
+    const results = await Promise.all(Array.from({ length: 14 }, () => tryCode("dana@example.com")));
+    expect(results.filter((u) => u.includes("error=tries")).length).toBeGreaterThanOrEqual(4);
   });
 
   it("each email has a higher ceiling of its own for wrong codes", async () => {
