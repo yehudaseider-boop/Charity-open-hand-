@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { BackHandler, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, TextLink } from "@/components/button";
 import { FadeUp } from "@/components/fade-up";
@@ -102,7 +102,7 @@ export default function Welcome() {
   // The questions, in the same look as the welcome (30/10/2026): white, soft bubbles drifting at the
   // edges, a small picture, the key word in blue, and answers on soft lilac cards.
   return (
-    <KeyboardAvoidingView style={styles.questionScreen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={styles.questionScreen} behavior="padding">
       <Bubbles
         items={[
           { size: 260, color: colors.lilacSoft, at: { right: -130, top: insets.top + 40 } },

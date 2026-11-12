@@ -6,7 +6,7 @@ import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AmountSwipe } from "@/components/amount-swipe";
 import { Button, TextLink } from "@/components/button";
@@ -86,7 +86,17 @@ type Snapshot = GiftSnapshot;
 
 export default function Give() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
+  // The pinned footer gives way to the form while the keyboard is up (small phones, 12/11/2026).
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const shown = Keyboard.addListener("keyboardDidShow", () => setKeyboardUp(true));
+    const hidden = Keyboard.addListener("keyboardDidHide", () => setKeyboardUp(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
   const { slug, label: labelParam, campaign: rawCampaign, demo, monthly: monthlyParam, amount: amountParam } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string; monthly?: string; amount?: string }>();
   // A link with a broken campaign id gives to the charity itself, rather than failing every check.
   const campaignParam = typeof rawCampaign === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawCampaign) ? rawCampaign : undefined;
@@ -859,7 +869,7 @@ export default function Give() {
   return (
     <View style={styles.screen}>
       <TopBar title={`Giving to ${charity.nameEn}`} fallback="/discover" />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: 8, gap: 20, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
           {campaign ? <CampaignCard campaign={campaign} compact /> : null}
           {campaignEnded ? (
@@ -1283,8 +1293,11 @@ export default function Give() {
         <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
           {message ? (
             <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={message.tone === "error" ? styles.errorNote : styles.waitNote}>
-              <Text style={{ fontSize: 16, lineHeight: 23, color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
-              {message.help ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
+              {/* Never taller than a slice of the screen: a long message scrolls inside, the form stays usable. */}
+              <ScrollView style={{ maxHeight: Math.round(windowHeight * (keyboardUp ? 0.14 : 0.26)) }} nestedScrollEnabled>
+                <Text style={{ fontSize: 16, lineHeight: 23, color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
+                {message.help && !keyboardUp ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
+              </ScrollView>
             </View>
           ) : null}
           <View style={{ gap: 8 }}>
@@ -1298,10 +1311,12 @@ export default function Give() {
             ) : (
               <HoldToGive label={total ? `Hold to give ${rand(total)}${isMonthly ? " every month" : ""}` : "Hold to give"} busyLabel={busy ? buttonLabel : "Giving…"} busy={busy !== false} onConfirm={give} />
             )}
+            {keyboardUp ? null : (
             <Text variant="label" style={styles.footerLine}>
               {total !== null ? `${rand(gift ?? 0)} to ${charity.nameEn}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. Contribution to Givezy: ${contributionLabel(contribution ?? 0, isMonthly)}. ` : ""}
               {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
             </Text>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>
