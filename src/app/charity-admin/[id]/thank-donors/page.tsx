@@ -68,7 +68,7 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
 
       {/* The automatic email after each gift: the charity's own paragraph in it (10/11/2026). Anyone who manages the charity may edit it, as for the public profile. */}
       <Card title="The thank-you email after each gift">
-        <div id="wording" className="space-y-4 text-sm">
+        <div id="wording" className="scroll-mt-24 space-y-4 text-sm">
           <p className="text-muted">
             Every donor gets this email from Givezy as soon as their gift is confirmed. You can add a short note of your own to it.
             The same note shows on the thank-you page after they pay and in the Givezy app.

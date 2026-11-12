@@ -122,6 +122,21 @@ h1 {
   box-shadow: 0 1px 0 var(--edge);
 }
 
+/* A small link or chip keeps its look but gets a 44 px tap area: an invisible box at least 44 px each way,
+   centred on it. Leave 8 px between neighbours that use it, so their tap areas don't overlap. */
+@utility hit {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* A page that runs edge to edge (the home page) marks its top element full-bleed; the layout's narrow column steps aside. */
 main:has(> .full-bleed),
 main:has(> .page-enter > .full-bleed) {

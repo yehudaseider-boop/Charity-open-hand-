@@ -100,7 +100,7 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
               type="button"
               aria-pressed={period === p.key}
               onClick={() => setPeriod(p.key)}
-              className={`min-h-9 rounded-[0.8rem] px-3 text-sm font-semibold transition ${period === p.key ? "bg-surface text-brand shadow-sm" : "text-muted hover:text-indigo"}`}
+              className={`hit min-h-9 rounded-[0.8rem] px-3 text-sm font-semibold transition ${period === p.key ? "bg-surface text-brand shadow-sm" : "text-muted hover:text-indigo"}`}
             >
               {p.label}
             </button>
@@ -139,8 +139,10 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
                 <span aria-hidden className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-brand shadow" style={{ left: `${(x(activeIndex) / 1000) * 100}%`, top: y(active.amountCents) }} />
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute z-10 whitespace-nowrap rounded-control bg-indigo px-3 py-2 text-xs leading-snug text-white shadow-lg"
-                  style={{ left: `${Math.min(86, Math.max(14, (x(activeIndex) / 1000) * 100))}%`, top: Math.max(26, y(active.amountCents)) - 12, transform: "translate(-50%, -100%)" }}
+                  className="pointer-events-none absolute z-10 w-max max-w-full rounded-control bg-indigo px-3 py-2 text-xs leading-snug text-white shadow-lg"
+                  // Anchored where the month sits along the chart: the first month's box opens to the right, the last one's to
+                  // the left, the middle ones around the dot. So it never runs off either side, even on a phone.
+                  style={{ left: `${(x(activeIndex) / 1000) * 100}%`, top: Math.max(26, y(active.amountCents)) - 12, transform: `translate(-${(x(activeIndex) / 1000) * 100}%, -100%)` }}
                 >
                   <span className="block opacity-75">{monthName(active.month)}</span>
                   <span className="block font-display text-sm font-bold">{formatRand(active.amountCents)}</span>
@@ -164,8 +166,10 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
               ))}
             </div>
             <div className="absolute inset-x-0 flex" style={{ top: H + 6 }} aria-hidden>
-              {shown.map((m) => (
-                <span key={m.month} className={`min-w-0 flex-1 text-center text-[11px] ${m.month === active?.month ? "font-bold text-brand" : m.month.startsWith(current) ? "font-semibold text-indigo" : "text-muted"}`}>
+              {/* On a phone, more than 6 months leaves too little room for each name: every other one is shown, counting back
+                  from the latest, and a name never breaks over two lines. */}
+              {shown.map((m, i) => (
+                <span key={m.month} className={`min-w-0 flex-1 whitespace-nowrap text-center text-[11px] ${n > 6 && (n - 1 - i) % 2 ? "max-sm:invisible" : ""} ${m.month === active?.month ? "font-bold text-brand" : m.month.startsWith(current) ? "font-semibold text-indigo" : "text-muted"}`}>
                   {shortMonth(m.month)}
                 </span>
               ))}

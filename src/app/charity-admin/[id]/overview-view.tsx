@@ -112,9 +112,9 @@ export function OverviewView(p: OverviewProps) {
           <div className="mt-4 border-t border-border pt-3 text-sm">
             <p className="mb-2">Share your Givezy page with your supporters:</p>
             <ShareLinks url={publicLink} message={`Give to ${charityName} on Givezy:`} />
-            <Link href={`${base}/poster`} className="mt-2 inline-block text-brand underline">Print a QR poster for your notice board</Link>
-            <Link href={`${base}/poster#link-builder`} className="mt-2 block text-brand underline">Make a give link or QR code with an amount</Link>
-            <Link href={`${base}/website-button`} className="mt-2 block text-brand underline">Add a &quot;Give with Givezy&quot; button to your website</Link>
+            <Link href={`${base}/poster`} className="flex min-h-11 items-center text-brand underline">Print a QR poster for your notice board</Link>
+            <Link href={`${base}/poster#link-builder`} className="flex min-h-11 items-center text-brand underline">Make a give link or QR code with an amount</Link>
+            <Link href={`${base}/website-button`} className="flex min-h-11 items-center text-brand underline">Add a &quot;Give with Givezy&quot; button to your website</Link>
           </div>
         </GettingStarted>
       ) : null}
@@ -157,13 +157,13 @@ export function OverviewView(p: OverviewProps) {
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-8">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-8">
           <Card lights title="Donations by month">
             <DonationsChart months={chart} current={today.slice(0, 7)} donationsBase={`${base}/donations`} taxYearFrom={taxStart} taxYearName={taxYearName(taxYear.taxYear)} />
           </Card>
         </div>
-        <div className="lg:col-span-4">
+        <div className="min-w-0 lg:col-span-4">
           <Card lights title="Where gifts come from">
             {sourceRows.length ? (
               <>
@@ -177,8 +177,8 @@ export function OverviewView(p: OverviewProps) {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-8">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-8">
           <Card lights title="Recent donations" aside={<Link href={`${base}/donations`} className="text-sm font-semibold text-brand underline">See all donations</Link>}>
             {recentRows.length ? (
               <RecentDonations rows={recentRows} donationsHref={`${base}/donations`} />
@@ -187,7 +187,7 @@ export function OverviewView(p: OverviewProps) {
             )}
           </Card>
         </div>
-        <div className="space-y-4 lg:col-span-4">
+        <div className="min-w-0 space-y-4 lg:col-span-4">
           {top.length > 0 ? (
             <Card lights title="Your biggest supporters">
               <ol className="space-y-1 text-sm">
@@ -209,13 +209,13 @@ export function OverviewView(p: OverviewProps) {
                 ))}
               </ol>
               <p className="mt-3 text-xs text-muted">All-time totals. A personal thank-you goes a long way.</p>
-              <Link href={`${base}/donors`} className="mt-2 inline-block text-sm font-semibold text-brand underline">All donors</Link>
+              <Link href={`${base}/donors`} className="hit mt-2 inline-block text-sm font-semibold text-brand underline">All donors</Link>
             </Card>
           ) : null}
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
         <Card lights title="Campaigns">
           {activeCampaigns.length ? (
             <ul className="space-y-4">
@@ -235,7 +235,7 @@ export function OverviewView(p: OverviewProps) {
           ) : (
             <p className="text-sm text-muted">Raising for something specific, like winter food parcels? Start a campaign with a goal, and donors see how close you are.</p>
           )}
-          <Link href={`${base}/campaigns`} className="mt-4 inline-block text-sm font-semibold text-brand underline">{activeCampaigns.length ? "Manage campaigns" : "Start a campaign"}</Link>
+          <Link href={`${base}/campaigns`} className="hit mt-4 inline-block text-sm font-semibold text-brand underline">{activeCampaigns.length ? "Manage campaigns" : "Start a campaign"}</Link>
         </Card>
 
         <Card lights title="Your donors">
@@ -322,7 +322,7 @@ export function OverviewView(p: OverviewProps) {
       <MonthlyTrend rows={recurring} now={now} seeAllHref={`${base}/monthly`} />
 
       <div className="flex flex-wrap gap-2 text-sm">
-        <a href={`${base}/export/donations`} className="rounded-full border-2 border-border bg-surface px-4 py-2 font-semibold text-brand hover:border-brand">Download paid donations (CSV)</a>
+        <a href={`${base}/export/donations`} className="inline-flex min-h-11 items-center rounded-full border-2 border-border bg-surface px-4 font-semibold text-brand hover:border-brand">Download paid donations (CSV)</a>
       </div>
     </div>
   );
