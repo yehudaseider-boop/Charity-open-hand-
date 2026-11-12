@@ -229,7 +229,7 @@ describe("webhook signature", () => {
 
   it("reads refunds and disputes, naming the original payment", async () => {
     const refund = JSON.stringify({ event: "refund.processed", data: { id: 7, amount: 18000, transaction_reference: base.reference } });
-    expect(await paystackGateway.parseWebhook(refund, headers(sign(refund)))).toMatchObject({ type: "refund_processed", reference: base.reference, amountCents: 18000, eventId: "refund.processed:7" });
+    expect(await paystackGateway.parseWebhook(refund, headers(sign(refund)))).toMatchObject({ type: "refund_processed", reference: base.reference, amountCents: 18000, eventId: "refund.processed:7:18000" });
     const opened = JSON.stringify({ event: "charge.dispute.create", data: { id: 8, transaction: { reference: base.reference } } });
     expect(await paystackGateway.parseWebhook(opened, headers(sign(opened)))).toMatchObject({ type: "dispute_opened", reference: base.reference });
     const resolved = JSON.stringify({ event: "charge.dispute.resolve", data: { id: 9, resolution: "declined", transaction: { reference: base.reference } } });
@@ -239,7 +239,7 @@ describe("webhook signature", () => {
     const bare2 = JSON.stringify({ event: "refund.processed", data: { amount: 200 } });
     const id1 = (await paystackGateway.parseWebhook(bare1, headers(sign(bare1))))?.eventId;
     const id2 = (await paystackGateway.parseWebhook(bare2, headers(sign(bare2))))?.eventId;
-    expect(id1).toBe(`refund.processed:sha256:${createHash("sha256").update(bare1).digest("hex")}`);
+    expect(id1).toBe(`refund.processed:?:100:sha256:${createHash("sha256").update(bare1).digest("hex")}`);
     expect(id2).not.toBe(id1);
     expect((await paystackGateway.parseWebhook(bare1, headers(sign(bare1))))?.eventId).toBe(id1);
     // A refund whose shape we don't recognise names no payment, so it is held for a person.
@@ -493,5 +493,117 @@ describe("checking a charity's bank account (POST /bank/validate)", () => {
   it("a bank Paystack can't check at is an error (shown as not checked), not a failed check", async () => {
     answers["/bank"] = [];
     await expect(paystackGateway.checkBankAccount!({ bankName: "FNB", accountNumber: "1", accountHolder: "X" })).rejects.toBeInstanceOf(GatewayError);
+  });
+});
+
+describe("which charge answers are a declined card", () => {
+  const charge = async (status: number, body: unknown) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
+    try {
+      await paystackGateway.chargeAuthorization({ ...base, authorizationCode: "AUTH_x", charityAccountRef: null, feeBearer: "charity" });
+    } catch (e) {
+      return e as InstanceType<typeof GatewayError>;
+    }
+    throw new Error("expected an error");
+  };
+
+  it("a refusal that names the card is a decline", async () => {
+    for (const message of ["Declined", "Insufficient Funds", "Do not honor", "Authorization is not active", "This authorization is not reusable", "Expired card"]) {
+      expect(await charge(400, { status: false, message })).toMatchObject({ refused: true, declined: true });
+    }
+  });
+
+  it("any other 400 or 422 is turned down but never a declined card (the donor is not told so, the card is kept)", async () => {
+    for (const message of ["Invalid split configuration", "Invalid amount", "Subaccount not found", "Currency not supported by merchant", "Invalid authorization code"]) {
+      expect(await charge(400, { status: false, message })).toMatchObject({ refused: true, declined: false });
+      expect(await charge(422, { status: false, message })).toMatchObject({ refused: true, declined: false });
+    }
+  });
+
+  it("an outage, a wrong key, a rate limit, a duplicate reference or the network failing is never a decline", async () => {
+    expect(await charge(500, { status: false, message: "Declined" })).toMatchObject({ declined: false });
+    expect(await charge(401, { status: false, message: "Invalid key" })).toMatchObject({ declined: false });
+    expect(await charge(429, { status: false, message: "Too many requests" })).toMatchObject({ declined: false });
+    expect(await charge(400, { status: false, message: "Duplicate Transaction Reference" })).toMatchObject({ declined: false });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    try {
+      await paystackGateway.chargeAuthorization({ ...base, authorizationCode: "AUTH_x", charityAccountRef: null, feeBearer: "charity" });
+    } catch (e) {
+      expect(e).toMatchObject({ unreachable: true, declined: false });
+    }
+  });
+
+  it("a 200 saying the charge failed is read as failed (the payment check then marks it declined)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ status: true, data: { status: "failed" } }), { status: 200 })));
+    expect(await paystackGateway.chargeAuthorization({ ...base, authorizationCode: "AUTH_x", charityAccountRef: null, feeBearer: "charity" })).toEqual({ status: "failed" });
+  });
+});
+
+describe("an abandoned checkout", () => {
+  it("stays pending, and says it was abandoned", async () => {
+    answers["/transaction/verify"] = { id: 42, status: "abandoned", amount: 20_345, currency: "ZAR", reference: base.reference };
+    expect(await paystackGateway.verifyTransaction(base.reference)).toMatchObject({ status: "pending", abandoned: true });
+    answers["/transaction/verify"] = { id: 42, status: "ongoing", amount: 20_345, currency: "ZAR", reference: base.reference };
+    expect(await paystackGateway.verifyTransaction(base.reference)).toMatchObject({ status: "pending", abandoned: false });
+  });
+});
+
+describe("refund events", () => {
+  const sign = (raw: string) => createHmac("sha512", "sk_test_unit").update(raw).digest("hex");
+  const parse = (data: Record<string, unknown>) => {
+    const raw = JSON.stringify({ event: "refund.processed", data: { transaction_reference: base.reference, currency: "ZAR", ...data } });
+    return paystackGateway.parseWebhook(raw, new Headers({ "x-paystack-signature": sign(raw) }));
+  };
+
+  it("two partial refunds of one payment are two events, never one dropped as a repeat", async () => {
+    const first = await parse({ refund_reference: "RF_1", amount: "5000" });
+    const second = await parse({ refund_reference: "RF_2", amount: "5000" });
+    expect(first?.eventId).toBe("refund.processed:RF_1:5000");
+    expect(second?.eventId).toBe("refund.processed:RF_2:5000");
+    // With no refund id at all, two different amounts are still two events.
+    const a = await parse({ amount: 5000 });
+    const b = await parse({ amount: 3000 });
+    expect(a?.eventId).not.toBe(b?.eventId);
+    // A repeat delivery of the same refund is the same event.
+    expect((await parse({ refund_reference: "RF_1", amount: "5000" }))?.eventId).toBe(first?.eventId);
+  });
+
+  it("reads an amount sent as a string of digits as whole cents", async () => {
+    expect(await parse({ refund_reference: "RF_1", amount: "18000" })).toMatchObject({ amountCents: 18000 });
+    expect(await parse({ refund_reference: "RF_1", amount: 18000 })).toMatchObject({ amountCents: 18000 });
+  });
+
+  it("an amount that isn't whole cents is not read (the refund is held for a person)", async () => {
+    for (const amount of ["180.50", "-100", "1e5", "", "abc", 180.5, -1, "99999999999999999999", null]) {
+      expect((await parse({ refund_reference: "RF_1", amount }))?.amountCents).toBeNull();
+    }
+  });
+});
+
+describe("deposits in a time budget", () => {
+  const ours = "ACCT_ours";
+  const settlement = (id: number) => ({ id, status: "success", settlement_date: "2026-10-20", total_amount: 9_700, subaccount: ours });
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const path = url.replace("https://api.paystack.co", "");
+        calls.push({ url: path, body: null });
+        const data = path.startsWith("/settlement?") ? [settlement(1), settlement(2), settlement(3)] : [{ reference: "d1", amount: 10_000, fees: 300, subaccount: ours }];
+        return new Response(JSON.stringify({ status: true, data }), { status: 200 });
+      }),
+    );
+  });
+
+  it("settlements already kept as final are left out without reading their transactions", async () => {
+    const out = await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: ours, since: "2026-10-01", skipRefs: new Set(["1", "3"]) });
+    expect(out.map((p) => p.ref)).toEqual(["2"]);
+    expect(calls.filter((c) => c.url.includes("/transactions")).map((c) => c.url)).toEqual(["/settlement/2/transactions?perPage=100&page=1"]);
+  });
+
+  it("past the deadline, no new settlement is started; only those read in full come back", async () => {
+    const out = await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: ours, since: "2026-10-01", deadline: Date.now() - 1 });
+    expect(out).toEqual([]);
+    expect(calls.some((c) => c.url.includes("/transactions"))).toBe(false);
   });
 });

@@ -105,7 +105,7 @@ describe("the monthly job", () => {
       confirm: async () => "paid",
       charityState: async () => ({ accepting: true }),
       isNotFound: () => false,
-      isRefused: () => false,
+      isDeclined: () => false,
       notifyFailed: async () => {},
     };
     const s = await runMonthlyCharges(deps);

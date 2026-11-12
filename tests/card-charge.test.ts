@@ -81,7 +81,7 @@ describe("monthly donations and the app", async () => {
       confirm: async () => "paid",
       charityState: async () => ({ accepting: true }),
       isNotFound: () => false,
-      isRefused: () => false,
+      isDeclined: () => false,
       notifyFailed: async () => {},
     });
     expect(created).toEqual([19_000 + cover]);

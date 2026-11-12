@@ -9,6 +9,7 @@ import { retryReceiptEmail } from "@/lib/receipts/email-retry";
 import { auditRetry, recordFailedConfirmations, runEmailRetries, supabaseRetryStore, type RetryHandler, type RetrySummary } from "@/lib/email/retry";
 import { emailIsOn, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
 import { heldLabel } from "./held";
+import { formatRand } from "@/lib/money";
 
 /**
  * The daily safety net, run after the monthly collection. It never charges anyone and never decides a
@@ -17,6 +18,7 @@ import { heldLabel } from "./held";
  */
 
 import type { MonthlySummary } from "@/lib/donations/monthly-job";
+import type { PayoutSyncSummary } from "@/lib/donations/payouts";
 
 /**
  * Collect the monthly donations that are due, run after run, until none are left or the time budget is
@@ -25,7 +27,7 @@ import type { MonthlySummary } from "@/lib/donations/monthly-job";
  * the next call (tomorrow's job, or the hourly one once the host allows it).
  */
 export async function collectMonthlyWithin(run: (deadline: number) => Promise<MonthlySummary>, budgetMs: number, now: () => number = Date.now): Promise<MonthlySummary & { runs: number }> {
-  const total: MonthlySummary & { runs: number } = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [], runs: 0 };
+  const total: MonthlySummary & { runs: number } = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [], waitingOnProvider: [], errors: [], runs: 0 };
   const started = now();
   // Each run stops starting new donations at the deadline it is given, so a run can't go past the budget by much.
   while (total.runs === 0 || now() - started < budgetMs - 5_000) {
@@ -39,6 +41,8 @@ export async function collectMonthlyWithin(run: (deadline: number) => Promise<Mo
     total.alreadyPaid += s.alreadyPaid;
     total.waiting.push(...s.waiting);
     total.review.push(...s.review);
+    total.unconfirmed!.push(...(s.unconfirmed ?? []));
+    total.waitingOnProvider!.push(...(s.waitingOnProvider ?? []));
     total.errors.push(...s.errors);
     // Stop when a run found nothing due, did nothing useful (rows that only error or wait would come back every run), or ran out of time.
     const progress = s.paid + s.failed + s.stopped + s.alreadyPaid + s.review.length;
@@ -56,6 +60,8 @@ export type DailyChecks = {
   pending: { checked: number; paid: number; failed: number; still: number; errors: number };
   /** Pending for more than 3 days: the provider still has no answer. */
   stuckPending: number;
+  /** Checkouts the donor left unpaid (the provider says abandoned or never received), closed as failed after 48 hours. */
+  abandonedClosed?: number;
   /** The older once-a-day resend of confirmations, used only until the email_retries table is there. */
   confirmations: { resent: number; failedAgain: number };
   /** Important emails tried again (gift confirmations, s18A receipts, declined-card notices). */
@@ -67,16 +73,30 @@ export type DailyChecks = {
 };
 
 const HOUR = 3_600_000;
+/**
+ * A checkout the provider says was abandoned (or never received) is closed as failed once it is this old: well past
+ * the time a donor takes to pay, and before the "pending more than 3 days" alert, which then only shows payments the
+ * provider is really still working on. A closed checkout can still become paid if the provider says so later.
+ */
+export const ABANDONED_AFTER_HOURS = 48;
 
 export async function runDailyChecks(now = new Date(), deadline = Infinity): Promise<DailyChecks> {
   const db = createAdminClient();
-  const out: DailyChecks = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+  const out: DailyChecks = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, abandonedClosed: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+  const closeAbandonedBefore = new Date(now.getTime() - ABANDONED_AFTER_HOURS * HOUR);
+  const check = async (ref: string) => {
+    const o = await confirmPayment(ref, { closeAbandonedBefore });
+    if (o === "paid") out.pending.paid += 1;
+    else if (o === "failed") out.pending.failed += 1;
+    else out.pending.still += 1;
+    return o;
+  };
 
   // 1. Once-off payments still pending (older than 30 minutes, the last week): ask the provider. Monthly
   // collections are the monthly job's own; gifts a charity recorded itself are never pending.
   const { data: pending, error: pErr } = await db
     .from("donations")
-    .select("gateway_ref")
+    .select("gateway_ref, created_at")
     .eq("status", "pending")
     // Every kind, the first payment of a monthly donation and a new card too: if the provider's message never
     // arrived, this is what settles them. (confirmPayment is safe to repeat.)
@@ -95,12 +115,34 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     }
     out.pending.checked += 1;
     try {
-      const o = await confirmPayment(p.gateway_ref as string);
-      if (o === "paid") out.pending.paid += 1;
-      else if (o === "failed") out.pending.failed += 1;
-      else out.pending.still += 1;
+      const o = await check(p.gateway_ref as string);
+      if (o === "failed" && new Date(p.created_at as string) < closeAbandonedBefore) out.abandonedClosed! += 1;
     } catch {
-      // The provider never heard of it (the donor closed the page before paying) or couldn't be reached.
+      // The provider couldn't be reached, or never heard of a recent one (the donor closed the page before paying).
+      out.pending.errors += 1;
+    }
+  }
+  // 1a. Older checkouts (a week to 30 days, the rest of the "pending more than 3 days" window), oldest first: the
+  // ones the provider says were abandoned or never received are closed, so they stop lighting that alert.
+  const { data: older, error: oErr } = await db
+    .from("donations")
+    .select("gateway_ref")
+    .eq("status", "pending")
+    .neq("gateway", "recorded")
+    .lt("created_at", new Date(now.getTime() - 7 * 24 * HOUR).toISOString())
+    .gte("created_at", new Date(now.getTime() - 30 * 24 * HOUR).toISOString())
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (oErr) throw new Error(`Could not list older pending payments: ${oErr.message}`);
+  for (const p of older ?? []) {
+    if (Date.now() > deadline) {
+      out.incomplete = true;
+      break;
+    }
+    out.pending.checked += 1;
+    try {
+      if ((await check(p.gateway_ref as string)) === "failed") out.abandonedClosed! += 1;
+    } catch {
       out.pending.errors += 1;
     }
   }
@@ -233,7 +275,34 @@ async function resendConfirmationsOldWay(db: ReturnType<typeof createAdminClient
 }
 
 /** What the monthly and payouts runs reported that needs a person. */
-export type JobProblems = { monthlyCutOff?: boolean; monthlyErrors: number; monthlyReview: number; monthlyStopped: number; payoutsFailed: boolean; monthlyFailed: boolean };
+export type JobProblems = {
+  monthlyCutOff?: boolean;
+  monthlyErrors: number;
+  monthlyReview: number;
+  monthlyStopped: number;
+  /** Monthly donations held: a try still pending at the payment provider after 48 hours (listed every day until settled). */
+  monthlyWaitingOnProvider?: { totalCents: number; charityName: string }[];
+  payoutsFailed: boolean;
+  monthlyFailed: boolean;
+};
+
+/**
+ * The deposit report's own short email, sent after the day's main email (the payouts run last, in a time budget).
+ * None when it ran in full. `started` false: there was no time left to start it at all.
+ */
+export function payoutsAlertLines(p: PayoutSyncSummary | null, opts: { started: boolean } = { started: true }): string[] {
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  if (!opts.started) return ["The deposit report had no time left to run today. Nothing is lost: it carries on tomorrow."];
+  if (p === null) return ["The deposit report could not be updated today (see the job log). It tries again tomorrow."];
+  const lines: string[] = [];
+  if (p.outOfTime) {
+    lines.push(
+      `The deposit report ran out of time today${p.notReached ? ` with ${n(p.notReached, "charity", "charities")} not reached` : ""}. What was read in full is kept; the rest is read tomorrow.`,
+    );
+  }
+  if (p.failed.length) lines.push(`The deposit report could not be read for ${n(p.failed.length, "charity", "charities")} today (see the job log). It tries again tomorrow.`);
+  return lines;
+}
 
 /** The lines of the daily email, or none when nothing needs a person. Plain words, one thing per line. */
 export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
@@ -244,12 +313,19 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   if (c.incomplete) lines.push("The daily checks ran out of time and stopped early. The rest is checked tomorrow.");
   if (jobs.monthlyErrors) lines.push(`Monthly collection: ${n(jobs.monthlyErrors, "monthly donation", "monthly donations")} could not be handled (see the job log).`);
   if (jobs.monthlyReview) lines.push(`Monthly collection: ${n(jobs.monthlyReview, "payment", "payments")} came back with a different amount and wait for a person.`);
+  for (const w of jobs.monthlyWaitingOnProvider ?? []) {
+    lines.push(`Monthly collection: still waiting for the payment provider about ${formatRand(w.totalCents)} for ${w.charityName}. Nothing more will be charged until it's settled.`);
+  }
   if (jobs.monthlyStopped) lines.push(`${n(jobs.monthlyStopped, "monthly donation", "monthly donations")} stopped after three declined tries. The donors were emailed a link to put in a new card.`);
   if (jobs.payoutsFailed) lines.push("The deposit report could not be updated today. It tries again tomorrow.");
   if (c.stuckPending) lines.push(`${n(c.stuckPending, "payment has", "payments have")} been pending for more than 3 days.`);
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
   if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));
   if (c.confirmations.failedAgain) lines.push(`${n(c.confirmations.failedAgain, "confirmation email", "confirmation emails")} to donors still could not be sent.`);
-  for (const [action, count] of Object.entries(c.held)) lines.push(`${heldLabel[action] ?? action}: ${count}`);
+  for (const [action, count] of Object.entries(c.held)) {
+    // Listed above, one line each with the amount and charity, every day until settled.
+    if (action === "monthly.waiting_on_provider") continue;
+    lines.push(`${heldLabel[action] ?? action}: ${count}`);
+  }
   return lines;
 }

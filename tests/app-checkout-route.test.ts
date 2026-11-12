@@ -130,9 +130,9 @@ describe("app checkout endpoint", () => {
     await call({ ...gift, details });
     expect(limits.map((l) => [l.bucket, l.limit])).toEqual([
       ["checkout", 5],
-      ["checkout-ip", 30],
+      ["checkout-ip", 60],
       ["checkout-day", 20],
-      ["checkout-ip-day", 150],
+      ["checkout-ip-day", 300],
       ["checkout-charity", 60],
     ]);
   });

@@ -53,6 +53,15 @@ function secretKey(): string {
   return k;
 }
 
+/**
+ * Paystack's words, on a refused request, for a card that was declined or can no longer be charged. Only these make a
+ * refusal a declined card (GatewayError.declined). Paystack mostly answers a declined charge_authorization with a 200
+ * and data.status "failed", which the payment check reads as failed; these cover the refusals that name the card.
+ * A refusal for anything else (a field, the amount, the split, the subaccount, our key) is never the donor's card.
+ * VERIFY in test mode with Paystack's declined, insufficient-funds and expired test cards, and widen if needed.
+ */
+const CARD_DECLINED = /declined|insufficient funds|do not hono(u)?r|authori[sz]ation (code )?(is )?not (active|reusable)|expired card|card (has )?expired|lost card|stolen card|restricted card|pick ?up card/i;
+
 /** How long to wait for Paystack before giving up on a call (it is then treated as unreachable, never as refused). */
 const TIMEOUT_MS = 20_000;
 
@@ -84,7 +93,8 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     // never a refusal of the card (the first payment may well have gone through), so nothing is marked failed.
     const duplicate = /duplicate transaction reference/i.test(body?.message ?? "");
     const refused = !notFound && !duplicate && ([400, 402, 422].includes(res.status) || (res.ok && body?.status === false));
-    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused, said: body?.message?.trim() || null });
+    const declined = refused && CARD_DECLINED.test(body?.message ?? "");
+    throw new GatewayError(`Paystack ${path} failed: ${body?.message ?? res.status}`, { notFound, refused, declined, said: body?.message?.trim() || null });
   }
   return body.data as T;
 }
@@ -159,6 +169,37 @@ async function findBank(bankName: string, { forChecks = false }: { forChecks?: b
   return candidates[0];
 }
 
+/**
+ * An amount in cents from Paystack: a whole number, or a string of digits (its refund events send "10000"). Anything
+ * else (a decimal, a sign, an exponent, too big to be exact) is null, so the refund is held for a person.
+ */
+export function wholeCents(v: unknown): number | null {
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d{1,15}$/.test(v.trim())) {
+    const n = Number(v.trim());
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * A webhook event's id, for idempotency. Paystack events carry no event id of their own. VERIFY in test mode.
+ * - A refund: the refund's own id or refund_reference, with its amount. Never the payment's: two partial refunds of
+ *   one payment are two events, and keying them by the payment would drop the second as a repeat.
+ * - Anything else: event type + transaction id (or reference), which is unique per payment event.
+ * With none of those, the body's own fingerprint: a repeat delivery is still the same event, and two different events
+ * are never taken for one (a fixed fallback would skip every later one).
+ */
+function eventIdOf(event: string, type: WebhookEvent["type"], d: { id?: number | string; reference?: string; amount?: unknown; refund_reference?: string }, original: string | null, rawBody: string): string {
+  const fingerprint = () => `sha256:${createHash("sha256").update(rawBody).digest("hex")}`;
+  if (type === "refund_processed") {
+    const own = [d.id, d.refund_reference].filter((x) => x !== undefined && x !== null && String(x) !== "").map(String).join(":");
+    const amount = wholeCents(d.amount) ?? "?";
+    return own ? `${event}:${own}:${amount}` : `${event}:${original ?? "?"}:${amount}:${fingerprint()}`;
+  }
+  return `${event}:${d.id ?? d.reference ?? original ?? fingerprint()}`;
+}
+
 /** The subaccount a settlement or transaction says it belongs to, in whichever form Paystack gives it; null if it doesn't say. */
 function ownerOf(x: { subaccount?: string | { subaccount_code?: string } | null; subaccount_code?: string | null }): string | null {
   if (typeof x.subaccount === "string" && x.subaccount) return x.subaccount;
@@ -219,6 +260,7 @@ export const paystackGateway: PaymentGateway = {
       gatewayTransactionId: String(data.id),
       paidAt: data.paid_at ?? null,
       authorization: toAuthorization(data.authorization),
+      abandoned: data.status === "abandoned",
     };
   },
 
@@ -250,10 +292,12 @@ export const paystackGateway: PaymentGateway = {
     // Odd characters in the header are a plain "no", never an error; the comparison is constant-time.
     if (!/^[0-9a-f]{128}$/i.test(got) || !sameSecret(got.toLowerCase(), expected)) return null;
     type Data = {
-      id?: number;
+      id?: number | string;
       reference?: string;
-      amount?: number;
+      /** A number, or (in Paystack's refund events) a string of digits. */
+      amount?: number | string;
       currency?: string;
+      refund_reference?: string;
       resolution?: string;
       status?: string;
       transaction_reference?: string;
@@ -274,14 +318,11 @@ export const paystackGateway: PaymentGateway = {
       : "other";
     const isPayment = type === "payment_succeeded" || type === "payment_failed";
     return {
-      // Paystack events carry no event id; event type + transaction id is unique. VERIFY.
-      // With none of those, the body's own fingerprint: a repeat delivery is still the same event, and two
-      // different events are never taken for one (a fixed fallback would skip every later one).
-      eventId: `${body.event}:${d.id ?? d.reference ?? original ?? `sha256:${createHash("sha256").update(rawBody).digest("hex")}`}`,
+      eventId: eventIdOf(body.event, type, d, original, rawBody),
       type,
       reference: isPayment ? (d.reference ?? null) : original,
       // Paystack amounts are in the smallest unit (cents for rand). VERIFY for refunds.
-      amountCents: type === "refund_processed" && Number.isSafeInteger(d.amount) ? (d.amount as number) : null,
+      amountCents: type === "refund_processed" ? wholeCents(d.amount) : null,
       currency: type === "refund_processed" && typeof d.currency === "string" ? d.currency : null,
       detail: type === "dispute_resolved" ? (d.resolution ?? d.status ?? null) : null,
       // What we keep of the event. Never the whole body: a charge carries the reusable card code
@@ -359,7 +400,7 @@ export const paystackGateway: PaymentGateway = {
    * its transactions naming this subaccount), and anything paid out before `since` is dropped. A settlement that
    * can't be shown to be this charity's is left out: another charity's money must never appear in a deposit report.
    */
-  async listPayouts({ charityAccountRef, since }) {
+  async listPayouts({ charityAccountRef, since, skipRefs, deadline }) {
     const out: Payout[] = [];
     type Owned = { subaccount?: string | { subaccount_code?: string } | null; subaccount_code?: string | null };
     for (let page = 1; page <= 20; page++) {
@@ -367,6 +408,10 @@ export const paystackGateway: PaymentGateway = {
         ({ id: number; status: string; settlement_date?: string; createdAt?: string; effective_amount?: number; total_amount?: number } & Owned)[]
       >(`/settlement?subaccount=${encodeURIComponent(charityAccountRef)}&from=${encodeURIComponent(since)}&perPage=100&page=${page}`);
       for (const st of settlements) {
+        // Out of time: stop before reading another settlement. Only settlements read in full are returned.
+        if (deadline !== undefined && Date.now() > deadline) return out;
+        // Already kept as final (paid out or failed): its lines don't change, so they aren't read again.
+        if (skipRefs?.has(String(st.id))) continue;
         const day = String(st.settlement_date ?? st.createdAt ?? "").slice(0, 10);
         const dated = /^\d{4}-\d{2}-\d{2}$/.test(day);
         // Before `since`: not asked for (the filter may have been ignored).
