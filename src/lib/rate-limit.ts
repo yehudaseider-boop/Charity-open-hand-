@@ -66,19 +66,24 @@ export async function hitRateLimit(bucket: string, keys: string[], limit: number
   // Record this attempt first, then count: parallel requests can't all slip under the limit.
   const { error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key })));
   if (error) throw error;
-  for (const key of keys) {
-    const { count, error: countError } = await db
-      .from("rate_limit_events")
-      .select("id", { count: "exact", head: true })
-      .eq("bucket", bucket)
-      .eq("key", key)
-      .gte("created_at", since);
-    if (countError) throw countError;
-    if ((count ?? 0) > limit) return true;
-  }
-  // Emails and address stand-ins here are kept for about a day (Privacy Policy).
-  await db.from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString());
-  return false;
+  // Each key is counted, and rows older than a day cleared, side by side rather than in turn (12/11/2026: speed).
+  const [counts] = await Promise.all([
+    Promise.all(
+      keys.map(async (key) => {
+        const { count, error: countError } = await db
+          .from("rate_limit_events")
+          .select("id", { count: "exact", head: true })
+          .eq("bucket", bucket)
+          .eq("key", key)
+          .gte("created_at", since);
+        if (countError) throw countError;
+        return count ?? 0;
+      }),
+    ),
+    // Emails and address stand-ins here are kept for about a day (Privacy Policy).
+    db.from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString()),
+  ]);
+  return counts.some((count) => count > limit);
 }
 
 /**
@@ -89,12 +94,14 @@ export async function rateLimitReached(bucket: string, keys: string[], limit: nu
   if (keys.length === 0) return false;
   const db = createAdminClient();
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
-  for (const key of keys) {
-    const { count, error } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
-    if (error) throw error;
-    if ((count ?? 0) >= limit) return true;
-  }
-  return false;
+  const counts = await Promise.all(
+    keys.map(async (key) => {
+      const { count, error } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
+      if (error) throw error;
+      return count ?? 0;
+    }),
+  );
+  return counts.some((count) => count >= limit);
 }
 
 /**

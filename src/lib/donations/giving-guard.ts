@@ -33,24 +33,36 @@ export async function checkGivingAllowed(args: { email: string; ip: string; char
     const addressKeys = ipKeys(args.ip);
     const emailKeys = keysOf(hashedKey("email", email));
 
-    // Several declined cards lately: wait before trying again. Read only, so waiting doesn't extend the wait.
-    // Email and address each have their own threshold (an address is shared by many donors).
-    if (await rateLimitReached("checkout-declined", emailKeys, guard.declinesPerEmail.tries, guard.declinesPerEmail.minutes)) {
-      return refuse("declines", guard.declinesPerEmail.minutes);
-    }
-    if (await rateLimitReached("checkout-declined", addressKeys, guard.declinesPerAddress.tries, guard.declinesPerAddress.minutes)) {
-      return refuse("declines", guard.declinesPerAddress.minutes);
-    }
-    // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it).
-    if (await hitRateLimit("checkout", [`email:${email}`], guard.perEmail.tries, guard.perEmail.minutes)) return refuse("email", guard.perEmail.minutes);
-    if (await hitRateLimit("checkout-ip", addressKeys, guard.perAddress.tries, guard.perAddress.minutes)) return refuse("address", guard.perAddress.minutes);
-    if (await hitRateLimit("checkout-day", emailKeys, guard.perEmailDay.tries, guard.perEmailDay.minutes)) return refuse("email-day", guard.perEmailDay.minutes);
-    if (await hitRateLimit("checkout-ip-day", addressKeys, guard.perAddressDay.tries, guard.perAddressDay.minutes)) return refuse("address-day", guard.perAddressDay.minutes);
+    // The checks run side by side, not one after another (12/11/2026: pressing Give took about 3 seconds before the
+    // payment page, most of it these checks waiting on each other). The answer is read in the same order as before,
+    // so the same refusal wins.
 
-    // A sudden rush on one charity (attackers change addresses and emails): tell the team, never block donors.
-    if (await hitRateLimit("checkout-charity", [`charity:${args.charityId}`], guard.charityStartsAlarm.tries, guard.charityStartsAlarm.minutes)) {
-      await raiseAlarm("starts", args.charityId, guard.charityStartsAlarm);
-    }
+    // Several declined cards lately: wait before trying again. Read only, so waiting doesn't extend the wait.
+    // Email and address each have their own threshold (an address is shared by many donors). A start refused here
+    // is not counted in the limits below, as before.
+    const [declinedEmail, declinedAddress] = await Promise.all([
+      rateLimitReached("checkout-declined", emailKeys, guard.declinesPerEmail.tries, guard.declinesPerEmail.minutes),
+      rateLimitReached("checkout-declined", addressKeys, guard.declinesPerAddress.tries, guard.declinesPerAddress.minutes),
+    ]);
+    if (declinedEmail) return refuse("declines", guard.declinesPerEmail.minutes);
+    if (declinedAddress) return refuse("declines", guard.declinesPerAddress.minutes);
+
+    // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it), and a
+    // sudden rush on one charity (attackers change addresses and emails): the team is told, donors are never blocked.
+    // Each counts this start. One difference from checking in turn: a start refused by one limit is now also counted
+    // in the others, which can only make a run of refused tries wait a little longer.
+    const [overEmail, overAddress, overEmailDay, overAddressDay, charityRush] = await Promise.all([
+      hitRateLimit("checkout", [`email:${email}`], guard.perEmail.tries, guard.perEmail.minutes),
+      hitRateLimit("checkout-ip", addressKeys, guard.perAddress.tries, guard.perAddress.minutes),
+      hitRateLimit("checkout-day", emailKeys, guard.perEmailDay.tries, guard.perEmailDay.minutes),
+      hitRateLimit("checkout-ip-day", addressKeys, guard.perAddressDay.tries, guard.perAddressDay.minutes),
+      hitRateLimit("checkout-charity", [`charity:${args.charityId}`], guard.charityStartsAlarm.tries, guard.charityStartsAlarm.minutes),
+    ]);
+    if (overEmail) return refuse("email", guard.perEmail.minutes);
+    if (overAddress) return refuse("address", guard.perAddress.minutes);
+    if (overEmailDay) return refuse("email-day", guard.perEmailDay.minutes);
+    if (overAddressDay) return refuse("address-day", guard.perAddressDay.minutes);
+    if (charityRush) await raiseAlarm("starts", args.charityId, guard.charityStartsAlarm);
     return null;
   } catch (e) {
     console.error("[giving-guard] limits could not be checked; the gift goes ahead", e);
