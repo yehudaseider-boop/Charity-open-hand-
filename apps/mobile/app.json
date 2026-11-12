@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "za.co.givingapp.app",
+      "bundleIdentifier": "za.co.givezy.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -21,7 +21,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "za.co.givingapp.app"
+      "package": "za.co.givezy.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",
