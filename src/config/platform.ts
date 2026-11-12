@@ -106,6 +106,21 @@ export const platformConfig = {
     minFillSeconds: 3,
   },
 
+  /**
+   * Sign-in limits on the website (security review, 12/11/2026). Counted per email together with the internet
+   * address, so a stranger asking for links or typing wrong codes for someone's email cannot lock that person out
+   * from their own phone or computer. Each email also has a much higher ceiling of its own (many addresses at once),
+   * and each address a limit of its own across emails. Only wrong codes count, never a right one.
+   */
+  signInGuard: {
+    linksPerEmailAndAddress: { tries: 5, minutes: 60 },
+    linksPerEmail: { tries: 30, minutes: 60 },
+    linksPerAddress: { tries: 20, minutes: 60 },
+    wrongCodesPerEmailAndAddress: { tries: 10, minutes: 60 },
+    wrongCodesPerEmail: { tries: 50, minutes: 60 },
+    wrongCodesPerAddress: { tries: 30, minutes: 60 },
+  },
+
   checkout: {
     /**
      * One tick on the website's give form instead of two: "I'm 18 or older and I agree to the Terms and Privacy
