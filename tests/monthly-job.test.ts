@@ -31,6 +31,9 @@ const failedEmails: { final: boolean }[] = [];
 let accepting = true;
 let chargeThrows = false;
 let chargeRefused = false;
+/** The gateway turned the charge down for a reason that is not the card (a field, the split, our key). */
+let chargeRejected = false;
+const audits: { action: string; id: string; details: Record<string, unknown> }[] = [];
 
 function deps(now: Date = NOW): MonthlyDeps {
   const store: MonthlyStore = {
@@ -50,6 +53,7 @@ function deps(now: Date = NOW): MonthlyDeps {
     charge: async ({ reference, totalCents }) => {
       if (chargeThrows) throw new Error("network down");
       if (chargeRefused) throw new Error("refused: authorization is not active");
+      if (chargeRejected) throw new Error("rejected: Invalid split configuration");
       charges.push({ reference, total: totalCents });
     },
     confirm: async (ref) => {
@@ -59,7 +63,8 @@ function deps(now: Date = NOW): MonthlyDeps {
     },
     charityState: async () => ({ accepting }),
     isNotFound: (e) => e instanceof Error && /not found/i.test(e.message),
-    isRefused: (e) => e instanceof Error && /^refused/.test(e.message),
+    isDeclined: (e) => e instanceof Error && /^refused/.test(e.message),
+    audit: async (action, id, details) => void audits.push({ action, id, details }),
     notifyFailed: async (_r, info) => void failedEmails.push({ final: info.final }),
   };
 }
@@ -72,6 +77,8 @@ beforeEach(() => {
   accepting = true;
   chargeThrows = false;
   chargeRefused = false;
+  chargeRejected = false;
+  audits.length = 0;
 });
 
 describe("collecting a month", () => {
@@ -371,3 +378,130 @@ describe("a charge the gateway refuses outright", () => {
   });
 });
 
+
+describe("a charge the gateway turns down for a reason that isn't the card", () => {
+  const ref = attemptDonationId("rec1", "2026-11", 0);
+
+  it("is an error for a person: no try counted, no email, the card kept, the attempt left to check next run", async () => {
+    chargeRejected = true;
+    const s = await runMonthlyCharges(deps());
+    expect(s).toMatchObject({ paid: 0, failed: 0, stopped: 0 });
+    expect(s.errors).toEqual([{ id: "rec1", message: "rejected: Invalid split configuration" }]);
+    expect(world.failures).toEqual([]);
+    expect(failedEmails).toEqual([]);
+    expect(world.attempts.get(ref)).toBe("pending");
+    expect(audits).toEqual([{ action: "monthly.charge_error", id: "rec1", details: { donationId: ref, message: "rejected: Invalid split configuration" } }]);
+  });
+
+  it("a network failure or outage while charging is the same: never a decline", async () => {
+    chargeThrows = true;
+    const s = await runMonthlyCharges(deps());
+    expect(s.failed).toBe(0);
+    expect(failedEmails).toEqual([]);
+    expect(audits.map((a) => a.action)).toEqual(["monthly.charge_error"]);
+  });
+
+  it("next run, if the gateway never received it, it is sent again under the same reference (never counted)", async () => {
+    chargeRejected = true;
+    await runMonthlyCharges(deps());
+    chargeRejected = false;
+    world.claimed.clear();
+    world.born = new Date(NOW.getTime() - 24 * 3_600_000);
+    let asked = 0;
+    confirmWith = () => {
+      if (asked++ === 0) throw new Error("Transaction reference not found");
+      return "paid";
+    };
+    const s = await runMonthlyCharges(deps(new Date(NOW.getTime() + 24 * 3_600_000)));
+    expect(charges).toEqual([{ reference: ref, total: 20_000 }]);
+    expect(s.paid).toBe(1);
+    expect(world.failures).toEqual([]);
+  });
+
+  it("an audit log that can't be written never hides the error", async () => {
+    chargeRejected = true;
+    const d = deps();
+    d.audit = async () => {
+      throw new Error("audit down");
+    };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const s = await runMonthlyCharges(d);
+    expect(s.errors).toEqual([{ id: "rec1", message: "rejected: Invalid split configuration" }]);
+  });
+});
+
+describe("an attempt still pending at the gateway after 48 hours", () => {
+  const ref = attemptDonationId("rec1", "2026-11", 0);
+  beforeEach(() => {
+    world.attempts.set(ref, "pending");
+    confirmWith = () => "pending";
+  });
+
+  it("before 48 hours it only waits", async () => {
+    world.born = new Date(NOW.getTime() - 47 * 3_600_000);
+    const s = await runMonthlyCharges(deps());
+    expect(s.waiting).toEqual([{ id: "rec1", reason: "payment pending" }]);
+    expect(world.failures).toEqual([]);
+  });
+
+  it("after 48 hours it is a failed try (retry later), with no 'declined' email, and a person is told", async () => {
+    world.born = new Date(NOW.getTime() - 49 * 3_600_000);
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(world.attempts.get(ref)).toBe("failed");
+    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: "2026-11-16T06:00:00.000Z" }]);
+    expect(failedEmails).toEqual([]);
+    expect(s).toMatchObject({ failed: 1, stopped: 0, unconfirmed: [{ id: "rec1", donationId: ref, why: "pending_too_long" }] });
+    expect(audits).toEqual([{ action: "monthly.try_unconfirmed", id: "rec1", details: { donationId: ref, why: "pending_too_long", failedAttempts: 1 } }]);
+  });
+
+  it("as the month's last try, it never stops the monthly donation: next month is collected as usual", async () => {
+    const third = attemptDonationId("rec1", "2026-11", 2);
+    world.attempts.clear();
+    world.attempts.set(third, "pending");
+    world.born = new Date(NOW.getTime() - 49 * 3_600_000);
+    world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 2 })];
+    const s = await runMonthlyCharges(deps());
+    expect(s).toMatchObject({ failed: 1, stopped: 0 });
+    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 3, retryAt: chargeTime("2026-12", 15).toISOString() }]);
+    expect(failedEmails).toEqual([]);
+  });
+
+  it("an earlier try left pending over 48 hours no longer holds this month's next try", async () => {
+    world.attempts.clear();
+    world.attempts.set(ref, "failed");
+    world.born = new Date(NOW.getTime() - 72 * 3_600_000);
+    world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 1 })];
+    confirmWith = (r) => (r === ref ? "pending" : "paid");
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 1), total: 20_000 }]);
+    expect(s.paid).toBe(1);
+  });
+});
+
+describe("an attempt marked failed here that the gateway never received", () => {
+  it("is counted as a failed try and the month moves on, instead of an error every day (no email)", async () => {
+    const ref = attemptDonationId("rec1", "2026-11", 0);
+    world.attempts.set(ref, "failed");
+    world.born = new Date(NOW.getTime() - 3 * 3_600_000);
+    confirmWith = () => {
+      throw new Error("Transaction reference not found");
+    };
+    const s = await runMonthlyCharges(deps());
+    expect(s.errors).toEqual([]);
+    expect(charges).toEqual([]);
+    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: "2026-11-16T06:00:00.000Z" }]);
+    expect(failedEmails).toEqual([]);
+    expect(s.unconfirmed).toEqual([{ id: "rec1", donationId: ref, why: "never_received" }]);
+  });
+
+  it("any other error about it is still reported, not counted", async () => {
+    world.attempts.set(attemptDonationId("rec1", "2026-11", 0), "failed");
+    confirmWith = () => {
+      throw new Error("gateway down");
+    };
+    const s = await runMonthlyCharges(deps());
+    expect(s.errors).toEqual([{ id: "rec1", message: "gateway down" }]);
+    expect(world.failures).toEqual([]);
+  });
+});

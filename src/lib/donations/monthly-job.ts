@@ -61,14 +61,22 @@ export type MonthlyDeps = {
   confirm(reference: string): Promise<ConfirmOutcome>;
   /** Whether an error from `confirm` means the gateway has no record of the payment at all. */
   isNotFound(e: unknown): boolean;
-  /** Whether an error from `charge` means the gateway answered and refused it (counted as a failed attempt). */
-  isRefused(e: unknown): boolean;
+  /**
+   * Whether an error from `charge` means the gateway answered that the card was declined (counted as a failed
+   * attempt, and the donor is told). Any other error is reported for a person and the attempt checked next run.
+   */
+  isDeclined(e: unknown): boolean;
+  /** Write a line to the audit log for a person (Admin, Payments and the daily email). Never stops the run. */
+  audit?(action: MonthlyAuditAction, recurringId: string, details: Record<string, unknown>): Promise<void>;
   /** Whether the charity can still take donations, and its account at the gateway. */
   charityState(slug: string): Promise<{ accepting: boolean }>;
   notifyFailed(r: DueMonthly, info: { totalCents: number; final: boolean; failedAttempts: number }): Promise<void>;
   now: Date;
   limit?: number;
 };
+
+/** Audit actions the monthly job writes; each is a held item for a person (see ops/held.ts). */
+export type MonthlyAuditAction = "monthly.charge_error" | "monthly.try_unconfirmed";
 
 export type MonthlySummary = {
   considered: number;
@@ -82,11 +90,19 @@ export type MonthlySummary = {
   alreadyPaid: number;
   /** The gateway took a payment that does not match what was asked: held for a person to look at, not charged again. */
   review: { id: string; donationId: string }[];
+  /**
+   * Tries counted as failed without the provider saying the card was declined: pending at the provider for more
+   * than 48 hours, or marked failed here and unknown to the provider. The donor is not emailed (we can't say
+   * "declined"), the card is kept, and the last such try of a month moves on to next month instead of stopping.
+   */
+  unconfirmed?: { id: string; donationId: string; why: "pending_too_long" | "never_received" }[];
   errors: { id: string; message: string }[];
 };
 
 /** An attempt the gateway still has no record of after this long is taken to have died before the charge was sent. */
 const STUCK_AFTER_MS = 20 * 60_000;
+/** An attempt the gateway still calls pending after this long is counted as a failed try (never as a declined card). */
+export const PENDING_TIMEOUT_MS = 48 * 3_600_000;
 
 /**
  * The month a due row is collecting for. A retry belongs to the month of the failed attempt, and a
@@ -118,14 +134,19 @@ async function earlierAttemptsOutcome(id: string, period: string, attempt: numbe
       throw e;
     }
     if (outcome === "paid") return "paid";
-    if (outcome !== "failed" && outcome !== "not_found") unsettled = true;
+    // Still pending at the provider after 48 hours: that try was already counted as failed (see below), so it
+    // no longer holds this month's next try. If it goes through after all, the payment check still records it.
+    const timedOut = outcome === "pending" && deps.now.getTime() - saved.createdAt.getTime() > PENDING_TIMEOUT_MS;
+    if (outcome !== "failed" && outcome !== "not_found" && !timedOut) unsettled = true;
   }
   return unsettled ? "unsettled" : "failed";
 }
 
 export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySummary> {
   const { store, now } = deps;
-  const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [] };
+  const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [], errors: [] };
+  const audit = (action: MonthlyAuditAction, id: string, details: Record<string, unknown>) =>
+    deps.audit?.(action, id, details).catch((e) => console.error(`[monthly] could not write ${action} to the audit log`, e));
 
   const { rows, unreadable } = await store.due(now, deps.limit ?? 50);
   summary.errors.push(...unreadable);
@@ -178,7 +199,10 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
           continue;
         }
       }
-      // The gateway turning the charge down outright counts as a failed attempt (not something to resend).
+      // The gateway saying the card was declined counts as a failed attempt (not something to resend). Any other
+      // error (an outage, a request it turned down for another reason) is never a declined card: no email to the
+      // donor, no try counted, the card kept. The attempt stays pending, a person is told (audit and daily email),
+      // and the next run asks the gateway about it (sending it again only if the gateway never received it).
       let refused = false;
       const send = async () => {
         // The donor may have cancelled, paused or been erased since this row was read.
@@ -186,11 +210,26 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         try {
           await deps.charge({ reference: donationId, r, totalCents });
         } catch (e) {
-          if (!deps.isRefused(e)) throw e;
+          if (!deps.isDeclined(e)) {
+            await audit("monthly.charge_error", r.id, { donationId, message: e instanceof Error ? e.message.slice(0, 300) : String(e).slice(0, 300) });
+            throw e;
+          }
           refused = true;
           await store.failAttempt(donationId);
         }
         return true;
+      };
+      // A try that ended without the provider saying "declined": counted, so the month moves on, but the donor is not
+      // told their card was declined and the card is kept. The last try of a month waits for next month instead of
+      // stopping the monthly donation. The attempt is marked failed here; if the provider later says it was paid,
+      // the payment check still records it (failed can become paid).
+      const countUnconfirmed = async (why: "pending_too_long" | "never_received") => {
+        await store.failAttempt(donationId);
+        const failedAttempts = attempt + 1;
+        await store.recordFailure(r.id, period, failedAttempts, retryTime(now, failedAttempts) ?? next);
+        await audit("monthly.try_unconfirmed", r.id, { donationId, why, failedAttempts });
+        summary.failed += 1;
+        summary.unconfirmed!.push({ id: r.id, donationId, why });
       };
       if (existing === null) {
         // Not even an attempt row for a donor who stopped since this list was read.
@@ -222,6 +261,13 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       try {
         outcome = await settle();
       } catch (e) {
+        // Marked failed here, and the gateway has never heard of it: a declined send whose run stopped before it
+        // was counted. Nothing was charged and nothing can come of it: count the try and move on (no email: the
+        // decline's own words are gone), instead of the same error every day.
+        if (existing !== null && existing.status === "failed" && deps.isNotFound(e)) {
+          await countUnconfirmed("never_received");
+          continue;
+        }
         // A pending attempt the gateway says it has never heard of: the run that made it died (or the
         // charge was refused) before the charge reached the gateway. Only then is it sent again, under the
         // same reference. Any other error (gateway down, database) is reported and checked next run.
@@ -250,6 +296,10 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         // (Admin, Payments), and the next collection is next month's.
         await store.reschedule(r.id, next);
         summary.review.push({ id: r.id, donationId });
+      } else if (outcome === "pending" && existing !== null && now.getTime() - existing.createdAt.getTime() > PENDING_TIMEOUT_MS) {
+        // Still pending at the provider 48 hours after it was sent: a failed try for this month, never a declined
+        // card (the provider didn't say so). Listed for a person in the daily email.
+        await countUnconfirmed("pending_too_long");
       } else {
         summary.waiting.push({ id: r.id, reason: `payment ${outcome}` });
       }

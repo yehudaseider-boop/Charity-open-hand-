@@ -9,5 +9,7 @@ export const heldLabel: Record<string, string> = {
   "donation.dispute_resolved": "Dispute resolved: check who won",
   "monthly.paid_twice": "A monthly donation was paid twice for one month: refund one of the two payments",
   "charity.public_name_changed": "An approved charity changed its public name: check it is still the same charity",
+  "monthly.charge_error": "A monthly collection could not be sent to the payment provider (not a declined card; the donor was not emailed). It is checked again on the next run: see the job log",
+  "monthly.try_unconfirmed": "A monthly collection try got no answer (pending at the payment provider for over 48 hours, or never received) and was counted as missed. The donor was not emailed and the card is kept: check it at the payment provider",
   "receipt.needs_reissue": "An issued s18A receipt includes a refunded or charged-back donation: void and re-issue it",
 };

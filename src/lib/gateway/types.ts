@@ -57,6 +57,11 @@ export type VerifiedTransaction = {
   paidAt?: string | null;
   /** The card used, when the gateway returns one that can be charged again. */
   authorization?: CardAuthorization | null;
+  /**
+   * The gateway says the donor opened its payment page and left without paying (still "pending": they could come
+   * back). Only an old payment in this state is closed as failed, by the daily check (see confirm.ts).
+   */
+  abandoned?: boolean;
 };
 
 export type ChargeRequest = {
@@ -172,7 +177,15 @@ export interface PaymentGateway {
    * The payouts the gateway made into one charity's account since a day (yyyy-mm-dd), each with its lines:
    * the payments in it, each payment's fee, and anything taken back out (refunds, chargebacks).
    */
-  listPayouts(args: { charityId: string; charityAccountRef: string; since: string }): Promise<Payout[]>;
+  listPayouts(args: {
+    charityId: string;
+    charityAccountRef: string;
+    since: string;
+    /** Payouts (by `ref`) already kept as final: left out without reading their lines again. */
+    skipRefs?: ReadonlySet<string>;
+    /** Don't start reading another payout after this time (epoch ms); what was read in full is still returned. */
+    deadline?: number;
+  }): Promise<Payout[]>;
   /**
    * Optional: check a charity's bank account with the bank (is it open, does it take payments in, is it in the
    * charity's name). A gateway without it simply shows "not checked".
@@ -192,13 +205,29 @@ export class GatewayError extends Error {
   readonly said: string | null;
   /** True when the gateway could not be reached at all (network failure or timeout). */
   readonly unreachable: boolean;
-  constructor(message: string, opts: { notFound?: boolean; refused?: boolean; said?: string | null; unreachable?: boolean } = {}) {
+  /**
+   * True only when the gateway's answer says the card itself was declined or can no longer be charged (a refusal
+   * whose words the adapter recognises). A refusal for any other reason (a field it didn't like, a split it
+   * couldn't make) is our problem or the gateway's, never the donor's card: it is not a decline.
+   */
+  readonly declined: boolean;
+  constructor(message: string, opts: { notFound?: boolean; refused?: boolean; said?: string | null; unreachable?: boolean; declined?: boolean } = {}) {
     super(message);
     this.notFound = opts.notFound ?? false;
     this.refused = opts.refused ?? false;
     this.said = opts.said ?? null;
     this.unreachable = opts.unreachable ?? false;
+    this.declined = (opts.declined ?? false) && this.refused;
   }
+}
+
+/**
+ * The gateway answered that the card was declined (or can't be charged again). Only this counts as a declined
+ * monthly collection: any other error (an outage, a request it refused for another reason) never tells a donor
+ * their card was declined, never stops a monthly donation and never drops a saved card.
+ */
+export function isGatewayDecline(e: unknown): boolean {
+  return e instanceof GatewayError && e.declined;
 }
 
 /** The gateway answered and said no, as opposed to never receiving the request or being unreachable. */

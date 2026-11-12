@@ -5,7 +5,8 @@ import { confirmPayment } from "./confirm";
 import { loadDonatableCharity } from "./charity";
 import { getEmailTransport } from "@/lib/email";
 import { getGateway } from "@/lib/gateway";
-import { isGatewayNotFound, isGatewayRefusal } from "@/lib/gateway/types";
+import { isGatewayDecline, isGatewayNotFound } from "@/lib/gateway/types";
+import { logAudit } from "@/lib/audit";
 import { platformConfig } from "@/config/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMonthlyCharges, type DueMonthly, type MonthlyDeps, type MonthlyStore, type MonthlySummary } from "./monthly-job";
@@ -241,7 +242,11 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
     },
     confirm: confirmPayment,
     isNotFound: isGatewayNotFound,
-    isRefused: isGatewayRefusal,
+    // Only an answer that says the card was declined: any other error is never told to the donor as a decline.
+    isDeclined: isGatewayDecline,
+    async audit(action, recurringId, details) {
+      await logAudit({ actorUserId: null, action, entityType: "recurring_donation", entityId: recurringId, details });
+    },
     async charityState(slug) {
       return { accepting: Boolean((await loadDonatableCharity(slug))?.acceptingPayments) };
     },
