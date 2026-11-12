@@ -4,7 +4,7 @@
  * run), then a day later, then three days after that. After three more tries it stops and Givezy is told once.
  * Pure rules, no database: the daily job (./retry) applies them.
  */
-import { EmailError } from "./index";
+import { EmailMaybeSent } from "./index";
 
 /** The emails tried again. Marketing-type sends (appeals, journeys, thank-yous) have their own handling. */
 export const RETRY_KINDS = ["donation_confirmation", "s18a_receipt", "monthly_declined"] as const;
@@ -69,14 +69,14 @@ export function tooOld(createdAt: Date, now: Date): boolean {
 }
 
 /**
- * A send that threw: may it still have gone? Only a refusal from the email service (EmailError: it answered and said
- * no, or the set-up is wrong) is sure not to have sent anything. A time limit, an abort, a dropped connection (fetch's
- * "fetch failed"), or anything else that went wrong around the send may have come after the provider accepted it, so
- * it counts as "may have gone": never sent again by itself, flagged for a person. The same rule as the journeys'
- * (review 12/11/2026), so every sender treats an unclear send the same way.
+ * A send that threw: may it still have gone? Only when the transport says so (EmailMaybeSent: the request was on its
+ * way to the provider when the connection dropped or the time limit fired). Those are never sent again by
+ * themselves and are flagged for a person. Everything else (a database read before the send, a missing setting, the
+ * provider refusing) is sure not to have sent anything, so it is an ordinary failure and is tried again
+ * (review 12/11/2026). The same rule for every sender.
  */
 export function wasCutOff(e: unknown): boolean {
-  return !(e instanceof EmailError);
+  return e instanceof EmailMaybeSent;
 }
 
 /** The same rule, by the name the marketing-type senders use. */

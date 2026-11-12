@@ -7,7 +7,8 @@ import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
 import { s18aDetailsMissing, type S18aDetailsRow } from "./s18a-details";
 import { NOT_REUSABLE } from "./recurring";
-import { markRetryGone, recordFailedEmail } from "@/lib/email/retry";
+import { alreadyHandled, markRetryGone, markRetryUnknown, recordFailedEmail } from "@/lib/email/retry";
+import { wasCutOff } from "@/lib/email/retry-plan";
 
 /**
  * Called once, when a donation is confirmed paid (by the webhook or the
@@ -17,6 +18,11 @@ import { markRetryGone, recordFailedEmail } from "@/lib/email/retry";
 export async function notifyDonationPaid(donationId: string, opts: { monthly?: "activated" | "not_reusable" | "none" } = {}) {
   // Sent (or nothing to send): the note that it is owed (see oweDonorConfirmation) is closed, so it never goes twice.
   // Failed: the note stays, and the daily job tries again.
+  // Already sent by the daily job's try again (or left as "may have gone" for a person): never a second copy.
+  if (await alreadyHandled("donation_confirmation", donationId)) {
+    await notifyCharityOfDonation(donationId);
+    return;
+  }
   if (await sendDonorConfirmation(donationId, opts)) await markRetryGone("donation_confirmation", donationId);
   await notifyCharityOfDonation(donationId);
 }
@@ -66,7 +72,9 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
       entityId: donationId,
       details: { message: e instanceof Error ? e.message : String(e) },
     }).catch((err) => console.error("[notify] could not record the failed email", err));
-    await recordFailedEmail("donation_confirmation", donationId, { error: e });
+    // Cut off mid-send: it may have reached the donor, so it is never sent again by itself (a person checks it).
+    if (wasCutOff(e)) await markRetryUnknown("donation_confirmation", donationId, e);
+    else await recordFailedEmail("donation_confirmation", donationId, { error: e });
     return false;
   }
 }

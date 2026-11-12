@@ -131,7 +131,7 @@ const sent: { to: string; text: string }[] = [];
 const audits: { action: string; details?: Record<string, unknown> }[] = [];
 let failSend = false;
 let dropSend = false;
-const { RefusedError } = vi.hoisted(() => ({ RefusedError: class RefusedError extends Error {} }));
+const { RefusedError, MaybeSentError } = vi.hoisted(() => ({ RefusedError: class RefusedError extends Error {}, MaybeSentError: class EmailMaybeSent extends Error {} }));
 /** Claims of the week that go through before the database "goes down" (Infinity: never). */
 let claimsBeforeOutage = Infinity;
 const records: { kind: string; details: Record<string, unknown> }[] = [];
@@ -139,11 +139,12 @@ vi.mock("@/lib/charity/charity-actions", () => ({ recordAction: async (_c: strin
 vi.mock("@/lib/audit", () => ({ logAudit: async (e: { action: string; details?: Record<string, unknown> }) => void audits.push(e) }));
 vi.mock("@/lib/email", () => ({
   EmailError: RefusedError,
+  EmailMaybeSent: MaybeSentError,
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string }) => {
       // A refusal from the email service (sure not to have gone), or a dropped connection (may have gone).
       if (failSend) throw new RefusedError("refused");
-      if (dropSend) throw new TypeError("fetch failed");
+      if (dropSend) throw new MaybeSentError("fetch failed");
       sent.push(m);
       return "sent";
     },

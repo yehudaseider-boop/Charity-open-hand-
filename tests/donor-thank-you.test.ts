@@ -43,7 +43,7 @@ let stopped = false;
 let claimed = false;
 let failSend = false;
 let dropSend = false;
-const { RefusedError } = vi.hoisted(() => ({ RefusedError: class RefusedError extends Error {} }));
+const { RefusedError, MaybeSentError } = vi.hoisted(() => ({ RefusedError: class RefusedError extends Error {}, MaybeSentError: class EmailMaybeSent extends Error {} }));
 let skipSend = false;
 let released = 0;
 let recordedOnly = false;
@@ -52,11 +52,12 @@ let appealThisWeek = false;
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/email", () => ({
   EmailError: RefusedError,
+  EmailMaybeSent: MaybeSentError,
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string; replyTo?: string }) => {
       // A refusal from the email service (sure not to have gone), or a dropped connection (may have gone).
       if (failSend) throw new RefusedError("refused");
-      if (dropSend) throw new TypeError("fetch failed");
+      if (dropSend) throw new MaybeSentError("fetch failed");
       if (skipSend) return "skipped";
       sent.push(m);
       return "sent";

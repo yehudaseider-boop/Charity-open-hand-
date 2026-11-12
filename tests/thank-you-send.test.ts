@@ -22,11 +22,13 @@ vi.mock("@/lib/charity/weekly-limit", () => ({
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 /** Addresses whose send throws as a dropped connection would. */
 let dropFor = new Set<string>();
+const { MaybeSent } = vi.hoisted(() => ({ MaybeSent: class EmailMaybeSent extends Error {} }));
 vi.mock("@/lib/email", () => ({
   EmailError: class EmailError extends Error {},
+  EmailMaybeSent: MaybeSent,
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string }) => {
-      if (dropFor.has(m.to)) throw new TypeError("fetch failed");
+      if (dropFor.has(m.to)) throw new MaybeSent("fetch failed");
       return (sent.push(m), "sent");
     },
   }),

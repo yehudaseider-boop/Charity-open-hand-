@@ -126,12 +126,14 @@ vi.mock("@/lib/charity/dashboard-queries", () => ({ loadDonors: async () => dono
 vi.mock("@/lib/charity/donor-care", () => ({ lapsedDaysFor: async () => 365, listSegments: async () => [], listTags: async () => [], tagsByDonor: async () => new Map() }));
 vi.mock("@/lib/email", () => {
   class EmailError extends Error {}
+  class EmailMaybeSent extends Error {}
   return {
     EmailError,
+    EmailMaybeSent,
     getEmailTransport: () => ({
       name: "resend",
       send: async (m: { to: string; subject: string }) => {
-        if (dropFor.has(m.to.toLowerCase())) throw new TypeError("fetch failed");
+        if (dropFor.has(m.to.toLowerCase())) throw new EmailMaybeSent("fetch failed");
         sent.push({ to: m.to, subject: m.subject });
         return "sent";
       },

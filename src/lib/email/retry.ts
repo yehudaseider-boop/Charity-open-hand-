@@ -246,3 +246,44 @@ export async function markRetryGone(kind: RetryKind, refId: string, now = new Da
     console.error(`[email] could not close an older ${kind} email`, e);
   }
 }
+
+/**
+ * Has this email already been dealt with through the list (sent by a try again, closed because it went another way,
+ * left as "may have gone" for a person, or skipped on purpose), or is a run sending it right now? Then a direct send
+ * (a webhook or a later check finishing a gift) must not send it again: one email per gift (review 12/11/2026).
+ * A failure to read the list, or no list yet, says no: an email sent twice is better than one never sent.
+ */
+export async function alreadyHandled(kind: RetryKind, refId: string, now = new Date()): Promise<boolean> {
+  try {
+    const { data, error } = await createAdminClient().from("email_retries").select("status, claimed_at").eq("kind", kind).eq("ref_id", refId).maybeSingle();
+    if (error || !data) return false;
+    return retryRowSettled(data as { status: string; claimed_at: string | null }, now);
+  } catch {
+    return false;
+  }
+}
+
+/** The rule behind alreadyHandled, on one row: settled, or claimed by a run in the last CLAIM_MINUTES. */
+export function retryRowSettled(row: { status: string; claimed_at: string | null }, now: Date): boolean {
+  if (row.status === "sent" || row.status === "gone" || row.status === "unknown" || row.status === "skipped") return true;
+  if (row.status === "waiting" && row.claimed_at) return now.getTime() - new Date(row.claimed_at).getTime() < CLAIM_MINUTES * 60_000;
+  return false;
+}
+
+/**
+ * A direct send that may have gone (cut off mid-send): note it as "may have gone", so the daily job never sends it
+ * again by itself and a person checks it. Creates the row if there isn't one. Never throws.
+ */
+export async function markRetryUnknown(kind: RetryKind, refId: string, error: unknown, now = new Date()): Promise<void> {
+  try {
+    const { error: dbError } = await createAdminClient()
+      .from("email_retries")
+      .upsert(
+        { kind, ref_id: refId, payload: {}, tries: 1, status: "unknown", next_try_at: now.toISOString(), claimed_at: null, last_error: safeErrorText(error), updated_at: now.toISOString() },
+        { onConflict: "kind,ref_id" },
+      );
+    if (dbError && !isMissingTable(dbError)) console.error(`[email] could not note a ${kind} email that may have gone: ${dbError.message}`);
+  } catch (e) {
+    console.error(`[email] could not note a ${kind} email that may have gone`, e);
+  }
+}
