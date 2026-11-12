@@ -1,6 +1,7 @@
 "use client";
 
 import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
+import { giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
 import { startTransition, useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useFormDraft } from "@/components/forms/use-form-draft";
 import { FormStateProvider } from "@/components/forms/action-form";
@@ -141,6 +142,7 @@ export function DonateFlow({
     },
     { ok: false } as CheckoutState,
   );
+  const slowGive = useSlowAfter(pending, SLOW_AFTER_MS);
   const [donorType, setDonorType] = useState<"individual" | "company" | "trust">("individual");
   const [want18a, setWant18a] = useState(false);
   // Take the gift first, the s18A details after (decided 04/11/2026). With a saved ID number, "now" is one tap less.
@@ -540,10 +542,15 @@ export function DonateFlow({
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
 
-        <button disabled={pending || !ready} className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy disabled:opacity-60">
-          {pending ? "Opening the secure payment page…" : !ready ? "Loading…" : total ? (monthly && !campaign ? `Give ${total} every month` : `Give ${total}`) : "Give"}
+        <button
+          disabled={pending || !ready}
+          aria-busy={pending}
+          className={`pressable relative w-full overflow-hidden rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy ${pending ? "" : "disabled:opacity-60"}`}
+        >
+          {pending ? <span aria-hidden className="give-sweep" /> : null}
+          <span className="relative">{giveButtonLabel({ pending, slow: slowGive, ready, total, monthly: monthly && !campaign })}</span>
         </button>
-        {pending ? <p role="status" className="text-center text-sm text-muted">Starting your payment. Nothing is charged until you confirm on the payment page.</p> : null}
+        {pending ? <p role="status" className="text-center text-sm text-muted">{giveWaitingLine(slowGive)}</p> : null}
         {state.message && !pending ? (
           <div role="alert" className="space-y-1 rounded-control border-2 border-danger-soft p-4 text-sm">
             <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{state.message}</span></p>
@@ -614,6 +621,20 @@ function Dedicate({ error }: { error?: string }) {
       {showError ? <p id={errorId} role="alert" className="text-xs font-semibold text-danger">{error}</p> : null}
     </fieldset>
   );
+}
+
+/** True once a pending gift has been waiting longer than usual: the button then says so instead of pretending to progress. */
+function useSlowAfter(active: boolean, ms: number): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const id = setTimeout(() => setSlow(true), ms);
+    return () => {
+      clearTimeout(id);
+      setSlow(false);
+    };
+  }, [active, ms]);
+  return active && slow;
 }
 
 /** The first thing to fix after Give: a field marked invalid, or a message that stands in for one (the saved ID number has no box). */

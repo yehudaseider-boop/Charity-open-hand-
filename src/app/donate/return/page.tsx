@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SupportContact } from "@/components/legal";
 import { KeepChecking } from "./keep-checking";
+import { PaidPing } from "@/components/paid-ping";
 import { confirmPayment, savedOutcome } from "@/lib/donations/confirm";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
@@ -19,7 +20,6 @@ import { SOURCE_PARAM, tagOf } from "@/lib/donations/source";
 import { getViewer } from "@/lib/auth";
 import { impactLine, impactSource, impactUnitFrom } from "@/lib/charity/impact";
 import { cardUpdateFor, newCardPath } from "@/lib/donations/new-card";
-import { Splash } from "@/components/splash";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { ClearFormDraft } from "@/components/forms/use-form-draft";
 import { currentFocus } from "@/lib/focus-server";
@@ -301,7 +301,7 @@ function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wa
     <section className="relative mx-auto mt-2 max-w-xl overflow-hidden rounded-[2rem] border-2 border-border bg-surface p-6 shadow-[0_24px_48px_rgba(9,37,119,0.08)] sm:mt-6 sm:p-9">
       {tone === "paid" ? <ConfettiBurst /> : null}
       {tone === "paid" ? (
-        <Splash className="pop-in relative mb-4 h-auto w-28 sm:w-32" />
+        <PaidPing />
       ) : tone === "wait" ? (
         <span aria-hidden className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-honey-soft">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="stroke-brand">

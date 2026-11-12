@@ -320,6 +320,24 @@ body:has([data-chrome="landing"]) .chrome-full {
   border-radius: 0.875rem;
 }
 
+/* The Give button while the gift is being secured: a soft lighter band slides across it, over and over. Still, and
+   not shown at all, for anyone who asks their device for less motion (the words carry the state). */
+@keyframes give-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(260%); }
+}
+.give-sweep {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.5), transparent);
+  animation: give-sweep 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .give-sweep { display: none; }
+}
+
 /* Cards answer a press with a small dip, so a tap feels felt. */
 .lift:active {
   transform: translateY(-2px) scale(0.99);
@@ -345,14 +363,39 @@ body:has([data-chrome="landing"]) .chrome-full {
   animation: confetti-fall 2.2s cubic-bezier(0.25, 0.6, 0.4, 1) both;
 }
 
+/* The ping for a confirmed gift: the tick pops onto the picture's corner just after the picture, then the logo's three
+   drops fly out once. Still tick, no drops, for anyone who asks their device for less motion. */
+@keyframes tick-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.tick-pop {
+  animation: tick-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 300ms both;
+}
+@keyframes drop-fly {
+  0% { transform: translate(-50%, -50%) scale(0.3) rotate(0deg); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--rot)); opacity: 0; }
+}
+.drop-fly {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  opacity: 0;
+  animation: drop-fly 1000ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--delay, 400ms) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-enter,
   .site-header,
   .skeleton,
-  .pop-in {
+  .pop-in,
+  .tick-pop {
     animation: none;
   }
-  .confetti-piece {
+  .confetti-piece,
+  .drop-fly {
     display: none;
   }
 }
