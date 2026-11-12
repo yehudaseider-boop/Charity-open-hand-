@@ -68,9 +68,13 @@ export function sentProofMatches(email: string, proof: unknown, now = Date.now()
   return want.length === got.length && timingSafeEqual(want, got);
 }
 
-/** The "Check your email" page for this address, with its proof (no address at all when there is no key). */
-export function sentPageUrl(email: string, next: string, extra: Record<string, string> = {}): string {
-  const proof = sentProof(email);
+/**
+ * The "Check your email" page for this address, with its proof (no address at all when there is no key). A new proof
+ * is made only when an email was really sent; anywhere else pass `keepProof`, the one the page already had, and the
+ * address is kept only if that still matches (so the code form can't be used to get a proof for any address).
+ */
+export function sentPageUrl(email: string, next: string, extra: Record<string, string> = {}, keepProof?: unknown): string {
+  const proof = keepProof === undefined ? sentProof(email) : sentProofMatches(email, keepProof) ? String(keepProof) : null;
   const q = new URLSearchParams({ sent: "1", ...extra, next, ...(proof ? { email, s: proof } : {}) });
   return `/login?${q.toString()}`;
 }

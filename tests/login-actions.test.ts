@@ -57,7 +57,7 @@ async function whereTo(p: Promise<unknown>): Promise<string> {
   throw new Error("no redirect");
 }
 const askLink = (email: string, extra: Record<string, string> = {}) => whereTo(sendLoginLink(form({ email, next: "/account", ...extra })));
-const tryCode = (email: string, code = "123456") => whereTo(verifyLoginCode(form({ email, code, next: "/account" })));
+const tryCode = (email: string, code = "123456", s?: string) => whereTo(verifyLoginCode(form({ email, code, next: "/account", s: s ?? sentProof(email) ?? "" })));
 
 beforeEach(() => {
   events.length = 0;
@@ -119,10 +119,20 @@ describe("typing the code", () => {
     expect(await tryCode("dana@example.com")).toContain("error=tries");
   });
 
-  it("a wrong code goes back to the code box for the same address, with a fresh proof", async () => {
-    const url = new URL(await tryCode("dana@example.com"), "https://x.test");
+  it("a wrong code goes back to the code box for the same address, keeping the page's proof", async () => {
+    const proof = sentProof("dana@example.com")!;
+    const url = new URL(await tryCode("dana@example.com", "123456", proof), "https://x.test");
     expect(url.searchParams.get("error")).toBe("code");
-    expect(sentProofMatches("dana@example.com", url.searchParams.get("s"))).toBe(true);
+    expect(url.searchParams.get("s")).toBe(proof);
+  });
+
+  it("never hands out a proof for an address it didn't send to", async () => {
+    const url = new URL(await tryCode("someone@example.com", "123456", "made-up"), "https://x.test");
+    expect(url.searchParams.get("error")).toBe("code");
+    expect(url.searchParams.has("email")).toBe(false);
+    expect(url.searchParams.has("s")).toBe(false);
+    const bad = new URL(await tryCode("someone@example.com", "not-a-code", sentProof("dana@example.com")!), "https://x.test");
+    expect(bad.searchParams.has("s")).toBe(false);
   });
 });
 

@@ -80,7 +80,9 @@ export async function verifyLoginCode(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const code = String(formData.get("code") ?? "").replace(/\s/g, "");
   const next = safeNext(formData.get("next"));
-  const back = (error: "code" | "tries") => sentPageUrl(email, next, { error });
+  // Back to the code box: the address stays only with the proof the page already had (never a new one from here).
+  const proof = String(formData.get("s") ?? "");
+  const back = (error: "code" | "tries") => sentPageUrl(email, next, { error }, proof);
   if (email.length > 254 || !looksLikeEmail(email) || !/^\d{6,10}$/.test(code)) redirect(back("code"));
   const keys = signInKeys(email, clientIp(await headers()));
   let limited: boolean;

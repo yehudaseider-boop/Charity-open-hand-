@@ -56,6 +56,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           {email ? (
             <form action={verifyLoginCode} className="space-y-3">
               <input type="hidden" name="email" value={email} />
+              <input type="hidden" name="s" value={typeof params.s === "string" ? params.s : ""} />
               <input type="hidden" name="next" value={next} />
               <label className="block text-sm font-medium" htmlFor="code">Code from the email</label>
               <input
