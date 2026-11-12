@@ -9,6 +9,7 @@ import { retryReceiptEmail } from "@/lib/receipts/email-retry";
 import { auditRetry, recordFailedConfirmations, runEmailRetries, supabaseRetryStore, type RetryHandler, type RetrySummary } from "@/lib/email/retry";
 import { emailIsOn, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
 import { heldLabel } from "./held";
+import { formatRand } from "@/lib/money";
 
 /**
  * The daily safety net, run after the monthly collection. It never charges anyone and never decides a
@@ -26,7 +27,7 @@ import type { PayoutSyncSummary } from "@/lib/donations/payouts";
  * the next call (tomorrow's job, or the hourly one once the host allows it).
  */
 export async function collectMonthlyWithin(run: (deadline: number) => Promise<MonthlySummary>, budgetMs: number, now: () => number = Date.now): Promise<MonthlySummary & { runs: number }> {
-  const total: MonthlySummary & { runs: number } = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [], errors: [], runs: 0 };
+  const total: MonthlySummary & { runs: number } = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [], waitingOnProvider: [], errors: [], runs: 0 };
   const started = now();
   // Each run stops starting new donations at the deadline it is given, so a run can't go past the budget by much.
   while (total.runs === 0 || now() - started < budgetMs - 5_000) {
@@ -41,6 +42,7 @@ export async function collectMonthlyWithin(run: (deadline: number) => Promise<Mo
     total.waiting.push(...s.waiting);
     total.review.push(...s.review);
     total.unconfirmed!.push(...(s.unconfirmed ?? []));
+    total.waitingOnProvider!.push(...(s.waitingOnProvider ?? []));
     total.errors.push(...s.errors);
     // Stop when a run found nothing due, did nothing useful (rows that only error or wait would come back every run), or ran out of time.
     const progress = s.paid + s.failed + s.stopped + s.alreadyPaid + s.review.length;
@@ -278,6 +280,8 @@ export type JobProblems = {
   monthlyErrors: number;
   monthlyReview: number;
   monthlyStopped: number;
+  /** Monthly donations held: a try still pending at the payment provider after 48 hours (listed every day until settled). */
+  monthlyWaitingOnProvider?: { totalCents: number; charityName: string }[];
   payoutsFailed: boolean;
   monthlyFailed: boolean;
 };
@@ -309,12 +313,19 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   if (c.incomplete) lines.push("The daily checks ran out of time and stopped early. The rest is checked tomorrow.");
   if (jobs.monthlyErrors) lines.push(`Monthly collection: ${n(jobs.monthlyErrors, "monthly donation", "monthly donations")} could not be handled (see the job log).`);
   if (jobs.monthlyReview) lines.push(`Monthly collection: ${n(jobs.monthlyReview, "payment", "payments")} came back with a different amount and wait for a person.`);
+  for (const w of jobs.monthlyWaitingOnProvider ?? []) {
+    lines.push(`Monthly collection: still waiting for the payment provider about ${formatRand(w.totalCents)} for ${w.charityName}. Nothing more will be charged until it's settled.`);
+  }
   if (jobs.monthlyStopped) lines.push(`${n(jobs.monthlyStopped, "monthly donation", "monthly donations")} stopped after three declined tries. The donors were emailed a link to put in a new card.`);
   if (jobs.payoutsFailed) lines.push("The deposit report could not be updated today. It tries again tomorrow.");
   if (c.stuckPending) lines.push(`${n(c.stuckPending, "payment has", "payments have")} been pending for more than 3 days.`);
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
   if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));
   if (c.confirmations.failedAgain) lines.push(`${n(c.confirmations.failedAgain, "confirmation email", "confirmation emails")} to donors still could not be sent.`);
-  for (const [action, count] of Object.entries(c.held)) lines.push(`${heldLabel[action] ?? action}: ${count}`);
+  for (const [action, count] of Object.entries(c.held)) {
+    // Listed above, one line each with the amount and charity, every day until settled.
+    if (action === "monthly.waiting_on_provider") continue;
+    lines.push(`${heldLabel[action] ?? action}: ${count}`);
+  }
   return lines;
 }

@@ -35,7 +35,7 @@ vi.mock("@/lib/ops/daily", async (orig) => {
 });
 
 const { GET } = await import("@/app/api/jobs/daily/route");
-const { collectMonthlyWithin, payoutsAlertLines } = await import("@/lib/ops/daily");
+const { collectMonthlyWithin, dailyDigest, payoutsAlertLines } = await import("@/lib/ops/daily");
 const call = () => GET(new Request("https://x.test/api/jobs/daily") as never);
 
 beforeEach(() => {
@@ -90,9 +90,23 @@ describe("monthly runs added up", () => {
     const total = await collectMonthlyWithin(async () => {
       n += 1;
       return n === 1
-        ? { considered: 1, paid: 0, failed: 1, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [{ id: "r1", donationId: "d1", why: "pending_too_long" as const }], errors: [] }
+        ? { considered: 1, paid: 0, failed: 1, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [{ id: "r1", donationId: "d1", why: "closed_unpaid" as const }], errors: [] }
         : { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [] };
     }, 30_000);
-    expect(total.unconfirmed).toEqual([{ id: "r1", donationId: "d1", why: "pending_too_long" }]);
+    expect(total.unconfirmed).toEqual([{ id: "r1", donationId: "d1", why: "closed_unpaid" }]);
+  });
+});
+
+describe("monthly donations held for the payment provider, in the daily email", () => {
+  const quiet = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+  const fine = { monthlyErrors: 0, monthlyReview: 0, monthlyStopped: 0, payoutsFailed: false, monthlyFailed: false };
+
+  it("names the amount and the charity, and says nothing more is charged, once a line each, every day", () => {
+    const lines = dailyDigest({ ...quiet, held: { "monthly.waiting_on_provider": 1 } }, { ...fine, monthlyWaitingOnProvider: [{ totalCents: 20_000, charityName: "Meals Fund" }] });
+    expect(lines).toEqual(["Monthly collection: still waiting for the payment provider about R200 for Meals Fund. Nothing more will be charged until it's settled."]);
+  });
+
+  it("a month paid twice is a line for a person", () => {
+    expect(dailyDigest({ ...quiet, held: { "monthly.paid_twice": 1 } }, fine)).toEqual(["A monthly donation was paid twice for one month: refund one of the two payments: 1"]);
   });
 });

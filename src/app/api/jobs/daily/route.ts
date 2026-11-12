@@ -42,6 +42,7 @@ async function handle(request: NextRequest) {
     monthlyErrors: monthly?.errors.length ?? 0,
     monthlyReview: monthly?.review.length ?? 0,
     monthlyStopped: monthly?.stopped ?? 0,
+    monthlyWaitingOnProvider: monthly?.waitingOnProvider ?? [],
     // Read after this email (below), with its own short email when it has a problem.
     payoutsFailed: false,
   });
@@ -75,7 +76,7 @@ async function handle(request: NextRequest) {
   const counts = (a: unknown[]) => a.length;
   return NextResponse.json(
     {
-      monthly: monthly && { ...monthly, waiting: counts(monthly.waiting), review: counts(monthly.review), unconfirmed: counts(monthly.unconfirmed ?? []), errors: counts(monthly.errors) },
+      monthly: monthly && { ...monthly, waiting: counts(monthly.waiting), review: counts(monthly.review), unconfirmed: counts(monthly.unconfirmed ?? []), waitingOnProvider: counts(monthly.waitingOnProvider ?? []), errors: counts(monthly.errors) },
       payouts: payouts && { ...payouts, failed: counts(payouts.failed) },
       checks,
       journeys,

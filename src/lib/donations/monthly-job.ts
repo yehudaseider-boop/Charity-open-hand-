@@ -58,7 +58,11 @@ export type MonthlyDeps = {
   deadline?: number;
   store: MonthlyStore;
   charge(req: { reference: string; r: DueMonthly; totalCents: number }): Promise<void>;
-  confirm(reference: string): Promise<ConfirmOutcome>;
+  /**
+   * Ask the gateway about a try and record the answer. With `closeUnpaidBefore`, a try made before then that the
+   * gateway says was abandoned or never received is closed as failed and comes back as "closed_unpaid".
+   */
+  confirm(reference: string, opts?: { closeUnpaidBefore?: Date }): Promise<CollectionOutcome>;
   /** Whether an error from `confirm` means the gateway has no record of the payment at all. */
   isNotFound(e: unknown): boolean;
   /**
@@ -75,8 +79,11 @@ export type MonthlyDeps = {
   limit?: number;
 };
 
+/** A try's outcome: the payment check's, or closed here as unpaid (abandoned, or never received, after 48 hours). */
+export type CollectionOutcome = ConfirmOutcome | "closed_unpaid";
+
 /** Audit actions the monthly job writes; each is a held item for a person (see ops/held.ts). */
-export type MonthlyAuditAction = "monthly.charge_error" | "monthly.try_unconfirmed";
+export type MonthlyAuditAction = "monthly.charge_error" | "monthly.try_unconfirmed" | "monthly.waiting_on_provider";
 
 export type MonthlySummary = {
   considered: number;
@@ -91,17 +98,25 @@ export type MonthlySummary = {
   /** The gateway took a payment that does not match what was asked: held for a person to look at, not charged again. */
   review: { id: string; donationId: string }[];
   /**
-   * Tries counted as failed without the provider saying the card was declined: pending at the provider for more
-   * than 48 hours, or marked failed here and unknown to the provider. The donor is not emailed (we can't say
-   * "declined"), the card is kept, and the last such try of a month moves on to next month instead of stopping.
+   * Tries counted as failed without the provider saying the card was declined: abandoned or never received at the
+   * provider after 48 hours, or marked failed here and unknown to the provider. The donor is not emailed (we can't
+   * say "declined"), the card is kept, and the last such try of a month moves on to next month instead of stopping.
    */
-  unconfirmed?: { id: string; donationId: string; why: "pending_too_long" | "never_received" }[];
+  unconfirmed?: { id: string; donationId: string; why: "closed_unpaid" | "never_received" }[];
+  /**
+   * Held: a try the provider has still called pending for more than 48 hours. Nothing more is charged for that
+   * monthly donation until the provider settles it (it is asked again every run); a person is told.
+   */
+  waitingOnProvider?: { id: string; donationId: string; totalCents: number; charityName: string }[];
   errors: { id: string; message: string }[];
 };
 
 /** An attempt the gateway still has no record of after this long is taken to have died before the charge was sent. */
 const STUCK_AFTER_MS = 20 * 60_000;
-/** An attempt the gateway still calls pending after this long is counted as a failed try (never as a declined card). */
+/**
+ * An attempt the gateway still calls pending after this long needs a person: the monthly donation is held (never a
+ * new try that month: the old one could still go through, and charging twice is worse than missing a month).
+ */
 export const PENDING_TIMEOUT_MS = 48 * 3_600_000;
 
 /**
@@ -117,34 +132,41 @@ export function collectingPeriod(r: Pick<DueMonthly, "attemptPeriod" | "lastPaid
   return candidate >= addMonths(current, -1) && candidate <= current ? candidate : current;
 }
 
-/** What this month's earlier attempts came to, asked fresh: any paid, any still unsettled, or all turned down. */
-async function earlierAttemptsOutcome(id: string, period: string, attempt: number, deps: MonthlyDeps): Promise<"paid" | "unsettled" | "failed"> {
-  let unsettled = false;
+/**
+ * What this month's earlier attempts came to, asked fresh: any paid, any still unsettled (the oldest of them), or all
+ * turned down. An old one the provider says was abandoned or never received is closed as unpaid (it can't be charged).
+ */
+async function earlierAttemptsOutcome(
+  id: string,
+  period: string,
+  attempt: number,
+  deps: MonthlyDeps,
+): Promise<{ kind: "paid" } | { kind: "failed" } | { kind: "unsettled"; donationId: string; createdAt: Date }> {
+  let unsettled: { kind: "unsettled"; donationId: string; createdAt: Date } | null = null;
   for (let n = 0; n < attempt; n++) {
     const earlierId = attemptDonationId(id, period, n);
     const saved = await deps.store.attemptStatus(earlierId);
     if (saved === null) continue;
-    if (saved.status === "paid") return "paid";
-    let outcome: ConfirmOutcome;
+    if (saved.status === "paid") return { kind: "paid" };
+    let outcome: CollectionOutcome;
     try {
-      outcome = await deps.confirm(earlierId);
+      outcome = await deps.confirm(earlierId, { closeUnpaidBefore: new Date(deps.now.getTime() - PENDING_TIMEOUT_MS) });
     } catch (e) {
       // The provider never heard of it: nothing was charged by that attempt.
       if (deps.isNotFound(e)) continue;
       throw e;
     }
-    if (outcome === "paid") return "paid";
-    // Still pending at the provider after 48 hours: that try was already counted as failed (see below), so it
-    // no longer holds this month's next try. If it goes through after all, the payment check still records it.
-    const timedOut = outcome === "pending" && deps.now.getTime() - saved.createdAt.getTime() > PENDING_TIMEOUT_MS;
-    if (outcome !== "failed" && outcome !== "not_found" && !timedOut) unsettled = true;
+    if (outcome === "paid") return { kind: "paid" };
+    if (outcome !== "failed" && outcome !== "not_found" && outcome !== "closed_unpaid" && unsettled === null) {
+      unsettled = { kind: "unsettled", donationId: earlierId, createdAt: saved.createdAt };
+    }
   }
-  return unsettled ? "unsettled" : "failed";
+  return unsettled ?? { kind: "failed" };
 }
 
 export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySummary> {
   const { store, now } = deps;
-  const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [], errors: [] };
+  const summary: MonthlySummary = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [], waitingOnProvider: [], errors: [] };
   const audit = (action: MonthlyAuditAction, id: string, details: Record<string, unknown>) =>
     deps.audit?.(action, id, details).catch((e) => console.error(`[monthly] could not write ${action} to the audit log`, e));
 
@@ -184,18 +206,28 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       const donationId = attemptDonationId(r.id, period, attempt);
       const totalCents = r.amountCents + r.contributionCents + (r.cardChargeCents ?? 0);
       const existing = await store.attemptStatus(donationId);
+      // A try the provider has called pending for more than 48 hours holds this monthly donation: nothing more is
+      // charged until the provider settles it (the old try could still go through; a missed month is the lesser
+      // harm). The donor is not emailed and the card is kept. It is asked about again on every run.
+      const hold = async (heldId: string) => {
+        summary.waitingOnProvider!.push({ id: r.id, donationId: heldId, totalCents, charityName: r.charityName });
+        await audit("monthly.waiting_on_provider", r.id, { donationId: heldId, totalCents, charityName: r.charityName });
+      };
+      const oldEnough = (createdAt: Date) => now.getTime() - createdAt.getTime() > PENDING_TIMEOUT_MS;
+      const closeUnpaidBefore = new Date(now.getTime() - PENDING_TIMEOUT_MS);
       // Before a retry, ask about this month's earlier attempts: one that was turned down may have gone
       // through after all (a late webhook, the provider finishing it). Then this month is paid, and a new
       // attempt would charge the donor twice. One still unsettled holds the retry until it is.
       if (existing === null && attempt > 0) {
         const earlier = await earlierAttemptsOutcome(r.id, period, attempt, deps);
-        if (earlier === "paid") {
+        if (earlier.kind === "paid") {
           await store.recordPaid(r.id, period, next);
           summary.paid += 1;
           continue;
         }
-        if (earlier === "unsettled") {
-          summary.waiting.push({ id: r.id, reason: "an earlier attempt this month is not settled yet" });
+        if (earlier.kind === "unsettled") {
+          if (oldEnough(earlier.createdAt)) await hold(earlier.donationId);
+          else summary.waiting.push({ id: r.id, reason: "an earlier attempt this month is not settled yet" });
           continue;
         }
       }
@@ -223,7 +255,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       // told their card was declined and the card is kept. The last try of a month waits for next month instead of
       // stopping the monthly donation. The attempt is marked failed here; if the provider later says it was paid,
       // the payment check still records it (failed can become paid).
-      const countUnconfirmed = async (why: "pending_too_long" | "never_received") => {
+      const countUnconfirmed = async (why: "closed_unpaid" | "never_received") => {
         await store.failAttempt(donationId);
         const failedAttempts = attempt + 1;
         await store.recordFailure(r.id, period, failedAttempts, retryTime(now, failedAttempts) ?? next);
@@ -248,16 +280,16 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
 
       // After a refusal, ask the gateway what it recorded (this also marks the attempt failed); a refusal
       // it has no transaction for is still a failed attempt.
-      const settle = async (): Promise<ConfirmOutcome> => {
-        if (!refused) return deps.confirm(donationId);
+      const settle = async (): Promise<CollectionOutcome> => {
+        if (!refused) return deps.confirm(donationId, { closeUnpaidBefore });
         try {
-          return await deps.confirm(donationId);
+          return await deps.confirm(donationId, { closeUnpaidBefore });
         } catch (e) {
           if (deps.isNotFound(e)) return "failed";
           throw e;
         }
       };
-      let outcome: ConfirmOutcome;
+      let outcome: CollectionOutcome;
       try {
         outcome = await settle();
       } catch (e) {
@@ -296,10 +328,12 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         // (Admin, Payments), and the next collection is next month's.
         await store.reschedule(r.id, next);
         summary.review.push({ id: r.id, donationId });
-      } else if (outcome === "pending" && existing !== null && now.getTime() - existing.createdAt.getTime() > PENDING_TIMEOUT_MS) {
-        // Still pending at the provider 48 hours after it was sent: a failed try for this month, never a declined
-        // card (the provider didn't say so). Listed for a person in the daily email.
-        await countUnconfirmed("pending_too_long");
+      } else if (outcome === "closed_unpaid") {
+        // Over 48 hours old and the provider says it was abandoned or never received: nothing can come of it, so the
+        // try is counted and the normal retry follows (no "declined" email: the provider didn't say declined).
+        await countUnconfirmed("closed_unpaid");
+      } else if (outcome === "pending" && existing !== null && oldEnough(existing.createdAt)) {
+        await hold(donationId);
       } else {
         summary.waiting.push({ id: r.id, reason: `payment ${outcome}` });
       }

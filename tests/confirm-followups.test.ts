@@ -12,6 +12,7 @@ type Row = { id: string; status: string; gateway: string; total_charged_cents: n
 let donation: Row;
 let audits: { action: string; entityId?: string | null; details?: unknown }[];
 let recurring: { id: string; first_donation_id: string }[];
+let otherGifts: { id: string; status: string }[] = [];
 const events: string[] = [];
 const verify = vi.fn();
 
@@ -40,7 +41,7 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (table: string) => {
       const filters: [string, unknown][] = [];
       const matches = (r: Record<string, unknown>) => filters.every(([c, v]) => (Array.isArray(v) ? v.includes(r[c]) : r[c] === v));
-      const rows = (): Record<string, unknown>[] => (table === "donations" ? [donation] : table === "audit_log" ? audits.map((a) => ({ id: "a", action: a.action, entity_id: a.entityId })) : table === "recurring_donations" ? recurring : []);
+      const rows = (): Record<string, unknown>[] => (table === "donations" ? [donation, ...otherGifts] : table === "audit_log" ? audits.map((a) => ({ id: "a", action: a.action, entity_id: a.entityId })) : table === "recurring_donations" ? recurring : []);
       let patch: Partial<Row> | null = null;
       const q = {
         select: () => q,
@@ -53,7 +54,7 @@ vi.mock("@/lib/supabase/admin", () => ({
           if (patch && table === "donations" && matches(donation as unknown as Record<string, unknown>)) {
             Object.assign(donation, patch);
             resolve({ data: [{ id: donation.id }], error: null });
-          } else resolve({ data: [], error: null });
+          } else resolve({ data: patch ? [] : rows().filter(matches), error: null });
         },
       };
       return q;
@@ -63,6 +64,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 const { confirmPayment } = await import("@/lib/donations/confirm");
 const { GatewayError } = await import("@/lib/gateway/types");
+const schedule = await import("@/lib/donations/schedule");
 const REF = "11111111-1111-1111-1111-111111111111";
 const NOW = new Date("2026-11-12T08:00:00Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
@@ -72,6 +74,7 @@ beforeEach(() => {
   donation = { id: REF, status: "pending", gateway: "test", total_charged_cents: 20_000, recurring_id: null, created_at: hoursAgo(1), gateway_ref: REF };
   audits = [];
   recurring = [];
+  otherGifts = [];
   events.length = 0;
   verify.mockReset();
 });
@@ -165,5 +168,56 @@ describe("old checkouts the donor never paid (daily check only)", () => {
     verify.mockResolvedValue({ status: "success", amountCents: 20_000, currency: "ZAR", paidAt: "2026-11-12T07:00:00Z" });
     expect(await confirmPayment(REF)).toBe("paid");
     expect(donation.status).toBe("paid");
+  });
+});
+
+describe("monthly collection tries", () => {
+  const { attemptDonationId } = schedule;
+  const second = attemptDonationId("rec1", "2026-11", 1);
+  const first = attemptDonationId("rec1", "2026-11", 0);
+  const paidTx = { status: "success", amountCents: 20_000, currency: "ZAR", paidAt: "2026-11-12T07:00:00Z" };
+  beforeEach(() => {
+    donation = { ...donation, id: second, gateway_ref: second, recurring_id: "rec1", created_at: "2026-11-16T06:30:00Z" };
+    recurring = [{ id: "rec1", first_donation_id: "the-first-gift" }];
+  });
+
+  it("two tries for the same month both paid are flagged once for a person (no automatic refund)", async () => {
+    otherGifts = [{ id: first, status: "paid" }];
+    verify.mockResolvedValue(paidTx);
+    expect(await confirmPayment(second)).toBe("paid");
+    const flagged = audits.filter((a) => a.action === "monthly.paid_twice");
+    expect(flagged).toEqual([expect.objectContaining({ entityId: second, details: { recurring: "rec1", period: "2026-11", alsoPaid: [first] } })]);
+    // Asked again later: still one row.
+    donation.status = "pending";
+    await confirmPayment(second);
+    expect(audits.filter((a) => a.action === "monthly.paid_twice")).toHaveLength(1);
+  });
+
+  it("one paid try in a month is not flagged", async () => {
+    otherGifts = [{ id: first, status: "failed" }];
+    verify.mockResolvedValue(paidTx);
+    expect(await confirmPayment(second)).toBe("paid");
+    expect(audits.filter((a) => a.action === "monthly.paid_twice")).toEqual([]);
+  });
+
+  it("the monthly job may close an old try the provider says was abandoned, and is told it closed it", async () => {
+    donation.created_at = "2026-11-10T06:30:00Z";
+    verify.mockResolvedValue({ status: "pending", abandoned: true, amountCents: 20_000, currency: "ZAR" });
+    const closed: string[] = [];
+    expect(await confirmPayment(second, { closeAbandonedBefore, includeCollections: true, onClosed: (w) => closed.push(w) })).toBe("failed");
+    expect(closed).toEqual(["abandoned"]);
+  });
+
+  it("the daily check never closes a collection try (only the monthly job does)", async () => {
+    donation.created_at = "2026-11-10T06:30:00Z";
+    verify.mockResolvedValue({ status: "pending", abandoned: true, amountCents: 20_000, currency: "ZAR" });
+    expect(await confirmPayment(second, { closeAbandonedBefore })).toBe("pending");
+    expect(donation.status).toBe("pending");
+  });
+
+  it("a try the provider still calls pending (not abandoned) is never closed", async () => {
+    donation.created_at = "2026-11-10T06:30:00Z";
+    verify.mockResolvedValue({ status: "pending", abandoned: false, amountCents: 20_000, currency: "ZAR" });
+    expect(await confirmPayment(second, { closeAbandonedBefore, includeCollections: true })).toBe("pending");
   });
 });

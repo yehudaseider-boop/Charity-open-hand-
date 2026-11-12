@@ -240,11 +240,30 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
         description: `Monthly donation to ${r.charityName}`,
       });
     },
-    confirm: confirmPayment,
+    async confirm(reference, opts) {
+      let closed = false;
+      const outcome = await confirmPayment(reference, {
+        closeAbandonedBefore: opts?.closeUnpaidBefore,
+        includeCollections: true,
+        onClosed: () => {
+          closed = true;
+        },
+      });
+      return closed ? "closed_unpaid" : outcome;
+    },
     isNotFound: isGatewayNotFound,
     // Only an answer that says the card was declined: any other error is never told to the donor as a decline.
     isDeclined: isGatewayDecline,
     async audit(action, recurringId, details) {
+      if (action === "monthly.waiting_on_provider") {
+        // One row per held try (Admin, Payments), however many runs find it still waiting; the daily email lists it every day.
+        const donationId = String(details.donationId);
+        const db = createAdminClient();
+        const { data, error } = await db.from("audit_log").select("id").eq("action", action).eq("entity_id", donationId).limit(1);
+        if (!error && (data ?? []).length) return;
+        await logAudit({ actorUserId: null, action, entityType: "donation", entityId: donationId, details: { ...details, recurring: recurringId } });
+        return;
+      }
       await logAudit({ actorUserId: null, action, entityType: "recurring_donation", entityId: recurringId, details });
     },
     async charityState(slug) {
