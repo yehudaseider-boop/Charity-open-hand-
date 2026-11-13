@@ -156,7 +156,14 @@ export default function Give() {
   // What was typed, else the account's address (which may arrive after this screen opened from a link).
   const [emailTyped, setEmail] = useState<string | null>(null);
   const email = emailTyped ?? account.email ?? "";
-  const [remember, setRemember] = useState(false);
+  const [remember, setRememberState] = useState(false);
+  // Once the donor has set the switch themselves, the default never changes it again.
+  const rememberTouched = useRef(false);
+  const setRemember = (v: boolean) => setRememberState(v);
+  const chooseRemember = (v: boolean) => {
+    rememberTouched.current = true;
+    setRememberState(v);
+  };
   const [remembered, setRemembered] = useState<RememberedDetails | null>(null);
   const [editingDetails, setEditingDetails] = useState(false);
   const [want18a, setWant18a] = useState(false);
@@ -295,6 +302,8 @@ export default function Give() {
   // Remembered details, once we know who is signed in (never the signed-out copy for a signed-in person). When the
   // person changes (sign-out on this screen) and has none of their own, the last person's details are taken off again.
   const accountKnown = account.status !== "loading";
+  // Signed in (or the design preview, which stands for a signed-in donor): remembering is on unless switched off.
+  const rememberByDefault = account.status === "signed-in" || preview;
   const filledFrom = useRef<RememberedDetails | null>(null);
   useEffect(() => {
     if (!accountKnown) return;
@@ -302,6 +311,10 @@ export default function Give() {
     loadDetails(account.userId).then((d) => {
       if (!live) return;
       if (!d) {
+        // Nothing remembered yet: on by default for a signed-in donor (13/11/2026, Yehuda: "should be already
+        // ticked"), so the next gift is quicker; they can switch it off. Never for someone not signed in: on a
+        // shared phone the next person would find their name and email.
+        if (!rememberTouched.current) setRemember(rememberByDefault);
         const was = filledFrom.current;
         if (!was) return;
         filledFrom.current = null;
@@ -322,7 +335,7 @@ export default function Give() {
     return () => {
       live = false;
     };
-  }, [account.userId, accountKnown]);
+  }, [account.userId, accountKnown, rememberByDefault]);
 
   const { accessToken } = account;
   useEffect(() => {
@@ -1091,11 +1104,12 @@ export default function Give() {
               <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
               <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
               <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={err("email")} helper="Your confirmation is sent here." />
+              <SwitchRow label="Remember my details on this phone" description="Your name and email, so next time you don't type them. Never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
             </View>
           ) : (
             <View style={styles.giver} onLayout={at("details")}>
               <View style={{ flex: 1 }}>
-                <Text variant="label">Giving as</Text>
+                <Text variant="label">Giving as · remembered on this phone</Text>
                 <Text style={styles.giverName} numberOfLines={1}>{first} {last}</Text>
                 <Text variant="label" numberOfLines={1}>{email}</Text>
               </View>
@@ -1172,6 +1186,19 @@ export default function Give() {
             </View>
           ) : null}
 
+          {/* Save my card, where the donor sees it (13/11/2026). Off until they turn it on: it is their agreement that
+              the card may be charged when they tap Give, so it is never chosen for them. */}
+          {offerSave ? (
+            <View style={styles.softCard}>
+              <SwitchRow
+                label="Save my card for next time"
+                description="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
+                value={saveCard}
+                onChange={setSaveCard}
+              />
+            </View>
+          ) : null}
+
           {/* Everything optional lives here, closed by default, so a first gift is: amount, name, email, Give. */}
           <View style={styles.more} onLayout={at("more")}>
             <Pressable
@@ -1193,11 +1220,6 @@ export default function Give() {
             <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
 
 
-                {showDetailFields ? (
-                  <>
-                    <SwitchRow label="Remember my details on this phone" description="Your name and email, so next time you don't type them. Never your ID number." value={remember} onChange={setRemember} />
-                  </>
-                ) : null}
             <SwitchRow
               label="Give anonymously"
               description={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
@@ -1251,14 +1273,7 @@ export default function Give() {
             ) : null}
 
 
-                {offerSave ? (
-                  <SwitchRow
-                    label="Save my card for next time"
-                    description="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
-                    value={saveCard}
-                    onChange={setSaveCard}
-                  />
-                ) : null}
+
               </View>
             ) : null}
           </View>
