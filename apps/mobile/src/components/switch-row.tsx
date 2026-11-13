@@ -1,29 +1,56 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { colors, fonts, touch } from "@/theme/tokens";
 import { haptic } from "@/lib/haptics";
 import { Text } from "./text";
 
-/** A setting that is on or off, with one line explaining it. */
-export function SwitchRow({ label, description, value, onChange }: { label: string; description?: string; value: boolean; onChange: (v: boolean) => void }) {
+/**
+ * A setting that is on or off, with one short line explaining it. The full explanation, when there is one, sits
+ * behind a small "More" tap (13/11/2026, Yehuda: "too much writing ... short, and then they can read more"), so
+ * nothing is lost but the screen stays light. A screen reader reads the full text with the switch.
+ */
+export function SwitchRow({ label, description, more, value, onChange }: { label: string; description?: string; more?: string; value: boolean; onChange: (v: boolean) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      accessibilityLabel={label}
-      onPress={() => {
-        haptic.tap();
-        onChange(!value);
-      }}
-      style={styles.row}
-    >
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={styles.label}>{label}</Text>
-        {description ? <Text variant="bodyMuted" style={{ fontSize: 16, lineHeight: 22 }}>{description}</Text> : null}
-      </View>
-      <View style={[styles.track, value && styles.trackOn]}>
-        <View style={[styles.knob, value && styles.knobOn]} />
-      </View>
-    </Pressable>
+    <View style={{ gap: 2 }}>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: value }}
+        accessibilityLabel={label}
+        accessibilityHint={more ? `${description ?? ""} ${more}`.trim() : undefined}
+        onPress={() => {
+          haptic.tap();
+          onChange(!value);
+        }}
+        style={styles.row}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={styles.label}>{label}</Text>
+          {description ? <Text variant="bodyMuted" style={{ fontSize: 16, lineHeight: 22 }}>{description}</Text> : null}
+        </View>
+        <View style={[styles.track, value && styles.trackOn]}>
+          <View style={[styles.knob, value && styles.knobOn]} />
+        </View>
+      </Pressable>
+      {more ? (
+        <View style={{ paddingRight: 66, gap: 4 }}>
+          {open ? <Text variant="bodyMuted" style={{ fontSize: 15, lineHeight: 21 }}>{more}</Text> : null}
+          <Pressable
+            onPress={() => {
+              haptic.tap();
+              setOpen((o) => !o);
+            }}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            accessibilityLabel={`${open ? "Hide" : "More about"} ${label}`}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 20 }}
+            style={styles.moreTap}
+          >
+            <Text style={styles.moreText}>{open ? "Less" : "More"}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -53,6 +80,8 @@ const styles = StyleSheet.create({
   trackOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.muted },
   knobOn: { alignSelf: "flex-end", backgroundColor: colors.surface },
+  moreTap: { alignSelf: "flex-start", minHeight: 28, justifyContent: "center" },
+  moreText: { fontFamily: fonts.bodySemibold, fontSize: 15, lineHeight: 20, color: colors.blue, textDecorationLine: "underline" },
   checkRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: touch - 8, paddingVertical: 4 },
   box: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.muted, alignItems: "center", justifyContent: "center", marginTop: 1 },
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },

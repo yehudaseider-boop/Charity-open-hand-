@@ -1104,7 +1104,7 @@ export default function Give() {
               <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
               <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
               <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={err("email")} helper="Your confirmation is sent here." />
-              <SwitchRow label="Remember my details on this phone" description="Your name and email, so next time you don't type them. Never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
+              <SwitchRow label="Remember my details" description="So you don't type them next time." more="Your name and email are kept on this phone only, never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
             </View>
           ) : (
             <View style={styles.giver} onLayout={at("details")}>
@@ -1191,8 +1191,9 @@ export default function Give() {
           {offerSave ? (
             <View style={styles.softCard}>
               <SwitchRow
-                label="Save my card for next time"
-                description="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
+                label="Save my card"
+                description="Charged only when you tap Give."
+                more="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
                 value={saveCard}
                 onChange={setSaveCard}
               />
@@ -1222,13 +1223,15 @@ export default function Give() {
 
             <SwitchRow
               label="Give anonymously"
-              description={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
+              description="Hide your name on public pages."
+              more={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
               value={anonymous}
               onChange={setAnonymous}
             />
             <SwitchRow
               label={`No news or appeals from ${charity.nameEn}`}
-              description={`${charity.nameEn} can email you news and appeals through Givezy, at most 4 a month. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
+              description="Turn on to stop their emails."
+              more={`${charity.nameEn} can email you news and appeals through Givezy, at most 4 a month. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
               value={noNews}
               onChange={setNoNews}
             />
@@ -1248,7 +1251,8 @@ export default function Give() {
             {/* Optional: in honour of, or in memory of, someone. */}
             <SwitchRow
               label="Dedicate this donation"
-              description="In honour of, or in memory of, someone. The charity sees the name; it is not on your s18A receipt."
+              description="In honour or in memory of someone."
+              more="The charity sees the name; it is not on your s18A receipt."
               value={dedicating}
               onChange={(v) => {
                 setDedicating(v);
