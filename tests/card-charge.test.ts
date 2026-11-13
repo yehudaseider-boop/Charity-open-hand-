@@ -44,8 +44,15 @@ describe("whether the box shows", () => {
     expect(cardChargeRates({ ...base, gatewayRatesIncludeVat: null }, "15")).toBeNull();
     expect(cardChargeRates({ ...base, gatewayChargePaidBy: "givezy" }, "15")).toBeNull();
   });
-  it("stays hidden today: the provider's rates have not been supplied yet", () => {
-    expect(cardChargeRates()).toBeNull();
+  it("shows with the provider's local card rate, 2.9% + R1 plus VAT, covering the gift only (13/11/2026)", async () => {
+    const r = cardChargeRates();
+    expect(r).toEqual({ percentPpm: 29_000, fixedCents: 100, vatOnTopPpm: 150_000, coverGiftOnly: true });
+    // The real test payment of 12/11/2026: R510 charged R18.16 by the provider.
+    const { providerCharge, cardChargeToCover } = await import("@/lib/fees");
+    expect(providerCharge(51_000, r!)).toBe(1_816);
+    // Covering a R100 gift adds R4.64, and the provider's charge on R104.64 is exactly that, so the charity gets R100.
+    expect(cardChargeToCover(10_000, r!)).toBe(464);
+    expect(providerCharge(10_464, r!)).toBe(464);
   });
 });
 

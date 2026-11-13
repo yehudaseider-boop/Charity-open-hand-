@@ -29,11 +29,15 @@ export const platformConfig = {
      * the gateway's rates below are filled in.
      */
     gatewayChargePaidBy: "each" as "charity" | "givezy" | "each" | null,
-    /** The gateway's charge, from its rate sheet. Empty until Yehuda supplies it. */
-    gatewayPercent: null as string | null,
-    gatewayFixedCents: null as number | null,
-    /** Do the rates above already include VAT? Also from the rate sheet. */
-    gatewayRatesIncludeVat: null as boolean | null,
+    /**
+     * The gateway's charge: South African local cards, 2.9% + R1 excluding VAT (Paystack support's answer of
+     * 13/11/2026; Yehuda chose the local rate, 13/11/2026: "Yes"). International cards cost 3.1% + R1, so covering
+     * one falls a little short (about 0.2% of the gift). VAT at 15% is added on top of the charge.
+     */
+    gatewayPercent: "2.9" as string | null,
+    gatewayFixedCents: 100 as number | null,
+    /** The rates above exclude VAT (Paystack, 13/11/2026). */
+    gatewayRatesIncludeVat: false as boolean | null,
   },
 
   /** Minimum donation to a charity. Confirmed: R30. */

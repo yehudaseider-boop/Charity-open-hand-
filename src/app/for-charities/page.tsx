@@ -271,7 +271,8 @@ export default function ForCharitiesPage() {
         picture={<Illustration name="workingTogether" sparkle="stars" className="mx-auto w-full max-w-[22rem]" />}
       />
 
-      {/* What you'll need, and the two ways to join (no fee claims until fees are settled, 11/11/2026). */}
+      {/* What you'll need, and the two ways to join. The cost line (13/11/2026, Yehuda: yes): a monthly fee, no cut;
+          no amount, which is agreed with each charity. */}
       <Reveal as="section" id="needs" className="mx-auto max-w-[75rem] scroll-mt-24 px-4 py-14 sm:px-6 md:py-20">
         <div className="grid gap-5 md:grid-cols-2">
           <div className="flex flex-col gap-5 rounded-[2rem] bg-honey-soft p-7 sm:p-10">
@@ -279,6 +280,7 @@ export default function ForCharitiesPage() {
             <ul className="flex flex-col gap-3 text-[16px]">
               {needs.map((n) => <li key={n} className="flex gap-3"><Tick />{n}</li>)}
             </ul>
+            <p className="border-t border-border pt-4 text-[16px]"><strong>What it costs:</strong> a simple monthly fee, with no cut from your donations.</p>
           </div>
           <div className="relative isolate flex flex-col gap-6 overflow-hidden rounded-[2rem] bg-navy p-7 text-white sm:p-10">
             <span aria-hidden className="pointer-events-none absolute -right-12 -top-12 -z-10 h-40 w-40 rounded-full border-[18px] border-white/10" />
