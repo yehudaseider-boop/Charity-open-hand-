@@ -28,10 +28,12 @@ export const ERASE_KEPT_TEXT =
  * names, numbers and address the charity reports to SARS in its IT3(d) file). Either by their account, or, for a
  * donor who never had one, by the email address they gave with.
  *
- * Order matters: the database erasure is one step, the confirmation email follows (to the address
- * we read beforehand), and the sign-in account is deleted last (deleting it also
- * removes their open privacy request, so the audit log is the lasting record).
- * Safe to run again.
+ * Order matters: everything that finds the person by their donor records or address (charities' notes, tags,
+ * follow-ups, journeys, thank-yous, activity rows) is cleared first, and the database erasure, which removes that
+ * address and the link to their account, comes after (13/11/2026: done the other way round, an erasure that stopped
+ * part way could never be finished, since pressing again found nobody). The confirmation email follows (to the
+ * address read beforehand), and the sign-in account is deleted last (deleting it also removes their open privacy
+ * request, so the audit log is the lasting record). Safe to run again.
  */
 export async function eraseDonor(args: { userId?: string; email?: string; actorUserId: string }): Promise<EraseSummary> {
   const db = createAdminClient();
@@ -74,8 +76,6 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     }
   }
 
-  const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
-  if (error) throw new Error(`Could not erase: ${error.message}`);
   if (ids.size) {
     // What charities wrote or set about this person (notes, follow-ups, tags) goes with them.
     for (const table of ["charity_donor_notes", "charity_donor_reminders", "charity_donor_tags"] as const) {
@@ -104,7 +104,10 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     const theirGifts = await allPages((from) => db.from("donations").select("id").in("donor_id", [...ids]).order("id").range(from, from + 999));
     const giftIds = new Set(theirGifts.map((g) => g.id as string));
     if (giftIds.size) {
-      const recorded = await allPages((from) => db.from("charity_actions").select("id, details, undo").eq("kind", "gift_recorded").order("id").range(from, from + 999));
+      // Only the charities they gave to can have recorded a gift for them.
+      const recorded = theirCharities.size
+        ? await allPages((from) => db.from("charity_actions").select("id, details, undo").eq("kind", "gift_recorded").in("charity_id", [...theirCharities]).order("id").range(from, from + 999))
+        : [];
       for (const a of recorded) {
         const undone = ((a.undo ?? {}) as { donationIds?: unknown }).donationIds;
         if (Array.isArray(undone) && undone.some((d) => typeof d === "string" && giftIds.has(d))) {
@@ -122,7 +125,8 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     for (const a of certs) {
       const scrubbed = scrubCertificateDetails((a.details ?? {}) as Record<string, unknown>, theirNames);
       if (scrubbed) {
-        const { error: e } = await db.from("charity_actions").update({ details: scrubbed }).eq("id", a.id);
+        // The undo of an edited certificate holds the old and new name and address, so it goes too (13/11/2026).
+        const { error: e } = await db.from("charity_actions").update({ details: scrubbed, undo: null }).eq("id", a.id);
         if (e) throw new Error(`Could not erase: ${e.message}`);
       }
     }
@@ -147,6 +151,9 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       }
     }
   }
+  // Last of the database steps: their details, address and the link to their account (see the order above).
+  const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
+  if (error) throw new Error(`Could not erase: ${error.message}`);
   const c = (counts ?? {}) as Record<string, number>;
 
   const summary: EraseSummary = {

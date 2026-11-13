@@ -355,3 +355,14 @@ describe("Givezy's daily email", () => {
     expect(lines[1]).toMatch(/could not run today/);
   });
 });
+
+describe("a first send that may have gone is never sent again by itself (13/11/2026)", () => {
+  // Both first sends hand a cut-off send to a person (markRetryUnknown), and only a refusal to the retry list.
+  it("the declined-card notice and the receipt run follow the rule", async () => {
+    const { readFileSync } = await import("node:fs");
+    const notice = readFileSync("src/lib/donations/monthly-store.ts", "utf8");
+    expect(notice).toMatch(/if \(wasCutOff\(e\)\) await markRetryUnknown\("monthly_declined", r\.id, e, now\);\s*else \{/);
+    const runs = readFileSync("src/lib/receipts/runs.ts", "utf8");
+    expect(runs).toContain('wasCutOff(e) ? markRetryUnknown("s18a_receipt", r.id, e) : recordFailedEmail("s18a_receipt"');
+  });
+});

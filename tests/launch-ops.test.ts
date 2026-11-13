@@ -47,6 +47,14 @@ describe("the daily safety-net email", () => {
     expect(dailyDigest({ ...quiet, incomplete: true }, { ...fine, monthlyCutOff: true }).join("\n")).toMatch(/monthly collection ran out of time[\s\S]*daily checks ran out of time/);
     expect(lines.join("\n")).not.toMatch(/!|—/);
   });
+  it("says when privacy requests are waiting, with the oldest date and nothing about who asked (13/11/2026)", () => {
+    expect(dailyDigest({ ...quiet, privacyRequests: { open: 0, oldestAt: null } }, fine)).toEqual([]);
+    expect(dailyDigest({ ...quiet, privacyRequests: { open: 1, oldestAt: "2026-11-12T22:30:00Z" } }, fine)).toEqual([
+      // 00:30 on the 13th in Johannesburg.
+      "1 privacy request is waiting for an answer (the oldest from 13/11/2026). See Admin, Privacy requests.",
+    ]);
+    expect(dailyDigest({ ...quiet, privacyRequests: { open: 3, oldestAt: "2026-11-01T08:00:00Z" } }, fine)[0]).toMatch(/^3 privacy requests are waiting/);
+  });
 });
 
 describe("the scheduler's key", () => {

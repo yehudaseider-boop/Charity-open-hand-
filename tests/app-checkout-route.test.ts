@@ -35,6 +35,9 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { g
 const limits: { bucket: string; keys: string[]; limit: number }[] = [];
 vi.mock("@/lib/rate-limit", () => ({
   hitRateLimit: async (bucket: string, keys: string[], limit: number) => (limits.push({ bucket, keys, limit }), false),
+  takeAttempt: async (bucket: string, keys: string[], limit: number) => (limits.push({ bucket, keys, limit }), { limited: false, ids: [] }),
+  forgetAttempts: async () => {},
+  clearOldAttempts: async () => {},
   rateLimitReached: async () => false,
   ipKeys: (ip: string) => [`ip:${ip}`],
   hashedKey: (kind: string, value: string) => `${kind}#${value}`,
@@ -128,13 +131,16 @@ describe("app checkout endpoint", () => {
     await call({ ...gift, giftCents: 100, shownTotalCents: 1_100, details });
     expect(limits).toHaveLength(0);
     await call({ ...gift, details });
-    expect(limits.map((l) => [l.bucket, l.limit])).toEqual([
-      ["checkout", 5],
-      ["checkout-ip", 60],
-      ["checkout-day", 20],
-      ["checkout-ip-day", 300],
-      ["checkout-charity", 60],
-    ]);
+    // Counted side by side (13/11/2026), so in no particular order.
+    expect(limits.map((l) => [l.bucket, l.limit]).sort()).toEqual(
+      [
+        ["checkout", 5],
+        ["checkout-ip", 60],
+        ["checkout-day", 20],
+        ["checkout-ip-day", 300],
+        ["checkout-charity", 60],
+      ].sort(),
+    );
   });
 
   it("fills in the saved ID number for the signed-in donor giving with their own email", async () => {

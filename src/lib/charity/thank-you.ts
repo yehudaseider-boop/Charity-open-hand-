@@ -71,6 +71,8 @@ export function oneDonorThankYouEmail(
     subject: `A thank-you from ${v.charityName}`,
     ...(v.replyTo ? { replyTo: v.replyTo } : {}),
     ...(v.oneClickUrl ? { headers: oneClickStopHeaders(v.oneClickUrl) } : {}),
+    // The charity's own words, in their own box headed with its name (13/11/2026): never links or Givezy's own cards.
+    quoted: { heading: v.charityName.replace(/\s+/g, " ").trim(), body: v.body, inText: v.body },
     text: [
       name ? `Dear ${name},` : "Hello,",
       "",
@@ -97,6 +99,8 @@ export function thankYouEmail(
     subject: `A thank-you from ${v.charityName}`,
     ...(v.replyTo ? { replyTo: v.replyTo } : {}),
     ...(v.oneClickUrl ? { headers: oneClickStopHeaders(v.oneClickUrl) } : {}),
+    // The charity's own words, in their own box (13/11/2026): never links or Givezy's own cards.
+    quoted: { heading: v.charityName.replace(/\s+/g, " ").trim(), body: v.body, inText: v.body },
     text: [
       name ? `Dear ${name},` : "Hello,",
       "",

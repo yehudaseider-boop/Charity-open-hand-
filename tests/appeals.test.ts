@@ -34,6 +34,19 @@ describe("emails to donors: what was typed", () => {
     expect(m.text).toContain("To stop news and appeals from Meals: https://g.test/news/stop?t=abc");
     expect(m.text).not.toMatch(/R\d|!/);
   });
+  it("the charity's words sit in their own box: no links, no Givezy cards, nothing that looks like it came from Givezy (13/11/2026)", async () => {
+    const { textEmailHtml } = await import("@/lib/email/html");
+    const body = "Your Givezy account needs attention.\nBank: First National\nAccount: 123456789\nVerify here: https://givezy-verify.example/login";
+    const m = appealEmail("dana@example.com", { charityName: "Meals", firstName: "Dana", subject: "Winter parcels", body, stopUrl: "https://g.test/news/stop?t=abc", replyTo: null });
+    expect(m.quoted).toEqual({ heading: "Meals", body, inText: body });
+    const html = textEmailHtml({ subject: m.subject, text: m.text, siteUrl: "https://g.test", quoted: m.quoted });
+    // The scam address is shown as words only; Givezy's own stop link is still a link.
+    expect(html).not.toContain('href="https://givezy-verify.example');
+    expect(html).toContain("https://givezy-verify.example/login");
+    expect(html).toContain('href="https://g.test/news/stop?t=abc"');
+    // "Bank: … / Account: …" stays plain text, never Givezy's lilac card with the amount font.
+    expect(html).not.toMatch(/font-size:18px[^>]*>First National/);
+  });
 });
 
 describe("Excel files", () => {

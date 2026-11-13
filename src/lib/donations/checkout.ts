@@ -240,108 +240,128 @@ export async function startDonation(args: {
     if (r.error) throw r.error;
   }
 
-  // Said no to news and appeals: kept before anything else, so it holds even if the payment never happens.
-  if (v.no_news === "on") await optOutAtCheckout(charity.id, v.email);
+  // Nothing below can have charged anyone: the card is only entered on the payment page, or charged after this.
+  // If something fails before then, the gift and its monthly record are closed at once (13/11/2026), so they never
+  // sit "pending" (a monthly one was never closed at all). Not for a saved-card attempt: the app asks about it again
+  // under the same id, and "failed" would read as a declined card.
+  const closeUnstarted = async () => {
+    const at = new Date().toISOString();
+    await Promise.all([
+      db.from("donations").update({ status: "failed", failed_at: at }).eq("id", donationId).eq("status", "pending"),
+      recurringId
+        ? db.from("recurring_donations").update({ status: "cancelled", cancelled_at: at, ended_reason: "the first payment could not be started" }).eq("id", recurringId).eq("status", "pending")
+        : null,
+    ]).catch((e) => console.error("[checkout] could not close a gift that never started", e));
+  };
 
-  const { error } = await db.from("donations").insert({
-    id: donationId,
-    donor_id: donorId,
-    charity_id: charity.id,
-    amount_cents: fees.amountCents,
-    contribution_cents: fees.contributionCents,
-    platform_fee_cents: 0,
-    fee_vat_cents: 0,
-    // The donor's cover for the card charge: it goes to the charity's line, and the provider takes its charge from there.
-    processing_charge_cents: fees.cardChargeCents,
-    total_charged_cents: fees.totalCents,
-    status: "pending",
-    gateway: gateway.name,
-    gateway_ref: donationId,
-    recurring_id: recurringId,
-    ...(campaign ? { campaign_id: campaign.id } : {}),
-    came_from: cameFromOf({ fromApp: args.fromApp, tag: args.sourceTag }),
-    wants_18a: want18a,
-    is_anonymous: v.is_anonymous === "on",
-    message: v.message ?? null,
-    // Only when there is one, so taking a donation keeps working even if this code goes live before the dedications database change (other screens do need it: run the database change first).
-    ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
-    popia_consent_at: now,
-    age_confirmed_at: now,
-  });
-  if (error) throw error;
+  let confirmationToken: string;
+  try {
+    // Said no to news and appeals: kept before anything else, so it holds even if the payment never happens.
+    if (v.no_news === "on") await optOutAtCheckout(charity.id, v.email);
 
-  // Everything below hangs off the gift saved above and doesn't depend on each other, so it is written side by side
-  // rather than in turn (12/11/2026: pressing Give took about 3 seconds before the payment page). Any failure still
-  // stops the gift before the payment page, as before.
-  const label = givingLabelOf(v);
-  const [confirmationToken] = await Promise.all([
-    // Sent only to the donor, in the address the gateway returns them to.
-    issueConfirmationToken(donationId),
-    // So a declined card reported later counts against whoever started this gift (card-testing protection).
-    rememberGiftStart(donationId, v.email, args.ip),
-    (async () => {
-      const details = await db.from("donation_checkout_details").insert({
-        donation_id: donationId,
-        donor_type: v.donor_type,
-        email: v.email,
-        first_name: v.first_name ?? null,
-        last_name: v.last_name ?? null,
-        organisation_name: v.organisation_name ?? null,
-        registration_number: v.registration_number ?? null,
-        contact_person: v.contact_person ?? null,
-        phone: v.phone ?? null,
-        // Only set when started by that account (signed in with this email): see saved-id.ts.
-        ...(startedBy ? { started_by_user: startedBy } : {}),
-        ...(detailsNow
-          ? {
-              receipt_identity: receiptIdentity({
-                donorType: v.donor_type,
-                idNumber: v.id_number,
-                taxReference: v.tax_reference,
-                registrationNumber: v.registration_number,
-              }),
-              id_number_encrypted: v.id_number ? encrypt(v.id_number.replace(/\s/g, "")) : null,
-              id_number_last4: v.id_number ? last4(v.id_number) : null,
-              tax_reference_encrypted: v.tax_reference ? encrypt(v.tax_reference) : null,
-              tax_reference_last4: v.tax_reference ? last4(v.tax_reference) : null,
-              address_line1: v.address_line1 ?? null,
-              address_line2: v.address_line2 ?? null,
-              suburb: v.suburb ?? null,
-              city: v.city ?? null,
-              postal_code: v.postal_code ?? null,
-            }
-          : {}),
-      });
-      if (details.error) throw details.error;
-    })(),
-    (async () => {
-      // What the donor agreed to, and which version of the Terms and Privacy Policy they saw.
-      const consent = await db.from("consents").insert({ kind: "donation", policy_version: legalConfig.policyVersion, donation_id: donationId });
-      if (consent.error) throw consent.error;
-    })(),
-    (async () => {
-      if (!recurringId) return;
-      // What the donor authorised: the same amount every month until they cancel.
-      const link = await db.from("recurring_donations").update({ first_donation_id: donationId }).eq("id", recurringId);
-      if (link.error) throw link.error;
-      const auth = await db.from("consents").insert({ kind: "monthly_authorisation", policy_version: legalConfig.policyVersion, donation_id: donationId });
-      if (auth.error) throw auth.error;
-    })(),
-    (async () => {
-      if (!args.saveCardFor) return;
-      // The donor ticked "Save my card": what they agreed to, and the card is kept once this payment is confirmed.
-      const keep = await db.from("consents").insert({ kind: "saved_card", policy_version: legalConfig.policyVersion, donation_id: donationId });
-      if (keep.error) throw keep.error;
-      await requestCardSave(donationId, args.saveCardFor.userId);
-    })(),
-    (async () => {
-      // The donor's own label for the gift, if they gave one. Kept in a table only the donor
-      // can read: charities never see it.
-      if (!label) return;
-      const kept = await db.from("donation_giving_kinds").insert({ donation_id: donationId, label });
-      if (kept.error) throw kept.error;
-    })(),
-  ]);
+    const { error } = await db.from("donations").insert({
+      id: donationId,
+      donor_id: donorId,
+      charity_id: charity.id,
+      amount_cents: fees.amountCents,
+      contribution_cents: fees.contributionCents,
+      platform_fee_cents: 0,
+      fee_vat_cents: 0,
+      // The donor's cover for the card charge: it goes to the charity's line, and the provider takes its charge from there.
+      processing_charge_cents: fees.cardChargeCents,
+      total_charged_cents: fees.totalCents,
+      status: "pending",
+      gateway: gateway.name,
+      gateway_ref: donationId,
+      recurring_id: recurringId,
+      ...(campaign ? { campaign_id: campaign.id } : {}),
+      came_from: cameFromOf({ fromApp: args.fromApp, tag: args.sourceTag }),
+      wants_18a: want18a,
+      is_anonymous: v.is_anonymous === "on",
+      message: v.message ?? null,
+      // Only when there is one, so taking a donation keeps working even if this code goes live before the dedications database change (other screens do need it: run the database change first).
+      ...(dedication ? { dedication_kind: dedication.kind, dedication_name: dedication.name } : {}),
+      popia_consent_at: now,
+      age_confirmed_at: now,
+    });
+    if (error) throw error;
+
+    // Everything below hangs off the gift saved above and doesn't depend on each other, so it is written side by side
+    // rather than in turn (12/11/2026: pressing Give took about 3 seconds before the payment page). Any failure still
+    // stops the gift before the payment page, as before.
+    const label = givingLabelOf(v);
+    [confirmationToken] = await Promise.all([
+      // Sent only to the donor, in the address the gateway returns them to.
+      issueConfirmationToken(donationId),
+      // So a declined card reported later counts against whoever started this gift (card-testing protection).
+      rememberGiftStart(donationId, v.email, args.ip),
+      (async () => {
+        const details = await db.from("donation_checkout_details").insert({
+          donation_id: donationId,
+          donor_type: v.donor_type,
+          email: v.email,
+          first_name: v.first_name ?? null,
+          last_name: v.last_name ?? null,
+          organisation_name: v.organisation_name ?? null,
+          registration_number: v.registration_number ?? null,
+          contact_person: v.contact_person ?? null,
+          phone: v.phone ?? null,
+          // Only set when started by that account (signed in with this email): see saved-id.ts.
+          ...(startedBy ? { started_by_user: startedBy } : {}),
+          ...(detailsNow
+            ? {
+                receipt_identity: receiptIdentity({
+                  donorType: v.donor_type,
+                  idNumber: v.id_number,
+                  taxReference: v.tax_reference,
+                  registrationNumber: v.registration_number,
+                }),
+                id_number_encrypted: v.id_number ? encrypt(v.id_number.replace(/\s/g, "")) : null,
+                id_number_last4: v.id_number ? last4(v.id_number) : null,
+                tax_reference_encrypted: v.tax_reference ? encrypt(v.tax_reference) : null,
+                tax_reference_last4: v.tax_reference ? last4(v.tax_reference) : null,
+                address_line1: v.address_line1 ?? null,
+                address_line2: v.address_line2 ?? null,
+                suburb: v.suburb ?? null,
+                city: v.city ?? null,
+                postal_code: v.postal_code ?? null,
+              }
+            : {}),
+        });
+        if (details.error) throw details.error;
+      })(),
+      (async () => {
+        // What the donor agreed to, and which version of the Terms and Privacy Policy they saw.
+        const consent = await db.from("consents").insert({ kind: "donation", policy_version: legalConfig.policyVersion, donation_id: donationId });
+        if (consent.error) throw consent.error;
+      })(),
+      (async () => {
+        if (!recurringId) return;
+        // What the donor authorised: the same amount every month until they cancel.
+        const link = await db.from("recurring_donations").update({ first_donation_id: donationId }).eq("id", recurringId);
+        if (link.error) throw link.error;
+        const auth = await db.from("consents").insert({ kind: "monthly_authorisation", policy_version: legalConfig.policyVersion, donation_id: donationId });
+        if (auth.error) throw auth.error;
+      })(),
+      (async () => {
+        if (!args.saveCardFor) return;
+        // The donor ticked "Save my card": what they agreed to, and the card is kept once this payment is confirmed.
+        const keep = await db.from("consents").insert({ kind: "saved_card", policy_version: legalConfig.policyVersion, donation_id: donationId });
+        if (keep.error) throw keep.error;
+        await requestCardSave(donationId, args.saveCardFor.userId);
+      })(),
+      (async () => {
+        // The donor's own label for the gift, if they gave one. Kept in a table only the donor
+        // can read: charities never see it.
+        if (!label) return;
+        const kept = await db.from("donation_giving_kinds").insert({ donation_id: donationId, label });
+        if (kept.error) throw kept.error;
+      })(),
+    ]);
+  } catch (e) {
+    if (!savedToken) await closeUnstarted();
+    throw e;
+  }
 
   if (savedToken) return chargeSavedCard({ donationId, savedToken, v, fees, charity, token: confirmationToken, resumed: false });
 
@@ -360,10 +380,7 @@ export async function startDonation(args: {
     });
     return { ok: true, redirectUrl, reference: donationId, token: confirmationToken };
   } catch (e) {
-    await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", donationId);
-    if (recurringId) {
-      await db.from("recurring_donations").update({ status: "cancelled", cancelled_at: new Date().toISOString(), ended_reason: "the first payment could not be started" }).eq("id", recurringId);
-    }
+    await closeUnstarted();
     if (e instanceof GatewayError) {
       console.error(e);
       return { ok: false, message: "We couldn't reach the payment provider, so nothing was charged. What you typed is still here. Please try again in a minute.", providerDown: true };

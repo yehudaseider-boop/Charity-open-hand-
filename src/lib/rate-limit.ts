@@ -80,10 +80,19 @@ export async function hitRateLimit(bucket: string, keys: string[], limit: number
         return count ?? 0;
       }),
     ),
-    // Emails and address stand-ins here are kept for about a day (Privacy Policy).
-    db.from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString()),
+    clearOldAttempts(),
   ]);
   return counts.some((count) => count > limit);
+}
+
+/** Emails and address stand-ins in the limits table are kept for about a day (Privacy Policy). Never throws. */
+export async function clearOldAttempts(): Promise<void> {
+  try {
+    const { error } = await createAdminClient().from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString());
+    if (error) console.error(`[rate-limit] could not clear old attempts: ${error.message}`);
+  } catch (e) {
+    console.error("[rate-limit] could not clear old attempts", e);
+  }
 }
 
 /**
@@ -116,12 +125,14 @@ export async function takeAttempt(bucket: string, keys: string[], limit: number,
   const { data, error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key }))).select("id");
   if (error) throw error;
   const ids = (data ?? []).map((r) => String(r.id));
-  for (const key of keys) {
-    const { count, error: countError } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
-    if (countError) throw countError;
-    if ((count ?? 0) > limit) return { limited: true, ids };
-  }
-  return { limited: false, ids };
+  const counts = await Promise.all(
+    keys.map(async (key) => {
+      const { count, error: countError } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
+      if (countError) throw countError;
+      return count ?? 0;
+    }),
+  );
+  return { limited: counts.some((count) => count > limit), ids };
 }
 
 /** Take back attempts counted with takeAttempt (a right code). Never throws: an attempt left counted only costs a try. */

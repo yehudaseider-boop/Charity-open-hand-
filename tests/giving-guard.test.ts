@@ -7,6 +7,9 @@ const calls: { fn: string; bucket: string; keys: string[]; limit: number; minute
 let over = new Set<string>();
 let reached = new Set<string>();
 let storeDown = false;
+// One bucket whose check fails (a brief database error), and the counted rows taken back after a refusal.
+let failing = new Set<string>();
+const forgotten: string[] = [];
 // Recent declines per stand-in key, for the read-only decline check.
 let declines: Record<string, number> = {};
 vi.mock("@/lib/rate-limit", () => ({
@@ -15,6 +18,14 @@ vi.mock("@/lib/rate-limit", () => ({
     calls.push({ fn: "hit", bucket, keys, limit, minutes });
     return over.has(bucket);
   },
+  // Each counted start is one row per key; its id names the bucket, so a test can see which were taken back.
+  takeAttempt: async (bucket: string, keys: string[], limit: number, minutes: number) => {
+    if (storeDown || failing.has(bucket)) throw new Error("store down");
+    calls.push({ fn: "hit", bucket, keys, limit, minutes });
+    return { limited: over.has(bucket), ids: keys.map((k) => `${bucket}|${k}`) };
+  },
+  forgetAttempts: async (ids: string[]) => void forgotten.push(...ids),
+  clearOldAttempts: async () => {},
   rateLimitReached: async (bucket: string, keys: string[], limit: number, minutes: number) => {
     if (storeDown) throw new Error("store down");
     calls.push({ fn: "reached", bucket, keys, limit, minutes });
@@ -83,6 +94,8 @@ beforeEach(() => {
   over = new Set();
   reached = new Set();
   storeDown = false;
+  failing = new Set();
+  forgotten.length = 0;
   declines = {};
   insertFails = false;
   startRows = [];
@@ -101,14 +114,15 @@ describe("checkGivingAllowed", () => {
     expect(calls.map((c) => [c.fn, c.bucket, c.limit, c.minutes])).toEqual([
       ["reached", "checkout-declined", 3, 60],
       ["reached", "checkout-declined", 30, 60],
+      ["hit", "checkout-charity", 60, 10],
       ["hit", "checkout", 5, 10],
       ["hit", "checkout-ip", 60, 10],
       ["hit", "checkout-day", 20, 1_440],
       ["hit", "checkout-ip-day", 300, 1_440],
-      ["hit", "checkout-charity", 60, 10],
     ]);
+    expect(forgotten).toEqual([]);
     // The email is compared without spaces or capitals; addresses only ever as stand-ins.
-    expect(calls[2].keys).toEqual(["email:donor@example.com"]);
+    expect(calls[3].keys).toEqual(["email:donor@example.com"]);
     expect(calls[0].keys).toEqual(["email#donor@example.com"]);
     expect(calls[1].keys).toEqual(["ip#196.1.2.3"]);
   });
@@ -182,6 +196,47 @@ describe("checkGivingAllowed", () => {
     expect(await checkGivingAllowed(start)).toBeNull();
     expect(err).toHaveBeenCalled();
     err.mockRestore();
+  });
+
+  it("a start refused by one limit stays counted only there and in the limits before it, never in the rush count (13/11/2026)", async () => {
+    // Over the 10-minute email limit: the day's email limit and both address limits don't count this press,
+    // so pressing on while told to wait can't turn the 10 minutes into a day.
+    over.add("checkout");
+    expect((await checkGivingAllowed(start))?.reason).toBe("email");
+    expect(forgotten.sort()).toEqual(
+      ["checkout-charity|charity:c1", "checkout-ip|ip#196.1.2.3", "checkout-day|email#donor@example.com", "checkout-ip-day|ip#196.1.2.3"].sort(),
+    );
+    // Refused by the address limit: the email limit before it keeps the press, as when they were checked in turn.
+    forgotten.length = 0;
+    over = new Set(["checkout-ip"]);
+    expect((await checkGivingAllowed(start))?.reason).toBe("address");
+    expect(forgotten.sort()).toEqual(["checkout-charity|charity:c1", "checkout-day|email#donor@example.com", "checkout-ip-day|ip#196.1.2.3"].sort());
+  });
+
+  it("when two limits are used up, the first in order answers, as before", async () => {
+    over = new Set(["checkout-ip-day", "checkout"]);
+    expect((await checkGivingAllowed(start))?.reason).toBe("email");
+    over = new Set(["checkout-ip-day", "checkout-day"]);
+    expect((await checkGivingAllowed(start))?.reason).toBe("email-day");
+  });
+
+  it("a limit that couldn't be checked never lets another limit's refusal through", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    failing = new Set(["checkout-charity", "checkout-ip"]);
+    over.add("checkout-day");
+    expect((await checkGivingAllowed(start))?.reason).toBe("email-day");
+    // With nothing used up, a failed check still lets the donor give (our outage never stops a donor), and says so.
+    over = new Set();
+    expect(await checkGivingAllowed(start)).toBeNull();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it("a refused start never raises the charity's rush alarm", async () => {
+    over = new Set(["checkout", "checkout-charity"]);
+    expect((await checkGivingAllowed(start))?.reason).toBe("email");
+    await runLater();
+    expect(alerts).toHaveLength(0);
   });
 
   it("with no known address, still limits the email", async () => {

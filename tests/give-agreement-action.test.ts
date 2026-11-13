@@ -46,7 +46,7 @@ const give = (fd: FormData) => submitDonation("meals", 25_000, 0, false, 25_000,
 describe("the single agreement tick", () => {
   it("on: the one tick sends both agreements to checkout", async () => {
     setSingle(true);
-    await expect(give(form({ agreement: "on" }))).rejects.toMatchObject({ url: "https://pay.test/x" });
+    await expect(give(form({ agreement: "on" }))).resolves.toEqual({ ok: true, redirectUrl: "https://pay.test/x" });
     expect(started[0]).toMatchObject({ age_confirmed: "on", popia_consent: "on" });
   });
   it("on, not ticked: one problem, on the one box, and nothing started", async () => {
@@ -59,14 +59,14 @@ describe("the single agreement tick", () => {
   });
   it("off: the two ticks as before; the single box alone is not enough", async () => {
     setSingle(false);
-    await expect(give(form({ age_confirmed: "on", popia_consent: "on" }))).rejects.toMatchObject({ url: "https://pay.test/x" });
+    await expect(give(form({ age_confirmed: "on", popia_consent: "on" }))).resolves.toEqual({ ok: true, redirectUrl: "https://pay.test/x" });
     expect(started[0]).toMatchObject({ age_confirmed: "on", popia_consent: "on" });
     const r = await give(form({ agreement: "on" }));
     expect(Object.keys(r.fieldErrors ?? {}).sort()).toEqual(["age_confirmed", "popia_consent"]);
     expect(started).toHaveLength(1);
   });
   it("after paying: an s18A gift starts without the ID number and address", async () => {
-    await expect(give(form({ agreement: "on", wants_18a: "on", s18a_when: "later" }))).rejects.toMatchObject({ url: "https://pay.test/x" });
+    await expect(give(form({ agreement: "on", wants_18a: "on", s18a_when: "later" }))).resolves.toEqual({ ok: true, redirectUrl: "https://pay.test/x" });
     expect(started[0]).toMatchObject({ wants_18a: "on", s18a_when: "later" });
     expect(started[0].id_number).toBeUndefined();
   });

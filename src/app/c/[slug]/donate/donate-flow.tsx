@@ -1,7 +1,7 @@
 "use client";
 
 import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
-import { giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
+import { GIVE_GAVE_UP_MESSAGE, GIVE_GIVE_UP_MS, giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
 import { startTransition, useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useFormDraft } from "@/components/forms/use-form-draft";
 import { FormStateProvider } from "@/components/forms/action-form";
@@ -66,7 +66,7 @@ const centsToInput = (c: number) => (c % 100 ? `${Math.floor(c / 100)}.${String(
 /**
  * A dropped connection or a server error at Give stays on this page, with everything typed kept, and says plainly
  * that nothing was charged (the card is only ever entered on the payment page, so nothing can be charged before it
- * opens). Next's own redirect to the payment page still goes through.
+ * opens). Next's own errors (a redirect, a not-found) still go through.
  */
 function offlineOrDown(e: unknown): { ok: false; message: string } {
   const digest = (e as { digest?: unknown } | null)?.digest;
@@ -143,6 +143,29 @@ export function DonateFlow({
     { ok: false } as CheckoutState,
   );
   const slowGive = useSlowAfter(pending, SLOW_AFTER_MS);
+  // Never wait for ever (13/11/2026): an answer lost on a weak connection would keep the form busy until the browser
+  // gives up, which can be minutes. After GIVE_GIVE_UP_MS the form says so and offers Try again (see give-feel.ts).
+  const gaveUp = useSlowAfter(pending, GIVE_GIVE_UP_MS);
+  const tryAgain = () => {
+    const url = new URL(window.location.href);
+    // The amount comes back in the address; the rest of what was typed is kept by the form's draft.
+    if (quote) url.searchParams.set("cents", String(quote.amountCents));
+    window.location.assign(url.toString());
+  };
+  // The payment page for this gift: the form opens it, and shows a link in case the phone doesn't (13/11/2026).
+  // Coming back from it with the browser's Back button shows the form again, ready to use.
+  const [cameBackFrom, setCameBackFrom] = useState<string | null>(null);
+  const opening = state.redirectUrl && state.redirectUrl !== cameBackFrom ? state.redirectUrl : null;
+  useEffect(() => {
+    if (opening) window.location.assign(opening);
+  }, [opening]);
+  useEffect(() => {
+    const shown = (e: PageTransitionEvent) => {
+      if (e.persisted && state.redirectUrl) setCameBackFrom(state.redirectUrl);
+    };
+    window.addEventListener("pageshow", shown);
+    return () => window.removeEventListener("pageshow", shown);
+  }, [state.redirectUrl]);
   const [donorType, setDonorType] = useState<"individual" | "company" | "trust">("individual");
   const [want18a, setWant18a] = useState(false);
   // Take the gift first, the s18A details after (decided 04/11/2026). With a saved ID number, "now" is one tap less.
@@ -543,14 +566,33 @@ export function DonateFlow({
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
 
         <button
-          disabled={pending || !ready}
-          aria-busy={pending}
-          className={`pressable relative w-full overflow-hidden rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy ${pending ? "" : "disabled:opacity-60"}`}
+          disabled={pending || !ready || Boolean(opening)}
+          aria-busy={pending || Boolean(opening)}
+          className={`pressable relative w-full overflow-hidden rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy ${pending && !gaveUp ? "" : "disabled:opacity-60"}`}
         >
-          {pending ? <span aria-hidden className="give-sweep" /> : null}
-          <span className="relative">{giveButtonLabel({ pending, slow: slowGive, ready, total, monthly: monthly && !campaign })}</span>
+          {(pending && !gaveUp) || opening ? <span aria-hidden className="give-sweep" /> : null}
+          <span className="relative">{giveButtonLabel({ pending, slow: slowGive, ready, total, monthly: monthly && !campaign, opening: Boolean(opening), gaveUp })}</span>
         </button>
-        {pending ? <p role="status" className="text-center text-sm text-muted">{giveWaitingLine(slowGive)}</p> : null}
+        {pending && !gaveUp ? <p role="status" className="text-center text-sm text-muted">{giveWaitingLine(slowGive)}</p> : null}
+        {pending && gaveUp ? (
+          <div role="alert" className="space-y-2 rounded-control border-2 border-danger-soft p-4 text-sm">
+            <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{GIVE_GAVE_UP_MESSAGE}</span></p>
+            <button type="button" onClick={tryAgain} className="min-h-11 font-bold text-brand underline underline-offset-4">
+              Try again
+            </button>
+            <p className="text-muted">If it keeps happening: <SupportContact />.</p>
+          </div>
+        ) : null}
+        {opening && !pending ? (
+          <div role="status" className="space-y-1 text-center text-sm">
+            <p className="text-muted">Nothing is charged until you confirm on the payment page.</p>
+            <p>
+              <a href={opening} className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">
+                Page not opening? Continue to the payment page
+              </a>
+            </p>
+          </div>
+        ) : null}
         {state.message && !pending ? (
           <div role="alert" className="space-y-1 rounded-control border-2 border-danger-soft p-4 text-sm">
             <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{state.message}</span></p>

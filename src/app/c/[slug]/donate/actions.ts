@@ -1,7 +1,6 @@
 "use server";
 
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { startDonation, type Quote } from "@/lib/donations/checkout";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { agreementErrors, applyAgreementTick, checkDonorDetails, checkoutSchema, cleanPhone, type CheckoutInput } from "@/lib/donations/validation";
@@ -22,6 +21,12 @@ export type CheckoutState = {
   failedToStart?: boolean;
   /** The campaign ended while the donor was on the page: the page offers giving to the charity instead. */
   campaignEnded?: boolean;
+  /**
+   * The payment provider's page for this gift. The form opens it itself (13/11/2026), rather than through a server
+   * redirect: a redirect kept the button on "Still working on it…" for as long as the phone took to open the page,
+   * with no way forward if it never did. Now the form says the page is opening and offers a link to it.
+   */
+  redirectUrl?: string;
 };
 
 export async function submitDonation(
@@ -82,8 +87,19 @@ export async function submitDonation(
     return { ...rest, failedToStart: providerDown };
   }
   // The website never charges a saved card (only the app does), so there is always a payment page.
-  if (!result.redirectUrl) return { ok: false, message: "We couldn't start the payment. Please try again." };
-  redirect(result.redirectUrl);
+  if (!isWebAddress(result.redirectUrl)) return { ok: false, message: "We couldn't start the payment. Please try again." };
+  return { ok: true, redirectUrl: result.redirectUrl };
+}
+
+/** Only a web address is ever handed to the browser to open. */
+function isWebAddress(url: string | undefined): url is string {
+  if (!url) return false;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 /** The line by the Pay button when fields need fixing. */

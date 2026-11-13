@@ -5,6 +5,12 @@ import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { hitRateLimit } from "@/lib/rate-limit";
 
 /**
+ * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
+ * steps, so a slow provider ends in our plain "nothing was charged" message rather than the host cutting it off.
+ */
+export const maxDuration = 30;
+
+/**
  * After the payment page closes, the app asks whether the payment went through, so it can thank
  * the donor or keep their form for another try. Only the outcome is returned, never details, and
  * only to the holder of the credential that came with this payment. Asking checks with the

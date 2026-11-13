@@ -6,6 +6,12 @@ import { gatewayByName } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
+ * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
+ * steps, so a slow provider ends in our plain "nothing was charged" message rather than the host cutting it off.
+ */
+export const maxDuration = 30;
+
+/**
  * Payment notifications from the gateway.
  * 1. Check the signature (reject anything we can't verify).
  * 2. Store the event once. A repeat delivery is acknowledged and ignored,

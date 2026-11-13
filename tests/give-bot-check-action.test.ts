@@ -32,7 +32,7 @@ const give = (fd: FormData) => submitDonation("meals", 25_000, 0, false, 25_000,
 
 describe("the give form's quiet bot checks", () => {
   it("a person who took their time goes through to the payment page", async () => {
-    await expect(give(form({ form_open_ms: "42000" }))).rejects.toMatchObject({ url: "https://pay.test/x" });
+    await expect(give(form({ form_open_ms: "42000" }))).resolves.toEqual({ ok: true, redirectUrl: "https://pay.test/x" });
     expect(started).toHaveLength(1);
     // The timing never reaches checkout or the saved details.
     expect(JSON.stringify(started[0])).not.toContain("form_open_ms");
@@ -52,7 +52,7 @@ describe("the give form's quiet bot checks", () => {
   });
 
   it("an older page with no timing still goes through (the attempt limits still apply in checkout)", async () => {
-    await expect(give(form({}))).rejects.toMatchObject({ url: "https://pay.test/x" });
+    await expect(give(form({}))).resolves.toEqual({ ok: true, redirectUrl: "https://pay.test/x" });
     expect(started).toHaveLength(1);
   });
 });

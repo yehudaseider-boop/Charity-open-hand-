@@ -4,7 +4,7 @@ import { legalConfig } from "@/config/legal";
 import { logAudit } from "@/lib/audit";
 import { alertGivezy } from "@/lib/ops/alert";
 import { after } from "next/server";
-import { hashedKey, hitRateLimit, ipKeys, rateLimitReached } from "@/lib/rate-limit";
+import { clearOldAttempts, forgetAttempts, hashedKey, hitRateLimit, ipKeys, rateLimitReached, takeAttempt } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tooManyTriesMessage, type GuardReason } from "./giving-guard-rules";
 
@@ -47,22 +47,32 @@ export async function checkGivingAllowed(args: { email: string; ip: string; char
     if (declinedEmail) return refuse("declines", guard.declinesPerEmail.minutes);
     if (declinedAddress) return refuse("declines", guard.declinesPerAddress.minutes);
 
-    // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it), and a
-    // sudden rush on one charity (attackers change addresses and emails): the team is told, donors are never blocked.
-    // Each counts this start. One difference from checking in turn: a start refused by one limit is now also counted
-    // in the others, which can only make a run of refused tries wait a little longer.
-    const [overEmail, overAddress, overEmailDay, overAddressDay, charityRush] = await Promise.all([
-      hitRateLimit("checkout", [`email:${email}`], guard.perEmail.tries, guard.perEmail.minutes),
-      hitRateLimit("checkout-ip", addressKeys, guard.perAddress.tries, guard.perAddress.minutes),
-      hitRateLimit("checkout-day", emailKeys, guard.perEmailDay.tries, guard.perEmailDay.minutes),
-      hitRateLimit("checkout-ip-day", addressKeys, guard.perAddressDay.tries, guard.perAddressDay.minutes),
-      hitRateLimit("checkout-charity", [`charity:${args.charityId}`], guard.charityStartsAlarm.tries, guard.charityStartsAlarm.minutes),
+    // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it), in the
+    // order they are answered, and a sudden rush on one charity (attackers change addresses and emails): the team is
+    // told, donors are never blocked. Each counts this start, side by side. A start refused by one limit stays counted
+    // only in that limit and the ones before it, as when they were checked in turn (13/11/2026: counting it in every
+    // limit could turn a 10-minute wait into a day's), and never in the charity's rush count. A limit that couldn't be
+    // checked never lets a refusal from another one through.
+    const limits: { bucket: string; keys: string[]; tries: number; minutes: number; reason: GuardReason }[] = [
+      { bucket: "checkout", keys: [`email:${email}`], ...guard.perEmail, reason: "email" },
+      { bucket: "checkout-ip", keys: addressKeys, ...guard.perAddress, reason: "address" },
+      { bucket: "checkout-day", keys: emailKeys, ...guard.perEmailDay, reason: "email-day" },
+      { bucket: "checkout-ip-day", keys: addressKeys, ...guard.perAddressDay, reason: "address-day" },
+    ];
+    const [rush, ...counted] = await Promise.allSettled([
+      takeAttempt("checkout-charity", [`charity:${args.charityId}`], guard.charityStartsAlarm.tries, guard.charityStartsAlarm.minutes),
+      ...limits.map((l) => takeAttempt(l.bucket, l.keys, l.tries, l.minutes)),
     ]);
-    if (overEmail) return refuse("email", guard.perEmail.minutes);
-    if (overAddress) return refuse("address", guard.perAddress.minutes);
-    if (overEmailDay) return refuse("email-day", guard.perEmailDay.minutes);
-    if (overAddressDay) return refuse("address-day", guard.perAddressDay.minutes);
-    if (charityRush) await raiseAlarm("starts", args.charityId, guard.charityStartsAlarm);
+    // Rows older than a day, cleared while the donor isn't waiting on it.
+    void clearOldAttempts();
+    for (const r of [rush, ...counted]) if (r.status === "rejected") console.error("[giving-guard] a limit could not be checked", r.reason);
+    const idsOf = (r: (typeof counted)[number]) => (r.status === "fulfilled" ? r.value.ids : []);
+    const refusedAt = counted.findIndex((r) => r.status === "fulfilled" && r.value.limited);
+    if (refusedAt >= 0) {
+      await forgetAttempts([...idsOf(rush), ...counted.slice(refusedAt + 1).flatMap(idsOf)]);
+      return refuse(limits[refusedAt].reason, limits[refusedAt].minutes);
+    }
+    if (rush.status === "fulfilled" && rush.value.limited) await raiseAlarm("starts", args.charityId, guard.charityStartsAlarm);
     return null;
   } catch (e) {
     console.error("[giving-guard] limits could not be checked; the gift goes ahead", e);

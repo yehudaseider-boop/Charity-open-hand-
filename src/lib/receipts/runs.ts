@@ -9,7 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buildReceiptHtml } from "./html";
 import { receiptDonorName } from "./details";
 import { runReceiptsJob, type IssuedReceipt, type JobSummary } from "./issue";
-import { recordFailedEmail } from "@/lib/email/retry";
+import { markRetryUnknown, recordFailedEmail } from "@/lib/email/retry";
+import { wasCutOff } from "@/lib/email/retry-plan";
 import { planReceipts, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
 import { applyDecisions, certificateFingerprint, countStatuses, type CertificateStatus, type DecidedReceipt } from "./review";
 import { completionWindow, inCompletionWindow } from "@/lib/donations/s18a-details";
@@ -352,7 +353,7 @@ function job(runId: string) {
   return {
     // Receipt emails link to the site: without its address they would be broken, so nothing is emailed.
     mailer: siteUrl
-      ? { transport: getEmailTransport(), siteUrl, platformName: platformConfig.appName, onEmailFailed: (r: IssuedReceipt, e: unknown) => recordFailedEmail("s18a_receipt", r.id, { error: e }) }
+      ? { transport: getEmailTransport(), siteUrl, platformName: platformConfig.appName, onEmailFailed: (r: IssuedReceipt, e: unknown) => (wasCutOff(e) ? markRetryUnknown("s18a_receipt", r.id, e) : recordFailedEmail("s18a_receipt", r.id, { error: e })) }
       : undefined,
     render: async ({ details, reference }: { details: Parameters<typeof buildReceiptHtml>[0]["details"]; reference: string }) => {
       // Loaded only when a PDF is made, so pages that never make one don't load Chrome's driver.

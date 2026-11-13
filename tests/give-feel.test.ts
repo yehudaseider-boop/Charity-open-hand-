@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { celebratesOutcome, giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
+import { celebratesOutcome, GIVE_GAVE_UP_MESSAGE, GIVE_GIVE_UP_MS, giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
 
 const base = { pending: false, slow: false, ready: true, total: "R210", monthly: false };
 
@@ -29,6 +29,35 @@ describe("the website's Give button words", () => {
     }
     expect(giveButtonLabel({ ...base, pending: true })).not.toMatch(/[!—]/);
     expect(SLOW_AFTER_MS).toBeGreaterThanOrEqual(3000);
+  });
+});
+
+describe("opening the payment page, and never waiting for ever (13/11/2026)", () => {
+  it("says the payment page is opening once the server has answered", () => {
+    expect(giveButtonLabel({ ...base, opening: true })).toBe("Opening the payment page…");
+    expect(giveButtonLabel({ ...base, opening: true, pending: true, slow: true })).toBe("Opening the payment page…");
+  });
+
+  it("stops waiting after a while, longer than the server's own limit, says nothing was charged and offers Try again", () => {
+    expect(GIVE_GIVE_UP_MS).toBeGreaterThan(30_000);
+    expect(GIVE_GAVE_UP_MESSAGE).toContain("Nothing was charged.");
+    expect(GIVE_GAVE_UP_MESSAGE).toContain("Try again");
+    expect(GIVE_GAVE_UP_MESSAGE).not.toMatch(/[!—]/);
+    expect(giveButtonLabel({ ...base, pending: true, slow: true, gaveUp: true })).toBe("Stopped waiting");
+    // Only while still waiting: a stale flag never changes the button.
+    expect(giveButtonLabel({ ...base, gaveUp: true })).toBe("Give R210");
+  });
+
+  it("the give form no longer redirects from the server, and offers a link to the payment page", () => {
+    const action = readFileSync("src/app/c/[slug]/donate/actions.ts", "utf8");
+    expect(action).not.toMatch(/\bredirect\(/);
+    expect(action).toContain("return { ok: true, redirectUrl: result.redirectUrl }");
+    const form = readFileSync("src/app/c/[slug]/donate/donate-flow.tsx", "utf8");
+    expect(form).toContain("window.location.assign(opening)");
+    expect(form).toContain("Continue to the payment page");
+    // Try again opens the form afresh (the lost answer would otherwise hold up a second press), with the amount kept.
+    expect(form).toContain("useSlowAfter(pending, GIVE_GIVE_UP_MS)");
+    expect(form).toMatch(/searchParams\.set\("cents", String\(quote\.amountCents\)\)/);
   });
 });
 

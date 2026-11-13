@@ -8,6 +8,12 @@ import { formatRand } from "@/lib/money";
 import { loadNewCardOffer, newCardLinkValid, offerMessage, ownsMonthly, type NotOffered } from "@/lib/donations/new-card";
 import { payWithNewCard } from "./actions";
 
+/**
+ * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
+ * steps, so a slow provider ends in our plain "nothing was charged" message rather than the host cutting it off.
+ */
+export const maxDuration = 30;
+
 // The address carries the donor's signed link: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Update your card", referrer: "no-referrer" };
 

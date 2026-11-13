@@ -10,6 +10,8 @@ describe("the personal thank-you email", () => {
     expect(m.subject).toBe("A thank-you from Meals Fund");
     expect(m.text).toMatch(/^Dear Sarah,\n\nYour gift fed a family this week\.\n\nFrom Meals Fund/);
     expect(m.text).toContain("Reply to this email to reach them.");
+    // The charity's words in their own box in the HTML (13/11/2026): never links or Givezy's own cards.
+    expect(m.quoted).toEqual({ heading: "Meals Fund", body: "Your gift fed a family this week.", inText: "Your gift fed a family this week." });
     expect(m.text).toContain("https://g.test/thanks/stop?t=x");
     expect(m.text).not.toMatch(/R\d|—|!/);
   });

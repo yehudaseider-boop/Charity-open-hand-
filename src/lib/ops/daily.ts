@@ -10,6 +10,7 @@ import { auditRetry, recordFailedConfirmations, runEmailRetries, supabaseRetrySt
 import { emailIsOn, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
 import { heldLabel } from "./held";
 import { formatRand } from "@/lib/money";
+import { formatDate } from "@/lib/dates";
 
 /**
  * The daily safety net, run after the monthly collection. It never charges anyone and never decides a
@@ -70,6 +71,11 @@ export type DailyChecks = {
   unhandledEvents: number;
   /** Held items from the last day, by what they are. */
   held: Record<string, number>;
+  /**
+   * Privacy requests (correct, delete, stop using) still open, and when the oldest came in (13/11/2026: until then
+   * nobody was told about a new one). A person must answer each; POPIA sets time limits.
+   */
+  privacyRequests?: { open: number; oldestAt: string | null };
 };
 
 const HOUR = 3_600_000;
@@ -220,6 +226,16 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity, opts
     .gte("created_at", new Date(now.getTime() - 24 * HOUR).toISOString())
     .limit(500);
   for (const h of held ?? []) out.held[h.action as string] = (out.held[h.action as string] ?? 0) + 1;
+
+  // 5. Privacy requests waiting for a person. Counts and a date only: never who asked or what about.
+  const { data: oldest, count: openRequests, error: requestsError } = await db
+    .from("data_requests")
+    .select("created_at", { count: "exact" })
+    .eq("status", "open")
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (requestsError) console.error("[daily] could not count open privacy requests", requestsError.message);
+  else out.privacyRequests = { open: openRequests ?? 0, oldestAt: (oldest?.[0]?.created_at as string | undefined) ?? null };
   return out;
 }
 
@@ -348,6 +364,10 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   if (jobs.monthlyStopped) lines.push(`${n(jobs.monthlyStopped, "monthly donation", "monthly donations")} stopped after three declined tries. The donors were emailed a link to put in a new card.`);
   if (jobs.payoutsFailed) lines.push("The deposit report could not be updated today. It tries again tomorrow.");
   if (c.stuckPending) lines.push(`${n(c.stuckPending, "payment has", "payments have")} been pending for more than 3 days.`);
+  if (c.privacyRequests?.open) {
+    const since = c.privacyRequests.oldestAt ? ` (the oldest from ${formatDate(c.privacyRequests.oldestAt)})` : "";
+    lines.push(`${n(c.privacyRequests.open, "privacy request is", "privacy requests are")} waiting for an answer${since}. See Admin, Privacy requests.`);
+  }
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
   if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));
   if (c.confirmations.failedAgain) lines.push(`${n(c.confirmations.failedAgain, "confirmation email", "confirmation emails")} to donors still could not be sent.`);
