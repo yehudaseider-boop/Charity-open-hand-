@@ -63,10 +63,17 @@ export async function checkGivingAllowed(args: { email: string; ip: string; char
       takeAttempt("checkout-charity", [`charity:${args.charityId}`], guard.charityStartsAlarm.tries, guard.charityStartsAlarm.minutes),
       ...limits.map((l) => takeAttempt(l.bucket, l.keys, l.tries, l.minutes)),
     ]);
-    // Rows older than a day, cleared while the donor isn't waiting on it.
-    void clearOldAttempts();
+    // Rows older than a day, cleared after the response, so the donor isn't waiting on it (straight away outside a
+    // request, where after() can't be used).
+    try {
+      after(clearOldAttempts);
+    } catch {
+      void clearOldAttempts();
+    }
     for (const r of [rush, ...counted]) if (r.status === "rejected") console.error("[giving-guard] a limit could not be checked", r.reason);
-    const idsOf = (r: (typeof counted)[number]) => (r.status === "fulfilled" ? r.value.ids : []);
+    // A limit that couldn't be counted still wrote its row: its ids come back on the error (takeAttempt).
+    const idsOf = (r: (typeof counted)[number]) =>
+      r.status === "fulfilled" ? r.value.ids : (((r.reason as { attemptIds?: unknown } | null)?.attemptIds as string[] | undefined) ?? []);
     const refusedAt = counted.findIndex((r) => r.status === "fulfilled" && r.value.limited);
     if (refusedAt >= 0) {
       await forgetAttempts([...idsOf(rush), ...counted.slice(refusedAt + 1).flatMap(idsOf)]);

@@ -125,14 +125,19 @@ export async function takeAttempt(bucket: string, keys: string[], limit: number,
   const { data, error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key }))).select("id");
   if (error) throw error;
   const ids = (data ?? []).map((r) => String(r.id));
-  const counts = await Promise.all(
-    keys.map(async (key) => {
-      const { count, error: countError } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
-      if (countError) throw countError;
-      return count ?? 0;
-    }),
-  );
-  return { limited: counts.some((count) => count > limit), ids };
+  try {
+    const counts = await Promise.all(
+      keys.map(async (key) => {
+        const { count, error: countError } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", bucket).eq("key", key).gte("created_at", since);
+        if (countError) throw countError;
+        return count ?? 0;
+      }),
+    );
+    return { limited: counts.some((count) => count > limit), ids };
+  } catch (e) {
+    // The rows were written but couldn't be counted: say which, so they can still be taken back (13/11/2026).
+    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { attemptIds: ids });
+  }
 }
 
 /** Take back attempts counted with takeAttempt (a right code). Never throws: an attempt left counted only costs a try. */

@@ -23,7 +23,7 @@ export const GIVE_GIVE_UP_MS = 40_000;
 
 /** Shown when the form stopped waiting for our server. Nothing was charged: the card is only entered on the payment page. */
 export const GIVE_GAVE_UP_MESSAGE =
-  "This is taking too long, so we've stopped waiting. Nothing was charged. Check your connection and tap Try again: what you typed is kept.";
+  "This is taking too long, so we've stopped waiting. Nothing was charged. Check your connection and press Try again. Your name, email and amount stay filled in; the ticks and any ID or tax number need doing again.";
 
 export function giveButtonLabel(o: { pending: boolean; slow: boolean; ready: boolean; total: string | null; monthly: boolean; opening?: boolean; gaveUp?: boolean }): string {
   if (o.opening) return "Opening the payment page…";

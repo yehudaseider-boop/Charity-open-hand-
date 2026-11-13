@@ -34,7 +34,9 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: build
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) }));
 vi.mock("@/lib/donations/giving-guard", () => ({ checkGivingAllowed: async () => null, rememberGiftStart: async () => {} }));
 vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
-vi.mock("@/lib/app-auth", () => ({ appAccount: async () => null }));
+let signedIn: { userId: string; email: string } | null = null;
+vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
+vi.mock("@/lib/donations/saved-card", () => ({ loadSavedCardToken: async () => ({ code: "AUTH_SECRET", gateway: "test" }), requestCardSave: async () => {} }));
 vi.mock("@/lib/donations/confirmation-access", () => ({ issueConfirmationToken: async () => "tok", reissueConfirmationToken: async () => "tok2" }));
 vi.mock("@/lib/donations/charity", () => ({
   loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: true, splitAccountRef: "ACCT_1" }),
@@ -68,6 +70,8 @@ beforeEach(() => {
   checkouts.length = 0;
   failInsertOn = null;
   gatewayDown = false;
+  signedIn = null;
+  delete process.env.SAVED_CARDS;
   process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
   process.env.APP_GIVING = "yes";
   process.env.SITE_URL = "https://site.test";
@@ -108,6 +112,21 @@ describe("a gift that fails before the payment page", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).message).toMatch(/couldn't reach the payment provider, so nothing was charged/);
     expect(updates("donations")[0].row).toMatchObject({ status: "failed" });
+  });
+
+  it("a saved-card attempt that hits an error is never closed, and the app is told the answer is unknown, so it keeps the attempt (13/11/2026)", async () => {
+    // An error after the provider may have been asked must never let the app forget the attempt: its next tap would
+    // use a new id and could charge the card a second time. "noReply" is what a lost answer looks like to the app.
+    process.env.SAVED_CARDS = "yes";
+    signedIn = { userId: "u1", email: "a@example.com" };
+    failInsertOn = "consents";
+    const res = await call({ ...gift, useSavedCard: true, attemptId: "6f1d2c3b-4a59-4e8f-9a7b-1c2d3e4f5a6b", details });
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, noReply: true });
+    expect(body.message).toMatch(/never charge twice/);
+    expect(body.message).not.toMatch(/nothing was charged/i);
+    expect(updates("donations")).toHaveLength(0);
   });
 
   it("a gift that starts normally is left pending for the payment page", async () => {

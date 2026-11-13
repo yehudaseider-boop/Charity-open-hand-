@@ -42,6 +42,8 @@ describe("opening the payment page, and never waiting for ever (13/11/2026)", ()
     expect(GIVE_GIVE_UP_MS).toBeGreaterThan(30_000);
     expect(GIVE_GAVE_UP_MESSAGE).toContain("Nothing was charged.");
     expect(GIVE_GAVE_UP_MESSAGE).toContain("Try again");
+    // Only what the form's draft really keeps: never ID or tax numbers or ticks (POPIA, fresh consent).
+    expect(GIVE_GAVE_UP_MESSAGE).toContain("the ticks and any ID or tax number need doing again");
     expect(GIVE_GAVE_UP_MESSAGE).not.toMatch(/[!—]/);
     expect(giveButtonLabel({ ...base, pending: true, slow: true, gaveUp: true })).toBe("Stopped waiting");
     // Only while still waiting: a stale flag never changes the button.

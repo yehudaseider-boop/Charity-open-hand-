@@ -74,7 +74,9 @@ const api = (site: string, path: string) => {
  * "Opening the payment page…" for ever; giving up is a thrown network error, so each caller shows its own
  * plain "couldn't reach Givezy" message (and, for a saved card, holds the attempt so nothing is charged twice).
  */
-export const REQUEST_TIMEOUT_MS = 20_000;
+// 35 seconds (13/11/2026, was 20): longer than the server's own limit for starting a gift (the payment provider gets
+// 20 seconds, the whole step 30), so a slow but working answer, or the server's plain "nothing was charged", arrives.
+export const REQUEST_TIMEOUT_MS = 35_000;
 
 /** `fetch`, and reading its reply, given up after `ms`. Throws on a timeout like any network error. */
 export async function fetchWithTimeout(url: string, init: RequestInit, ms = REQUEST_TIMEOUT_MS, f: typeof fetch = fetch): Promise<{ status: number; json: unknown }> {

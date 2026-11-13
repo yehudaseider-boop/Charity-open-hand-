@@ -28,10 +28,10 @@ import { missingWords } from "@/lib/donations/s18a-details";
 import { S18aDetailsForm } from "@/components/s18a-details-form";
 
 /**
- * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
- * steps, so a slow provider ends in our plain "nothing was charged" message rather than the host cutting it off.
+ * The longest this may run (13/11/2026): checking the payment with the provider can take up to 20 seconds, and the
+ * confirmation follows. Anything slower shows "still confirming", never a host error.
  */
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // The address carries the donor's credential: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Your donation", referrer: "no-referrer" };

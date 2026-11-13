@@ -246,12 +246,13 @@ export async function startDonation(args: {
   // under the same id, and "failed" would read as a declined card.
   const closeUnstarted = async () => {
     const at = new Date().toISOString();
-    await Promise.all([
+    const results = await Promise.all([
       db.from("donations").update({ status: "failed", failed_at: at }).eq("id", donationId).eq("status", "pending"),
       recurringId
         ? db.from("recurring_donations").update({ status: "cancelled", cancelled_at: at, ended_reason: "the first payment could not be started" }).eq("id", recurringId).eq("status", "pending")
         : null,
-    ]).catch((e) => console.error("[checkout] could not close a gift that never started", e));
+    ]).catch((e: unknown) => [{ error: e }]);
+    for (const r of results) if (r?.error) console.error("[checkout] could not close a gift that never started; the daily check closes it later", r.error);
   };
 
   let confirmationToken: string;

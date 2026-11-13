@@ -6,10 +6,10 @@ import { gatewayByName } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
- * steps, so a slow provider ends in our plain "nothing was charged" message rather than the host cutting it off.
+ * The longest this may run (13/11/2026): checking a payment with the provider can take up to 20 seconds, and the
+ * confirmation emails follow. If it is ever cut off, the provider sends the message again and it is handled once.
  */
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
  * Payment notifications from the gateway.

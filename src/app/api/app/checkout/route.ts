@@ -48,8 +48,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, message: "Please sign in again to use your saved ID number." }, { status: 401 });
   }
   // An unexpected error answers in words the app can show (13/11/2026), never a bare error page. A new card is only
-  // ever entered on the payment page, so nothing can have been charged; a saved-card attempt is asked about again
-  // under the same id, so it can never be charged twice.
+  // ever entered on the payment page, so nothing can have been charged. A saved-card attempt may already have been
+  // charged (the error can come after the provider was asked): it answers `noReply`, exactly as a lost answer does,
+  // so the app keeps the attempt's id and asks about it again under that id, never charging twice.
   let result: Awaited<ReturnType<typeof startDonation>>;
   try {
     result = await startDonation({
@@ -71,10 +72,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (e) {
     console.error("[app checkout] the gift could not be started", e);
-    const message = body.data.useSavedCard
-      ? "Something went wrong on our side. Please try again in a minute. Your card won't be charged twice."
-      : "We couldn't start your payment, so nothing was charged. Please try again in a minute.";
-    return NextResponse.json({ ok: false, message }, { status: 503 });
+    if (body.data.useSavedCard) {
+      return NextResponse.json(
+        { ok: false, noReply: true, message: "Something went wrong on our side, and we don't know yet whether your card was charged. Tap Give again in a minute: we check first, and never charge twice." },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ ok: false, message: "We couldn't start your payment, so nothing was charged. Please try again in a minute." }, { status: 503 });
   }
   return NextResponse.json(result, { status: result.ok ? 200 : result.limited ? 429 : result.fieldErrors ? 422 : 409 });
 }

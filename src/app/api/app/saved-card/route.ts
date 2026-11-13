@@ -4,11 +4,8 @@ import { appAccount } from "@/lib/app-auth";
 import { savedCardsOpen } from "@/lib/donations/app-api";
 import { loadSavedCardInfo, removeSavedCard } from "@/lib/donations/saved-card";
 
-/**
- * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
- * steps, so a slow provider ends in our plain "nothing was charged" message rather than the host cutting it off.
- */
-export const maxDuration = 30;
+/** The longest this may run (13/11/2026): a call to the payment provider can take up to 20 seconds. */
+export const maxDuration = 60;
 
 /**
  * The donor's saved card, as the Account screen shows it: "Visa ending 4242", and a way to remove it.

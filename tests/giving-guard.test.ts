@@ -20,7 +20,9 @@ vi.mock("@/lib/rate-limit", () => ({
   },
   // Each counted start is one row per key; its id names the bucket, so a test can see which were taken back.
   takeAttempt: async (bucket: string, keys: string[], limit: number, minutes: number) => {
-    if (storeDown || failing.has(bucket)) throw new Error("store down");
+    if (storeDown) throw new Error("store down");
+    // Written but not counted: the rows written come back on the error, as takeAttempt does.
+    if (failing.has(bucket)) throw Object.assign(new Error("count failed"), { attemptIds: keys.map((k) => `${bucket}|${k}`) });
     calls.push({ fn: "hit", bucket, keys, limit, minutes });
     return { limited: over.has(bucket), ids: keys.map((k) => `${bucket}|${k}`) };
   },
@@ -229,6 +231,15 @@ describe("checkGivingAllowed", () => {
     over = new Set();
     expect(await checkGivingAllowed(start)).toBeNull();
     expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it("a limit written but not counted is still taken back after a refusal, so it never counts a refused start", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    over.add("checkout");
+    failing = new Set(["checkout-day"]);
+    expect((await checkGivingAllowed(start))?.reason).toBe("email");
+    expect(forgotten).toContain("checkout-day|email#donor@example.com");
     err.mockRestore();
   });
 
