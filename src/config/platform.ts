@@ -17,7 +17,8 @@ export const platformConfig = {
 
   fees: {
     /**
-     * No platform fee and no processing fee on donations (Yehuda, 08/10/2026).
+     * No platform fee and no processing fee on donations (Yehuda, 08/10/2026). Givezy earns a monthly fee from each
+     * charity, invoiced outside the platform (Yehuda, 13/11/2026): nothing here bills charities.
      * The donor may give Givezy a separate contribution (the buttons below, or "No thanks").
      *
      * The gateway's own charge: each side pays it on its own share, in proportion
