@@ -155,6 +155,15 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 - [ ] **Decision: the donation return page's link never expires.** The link a donor comes back on (and the status view it opens) works for as long as the gift exists. Decide an expiry for the status view; changing s18A details already has its own time window.
 - [ ] **Known, for later: inline scripts and readable sign-in cookies.** The Content Security Policy still allows inline scripts, and the sign-in cookies can be read by page scripts (not for the Supabase browser client, which the website doesn't use, but because the header reads them to know whether someone is signed in: `src/components/header-nav.tsx`). Later: script nonces in the CSP; a separate harmless "signed in" marker cookie for the header, then httpOnly on the Supabase sign-in cookies (security review 12/11/2026).
 - [ ] **Tidy (no user-facing effect):** move the `citext` extension out of the `public` schema; the `donation_giving_kinds` check constraint still lists the old kind names. Both with a small migration later.
+### Apple Pay and Google Pay (Paystack's answer, 13/11/2026)
+
+Paystack support (13/11/2026): Google Pay is available to South African businesses (Settings, Preferences, Payment Channels; cards must stay on). Apple Pay is available to eligible South African businesses in ZAR, **not to businesses classed as NGOs**, and needs international payments switched on first. Both work with transaction splits (subaccount, charge and bearer as we send them). Apple Pay gives no reusable authorisation (so no saved-card or monthly charges by Apple Pay; our monthly checkout is card-only already); Google Pay can. No domain registration with Paystack's hosted checkout (ours). Rates: local cards 2.9% + R1, international 3.1% + R1, excl VAT.
+
+- [ ] **Check Givezy's business category in Paystack** is a company, not an NGO, or Apple Pay can't be switched on (Yehuda, Settings, Business).
+- [ ] **Ask Paystack to switch on international payments**, then switch on Apple Pay and Google Pay in Settings, Preferences (Live mode). Test a small gift from an iPhone and check the split.
+- [ ] **Card charge rates in `platformConfig.fees`:** Yehuda to confirm which rate to use (suggested: local 2.9% + R1 excl VAT, plus 15% VAT) before they are filled in; that switches on "Cover the card charge".
+- Receipts: Apple Pay and Google Pay are cards underneath, so "Card (online)" stays true for them. Scan to Pay, SnapScan and EFT are not (see the receipt item above).
+
 ### Monthly fee for charities (decided 13/11/2026)
 
 - [ ] **Charity agreement and Terms:** add the monthly fee (amount, when it's invoiced, what happens if unpaid, notice to change it). For Yosef.
