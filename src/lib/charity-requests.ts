@@ -13,8 +13,25 @@
 export const CHARITY_REQUEST_CONSENT = {
   version: "charity-request-2026-11-15",
   label: "Email me when it joins",
-  text: "We'll email you once, when this charity joins Givezy. We use your email for nothing else and delete it once that email has gone.",
+  text: "We'll email you once if this charity joins Givezy within a month. We use your email for nothing else, and delete it once that email has gone, or after a month.",
 } as const;
+
+/**
+ * How long an email waits on a request for a charity that hasn't joined (Yehuda, 15/11/2026: "a month"): one
+ * calendar month from the request. Then it is deleted unused by the daily job; the request itself stays for Admin.
+ */
+export const CHARITY_REQUEST_EMAIL_MONTHS = 1;
+
+/** The moment before which an unused email is deleted: one calendar month back (31/03 goes to 28/02 or 29/02). */
+export function emailKeptSince(now: Date, months = CHARITY_REQUEST_EMAIL_MONTHS): Date {
+  const d = new Date(now.getTime());
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() - months);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, last));
+  return d;
+}
 
 export const CHARITY_REQUEST_LIMITS = {
   name: 120,
@@ -37,7 +54,7 @@ export const CHARITY_REQUEST_MESSAGES = {
 /** The answer after a request is sent, worded for whether they asked to hear back. */
 export function requestSentMessage(name: string, emailMe: boolean): string {
   return emailMe
-    ? `Thank you. We've asked ${name} to join Givezy, and we'll email you once if they do.`
+    ? `Thank you. We'll ask ${name} to join Givezy, and email you once if they join within a month.`
     : `Thank you. We'll ask ${name} to join Givezy.`;
 }
 

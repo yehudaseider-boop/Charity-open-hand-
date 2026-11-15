@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-import { checkCharityRequest, cleanLink, groupRequests, joinedEmail, requestKey, requestSentMessage, type RequestRow } from "@/lib/charity-requests";
+import { checkCharityRequest, cleanLink, emailKeptSince, groupRequests, joinedEmail, requestKey, requestSentMessage, type RequestRow } from "@/lib/charity-requests";
 import { emptyState, requestHref } from "@/lib/charity/browse";
 import { dailyDigest, type DailyChecks } from "@/lib/ops/daily";
 
@@ -34,8 +34,14 @@ describe("the request form", () => {
     expect(Object.keys((r as { fieldErrors: object }).fieldErrors)).toEqual(["name", "link", "note"]);
   });
 
+  it("an email waits one calendar month", () => {
+    expect(emailKeptSince(new Date("2026-11-15T10:00:00Z")).toISOString()).toBe("2026-10-15T10:00:00.000Z");
+    expect(emailKeptSince(new Date("2027-03-31T10:00:00Z")).toISOString()).toBe("2027-02-28T10:00:00.000Z");
+    expect(emailKeptSince(new Date("2027-01-10T10:00:00Z")).toISOString()).toBe("2026-12-10T10:00:00.000Z");
+  });
+
   it("the thank-you says whether they'll hear back", () => {
-    expect(requestSentMessage("Hope House", true)).toMatch(/email you once if they do/);
+    expect(requestSentMessage("Hope House", true)).toMatch(/email you once if they join within a month/);
     expect(requestSentMessage("Hope House", false)).not.toMatch(/email/);
   });
 });

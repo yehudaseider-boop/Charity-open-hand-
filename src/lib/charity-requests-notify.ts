@@ -1,7 +1,7 @@
 import "server-only";
 import { EmailMaybeSent, getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { joinedEmail } from "@/lib/charity-requests";
+import { emailKeptSince, joinedEmail } from "@/lib/charity-requests";
 
 export type NotifySummary = { sent: number; failed: number };
 
@@ -77,5 +77,23 @@ export async function clearStaleClaims(now = new Date()): Promise<void> {
     if (error && error.code !== "PGRST205" && error.code !== "42P01") console.error("[charity-request] could not clear unfinished claims", error.message);
   } catch (e) {
     console.error("[charity-request] could not clear unfinished claims", e);
+  }
+}
+
+/**
+ * An email that waited a month on a charity that hasn't joined is deleted unused (Yehuda, 15/11/2026), as the tick
+ * line promises. The request stays, without it. Run by the daily job. Never throws; a missing table is fine.
+ */
+export async function clearExpiredEmails(now = new Date()): Promise<void> {
+  try {
+    const { error } = await createAdminClient()
+      .from("charity_requests")
+      .update({ notify_email: null })
+      .not("notify_email", "is", null)
+      .is("notified_at", null)
+      .lt("created_at", emailKeptSince(now).toISOString());
+    if (error && error.code !== "PGRST205" && error.code !== "42P01") console.error("[charity-request] could not delete month-old emails", error.message);
+  } catch (e) {
+    console.error("[charity-request] could not delete month-old emails", e);
   }
 }

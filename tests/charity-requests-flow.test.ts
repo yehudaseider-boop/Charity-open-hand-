@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-type Row = { id: string; notify_email: string | null; notified_at: string | null; charity_id: string; status: string };
+type Row = { id: string; notify_email: string | null; notified_at: string | null; charity_id: string; status: string; created_at?: string };
 let rows: Row[] = [];
 let charities: { id: string; name_en: string; slug: string; status: string }[] = [];
 const inserts: Record<string, unknown>[] = [];
@@ -59,7 +59,7 @@ vi.mock("@/lib/email", () => {
   };
 });
 
-const { notifyJoined, clearStaleClaims } = await import("@/lib/charity-requests-notify");
+const { notifyJoined, clearStaleClaims, clearExpiredEmails } = await import("@/lib/charity-requests-notify");
 const { saveCharityRequest } = await import("@/lib/charity-requests-store");
 
 const joined = (id: string, email: string | null): Row => ({ id, notify_email: email, notified_at: null, charity_id: "c1", status: "joined" });
@@ -108,6 +108,16 @@ describe("the email when a charity joins", () => {
     rows = [{ ...joined("r1", "thandi@example.co.za"), notified_at: "2026-11-15T08:00:00.000Z" }];
     await clearStaleClaims(new Date("2026-11-15T09:00:00Z"));
     expect(rows[0].notify_email).toBeNull();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("an email that waited a month for a charity that hasn't joined is deleted unused; a newer one stays", async () => {
+    rows = [
+      { id: "old", notify_email: "a@example.co.za", notified_at: null, charity_id: "", status: "new", created_at: "2026-10-14T09:00:00.000Z" } as Row,
+      { id: "new", notify_email: "b@example.co.za", notified_at: null, charity_id: "", status: "invited", created_at: "2026-10-20T09:00:00.000Z" } as Row,
+    ];
+    await clearExpiredEmails(new Date("2026-11-15T09:00:00Z"));
+    expect(rows.map((r) => r.notify_email)).toEqual([null, "b@example.co.za"]);
     expect(sent).toHaveLength(0);
   });
 

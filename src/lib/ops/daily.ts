@@ -1,5 +1,5 @@
 import "server-only";
-import { clearStaleClaims } from "@/lib/charity-requests-notify";
+import { clearExpiredEmails, clearStaleClaims } from "@/lib/charity-requests-notify";
 import { logAudit } from "@/lib/audit";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -241,8 +241,9 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity, opts
   else out.privacyRequests = { open: openRequests ?? 0, oldestAt: (oldest?.[0]?.created_at as string | undefined) ?? null };
 
   // 6. "Request a charity" (15/11/2026): counts only. Skipped quietly until that migration has run. An address whose
-  // "it joined" email was claimed but never finished is deleted here too, never kept.
-  await clearStaleClaims(now);
+  // "it joined" email was claimed but never finished is deleted here too, never kept, and so is an email that waited
+  // a month for a charity that hasn't joined.
+  await Promise.all([clearStaleClaims(now), clearExpiredEmails(now)]);
   const [lastDay, waiting] = await Promise.all([
     db.from("charity_requests").select("id", { count: "exact", head: true }).gte("created_at", new Date(now.getTime() - 24 * HOUR).toISOString()),
     db.from("charity_requests").select("id", { count: "exact", head: true }).eq("status", "new"),

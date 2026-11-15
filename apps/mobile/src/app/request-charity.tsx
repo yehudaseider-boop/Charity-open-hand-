@@ -120,7 +120,7 @@ export default function RequestCharity() {
               <Field label="Anything we should know (optional)" value={note} onChangeText={setNote} maxLength={L.note} error={errors.note} multiline numberOfLines={3} textAlignVertical="top" />
 
               <View style={styles.optIn}>
-                <SwitchRow label={CHARITY_REQUEST_CONSENT.label} description="One email, only if they join." more={CHARITY_REQUEST_CONSENT.text} value={emailMe} onChange={setEmailMe} />
+                <SwitchRow label={CHARITY_REQUEST_CONSENT.label} description="One email, if they join within a month." more={CHARITY_REQUEST_CONSENT.text} value={emailMe} onChange={setEmailMe} />
                 {emailMe ? (
                   <Field label="Your email address" value={email} onChangeText={setEmail} maxLength={L.email} error={errors.email} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" />
                 ) : null}
