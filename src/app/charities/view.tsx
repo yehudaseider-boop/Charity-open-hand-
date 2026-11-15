@@ -5,7 +5,8 @@ import { CharitySearch } from "@/components/charity-search";
 import { Illustration } from "@/components/illustration";
 import { Bubbles, Key } from "@/components/marketing";
 import { Splash } from "@/components/splash";
-import { causeHref, coverTone, emptyState, resultsLine } from "@/lib/charity/browse";
+import { causeHref, coverTone, emptyState, requestHref, resultsLine } from "@/lib/charity/browse";
+import { charityRequestsOpen } from "@/config/app-links";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
@@ -97,7 +98,8 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
     `inline-flex min-h-11 shrink-0 items-center rounded-full border-2 px-4 text-[15px] font-semibold transition-[transform,color,background-color,border-color] duration-150 active:scale-[0.97] motion-reduce:transition-none ${
       active ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand hover:text-brand"
     }`;
-  const empty = charities.length === 0 ? emptyState(q, category ? { slug: category.slug, name: category.name_en } : null) : null;
+  const requestsOpen = charityRequestsOpen();
+  const empty = charities.length === 0 ? emptyState(q, category ? { slug: category.slug, name: category.name_en } : null, { requestsOpen }) : null;
 
   return (
     // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
@@ -167,9 +169,17 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
             ))}
           </ul>
         ) : null}
-        <p className="pt-4 text-muted">
-          Run a charity? <Link href="/apply" className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">List it here</Link>
-        </p>
+        <div className="flex flex-col gap-1 pt-4 text-muted sm:flex-row sm:flex-wrap sm:gap-x-8">
+          {/* An empty list already offers it as a button. */}
+          {requestsOpen && !empty ? (
+            <p>
+              Can&apos;t find your charity? <Link href={requestHref(q)} className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">Ask us to add it</Link>
+            </p>
+          ) : null}
+          <p>
+            Run a charity? <Link href="/apply" className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">List it here</Link>
+          </p>
+        </div>
       </section>
     </div>
   );

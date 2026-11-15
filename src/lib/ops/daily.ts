@@ -76,6 +76,8 @@ export type DailyChecks = {
    * nobody was told about a new one). A person must answer each; POPIA sets time limits.
    */
   privacyRequests?: { open: number; oldestAt: string | null };
+  /** "Request a charity" (15/11/2026): asks in the last day, and charities still asked for and not yet handled. */
+  charityRequests?: { lastDay: number; waiting: number };
 };
 
 const HOUR = 3_600_000;
@@ -236,6 +238,17 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity, opts
     .limit(1);
   if (requestsError) console.error("[daily] could not count open privacy requests", requestsError.message);
   else out.privacyRequests = { open: openRequests ?? 0, oldestAt: (oldest?.[0]?.created_at as string | undefined) ?? null };
+
+  // 6. "Request a charity" (15/11/2026): counts only. Skipped quietly until that migration has run.
+  const [lastDay, waiting] = await Promise.all([
+    db.from("charity_requests").select("id", { count: "exact", head: true }).gte("created_at", new Date(now.getTime() - 24 * HOUR).toISOString()),
+    db.from("charity_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
+  ]);
+  const missing = (code: string | undefined) => code === "PGRST205" || code === "42P01";
+  if (lastDay.error || waiting.error) {
+    const e = lastDay.error ?? waiting.error;
+    if (!missing(e?.code)) console.error("[daily] could not count charity requests", e?.message);
+  } else out.charityRequests = { lastDay: lastDay.count ?? 0, waiting: waiting.count ?? 0 };
   return out;
 }
 
@@ -367,6 +380,9 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   if (c.privacyRequests?.open) {
     const since = c.privacyRequests.oldestAt ? ` (the oldest from ${formatDate(c.privacyRequests.oldestAt)})` : "";
     lines.push(`${n(c.privacyRequests.open, "privacy request is", "privacy requests are")} waiting for an answer${since}. See Admin, Privacy requests.`);
+  }
+  if (c.charityRequests?.lastDay) {
+    lines.push(`${n(c.charityRequests.lastDay, "donor asked", "donors asked")} for a charity that isn't on Givezy yet. ${n(c.charityRequests.waiting, "request waits", "requests wait")} for a look in Admin, Charity requests.`);
   }
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
   if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));

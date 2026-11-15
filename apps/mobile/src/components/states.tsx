@@ -43,13 +43,15 @@ export function LoadingList({ count = 3, imageHeight = 120 }: { count?: number; 
  * Nothing here yet. `art` adds one of the people illustrations above the words (for a page's main empty
  * state, not for small ones inside a card). Without it, a soft lilac ring and dot keep it from looking bare.
  */
-export function EmptyState({ title, body, action, art }: { title: string; body: string; action?: { label: string; onPress: () => void }; art?: PeopleName }) {
+/** `away`: a second, quieter way on, as a text link under the button. */
+export function EmptyState({ title, body, action, away, art }: { title: string; body: string; action?: { label: string; onPress: () => void }; away?: { label: string; onPress: () => void }; art?: PeopleName }) {
   return (
     <View style={styles.box}>
       <Mark art={art} />
       <Text variant="h2" style={styles.title}>{title}</Text>
       <Text variant="bodyMuted" style={styles.body}>{body}</Text>
       {action ? <View style={styles.action}><Button label={action.label} onPress={action.onPress} /></View> : null}
+      {away ? <TextLink label={away.label} onPress={away.onPress} /> : null}
     </View>
   );
 }

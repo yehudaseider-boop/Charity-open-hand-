@@ -22,7 +22,7 @@ export function causeHref(slug: string | null, q: string): string {
  * What the page says when the list is empty. A search or cause that finds nothing gets a way out: clear the search
  * (keeping the cause), or see every charity. With no search and no cause, the list is simply empty for now.
  */
-export function emptyState(q: string, cause: { slug: string; name: string } | null): {
+export function emptyState(q: string, cause: { slug: string; name: string } | null, opts: { requestsOpen?: boolean } = {}): {
   title: string;
   body: string;
   actions: { label: string; href: string }[];
@@ -35,7 +35,14 @@ export function emptyState(q: string, cause: { slug: string; name: string } | nu
   // With no cause, clearing the search already shows every charity, so there is one button, not two to one place.
   if (q) actions.push({ label: "Clear the search", href: causeHref(cause?.slug ?? null, "") });
   if (cause) actions.push({ label: "See all charities", href: "/charities" });
+  // "Request a charity" (15/11/2026): a name that found nothing is carried to the request form.
+  if (opts.requestsOpen) actions.push({ label: "Ask us to add it", href: requestHref(q) });
   return { title: "No charities match that yet", body: `Nothing for ${what}. Try another word or a different cause.`, actions };
+}
+
+/** The "Request a charity" page, with what was searched for as the charity's name. */
+export function requestHref(q: string): string {
+  return q ? `/charities/request?${new URLSearchParams({ name: q }).toString()}` : "/charities/request";
 }
 
 /** The soft colour behind a charity with no cover photo, in turn, so a row of them isn't one flat block. */

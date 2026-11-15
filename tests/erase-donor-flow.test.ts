@@ -99,6 +99,9 @@ describe("erasing a donor by their account", () => {
     expect(calls).toEqual([
       // Their email on the landing page's launch list goes too (10/11/2026).
       "launch_list:deleted:email=erin@example.co.za",
+      // Their "Request a charity" asks, by account and by the email left to hear back (15/11/2026).
+      "charity_requests:deleted:requested_by=11111111-1111-1111-1111-111111111111",
+      "charity_requests:deleted:notify_email=erin@example.co.za",
       // The database erasure comes after everything that finds them by address or donor record (13/11/2026), so an
       // erasure that stops part way can be finished by running it again.
       "rpc",

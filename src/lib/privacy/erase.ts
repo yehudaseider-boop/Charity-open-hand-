@@ -138,6 +138,19 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     const { error: listError } = await db.from("launch_list").delete().eq("email", email);
     if (listError && listError.code !== "PGRST205" && listError.code !== "42P01") throw new Error(`Could not erase: ${listError.message}`);
   }
+  // Their "Request a charity" asks (15/11/2026): by their account, or by the email they left to hear when it joins.
+  // Until that migration has run there is no such table, and that must never stop an erasure.
+  {
+    const gone = (code: string | undefined) => code === "PGRST205" || code === "42P01";
+    if (userId) {
+      const { error: e } = await db.from("charity_requests").delete().eq("requested_by", userId);
+      if (e && !gone(e.code)) throw new Error(`Could not erase: ${e.message}`);
+    }
+    if (email) {
+      const { error: e } = await db.from("charity_requests").delete().eq("notify_email", email);
+      if (e && !gone(e.code)) throw new Error(`Could not erase: ${e.message}`);
+    }
+  }
   if (email) {
     const exact = email.replace(/[\\%_]/g, (ch) => `\\${ch}`);
     const teamRows = await allPages((from) =>
