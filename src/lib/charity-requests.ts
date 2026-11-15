@@ -116,13 +116,15 @@ export function checkCharityRequest(raw: { name?: unknown; town?: unknown; link?
 
 /** Requests for the same charity are grouped by this: lower case, single spaces, no punctuation, no "the". */
 export function requestKey(name: string): string {
-  return oneLine(name)
+  const key = oneLine(name)
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/^the /, "")
     .trim();
+  // Some letters spell out longer when made plain: never longer than the database allows.
+  return key.slice(0, 120).trim();
 }
 
 
@@ -148,11 +150,11 @@ export function isBot(honeypot: unknown): boolean {
   return typeof honeypot === "string" && honeypot.trim().length > 0;
 }
 
-export type CharityRequestStatus = "new" | "invited" | "added" | "declined";
+export type CharityRequestStatus = "new" | "invited" | "joined" | "declined";
 export const REQUEST_STATUS_LABEL: Record<CharityRequestStatus, string> = {
   new: "New",
   invited: "Invited",
-  added: "Joined",
+  joined: "Joined",
   declined: "Not adding",
 };
 
@@ -162,7 +164,8 @@ export type RequestRow = {
   town: string | null;
   link: string | null;
   note: string | null;
-  wants_email: boolean;
+  /** The address to tell, if they ticked the box (server only: counted, never shown). */
+  email: string | null;
   status: CharityRequestStatus;
   created_at: string;
 };
@@ -172,6 +175,7 @@ export type RequestGroup = {
   /** The spelling most people used (the latest, on a tie). */
   name: string;
   asks: number;
+  /** Different addresses waiting for the email (someone who asked twice counts once). */
   wantEmail: number;
   /** "invited" once any of them is; otherwise "new". */
   status: "new" | "invited";
@@ -199,7 +203,7 @@ export function groupRequests(rows: RequestRow[]): RequestGroup[] {
       key,
       name,
       asks: rs.length,
-      wantEmail: rs.filter((r) => r.wants_email).length,
+      wantEmail: new Set(rs.map((r) => r.email?.trim().toLowerCase()).filter(Boolean)).size,
       status: rs.some((r) => r.status === "invited") ? "invited" : "new",
       towns: distinct(sorted.map((r) => r.town)).slice(0, 5),
       links: distinct(sorted.map((r) => r.link)).slice(0, 5),

@@ -56,16 +56,18 @@ describe("grouping for Admin", () => {
   it("the same charity typed differently is one group", () => {
     expect(requestKey("The Hope-House!")).toBe(requestKey("hope house"));
     expect(requestKey("Café Kids")).toBe(requestKey("cafe kids"));
+    // Letters that spell out longer when made plain never push the key past the database's limit.
+    expect(requestKey("\ufdfa".repeat(120)).length).toBeLessThanOrEqual(120);
   });
 
   it("most asked first, with the spelling most people used", () => {
-    const row = (name: string, at: string, extra: Partial<RequestRow> = {}): RequestRow => ({ name, name_key: requestKey(name), town: null, link: null, note: null, wants_email: false, status: "new", created_at: at, ...extra });
+    const row = (name: string, at: string, extra: Partial<RequestRow> = {}): RequestRow => ({ name, name_key: requestKey(name), town: null, link: null, note: null, email: null, status: "new", created_at: at, ...extra });
     const groups = groupRequests([
-      row("Hope House", "2026-11-10T08:00:00Z", { wants_email: true, town: "Soweto" }),
+      row("Hope House", "2026-11-10T08:00:00Z", { email: "a@example.co.za", town: "Soweto" }),
       row("hope house", "2026-11-12T08:00:00Z", { status: "invited", town: "Soweto" }),
-      row("Hope House", "2026-11-11T08:00:00Z"),
+      row("Hope House", "2026-11-11T08:00:00Z", { email: "A@example.co.za " }),
       row("Lone Charity", "2026-11-14T08:00:00Z"),
-      row("Done Charity", "2026-11-14T08:00:00Z", { status: "added" }),
+      row("Done Charity", "2026-11-14T08:00:00Z", { status: "joined" }),
     ]);
     expect(groups.map((g) => [g.name, g.asks])).toEqual([["Hope House", 3], ["Lone Charity", 1]]);
     expect(groups[0]).toMatchObject({ wantEmail: 1, status: "invited", towns: ["Soweto"], firstAt: "2026-11-10T08:00:00Z", lastAt: "2026-11-12T08:00:00Z" });

@@ -9,7 +9,7 @@ import {
   requestKey,
   requestSentMessage,
 } from "@/lib/charity-requests";
-import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
+import { hashedKey, hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /** The table isn't on this database yet (the migration waits for Yehuda's yes). */
@@ -34,12 +34,19 @@ export async function saveCharityRequest(
   const r = checked.request;
   try {
     const limit = CHARITY_REQUEST_LIMITS.perHour;
-    if (await hitRateLimit("charity-request", ipKeys(ctx.ip), limit.tries, limit.minutes)) {
+    // By internet address, and by the address to tell (so nobody can pile requests onto someone else's inbox from
+    // many places) and the signed-in account.
+    const keys = [...ipKeys(ctx.ip), ...(ctx.userId ? [`user:${ctx.userId}`] : [])];
+    const emailKey = r.notifyEmail ? hashedKey("email", r.notifyEmail) : null;
+    if (emailKey) keys.push(emailKey);
+    if (await hitRateLimit("charity-request", keys, limit.tries, limit.minutes)) {
       return { ok: false, message: CHARITY_REQUEST_MESSAGES.tooMany, status: 429 };
     }
     const db = createAdminClient();
     // Already listed under that name (searches can miss a name typed differently): send them to it instead.
-    const { data: listed } = await db.from("charities").select("name_en, slug").eq("status", "approved").ilike("name_en", r.name.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle();
+    // The database's lookup treats * as "anything", so the answer is checked here too: only the same name counts.
+    const { data: listedRows } = await db.from("charities").select("name_en, slug").eq("status", "approved").ilike("name_en", r.name.replace(/[%_*\\]/g, "\\$&")).limit(5);
+    const listed = (listedRows ?? []).find((c) => requestKey(c.name_en as string) === requestKey(r.name));
     if (listed?.slug) {
       return { ok: true, message: `${listed.name_en} is already on Givezy. Nothing was sent.`, existing: { name: listed.name_en as string, slug: listed.slug as string } };
     }

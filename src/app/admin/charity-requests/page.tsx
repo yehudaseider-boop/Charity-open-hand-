@@ -22,7 +22,7 @@ export default async function CharityRequestsPage() {
   const db = createAdminClient();
   const [open, owed, live] = await Promise.all([
     db.from("charity_requests").select("name, name_key, town, link, note, notify_email, status, created_at").in("status", ["new", "invited"]).order("created_at", { ascending: false }).limit(1000),
-    db.from("charity_requests").select("charity_id").eq("status", "added").not("notify_email", "is", null).is("notified_at", null).limit(1000),
+    db.from("charity_requests").select("charity_id").eq("status", "joined").not("notify_email", "is", null).is("notified_at", null).limit(1000),
     db.from("charities").select("id, name_en").eq("status", "approved").order("name_en").limit(2000),
   ]);
   if (open.error && notSetUp(open.error.code)) {
@@ -45,7 +45,7 @@ export default async function CharityRequestsPage() {
     town: r.town as string | null,
     link: r.link as string | null,
     note: r.note as string | null,
-    wants_email: Boolean(r.notify_email),
+    email: (r.notify_email as string | null) ?? null,
     status: r.status as RequestRow["status"],
     created_at: r.created_at as string,
   }));

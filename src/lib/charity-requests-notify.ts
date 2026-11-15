@@ -5,14 +5,20 @@ import { joinedEmail } from "@/lib/charity-requests";
 
 export type NotifySummary = { sent: number; failed: number };
 
+/** A claim older than this was cut off mid-way (the server stopped between claiming and finishing). */
+const STALE_CLAIM_MINUTES = 15;
+
 /**
- * Email everyone who asked for a charity (and ticked the box) that it has joined, then delete their address. Each
- * request is claimed first (notified_at), so two runs at once never email anyone twice. A send that surely didn't go
- * is released for "Try again"; one that may have gone is counted as sent, never repeated. Never throws per person.
+ * Email everyone who asked for a charity (and ticked the box) that it has joined, then delete their address.
+ * One email per address, however many requests carry it (asked twice, or under two spellings). The address's
+ * requests are claimed first (notified_at), so two runs at once never email anyone twice. A send that surely didn't
+ * go is released for "Try again"; one that may have gone is counted as sent and never repeated. Never throws per
+ * person.
  */
 export async function notifyJoined(charityId: string): Promise<NotifySummary> {
   const db = createAdminClient();
   const out: NotifySummary = { sent: 0, failed: 0 };
+  await clearStaleClaims();
   const { data: charity, error: cErr } = await db.from("charities").select("name_en, slug, status").eq("id", charityId).maybeSingle();
   if (cErr) throw cErr;
   if (!charity || charity.status !== "approved") return out;
@@ -23,32 +29,53 @@ export async function notifyJoined(charityId: string): Promise<NotifySummary> {
     .from("charity_requests")
     .select("id, notify_email")
     .eq("charity_id", charityId)
-    .eq("status", "added")
+    .eq("status", "joined")
     .not("notify_email", "is", null)
     .is("notified_at", null)
-    .limit(500);
+    .limit(1000);
   if (error) throw error;
+  const byAddress = new Map<string, string[]>();
+  for (const r of rows ?? []) {
+    const address = String(r.notify_email).trim().toLowerCase();
+    byAddress.set(address, [...(byAddress.get(address) ?? []), r.id as string]);
+  }
   const transport = getEmailTransport();
-  for (const row of rows ?? []) {
-    const claim = await db.from("charity_requests").update({ notified_at: new Date().toISOString() }).eq("id", row.id).is("notified_at", null).select("id");
+  for (const [address, ids] of byAddress) {
+    const claim = await db.from("charity_requests").update({ notified_at: new Date().toISOString() }).in("id", ids).is("notified_at", null).select("id");
     if (claim.error || !claim.data?.length) continue;
+    const claimed = claim.data.map((c) => c.id as string);
     try {
-      await transport.send({ to: row.notify_email as string, subject, text });
+      await transport.send({ to: address, subject, text });
       out.sent += 1;
     } catch (e) {
-      if (e instanceof EmailMaybeSent) {
-        // It may have gone: never send it again.
-        out.sent += 1;
-        console.error("[charity-request] the joined email may or may not have gone; not sending again", e);
-      } else {
+      if (!(e instanceof EmailMaybeSent)) {
         out.failed += 1;
         console.error("[charity-request] the joined email was not sent", e);
-        await db.from("charity_requests").update({ notified_at: null }).eq("id", row.id);
+        await db.from("charity_requests").update({ notified_at: null }).in("id", claimed);
         continue;
       }
+      // It may have gone: never send it again.
+      out.sent += 1;
+      console.error("[charity-request] the joined email may or may not have gone; not sending again", e);
     }
-    const { error: clearErr } = await db.from("charity_requests").update({ notify_email: null }).eq("id", row.id);
+    const { error: clearErr } = await db.from("charity_requests").update({ notify_email: null }).in("id", claimed);
+    // Left for clearStaleClaims to finish.
     if (clearErr) console.error("[charity-request] could not delete an address after its email", clearErr.message);
   }
   return out;
+}
+
+/**
+ * Addresses whose email was claimed but never finished (the server stopped, or deleting the address failed) are
+ * deleted, never kept: the email may have gone, so it is not sent again. Run before each send and by the daily job.
+ * Never throws; a missing table (the migration not yet run) is fine.
+ */
+export async function clearStaleClaims(now = new Date()): Promise<void> {
+  try {
+    const before = new Date(now.getTime() - STALE_CLAIM_MINUTES * 60_000).toISOString();
+    const { error } = await createAdminClient().from("charity_requests").update({ notify_email: null }).not("notify_email", "is", null).lt("notified_at", before);
+    if (error && error.code !== "PGRST205" && error.code !== "42P01") console.error("[charity-request] could not clear unfinished claims", error.message);
+  } catch (e) {
+    console.error("[charity-request] could not clear unfinished claims", e);
+  }
 }

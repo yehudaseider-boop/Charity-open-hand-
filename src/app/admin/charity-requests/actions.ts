@@ -41,7 +41,7 @@ export async function markJoined(nameKey: string, _prev: FormState, formData: Fo
   if (charity?.status !== "approved") return { ok: false, message: "That charity isn't live yet. Nothing was changed or sent.", fieldErrors: { charity_id: "Choose a live charity." } };
   const { data, error } = await db
     .from("charity_requests")
-    .update({ status: "added", charity_id: charityId })
+    .update({ status: "joined", charity_id: charityId })
     .eq("name_key", nameKey)
     .in("status", ["new", "invited"])
     .select("id");
@@ -59,9 +59,10 @@ export async function markJoined(nameKey: string, _prev: FormState, formData: Fo
 
 /** Emails that didn't go when a charity was marked as joined. */
 export async function retryJoined(charityId: string): Promise<FormState> {
-  await requirePlatformAdmin();
+  const admin = await requirePlatformAdmin();
   if (!UUID.test(charityId)) return { ok: false, message: "That charity wasn't found. Nothing was sent." };
   const sent = await notifyJoined(charityId).catch(() => null);
+  await logAudit({ actorUserId: admin.userId, action: "charity_request.retried", entityType: "charity", entityId: charityId, details: { sent: sent?.sent ?? 0, failed: sent?.failed ?? null } });
   done();
   if (!sent) return { ok: false, message: "We couldn't send them. Nothing was emailed. Please try again later." };
   return sent.failed ? { ok: false, message: `${sent.sent} emailed, ${sent.failed} still not sent.` } : { ok: true, message: `${sent.sent} emailed.` };

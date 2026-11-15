@@ -25,7 +25,7 @@ create table public.charity_requests (
   constraint charity_requests_consent_with_email check (notify_email is null or consent_version is not null),
   requested_by uuid references auth.users (id) on delete set null,
   came_from text not null constraint charity_requests_came_from check (came_from in ('website', 'app')),
-  status text not null default 'new' constraint charity_requests_status check (status in ('new', 'invited', 'added', 'declined')),
+  status text not null default 'new' constraint charity_requests_status check (status in ('new', 'invited', 'joined', 'declined')),
   -- The charity it became, once it joined (Admin picks it).
   charity_id uuid references public.charities (id) on delete set null,
   -- When the "it joined" email went to this person (their address is then cleared).
