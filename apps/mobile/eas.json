@@ -9,7 +9,10 @@
       "ios": {
         "resourceClass": "default"
       },
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "hello@givezy.co.za"
+      }
     }
   },
   "submit": {

@@ -2,6 +2,7 @@
 
 ## Decided
 
+- **Givezy's contact address is hello@givezy.co.za (16/11/2026, Yehuda set up the mailbox).** One address for everything: it is `legalConfig.supportEmail` and `privacyEmail` (the "Contact" link on the home and coming-soon pages, the Privacy Policy and Terms, "contact us" in plain-words errors, and where privacy requests are sent), and `EXPO_PUBLIC_SUPPORT_EMAIL` in the app's store build (eas.json). The Information Officer's name and email stay to be confirmed (Yosef). Emails the site sends will come from it too once Resend is set up (go-live list).
 - **Full code review and fixes (16/11/2026, Yehuda: "Yes go ahead, and yes to your recommendation on 6 and 8").** Five fresh reviews (money and receipts; security and the database; personal data and every email; the phone app; the dashboard, Admin and public pages) found nothing blocking: no gift marked paid without the provider's word, no double charge, no wrong s18A receipt, no access to another charity's data. Fixed the same day:
   1. "It joined" (Request a charity) counts only real sends: with email switched off, or an address off the test site's allowed list, the address is kept and Admin is told, instead of "emailed, and their addresses deleted".
   2. When the email service says "not now" (too many too fast, or its own outage) part-way through an appeal or a monthly thank-you, the run stops and everyone not yet emailed waits for "Send the rest". Before, the rest of the list was lost for good.

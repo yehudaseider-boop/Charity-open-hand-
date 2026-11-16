@@ -15,10 +15,10 @@ export const legalConfig = {
   address: null as string | null,
   /** POPIA Information Officer: name and contact email. */
   informationOfficer: { name: null as string | null, email: null as string | null },
-  /** Where people send privacy requests and complaints. */
-  privacyEmail: null as string | null,
-  /** Where charities ask for help (a lost authenticator, a change to their details). Not chosen yet. */
-  supportEmail: null as string | null,
+  /** Where people send privacy requests and complaints (Yehuda, 16/11/2026: the one Givezy mailbox). */
+  privacyEmail: "hello@givezy.co.za" as string | null,
+  /** Where donors and charities ask for help (Yehuda, 16/11/2026: hello@givezy.co.za, the one Givezy mailbox). */
+  supportEmail: "hello@givezy.co.za" as string | null,
 
   /** Version of the Terms and Privacy Policy (set in src/lib/policy.ts, shared with the app). */
   policyVersion: POLICY_VERSION,
