@@ -78,8 +78,9 @@ export function TaxPackView({ year, email, pack, current }: { year: number; emai
             <table className="mt-2 w-full text-sm">
               <thead><tr className="text-left text-muted"><th className="py-1 font-medium">Charity</th><th className="hidden py-1 text-right font-medium sm:table-cell print:table-cell">Donations</th><th className="py-1 pl-2 text-right font-medium">s18A</th><th className="py-1 pl-2 text-right font-medium">Total</th></tr></thead>
               <tbody>
-                {pack.byCharity.map((c) => (
-                  <tr key={c.name} className="border-t border-border">
+                {pack.byCharity.map((c, i) => (
+                  // Two charities can share a name (16/11/2026: grouped by charity, not name), so the place keys the row.
+                  <tr key={`${i}-${c.name}`} className="border-t border-border">
                     <td className="py-2 pr-2">{c.name}</td>
                     <td className="hidden py-2 text-right tabular-nums sm:table-cell print:table-cell">{c.count}</td>
                     <td className="py-2 pl-2 text-right whitespace-nowrap tabular-nums">{c.s18aCents ? formatRand(c.s18aCents) : "None"}</td>

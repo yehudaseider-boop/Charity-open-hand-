@@ -115,7 +115,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const [thanked, stopped, thisWeek] = canThank
     ? await Promise.all([
         lastThanked(id, shownDonors.map((d) => d.donor_id)),
-        optedOut(emailed.map((d) => d.email)),
+        optedOut(emailed.map((d) => d.email), id),
         // If this check fails the button still shows: sending checks again and says plainly if it's this week.
         messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) }))).catch((e: unknown) => {
           console.error("[donors] weekly check failed", e instanceof Error ? e.message : e);

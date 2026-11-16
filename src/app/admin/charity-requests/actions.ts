@@ -53,6 +53,7 @@ export async function markJoined(nameKey: string, _prev: FormState, formData: Fo
   await logAudit({ actorUserId: admin.userId, action: "charity_request.joined", entityType: "charity", entityId: charityId, details: { name_key: nameKey, count: data?.length ?? 0, sent: sent?.sent ?? 0, failed: sent?.failed ?? null } });
   done();
   if (!sent) return { ok: false, message: "Marked as joined, but the emails couldn't be sent. Nothing was emailed. Use Try again below." };
+  if (sent.skipped) return { ok: false, message: `Marked as joined. ${sent.sent ? `${sent.sent} emailed. ` : ""}${sent.skipped} ${sent.skipped === 1 ? "wasn't" : "weren't"} emailed: email isn't switched on here, or the address isn't on this site's allowed list. Their addresses are kept; use Try again.` };
   if (sent.failed) return { ok: false, message: `Marked as joined. ${sent.sent} emailed, ${sent.failed} not sent. Use Try again below.` };
   return { ok: true, message: sent.sent ? `Marked as joined. ${sent.sent} ${sent.sent === 1 ? "donor was" : "donors were"} emailed, and their addresses deleted.` : "Marked as joined. Nobody had asked for an email." };
 }
@@ -62,9 +63,10 @@ export async function retryJoined(charityId: string): Promise<FormState> {
   const admin = await requirePlatformAdmin();
   if (!UUID.test(charityId)) return { ok: false, message: "That charity wasn't found. Nothing was sent." };
   const sent = await notifyJoined(charityId).catch(() => null);
-  await logAudit({ actorUserId: admin.userId, action: "charity_request.retried", entityType: "charity", entityId: charityId, details: { sent: sent?.sent ?? 0, failed: sent?.failed ?? null } });
+  await logAudit({ actorUserId: admin.userId, action: "charity_request.retried", entityType: "charity", entityId: charityId, details: { sent: sent?.sent ?? 0, failed: sent?.failed ?? null, skipped: sent?.skipped ?? null } });
   done();
   if (!sent) return { ok: false, message: "We couldn't send them. Nothing was emailed. Please try again later." };
+  if (sent.skipped) return { ok: false, message: `${sent.sent ? `${sent.sent} emailed. ` : ""}${sent.skipped} still not emailed: email isn't switched on here, or the address isn't on this site's allowed list.` };
   return sent.failed ? { ok: false, message: `${sent.sent} emailed, ${sent.failed} still not sent.` } : { ok: true, message: `${sent.sent} emailed.` };
 }
 

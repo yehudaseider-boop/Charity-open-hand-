@@ -31,7 +31,7 @@ describe("emails to donors: what was typed", () => {
     expect(m.subject).toBe("Winter parcels");
     expect(m.replyTo).toBe("info@meals.org.za");
     expect(m.text.startsWith("Dear Dana,\n\nThank you.\n\nFrom Meals")).toBe(true);
-    expect(m.text).toContain("To stop news and appeals from Meals: https://g.test/news/stop?t=abc");
+    expect(m.text).toContain("To stop emails from Meals: https://g.test/news/stop?t=abc");
     expect(m.text).not.toMatch(/R\d|!/);
   });
   it("the charity's words sit in their own box: no links, no Givezy cards, nothing that looks like it came from Givezy (13/11/2026)", async () => {

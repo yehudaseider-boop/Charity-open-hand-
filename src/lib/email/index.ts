@@ -37,7 +37,21 @@ export interface EmailTransport {
   send(message: EmailMessage): Promise<SendOutcome>;
 }
 
-export class EmailError extends Error {}
+export class EmailError extends Error {
+  /** The email service's HTTP status, when it answered with a refusal. */
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
+
+/**
+ * The email service said "not now" (too many emails too fast, or its own outage), not "never": nothing was sent, and
+ * the same email can go later. A bulk send stops and leaves the rest for "Send the rest" (review 16/11/2026: before,
+ * such a refusal used up the donor's email for good).
+ */
+export function isTemporaryRefusal(e: unknown): boolean {
+  return e instanceof EmailError && e.status !== undefined && (e.status === 429 || e.status >= 500);
+}
 
 /**
  * The email may have left even though the send failed: the request was on its way to the provider when the
@@ -99,7 +113,7 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
         // The request may have reached Resend before the connection dropped or the time limit fired.
         throw new EmailMaybeSent(`The send to Resend was cut off: ${e instanceof Error ? e.message : String(e)}`);
       }
-      if (!res.ok) throw new EmailError(`Resend refused the email (${res.status}).`);
+      if (!res.ok) throw new EmailError(`Resend refused the email (${res.status}).`, res.status);
       return "sent";
     },
   };

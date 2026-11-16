@@ -257,10 +257,11 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       const told =
         emailed === "sent" ? `We've emailed them to contact you on ${String(d.phone ?? "your number")} or ${String(d.email ?? "your email")}.`
         : emailed === "no_address" ? "We have no email address for them, so please contact them yourself."
+        : emailed === "unknown" ? "The connection dropped while emailing them, so we can't tell whether it reached them. To be safe it won't be sent again: contact them yourself if you're not sure."
         : "The email to them hasn't gone yet: open the receipt and press Send the email again, or contact them yourself.";
       return {
         what: `You declined the s18A receipt for ${nameOf(d, "this donor")}. It's left out of your list. ${told}`,
-        next: emailed === "sent" || emailed === "no_address" || !d.key ? nextCertificate(c, d) : { label: "Open the receipt", href: certificateHref(c, d.taxYear, d.key) },
+        next: emailed === "sent" || emailed === "no_address" || emailed === "unknown" || !d.key ? nextCertificate(c, d) : { label: "Open the receipt", href: certificateHref(c, d.taxYear, d.key) },
       };
     }
     case "certificate_reopened":

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The phone's secure storage, as a plain map.
 const store = new Map<string, string>();
@@ -68,7 +68,13 @@ describe("counting a gift once", () => {
 });
 
 describe("kept on the phone, per person", () => {
-  beforeEach(() => store.clear());
+  // The store drops gifts older than a month by the real clock, so freeze it at the gifts' own date.
+  beforeEach(() => {
+    store.clear();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+  });
+  afterEach(() => vi.useRealTimers());
 
   it("survives the app closing, and is the giver's own", async () => {
     expect(await keepPendingGift("ann", gift() as never)).toBe(true);

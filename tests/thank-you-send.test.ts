@@ -22,13 +22,26 @@ vi.mock("@/lib/charity/weekly-limit", () => ({
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 /** Addresses whose send throws as a dropped connection would. */
 let dropFor = new Set<string>();
-const { MaybeSent } = vi.hoisted(() => ({ MaybeSent: class EmailMaybeSent extends Error {} }));
+const { MaybeSent, Refused } = vi.hoisted(() => ({
+  MaybeSent: class EmailMaybeSent extends Error {},
+  Refused: class EmailError extends Error {
+    constructor(message: string, readonly status?: number) {
+      super(message);
+    }
+  },
+}));
+/** Addresses for which the email service says "too many, slow down" (429). */
+let busyFor = new Set<string>();
+/** Address hashes that stopped every email from this charity with its own stop link. */
+let charityStops: string[] = [];
 vi.mock("@/lib/email", () => ({
-  EmailError: class EmailError extends Error {},
+  EmailError: Refused,
   EmailMaybeSent: MaybeSent,
+  isTemporaryRefusal: (e: unknown) => e instanceof Refused && e.status === 429,
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string }) => {
       if (dropFor.has(m.to)) throw new MaybeSent("fetch failed");
+      if (busyFor.has(m.to)) throw new Refused("Resend refused the email (429).", 429);
       return (sent.push(m), "sent");
     },
   }),
@@ -39,7 +52,9 @@ vi.mock("@/lib/supabase/admin", () => ({
       const b: Record<string, unknown> = {};
       const filters: Record<string, unknown> = {};
       let patch: Record<string, unknown> | null = null;
-      for (const m of ["select", "gte", "lt", "order", "delete"]) b[m] = () => b;
+      let deleting = false;
+      for (const m of ["select", "gte", "lt", "order"]) b[m] = () => b;
+      b.delete = () => ((deleting = true), b);
       b.eq = (col: string, val: unknown) => ((filters[col] = val), b);
       b.update = (p: Record<string, unknown>) => ((patch = p), b);
       b.neq = (col: string, val: string) => (neqs.push(`${table}.${col}!=${val}`), b);
@@ -50,7 +65,11 @@ vi.mock("@/lib/supabase/admin", () => ({
         }
         return { data: from === 0 ? donations : [], error: null };
       };
-      b.in = async (_c: string, hashes: string[]) => ({ data: hashes.filter((h) => optedOut.includes(h)).map((h) => ({ email_hash: h })), error: null });
+      // .in("source", ...) narrows a charity's own stops; the address list comes last.
+      b.in = (c: string, hashes: string[]) =>
+        c === "source"
+          ? b
+          : Promise.resolve({ data: hashes.filter((h) => (table === "charity_email_opt_outs" ? charityStops : optedOut).includes(h)).map((h) => ({ email_hash: h })), error: null });
       b.maybeSingle = async () => ({ data: month, error: null });
       b.insert = (row: Record<string, string>) => {
         if (table === "email_stop_tokens") {
@@ -71,6 +90,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         },
       });
       b.then = (ok: (v: unknown) => unknown) => {
+        if (deleting && table === "charity_thank_you_recipients") recipients.delete(filters.email_hash as string);
         if (patch && table === "charity_thank_you_recipients") {
           if (statusSaveFails) return Promise.resolve({ error: { message: "down" } }).then(ok);
           recipients.set(filters.email_hash as string, patch.status as string);
@@ -89,6 +109,8 @@ const args = { charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", 
 
 beforeEach(() => {
   sent.length = 0;
+  busyFor = new Set();
+  charityStops = [];
   tokens.length = 0;
   month = null;
   recipients = new Map();
@@ -101,6 +123,29 @@ beforeEach(() => {
 });
 
 describe("sending a thank-you", () => {
+  it("someone who stopped this charity's emails with its own stop link gets no thank-you from it (16/11/2026)", async () => {
+    donations = [gift("sarah@x.co", "Sarah"), gift("david@x.co", "David")];
+    charityStops = [emailHash("sarah@x.co")];
+    const r = await sendThankYou(args);
+    expect(r).toMatchObject({ ok: true, sent: 1 });
+    expect(sent.map((m) => m.to)).toEqual(["david@x.co"]);
+  });
+
+  it("the email service saying 'not now' stops the run and hands the address back for Send the rest (review 16/11/2026)", async () => {
+    donations = [gift("ann@x.co", "Ann"), gift("ben@x.co", "Ben"), gift("cat@x.co", "Cat")];
+    busyFor = new Set(["ben@x.co"]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await sendThankYou(args);
+    err.mockRestore();
+    expect(sent.map((m) => m.to)).toEqual(["ann@x.co"]);
+    expect(r).toMatchObject({ ok: true, sent: 1, failed: 0, remaining: 2 });
+    expect(month?.finished_at).toBeNull();
+    busyFor = new Set();
+    await continueThankYou(args);
+    expect(sent.map((m) => m.to)).toEqual(["ann@x.co", "ben@x.co", "cat@x.co"]);
+    expect(month?.finished_at).not.toBeNull();
+  });
+
   it("emails each address once, skipping erased and opted-out donors", async () => {
     donations = [gift("sarah@x.co", "Sarah"), gift("SARAH@x.co", "Sarah"), gift("erased+1@erased.invalid", null), gift("gone@x.co", "Gone", true), gift("stop@x.co", "Stop"), gift("david@x.co", "David")];
     optedOut = [emailHash("stop@x.co")];

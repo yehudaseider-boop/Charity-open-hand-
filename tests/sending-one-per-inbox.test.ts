@@ -114,6 +114,8 @@ async function rpc(name: string, args: { p_appeal_id: string; p_limit: number })
 const sent: { to: string; subject: string }[] = [];
 /** Addresses whose send throws as a dropped connection would (fetch's "fetch failed"). */
 let dropFor = new Set<string>();
+/** Addresses for which the email service answers "too many, slow down" (429): nothing goes. */
+let busyFor = new Set<string>();
 let donorList: Row[] = [];
 
 vi.mock("server-only", () => ({}));
@@ -125,15 +127,21 @@ vi.mock("@/lib/charity/weekly-limit", () => ({ WEEKLY_LIMIT: "One a week.", mess
 vi.mock("@/lib/charity/dashboard-queries", () => ({ loadDonors: async () => donorList }));
 vi.mock("@/lib/charity/donor-care", () => ({ lapsedDaysFor: async () => 365, listSegments: async () => [], listTags: async () => [], tagsByDonor: async () => new Map() }));
 vi.mock("@/lib/email", () => {
-  class EmailError extends Error {}
+  class EmailError extends Error {
+    constructor(message: string, readonly status?: number) {
+      super(message);
+    }
+  }
   class EmailMaybeSent extends Error {}
   return {
     EmailError,
     EmailMaybeSent,
+    isTemporaryRefusal: (e: unknown) => e instanceof EmailError && (e.status === 429 || (e.status ?? 0) >= 500),
     getEmailTransport: () => ({
       name: "resend",
       send: async (m: { to: string; subject: string }) => {
         if (dropFor.has(m.to.toLowerCase())) throw new EmailMaybeSent("fetch failed");
+        if (busyFor.has(m.to.toLowerCase())) throw new EmailError("Resend refused the email (429).", 429);
         sent.push({ to: m.to, subject: m.subject });
         return "sent";
       },
@@ -158,6 +166,7 @@ const donor = (donor_id: string, email: string, donor_type = "individual") => ({
 beforeEach(() => {
   sent.length = 0;
   dropFor = new Set();
+  busyFor = new Set();
   nextId = 1;
   forgetJourneysV2();
   process.env.SITE_URL = "https://g.test";
@@ -188,6 +197,28 @@ describe("an appeal reaches each inbox once", () => {
     expect(status).toEqual({ sarah: "sent", "sarah-co": "skipped", ben: "sending" });
     // "sending" counts as not sent on the page, and is never claimed again by "Send the rest".
     expect(p).toMatchObject({ sent: 1, skipped: 1, failed: 1, waiting: 0 });
+  });
+});
+
+describe("the email service saying 'not now' part-way (review 16/11/2026)", () => {
+  it("stops the appeal and leaves that donor and everyone after waiting for Send the rest; nothing is lost", async () => {
+    donorList = [donor("ann", "ann@x.co"), donor("ben", "ben@x.co"), donor("cat", "cat@x.co")];
+    tables.charity_appeals = [];
+    tables.charity_appeal_recipients = [];
+    const id = await createAppeal({ charityId: C, userId: "u1", subject: "Winter parcels", body: "Thank you for helping.", audience: { kind: "all" }, pick: { donors: donorList as never, stopped: 0, thisWeek: 0, recordedOnly: 0, label: "All your donors" } });
+    for (const r of tables.charity_appeal_recipients) r.status = "waiting";
+    busyFor = new Set(["ben@x.co"]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const p = await sendAppeal({ charityId: C, appealId: id, charityName: "Meals Fund", replyTo: null, userId: "u1" });
+    err.mockRestore();
+    expect(sent.map((m) => m.to)).toEqual(["ann@x.co"]);
+    const status = Object.fromEntries(tables.charity_appeal_recipients.map((r) => [r.donor_id, r.status]));
+    expect(status).toEqual({ ann: "sent", ben: "waiting", cat: "waiting" });
+    expect(p).toMatchObject({ sent: 1, failed: 0, waiting: 2 });
+    // Send the rest, once the service is happy again: the two who waited get it, nobody twice.
+    busyFor = new Set();
+    await sendAppeal({ charityId: C, appealId: id, charityName: "Meals Fund", replyTo: null, userId: "u1" });
+    expect(sent.map((m) => m.to).sort()).toEqual(["ann@x.co", "ben@x.co", "cat@x.co"]);
   });
 });
 

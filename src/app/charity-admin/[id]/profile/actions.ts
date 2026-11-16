@@ -36,6 +36,7 @@ function revalidate(charityId: string, slug: string) {
   revalidatePath(`/charity-admin/${charityId}/profile`);
   revalidatePath(`/c/${slug}`);
   revalidatePath("/charities");
+  revalidatePath("/browse-charities"); // the plain list is served from this cached twin (see src/proxy.ts)
 }
 
 

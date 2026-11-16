@@ -6,7 +6,9 @@
  * ("Thanks;=cmd…") is defused the same way.
  */
 
-const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+// A plain number (an amount) is left alone, negative ones too. One that starts with "+" is not: that is a phone
+// number like +447911123456, and left bare a spreadsheet would open it as 447911123456, so it gets the apostrophe.
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
 
 export function csvCell(value: string | number | null | undefined): string {
   let s = value === null || value === undefined ? "" : String(value);

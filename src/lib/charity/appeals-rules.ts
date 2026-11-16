@@ -96,7 +96,7 @@ export function appealEmail(
       "",
       "",
       v.replyTo ? `${v.charityName} sent this through Givezy. Reply to this email to reach them.` : `${v.charityName} sent this through Givezy.`,
-      `You're getting this because you gave to ${v.charityName} on Givezy. To stop news and appeals from ${v.charityName}: ${v.stopUrl}`,
+      `You're getting this because you gave to ${v.charityName} on Givezy. To stop emails from ${v.charityName}: ${v.stopUrl}`,
     ].join("\n"),
   };
 }

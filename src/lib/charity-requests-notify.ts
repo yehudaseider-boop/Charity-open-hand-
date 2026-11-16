@@ -3,7 +3,8 @@ import { EmailMaybeSent, getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailKeptSince, joinedEmail } from "@/lib/charity-requests";
 
-export type NotifySummary = { sent: number; failed: number };
+/** `skipped`: email isn't switched on here, or the address isn't on the test site's allowed list. Nothing went. */
+export type NotifySummary = { sent: number; failed: number; skipped: number };
 
 /** A claim older than this was cut off mid-way (the server stopped between claiming and finishing). */
 const STALE_CLAIM_MINUTES = 15;
@@ -17,7 +18,7 @@ const STALE_CLAIM_MINUTES = 15;
  */
 export async function notifyJoined(charityId: string): Promise<NotifySummary> {
   const db = createAdminClient();
-  const out: NotifySummary = { sent: 0, failed: 0 };
+  const out: NotifySummary = { sent: 0, failed: 0, skipped: 0 };
   await clearStaleClaims();
   const { data: charity, error: cErr } = await db.from("charities").select("name_en, slug, status").eq("id", charityId).maybeSingle();
   if (cErr) throw cErr;
@@ -45,7 +46,14 @@ export async function notifyJoined(charityId: string): Promise<NotifySummary> {
     if (claim.error || !claim.data?.length) continue;
     const claimed = claim.data.map((c) => c.id as string);
     try {
-      await transport.send({ to: address, subject, text });
+      const outcome = await transport.send({ to: address, subject, text });
+      if (outcome !== "sent") {
+        // Nothing went (review 16/11/2026: this was counted as sent and the address deleted, so the donor could never
+        // be told). The address is kept for Try again.
+        out.skipped += 1;
+        await db.from("charity_requests").update({ notified_at: null }).in("id", claimed);
+        continue;
+      }
       out.sent += 1;
     } catch (e) {
       if (!(e instanceof EmailMaybeSent)) {

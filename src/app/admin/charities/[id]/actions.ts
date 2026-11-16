@@ -22,6 +22,7 @@ function refresh(id: string, slug?: string) {
   revalidatePath(`/admin/charities/${id}`);
   revalidatePath("/admin/charities");
   revalidatePath("/charities");
+  revalidatePath("/browse-charities"); // the plain list is served from this cached twin (see src/proxy.ts)
   if (slug) revalidatePath(`/c/${slug}`);
 }
 

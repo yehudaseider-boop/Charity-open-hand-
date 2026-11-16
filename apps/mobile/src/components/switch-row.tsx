@@ -17,7 +17,7 @@ export function SwitchRow({ label, description, more, value, onChange }: { label
         accessibilityRole="switch"
         accessibilityState={{ checked: value }}
         accessibilityLabel={label}
-        accessibilityHint={more ? `${description ?? ""} ${more}`.trim() : undefined}
+        accessibilityHint={[description, more].filter(Boolean).join(" ") || undefined}
         onPress={() => {
           haptic.tap();
           onChange(!value);

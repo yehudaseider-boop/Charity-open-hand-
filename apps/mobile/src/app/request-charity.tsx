@@ -38,9 +38,11 @@ export default function RequestCharity() {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState<Extract<RequestReply, { ok: true }> | null>(null);
   const scroll = useRef<ScrollViewInstance>(null);
+  // Set before anything is awaited, so a double tap in the same frame can't send the request twice.
+  const sendingRef = useRef(false);
 
   const send = async () => {
-    if (sending) return;
+    if (sendingRef.current) return;
     const checked = checkCharityRequest({ name, town, link, note, emailMe, email });
     if (!checked.ok) {
       haptic.soft();
@@ -51,10 +53,16 @@ export default function RequestCharity() {
     }
     setErrors({});
     setProblem(null);
+    sendingRef.current = true;
     setSending(true);
-    const token = await account.accessToken().catch(() => null);
-    const reply = await sendCharityRequest({ name, town, link, note, emailMe, email }, token);
-    setSending(false);
+    let reply: RequestReply;
+    try {
+      const token = await account.accessToken().catch(() => null);
+      reply = await sendCharityRequest({ name, town, link, note, emailMe, email }, token);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
     if (reply.ok) {
       haptic.success();
       setDone(reply);

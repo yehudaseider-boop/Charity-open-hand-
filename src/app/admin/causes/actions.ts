@@ -13,6 +13,7 @@ const back = (q: Record<string, string>) => `/admin/causes?${new URLSearchParams
 function refresh() {
   revalidatePath("/admin/causes");
   revalidatePath("/charities");
+  revalidatePath("/browse-charities"); // the plain list is served from this cached twin (see src/proxy.ts)
   revalidatePath("/");
 }
 

@@ -13,7 +13,7 @@ let charities: { id: string; name_en: string; slug: string; status: string }[] =
 const inserts: Record<string, unknown>[] = [];
 let insertError: { code: string; message: string } | null = null;
 const sent: string[] = [];
-let sendFails: "no" | "surely" | "maybe" = "no";
+let sendFails: "no" | "surely" | "maybe" | "off" = "no";
 let limited = false;
 
 function q(table: string) {
@@ -51,6 +51,7 @@ vi.mock("@/lib/email", () => {
       name: "test",
       send: async (m: { to: string }) => {
         if (sendFails === "surely") throw new Error("refused");
+        if (sendFails === "off") return "skipped";
         sent.push(m.to);
         if (sendFails === "maybe") throw new EmailMaybeSent("cut off");
         return "sent";
@@ -79,29 +80,36 @@ beforeEach(() => {
 describe("the email when a charity joins", () => {
   it("goes once per address, even when one person asked twice, and every address is deleted after", async () => {
     rows = [joined("r1", "thandi@example.co.za"), joined("r2", "Thandi@Example.co.za"), joined("r3", "sipho@example.co.za"), joined("r4", null)];
-    expect(await notifyJoined("c1")).toEqual({ sent: 2, failed: 0 });
+    expect(await notifyJoined("c1")).toEqual({ sent: 2, failed: 0, skipped: 0 });
     expect(sent.sort()).toEqual(["sipho@example.co.za", "thandi@example.co.za"]);
     expect(rows.every((r) => r.notify_email === null)).toBe(true);
     // A second press sends nothing more.
-    expect(await notifyJoined("c1")).toEqual({ sent: 0, failed: 0 });
+    expect(await notifyJoined("c1")).toEqual({ sent: 0, failed: 0, skipped: 0 });
     expect(sent).toHaveLength(2);
   });
 
   it("a send that surely didn't go keeps the address for Try again", async () => {
     rows = [joined("r1", "thandi@example.co.za")];
     sendFails = "surely";
-    expect(await notifyJoined("c1")).toEqual({ sent: 0, failed: 1 });
+    expect(await notifyJoined("c1")).toEqual({ sent: 0, failed: 1, skipped: 0 });
     expect(rows[0]).toMatchObject({ notify_email: "thandi@example.co.za", notified_at: null });
   });
 
   it("a send that may have gone is never repeated, and the address is still deleted", async () => {
     rows = [joined("r1", "thandi@example.co.za")];
     sendFails = "maybe";
-    expect(await notifyJoined("c1")).toEqual({ sent: 1, failed: 0 });
+    expect(await notifyJoined("c1")).toEqual({ sent: 1, failed: 0, skipped: 0 });
     expect(rows[0].notify_email).toBeNull();
     sendFails = "no";
     await notifyJoined("c1");
     expect(sent).toHaveLength(1);
+  });
+
+  it("with email switched off nothing counts as sent, and the address is kept for Try again (review 16/11/2026)", async () => {
+    rows = [joined("r1", "thandi@example.co.za")];
+    sendFails = "off";
+    expect(await notifyJoined("c1")).toEqual({ sent: 0, failed: 0, skipped: 1 });
+    expect(rows[0]).toMatchObject({ notify_email: "thandi@example.co.za", notified_at: null });
   });
 
   it("an address left behind by a send that was cut off is deleted, not kept or sent again", async () => {
@@ -124,7 +132,7 @@ describe("the email when a charity joins", () => {
   it("sends nothing for a charity that isn't live", async () => {
     charities[0].status = "pending_review";
     rows = [joined("r1", "thandi@example.co.za")];
-    expect(await notifyJoined("c1")).toEqual({ sent: 0, failed: 0 });
+    expect(await notifyJoined("c1")).toEqual({ sent: 0, failed: 0, skipped: 0 });
     expect(rows[0].notify_email).toBe("thandi@example.co.za");
   });
 });

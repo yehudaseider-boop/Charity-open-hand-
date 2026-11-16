@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
-import { getEmailTransport } from "@/lib/email";
+import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
@@ -53,7 +53,7 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   const all = [...byEmail.values()];
   if (!all.length) return [];
   const hashes = all.map((r) => emailHash(r.email));
-  const stopped = new Set<string>();
+  const stopped = await stoppedThisCharity(charityId, hashes);
   for (let i = 0; i < hashes.length; i += 200) {
     const { data, error } = await db.from("thank_you_opt_outs").select("email_hash").in("email_hash", hashes.slice(i, i + 200));
     if (error) throw error;
@@ -168,6 +168,14 @@ async function runThankYou(args: { charityId: string; charityName: string; month
       await mark(outcome === "sent" ? "sent" : "failed");
     } catch (e) {
       console.error("[thank-you] not sent", e instanceof Error ? e.message : e);
+      if (isTemporaryRefusal(e)) {
+        // The email service said "not now": nothing went. Hand this address back and stop; "Send the rest" carries on.
+        const { error: releaseError } = await db.from("charity_thank_you_recipients").delete().eq("thank_you_id", args.thankYouId).eq("email_hash", hash);
+        if (releaseError) console.error("[thank-you] claim not released", releaseError.message);
+        else claimed.delete(hash);
+        stoppedEarly = true;
+        break;
+      }
       // Cut off or a dropped connection: it may have gone, so it stays "sending" (counted as not sent, but still this
       // donor's message for the week, and never sent again). Only a refusal is marked failed.
       if (!mayHaveSent(e)) await mark("failed");
@@ -253,8 +261,12 @@ export async function sendDonorThankYou(args: {
   const name = (individual ? [d.first_name, d.last_name].filter(Boolean).join(" ") : d.organisation_name) || "this donor";
   const greeting = individual ? d.first_name : d.contact_person?.split(/\s+/)[0] ?? null;
   const hash = emailHash(d.email);
-  const { data: stopped, error: stopError } = await db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", hash).maybeSingle();
+  const [{ data: stopped, error: stopError }, fromCharity] = await Promise.all([
+    db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", hash).maybeSingle(),
+    stoppedThisCharity(args.charityId, [hash]),
+  ]);
   if (stopError) throw stopError;
+  if (fromCharity.has(hash)) return { ok: false, message: `${isolate(name)} asked not to get emails from you, so nothing was sent.` };
   // The name sits in a sentence on the page: isolated, so a right-to-left name doesn't reorder the words around it.
   if (stopped) return { ok: false, message: `${isolate(name)} asked not to get thank-you emails from charities, so nothing was sent.` };
   const thisWeek = `${isolate(name)} already had a message from you this week, so nothing was sent. ${WEEKLY_LIMIT} You can thank them from Monday.`;
@@ -304,30 +316,62 @@ export async function sendDonorThankYou(args: {
 /** When each of these donors was last thanked personally by this charity (service role: check access first). */
 export async function lastThanked(charityId: string, donorIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  if (!donorIds.length) return out;
-  const { data, error } = await createAdminClient()
-    .from("charity_donor_thanks")
-    .select("donor_id, sent_at")
-    .eq("charity_id", charityId)
-    // Thank-yous only: the same table also holds the week's s18A reminders (they share the one-a-week limit).
-    .eq("kind", "thank_you")
-    .in("donor_id", donorIds)
-    .order("sent_at", { ascending: false });
-  if (error) throw error;
-  for (const r of data ?? []) if (!out.has(r.donor_id as string)) out.set(r.donor_id as string, r.sent_at as string);
+  // In pages of 200: a busy week's new donors must not make the request too long (review 16/11/2026).
+  for (let i = 0; i < donorIds.length; i += 200) {
+    const { data, error } = await createAdminClient()
+      .from("charity_donor_thanks")
+      .select("donor_id, sent_at")
+      .eq("charity_id", charityId)
+      // Thank-yous only: the same table also holds the week's s18A reminders (they share the one-a-week limit).
+      .eq("kind", "thank_you")
+      .in("donor_id", donorIds.slice(i, i + 200))
+      .order("sent_at", { ascending: false });
+    if (error) throw error;
+    for (const r of data ?? []) if (!out.has(r.donor_id as string)) out.set(r.donor_id as string, r.sent_at as string);
+  }
   return out;
 }
 
-/** Which of these addresses asked not to get thank-you emails (service role: check access first). */
-export async function optedOut(emails: string[]): Promise<Set<string>> {
-  const byHash = new Map(emails.map((e) => [emailHash(e), e.trim().toLowerCase()]));
+/**
+ * Which of these addresses asked not to get thank-you emails: from any charity, or (with `charityId`) every email
+ * from this charity through its own stop link (service role: check access first). In pages of 200, so a busy week
+ * never makes the request too long (review 16/11/2026).
+ */
+export async function optedOut(emails: string[], charityId?: string): Promise<Set<string>> {
+  const byHash = new Map(emails.filter(Boolean).map((e) => [emailHash(e), e.trim().toLowerCase()]));
   const out = new Set<string>();
   if (!byHash.size) return out;
-  const { data, error } = await createAdminClient().from("thank_you_opt_outs").select("email_hash").in("email_hash", [...byHash.keys()]);
-  if (error) throw error;
-  for (const r of data ?? []) {
-    const e = byHash.get(r.email_hash as string);
+  const hashes = [...byHash.keys()];
+  const stopped = charityId ? await stoppedThisCharity(charityId, hashes) : new Set<string>();
+  for (let i = 0; i < hashes.length; i += 200) {
+    const { data, error } = await createAdminClient().from("thank_you_opt_outs").select("email_hash").in("email_hash", hashes.slice(i, i + 200));
+    if (error) throw error;
+    for (const r of data ?? []) stopped.add(r.email_hash as string);
+  }
+  for (const h of stopped) {
+    const e = byHash.get(h);
     if (e) out.add(e);
+  }
+  return out;
+}
+
+/**
+ * Addresses (as hashes) that stopped every email from this charity: its stop link, or the charity noting it for them
+ * (Yehuda, 16/11/2026: "To stop emails from {charity}" must stop its thank-yous too). The checkout tick
+ * "No news or appeals" is not counted here: it promised news and appeals only. Confirmations and s18A receipts are
+ * never stopped.
+ */
+export async function stoppedThisCharity(charityId: string, hashes: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < hashes.length; i += 200) {
+    const { data, error } = await createAdminClient()
+      .from("charity_email_opt_outs")
+      .select("email_hash")
+      .eq("charity_id", charityId)
+      .in("source", ["stop_link", "charity"])
+      .in("email_hash", hashes.slice(i, i + 200));
+    if (error) throw error;
+    for (const r of data ?? []) out.add(r.email_hash as string);
   }
   return out;
 }

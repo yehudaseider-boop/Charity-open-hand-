@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
-import { getEmailTransport } from "@/lib/email";
+import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { mayHaveSent } from "@/lib/email/retry-plan";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -195,7 +195,9 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
   let donorsById: Map<string, DonorRow> | null = null;
   // Addresses this run has emailed (or tried to): a second donor with the same address is skipped, never emailed twice.
   const inbox = new Set<string>();
-  while (Date.now() - started < budget) {
+  // The email service said "not now": stop, and leave everyone not yet sent waiting for "Send the rest".
+  let paused = false;
+  while (!paused && Date.now() - started < budget) {
     const { data: claimed, error: claimError } = await db().rpc("claim_appeal_recipients", { p_appeal_id: appeal.id, p_limit: 25 });
     if (claimError) throw claimError;
     const ids = ((claimed ?? []) as { donor_id: string }[]).map((r) => r.donor_id);
@@ -215,8 +217,13 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
     );
     for (const id of ids) {
       const d = donorsById.get(id);
-      const mark = (status: "sent" | "failed" | "skipped") =>
+      const mark = (status: "sent" | "failed" | "skipped" | "waiting") =>
         db().from("charity_appeal_recipients").update({ status, ...(status === "sent" ? { sent_at: new Date().toISOString() } : {}) }).eq("appeal_id", appeal.id).eq("donor_id", id);
+      if (paused) {
+        // Claimed in this batch but not tried: back in the queue.
+        await mark("waiting");
+        continue;
+      }
       if (!d?.email || isErasedEmail(d.email) || stopped.has(d.email.trim().toLowerCase()) || recent.has(id) || inbox.has(inboxKey(d.email))) {
         await mark("skipped");
         continue;
@@ -236,6 +243,13 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
         await mark(outcome === "sent" ? "sent" : "skipped");
       } catch (e) {
         console.error("[appeal] not sent", e instanceof Error ? e.message : e);
+        if (isTemporaryRefusal(e)) {
+          // Nothing went: this donor waits for "Send the rest", and so does everyone after them.
+          inbox.delete(inboxKey(d.email));
+          await mark("waiting");
+          paused = true;
+          continue;
+        }
         // Cut off or a dropped connection: it may have gone, so the row stays "sending" (counted as not sent, still this
         // donor's message for the week, never sent again). Only a refusal is marked failed.
         if (!mayHaveSent(e)) await mark("failed");
@@ -293,7 +307,9 @@ export async function stopAppeals(token: string): Promise<{ charityName: string 
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, charities(name_en)").eq("token_hash", sha(token)).maybeSingle();
   if (!data) return null;
-  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: data.charity_id, email_hash: data.email_hash, source: "stop_link" }, { onConflict: "charity_id,email_hash", ignoreDuplicates: true });
+  // Not ignoreDuplicates: an earlier "no news" tick at checkout becomes a stop link, which also stops thank-yous
+  // (16/11/2026), as the stop page promises.
+  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: data.charity_id, email_hash: data.email_hash, source: "stop_link" }, { onConflict: "charity_id,email_hash" });
   if (error) throw error;
   const c = data.charities as unknown as { name_en: string } | null;
   return { charityName: c?.name_en ?? "this charity" };

@@ -1,10 +1,12 @@
 import "server-only";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { brandColors } from "@/lib/brand-colors";
 import { getViewer } from "@/lib/auth";
 import { hasSecondStep } from "@/lib/mfa";
 import { hitRateLimit } from "@/lib/rate-limit";
+import { crossSiteRequest } from "@/lib/same-site";
 import { createClient } from "@/lib/supabase/server";
 import { can, refusedFor, type Permission } from "./permissions";
 import { memberRole } from "./team";
@@ -15,6 +17,9 @@ import { memberRole } from "./team";
  * or a response to send straight back.
  */
 export async function authoriseExport(id: string, permission: Permission = "export"): Promise<{ userId: string } | NextResponse> {
+  // A download started by another site (a hidden link or image) is refused first, before it can use up the
+  // rate limit or add a line to the audit log. A click on the dashboard, a bookmark or an older browser still works.
+  if (crossSiteRequest(await headers())) return refusal("This download only works from your Givezy dashboard. Nothing was downloaded.", 403, `/charity-admin`, "Back to your charities");
   const supabase = await createClient();
   // The viewer, not just any user: a session started with a password sees nothing (see auth.ts).
   const user = await getViewer();

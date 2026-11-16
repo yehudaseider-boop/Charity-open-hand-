@@ -275,6 +275,10 @@ describe("sending reminders", () => {
   });
 
   it("one message a week: a reminder after a thank-you is skipped, and a thank-you after a reminder is refused", async () => {
+    // Both sends on the test's own day (16/11/2026: the thank-you used the real clock, so the test failed once a new
+    // week began).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     expect((await sendDonorThankYou({ charityId: "c1", charityName: "Meals Fund", donorId: "sarah", body: "Thank you, truly.", userId: "u1", replyTo: null })).ok).toBe(true);
     const r = await sendS18aReminders(args(["sarah"]));
     expect(r.sent).toBe(0);
@@ -291,6 +295,7 @@ describe("sending reminders", () => {
     // Pressing again the same week sends nothing more.
     expect((await sendS18aReminders(args(["sarah"]))).skipped.this_week).toBe(1);
     expect(sent).toHaveLength(1);
+    vi.useRealTimers();
   });
 
   it("a news email or appeal sent this week counts too", async () => {
