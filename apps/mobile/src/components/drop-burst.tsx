@@ -16,20 +16,23 @@ const DROPS = [
 
 /**
  * A small burst of the logo's own drops (lilac, orange and blue), once, when a gift goes through. Never repeats and
- * is left out entirely for anyone who asks their phone for less motion. Decoration only.
+ * is left out entirely for anyone who asks their phone for less motion. Decoration only. `compact` is the smaller,
+ * quicker one that plays over the Give button when its tick shows.
  */
-export function DropBurst() {
+export function DropBurst({ compact = false }: { compact?: boolean }) {
   const [t] = useState(() => new Animated.Value(0));
   const [calm] = useState(() => reduceMotion());
+  const span = compact ? 800 : 1500;
+  const k = compact ? 0.5 : 1;
   useEffect(() => {
     if (calm) return;
-    Animated.timing(t, { toValue: 1, duration: 1500, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [t, calm]);
+    Animated.timing(t, { toValue: 1, duration: span, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [t, calm, span]);
   if (calm) return null;
   return (
     <View pointerEvents="none" style={styles.box} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {DROPS.map((d, i) => {
-        const a = d.delay / 1500;
+        const a = (compact ? d.delay / 2 : d.delay) / span;
         return (
           <Animated.View
             key={i}
@@ -37,13 +40,13 @@ export function DropBurst() {
               position: "absolute",
               opacity: t.interpolate({ inputRange: [0, a, a + 0.08, 0.7, 1], outputRange: [0, 0, 1, 1, 0], extrapolate: "clamp" }),
               transform: [
-                { translateX: t.interpolate({ inputRange: [0, a, 1], outputRange: [0, 0, d.dx], extrapolate: "clamp" }) },
-                { translateY: t.interpolate({ inputRange: [0, a, 0.6, 1], outputRange: [0, 0, d.dy, d.dy + 40], extrapolate: "clamp" }) },
+                { translateX: t.interpolate({ inputRange: [0, a, 1], outputRange: [0, 0, d.dx * k], extrapolate: "clamp" }) },
+                { translateY: t.interpolate({ inputRange: [0, a, 0.6, 1], outputRange: [0, 0, d.dy * k, (d.dy + 40) * k], extrapolate: "clamp" }) },
                 { scale: t.interpolate({ inputRange: [0, a, a + 0.25, 1], outputRange: [0.2, 0.2, 1, 0.9], extrapolate: "clamp" }) },
               ],
             }}
           >
-            <Drop size={d.size} color={d.color} rotate={d.rot} />
+            <Drop size={Math.round(d.size * (compact ? 0.55 : 1))} color={d.color} rotate={d.rot} />
           </Animated.View>
         );
       })}

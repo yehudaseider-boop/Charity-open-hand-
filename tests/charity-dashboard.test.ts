@@ -30,8 +30,15 @@ describe("csv export", () => {
   it("leaves ordinary numbers and phone numbers alone", () => {
     expect(csvCell("1250.00")).toBe("1250.00");
     expect(csvCell("-35.50")).toBe("-35.50");
-    expect(csvCell("+27821234567")).toBe("+27821234567");
     expect(csvCell("082 123 4567")).toBe("082 123 4567");
+  });
+
+  it("keeps the + on a foreign phone number by writing it as text", () => {
+    expect(csvCell("+447911123456")).toBe("'+447911123456");
+    expect(csvCell(csvPhone("+447911123456"))).toBe("'+447911123456");
+    expect(csvCell("+27821234567")).toBe("'+27821234567");
+    // Still defused like any other cell that starts with +.
+    expect(csvCell("+1+cmd|' /C calc'!A0")).toBe("'+1+cmd|' /C calc'!A0");
   });
 
   it("writes a header, CRLF rows and a byte order mark (for accents and Hebrew)", () => {

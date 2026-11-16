@@ -10,7 +10,8 @@ chain.then = (ok: (v: unknown) => unknown) => ok({ data: [], error: null });
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => chain }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(async () => undefined) }));
 
-const { afterTry, nextTryAt, safeErrorText, emailIsOn, retryDigestLines, tooOld, wasCutOff, MAX_TRIES } = await import("@/lib/email/retry-plan");
+const { afterTry, nextTryAt, safeErrorText, emailIsOn, retryDigestLines, tooOld, wasCutOff, mayHaveSent, MAX_TRIES } = await import("@/lib/email/retry-plan");
+const { EmailError, EmailMaybeSent } = await import("@/lib/email");
 const { runEmailRetries, markRetryGone, recordFailedConfirmations } = await import("@/lib/email/retry");
 const { declinedNoticeStillTrue, declinedInfoFrom } = await import("@/lib/donations/monthly-declined-retry");
 const { DECLINED_REASON } = await import("@/lib/donations/monthly-reasons");
@@ -49,7 +50,7 @@ function fakeStore(rows: Row[], opts: { taken?: Set<string>; missing?: boolean; 
   };
 }
 const row = (id: string, o: Partial<Row> = {}): Row => ({ id, kind: "donation_confirmation", refId: `ref-${id}`, payload: {}, tries: 1, createdAt: T0, ...o });
-const cutOff = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+const cutOff = () => new EmailMaybeSent("The send to Resend was cut off: The operation was aborted due to timeout");
 
 describe("the waits", () => {
   it("tries an hour after the first failure, then a day, then three days, then stops", () => {
@@ -158,7 +159,8 @@ describe("the daily run of tries", () => {
     const s = await runEmailRetries({
       store: f.store,
       handlers: handlers(async () => {
-        throw new Error("timeout talking to sipho@example.test");
+        // The email service answered and refused it: sure not to have gone, so it is tried again.
+        throw new EmailError("timeout talking to sipho@example.test");
       }),
       now: T0,
       deadline: Infinity,
@@ -198,8 +200,31 @@ describe("the daily run of tries", () => {
     expect(s).toMatchObject({ unknown: 1, failedAgain: 0, gaveUp: 0 });
     expect(f.finished.a).toMatchObject({ status: "unknown", tries: 2, nextTryAt: null });
     expect(audit).toHaveBeenCalledWith("email.retry_unknown", expect.objectContaining({ id: "a" }), expect.objectContaining({ kind: "s18a_receipt", try: 2 }));
-    expect(wasCutOff(Object.assign(new Error("x"), { name: "AbortError" }))).toBe(true);
-    expect(wasCutOff(new Error("Resend 500"))).toBe(false);
+    expect(wasCutOff(cutOff())).toBe(true);
+    expect(wasCutOff(new EmailError("Resend refused the email (500)."))).toBe(false);
+  });
+
+  it("a dropped connection during the send is 'unknown' too: flagged, never resent", async () => {
+    // Only the transport says a send may have gone (EmailMaybeSent): it wraps fetch's "fetch failed" and time limits.
+    expect(wasCutOff(new EmailMaybeSent("The send to Resend was cut off: fetch failed"))).toBe(true);
+    expect(mayHaveSent).toBe(wasCutOff);
+    const f = fakeStore([row("a", { kind: "donation_confirmation" })]);
+    const audit = vi.fn(async () => undefined);
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(async () => Promise.reject(new EmailMaybeSent("fetch failed"))), now: T0, deadline: Infinity, emailOn: true, audit });
+    expect(s).toMatchObject({ unknown: 1, failedAgain: 0, resent: 0 });
+    expect(f.finished.a).toMatchObject({ status: "unknown", nextTryAt: null });
+    expect(audit).toHaveBeenCalledWith("email.retry_unknown", expect.objectContaining({ id: "a" }), expect.anything());
+  });
+
+  it("a failure before anything was sent (a database read, a missing setting) is tried again, never left as 'unknown'", async () => {
+    // These never reached the email service, so nothing can have gone (review 12/11/2026).
+    for (const e of [new Error("database went away"), new Error("SITE_URL is not set"), new TypeError("fetch failed"), Object.assign(new Error("x"), { name: "AbortError" })]) {
+      expect(wasCutOff(e)).toBe(false);
+    }
+    const f = fakeStore([row("a", { kind: "donation_confirmation" }), row("b", { kind: "s18a_receipt" }), row("c", { kind: "monthly_declined" })]);
+    const s = await runEmailRetries({ store: f.store, handlers: handlers(async () => Promise.reject(new Error("database went away"))), now: T0, deadline: Infinity, emailOn: true, audit: vi.fn(async () => undefined) });
+    expect(s).toMatchObject({ unknown: 0, failedAgain: 3 });
+    for (const id of ["a", "b", "c"]) expect(f.finished[id]).toMatchObject({ status: "waiting" });
   });
 
   it("doesn't send a row taken over from a run that stopped mid-way: that run may have sent it", async () => {
@@ -328,5 +353,16 @@ describe("Givezy's daily email", () => {
     const lines = dailyDigest({ ...quiet, stuckPending: 1, emailRetries: { ...none, broken: true } }, fine);
     expect(lines).toHaveLength(2);
     expect(lines[1]).toMatch(/could not run today/);
+  });
+});
+
+describe("a first send that may have gone is never sent again by itself (13/11/2026)", () => {
+  // Both first sends hand a cut-off send to a person (markRetryUnknown), and only a refusal to the retry list.
+  it("the declined-card notice and the receipt run follow the rule", async () => {
+    const { readFileSync } = await import("node:fs");
+    const notice = readFileSync("src/lib/donations/monthly-store.ts", "utf8");
+    expect(notice).toMatch(/if \(wasCutOff\(e\)\) await markRetryUnknown\("monthly_declined", r\.id, e, now\);\s*else \{/);
+    const runs = readFileSync("src/lib/receipts/runs.ts", "utf8");
+    expect(runs).toContain('wasCutOff(e) ? markRetryUnknown("s18a_receipt", r.id, e) : recordFailedEmail("s18a_receipt"');
   });
 });

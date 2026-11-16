@@ -7,7 +7,6 @@
 import type { CardChargeRates } from "@shared/fees";
 
 export type Pricing = { amountCents: number; contributionCents: number; cardChargeCents?: number; totalCents: number };
-export type QuoteReply = { ok: true; quote: Pricing } | { ok: false; message: string };
 export type CheckoutReply =
   | { ok: true; redirectUrl: string; charged?: undefined; reference: string; token: string }
   /** Paid with the saved card: no payment page. Ask for the outcome (the charge is only a first indication). */
@@ -75,7 +74,9 @@ const api = (site: string, path: string) => {
  * "Opening the payment page…" for ever; giving up is a thrown network error, so each caller shows its own
  * plain "couldn't reach Givezy" message (and, for a saved card, holds the attempt so nothing is charged twice).
  */
-export const REQUEST_TIMEOUT_MS = 20_000;
+// 35 seconds (13/11/2026, was 20): longer than the server's own limit for starting a gift (the payment provider gets
+// 20 seconds, the whole step 30), so a slow but working answer, or the server's plain "nothing was charged", arrives.
+export const REQUEST_TIMEOUT_MS = 35_000;
 
 /** `fetch`, and reading its reply, given up after `ms`. Throws on a timeout like any network error. */
 export async function fetchWithTimeout(url: string, init: RequestInit, ms = REQUEST_TIMEOUT_MS, f: typeof fetch = fetch): Promise<{ status: number; json: unknown }> {
@@ -98,10 +99,6 @@ export const fetchPost: Post = async (url, body, token) => {
   if (token) headers.authorization = `Bearer ${token}`;
   return fetchWithTimeout(url, { method: "POST", headers, body: JSON.stringify(body) });
 };
-
-export function requestQuote(site: string, slug: string, giftCents: number, contributionCents: number, post: Post = fetchPost) {
-  return call<QuoteReply>(post, api(site, "quote"), { slug, giftCents, contributionCents });
-}
 
 export function startPayment(
   site: string,
@@ -252,6 +249,17 @@ export async function requestReceiptLink(site: string, receiptId: string, token:
   return { ok: false, message: r.ok ? NETWORK : (r.message ?? NETWORK) };
 }
 
+/**
+ * The signed-in donor's gifts still waiting for their s18A details (given with "Add my details after paying", on any
+ * phone or the website), from our server (12/11/2026). null when there is no usable answer (offline, an error): the
+ * Receipts screen then falls back to the gifts given that way on this phone.
+ */
+export async function requestS18aWaiting(site: string, token: string, post: Post = fetchPost): Promise<Set<string> | null> {
+  const r = await call<{ ok: boolean; waiting?: unknown }>(post, api(site, "s18a-waiting"), {}, token);
+  if (!r.ok || !Array.isArray(r.waiting) || !r.waiting.every((id) => typeof id === "string")) return null;
+  return new Set(r.waiting as string[]);
+}
+
 export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
 
 /**
@@ -273,7 +281,9 @@ export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, sa
   // Johannesburg time (UTC+2, no daylight saving).
   const jhb = checkedAt ? new Date(checkedAt.getTime() + 2 * 3_600_000) : null;
   const last = jhb ? ` Last checked at ${String(jhb.getUTCHours()).padStart(2, "0")}:${String(jhb.getUTCMinutes()).padStart(2, "0")}.` : "";
-  if (outcome === "failed") return "Your card was declined and nothing was charged. Your details are still here: tap Give to try again, or use another card.";
+  // The same words as the website's return page: a "failed" payment may be a declined card or a payment page that
+  // was closed (an old checkout is closed after 48 hours), so it never claims which (review 12/11/2026).
+  if (outcome === "failed") return "This payment didn't go through, so nothing was charged. This usually means the card was declined or the payment page was closed. Your details are still here: tap Give to try again, or use another card.";
   if (outcome === "reversed") return "This donation was refunded, so nothing is owed on it. Your details are still here if you'd like to give again.";
   if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: tap Give to try again.";
   if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.${last}`;

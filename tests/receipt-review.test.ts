@@ -277,7 +277,8 @@ describe("the dashboard's words for a decision on one receipt", () => {
   it("say what happened and point to the next one to check, without exclamation marks", () => {
     const d = { taxYear: 2027, key: "k1", name: "Thandi Mokoena", total: "R500", nextKey: "k2", nextName: "Sipho Ndlovu", emailed: "sent", phone: "011 555 0101", email: "office@meals.org.za", changed: "address", was: "declined" };
     const approved = describeDone("certificate_approved", d, ctx);
-    expect(approved.what).toBe("You approved the s18A receipt for Thandi Mokoena, R500 for the 2026/27 tax year. It's issued with your list once Givezy has signed it off.");
+    // The donor's name is isolated in the sentence (the plain-string <bdi>).
+    expect(approved.what).toBe("You approved the s18A receipt for ⁨Thandi Mokoena⁩, R500 for the 2026/27 tax year. It's issued with your list once Givezy has signed it off.");
     expect(approved.next).toEqual({ label: "Next to check: Sipho Ndlovu", href: "/charity-admin/c1/receipts/certificate?year=2027&c=k2" });
     expect(describeDone("certificate_declined", d, ctx).what).toContain("We've emailed them to contact you on 011 555 0101 or office@meals.org.za.");
     expect(describeDone("certificate_declined", { ...d, emailed: "failed" }, ctx).next).toEqual({ label: "Open the receipt", href: "/charity-admin/c1/receipts/certificate?year=2027&c=k1" });

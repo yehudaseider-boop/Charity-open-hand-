@@ -82,7 +82,7 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
                 ) : null}
                 {charity.status === "approved" ? (
                   <details className="text-sm">
-                    <summary className="inline-flex min-h-9 cursor-pointer items-center rounded-control font-semibold text-brand underline hover:no-underline focus-visible:no-underline">Share this campaign</summary>
+                    <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-control font-semibold text-brand underline hover:no-underline focus-visible:no-underline">Share this campaign</summary>
                     <div className="mt-2">
                       <ShareLinks url={giveUrl(c.id)} message={`${charity.name_en} is raising for ${c.title}. Give here:`} />
                     </div>
@@ -118,7 +118,7 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
 }
 
 /** A text link as on the Overview: blue and underlined, the underline drops on hover and keyboard focus. */
-const link = "inline-flex min-h-9 items-center gap-1 rounded-control text-sm font-semibold text-brand underline hover:no-underline focus-visible:no-underline";
+const link = "inline-flex min-h-11 items-center gap-1 rounded-control text-sm font-semibold text-brand underline hover:no-underline focus-visible:no-underline";
 
 /** Progress towards the goal as a ring, as on the Overview: orange on a light-purple track. */
 function CampaignBar({ raised, target, gifts, endsAt }: { raised: number; target: number | null; gifts: number; endsAt: string | null }) {

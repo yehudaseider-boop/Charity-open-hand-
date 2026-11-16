@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { ActionForm } from "@/components/forms/action-form";
 import { requireViewer } from "@/lib/auth";
-import { enrolmentLabel, existingSkippedSentence, journeyCounts, journeyTitle, parseRefKey, refKey, sameRef, starterSteps, type JourneyRef } from "@/lib/charity/journey";
+import { enrolmentLabel, existingSkippedSentence, journeyCounts, journeyTitle, parseRefKey, partWay, refKey, sameRef, starterSteps, type JourneyRef } from "@/lib/charity/journey";
 import { enrolmentStates, journeyPeople, journeysV2, listJourneys, loadJourney, planExistingDonors } from "@/lib/charity/journey-store";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { can } from "@/lib/charity/permissions";
@@ -191,6 +191,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
             canEdit={owner}
             siteUrl={process.env.SITE_URL}
             starter={starterSteps(ref.kind, campaignTitle)}
+            onIt={partWay(states)}
           />
         </div>
       </Card>

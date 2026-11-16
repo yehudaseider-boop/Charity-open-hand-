@@ -18,6 +18,9 @@ const noSubscription = () => () => {};
 /** The most a door tips toward the mouse, in degrees. */
 const MAX_TILT = 4;
 
+/** How long a story takes to open or close (.door-panel in globals.css). */
+const PANEL_MS = 480;
+
 /** With a mouse, a door tips a little toward the pointer and its light follows. Never on touch or with reduced motion. */
 function tilt(e: React.PointerEvent<HTMLElement>) {
   if (e.pointerType !== "mouse") return;
@@ -75,38 +78,90 @@ export function Doors({ give, charity }: { give: React.ReactNode; charity: React
   const open = doorFromHash(hash);
   const panels = useRef<Record<Door, HTMLDivElement | null>>({ give: null, charity: null });
 
+  const buttons = useRef<Record<Door, HTMLAnchorElement | null>>({ give: null, charity: null });
+  // A press while a story is still opening or closing is ignored, so a double-click can't open it and shut it again.
+  const busyUntil = useRef(0);
+
   const choose = useCallback((door: Door) => {
-    const next = doorFromHash(window.location.hash) === door ? null : door;
+    const now = Date.now();
+    if (now < busyUntil.current) return;
+    busyUntil.current = now + PANEL_MS;
+    const was = doorFromHash(window.location.hash);
+    const next = was === door ? null : door;
     // Replaced, not pushed: opening a door isn't a new page, so Back leaves the site as expected.
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${next ? `#${next}` : ""}`);
     window.dispatchEvent(new Event(DOOR_EVENT));
     if (!next) return;
-    // Once the story starts to open, bring its top into view if it starts low on the screen, and move the
-    // screen reader there (without a second jump).
-    window.setTimeout(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const moveReader = (el: HTMLDivElement) => el.querySelector<HTMLElement>("[data-panel-title]")?.focus({ preventScroll: true });
+    if (!was) {
+      // Nothing was open, so nothing above moves: once the story starts to open, bring its top into view if it starts
+      // low on the screen, and move the screen reader there (without a second jump).
+      window.setTimeout(() => {
+        const el = panels.current[next];
+        if (!el) return;
+        if (el.getBoundingClientRect().top > window.innerHeight * 0.7) el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+        moveReader(el);
+      }, 80);
+      return;
+    }
+    // The other story is closing. Measured now, the chosen door would be scrolled to where it was before that story
+    // folded away, landing past it. So wait until it has, then bring the chosen door up if it isn't on screen.
+    const closing = panels.current[was];
+    let done = false;
+    const after = () => {
+      if (done) return;
+      done = true;
+      closing?.removeEventListener("transitionend", onEnd);
+      const button = buttons.current[next];
       const el = panels.current[next];
-      if (!el) return;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (el.getBoundingClientRect().top > window.innerHeight * 0.7) el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-      el.querySelector<HTMLElement>("[data-panel-title]")?.focus({ preventScroll: true });
-    }, 80);
+      if (!button || !el) return;
+      const top = button.getBoundingClientRect().top;
+      if (top < 0 || top > window.innerHeight * 0.6) button.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      moveReader(el);
+    };
+    const onEnd = (e: TransitionEvent) => {
+      if (e.target === closing && e.propertyName === "grid-template-rows") after();
+    };
+    if (reduce || !closing) {
+      window.requestAnimationFrame(after);
+      return;
+    }
+    closing.addEventListener("transitionend", onEnd);
+    // In case the browser never reports the end (a hidden tab, a cancelled transition).
+    window.setTimeout(after, PANEL_MS + 80);
   }, []);
+
+  // Escape closes the open story and puts the keyboard back on its door.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "Escape" || !open) return;
+    e.preventDefault();
+    busyUntil.current = 0;
+    const button = buttons.current[open];
+    choose(open);
+    button?.focus();
+  };
 
   // One grid holds both doors and both stories. On a phone each story opens right under its own door; from tablet
   // width the doors sit side by side and the open story runs full width underneath them.
   return (
-    <div className="doors mx-auto grid max-w-[75rem] gap-4 px-4 sm:px-6 md:grid-cols-2 md:gap-x-6 md:gap-y-0" data-ready={ready ? "" : undefined} data-chosen={open ? "" : undefined}>
+    <div className="doors mx-auto grid max-w-[75rem] gap-4 px-4 sm:px-6 md:grid-cols-2 md:gap-x-6 md:gap-y-0" data-ready={ready ? "" : undefined} data-chosen={open ? "" : undefined} onKeyDown={onKeyDown}>
       {DOORS.map((d, i) => {
         const isOpen = open === d.id;
         return (
           <Fragment key={d.id}>
             <a
+              ref={(el) => {
+                buttons.current[d.id] = el;
+              }}
               href={`#${d.id}`}
               role="button"
               aria-expanded={isOpen}
               aria-controls={`${d.id}-story`}
               onClick={(e) => {
                 e.preventDefault();
+                // The second click of a double-click is not a second choice.
+                if (e.detail > 1) return;
                 choose(d.id);
               }}
               onPointerMove={tilt}
@@ -114,7 +169,7 @@ export function Doors({ give, charity }: { give: React.ReactNode; charity: React
               onKeyDown={(e) => {
                 if (e.key === " ") {
                   e.preventDefault();
-                  choose(d.id);
+                  if (!e.repeat) choose(d.id);
                 }
               }}
               data-door={d.id}

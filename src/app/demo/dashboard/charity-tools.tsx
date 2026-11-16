@@ -58,7 +58,7 @@ export function DemoTeam() {
                 <p className="font-semibold text-navy [overflow-wrap:anywhere]">{m.email}{m.you ? <span className="text-muted"> (you)</span> : null}</p>
                 <p className="text-xs text-muted">Since {m.since}</p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 has-[[role=alertdialog]]:basis-full">
                 <Badge tone={m.role === "owner" ? "brand" : undefined}>{m.role === "owner" ? "Owner" : "Admin"}</Badge>
                 {m.role === "admin" ? <RemoveMemberForm action={remove(m)} email={m.email} self={false} /> : null}
               </div>

@@ -6,7 +6,10 @@ import {
   JOURNEY_MAX_STEPS,
   STARTER_STEPS,
   SUBJECT_MAX,
+  canRemoveStep,
   charityPageUrl,
+  middleStepWords,
+  stepsShifted,
   cleanSubject,
   journeyEmail,
   waitRange,
@@ -16,8 +19,9 @@ import { cleanThankYouNote, hasWebAddress } from "@/lib/charity/thank-you-note";
 import { textEmailHtml } from "@/lib/email/html";
 import { initialFormState, type FormState } from "@/lib/form";
 
-type Draft = { key: number; subject: string; body: string; wait: string };
-const toDraft = (s: JourneyStep, key: number): Draft => ({ key, subject: s.subject, body: s.body, wait: String(s.waitDays) });
+/** `from`: the email's place when the page was opened (0-based), or null for one added since. */
+type Draft = { key: number; subject: string; body: string; wait: string; from: number | null };
+const toDraft = (s: JourneyStep, key: number, from: number | null): Draft => ({ key, subject: s.subject, body: s.body, wait: String(s.waitDays), from });
 /** A fresh key for a new or reset email (only in event handlers, never while drawing). */
 const freshKey = () => Date.now() + Math.random();
 
@@ -48,6 +52,7 @@ export function JourneyEditor({
   canEdit,
   siteUrl,
   starter = STARTER_STEPS,
+  onIt = 0,
 }: {
   action: (s: FormState, f: FormData) => Promise<FormState>;
   charityName: string;
@@ -57,6 +62,8 @@ export function JourneyEditor({
   siteUrl?: string;
   /** The suggested wording for this kind of journey (DRAFT for Yosef). */
   starter?: JourneyStep[];
+  /** People part way through the journey: while there are any, only the last email can be removed. */
+  onIt?: number;
 }) {
   const safeAction = async (prev: FormState, formData: FormData): Promise<FormState> => {
     try {
@@ -74,7 +81,7 @@ export function JourneyEditor({
     }
   };
   const [state, dispatch, pending] = useActionState(safeAction, initialFormState);
-  const [drafts, setDrafts] = useState<Draft[]>(() => saved.map((s, i) => toDraft(s, i)));
+  const [drafts, setDrafts] = useState<Draft[]>(() => saved.map((s, i) => toDraft(s, i, i)));
   const [showing, setShowing] = useState(0);
   const id = useId();
 
@@ -102,10 +109,12 @@ export function JourneyEditor({
 
   const change = (i: number, patch: Partial<Draft>) => setDrafts((all) => all.map((d, j) => (j === i ? { ...d, ...patch } : d)));
   const add = () => {
-    setDrafts((all) => [...all, { key: freshKey(), subject: "", body: "", wait: all.length ? "30" : "2" }]);
+    setDrafts((all) => [...all, { key: freshKey(), subject: "", body: "", wait: all.length ? "30" : "2", from: null }]);
     setShowing(drafts.length);
   };
   const remove = (i: number) => {
+    // Never a middle email while people are part way through (the button isn't offered then; this is the backstop).
+    if (!canRemoveStep(i, drafts.length, onIt)) return;
     setDrafts((all) => all.filter((_, j) => j !== i));
     setShowing((s) => Math.max(0, Math.min(s, drafts.length - 2)));
   };
@@ -140,6 +149,8 @@ export function JourneyEditor({
         }}
       >
         <input type="hidden" name="steps" value={drafts.length} />
+        {/* Tells the server a saved email would move to another number, so it can refuse while people are part way. */}
+        <input type="hidden" name="shifted" value={stepsShifted(drafts.map((d) => d.from)) ? "yes" : ""} />
         {drafts.length === 0 ? (
           <div className="space-y-3 rounded-control border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm">
             <p className="font-semibold text-navy">No emails yet.</p>
@@ -148,7 +159,7 @@ export function JourneyEditor({
               <button
                 type="button"
                 onClick={() => {
-                  setDrafts(starter.map((s) => toDraft(s, freshKey())));
+                  setDrafts(starter.map((s, i) => toDraft(s, freshKey(), i < saved.length ? i : null)));
                   setShowing(0);
                 }}
                 className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast"
@@ -226,10 +237,13 @@ export function JourneyEditor({
                 <button type="button" onClick={() => setShowing(i)} className="px-1 py-2 text-sm font-medium text-brand underline">
                   Preview this email
                 </button>
-                <button type="button" onClick={() => remove(i)} className="px-1 py-2 text-sm font-medium text-danger underline">
-                  Remove email {i + 1}
-                </button>
+                {canRemoveStep(i, drafts.length, onIt) ? (
+                  <button type="button" onClick={() => remove(i)} className="px-1 py-2 text-sm font-medium text-danger underline">
+                    Remove email {i + 1}
+                  </button>
+                ) : null}
               </div>
+              {canRemoveStep(i, drafts.length, onIt) ? null : <p className="text-xs text-muted">{middleStepWords(onIt)}</p>}
             </fieldset>
           );
         })}
@@ -252,7 +266,7 @@ export function JourneyEditor({
                 type="button"
                 disabled={pending}
                 onClick={() => {
-                  setDrafts(saved.map((s) => toDraft(s, freshKey())));
+                  setDrafts(saved.map((s, i) => toDraft(s, freshKey(), i)));
                   setShowing(0);
                 }}
                 className="px-1 py-2.5 text-sm font-medium text-brand underline"

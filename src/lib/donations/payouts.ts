@@ -13,18 +13,51 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /** How far back each run looks: payouts can change status for a few days after they are made. */
 const LOOK_BACK_DAYS = 45;
 
-export type PayoutSyncSummary = { charities: number; payouts: number; lines: number; unmatched: number; failed: { charityId: string; message: string }[] };
+export type PayoutSyncSummary = {
+  charities: number;
+  payouts: number;
+  lines: number;
+  unmatched: number;
+  failed: { charityId: string; message: string }[];
+  /** The time budget ran out: charities not reached (or not finished) are read on the next run. */
+  outOfTime?: boolean;
+  /** Charities not reached because the time ran out. */
+  notReached?: number;
+};
 
-export async function syncPayouts(now = new Date()): Promise<PayoutSyncSummary> {
+/**
+ * `deadline` (epoch ms): no charity, and no payout within one, is started after it. Payouts already kept as final
+ * (paid out or failed) aren't read again, so each day's run gets further. The order of charities moves on by one
+ * each day, so the same charities are never always the ones left for tomorrow.
+ */
+export async function syncPayouts(now = new Date(), opts: { deadline?: number } = {}): Promise<PayoutSyncSummary> {
   const gateway = getGateway();
   const db = createAdminClient();
   const since = isoDateInJhb(new Date(now.getTime() - LOOK_BACK_DAYS * 86_400_000));
-  const { data: charities, error } = await db.from("charities").select("id, gateway, gateway_subaccount_ref").eq("gateway", gateway.name).not("gateway_subaccount_ref", "is", null);
+  const { data: charities, error } = await db
+    .from("charities")
+    .select("id, gateway, gateway_subaccount_ref")
+    .eq("gateway", gateway.name)
+    .not("gateway_subaccount_ref", "is", null)
+    .order("id");
   if (error) throw error;
   const summary: PayoutSyncSummary = { charities: 0, payouts: 0, lines: 0, unmatched: 0, failed: [] };
-  for (const c of charities ?? []) {
+  const list = charities ?? [];
+  const shift = list.length ? Math.floor(now.getTime() / 86_400_000) % list.length : 0;
+  const ordered = [...list.slice(shift), ...list.slice(0, shift)];
+  const outOfTime = () => opts.deadline !== undefined && Date.now() > opts.deadline;
+  for (let i = 0; i < ordered.length; i++) {
+    const c = ordered[i];
+    if (outOfTime()) {
+      summary.outOfTime = true;
+      summary.notReached = ordered.length - i;
+      break;
+    }
     try {
-      const payouts = await gateway.listPayouts({ charityId: c.id as string, charityAccountRef: c.gateway_subaccount_ref as string, since });
+      const final = await finalPayoutRefs(c.id as string, gateway.name);
+      const payouts = await gateway.listPayouts({ charityId: c.id as string, charityAccountRef: c.gateway_subaccount_ref as string, since, skipRefs: final, deadline: opts.deadline });
+      // Out of time part-way: what was read in full is kept below, the rest is read tomorrow.
+      if (outOfTime()) summary.outOfTime = true;
       for (const p of payouts) {
         const r = await keepPayout(c.id as string, gateway.name, p);
         summary.payouts += 1;
@@ -38,6 +71,19 @@ export async function syncPayouts(now = new Date()): Promise<PayoutSyncSummary> 
     }
   }
   return summary;
+}
+
+/** This charity's payouts already kept as paid out or failed: their lines don't change, so they aren't read again. */
+async function finalPayoutRefs(charityId: string, gatewayName: string): Promise<Set<string>> {
+  const { data, error } = await createAdminClient()
+    .from("payouts")
+    .select("gateway_payout_ref")
+    .eq("charity_id", charityId)
+    .eq("gateway", gatewayName)
+    .in("status", ["paid", "failed"])
+    .limit(5000);
+  if (error) throw error;
+  return new Set((data ?? []).map((p) => String(p.gateway_payout_ref)));
 }
 
 /** Keep one payout and replace its lines. Lines are matched to this charity's own gifts by reference only. */

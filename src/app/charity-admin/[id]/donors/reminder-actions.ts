@@ -33,13 +33,14 @@ export async function remindS18aDetails(charityId: string, back: string, _prev: 
   }
   // Writes the audit entry and the dashboard record itself, with the counts so far, even if sending stops part way.
   const r = await sendS18aReminders({ charityId, charityName: charity.name_en, donorIds, userId: viewer.userId, replyTo: priv?.contact_email ?? null });
-  if (r.sent || r.failed) {
+  if (r.sent || r.failed || r.unknown) {
     // Counting must never hide what was sent: a failure here is logged, not shown.
     await hitRateLimit("s18a-reminder", keys, 10, 24 * 60).catch((e: unknown) => console.error("[s18a-reminder] press not counted", e instanceof Error ? e.message : e));
   }
   // Nothing went: say why on the form, with the choice kept.
-  if (r.sent === 0 && r.failed === 0 && r.remaining === 0) return { ok: false, message: reminderOutcome(r) };
-  if (r.sent === 0 && r.remaining === 0) return { ok: false, message: `${reminderOutcome(r)} Nothing went out.` };
+  if (r.sent === 0 && r.failed === 0 && !r.unknown && r.remaining === 0) return { ok: false, message: reminderOutcome(r) };
+  // A send that may have gone (a dropped connection) is never "Nothing went out".
+  if (r.sent === 0 && r.remaining === 0 && !r.unknown) return { ok: false, message: `${reminderOutcome(r)} Nothing went out.` };
   const done = r.done;
   // The record couldn't be written: say what happened on the form instead.
   if (!done) return { ok: r.sent > 0, message: reminderOutcome(r) };

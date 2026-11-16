@@ -42,6 +42,18 @@ export function s18aDetailsMissing(d: S18aDetailsRow): MissingDetail[] {
   return out;
 }
 
+/**
+ * Whether a paid gift that asked for an s18A receipt is still waiting for its details ("Add my details after paying",
+ * decided 04/11/2026), so it can't go on a receipt yet: no checkout details, erased ones, or details still missing.
+ * A gift already on an issued receipt is never waiting. The phone app's "Counts towards your s18A receipts" uses this
+ * through /api/app/s18a-waiting, so it matches the website's account page (12/11/2026). Pure.
+ */
+export function waitingForS18aDetails(gift: { id: string; wants_18a: boolean; status: string }, details: S18aDetailsRow | null, onIssuedReceipt: ReadonlySet<string>): boolean {
+  if (gift.status !== "paid" || !gift.wants_18a || onIssuedReceipt.has(gift.id)) return false;
+  if (!details || details.erased_at) return true;
+  return s18aDetailsMissing(details).length > 0;
+}
+
 /** "your SA ID number and address", for a sentence. */
 export function missingWords(missing: MissingDetail[], who: "your" | "their" = "your"): string {
   const words = missing.map((m) => (m === "id_number" ? "SA ID number" : m === "registration_number" ? "registration number" : "address"));

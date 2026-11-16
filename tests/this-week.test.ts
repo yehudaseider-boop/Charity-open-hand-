@@ -1,6 +1,6 @@
 /** "Needs you this week" on the charity overview (CRM step 17, 10/11/2026). */
 import { describe, expect, it } from "vitest";
-import { donorsToThank, listInWords, thisWeek, WEEK_SOURCE_NAMES, type ThisWeekFacts } from "@/lib/charity/this-week";
+import { donorsToThank, listInWords, recentReversals, thisWeek, WEEK_SOURCE_NAMES, type ThisWeekFacts } from "@/lib/charity/this-week";
 
 const base = "/charity-admin/c1";
 const empty: ThisWeekFacts = {
@@ -48,7 +48,8 @@ describe("thisWeek", () => {
     expect(text).toContain("3 new donors this week, not yet thanked personally");
     expect(text).toContain("1 monthly donor stopped in the last 30 days (R250 a month)");
     expect(text).toContain("4 donors asked for an s18A receipt but haven't added the details SARS needs");
-    expect(text).toContain("2 donations refunded (R125.50)");
+    expect(text).toContain("2 donations refunded in the last 30 days (R125.50)");
+    expect(text).toContain("1 donation charged back in the last 30 days");
     for (const t of text) {
       expect(t).not.toMatch(/[!—]/);
     }
@@ -136,5 +137,30 @@ describe("donorsToThank", () => {
 
   it("ignores a first gift dated in the future", () => {
     expect(donorsToThank([{ donor_id: "f", first_paid_at: at(-1), email: "f@x.co" }], now, facts)).toEqual([]);
+  });
+});
+
+describe("recentReversals", () => {
+  const now = new Date("2026-11-16T10:00:00Z");
+  it("counts only refunds and chargebacks of the last 30 days, by when they happened", () => {
+    const r = recentReversals([
+      { status: "refunded", amount_cents: 10_000, refunded_at: "2026-11-01T08:00:00Z", charged_back_at: null },
+      { status: "refunded", amount_cents: "2550", refunded_at: "2026-10-17T10:00:00Z", charged_back_at: null },
+      // 31 days ago: not this month's business.
+      { status: "refunded", amount_cents: 99_900, refunded_at: "2026-10-16T09:59:00Z", charged_back_at: null },
+      { status: "refunded", amount_cents: 5_000, refunded_at: null, charged_back_at: null },
+      { status: "charged_back", amount_cents: 7_000, refunded_at: null, charged_back_at: "2026-11-15T12:00:00Z" },
+      { status: "charged_back", amount_cents: 7_000, refunded_at: null, charged_back_at: "2026-09-01T12:00:00Z" },
+    ], now);
+    expect(r).toEqual({ refunded: { count: 2, cents: 12_550 }, chargedBack: 1 });
+  });
+
+  it("shows nothing when there were none", () => {
+    expect(recentReversals([], now)).toEqual({ refunded: { count: 0, cents: 0 }, chargedBack: 0 });
+  });
+
+  it("refunds and chargebacks that couldn't be read are named, not shown as none (review 16/11/2026)", () => {
+    const w = thisWeek({ ...empty, refunded: null, chargedBack: null });
+    expect(w.unavailable).toContain("refunds and chargebacks");
   });
 });

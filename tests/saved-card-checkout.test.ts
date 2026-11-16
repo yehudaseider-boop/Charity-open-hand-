@@ -36,6 +36,9 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { g
 let limitsUsedUp = false;
 vi.mock("@/lib/rate-limit", () => ({
   hitRateLimit: async () => limitsUsedUp,
+  takeAttempt: async () => ({ limited: limitsUsedUp, ids: [] }),
+  forgetAttempts: async () => {},
+  clearOldAttempts: async () => {},
   rateLimitReached: async () => limitsUsedUp,
   ipKeys: (ip: string) => [`ip:${ip}`],
   hashedKey: (kind: string, value: string) => `${kind}#${value}`,

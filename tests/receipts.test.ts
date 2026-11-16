@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildReceiptDetails, missingForSars, type CharityRow, type DonorRow } from "@/lib/receipts/details";
 import { buildReceiptEmail } from "@/lib/receipts/email";
-import { getEmailTransport, maskEmail, type EmailMessage } from "@/lib/email";
+import { EmailMaybeSent, getEmailTransport, maskEmail, type EmailMessage } from "@/lib/email";
 import { buildReceiptHtml, esc } from "@/lib/receipts/html";
 import { previewReceipts, runReceiptsJob, type IssuedReceipt, type ReceiptStore } from "@/lib/receipts/issue";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } from "@/lib/receipts/plan";
@@ -348,6 +348,24 @@ describe("emailing receipts", () => {
     const second = await runReceiptsJob({ store, render, ...base, mailer });
     expect(second.emailed).toBe(1);
     expect(emailed.size).toBe(2);
+  });
+
+  it("an email cut off mid-send may have gone, so it keeps its claim and is never sent again by itself (13/11/2026)", async () => {
+    const { store, emailed } = setup([don({ id: "a" })]);
+    const sent: string[] = [];
+    let cutOff = true;
+    const transport = { name: "test", send: async (m: EmailMessage) => { if (cutOff) throw new EmailMaybeSent("connection dropped"); sent.push(m.to); return "sent" as const; } };
+    const flagged: unknown[] = [];
+    const mailer = { transport, siteUrl: "https://example.co.za", platformName: "Givezy", onEmailFailed: async (_r: IssuedReceipt, e: unknown) => void flagged.push(e) };
+    const first = await runReceiptsJob({ store, render, ...base, mailer });
+    expect(first).toMatchObject({ emailed: 0, emailFailed: 1 });
+    expect(flagged[0]).toBeInstanceOf(EmailMaybeSent);
+    // The next run (or a second Finish press) doesn't send a second copy.
+    cutOff = false;
+    const second = await runReceiptsJob({ store, render, ...base, mailer });
+    expect(second.emailed).toBe(0);
+    expect(sent).toHaveLength(0);
+    expect(emailed.size).toBe(0);
   });
 
   it("the email names the receipt and the total, and escapes names", () => {

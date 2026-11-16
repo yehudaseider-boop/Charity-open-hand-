@@ -3,9 +3,11 @@
 import { Card, Notice } from "@/components/card";
 import { PageHeader } from "@/components/dash";
 import { ThankYouForm } from "@/app/charity-admin/[id]/thank-donors/forms";
+import { WordingEditor } from "@/app/charity-admin/[id]/thank-donors/wording-editor";
 import { AppealForm } from "@/app/charity-admin/[id]/email-donors/forms";
 import type { AppealCheck } from "@/app/charity-admin/[id]/email-donors/actions";
 import { APPEALS_PER_MONTH, checkAppeal } from "@/lib/charity/appeals-rules";
+import { checkThankYouNote } from "@/lib/charity/thank-you-note";
 import type { FormState } from "@/lib/form";
 import { demoId, demoNow, pause, useDemo } from "./store";
 
@@ -18,8 +20,9 @@ const NOT_SENT = "In this demo nothing was emailed.";
 
 type Thanked = { id: string; month: string; label: string; body: string; at: string; count: number };
 
-export function DemoThankDonors({ months, sampleName }: { months: { month: string; label: string; count: number }[]; sampleName: string }) {
+export function DemoThankDonors({ months, sampleName, charityName, sampleDate }: { months: { month: string; label: string; count: number }[]; sampleName: string; charityName: string; sampleDate: string }) {
   const [sent, setSent] = useDemo<Thanked[]>("thank-yous", []);
+  const [note, setNote] = useDemo<string | null>("thank-you-note", null);
   const done = new Set(sent.map((s) => s.month));
   const open = months.filter((m) => !done.has(m.month));
 
@@ -30,6 +33,16 @@ export function DemoThankDonors({ months, sampleName }: { months: { month: strin
     await pause();
     setSent([{ id: demoId(), month: m.month, label: m.label, body, at: demoNow(), count: m.count }, ...sent]);
     return { ok: true, message: `Sent to ${m.count} ${m.count === 1 ? "donor" : "donors"}. ${NOT_SENT}` };
+  };
+
+  // The note in the email after each gift: checked as the real page checks it, kept in this browser only.
+  const saveNote = async (_: FormState, f: FormData): Promise<FormState> => {
+    const checked = f.get("intent") === "reset" ? ({ ok: true, note: null } as const) : checkThankYouNote(String(f.get("note") ?? ""));
+    if (!checked.ok) return { ok: false, fieldErrors: { note: checked.message } };
+    if (checked.note === note) return { ok: true, message: checked.note ? "That is the note already saved. Nothing changed." : "You're on Givezy's wording already. Nothing changed." };
+    await pause();
+    setNote(checked.note);
+    return { ok: true, message: `${checked.note ? "Saved." : "Back to Givezy's wording."} In this demo it stays in your own browser.` };
   };
 
   return (
@@ -43,6 +56,20 @@ export function DemoThankDonors({ months, sampleName }: { months: { month: strin
           </>
         }
       />
+
+      {/* The same card as the real page, with the same id, so "Open" on the Overview's checklist lands on it. */}
+      <Card title="The thank-you email after each gift">
+        <div id="wording" className="scroll-mt-24 space-y-4 text-sm">
+          <p className="text-muted">
+            Every donor gets this email from Givezy as soon as their gift is confirmed. You can add a short note of your own to it.
+            The same note shows on the thank-you page after they pay and in the Givezy app.
+          </p>
+          {/* Keyed by the saved note: the note is read from this browser after the first paint, so the box starts again from it. */}
+          <WordingEditor key={note ?? ""} action={saveNote} charityName={charityName} saved={note} sampleDate={sampleDate} />
+        </div>
+      </Card>
+
+      <h2 className="font-display text-xl font-bold text-indigo">A thank-you for a whole month</h2>
       <Notice>Each donor sees &quot;Dear&quot; and their own first name, for example &quot;Dear {sampleName}&quot;, then your words, then your charity&apos;s name and a link to stop these emails.</Notice>
 
       {open.map((m) => (

@@ -10,7 +10,8 @@ import { glow } from "@/components/card";
 export function PageHeader({ title, intro, actions, back }: { title: React.ReactNode; intro?: React.ReactNode; actions?: React.ReactNode; back?: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      {back ? <div className="text-sm">{back}</div> : null}
+      {/* The back link keeps its small look; the 44 px tap area overlaps the space around it. */}
+      {back ? <div className="text-sm [&>a]:-my-3 [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center">{back}</div> : null}
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-bold text-indigo [overflow-wrap:anywhere]">{title}</h1>
@@ -39,13 +40,13 @@ export function ActionLink({ href, children, primary = false, download = false }
 /** Pill tabs that are links (status filters, sub-pages). The current one is blue and marked for screen readers. */
 export function Tabs({ label, items }: { label: string; items: { href: string; label: React.ReactNode; active: boolean; count?: number }[] }) {
   return (
-    <nav aria-label={label} className="flex flex-wrap gap-1.5">
+    <nav aria-label={label} className="flex flex-wrap gap-x-1.5 gap-y-2">
       {items.map((t) => (
         <Link
           key={t.href}
           href={t.href}
           aria-current={t.active ? "page" : undefined}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border-2 px-3.5 text-sm font-semibold transition ${t.active ? "border-brand bg-brand text-white" : "border-border bg-surface text-muted hover:border-brand hover:text-brand"}`}
+          className={`hit inline-flex min-h-9 items-center gap-1.5 rounded-full border-2 px-3.5 text-sm font-semibold transition ${t.active ? "border-brand bg-brand text-white" : "border-border bg-surface text-muted hover:border-brand hover:text-brand"}`}
         >
           {t.label}
           {t.count !== undefined ? <span className={`rounded-full px-1.5 text-xs tabular-nums ${t.active ? "bg-white/20" : "bg-honey-soft"}`}>{t.count}</span> : null}
@@ -62,12 +63,24 @@ export const field = "min-h-11 rounded-control border-2 border-border bg-surface
 export const table = {
   wrap: "-mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6",
   table: "w-full border-collapse text-sm",
-  headRow: "border-b-2 border-border text-left text-xs font-bold uppercase tracking-wide text-muted",
+  headRow: "whitespace-nowrap border-b-2 border-border text-left text-xs font-bold uppercase tracking-wide text-muted",
   th: "pb-2 pr-3 font-bold",
   row: "group border-b border-border transition last:border-0 hover:bg-honey-soft focus-within:bg-honey-soft",
   td: "py-2.5 pr-3 align-middle",
   num: "py-2.5 text-right font-semibold tabular-nums",
 } as const;
+
+/**
+ * The box a wide table scrolls sideways in on a phone. It can take keyboard focus (so the arrow keys scroll it)
+ * and is named for screen readers, as a scrolling region must be. Use it instead of a bare `table.wrap` div.
+ */
+export function TableScroll({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className={`${table.wrap} rounded-control focus-visible:outline-offset-[-3px]`} tabIndex={0} role="region" aria-label={label}>
+      {children}
+    </div>
+  );
+}
 
 /** Classes for one line of a list that opens something: lights up under the pointer, the whole line is the link. */
 export const rowLink = "group -mx-2 flex items-center justify-between gap-3 rounded-control px-2 py-2 transition hover:bg-honey-soft focus-visible:bg-honey-soft";

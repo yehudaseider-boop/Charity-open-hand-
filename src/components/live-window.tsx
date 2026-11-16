@@ -13,11 +13,22 @@ export function LiveWindow({ tabs, label }: { tabs: LiveTab[]; label: string }) 
   const [active, setActive] = useState(0);
   const id = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const phoneButtons = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const go = (i: number) => {
+  // Arrow keys, Home and End move between tabs (and End never scrolls the page). The phone's row of tabs slides the
+  // chosen one into view.
+  const go = (i: number, phone = false) => {
     const next = (i + tabs.length) % tabs.length;
     setActive(next);
-    buttons.current[next]?.focus();
+    const el = (phone ? phoneButtons : buttons).current[next];
+    el?.focus({ preventScroll: true });
+    if (phone) el?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  };
+  const onPhoneKey = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); go(active + 1, true); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); go(active - 1, true); }
+    if (e.key === "Home") { e.preventDefault(); go(0, true); }
+    if (e.key === "End") { e.preventDefault(); go(tabs.length - 1, true); }
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); go(active + 1); }
@@ -28,7 +39,7 @@ export function LiveWindow({ tabs, label }: { tabs: LiveTab[]; label: string }) 
   const tab = (t: LiveTab, i: number, phone: boolean) => (
     <button
       key={t.label}
-      ref={phone ? undefined : (el) => { buttons.current[i] = el; }}
+      ref={(el) => { (phone ? phoneButtons : buttons).current[i] = el; }}
       type="button"
       role="tab"
       id={`${id}-${phone ? "p" : "t"}${i}`}
@@ -42,7 +53,7 @@ export function LiveWindow({ tabs, label }: { tabs: LiveTab[]; label: string }) 
       }}
       className={
         phone
-          ? `shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors ${i === active ? "bg-brand text-white" : "bg-honey-soft text-navy"}`
+          ? `inline-flex min-h-11 shrink-0 items-center rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors ${i === active ? "bg-brand text-white" : "bg-honey-soft text-navy"}`
           : `w-full rounded-lg px-3 py-2 text-left transition-colors ${i === active ? "bg-brand-soft font-semibold text-brand" : "text-muted hover:bg-honey-soft hover:text-navy"}`
       }
     >
@@ -59,7 +70,7 @@ export function LiveWindow({ tabs, label }: { tabs: LiveTab[]; label: string }) 
         <span className="ml-4 h-6 flex-1 rounded-full bg-honey-soft" />
       </div>
       {/* Phone: the tabs sit above the screen and scroll sideways. */}
-      <div role="tablist" aria-label={label} className="no-scrollbar flex gap-2 overflow-x-auto border-b border-border px-4 py-3 sm:hidden">
+      <div role="tablist" aria-label={label} onKeyDown={onPhoneKey} className="no-scrollbar flex gap-2 overflow-x-auto border-b border-border px-4 py-3 sm:hidden">
         {tabs.map((t, i) => tab(t, i, true))}
       </div>
       <div className="flex min-h-[21rem]">

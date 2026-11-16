@@ -386,6 +386,36 @@ export function journeyCounts(rows: { status: string; next_step: number }[], ste
   return { waiting, finished, stopped, total: rows.length };
 }
 
+/**
+ * Removing an email in the middle (review 12/11/2026). Each donor's place on a journey, and the record of what was sent
+ * to them, go by the email's number, so taking out email 2 of 4 would move emails 3 and 4 up: someone waiting for
+ * email 3 would skip what was email 3, and someone already sent email 3 could miss the new email 3. So while anyone
+ * is still part way through (on it, not finished or stopped), only the last email can be removed.
+ */
+
+/** How many people are part way through the journey (still to get an email from it). */
+export function partWay(rows: { status: string }[]): number {
+  return rows.filter((r) => r.status === "active").length;
+}
+
+/** May email `i` (0-based) of `count` be removed, with `onIt` people part way through? */
+export function canRemoveStep(i: number, count: number, onIt: number): boolean {
+  return onIt === 0 || i === count - 1;
+}
+
+/**
+ * Would saving move a saved email to another number? `from` is each email's place when the page was opened
+ * (0-based), in the new order, or null for an email added since.
+ */
+export function stepsShifted(from: (number | null)[]): boolean {
+  return from.some((f, i) => f !== null && f !== i);
+}
+
+/** Said when an email in the middle can't be removed. */
+export function middleStepWords(onIt: number): string {
+  return `${onIt === 1 ? "1 person is" : `${onIt} people are`} part way through this journey, so only the last email can be removed: removing one in the middle would move the emails after it and some donors would miss one. Change this email's words instead, or remove emails from the end.`;
+}
+
 export const STOP_WORDS: Record<StopReason, string> = {
   erased: "Details erased at their request",
   opted_out: "Turned off emails from you",

@@ -35,6 +35,18 @@ describe("the annual tax pack", () => {
     ]);
   });
 
+  it("keeps two charities with the same name (or no name we can read) on their own lines", () => {
+    const pack = buildTaxPack(2027, [
+      row({ id: "a", charityId: "c-1", charityName: "Charity", amountCents: 1_000, wants18a: false }),
+      row({ id: "b", charityId: "c-2", charityName: "Charity", amountCents: 2_000, wants18a: false }),
+      row({ id: "c", charityId: "c-1", charityName: "Charity", amountCents: 500, wants18a: false }),
+    ], []);
+    expect(pack.byCharity).toEqual([
+      { name: "Charity", cents: 2_000, count: 1, s18aCents: 0 },
+      { name: "Charity", cents: 1_500, count: 2, s18aCents: 0 },
+    ]);
+  });
+
   it("lists donations oldest first and totals the donor's own labels, whatever their case", () => {
     const pack = buildTaxPack(2027, [
       row({ id: "late", paidAt: "2026-12-01T08:00:00Z", label: "Work giving", amountCents: 7_000 }),

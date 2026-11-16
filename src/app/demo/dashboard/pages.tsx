@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { Card } from "@/components/card";
-import { ActionLink, EmptyState, MiniStat, PageHeader, Tabs, blueAction, field, rowLink, table } from "@/components/dash";
+import { ActionLink, EmptyState, MiniStat, PageHeader, Tabs, blueAction, field, rowLink, TableScroll, table } from "@/components/dash";
 import { GoalRing } from "@/app/charity-admin/[id]/overview-parts";
 import { chargeDayLabel, donationStatus, monthlyState, monthlyStateLabel } from "@/lib/charity/dashboard";
 import { donorGroup, donorGroupsFor } from "@/lib/charity/insights";
@@ -14,7 +14,7 @@ import { formatRand } from "@/lib/money";
 import { typedDay } from "@/lib/typed-date";
 import { plural } from "@/lib/text";
 import { donorFacts, type DemoData, type DemoGift } from "./data";
-import { DEMO_BASE as base, DEMO_LAPSED_DAYS, monthOf, saDay } from "./sample";
+import { DEMO_BASE as base, DEMO_CHARITY, DEMO_LAPSED_DAYS, monthOf, saDay } from "./sample";
 import { DEMO_TAGS, demoCareSeed, demoDonorIndex } from "./care";
 import { DemoDonorCare } from "./donor-care";
 import { DemoEmailDonors, DemoThankDonors } from "./donor-tools";
@@ -149,7 +149,7 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
         <EmptyState title="No matches" action={<ActionLink href={`${base}/donations`}>Show every donation</ActionLink>}>No donations match these filters. Try a wider period or clear the search.</EmptyState>
       ) : (
         <Card lights>
-          <div className={table.wrap}>
+          <TableScroll label="Donations table">
             <table className={`${table.table} min-w-[40rem]`}>
               <thead><tr className={table.headRow}><th className={table.th}>Status</th><th className={table.th}>Donor</th><th className={table.th}>For</th><th className={table.th}>From</th><th className={table.th}>Date</th><th className={`${table.th} text-right`}>Amount</th></tr></thead>
               <tbody>
@@ -173,7 +173,7 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       )}
       {pages > 1 ? (
@@ -466,7 +466,7 @@ export function DemoReport({ data, sp }: { data: DemoData; sp: Params }) {
             <MiniStat label="Monthly donations" value={formatRand(sum(paid.filter((g) => g.recurringId)))} />
           </div>
           <Card title="Month by month">
-            <div className={table.wrap}>
+            <TableScroll label="Donations by month table">
               <table className={table.table}>
                 <thead><tr className={table.headRow}><th className={table.th}>Month</th><th className={table.th}>Donations</th><th className={`${table.th} text-right`}>Received</th></tr></thead>
                 <tbody>
@@ -483,7 +483,7 @@ export function DemoReport({ data, sp }: { data: DemoData; sp: Params }) {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           </Card>
         </>
       )}
@@ -493,31 +493,24 @@ export function DemoReport({ data, sp }: { data: DemoData; sp: Params }) {
 
 // An address the demo doesn't know -------------------------------------------------------------------------------
 
-// Every page in the dashboard's menu works in the demo (09/11/2026). An address the demo doesn't know lands here.
-const ABOUT: Record<string, { title: string; lines: string[] }> = {};
-
+// Every page in the demo's menu works (09/11/2026). Keeping donors, Donor journey and Activity are left out of its
+// menu (DEMO_HIDDEN_TABS): made-up records would show nothing true about them. Any other address lands here and
+// says so plainly, without promising a description it doesn't have.
 export function DemoAbout({ path }: { path: string }) {
-  const about = Object.hasOwn(ABOUT, path) ? ABOUT[path] : undefined;
   return (
     <div className="space-y-5">
       <PageHeader
-        title={about?.title ?? "Not in the demo"}
+        title="Not in the demo"
         back={path.startsWith("donations/")
           ? <Link href={`${base}/donations`} className="font-semibold text-muted hover:text-brand">← Donations</Link>
           : <Link href={base} className="font-semibold text-muted hover:text-brand">← Overview</Link>}
       />
-      <Card title="What this page does">
-        {about ? (
-          <ul className="list-disc space-y-1.5 pl-5 text-sm">{about.lines.map((l) => <li key={l}>{l}</li>)}</ul>
-        ) : (
-          <p className="text-sm">This page isn&apos;t part of the demonstration.</p>
-        )}
-        <p className="mt-4 text-sm text-muted">In the demo nothing is saved or sent, so this page is described rather than shown.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <ActionLink href={base}>Back to the Overview</ActionLink>
-          <ActionLink href={`${base}/donations`}>See donations</ActionLink>
-        </div>
-      </Card>
+      <EmptyState
+        title="This page isn't part of the demonstration"
+        action={<div className="flex flex-wrap justify-center gap-2"><ActionLink href={base}>Back to the Overview</ActionLink><ActionLink href={`${base}/donations`}>See donations</ActionLink></div>}
+      >
+        It may have been an old link. Every page in the menu works in the demo.
+      </EmptyState>
     </div>
   );
 }
@@ -541,7 +534,7 @@ function giversIn(data: DemoData, month: string): Set<string> {
 
 export function DemoThankDonorsPage({ data }: { data: DemoData }) {
   const months = recentMonths(data.now).map((m) => ({ month: m, label: monthLabel(m), count: giversIn(data, m).size }));
-  return <DemoThankDonors months={months} sampleName={data.donors[0]?.first ?? "Naledi"} />;
+  return <DemoThankDonors months={months} sampleName={data.donors[0]?.first ?? "Naledi"} charityName={DEMO_CHARITY.name_en} sampleDate={data.now.toISOString()} />;
 }
 
 export function DemoEmailDonorsPage({ data }: { data: DemoData }) {

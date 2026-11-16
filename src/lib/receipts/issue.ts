@@ -9,6 +9,7 @@
  */
 import { taxYearName, taxYearRange } from "@/lib/dates";
 import type { EmailTransport } from "@/lib/email";
+import { wasCutOff } from "@/lib/email/retry-plan";
 import { buildReceiptEmail } from "./email";
 import { buildReceiptDetails, missingForSars, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped, type SeveralIdentities } from "./plan";
@@ -192,7 +193,10 @@ export async function runReceiptsJob(args: {
           summary.emailed += 1;
         } else await store.releaseEmail(r);
       } catch (e) {
-        await store.releaseEmail(r).catch(() => undefined);
+        // A send cut off at the time limit, or a dropped connection, may have gone (13/11/2026): the claim stays, so
+        // nothing sends it again by itself, and onEmailFailed flags it for a person. Only a refusal from the email
+        // service (sure not to have gone) frees it for the next run or the daily retry.
+        if (!wasCutOff(e)) await store.releaseEmail(r).catch(() => undefined);
         summary.emailFailed += 1;
         await args.mailer.onEmailFailed?.(r, e).catch(() => undefined);
         console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);

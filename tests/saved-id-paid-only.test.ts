@@ -48,6 +48,12 @@ describe("the saved ID number", () => {
     expect(gifts?.eq).toContainEqual(["wants_18a", true]);
   });
 
+  it("looks only at gifts this same account started while signed in (never a guest gift with their email)", async () => {
+    await savedIdLast4("user-1");
+    const details = calls.find((c) => c.table === "donation_checkout_details");
+    expect(details?.eq).toContainEqual(["started_by_user", "user-1"]);
+  });
+
   it("offers nothing when there is no paid gift with an ID", async () => {
     rows.donations = [];
     expect(await savedIdLast4("user-1")).toBeNull();

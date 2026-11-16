@@ -2,11 +2,13 @@ import "server-only";
 import { labelOf } from "@/lib/donations/labels";
 import { taxYearRange } from "@/lib/dates";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { buildTaxPack, type PackDonationRow, type PackReceiptRow, type TaxPack } from "./build";
 
 type DonationRow = {
   id: string;
+  charity_id: string;
   paid_at: string | null;
   amount_cents: number | string;
   wants_18a: boolean;
@@ -38,7 +40,7 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
   for (let page = 0; ; page += 1000) {
     const { data, error } = await supabase
       .from("donations")
-      .select("id, paid_at, amount_cents, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_giving_kinds(kind, label)")
+      .select("id, charity_id, paid_at, amount_cents, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_giving_kinds(kind, label)")
       .in("donor_id", donorIds)
       .eq("status", "paid")
       .gte("paid_at", from)
@@ -66,12 +68,14 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
     for (const l of links ?? []) receiptedIds.add(l.donation_id as string);
   }
 
+  const names = await missingCharityNames(rows);
   const donations: PackDonationRow[] = rows
     .filter((r) => r.paid_at)
     .map((r) => ({
       id: r.id,
       paidAt: r.paid_at!,
-      charityName: one(r.charities)?.name_en ?? "Charity",
+      charityId: r.charity_id,
+      charityName: one(r.charities)?.name_en ?? names.get(r.charity_id) ?? "Charity",
       amountCents: r.amount_cents,
       wants18a: r.wants_18a,
       monthly: r.recurring_id !== null,
@@ -89,4 +93,19 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
     status: r.status,
   }));
   return buildTaxPack(taxYear, donations, receiptRows, receiptedIds);
+}
+
+/**
+ * Row-level security only shows approved charities, so a gift to a charity that was later suspended comes back
+ * without a name. Those names (and nothing else) are read with the server's own client, strictly for the charity ids
+ * on this donor's own gifts already loaded above.
+ */
+async function missingCharityNames(rows: DonationRow[]): Promise<Map<string, string>> {
+  const ids = [...new Set(rows.filter((r) => r.charity_id && !one(r.charities)?.name_en).map((r) => r.charity_id))];
+  const names = new Map<string, string>();
+  if (ids.length === 0) return names;
+  const { data, error } = await createAdminClient().from("charities").select("id, name_en").in("id", ids);
+  if (error) return names; // A missing name is shown as "Charity"; the pack itself still loads.
+  for (const c of (data ?? []) as { id: string; name_en: string | null }[]) if (c.name_en) names.set(c.id, c.name_en);
+  return names;
 }

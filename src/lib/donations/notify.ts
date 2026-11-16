@@ -7,7 +7,8 @@ import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
 import { s18aDetailsMissing, type S18aDetailsRow } from "./s18a-details";
 import { NOT_REUSABLE } from "./recurring";
-import { recordFailedEmail } from "@/lib/email/retry";
+import { alreadyHandled, markRetryGone, markRetryUnknown, recordFailedEmail } from "@/lib/email/retry";
+import { wasCutOff } from "@/lib/email/retry-plan";
 
 /**
  * Called once, when a donation is confirmed paid (by the webhook or the
@@ -15,8 +16,25 @@ import { recordFailedEmail } from "@/lib/email/retry";
  * undoes the payment: it is logged for the team to resend.
  */
 export async function notifyDonationPaid(donationId: string, opts: { monthly?: "activated" | "not_reusable" | "none" } = {}) {
-  await sendDonorConfirmation(donationId, opts);
+  // Sent (or nothing to send): the note that it is owed (see oweDonorConfirmation) is closed, so it never goes twice.
+  // Failed: the note stays, and the daily job tries again.
+  // Already sent by the daily job's try again (or left as "may have gone" for a person): never a second copy.
+  if (await alreadyHandled("donation_confirmation", donationId)) {
+    await notifyCharityOfDonation(donationId);
+    return;
+  }
+  if (await sendDonorConfirmation(donationId, opts)) await markRetryGone("donation_confirmation", donationId);
   await notifyCharityOfDonation(donationId);
+}
+
+/**
+ * Called just before a gift is saved as paid: note the donor's confirmation as owed, on the same list as a failed
+ * one (email_retries, kind donation_confirmation). If the process stops after the gift is saved and before the email
+ * goes, the daily job's email retries send it; once notifyDonationPaid has sent it, the note is closed. There is no
+ * other "confirmation sent" marker. Never throws, and does nothing before the email_retries table exists.
+ */
+export async function oweDonorConfirmation(donationId: string): Promise<void> {
+  await recordFailedEmail("donation_confirmation", donationId);
 }
 
 /**
@@ -54,7 +72,9 @@ export async function sendDonorConfirmation(donationId: string, opts: { monthly?
       entityId: donationId,
       details: { message: e instanceof Error ? e.message : String(e) },
     }).catch((err) => console.error("[notify] could not record the failed email", err));
-    await recordFailedEmail("donation_confirmation", donationId, { error: e });
+    // Cut off mid-send: it may have reached the donor, so it is never sent again by itself (a person checks it).
+    if (wasCutOff(e)) await markRetryUnknown("donation_confirmation", donationId, e);
+    else await recordFailedEmail("donation_confirmation", donationId, { error: e });
     return false;
   }
 }

@@ -251,12 +251,12 @@ describe("money constraints", () => {
     });
   });
 
-  it("seeds the legacy fee settings row with no platform fee and gateway rates empty", async () => {
+  it("seeds the legacy fee settings row with no platform fee and the gateway's rates from the config (2.9% + R1, 13/11/2026)", async () => {
     const [fees] = await rows("select * from public.fee_settings");
     expect(fees.platform_fee_ppm).toBe(0);
     expect(fees.min_donation_cents).toBe("3000");
-    expect(fees.gateway_percent_ppm).toBeNull();
-    expect(fees.gateway_fixed_cents).toBeNull();
+    expect(fees.gateway_percent_ppm).toBe(29_000);
+    expect(Number(fees.gateway_fixed_cents)).toBe(100);
     expect(fees.vat_enabled).toBe(false);
     expect(fees.vat_rate_ppm).toBe(150_000);
   });

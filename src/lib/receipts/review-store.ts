@@ -2,7 +2,7 @@ import "server-only";
 import { platformConfig } from "@/config/platform";
 import { logAudit } from "@/lib/audit";
 import { taxYearRange } from "@/lib/dates";
-import { getEmailTransport, isErasedAddress } from "@/lib/email";
+import { EmailMaybeSent, getEmailTransport, isErasedAddress } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildReceiptDetails, receiptDonorName, type ReceiptDetails } from "./details";
 import { decidedPlan, openRun, type ReceiptRun } from "./runs";
@@ -118,7 +118,10 @@ async function saveDecision(charityId: string, r: DecidedReceipt, decision: "app
       {
         charity_id: charityId, tax_year: r.taxYear, donor_id: r.donorId, donor_identity: r.donorIdentity, decision,
         certificate_fingerprint: certificateFingerprint(r), decided_by: userId, decided_at: new Date().toISOString(),
-        note: note ?? null, decline_emailed_at: null,
+        note: note ?? null,
+        // A decline never touches whether its email went (review 16/11/2026: a second press at the same moment wrote
+        // it back to "not sent" and the donor got the email twice). Approving or editing clears it.
+        ...(decision === "declined" ? {} : { decline_emailed_at: null }),
       },
       { onConflict: "charity_id,tax_year,donor_id,donor_identity" },
     )
@@ -150,7 +153,7 @@ export async function approveCertificate(a: Args): Promise<DecisionDone | { ok: 
 }
 
 export type DeclineResult =
-  | { ok: true; decisionId: string; emailed: "sent" | "not_sent" | "failed" | "no_address"; cert: Certificate }
+  | { ok: true; decisionId: string; emailed: "sent" | "not_sent" | "failed" | "unknown" | "no_address"; cert: Certificate }
   | { ok: false; why: ReviewFailure };
 
 /**
@@ -175,11 +178,20 @@ export async function declineCertificate(a: Args & { contact: { phone: string | 
 
   const to = f.cert.gifts.find((g) => g.email)?.email ?? null;
   const siteUrl = process.env.SITE_URL ?? "";
-  let emailed: "sent" | "not_sent" | "failed" | "no_address" = "not_sent";
+  let emailed: "sent" | "not_sent" | "failed" | "unknown" | "no_address" = "not_sent";
   if (!to || isErasedAddress(to)) emailed = "no_address";
   else {
     const { data: c, error } = await db.from("charities").select("name_en").eq("id", a.charityId).single();
     if (error) throw error;
+    // Claimed before it goes (review 16/11/2026): two presses at once, or a press after a dropped connection, never
+    // send it twice. Handed back only when it surely didn't go.
+    const claim = await db.from("receipt_plan_decisions").update({ decline_emailed_at: new Date().toISOString() }).eq("id", decisionId).eq("decision", "declined").is("decline_emailed_at", null).select("id");
+    if (claim.error) throw claim.error;
+    if (!claim.data?.length) return { ok: false, why: "already" };
+    const release = async () => {
+      const { error: e } = await db.from("receipt_plan_decisions").update({ decline_emailed_at: null }).eq("id", decisionId);
+      if (e) console.error("[receipts] could not hand back the decline email's claim:", e.message);
+    };
     const mail = buildDeclineEmail({
       donorName: f.cert.donorName, donorType: f.cert.donorType, charityName: c.name_en as string, taxYear: a.taxYear, totalCents: r.totalCents,
       contactPhone: phone, contactEmail: email, siteUrl, platformName: platformConfig.appName,
@@ -189,12 +201,10 @@ export async function declineCertificate(a: Args & { contact: { phone: string | 
       emailed = sent === "sent" ? "sent" : "not_sent";
     } catch (e) {
       console.error("[receipts] could not email a declined certificate's donor:", e instanceof Error ? e.message : e);
-      emailed = "failed";
+      // Cut off part way: it may have gone, so it stays claimed and is never sent again.
+      emailed = e instanceof EmailMaybeSent ? "unknown" : "failed";
     }
-  }
-  if (emailed === "sent") {
-    const { error } = await db.from("receipt_plan_decisions").update({ decline_emailed_at: new Date().toISOString() }).eq("id", decisionId).eq("decision", "declined");
-    if (error) console.error("[receipts] the decline email went, but could not be marked sent:", error.message);
+    if (emailed === "not_sent" || emailed === "failed") await release();
   }
   await logAudit({ actorUserId: a.userId, action: "receipts.certificate_decline_email", entityType: "charity", entityId: a.charityId, details: { taxYear: a.taxYear, certificate: a.key, outcome: emailed } });
   return { ok: true, decisionId, emailed, cert: f.cert };

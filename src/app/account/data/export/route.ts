@@ -123,6 +123,18 @@ export async function GET(request: Request) {
   const launch = accountEmail ? await createAdminClient().from("launch_list").select("email, consent_version, source, created_at").eq("email", accountEmail) : null;
   const launchList = launch && !launch.error ? (launch.data ?? []) : [];
 
+  // Their "Request a charity" asks (15/11/2026): by account, or by the email they left to hear when it joins.
+  const requestCols = "name, town, link, note, notify_email, consent_version, came_from, status, notified_at, created_at";
+  const [byAccount, byEmail] = await Promise.all([
+    createAdminClient().from("charity_requests").select(requestCols).eq("requested_by", user.id),
+    // Found by email only: someone else may have typed this address, so only what concerns this person (the charity
+    // asked about, the address and the agreement), never the other person's town, link or note.
+    accountEmail ? createAdminClient().from("charity_requests").select("name, notify_email, consent_version, status, created_at").eq("notify_email", accountEmail) : null,
+  ]);
+  const charityRequests = [...(byAccount.error ? [] : (byAccount.data ?? [])), ...(byEmail && !byEmail.error ? (byEmail.data ?? []) : [])].filter(
+    (r, i, all) => all.findIndex((o) => o.created_at === r.created_at && o.name === r.name) === i,
+  );
+
   // The saved card, as brand, last four digits and expiry only. The stored token is never included.
   const savedCard = await loadSavedCardInfo(user.id).catch(() => null);
 
@@ -154,6 +166,7 @@ export async function GET(request: Request) {
     giving_elsewhere: external.data ?? [],
     private_notes: notes.data ?? [],
     launch_list: launchList,
+    charity_requests: charityRequests,
   };
 
   await logAudit({ actorUserId: user.id, action: "privacy.data_downloaded", entityType: "user", entityId: user.id });

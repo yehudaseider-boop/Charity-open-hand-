@@ -43,8 +43,17 @@ vi.mock("@/lib/receipts/store", () => ({
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: { action: string; details?: Record<string, unknown> }) => void audits.push(a) }));
 vi.mock("@/lib/email", async (orig) => ({
   ...(await orig<object>()),
-  getEmailTransport: () => ({ name: "test", send: async (m: { to: string; subject: string; text: string; replyTo?: string }) => (mails.push(m), "sent") }),
+  getEmailTransport: () => ({
+    name: "test",
+    send: async (m: { to: string; subject: string; text: string; replyTo?: string }) => {
+      if (sendCutOff) throw new (await import("@/lib/email")).EmailMaybeSent("fetch failed");
+      return (mails.push(m), "sent");
+    },
+  }),
 }));
+
+let claimTaken = false;
+let sendCutOff = false;
 
 /** A stand-in for the service-role client: answers each table the way the code reads it, and records writes. */
 function query(table: string) {
@@ -55,6 +64,8 @@ function query(table: string) {
     if (table === "charities") return { data: { name_en: "Northcliff Meals Fund" }, error: null };
     if (table === "receipt_plan_decisions" && op === "upsert") return { data: { id: "dec1", decided_at: "2027-03-02T08:00:00+00:00" }, error: null };
     if (table === "receipt_plan_decisions" && op === "delete") return { data: [{ id: "dec1", decision: "declined" }], error: null };
+    // The decline email's claim: taken unless someone else got there first.
+    if (table === "receipt_plan_decisions" && op === "update") return { data: claimTaken && (payload as Record<string, unknown>)?.decline_emailed_at ? [] : [{ id: "dec1" }], error: null };
     return { data: null, error: null };
   };
   const b: Record<string, unknown> = {};
@@ -171,6 +182,8 @@ describe("declining a receipt", () => {
     const r = await declineCertificate({ ...args, contact });
     expect(r).toMatchObject({ ok: true, emailed: "sent" });
     expect(writes.find((w) => w.op === "upsert")?.payload).toMatchObject({ decision: "declined" });
+    // A decline never writes "not emailed" back over a claim another press just took (review 16/11/2026).
+    expect(writes.find((w) => w.op === "upsert")?.payload).not.toHaveProperty("decline_emailed_at");
     expect(writes.find((w) => w.op === "update")?.payload).toHaveProperty("decline_emailed_at");
     expect(mails).toHaveLength(1);
     expect(mails[0]).toMatchObject({ to: "thandi@example.co.za", replyTo: "office@meals.org.za" });
@@ -187,6 +200,24 @@ describe("declining a receipt", () => {
     expect(r).toMatchObject({ ok: true, emailed: "sent" });
     expect(writes.filter((w) => w.op === "upsert")).toEqual([]);
     expect(mails).toHaveLength(1);
+  });
+
+  it("two presses at once send it once: the second finds it claimed (review 16/11/2026)", async () => {
+    claimTaken = true;
+    expect(await declineCertificate({ ...args, contact })).toEqual({ ok: false, why: "already" });
+    expect(mails).toEqual([]);
+    claimTaken = false;
+  });
+
+  it("a send cut off part way stays claimed, so it is never sent twice, and says it can't tell", async () => {
+    sendCutOff = true;
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await declineCertificate({ ...args, contact });
+    err.mockRestore();
+    sendCutOff = false;
+    expect(r).toMatchObject({ ok: true, emailed: "unknown" });
+    // Claimed, and never handed back.
+    expect(writes.filter((w) => w.table === "receipt_plan_decisions" && w.op === "update").map((w) => w.payload)).toEqual([{ decline_emailed_at: expect.any(String) }]);
   });
 
   it("says so when there is no address to email", async () => {

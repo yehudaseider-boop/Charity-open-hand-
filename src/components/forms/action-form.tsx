@@ -76,7 +76,9 @@ export function ActionForm({
         // Our own plain-words checks run (on the server, shown by each field). Forms that ask first keep
         // the browser's quick checks, so nothing is confirmed that would then be refused.
         noValidate={!confirm}
-        className={`space-y-3 ${className}`}
+        // While it asks, a form that sits in a row (Remove beside a name) takes the whole row, so the question wraps
+        // under it at the row's width instead of running off the side of a phone.
+        className={`space-y-3 has-[[role=alertdialog]]:basis-full ${className}`}
         onSubmit={(e) => {
           e.preventDefault();
           const formData = new FormData(e.currentTarget);
@@ -89,7 +91,7 @@ export function ActionForm({
       >
         {children}
         {asking ? (
-          <div role="alertdialog" aria-label="Please confirm" className="space-y-3 rounded-card border-2 border-honey bg-honey-soft p-4 text-sm">
+          <div role="alertdialog" aria-label="Please confirm" className="w-full min-w-0 space-y-3 rounded-card border-2 border-honey bg-honey-soft p-4 text-sm [overflow-wrap:anywhere]">
             <p className="font-medium text-navy">{confirm}</p>
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -105,7 +107,7 @@ export function ActionForm({
               >
                 {confirmLabel ?? `Yes, ${submitLabel.charAt(0).toLowerCase()}${submitLabel.slice(1)}`}
               </button>
-              <button type="button" onClick={() => setAsking(null)} className="px-2 py-2.5 font-medium text-brand underline">
+              <button type="button" onClick={() => setAsking(null)} className="inline-flex min-h-11 items-center px-2 font-medium text-brand underline">
                 Not yet
               </button>
             </div>

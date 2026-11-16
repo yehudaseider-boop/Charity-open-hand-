@@ -37,7 +37,29 @@ export interface EmailTransport {
   send(message: EmailMessage): Promise<SendOutcome>;
 }
 
-export class EmailError extends Error {}
+export class EmailError extends Error {
+  /** The email service's HTTP status, when it answered with a refusal. */
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
+
+/**
+ * The email service said "not now" (too many emails too fast, or its own outage), not "never": nothing was sent, and
+ * the same email can go later. A bulk send stops and leaves the rest for "Send the rest" (review 16/11/2026: before,
+ * such a refusal used up the donor's email for good).
+ */
+export function isTemporaryRefusal(e: unknown): boolean {
+  return e instanceof EmailError && e.status !== undefined && (e.status === 429 || e.status >= 500);
+}
+
+/**
+ * The email may have left even though the send failed: the request was on its way to the provider when the
+ * connection dropped or the time limit fired. Only the transport throws this, and only around the provider call
+ * itself. Every other failure (a database read before the send, a missing setting, the provider saying no) is
+ * sure not to have sent anything, so it can be tried again (review 12/11/2026).
+ */
+export class EmailMaybeSent extends Error {}
 
 /** "sarah@example.co.za" -> "s•••@example.co.za" (for logs). */
 export function maskEmail(address: string): string {
@@ -65,25 +87,33 @@ export function resendTransport(env: { RESEND_API_KEY?: string; EMAIL_FROM?: str
   return {
     name: "resend",
     async send(m) {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        ...(m.signal ? { signal: m.signal } : {}),
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from,
-          to: [m.to],
-          // A subject is one line, whatever a charity typed into its name.
-          subject: m.subject.replace(/[\r\n]+/g, " "),
-          text: m.text,
-          ...(m.html ? { html: m.html } : {}),
-          ...(m.replyTo ? { reply_to: m.replyTo } : {}),
-          ...(m.headers && Object.keys(m.headers).length ? { headers: cleanHeaders(m.headers) } : {}),
-          ...(m.attachments?.length
-            ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
-            : {}),
-        }),
-      });
-      if (!res.ok) throw new EmailError(`Resend refused the email (${res.status}).`);
+      // Already given up before anything left: nothing was sent, so this is an ordinary failure.
+      if (m.signal?.aborted) throw new Error("The email was not sent: its time limit had already passed.");
+      let res: Response;
+      try {
+        res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          ...(m.signal ? { signal: m.signal } : {}),
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from,
+            to: [m.to],
+            // A subject is one line, whatever a charity typed into its name.
+            subject: m.subject.replace(/[\r\n]+/g, " "),
+            text: m.text,
+            ...(m.html ? { html: m.html } : {}),
+            ...(m.replyTo ? { reply_to: m.replyTo } : {}),
+            ...(m.headers && Object.keys(m.headers).length ? { headers: cleanHeaders(m.headers) } : {}),
+            ...(m.attachments?.length
+              ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
+              : {}),
+          }),
+        });
+      } catch (e) {
+        // The request may have reached Resend before the connection dropped or the time limit fired.
+        throw new EmailMaybeSent(`The send to Resend was cut off: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (!res.ok) throw new EmailError(`Resend refused the email (${res.status}).`, res.status);
       return "sent";
     },
   };

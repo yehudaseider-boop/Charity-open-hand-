@@ -10,6 +10,8 @@ import { cleanLabel } from "@/lib/donations/labels";
 export type PackDonationRow = {
   id: string;
   paidAt: string;
+  /** The charity's id: gifts are grouped by it, so two charities with the same (or a missing) name stay apart. */
+  charityId?: string | null;
   charityName: string;
   amountCents: number | string;
   /** The donor asked for an s18A receipt (only possible with an s18A charity). */
@@ -26,6 +28,7 @@ export type PackReceiptRow = { charityName: string | null; reference: string | n
 export type PackLine = {
   id: string;
   paidAt: string;
+  charityId: string | null;
   charityName: string;
   cents: number;
   /** The donor asked for an s18A receipt. */
@@ -65,6 +68,7 @@ export function buildTaxPack(taxYear: number, donations: PackDonationRow[], rece
     .map((d) => ({
       id: d.id,
       paidAt: d.paidAt,
+      charityId: d.charityId ?? null,
       charityName: d.charityName,
       cents: Number(d.amountCents),
       s18a: d.wants18a,
@@ -79,12 +83,14 @@ export function buildTaxPack(taxYear: number, donations: PackDonationRow[], rece
   const s18aCents = lines.filter((l) => l.s18a).reduce((t, l) => t + l.cents, 0);
   const receiptedCents = lines.filter((l) => l.receipted).reduce((t, l) => t + l.cents, 0);
   const charities = new Map<string, PackCharity>();
+  // By charity id, not name: two charities that share a name (or both fall back to "Charity") stay on their own lines.
   for (const l of lines) {
-    const c = charities.get(l.charityName) ?? { name: l.charityName, cents: 0, count: 0, s18aCents: 0 };
+    const key = l.charityId ? `id:${l.charityId}` : `name:${l.charityName}`;
+    const c = charities.get(key) ?? { name: l.charityName, cents: 0, count: 0, s18aCents: 0 };
     c.cents += l.cents;
     c.count += 1;
     if (l.s18a) c.s18aCents += l.cents;
-    charities.set(l.charityName, c);
+    charities.set(key, c);
   }
   // Labels are grouped whatever their case ("family" with "Family"), shown as first written.
   const labels = new Map<string, { label: string; cents: number }>();

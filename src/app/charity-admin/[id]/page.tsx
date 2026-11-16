@@ -15,14 +15,14 @@ import { countDonorGroups, donorGroupsFor, endsWithinAWeek, giftsPerDonor, lapse
 import { dueReminders, lapsedDaysFor } from "@/lib/charity/donor-care";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { isRunning } from "@/lib/charity/campaigns";
-import { loadDonors, loadGiftSources, loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview, loadRecentDonations } from "@/lib/charity/dashboard-queries";
+import { loadDonors, loadGiftSources, loadInsights, loadMonthlyDonations, loadMonthlyTotals, loadOverview, loadRecentDonations, loadReversalsSince } from "@/lib/charity/dashboard-queries";
 import { isoDateInJhb } from "@/lib/dates";
 import { impactUnitFrom } from "@/lib/charity/impact";
 import { keepingWindow } from "@/lib/charity/keeping-donors";
 import { lapsedPeriod } from "@/lib/charity/lapsed-monthly";
 import { loadLapsedMonthly } from "@/lib/charity/lapsed-monthly-queries";
 import { loadS18aMissing } from "@/lib/charity/s18a-reminder-send";
-import { thisWeek } from "@/lib/charity/this-week";
+import { recentReversals, reversalsSince, thisWeek } from "@/lib/charity/this-week";
 import { newDonorsToThank } from "@/lib/charity/this-week-store";
 import { KeepingNotSetUp, loadKeepingSummary } from "@/lib/charity/keeping-donors-queries";
 
@@ -102,7 +102,7 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
   const keepingYear = keepingWindow("this", now);
   // "Needs you this week" (CRM step 17): each line links to the page where the charity acts on it. Unpaid attempts
   // are not shown to charities. A part that can't be read is named on the card; the rest still shows.
-  const [lapsedDays, due, keepingRows, toThank, stopped, s18aMissing] = await Promise.all([
+  const [lapsedDays, due, keepingRows, toThank, stopped, s18aMissing, reversals] = await Promise.all([
     lapsedDaysFor(id),
     dueReminders(id, isoDateInJhb(now)),
     // A bonus panel: if it can't load, the overview still shows, with a plain line instead. Not set up yet: no panel.
@@ -114,6 +114,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     ),
     // Anyone who manages the charity sees the count; only the owner can send the reminder from the Donors list.
     loadS18aMissing(id, now).then((m) => m.size, (e: unknown) => quiet("s18A details", e)),
+    // Refunds and chargebacks of the last 30 days only (Yehuda's decision), not all time.
+    loadReversalsSince(id, reversalsSince(now)).then((rows) => recentReversals(rows, now), (e: unknown) => quiet("refunds and chargebacks", e)),
   ]);
   const keeping = keepingRows === undefined ? undefined : keepingRows === null ? null : { summary: keepingRows, window: keepingYear };
   const donorGroups = donorGroupsFor(lapsedDays);
@@ -143,8 +145,8 @@ export default async function CharityDashboardPage({ params }: PageProps<"/chari
     lapsed: { count: groups.lapsed, periodText: lapsedPeriodText(lapsedDays) },
     followUps: due,
     endingSoon,
-    refunded: { count: all.refunded_count, cents: all.refunded_cents },
-    chargedBack: all.charged_back_count,
+    refunded: reversals?.refunded ?? null,
+    chargedBack: reversals?.chargedBack ?? null,
   });
 
   return (

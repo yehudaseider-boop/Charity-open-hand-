@@ -48,6 +48,8 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       .eq("charity_id", id)
       .order("paid_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
+      // Imported gifts can share both times: the id makes the order unique, so no gift repeats or goes missing between pages.
+      .order("id")
       .range((page - 1) * PAGE, page * PAGE - 1),
     filters,
   );

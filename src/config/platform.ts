@@ -17,7 +17,8 @@ export const platformConfig = {
 
   fees: {
     /**
-     * No platform fee and no processing fee on donations (Yehuda, 08/10/2026).
+     * No platform fee and no processing fee on donations (Yehuda, 08/10/2026). Givezy earns a monthly fee from each
+     * charity, invoiced outside the platform (Yehuda, 13/11/2026): nothing here bills charities.
      * The donor may give Givezy a separate contribution (the buttons below, or "No thanks").
      *
      * The gateway's own charge: each side pays it on its own share, in proportion
@@ -28,11 +29,15 @@ export const platformConfig = {
      * the gateway's rates below are filled in.
      */
     gatewayChargePaidBy: "each" as "charity" | "givezy" | "each" | null,
-    /** The gateway's charge, from its rate sheet. Empty until Yehuda supplies it. */
-    gatewayPercent: null as string | null,
-    gatewayFixedCents: null as number | null,
-    /** Do the rates above already include VAT? Also from the rate sheet. */
-    gatewayRatesIncludeVat: null as boolean | null,
+    /**
+     * The gateway's charge: South African local cards, 2.9% + R1 excluding VAT (Paystack support's answer of
+     * 13/11/2026; Yehuda chose the local rate, 13/11/2026: "Yes"). International cards cost 3.1% + R1, so covering
+     * one falls a little short (about 0.2% of the gift). VAT at 15% is added on top of the charge.
+     */
+    gatewayPercent: "2.9" as string | null,
+    gatewayFixedCents: 100 as number | null,
+    /** The rates above exclude VAT (Paystack, 13/11/2026). */
+    gatewayRatesIncludeVat: false as boolean | null,
   },
 
   /** Minimum donation to a charity. Confirmed: R30. */
@@ -90,15 +95,20 @@ export const platformConfig = {
     /** Gift starts per email address. */
     perEmail: { tries: 5, minutes: 10 },
     perEmailDay: { tries: 20, minutes: 1_440 },
-    /** Gift starts per internet address. */
-    perAddress: { tries: 30, minutes: 10 },
-    perAddressDay: { tries: 150, minutes: 1_440 },
+    /**
+     * Gift starts per internet address. Raised on 12/11/2026 (from 30 and 150): South African mobile networks put
+     * very many phones behind one shared address, so a busy campaign evening must not stop real donors. Starting
+     * values for Yehuda to confirm (go-live list); the per-email limits above stay as they were.
+     */
+    perAddress: { tries: 60, minutes: 10 },
+    perAddressDay: { tries: 300, minutes: 1_440 },
     /**
      * Declined cards: this many, and new gifts wait until the oldest is this old. An address gets far more than an
      * email, so a few declines on a shared office or mobile network address don't stop everyone behind it.
      */
     declinesPerEmail: { tries: 3, minutes: 60 },
-    declinesPerAddress: { tries: 15, minutes: 60 },
+    /** Raised from 15 on 12/11/2026, for shared mobile-network addresses. A starting value for Yehuda to confirm. */
+    declinesPerAddress: { tries: 30, minutes: 60 },
     /** Alarms for the Givezy team (an email and Admin, Payments); these never stop anyone giving. */
     charityStartsAlarm: { tries: 60, minutes: 10 },
     charityDeclinesAlarm: { tries: 10, minutes: 60 },
@@ -106,14 +116,30 @@ export const platformConfig = {
     minFillSeconds: 3,
   },
 
+  /**
+   * Sign-in limits on the website (security review, 12/11/2026). Counted per email together with the internet
+   * address, so a stranger asking for links or typing wrong codes for someone's email cannot lock that person out
+   * from their own phone or computer. Each email also has a much higher ceiling of its own (many addresses at once),
+   * and each address a limit of its own across emails. Only wrong codes count, never a right one.
+   */
+  signInGuard: {
+    linksPerEmailAndAddress: { tries: 5, minutes: 60 },
+    linksPerEmail: { tries: 30, minutes: 60 },
+    linksPerAddress: { tries: 20, minutes: 60 },
+    wrongCodesPerEmailAndAddress: { tries: 10, minutes: 60 },
+    wrongCodesPerEmail: { tries: 50, minutes: 60 },
+    wrongCodesPerAddress: { tries: 30, minutes: 60 },
+  },
+
   checkout: {
     /**
      * One tick on the website's give form instead of two: "I'm 18 or older and I agree to the Terms and Privacy
      * Policy, and that my details are shared with {charity} so they can record my donation." It records the same
      * agreements as the two ticks (decided 04/11/2026).
-     * Turn on once Yosef approves the wording (go-live list).
+     * ON for the test site since 12/11/2026 (Yehuda: the form felt like too many ticks). Yosef must still approve the
+     * wording before launch (go-live list); switch off to go back to the two ticks.
      */
-    singleAgreementTick: false as boolean,
+    singleAgreementTick: true as boolean,
   },
 } as const;
 

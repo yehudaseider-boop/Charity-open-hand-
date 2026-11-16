@@ -6,7 +6,7 @@ import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AmountSwipe } from "@/components/amount-swipe";
 import { Button, TextLink } from "@/components/button";
@@ -45,9 +45,12 @@ import { charityShareText } from "@/lib/share";
 import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow";
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
+import { celebrates, stageLabel, TICK_MS, type GiveStage } from "@/lib/give-stage";
 import { confirmThen, openSite, openUrl } from "@/lib/open-site";
 import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
+import { inHistory, settles, type GiftSnapshot, type PendingGift } from "@/lib/pending-gift";
+import { dropPendingGift, keepPendingGift, loadPendingGift, markDetailsLater } from "@/lib/pending-gift-store";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -80,11 +83,21 @@ const SECTION_OF: Record<string, string> = {
  * through: paid is thanked, anything else keeps the form so the donor can try again.
  */
 /** Exactly what one tap of Give sent, kept for the thank-you and for holding an unresolved saved-card attempt. */
-type Snapshot = { cents: number; contributionCents: number; email: string; monthly: boolean; label: string | null; amountText?: string; extraText?: string; extraChoice?: ContributionChoice };
+type Snapshot = GiftSnapshot;
 
 export default function Give() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
+  // The pinned footer gives way to the form while the keyboard is up (small phones, 12/11/2026).
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const shown = Keyboard.addListener("keyboardDidShow", () => setKeyboardUp(true));
+    const hidden = Keyboard.addListener("keyboardDidHide", () => setKeyboardUp(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
   const { slug, label: labelParam, campaign: rawCampaign, demo, monthly: monthlyParam, amount: amountParam } = useLocalSearchParams<{ slug: string; kind?: string; label?: string; campaign?: string; demo?: string; monthly?: string; amount?: string }>();
   // A link with a broken campaign id gives to the charity itself, rather than failing every check.
   const campaignParam = typeof rawCampaign === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawCampaign) ? rawCampaign : undefined;
@@ -143,7 +156,14 @@ export default function Give() {
   // What was typed, else the account's address (which may arrive after this screen opened from a link).
   const [emailTyped, setEmail] = useState<string | null>(null);
   const email = emailTyped ?? account.email ?? "";
-  const [remember, setRemember] = useState(false);
+  const [remember, setRememberState] = useState(false);
+  // Once the donor has set the switch themselves, the default never changes it again.
+  const rememberTouched = useRef(false);
+  const setRemember = (v: boolean) => setRememberState(v);
+  const chooseRemember = (v: boolean) => {
+    rememberTouched.current = true;
+    setRememberState(v);
+  };
   const [remembered, setRemembered] = useState<RememberedDetails | null>(null);
   const [editingDetails, setEditingDetails] = useState(false);
   const [want18a, setWant18a] = useState(false);
@@ -188,7 +208,11 @@ export default function Give() {
     const y = e.nativeEvent.layout.y;
     setSectionY((was) => (was[key] === y ? was : { ...was, [key]: y }));
   };
-  const [busy, setBusy] = useState<false | "opening" | "checking">(false);
+  // What the Give button is really doing: securing (our server makes the payment, or charges the saved card), opening
+  // (the payment page), checking (asking the provider). The words and the sweep on the button follow it.
+  const [busy, setBusy] = useState<GiveStage>(false);
+  // Shown for a moment, on the button, once the provider has confirmed the gift as paid.
+  const [confirmed, setConfirmed] = useState(false);
   // Where "Back" goes when there is no screen behind this one (opened cold from a link).
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/discover"));
   // Two taps in the same frame both see busy as false; the ref stops the second at once.
@@ -199,11 +223,15 @@ export default function Give() {
   const [done, setDone] = useState<SentGift | null>(null);
   const typedSomething = Boolean(amount || first || last || emailTyped || idNumber || street || suburb || town || postal || note || extraAmount);
   const heldOne = heldAttempt !== null;
+  const waitingOne = unsettled !== null;
   const isDone = done !== null;
   // Leaving by the back gesture or the hardware button: ask first when something typed would be lost,
-  // when we are still checking a payment, or when a saved-card charge is waiting for its reply.
-  usePreventRemove(!isDone && (typedSomething || busy !== false || heldOne), ({ repeat }) => {
-    if (busy === "checking") {
+  // when we are still checking a payment, or when a gift is waiting for its answer. A waiting gift is kept on
+  // the phone (pending-gift-store), so leaving loses nothing: Progress and this screen go on asking.
+  usePreventRemove(!isDone && (typedSomething || busy !== false || heldOne || waitingOne), ({ repeat }) => {
+    if (heldOne || waitingOne) {
+      confirmThen("Your gift may still be going through", "If you leave, we'll keep checking.", "Leave", repeat, "Stay");
+    } else if (busy === "checking") {
       confirmThen("We're still checking your payment", "Leaving now may lose the result. It takes a few seconds.", "Leave anyway", repeat, "Wait");
     } else {
       confirmThen("Leave and lose what you typed?", "", "Leave", repeat, "Keep editing");
@@ -211,6 +239,59 @@ export default function Give() {
   });
   // Preview of the after-gift screen for design review: ?demo=sent.
   const [demoShown, setDemoShown] = useState(false);
+
+  // A gift we hadn't heard the end of when this screen was left or the app was closed (even while the payment
+  // page was open): picked up again for this person and charity, and asked about at once. The answer is shown
+  // below, once the thank-you can be drawn (`resumed`).
+  const [resumed, setResumed] = useState<{ outcome: string; gift: PendingGift; at: Date } | null>(null);
+  const restoredFor = useRef<string | null>(null);
+  const { refresh: refreshGiving } = account;
+  useEffect(() => {
+    if (preview || !ownerKnown || !slug || !site) return;
+    const who = `${owner ?? "-"}:${slug}`;
+    if (restoredFor.current === who) return;
+    let live = true;
+    loadPendingGift(owner, slug).then(async (p) => {
+      if (!live || restoredFor.current === who) return;
+      restoredFor.current = who;
+      // A gift started on this screen in the meantime is the one that counts.
+      if (!p || busyRef.current) return;
+      if (p.attemptId) {
+        // A saved-card charge: held exactly as it was sent, under the same attempt id, so it is never charged twice.
+        attemptRef.current = p.attemptId;
+        setHeldAttempt(p.summary);
+        setAmount(p.summary.amountText ?? centsToInput(p.summary.cents));
+        if (p.summary.extraChoice !== undefined) setExtraPick(p.summary.extraChoice);
+        setExtraAmount(p.summary.extraText ?? "");
+        setEmail(p.summary.email);
+        setMonthly(false);
+      }
+      if (!p.reference || !p.token) {
+        setMessage(`Your gift of ${rand(p.summary.cents + p.summary.contributionCents)} from your saved card may still be going through. Tap Give: we check first, and never charge twice.`, "wait", true);
+        return;
+      }
+      setUnsettled({ reference: p.reference, token: p.token, charged: p.charged, summary: p.summary });
+      setMessage(`Checking your gift of ${rand(p.summary.cents + p.summary.contributionCents)}…`, "info");
+      busyRef.current = true;
+      setBusy("checking");
+      const outcome = await paymentStatus(site, p.reference, p.token);
+      busyRef.current = false;
+      if (!live) return;
+      setBusy(false);
+      if (settles(outcome)) {
+        attemptRef.current = null;
+        void dropPendingGift(owner, slug);
+      }
+      if (outcome === "paid") {
+        haptic.success();
+        void refreshAfterGiving(refreshGiving);
+      }
+      setResumed({ outcome, gift: p, at: new Date() });
+    });
+    return () => {
+      live = false;
+    };
+  }, [preview, ownerKnown, owner, slug, site, refreshGiving]);
 
   // The proud screen says thank you here, so the tabs' "a donation arrived" thank-you doesn't pop up again over it.
   const { arrived, dismissArrived } = account;
@@ -221,6 +302,8 @@ export default function Give() {
   // Remembered details, once we know who is signed in (never the signed-out copy for a signed-in person). When the
   // person changes (sign-out on this screen) and has none of their own, the last person's details are taken off again.
   const accountKnown = account.status !== "loading";
+  // Signed in (or the design preview, which stands for a signed-in donor): remembering is on unless switched off.
+  const rememberByDefault = account.status === "signed-in" || preview;
   const filledFrom = useRef<RememberedDetails | null>(null);
   useEffect(() => {
     if (!accountKnown) return;
@@ -228,6 +311,10 @@ export default function Give() {
     loadDetails(account.userId).then((d) => {
       if (!live) return;
       if (!d) {
+        // Nothing remembered yet: on by default for a signed-in donor (13/11/2026, Yehuda: "should be already
+        // ticked"), so the next gift is quicker; they can switch it off. Never for someone not signed in: on a
+        // shared phone the next person would find their name and email.
+        if (!rememberTouched.current) setRemember(rememberByDefault);
         const was = filledFrom.current;
         if (!was) return;
         filledFrom.current = null;
@@ -248,7 +335,7 @@ export default function Give() {
     return () => {
       live = false;
     };
-  }, [account.userId, accountKnown]);
+  }, [account.userId, accountKnown, rememberByDefault]);
 
   const { accessToken } = account;
   useEffect(() => {
@@ -416,18 +503,23 @@ export default function Give() {
 
   /** What the after-gift screen shows: this gift added to the goal and the streak, and honest badges. */
   /** `cents` is the gift to the charity only: a contribution to Givezy never counts towards a goal. */
-  function sentSummary(s: Snapshot, confirming: boolean): SentGift {
+  /** `reference`: the donation, so a gift already in the (refreshed) history is never added to the ring twice. */
+  function sentSummary(s: Snapshot, confirming: boolean, reference?: string | null): SentGift {
     const { cents, contributionCents, email: mail, monthly: wasMonthly } = s;
     const today = jhbToday();
-    const rows = [...history, ...elsewhere, { date: today, cents, label: cleanLabel(s.label) }];
+    const seen = inHistory(history, reference);
+    const rows = seen.counted ? [...history, ...elsewhere] : [...history, ...elsewhere, { date: today, cents, label: cleanLabel(s.label) }];
     const pr = goal && counts(goal, cleanLabel(s.label)) ? goalProgress(goal, rows, income.value, today) : null;
+    // Still their first gift when the fresh history holds only this one.
+    const first = firstEver || (seen.firstOnly && account.status === "signed-in" && account.live !== null && !account.live.fromCache);
+    const firstHere = first ? isFirstGift({ signedIn: account.status === "signed-in", freshHistoryEmpty: true, newDonor, invited }) : firstGift;
     const badges = [
-      firstEver ? "First gift on Givezy" : null,
+      first ? "First gift on Givezy" : null,
       wasMonthly ? "Monthly giver" : null,
       s18aAvailable && want18a ? (detailsLater ? "s18A details still to add, from your account on our website" : "s18A receipt at tax time") : null,
       pr && goal ? `Counts towards ${goal.name}` : null,
     ].filter((b): b is string => Boolean(b));
-    const inviteNow = (demo === "invite" && !site) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift, confirming });
+    const inviteNow = (demo === "invite" && !site) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift: firstHere, confirming });
     const invite: GoalInvite | null = inviteNow
       ? {
           labels: [],
@@ -458,6 +550,22 @@ export default function Give() {
   if ((demo === "sent" || demo === "invite") && !site && !demoShown) {
     setDemoShown(true);
     setDone(sentSummary({ cents: 18_000, contributionCents: 0, email: "sarah@example.co.za", monthly: false, label }, false));
+  }
+  // The answer about a gift picked up again (see `resumed` above): the thank-you when paid, else what happened.
+  if (resumed) {
+    const { outcome, gift: g, at: checkedAt } = resumed;
+    setResumed(null);
+    if (settles(outcome)) {
+      setUnsettled(null);
+      if (g.charged) setHeldAttempt(null);
+    }
+    if (outcome === "paid") {
+      setMessage(null);
+      setDone(sentSummary(g.summary, false, g.reference));
+    } else {
+      const o = outcome === "failed" || outcome === "not_found" || outcome === "reversed" || outcome === "review" ? outcome : "pending";
+      setMessage(afterPaymentMessage(o, g.charged, checkedAt), afterPaymentTone(o), true);
+    }
   }
 
   function check() {
@@ -498,6 +606,22 @@ export default function Give() {
     if (ys.length) scrollRef.current?.scrollTo({ y: Math.max(0, Math.min(...ys) - 12), animated: true });
   }
 
+  /** A saved-card charge with no answer yet: kept on the phone under its attempt id, so it is asked about again, never charged twice. */
+  async function keepAttempt(s: Snapshot) {
+    if (!attemptRef.current) return;
+    await keepPendingGift(owner, {
+      slug: charity!.slug,
+      charityName: charity!.nameEn,
+      reference: null,
+      token: null,
+      charged: true,
+      attemptId: attemptRef.current,
+      detailsLater,
+      summary: s,
+      sentAt: new Date().toISOString(),
+    });
+  }
+
   async function give() {
     if (busy || busyRef.current) return;
     busyRef.current = true;
@@ -521,7 +645,7 @@ export default function Give() {
       setMessage(`This is the demo, so no payment is taken. In the real app this opens the secure payment page for ${rand(total)}.`, "info");
       return;
     }
-    setBusy("opening");
+    setBusy("securing");
     const details = {
       donor_type: "individual" as const,
       email: email.trim(),
@@ -570,7 +694,10 @@ export default function Give() {
       );
     } catch {
       setBusy(false);
-      if (payWithSaved) setHeldAttempt(sent);
+      if (payWithSaved) {
+        setHeldAttempt(sent);
+        await keepAttempt(sent);
+      }
       setMessage(
         payWithSaved
           ? "Something went wrong before we could check your card, and we don't know yet whether it was charged. Your gift is held as it was. Tap Give again: we check first, and never charge twice."
@@ -586,13 +713,20 @@ export default function Give() {
     // its id until we know it was paid or declined (below), so "try again" can never charge twice.
     if (!r.ok && !("noReply" in r) && !r.attemptMismatch) attemptRef.current = null;
     if (r.ok && !r.charged) attemptRef.current = null;
-    if (attemptRef.current === null) setHeldAttempt(null);
+    if (attemptRef.current === null && heldAttempt) {
+      setHeldAttempt(null);
+      // The held saved-card attempt is over (refused, or this tap opened a payment page instead).
+      if (!r.ok) void dropPendingGift(owner, charity!.slug);
+    }
     if (!r.ok) {
       setBusy(false);
       // A declined saved card: offer the payment page, where another card can be used.
       if (r.savedCardDeclined) setUseSavedCard(false);
       if ("noReply" in r) {
-        if (payWithSaved) setHeldAttempt(sent);
+        if (payWithSaved) {
+          setHeldAttempt(sent);
+          await keepAttempt(sent);
+        }
         setMessage(
           payWithSaved
             ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your gift is held exactly as it was. Tap Give again: we check first, and never charge twice."
@@ -607,6 +741,7 @@ export default function Give() {
         // was sent, so the next tap asks about that charge instead of starting a new one.
         const held = heldAttempt ?? sent;
         setHeldAttempt(held);
+        await keepAttempt(held);
         setAmount(held.amountText ?? amount);
         setExtraPick(held.extraChoice ?? extraChoice);
         setExtraAmount(held.extraText ?? extraAmount);
@@ -630,6 +765,23 @@ export default function Give() {
       if (r.quote) setAuthorisedTotal(null);
       return;
     }
+    // Our server has made the payment: the payment page is next (a saved-card gift has no page, only the check below).
+    if (!r.charged) setBusy("opening");
+    // Kept on the phone before the payment page opens, so a phone that closes the app meanwhile still asks about it
+    // when the donor comes back (Progress, and this screen when it opens again).
+    await keepPendingGift(owner, {
+      slug: charity!.slug,
+      charityName: charity!.nameEn,
+      reference: r.reference,
+      token: r.token,
+      charged: Boolean(r.charged),
+      attemptId: r.charged ? attemptRef.current : null,
+      detailsLater,
+      summary: sent,
+      sentAt: new Date().toISOString(),
+    });
+    // "Add my details after paying": Receipts doesn't count this gift towards an s18A receipt until they are added.
+    if (detailsLater) void markDetailsLater(owner, r.reference);
     // The phone number is no longer asked on the give screen (04/11/2026); a number remembered earlier is dropped.
     const mine = { first_name: details.first_name, last_name: details.last_name, email: details.email, phone: "" };
     if (remember) await saveDetails(account.userId, mine);
@@ -642,6 +794,7 @@ export default function Give() {
         shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
       } catch {
         setBusy(false);
+        void dropPendingGift(owner, charity!.slug);
         setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here: tap Give to try again.", "error", true);
         return;
       }
@@ -670,13 +823,28 @@ export default function Give() {
     if (!finished) {
       haptic.tap();
       const o = outcome === "paid" || outcome === "unknown" ? "pending" : outcome;
-      setUnsettled(o === "pending" || o === "review" ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent } : null);
+      const waiting = o === "pending" || o === "review";
+      setUnsettled(waiting ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent } : null);
+      // Declined or not found: nothing to wait for. Still waiting: kept on the phone (above) until we hear.
+      if (!waiting) void dropPendingGift(owner, charity!.slug);
       setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date()), afterPaymentTone(o), true);
       return;
     }
-    haptic.success();
+    // The success moment (buzz, tick and burst on the button) is only for a gift the provider confirmed as paid. A gift
+    // we only believe went through (back from the page, provider still catching up) opens the thank-you quietly.
+    if (celebrates(outcome)) haptic.success();
+    else haptic.tap();
+    // Paid, or back from a finished payment page: the thank-you shows now and the history catches up. A gift the
+    // server still calls pending stays kept on the phone, so Progress keeps checking it until it is paid, didn't go
+    // through, or isn't found: a late decline is then still shown (review 12/11/2026).
+    if (outcome === "paid") void dropPendingGift(owner, charity!.slug);
     void refreshAfterGiving(account.refresh);
-    setDone(sentSummary(sent, outcome !== "paid"));
+    if (celebrates(outcome)) {
+      setConfirmed(true);
+      await new Promise((ok) => setTimeout(ok, TICK_MS));
+      setConfirmed(false);
+    }
+    setDone(sentSummary(sent, outcome !== "paid", r.reference));
   }
 
   /** "Check again": ask the payment provider about the unsettled payment, without starting a new one. */
@@ -687,9 +855,9 @@ export default function Give() {
     try {
       const outcome = await paymentStatus(site, unsettled.reference, unsettled.token);
       setBusy(false);
-      const settles = outcome === "paid" || outcome === "failed" || outcome === "not_found" || outcome === "reversed";
-      if (settles) {
+      if (settles(outcome)) {
         setUnsettled(null);
+        void dropPendingGift(owner, charity!.slug);
         if (unsettled.charged) {
           attemptRef.current = null;
           setHeldAttempt(null);
@@ -699,8 +867,8 @@ export default function Give() {
         setMessage(null);
         haptic.success();
         void refreshAfterGiving(account.refresh);
-        // The thank-you shows what was paid, not what is in the form now.
-        setDone(sentSummary(unsettled.summary, false));
+        // The thank-you shows what was paid, not what is in the form now; a gift the history already has isn't added twice.
+        setDone(sentSummary(unsettled.summary, false, unsettled.reference));
         return;
       }
       const o = outcome === "unknown" ? "pending" : outcome;
@@ -711,7 +879,7 @@ export default function Give() {
   }
 
   const err = (k: string) => errors[k];
-  const locked = busy !== false || heldAttempt !== null;
+  const locked = busy !== false || confirmed || heldAttempt !== null;
   const chosenExtras = [
     label ? `Label: ${label}` : null,
     anonymous ? "Anonymous" : null,
@@ -721,7 +889,7 @@ export default function Give() {
     saveCard ? "Save card" : null,
   ].filter((x): x is string => Boolean(x));
   const moreSummary = chosenExtras.length ? `On: ${chosenExtras.join(", ")}` : `label, message, anonymous, dedication`;
-  const buttonLabel = busy === "opening" ? (payWithSaved ? "Charging your card…" : "Opening the payment page…") : busy === "checking" ? "Checking your payment…" : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
+  const buttonLabel = busy ? stageLabel(busy, payWithSaved) : total ? `Give ${rand(total)}${isMonthly ? " every month" : ""}` : "Give";
   // The goal question only makes sense when the goal counts some labels: Yes puts its label on the gift.
   const goalLabel = goal?.counts?.[0] ?? null;
   const counting = goal ? counts(goal, cleanLabel(label)) : false;
@@ -729,7 +897,7 @@ export default function Give() {
   return (
     <View style={styles.screen}>
       <TopBar title={`Giving to ${charity.nameEn}`} fallback="/discover" />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: 8, gap: 20, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
           {campaign ? <CampaignCard campaign={campaign} compact /> : null}
           {campaignEnded ? (
@@ -936,11 +1104,12 @@ export default function Give() {
               <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
               <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
               <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={err("email")} helper="Your confirmation is sent here." />
+              <SwitchRow label="Remember my details" description="So you don't type them next time." more="Your name and email are kept on this phone only, never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
             </View>
           ) : (
             <View style={styles.giver} onLayout={at("details")}>
               <View style={{ flex: 1 }}>
-                <Text variant="label">Giving as</Text>
+                <Text variant="label">Giving as · remembered on this phone</Text>
                 <Text style={styles.giverName} numberOfLines={1}>{first} {last}</Text>
                 <Text variant="label" numberOfLines={1}>{email}</Text>
               </View>
@@ -1017,6 +1186,20 @@ export default function Give() {
             </View>
           ) : null}
 
+          {/* Save my card, where the donor sees it (13/11/2026). Off until they turn it on: it is their agreement that
+              the card may be charged when they tap Give, so it is never chosen for them. */}
+          {offerSave ? (
+            <View style={styles.softCard}>
+              <SwitchRow
+                label="Save my card"
+                description="Charged only when you tap Give."
+                more="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
+                value={saveCard}
+                onChange={setSaveCard}
+              />
+            </View>
+          ) : null}
+
           {/* Everything optional lives here, closed by default, so a first gift is: amount, name, email, Give. */}
           <View style={styles.more} onLayout={at("more")}>
             <Pressable
@@ -1038,20 +1221,17 @@ export default function Give() {
             <LabelPicker value={label} onChange={setLabel} suggestions={labelSuggestions} />
 
 
-                {showDetailFields ? (
-                  <>
-                    <SwitchRow label="Remember my details on this phone" description="Your name and email, so next time you don't type them. Never your ID number." value={remember} onChange={setRemember} />
-                  </>
-                ) : null}
             <SwitchRow
               label="Give anonymously"
-              description={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
+              description="Hide your name on public pages."
+              more={`Your name won't appear on public pages, campaign lists or live totals. ${charity.nameEn} still sees your details, because it needs them to record your donation${s18aAvailable ? " and issue your s18A receipt" : ""}.`}
               value={anonymous}
               onChange={setAnonymous}
             />
             <SwitchRow
               label={`No news or appeals from ${charity.nameEn}`}
-              description={`${charity.nameEn} can email you news and appeals through Givezy, at most 4 a month. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
+              description="Turn on to stop their emails."
+              more={`${charity.nameEn} can email you news and appeals through Givezy, at most 4 a month. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
               value={noNews}
               onChange={setNoNews}
             />
@@ -1071,7 +1251,8 @@ export default function Give() {
             {/* Optional: in honour of, or in memory of, someone. */}
             <SwitchRow
               label="Dedicate this donation"
-              description="In honour of, or in memory of, someone. The charity sees the name; it is not on your s18A receipt."
+              description="In honour or in memory of someone."
+              more="The charity sees the name; it is not on your s18A receipt."
               value={dedicating}
               onChange={(v) => {
                 setDedicating(v);
@@ -1096,14 +1277,7 @@ export default function Give() {
             ) : null}
 
 
-                {offerSave ? (
-                  <SwitchRow
-                    label="Save my card for next time"
-                    description="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
-                    value={saveCard}
-                    onChange={setSaveCard}
-                  />
-                ) : null}
+
               </View>
             ) : null}
           </View>
@@ -1153,8 +1327,11 @@ export default function Give() {
         <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
           {message ? (
             <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={message.tone === "error" ? styles.errorNote : styles.waitNote}>
-              <Text style={{ fontSize: 16, lineHeight: 23, color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
-              {message.help ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
+              {/* Never taller than a slice of the screen: a long message scrolls inside, the form stays usable. */}
+              <ScrollView style={{ maxHeight: Math.round(windowHeight * (keyboardUp ? 0.14 : 0.26)) }} nestedScrollEnabled>
+                <Text style={{ fontSize: 16, lineHeight: 23, color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
+                {message.help && !keyboardUp ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
+              </ScrollView>
             </View>
           ) : null}
           <View style={{ gap: 8 }}>
@@ -1162,16 +1339,18 @@ export default function Give() {
               <>
                 <Button variant="cta" label={busy === "checking" ? "Checking your payment…" : "Check again"} disabled={busy !== false} onPress={checkAgain} />
                 {unsettled.charged ? null : (
-                  <TextLink label="I didn't pay: start again" onPress={() => { setUnsettled(null); setMessage(null); }} />
+                  <TextLink label="I didn't pay: start again" onPress={() => { setUnsettled(null); setMessage(null); void dropPendingGift(owner, charity.slug); }} />
                 )}
               </>
             ) : (
-              <HoldToGive label={total ? `Hold to give ${rand(total)}${isMonthly ? " every month" : ""}` : "Hold to give"} busyLabel={busy ? buttonLabel : "Giving…"} busy={busy !== false} onConfirm={give} />
+              <HoldToGive label={total ? `Hold to give ${rand(total)}${isMonthly ? " every month" : ""}` : "Hold to give"} busyLabel={busy ? buttonLabel : "Giving…"} busy={busy !== false} confirmed={confirmed} onConfirm={give} />
             )}
+            {keyboardUp ? null : (
             <Text variant="label" style={styles.footerLine}>
               {total !== null ? `${rand(gift ?? 0)} to ${charity.nameEn}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. Contribution to Givezy: ${contributionLabel(contribution ?? 0, isMonthly)}. ` : ""}
               {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
             </Text>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>

@@ -33,6 +33,7 @@ export default async function AdminPage() {
           { href: "/admin/receipts", title: "s18A receipts", body: "See issued receipts and withdraw one if it is wrong" },
           { href: "/admin/requests", title: "Privacy requests", body: "People asking to correct, delete or stop use of their information" },
           { href: "/admin/featured", title: "Cause of the week", body: "Choose the cause shown first on the home page" },
+          { href: "/admin/charity-requests", title: "Charity requests", body: "Charities donors asked for that aren't on Givezy yet" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="block rounded-card border-2 border-border bg-surface p-5 transition hover:border-brand">
             <p className="font-display text-lg font-bold text-indigo">{l.title}</p>

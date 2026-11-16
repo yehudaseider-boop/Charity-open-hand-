@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/badge";
+import { TableScroll } from "@/components/dash";
 
 export type RecentRow = {
   id: string;
@@ -48,14 +49,14 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
   const shown = filter === "all" ? rows : rows.filter((r) => r.status === filter);
   return (
     <div className="space-y-3">
-      <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
+      <div role="group" aria-label="Show" className="flex flex-wrap gap-x-1.5 gap-y-2">
         {FILTERS.map((f) => (
           <button
             key={f.key}
             type="button"
             aria-pressed={filter === f.key}
             onClick={() => setFilter(f.key)}
-            className={`min-h-9 rounded-full border-2 px-3.5 text-sm font-semibold transition ${filter === f.key ? "border-brand bg-brand text-white" : "border-border bg-surface text-muted hover:border-brand"}`}
+            className={`hit min-h-9 rounded-full border-2 px-3.5 text-sm font-semibold transition ${filter === f.key ? "border-brand bg-brand text-white" : "border-border bg-surface text-muted hover:border-brand"}`}
           >
             {f.label}
           </button>
@@ -67,10 +68,10 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
           <Link href={filter === "all" ? donationsHref : `${donationsHref}?status=${filter}`} className="font-semibold text-brand underline">See every {filter === "all" ? "donation" : FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} one</Link>.
         </p>
       ) : (
-        <div className="-mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6">
+        <TableScroll label="Recent donations table">
           <table className="w-full min-w-[38rem] border-collapse text-sm">
             <thead>
-              <tr className="border-b-2 border-border text-left text-xs font-bold uppercase tracking-wide text-muted">
+              <tr className="whitespace-nowrap border-b-2 border-border text-left text-xs font-bold uppercase tracking-wide text-muted">
                 <th className="pb-2 pr-3 font-bold">Status</th>
                 <th className="pb-2 pr-3 font-bold">Donor</th>
                 <th className="pb-2 pr-3 font-bold">For</th>
@@ -100,7 +101,7 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
     </div>
   );

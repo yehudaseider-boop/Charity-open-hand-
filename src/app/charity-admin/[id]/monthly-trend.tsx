@@ -53,7 +53,7 @@ export function MonthlyTrend({ rows, now, seeAllHref }: { rows: MonthlyRow[]; no
               );
             })}
           </ul>
-          {seeAllHref ? <Link href={seeAllHref} className="mt-3 inline-block text-sm text-brand underline">See every monthly donor</Link> : null}
+          {seeAllHref ? <Link href={seeAllHref} className="hit mt-3 inline-block text-sm text-brand underline">See every monthly donor</Link> : null}
           <p className="mt-3 text-xs text-muted">Each month shows who was giving at its end (today, for this month). A donor who is paused now is counted as paused from the day they paused.</p>
         </>
       )}

@@ -1,14 +1,17 @@
 "use client";
 
 import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
+import { GIVE_GAVE_UP_MESSAGE, GIVE_GIVE_UP_MS, giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
 import { startTransition, useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useFormDraft } from "@/components/forms/use-form-draft";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
-import { SupportContact, TermsAndPrivacyLinks } from "@/components/legal";
+import { SupportContact } from "@/components/legal";
 import { ErrorMark, TextArea, TextField, useFieldId } from "@/components/forms/fields";
 import { formatRand, parseRandToCents } from "@/lib/money";
 import { submitDonation, type CheckoutState } from "./actions";
+import { BeforeYouGive } from "./before-you-give";
+import { Check } from "./check";
 import { impactLine, impactSource, type ImpactUnit } from "@/lib/charity/impact";
 import { platformConfig } from "@/config/platform";
 import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
@@ -63,7 +66,7 @@ const centsToInput = (c: number) => (c % 100 ? `${Math.floor(c / 100)}.${String(
 /**
  * A dropped connection or a server error at Give stays on this page, with everything typed kept, and says plainly
  * that nothing was charged (the card is only ever entered on the payment page, so nothing can be charged before it
- * opens). Next's own redirect to the payment page still goes through.
+ * opens). Next's own errors (a redirect, a not-found) still go through.
  */
 function offlineOrDown(e: unknown): { ok: false; message: string } {
   const digest = (e as { digest?: unknown } | null)?.digest;
@@ -139,6 +142,30 @@ export function DonateFlow({
     },
     { ok: false } as CheckoutState,
   );
+  const slowGive = useSlowAfter(pending, SLOW_AFTER_MS);
+  // Never wait for ever (13/11/2026): an answer lost on a weak connection would keep the form busy until the browser
+  // gives up, which can be minutes. After GIVE_GIVE_UP_MS the form says so and offers Try again (see give-feel.ts).
+  const gaveUp = useSlowAfter(pending, GIVE_GIVE_UP_MS);
+  const tryAgain = () => {
+    const url = new URL(window.location.href);
+    // The amount comes back in the address; the rest of what was typed is kept by the form's draft.
+    if (quote) url.searchParams.set("cents", String(quote.amountCents));
+    window.location.assign(url.toString());
+  };
+  // The payment page for this gift: the form opens it, and shows a link in case the phone doesn't (13/11/2026).
+  // Coming back from it with the browser's Back button shows the form again, ready to use.
+  const [cameBackFrom, setCameBackFrom] = useState<string | null>(null);
+  const opening = state.redirectUrl && state.redirectUrl !== cameBackFrom ? state.redirectUrl : null;
+  useEffect(() => {
+    if (opening) window.location.assign(opening);
+  }, [opening]);
+  useEffect(() => {
+    const shown = (e: PageTransitionEvent) => {
+      if (e.persisted && state.redirectUrl) setCameBackFrom(state.redirectUrl);
+    };
+    window.addEventListener("pageshow", shown);
+    return () => window.removeEventListener("pageshow", shown);
+  }, [state.redirectUrl]);
   const [donorType, setDonorType] = useState<"individual" | "company" | "trust">("individual");
   const [want18a, setWant18a] = useState(false);
   // Take the gift first, the s18A details after (decided 04/11/2026). With a saved ID number, "now" is one tap less.
@@ -527,40 +554,45 @@ export function DonateFlow({
           ) : null}
         </div>}
 
-        <h2 className="border-t-2 border-border pt-5 font-display text-2xl font-bold">Before you give</h2>
-        <div className="space-y-3">
-          <Check name="is_anonymous">
-            Give anonymously. Your name won&apos;t appear on public pages, campaign lists or live totals.{" "}
-            <span className="text-muted"><bdi>{charityName}</bdi> still sees your details, because it needs them to record your donation{receiptsAvailable ? " and issue your s18A receipt" : ""}.</span>
-          </Check>
-          <Check name="no_news">
-            Don&apos;t send me news or appeals from <bdi>{charityName}</bdi>. <span className="text-muted">You&apos;ll still get your confirmation{receiptsAvailable ? " and s18A receipt" : ""}.</span>
-          </Check>
-          {singleAgreementTick ? (
-            <Check name="agreement" error={state.fieldErrors?.agreement}>
-              I&apos;m 18 or older{org ? " and allowed to give on behalf of this organisation," : ""} and I agree to <TermsAndPrivacyLinks />, and that my details are shared with <bdi>{charityName}</bdi> so they
-              can record my donation.
-            </Check>
-          ) : (
-            <>
-              <Check name="age_confirmed" error={state.fieldErrors?.age_confirmed}>
-                I am 18 or older{org ? ", and allowed to give on behalf of this organisation" : ""}.
-              </Check>
-              <Check name="popia_consent" error={state.fieldErrors?.popia_consent}>
-                I agree to <TermsAndPrivacyLinks />, and that my details are shared with <bdi>{charityName}</bdi> so they can record my
-                donation. Givezy keeps any label I give it privately, for my own records.
-              </Check>
-            </>
-          )}
-        </div>
+        <BeforeYouGive
+          charityName={charityName}
+          receiptsAvailable={receiptsAvailable}
+          org={org}
+          singleAgreementTick={singleAgreementTick}
+          fieldErrors={state.fieldErrors}
+        />
 
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
 
-        <button disabled={pending || !ready} className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy disabled:opacity-60">
-          {pending ? "Opening the secure payment page…" : !ready ? "Loading…" : total ? (monthly && !campaign ? `Give ${total} every month` : `Give ${total}`) : "Give"}
+        <button
+          disabled={pending || !ready || Boolean(opening)}
+          aria-busy={pending || Boolean(opening)}
+          className={`pressable relative w-full overflow-hidden rounded-control bg-coral px-4 py-3.5 text-lg font-bold text-navy ${pending && !gaveUp ? "" : "disabled:opacity-60"}`}
+        >
+          {(pending && !gaveUp) || opening ? <span aria-hidden className="give-sweep" /> : null}
+          <span className="relative">{giveButtonLabel({ pending, slow: slowGive, ready, total, monthly: monthly && !campaign, opening: Boolean(opening), gaveUp })}</span>
         </button>
-        {pending ? <p role="status" className="text-center text-sm text-muted">Starting your payment. Nothing is charged until you confirm on the payment page.</p> : null}
+        {pending && !gaveUp ? <p role="status" className="text-center text-sm text-muted">{giveWaitingLine(slowGive)}</p> : null}
+        {pending && gaveUp ? (
+          <div role="alert" className="space-y-2 rounded-control border-2 border-danger-soft p-4 text-sm">
+            <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{GIVE_GAVE_UP_MESSAGE}</span></p>
+            <button type="button" onClick={tryAgain} className="min-h-11 font-bold text-brand underline underline-offset-4">
+              Try again
+            </button>
+            <p className="text-muted">If it keeps happening: <SupportContact />.</p>
+          </div>
+        ) : null}
+        {opening && !pending ? (
+          <div role="status" className="space-y-1 text-center text-sm">
+            <p className="text-muted">Nothing is charged until you confirm on the payment page.</p>
+            <p>
+              <a href={opening} className="inline-flex min-h-11 items-center font-bold text-brand underline underline-offset-4">
+                Page not opening? Continue to the payment page
+              </a>
+            </p>
+          </div>
+        ) : null}
         {state.message && !pending ? (
           <div role="alert" className="space-y-1 rounded-control border-2 border-danger-soft p-4 text-sm">
             <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{state.message}</span></p>
@@ -607,38 +639,6 @@ function Breakdown({ q, charityName, monthly }: { q: Quote; charityName: string;
 }
 
 /**
- * A consent box. `children` is the label (clicking it ticks the box); `detail` follows it in the same
- * sentence but outside the label, so links in it can be clicked without toggling the box.
- */
-function Check({ name, children, detail, error }: { name: string; children: React.ReactNode; detail?: React.ReactNode; error?: string }) {
-  const [checked, setChecked] = useState(false);
-  const id = useFieldId(name);
-  const showError = Boolean(error) && !checked;
-  const describedBy = [detail ? `${id}-detail` : null, showError ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
-  return (
-    <div>
-      <div className="flex min-h-11 items-start gap-3 py-1 text-sm leading-relaxed">
-        <input
-          id={id}
-          type="checkbox"
-          name={name}
-          className="mt-0.5"
-          checked={checked}
-          onChange={(e) => setChecked(e.target.checked)}
-          aria-invalid={showError || undefined}
-          aria-describedby={describedBy}
-        />
-        <span>
-          <label htmlFor={id}>{children}</label>
-          {detail ? <span id={`${id}-detail`}> {detail}</span> : null}
-        </span>
-      </div>
-      {showError ? <p id={`${id}-error`} role="alert" className="ml-[2.125rem] flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{error}</span></p> : null}
-    </div>
-  );
-}
-
-/**
  * Optional: give in honour of, or in memory of, someone. The charity sees it on the donation;
  * it is never on the s18A receipt. A note about the person goes in the message below.
  */
@@ -663,6 +663,20 @@ function Dedicate({ error }: { error?: string }) {
       {showError ? <p id={errorId} role="alert" className="text-xs font-semibold text-danger">{error}</p> : null}
     </fieldset>
   );
+}
+
+/** True once a pending gift has been waiting longer than usual: the button then says so instead of pretending to progress. */
+function useSlowAfter(active: boolean, ms: number): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const id = setTimeout(() => setSlow(true), ms);
+    return () => {
+      clearTimeout(id);
+      setSlow(false);
+    };
+  }, [active, ms]);
+  return active && slow;
 }
 
 /** The first thing to fix after Give: a field marked invalid, or a message that stands in for one (the saved ID number has no box). */

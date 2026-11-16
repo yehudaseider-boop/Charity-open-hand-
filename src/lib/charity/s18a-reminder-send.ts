@@ -4,6 +4,7 @@ import { logAudit } from "@/lib/audit";
 import { onIssuedReceipt } from "@/lib/donations/s18a-complete";
 import { canCompleteS18a, completionWindow, s18aDetailsMissing, type MissingDetail, type S18aDetailsRow } from "@/lib/donations/s18a-details";
 import { getEmailTransport } from "@/lib/email";
+import { mayHaveSent } from "@/lib/email/retry-plan";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
@@ -11,6 +12,7 @@ import { REMINDER_SKIPS, detailsUrl, mergeMissing, planReminders, s18aReminderEm
 import { emailHash, weekStart } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
 import { recordAction } from "./charity-actions";
+import { readPages } from "./paged";
 
 /**
  * The s18A filter's "details missing" and the reminder email (CRM step 2, 10/11/2026). Every call here comes after
@@ -66,15 +68,18 @@ export async function loadS18aMissing(charityId: string, now = new Date()): Prom
 export async function lastReminded(charityId: string, donorIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (let i = 0; i < donorIds.length; i += 200) {
-    const { data, error } = await db()
-      .from("charity_donor_thanks")
-      .select("donor_id, sent_at")
-      .eq("charity_id", charityId)
-      .eq("kind", REMINDER_KIND)
-      .in("donor_id", donorIds.slice(i, i + 200))
-      .order("sent_at", { ascending: false });
-    if (error) throw error;
-    for (const r of data ?? []) if (!out.has(r.donor_id as string)) out.set(r.donor_id as string, r.sent_at as string);
+    const data = await readPages<{ donor_id: string; sent_at: string }>((from, to) =>
+      db()
+        .from("charity_donor_thanks")
+        .select("donor_id, sent_at")
+        .eq("charity_id", charityId)
+        .eq("kind", REMINDER_KIND)
+        .in("donor_id", donorIds.slice(i, i + 200))
+        .order("sent_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    );
+    for (const r of data) if (!out.has(r.donor_id as string)) out.set(r.donor_id as string, r.sent_at as string);
   }
   return out;
 }
@@ -87,15 +92,20 @@ export async function contacts(charityId: string, donorIds: string[]): Promise<{
   const erased = new Set<string>();
   const byDonor = new Map<string, Contact>();
   for (let i = 0; i < donorIds.length; i += 200) {
-    const { data, error } = await db()
-      .from("donations")
-      .select("donor_id, gateway, paid_at, donation_checkout_details(email, first_name, donor_type, contact_person, erased_at)")
-      .eq("charity_id", charityId)
-      .eq("status", "paid")
-      .in("donor_id", donorIds.slice(i, i + 200))
-      .order("paid_at", { ascending: false });
-    if (error) throw error;
-    for (const g of data ?? []) {
+    // Page by page: 200 long-standing donors can hold far more than the 1 000 rows one read returns, and a donor whose
+    // gifts fell off the end would look like someone with no paid gift (and be stopped, or enrolled as new).
+    const data = await readPages<{ donor_id: string; gateway: string; paid_at: string; donation_checkout_details: unknown }>((from, to) =>
+      db()
+        .from("donations")
+        .select("donor_id, gateway, paid_at, donation_checkout_details(email, first_name, donor_type, contact_person, erased_at)")
+        .eq("charity_id", charityId)
+        .eq("status", "paid")
+        .in("donor_id", donorIds.slice(i, i + 200))
+        .order("paid_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    );
+    for (const g of data) {
       const id = g.donor_id as string;
       found.add(id);
       const raw = g.donation_checkout_details as unknown;
@@ -133,6 +143,8 @@ export async function optedOutHashes(charityId: string, hashes: string[]): Promi
 export type ReminderResult = {
   sent: number;
   failed: number;
+  /** Sends cut off part way (a dropped connection): they may have gone, so the donor's week stays used. */
+  unknown: number;
   remaining: number;
   skipped: Record<ReminderSkip, number>;
   /** True when something went wrong part way: the counts are what happened before it, the rest are in `remaining`. */
@@ -188,6 +200,7 @@ export async function sendS18aReminders(args: {
   const week = weekStart(now);
   let sent = 0;
   let failed = 0;
+  let unknown = 0;
   let remaining = 0;
   let interrupted = false;
   let at = 0;
@@ -239,8 +252,13 @@ export async function sendS18aReminders(args: {
         }
       } catch (e) {
         console.error("[s18a-reminder] not sent", e instanceof Error ? e.message : e);
-        await release();
-        failed++;
+        if (mayHaveSent(e)) {
+          // Cut off or a dropped connection: it may have gone. The week stays claimed, so it is never sent twice.
+          unknown++;
+        } else {
+          await release();
+          failed++;
+        }
       }
     }
   } catch (e) {
@@ -250,17 +268,17 @@ export async function sendS18aReminders(args: {
     interrupted = true;
     remaining += plan.send.length - at;
   }
-  const counts = { sent, failed, remaining, ...(interrupted ? { interrupted: true } : {}) };
+  const counts = { sent, failed, remaining, ...(unknown ? { unknown } : {}), ...(interrupted ? { interrupted: true } : {}) };
   // Each record is written even if the other can't be: a failed audit write must not hide what was sent.
   await logAudit({ actorUserId: args.userId, action: "charity.s18a_reminders_sent", entityType: "charity", entityId: args.charityId, details: { chosen: donorIds.length, ...counts, ...plan.skipped } }).catch(
     (e: unknown) => console.error("[s18a-reminder] audit not written", e instanceof Error ? e.message : e),
   );
   let done: string | null = null;
-  if (sent || failed || remaining) {
+  if (sent || failed || unknown || remaining) {
     done = await recordAction(args.charityId, args.userId, "s18a_reminders_sent", { ...counts, ...Object.fromEntries(REMINDER_SKIPS.map((k) => [`skipped_${k}`, plan.skipped[k]])) }, null).catch((e: unknown) => {
       console.error("[s18a-reminder] dashboard record not written", e instanceof Error ? e.message : e);
       return null;
     });
   }
-  return { sent, failed, remaining, skipped: plan.skipped, interrupted, done };
+  return { sent, failed, unknown, remaining, skipped: plan.skipped, interrupted, done };
 }

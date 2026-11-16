@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +44,23 @@ export default function Account() {
   const p = useLocalSearchParams<{ demo?: string }>();
   const account = useAccount();
   const [demoSignedIn, setDemoSignedIn] = useState(p.demo === "signedin");
+  // Signing out clears this phone and then waits for the sign-in service, so the button says so while it runs.
+  const [signingOut, setSigningOut] = useState(false);
+  const signingOutRef = useRef(false);
+  const signOut = () => {
+    if (account.demo) return account.exitDemo();
+    if (preview) return setDemoSignedIn(false);
+    if (signingOutRef.current) return;
+    signingOutRef.current = true;
+    setSigningOut(true);
+    account
+      .signOut()
+      .catch(() => notify("Sign out", "We couldn't finish signing you out. Check your connection and try again."))
+      .finally(() => {
+        signingOutRef.current = false;
+        setSigningOut(false);
+      });
+  };
   const preview = account.status === "preview";
   const signedIn = preview ? account.demo || demoSignedIn : account.status === "signed-in";
 
@@ -141,7 +158,7 @@ export default function Account() {
               ]}
             />
             <SettingsGroup
-              cells={[{ label: "Sign out", destructive: true, onPress: () => (account.demo ? account.exitDemo() : preview ? setDemoSignedIn(false) : account.signOut()) }]}
+              cells={[{ label: signingOut ? "Signing out…" : "Sign out", destructive: true, onPress: signingOut ? undefined : signOut }]}
             />
           </>
         ) : (

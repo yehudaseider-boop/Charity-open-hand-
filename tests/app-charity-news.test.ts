@@ -6,6 +6,8 @@ import { charitiesGivenTo, newsFeed, newsKey, optOutIds, postedWhen, relationLin
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 const today = d(2026, 11, 8);
+// An update is a real moment (a database timestamp): 10:00 in Johannesburg that day, so the test reads the same in any time zone.
+const at = (y: number, m: number, day: number) => new Date(Date.UTC(y, m - 1, day, 8));
 const gift = (id: string, slug: string, date: Date): Gift => ({ id, date, charitySlug: slug, charityName: slug === "meals" ? "Meals Fund" : "Animal Rescue", cents: 10_000, monthly: false, with18a: false, label: null });
 const monthly = (slug: string, status: Recurring["status"]): Recurring => ({ id: `r-${slug}`, charitySlug: slug, charityName: "Patient Care", cents: 18_000, nextDate: d(2026, 12, 1), status });
 const upd = (id: string, date: Date, body = "Parcels went out this week."): CharityUpdate => ({ id, date, body, photoUrl: null });
@@ -42,9 +44,9 @@ describe("the news on Home", () => {
 
   it("shows the newest updates first, at most three, and leaves out old or empty ones", () => {
     const updates = new Map([
-      ["meals", [upd("m1", d(2026, 11, 6)), upd("m2", d(2026, 10, 20)), upd("m-old", d(2026, 8, 1)), upd("m-empty", d(2026, 11, 7), "   ")]],
-      ["animals", [upd("a1", d(2026, 11, 4)), upd("a2", d(2026, 10, 1))]],
-      ["someone-else", [upd("x1", d(2026, 11, 8))]],
+      ["meals", [upd("m1", at(2026, 11, 6)), upd("m2", at(2026, 10, 20)), upd("m-old", at(2026, 8, 1)), upd("m-empty", at(2026, 11, 7), "   ")]],
+      ["animals", [upd("a1", at(2026, 11, 4)), upd("a2", at(2026, 10, 1))]],
+      ["someone-else", [upd("x1", at(2026, 11, 8))]],
     ]);
     const feed = newsFeed(gaveTo, updates, today);
     expect(feed.map((n) => n.id)).toEqual(["m1", "a1", "m2"]);
@@ -54,7 +56,7 @@ describe("the news on Home", () => {
 
   it("is empty when there is no news, so Home shows no section at all", () => {
     expect(newsFeed(gaveTo, new Map(), today)).toEqual([]);
-    expect(newsFeed([], new Map([["meals", [upd("m1", d(2026, 11, 6))]]]), today)).toEqual([]);
+    expect(newsFeed([], new Map([["meals", [upd("m1", at(2026, 11, 6))]]]), today)).toEqual([]);
   });
 });
 

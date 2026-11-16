@@ -53,7 +53,7 @@ describe("app ready check", () => {
   it("says whether the charity can take a payment, the campaign is open, and the minimums", async () => {
     campaignOpen = true;
     const r = await (await ready(req({ slug: "a", campaignId: REF }))).json();
-    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: true, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, contributionPresetsCents: [1_000, 1_500, 2_000], contributionDefaultCents: 1_000, maxGiftCents: 100_000_000, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: null });
+    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: true, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, contributionPresetsCents: [1_000, 1_500, 2_000], contributionDefaultCents: 1_000, maxGiftCents: 100_000_000, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: { percentPpm: 29_000, fixedCents: 100, vatOnTopPpm: 150_000, coverGiftOnly: true } });
   });
   it("a charity not connected for payments is not accepting", async () => {
     charity = { id: "c1", acceptingPayments: false, receiptsAvailable: false };

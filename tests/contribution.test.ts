@@ -68,7 +68,8 @@ describe("the words", () => {
     for (const line of [CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE]) {
       expect(line).not.toMatch(/!|sure|only|just|please|sad|miss/i);
     }
-    expect(CONTRIBUTION_EXPLAINER).toContain("separate from your gift");
+    expect(CONTRIBUTION_EXPLAINER).toContain("Givezy takes nothing from your gift.");
+    expect(CONTRIBUTION_EXPLAINER).toContain("separate from it");
   });
 });
 

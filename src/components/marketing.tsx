@@ -133,10 +133,13 @@ export function AppWindow({ nav, active, children }: { nav: string[]; active: nu
   );
 }
 
-/** A small card that floats over the edge of the hero window. */
+/**
+ * A small card that floats over the edge of the hero window. Only from laptop width: on a tablet there is no room
+ * beside the window, so the cards were cut off by both edges of the screen.
+ */
 export function Floating({ className, children }: { className: string; children: React.ReactNode }) {
   return (
-    <div className={`absolute z-10 hidden rounded-[1.125rem] border-[1.5px] border-honey bg-white p-4 text-left shadow-[0_24px_48px_rgba(23,73,181,0.18)] md:block ${className}`}>
+    <div className={`absolute z-10 hidden rounded-[1.125rem] border-[1.5px] border-honey bg-white p-4 text-left shadow-[0_24px_48px_rgba(23,73,181,0.18)] lg:block ${className}`}>
       {children}
     </div>
   );

@@ -5,6 +5,12 @@ import { clientIp } from "@/lib/client-ip";
 import { appAccount } from "@/lib/app-auth";
 
 /**
+ * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
+ * steps, so a slow provider ends in our plain "nothing was charged" message rather than the host cutting it off.
+ */
+export const maxDuration = 30;
+
+/**
  * Start a gift from the phone app, once-off or monthly: record it as pending (and, for a monthly
  * gift, a pending monthly record and the donor's authorisation) and return the payment
  * provider's own page for the card. With a saved card (switched off until SAVED_CARDS=yes), a once-off gift is
@@ -31,7 +37,9 @@ export async function POST(request: NextRequest) {
   if (!details.ok) return NextResponse.json({ ok: false, message: "Please check the highlighted fields.", fieldErrors: details.fieldErrors }, { status: 422 });
 
   // Saved cards: only for the signed-in donor, checked from their token (and only when switched on, which startDonation checks).
-  const account = body.data.saveCard || body.data.useSavedCard || body.data.useSavedId ? ((await appAccount(request, { forMoney: true })) ?? undefined) : undefined;
+  // Always asked when the app sends a token: a gift given with the signed-in donor's own email counts as theirs (and
+  // can later give "Use my ID ending 1234"); a guest gift never does.
+  const account = (await appAccount(request, { forMoney: true })) ?? undefined;
   if ((body.data.saveCard || body.data.useSavedCard) && !account) {
     return NextResponse.json({ ok: false, message: "Please sign in again to use a saved card." }, { status: 401 });
   }
@@ -39,21 +47,38 @@ export async function POST(request: NextRequest) {
   if (body.data.useSavedId && !account) {
     return NextResponse.json({ ok: false, message: "Please sign in again to use your saved ID number." }, { status: 401 });
   }
-  const result = await startDonation({
-    charitySlug: body.data.slug,
-    giftCents: body.data.giftCents,
-    contributionCents: body.data.contributionCents,
-    coverCardCharge: body.data.coverCardCharge === true,
-    shownTotalCents: body.data.shownTotalCents,
-    fromApp: true,
-    campaignId: body.data.campaignId,
-    input: details.input,
-    ip: clientIp(request.headers),
-    // "Use my ID ending 1234": only for the donor signed in to the app, checked from their token.
-    useSavedIdOf: body.data.useSavedId ? account : undefined,
-    saveCardFor: body.data.saveCard ? account : undefined,
-    useSavedCardOf: body.data.useSavedCard ? account : undefined,
-    attemptId: body.data.attemptId,
-  });
+  // An unexpected error answers in words the app can show (13/11/2026), never a bare error page. A new card is only
+  // ever entered on the payment page, so nothing can have been charged. A saved-card attempt may already have been
+  // charged (the error can come after the provider was asked): it answers `noReply`, exactly as a lost answer does,
+  // so the app keeps the attempt's id and asks about it again under that id, never charging twice.
+  let result: Awaited<ReturnType<typeof startDonation>>;
+  try {
+    result = await startDonation({
+      charitySlug: body.data.slug,
+      giftCents: body.data.giftCents,
+      contributionCents: body.data.contributionCents,
+      coverCardCharge: body.data.coverCardCharge === true,
+      shownTotalCents: body.data.shownTotalCents,
+      fromApp: true,
+      campaignId: body.data.campaignId,
+      input: details.input,
+      ip: clientIp(request.headers),
+      signedInAs: account,
+      // "Use my ID ending 1234": only for the donor signed in to the app, checked from their token.
+      useSavedIdOf: body.data.useSavedId ? account : undefined,
+      saveCardFor: body.data.saveCard ? account : undefined,
+      useSavedCardOf: body.data.useSavedCard ? account : undefined,
+      attemptId: body.data.attemptId,
+    });
+  } catch (e) {
+    console.error("[app checkout] the gift could not be started", e);
+    if (body.data.useSavedCard) {
+      return NextResponse.json(
+        { ok: false, noReply: true, message: "Something went wrong on our side, and we don't know yet whether your card was charged. Tap Give again in a minute: we check first, and never charge twice." },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ ok: false, message: "We couldn't start your payment, so nothing was charged. Please try again in a minute." }, { status: 503 });
+  }
   return NextResponse.json(result, { status: result.ok ? 200 : result.limited ? 429 : result.fieldErrors ? 422 : 409 });
 }

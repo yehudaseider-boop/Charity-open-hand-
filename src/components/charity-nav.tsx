@@ -65,7 +65,7 @@ export function CharityNav({ id, base: baseOverride, hidden = [] }: { id: string
               <Link
                 href={`${base}${t.href}`}
                 aria-current={active ? "page" : undefined}
-                className={`inline-block rounded-full border-2 px-4 py-2 text-sm font-semibold transition ${active ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand"}`}
+                className={`inline-flex min-h-11 items-center rounded-full border-2 px-4 text-sm font-semibold transition ${active ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand"}`}
               >
                 {t.label}
               </Link>

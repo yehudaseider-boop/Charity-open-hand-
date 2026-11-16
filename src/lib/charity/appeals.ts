@@ -1,16 +1,18 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
-import { getEmailTransport } from "@/lib/email";
+import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
+import { mayHaveSent } from "@/lib/email/retry-plan";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { appealEmail, audienceValue, greetingName, type Audience } from "./appeals-rules";
-import { isErasedEmail } from "./dashboard";
+import { donorMatches, isErasedEmail } from "./dashboard";
 import { loadDonors, type DonorRow } from "./dashboard-queries";
 import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "./donor-care";
 import { donorGroup, donorGroupsFor } from "./insights";
 import { emailHash } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
+import { inboxKey, onePerAddress } from "./one-per-address";
 
 /**
  * Emails from a charity to its donors. Every call here comes after loadCharityForManager and the owner
@@ -38,8 +40,9 @@ export type AudiencePick = {
 
 /** Everyone the chosen audience means, less those who said no. Null when the choice is no longer there. */
 export async function pickAudience(charityId: string, audience: Audience, now = new Date()): Promise<AudiencePick | null> {
-  const all = (await loadDonors(charityId)).filter((d) => d.email && !isErasedEmail(d.email));
-  let donors: DonorRow[];
+  // Only donors with an address the owner can see (never erased).
+  const all = (await loadDonors(charityId)).filter((d): d is DonorRow & { email: string } => Boolean(d.email) && !isErasedEmail(d.email));
+  let donors: (DonorRow & { email: string })[];
   let label: string;
   switch (audience.kind) {
     case "all":
@@ -70,7 +73,7 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
         (d) =>
           (!f.group || donorGroup(d, now, lapsedDays) === f.group) &&
           (!f.tag || (byDonor.get(d.donor_id) ?? []).includes(f.tag)) &&
-          (!needle || d.display_name.toLowerCase().includes(needle) || d.email.toLowerCase().includes(needle)),
+          donorMatches(d, needle),
       );
       label = `Your list "${segment.name}"`;
       break;
@@ -96,7 +99,8 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
   const stopped = await stoppedEmails(charityId, reachable.map((d) => d.email));
   const allowed = reachable.filter((d) => !stopped.has(d.email.trim().toLowerCase()));
   const recent = await messagedThisWeek(charityId, allowed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) })), now);
-  const kept = allowed.filter((d) => !recent.has(d.donor_id));
+  // One email per inbox: someone who is two donors (themselves and their company) gets it once.
+  const kept = onePerAddress(allowed.filter((d) => !recent.has(d.donor_id)), (d) => d.email);
   return { donors: kept, stopped: reachable.length - allowed.length, thisWeek: allowed.length - kept.length, recordedOnly: donors.length - reachable.length, label };
 }
 
@@ -189,7 +193,11 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
   const transport = getEmailTransport();
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   let donorsById: Map<string, DonorRow> | null = null;
-  while (Date.now() - started < budget) {
+  // Addresses this run has emailed (or tried to): a second donor with the same address is skipped, never emailed twice.
+  const inbox = new Set<string>();
+  // The email service said "not now": stop, and leave everyone not yet sent waiting for "Send the rest".
+  let paused = false;
+  while (!paused && Date.now() - started < budget) {
     const { data: claimed, error: claimError } = await db().rpc("claim_appeal_recipients", { p_appeal_id: appeal.id, p_limit: 25 });
     if (claimError) throw claimError;
     const ids = ((claimed ?? []) as { donor_id: string }[]).map((r) => r.donor_id);
@@ -209,12 +217,18 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
     );
     for (const id of ids) {
       const d = donorsById.get(id);
-      const mark = (status: "sent" | "failed" | "skipped") =>
+      const mark = (status: "sent" | "failed" | "skipped" | "waiting") =>
         db().from("charity_appeal_recipients").update({ status, ...(status === "sent" ? { sent_at: new Date().toISOString() } : {}) }).eq("appeal_id", appeal.id).eq("donor_id", id);
-      if (!d?.email || isErasedEmail(d.email) || stopped.has(d.email.trim().toLowerCase()) || recent.has(id)) {
+      if (paused) {
+        // Claimed in this batch but not tried: back in the queue.
+        await mark("waiting");
+        continue;
+      }
+      if (!d?.email || isErasedEmail(d.email) || stopped.has(d.email.trim().toLowerCase()) || recent.has(id) || inbox.has(inboxKey(d.email))) {
         await mark("skipped");
         continue;
       }
+      inbox.add(inboxKey(d.email));
       const token = randomBytes(32).toString("base64url");
       const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: args.charityId, email_hash: emailHash(d.email) });
       if (saved.error) {
@@ -229,7 +243,16 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
         await mark(outcome === "sent" ? "sent" : "skipped");
       } catch (e) {
         console.error("[appeal] not sent", e instanceof Error ? e.message : e);
-        await mark("failed");
+        if (isTemporaryRefusal(e)) {
+          // Nothing went: this donor waits for "Send the rest", and so does everyone after them.
+          inbox.delete(inboxKey(d.email));
+          await mark("waiting");
+          paused = true;
+          continue;
+        }
+        // Cut off or a dropped connection: it may have gone, so the row stays "sending" (counted as not sent, still this
+        // donor's message for the week, never sent again). Only a refusal is marked failed.
+        if (!mayHaveSent(e)) await mark("failed");
       }
     }
   }
@@ -284,7 +307,9 @@ export async function stopAppeals(token: string): Promise<{ charityName: string 
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, charities(name_en)").eq("token_hash", sha(token)).maybeSingle();
   if (!data) return null;
-  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: data.charity_id, email_hash: data.email_hash, source: "stop_link" }, { onConflict: "charity_id,email_hash", ignoreDuplicates: true });
+  // Not ignoreDuplicates: an earlier "no news" tick at checkout becomes a stop link, which also stops thank-yous
+  // (16/11/2026), as the stop page promises.
+  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: data.charity_id, email_hash: data.email_hash, source: "stop_link" }, { onConflict: "charity_id,email_hash" });
   if (error) throw error;
   const c = data.charities as unknown as { name_en: string } | null;
   return { charityName: c?.name_en ?? "this charity" };

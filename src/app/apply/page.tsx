@@ -8,6 +8,7 @@ import { findOpenInvite, isInviteToken } from "@/lib/charity/invites";
 import { reviewWithin } from "@/lib/charity/review-time";
 import { sendLoginLink } from "@/app/login/actions";
 import { StartForm } from "./start-form";
+import { signInMessage } from "@/lib/sign-in";
 
 export const metadata: Metadata = { title: "List your charity" };
 
@@ -28,11 +29,15 @@ const papers: { icon: IconName; title: string; body: string; when?: string }[] =
 
 export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
   const viewer = await getViewer();
-  const sp = (await searchParams) as { invite?: string; name?: string };
+  const sp = (await searchParams) as { invite?: string; name?: string; error?: string; email?: string };
   const token = isInviteToken(sp.invite) ? sp.invite : undefined;
   const invite = await findOpenInvite(token);
   const typedName = typeof sp.name === "string" ? sp.name.slice(0, 120) : "";
   const startName = invite?.charityName ?? typedName;
+  // Sent back by the sign-in action (an address it can't use, too many links, a failed send): the same plain
+  // message as on Sign in, here with both fields still filled in.
+  const signInError = signInMessage(sp.error);
+  const typedEmail = typeof sp.email === "string" ? sp.email.slice(0, 200) : "";
   const back = (name: string) => `/apply?${new URLSearchParams({ ...(token ? { invite: token } : {}), ...(name ? { name } : {}) }).toString()}`;
 
   return (
@@ -94,8 +99,9 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="apply-email" className="block text-sm font-semibold">Your email</label>
-                  <input id="apply-email" name="email" type="email" required maxLength={200} autoComplete="email" className="min-h-12 w-full rounded-control border-2 border-border bg-surface px-3 focus:border-brand" />
+                  <input id="apply-email" name="email" type="email" required maxLength={200} autoComplete="email" defaultValue={typedEmail} aria-invalid={signInError ? true : undefined} aria-describedby={signInError ? "apply-error" : undefined} className="min-h-12 w-full rounded-control border-2 border-border bg-surface px-3 focus:border-brand" />
                 </div>
+                {signInError ? <p id="apply-error" role="alert" className="text-sm text-danger">{signInError}</p> : null}
                 <input type="hidden" name="next" value={back(startName)} />
                 <button className="pressable w-full rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Email me a code</button>
                 <p className="text-sm text-muted">Already applied? <Link href={`/login?next=${encodeURIComponent("/charity-admin")}`} className="font-semibold text-brand underline">Sign in to carry on</Link>.</p>

@@ -8,23 +8,19 @@ import { safeNextPath } from "@/lib/safe-path";
 import { Splash } from "@/components/splash";
 import { Illustration } from "@/components/illustration";
 import { Bubbles } from "@/components/marketing";
+import { sentProofMatches, signInMessage } from "@/lib/sign-in";
 
 export const metadata: Metadata = { title: "Sign in" };
-
-const errors: Record<string, string> = {
-  email: "Please enter a valid email address.",
-  send: "We couldn't send the link. Please try again in a minute.",
-  link: "That sign-in link didn't work. It only opens in the browser you asked for it from. Ask for a new one and type the code from the email instead.",
-  code: "That code didn't work. Check it, or ask for a new email and use the newest code.",
-  busy: "We've sent several links to this address in the last hour. Please use the latest one, or try again later.",
-};
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
   const sent = params.sent === "1";
-  const error = typeof params.error === "string" ? errors[params.error] : undefined;
+  const error = signInMessage(params.error);
   const next = typeof params.next === "string" ? params.next : "/account";
-  const email = typeof params.email === "string" ? params.email.slice(0, 200) : "";
+  const typed = typeof params.email === "string" ? params.email.slice(0, 254) : "";
+  // "We sent a link to …" names the address only when our own server just sent to it (a signed, short-lived proof
+  // from the sign-in action): a link anyone makes with ?sent=1&email=… shows no address and no code box.
+  const email = sent ? (sentProofMatches(typed, params.s) ? typed : "") : typed.slice(0, 200);
   const viewer = await getViewer();
 
   return (
@@ -49,10 +45,18 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         </p>
       ) : sent ? (
         <div className="mt-3 space-y-4">
-          <p className="text-[15px] text-muted">We sent a link{email ? <> to <span className="font-semibold text-navy">{email}</span></> : ""}. Tap it, or type the code from the email here.</p>
+          <p className="text-[15px] text-muted">
+            {/* The full stop stays with the address (a long address must not leave it alone on the next line). */}
+            {email ? (
+              <>We sent a link to <span dir="auto" className="font-semibold text-navy [overflow-wrap:anywhere]">{email.slice(0, -1)}<span className="whitespace-nowrap">{email.slice(-1)}<span className="font-normal text-muted">.</span></span></span> Tap it, or type the code from the email here.</>
+            ) : (
+              <>If you asked for a sign-in email, we sent it. Tap the link in it, or ask for a new email to get a code you can type here.</>
+            )}
+          </p>
           {email ? (
             <form action={verifyLoginCode} className="space-y-3">
               <input type="hidden" name="email" value={email} />
+              <input type="hidden" name="s" value={typeof params.s === "string" ? params.s : ""} />
               <input type="hidden" name="next" value={next} />
               <label className="block text-sm font-medium" htmlFor="code">Code from the email</label>
               <input

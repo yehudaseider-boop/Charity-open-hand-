@@ -84,6 +84,9 @@ export function appealEmail(
     subject: v.subject,
     ...(v.replyTo ? { replyTo: v.replyTo } : {}),
     ...(v.oneClickUrl ? { headers: oneClickStopHeaders(v.oneClickUrl) } : {}),
+    // The charity's own words, in their own box headed with its name (13/11/2026): escaped, and nothing in them becomes
+    // a link, a button or one of Givezy's lilac cards, so an appeal can never pass itself off as a message from Givezy.
+    quoted: { heading: v.charityName.replace(/\s+/g, " ").trim(), body: v.body, inText: v.body },
     text: [
       v.firstName ? `Dear ${v.firstName},` : "Hello,",
       "",
@@ -93,7 +96,7 @@ export function appealEmail(
       "",
       "",
       v.replyTo ? `${v.charityName} sent this through Givezy. Reply to this email to reach them.` : `${v.charityName} sent this through Givezy.`,
-      `You're getting this because you gave to ${v.charityName} on Givezy. To stop news and appeals from ${v.charityName}: ${v.stopUrl}`,
+      `You're getting this because you gave to ${v.charityName} on Givezy. To stop emails from ${v.charityName}: ${v.stopUrl}`,
     ].join("\n"),
   };
 }

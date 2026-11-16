@@ -22,6 +22,7 @@ import { haptic } from "@/lib/haptics";
 import { loadCausePrefs } from "@/lib/cause-prefs";
 import { causesFirst, inCause } from "@/lib/live-charities";
 import { useScreenState } from "@/lib/screen-state";
+import { useRequestsOpen } from "@/lib/charity-request";
 import { Bubbles, People } from "@/components/people";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
@@ -53,6 +54,12 @@ export default function Discover() {
     loadCausePrefs().then(setPicked);
   }, []);
   const searching = query.trim().length > 0;
+  // "Ask us to add a charity" (15/11/2026): shown only once our server says requests are open.
+  const requestsOpen = useRequestsOpen();
+  const askToAdd = () => {
+    haptic.tap();
+    router.push({ pathname: "/request-charity", params: query.trim() ? { name: query.trim() } : {} });
+  };
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -105,7 +112,7 @@ export default function Discover() {
               <TextInput
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Search by name, cause or area"
+                placeholder="Name, cause or area"
                 placeholderTextColor={colors.muted}
                 accessibilityLabel="Search charities"
                 returnKeyType="search"
@@ -136,13 +143,14 @@ export default function Discover() {
           ) : state === "error" ? (
             <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={() => (live ? directory.retry() : router.replace("/discover"))} />
           ) : noneYet ? (
-            <EmptyState art="dreamGift" title="Charities are on their way" body="The first charities are joining Givezy. Check back soon." />
+            <EmptyState art="dreamGift" title="Charities are on their way" body="The first charities are joining Givezy. Check back soon." away={requestsOpen ? { label: "Ask us to add a charity", onPress: askToAdd } : undefined} />
           ) : results.length === 0 ? (
             <EmptyState
               art="checklist"
               title="No charities found"
               body={query.trim() ? `Nothing matches "${query.trim()}". Try another name or a different cause.` : "No charities in this cause yet. Try another one."}
-              action={{ label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } }}
+              action={requestsOpen && query.trim() ? { label: "Ask us to add it", onPress: askToAdd } : { label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } }}
+              away={requestsOpen && query.trim() ? { label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } } : requestsOpen ? { label: "Ask us to add a charity", onPress: askToAdd } : undefined}
             />
           ) : (
             <View style={{ gap: space.block }}>
@@ -169,6 +177,15 @@ export default function Discover() {
                   </FadeUp>
                 ))}
               </View>
+              {requestsOpen ? (
+                <Pressable onPress={askToAdd} accessibilityRole="button" accessibilityLabel="Can't find your charity? Ask us to add it" style={({ pressed }) => [styles.askRow, pressed && { opacity: 0.85 }]}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.askTitle}>Can&apos;t find your charity?</Text>
+                    <Text style={styles.askLink}>Ask us to add it</Text>
+                  </View>
+                  <View style={styles.askPlus}><Text style={styles.askPlusText}>+</Text></View>
+                </Pressable>
+              ) : null}
               {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities (demo data)</Text>}
             </View>
           )}
@@ -214,6 +231,11 @@ function CauseOfTheWeek({ charity, live }: { charity: Charity; live: boolean }) 
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "transparent" },
+  askRow: { flexDirection: "row", alignItems: "center", gap: 14, padding: 18, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.lilacSoft },
+  askTitle: { fontFamily: fonts.display, fontSize: 18, lineHeight: 23, color: colors.navy },
+  askLink: { fontFamily: fonts.bodySemibold, fontSize: 16, lineHeight: 22, color: colors.blue },
+  askPlus: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", borderBottomWidth: 3, borderBottomColor: colors.blueEdge },
+  askPlusText: { fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 28, color: colors.onInk },
   gutter: { paddingHorizontal: space.gutter },
   hero: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, padding: 16, paddingTop: 20, gap: 14, overflow: "hidden" },
   heroTop: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12, paddingHorizontal: 4 },

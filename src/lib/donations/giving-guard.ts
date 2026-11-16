@@ -4,7 +4,7 @@ import { legalConfig } from "@/config/legal";
 import { logAudit } from "@/lib/audit";
 import { alertGivezy } from "@/lib/ops/alert";
 import { after } from "next/server";
-import { hashedKey, hitRateLimit, ipKeys, rateLimitReached } from "@/lib/rate-limit";
+import { clearOldAttempts, forgetAttempts, hashedKey, hitRateLimit, ipKeys, rateLimitReached, takeAttempt } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tooManyTriesMessage, type GuardReason } from "./giving-guard-rules";
 
@@ -33,24 +33,53 @@ export async function checkGivingAllowed(args: { email: string; ip: string; char
     const addressKeys = ipKeys(args.ip);
     const emailKeys = keysOf(hashedKey("email", email));
 
-    // Several declined cards lately: wait before trying again. Read only, so waiting doesn't extend the wait.
-    // Email and address each have their own threshold (an address is shared by many donors).
-    if (await rateLimitReached("checkout-declined", emailKeys, guard.declinesPerEmail.tries, guard.declinesPerEmail.minutes)) {
-      return refuse("declines", guard.declinesPerEmail.minutes);
-    }
-    if (await rateLimitReached("checkout-declined", addressKeys, guard.declinesPerAddress.tries, guard.declinesPerAddress.minutes)) {
-      return refuse("declines", guard.declinesPerAddress.minutes);
-    }
-    // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it).
-    if (await hitRateLimit("checkout", [`email:${email}`], guard.perEmail.tries, guard.perEmail.minutes)) return refuse("email", guard.perEmail.minutes);
-    if (await hitRateLimit("checkout-ip", addressKeys, guard.perAddress.tries, guard.perAddress.minutes)) return refuse("address", guard.perAddress.minutes);
-    if (await hitRateLimit("checkout-day", emailKeys, guard.perEmailDay.tries, guard.perEmailDay.minutes)) return refuse("email-day", guard.perEmailDay.minutes);
-    if (await hitRateLimit("checkout-ip-day", addressKeys, guard.perAddressDay.tries, guard.perAddressDay.minutes)) return refuse("address-day", guard.perAddressDay.minutes);
+    // The checks run side by side, not one after another (12/11/2026: pressing Give took about 3 seconds before the
+    // payment page, most of it these checks waiting on each other). The answer is read in the same order as before,
+    // so the same refusal wins.
 
-    // A sudden rush on one charity (attackers change addresses and emails): tell the team, never block donors.
-    if (await hitRateLimit("checkout-charity", [`charity:${args.charityId}`], guard.charityStartsAlarm.tries, guard.charityStartsAlarm.minutes)) {
-      await raiseAlarm("starts", args.charityId, guard.charityStartsAlarm);
+    // Several declined cards lately: wait before trying again. Read only, so waiting doesn't extend the wait.
+    // Email and address each have their own threshold (an address is shared by many donors). A start refused here
+    // is not counted in the limits below, as before.
+    const [declinedEmail, declinedAddress] = await Promise.all([
+      rateLimitReached("checkout-declined", emailKeys, guard.declinesPerEmail.tries, guard.declinesPerEmail.minutes),
+      rateLimitReached("checkout-declined", addressKeys, guard.declinesPerAddress.tries, guard.declinesPerAddress.minutes),
+    ]);
+    if (declinedEmail) return refuse("declines", guard.declinesPerEmail.minutes);
+    if (declinedAddress) return refuse("declines", guard.declinesPerAddress.minutes);
+
+    // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it), in the
+    // order they are answered, and a sudden rush on one charity (attackers change addresses and emails): the team is
+    // told, donors are never blocked. Each counts this start, side by side. A start refused by one limit stays counted
+    // only in that limit and the ones before it, as when they were checked in turn (13/11/2026: counting it in every
+    // limit could turn a 10-minute wait into a day's), and never in the charity's rush count. A limit that couldn't be
+    // checked never lets a refusal from another one through.
+    const limits: { bucket: string; keys: string[]; tries: number; minutes: number; reason: GuardReason }[] = [
+      { bucket: "checkout", keys: [`email:${email}`], ...guard.perEmail, reason: "email" },
+      { bucket: "checkout-ip", keys: addressKeys, ...guard.perAddress, reason: "address" },
+      { bucket: "checkout-day", keys: emailKeys, ...guard.perEmailDay, reason: "email-day" },
+      { bucket: "checkout-ip-day", keys: addressKeys, ...guard.perAddressDay, reason: "address-day" },
+    ];
+    const [rush, ...counted] = await Promise.allSettled([
+      takeAttempt("checkout-charity", [`charity:${args.charityId}`], guard.charityStartsAlarm.tries, guard.charityStartsAlarm.minutes),
+      ...limits.map((l) => takeAttempt(l.bucket, l.keys, l.tries, l.minutes)),
+    ]);
+    // Rows older than a day, cleared after the response, so the donor isn't waiting on it (straight away outside a
+    // request, where after() can't be used).
+    try {
+      after(clearOldAttempts);
+    } catch {
+      void clearOldAttempts();
     }
+    for (const r of [rush, ...counted]) if (r.status === "rejected") console.error("[giving-guard] a limit could not be checked", r.reason);
+    // A limit that couldn't be counted still wrote its row: its ids come back on the error (takeAttempt).
+    const idsOf = (r: (typeof counted)[number]) =>
+      r.status === "fulfilled" ? r.value.ids : (((r.reason as { attemptIds?: unknown } | null)?.attemptIds as string[] | undefined) ?? []);
+    const refusedAt = counted.findIndex((r) => r.status === "fulfilled" && r.value.limited);
+    if (refusedAt >= 0) {
+      await forgetAttempts([...idsOf(rush), ...counted.slice(refusedAt + 1).flatMap(idsOf)]);
+      return refuse(limits[refusedAt].reason, limits[refusedAt].minutes);
+    }
+    if (rush.status === "fulfilled" && rush.value.limited) await raiseAlarm("starts", args.charityId, guard.charityStartsAlarm);
     return null;
   } catch (e) {
     console.error("[giving-guard] limits could not be checked; the gift goes ahead", e);

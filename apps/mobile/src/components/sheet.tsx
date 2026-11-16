@@ -130,7 +130,7 @@ export function Sheet({ visible, onClose, guard = null, children }: { visible: b
         <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: v }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={tryClose} accessibilityLabel="Close" accessibilityRole="button" />
         </Animated.View>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.anchor} pointerEvents="box-none">
+        <KeyboardAvoidingView behavior="padding" style={styles.anchor} pointerEvents="box-none">
           <Animated.View
             accessibilityViewIsModal
             style={[

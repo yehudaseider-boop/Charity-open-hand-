@@ -1,4 +1,5 @@
 import "server-only";
+import { clearExpiredEmails, clearStaleClaims } from "@/lib/charity-requests-notify";
 import { logAudit } from "@/lib/audit";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -9,6 +10,8 @@ import { retryReceiptEmail } from "@/lib/receipts/email-retry";
 import { auditRetry, recordFailedConfirmations, runEmailRetries, supabaseRetryStore, type RetryHandler, type RetrySummary } from "@/lib/email/retry";
 import { emailIsOn, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
 import { heldLabel } from "./held";
+import { formatRand } from "@/lib/money";
+import { formatDate } from "@/lib/dates";
 
 /**
  * The daily safety net, run after the monthly collection. It never charges anyone and never decides a
@@ -17,6 +20,7 @@ import { heldLabel } from "./held";
  */
 
 import type { MonthlySummary } from "@/lib/donations/monthly-job";
+import type { PayoutSyncSummary } from "@/lib/donations/payouts";
 
 /**
  * Collect the monthly donations that are due, run after run, until none are left or the time budget is
@@ -25,7 +29,7 @@ import type { MonthlySummary } from "@/lib/donations/monthly-job";
  * the next call (tomorrow's job, or the hourly one once the host allows it).
  */
 export async function collectMonthlyWithin(run: (deadline: number) => Promise<MonthlySummary>, budgetMs: number, now: () => number = Date.now): Promise<MonthlySummary & { runs: number }> {
-  const total: MonthlySummary & { runs: number } = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], errors: [], runs: 0 };
+  const total: MonthlySummary & { runs: number } = { considered: 0, paid: 0, failed: 0, stopped: 0, waiting: [], alreadyPaid: 0, review: [], unconfirmed: [], waitingOnProvider: [], errors: [], runs: 0 };
   const started = now();
   // Each run stops starting new donations at the deadline it is given, so a run can't go past the budget by much.
   while (total.runs === 0 || now() - started < budgetMs - 5_000) {
@@ -39,6 +43,8 @@ export async function collectMonthlyWithin(run: (deadline: number) => Promise<Mo
     total.alreadyPaid += s.alreadyPaid;
     total.waiting.push(...s.waiting);
     total.review.push(...s.review);
+    total.unconfirmed!.push(...(s.unconfirmed ?? []));
+    total.waitingOnProvider!.push(...(s.waitingOnProvider ?? []));
     total.errors.push(...s.errors);
     // Stop when a run found nothing due, did nothing useful (rows that only error or wait would come back every run), or ran out of time.
     const progress = s.paid + s.failed + s.stopped + s.alreadyPaid + s.review.length;
@@ -56,6 +62,8 @@ export type DailyChecks = {
   pending: { checked: number; paid: number; failed: number; still: number; errors: number };
   /** Pending for more than 3 days: the provider still has no answer. */
   stuckPending: number;
+  /** Checkouts the donor left unpaid (the provider says abandoned or never received), closed as failed after 48 hours. */
+  abandonedClosed?: number;
   /** The older once-a-day resend of confirmations, used only until the email_retries table is there. */
   confirmations: { resent: number; failedAgain: number };
   /** Important emails tried again (gift confirmations, s18A receipts, declined-card notices). */
@@ -64,19 +72,62 @@ export type DailyChecks = {
   unhandledEvents: number;
   /** Held items from the last day, by what they are. */
   held: Record<string, number>;
+  /**
+   * Privacy requests (correct, delete, stop using) still open, and when the oldest came in (13/11/2026: until then
+   * nobody was told about a new one). A person must answer each; POPIA sets time limits.
+   */
+  privacyRequests?: { open: number; oldestAt: string | null };
+  /** "Request a charity" (15/11/2026): asks in the last day, and charities still asked for and not yet handled. */
+  charityRequests?: { lastDay: number; waiting: number };
 };
 
 const HOUR = 3_600_000;
+/**
+ * A checkout the provider says was abandoned (or never received) is closed as failed once it is this old: well past
+ * the time a donor takes to pay, and before the "pending more than 3 days" alert, which then only shows payments the
+ * provider is really still working on. A closed checkout can still become paid if the provider says so later.
+ */
+export const ABANDONED_AFTER_HOURS = 48;
 
-export async function runDailyChecks(now = new Date(), deadline = Infinity): Promise<DailyChecks> {
+/** What the email retries, run on their own first (see runImportantEmailRetries), hand to the checks. */
+export type RetriesDone = Pick<DailyChecks, "confirmations" | "emailRetries"> & { incomplete: boolean };
+
+const emptyChecks = (): DailyChecks => ({ incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, abandonedClosed: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} });
+
+/**
+ * The important emails that failed (owed confirmations, s18A receipts, declined-card notices), tried again on their
+ * own, at the very start of the daily job: a long collection day can then never leave them for tomorrow
+ * (review 12/11/2026). The checks are then told it is done (runDailyChecks' `retries`).
+ */
+export async function runImportantEmailRetries(now = new Date(), deadline = Infinity): Promise<RetriesDone> {
+  const out = emptyChecks();
+  await retryImportantEmails(createAdminClient(), now, deadline, out);
+  return { incomplete: out.incomplete, confirmations: out.confirmations, emailRetries: out.emailRetries };
+}
+
+export async function runDailyChecks(now = new Date(), deadline = Infinity, opts: { retries?: RetriesDone } = {}): Promise<DailyChecks> {
   const db = createAdminClient();
-  const out: DailyChecks = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+  const out: DailyChecks = emptyChecks();
+  if (opts.retries) {
+    out.confirmations = opts.retries.confirmations;
+    if (opts.retries.emailRetries) out.emailRetries = opts.retries.emailRetries;
+    if (opts.retries.incomplete) out.incomplete = true;
+  }
+  const closeAbandonedBefore = new Date(now.getTime() - ABANDONED_AFTER_HOURS * HOUR);
+  const check = async (ref: string) => {
+    // Counted only when the check itself closed an abandoned or never-received checkout, never for a decline.
+    const o = await confirmPayment(ref, { closeAbandonedBefore, onClosed: () => (out.abandonedClosed = (out.abandonedClosed ?? 0) + 1) });
+    if (o === "paid") out.pending.paid += 1;
+    else if (o === "failed") out.pending.failed += 1;
+    else out.pending.still += 1;
+    return o;
+  };
 
   // 1. Once-off payments still pending (older than 30 minutes, the last week): ask the provider. Monthly
   // collections are the monthly job's own; gifts a charity recorded itself are never pending.
   const { data: pending, error: pErr } = await db
     .from("donations")
-    .select("gateway_ref")
+    .select("gateway_ref, created_at")
     .eq("status", "pending")
     // Every kind, the first payment of a monthly donation and a new card too: if the provider's message never
     // arrived, this is what settles them. (confirmPayment is safe to repeat.)
@@ -95,12 +146,37 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     }
     out.pending.checked += 1;
     try {
-      const o = await confirmPayment(p.gateway_ref as string);
-      if (o === "paid") out.pending.paid += 1;
-      else if (o === "failed") out.pending.failed += 1;
-      else out.pending.still += 1;
+      await check(p.gateway_ref as string);
     } catch {
-      // The provider never heard of it (the donor closed the page before paying) or couldn't be reached.
+      // The provider couldn't be reached, or never heard of a recent one (the donor closed the page before paying).
+      out.pending.errors += 1;
+    }
+  }
+  // 2. Important emails that failed (owed confirmations, receipts, declined-card notices): right after the recent
+  // payments, before the older checkouts, so a long collection day never leaves them for tomorrow (review 12/11/2026).
+  if (!opts.retries) await retryImportantEmails(db, now, deadline, out);
+
+  // 1a. Older checkouts (a week to 30 days, the rest of the "pending more than 3 days" window), oldest first: the
+  // ones the provider says were abandoned or never received are closed, so they stop lighting that alert.
+  const { data: older, error: oErr } = await db
+    .from("donations")
+    .select("gateway_ref")
+    .eq("status", "pending")
+    .neq("gateway", "recorded")
+    .lt("created_at", new Date(now.getTime() - 7 * 24 * HOUR).toISOString())
+    .gte("created_at", new Date(now.getTime() - 30 * 24 * HOUR).toISOString())
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (oErr) throw new Error(`Could not list older pending payments: ${oErr.message}`);
+  for (const p of older ?? []) {
+    if (Date.now() > deadline) {
+      out.incomplete = true;
+      break;
+    }
+    out.pending.checked += 1;
+    try {
+      await check(p.gateway_ref as string);
+    } catch {
       out.pending.errors += 1;
     }
   }
@@ -137,7 +213,69 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     }
   }
 
-  // 2. Important emails that failed: tried again an hour later (the next run), then a day, then three days, then
+  // 3. Provider messages not handled after an hour.
+  const { count: events } = await db
+    .from("gateway_events")
+    .select("id", { count: "exact", head: true })
+    .is("processed_at", null)
+    .lt("received_at", new Date(now.getTime() - HOUR).toISOString());
+  out.unhandledEvents = events ?? 0;
+
+  // 4. Held items from the last day (the same list as Admin, Payments).
+  const { data: held } = await db
+    .from("audit_log")
+    .select("action")
+    .in("action", Object.keys(heldLabel))
+    .gte("created_at", new Date(now.getTime() - 24 * HOUR).toISOString())
+    .limit(500);
+  for (const h of held ?? []) out.held[h.action as string] = (out.held[h.action as string] ?? 0) + 1;
+
+  // 5. Privacy requests waiting for a person. Counts and a date only: never who asked or what about.
+  const { data: oldest, count: openRequests, error: requestsError } = await db
+    .from("data_requests")
+    .select("created_at", { count: "exact" })
+    .eq("status", "open")
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (requestsError) console.error("[daily] could not count open privacy requests", requestsError.message);
+  else out.privacyRequests = { open: openRequests ?? 0, oldestAt: (oldest?.[0]?.created_at as string | undefined) ?? null };
+
+  // 6. "Request a charity" (15/11/2026): counts only. Skipped quietly until that migration has run. An address whose
+  // "it joined" email was claimed but never finished is deleted here too, never kept, and so is an email that waited
+  // a month for a charity that hasn't joined.
+  await Promise.all([clearStaleClaims(now), clearExpiredEmails(now)]);
+  const [lastDay, waiting] = await Promise.all([
+    db.from("charity_requests").select("id", { count: "exact", head: true }).gte("created_at", new Date(now.getTime() - 24 * HOUR).toISOString()),
+    db.from("charity_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
+  ]);
+  const missing = (code: string | undefined) => code === "PGRST205" || code === "42P01";
+  if (lastDay.error || waiting.error) {
+    const e = lastDay.error ?? waiting.error;
+    if (!missing(e?.code)) console.error("[daily] could not count charity requests", e?.message);
+  } else out.charityRequests = { lastDay: lastDay.count ?? 0, waiting: waiting.count ?? 0 };
+  return out;
+}
+
+/** Each kind's sender for a try again. */
+const retryHandlers: Record<RetryKind, RetryHandler> = {
+  donation_confirmation: (row, signal) => deliverDonorConfirmation(row.refId, { signal }),
+  s18a_receipt: (row, signal) => retryReceiptEmail(row.refId, signal),
+  monthly_declined: (row, signal) => retryDeclinedNotice(row.refId, row.payload, signal),
+};
+
+/** Confirmations noted as failed in the audit log in the last week and not resent: added to the list to try again. */
+async function queueAuditOnlyFailures(db: ReturnType<typeof createAdminClient>, since: string) {
+  const { data: failedMail } = await db.from("audit_log").select("entity_id").eq("action", "donation.confirmation_email_failed").gte("created_at", since).limit(200);
+  const { data: resentMail } = await db.from("audit_log").select("entity_id").eq("action", "donation.confirmation_email_resent").gte("created_at", since).limit(1000);
+  const done = new Set((resentMail ?? []).map((r) => r.entity_id as string));
+  const ids = [...new Set((failedMail ?? []).map((r) => r.entity_id as string))].filter((id) => id && !done.has(id));
+  // One write, and an existing row is kept as it is, so this never resets a row's tries.
+  await recordFailedConfirmations(ids);
+}
+
+/** Step 2 of the daily checks: important emails that failed, tried again (rules in @/lib/email/retry-plan). */
+async function retryImportantEmails(db: ReturnType<typeof createAdminClient>, now: Date, deadline: number, out: DailyChecks): Promise<void> {
+  // Important emails that failed: tried again an hour later (the next run), then a day, then three days, then
   // Givezy is told once. Nothing at all while email is off: a "sent" must mean a real email left.
   if (emailIsOn()) {
     const since = new Date(now.getTime() - 7 * 24 * HOUR).toISOString();
@@ -166,40 +304,6 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity): Pro
     }
   }
 
-  // 3. Provider messages not handled after an hour.
-  const { count: events } = await db
-    .from("gateway_events")
-    .select("id", { count: "exact", head: true })
-    .is("processed_at", null)
-    .lt("received_at", new Date(now.getTime() - HOUR).toISOString());
-  out.unhandledEvents = events ?? 0;
-
-  // 4. Held items from the last day (the same list as Admin, Payments).
-  const { data: held } = await db
-    .from("audit_log")
-    .select("action")
-    .in("action", Object.keys(heldLabel))
-    .gte("created_at", new Date(now.getTime() - 24 * HOUR).toISOString())
-    .limit(500);
-  for (const h of held ?? []) out.held[h.action as string] = (out.held[h.action as string] ?? 0) + 1;
-  return out;
-}
-
-/** Each kind's sender for a try again. */
-const retryHandlers: Record<RetryKind, RetryHandler> = {
-  donation_confirmation: (row, signal) => deliverDonorConfirmation(row.refId, { signal }),
-  s18a_receipt: (row, signal) => retryReceiptEmail(row.refId, signal),
-  monthly_declined: (row, signal) => retryDeclinedNotice(row.refId, row.payload, signal),
-};
-
-/** Confirmations noted as failed in the audit log in the last week and not resent: added to the list to try again. */
-async function queueAuditOnlyFailures(db: ReturnType<typeof createAdminClient>, since: string) {
-  const { data: failedMail } = await db.from("audit_log").select("entity_id").eq("action", "donation.confirmation_email_failed").gte("created_at", since).limit(200);
-  const { data: resentMail } = await db.from("audit_log").select("entity_id").eq("action", "donation.confirmation_email_resent").gte("created_at", since).limit(1000);
-  const done = new Set((resentMail ?? []).map((r) => r.entity_id as string));
-  const ids = [...new Set((failedMail ?? []).map((r) => r.entity_id as string))].filter((id) => id && !done.has(id));
-  // One write, and an existing row is kept as it is, so this never resets a row's tries.
-  await recordFailedConfirmations(ids);
 }
 
 /**
@@ -233,7 +337,34 @@ async function resendConfirmationsOldWay(db: ReturnType<typeof createAdminClient
 }
 
 /** What the monthly and payouts runs reported that needs a person. */
-export type JobProblems = { monthlyCutOff?: boolean; monthlyErrors: number; monthlyReview: number; monthlyStopped: number; payoutsFailed: boolean; monthlyFailed: boolean };
+export type JobProblems = {
+  monthlyCutOff?: boolean;
+  monthlyErrors: number;
+  monthlyReview: number;
+  monthlyStopped: number;
+  /** Monthly donations held: a try still pending at the payment provider after 48 hours (listed every day until settled). */
+  monthlyWaitingOnProvider?: { totalCents: number; charityName: string }[];
+  payoutsFailed: boolean;
+  monthlyFailed: boolean;
+};
+
+/**
+ * The deposit report's own short email, sent after the day's main email (the payouts run last, in a time budget).
+ * None when it ran in full. `started` false: there was no time left to start it at all.
+ */
+export function payoutsAlertLines(p: PayoutSyncSummary | null, opts: { started: boolean } = { started: true }): string[] {
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  if (!opts.started) return ["The deposit report had no time left to run today. Nothing is lost: it carries on tomorrow."];
+  if (p === null) return ["The deposit report could not be updated today (see the job log). It tries again tomorrow."];
+  const lines: string[] = [];
+  if (p.outOfTime) {
+    lines.push(
+      `The deposit report ran out of time today${p.notReached ? ` with ${n(p.notReached, "charity", "charities")} not reached` : ""}. What was read in full is kept; the rest is read tomorrow.`,
+    );
+  }
+  if (p.failed.length) lines.push(`The deposit report could not be read for ${n(p.failed.length, "charity", "charities")} today (see the job log). It tries again tomorrow.`);
+  return lines;
+}
 
 /** The lines of the daily email, or none when nothing needs a person. Plain words, one thing per line. */
 export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
@@ -244,12 +375,26 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   if (c.incomplete) lines.push("The daily checks ran out of time and stopped early. The rest is checked tomorrow.");
   if (jobs.monthlyErrors) lines.push(`Monthly collection: ${n(jobs.monthlyErrors, "monthly donation", "monthly donations")} could not be handled (see the job log).`);
   if (jobs.monthlyReview) lines.push(`Monthly collection: ${n(jobs.monthlyReview, "payment", "payments")} came back with a different amount and wait for a person.`);
+  for (const w of jobs.monthlyWaitingOnProvider ?? []) {
+    lines.push(`Monthly collection: still waiting for the payment provider about ${formatRand(w.totalCents)} for ${w.charityName}. Nothing more will be charged until it's settled.`);
+  }
   if (jobs.monthlyStopped) lines.push(`${n(jobs.monthlyStopped, "monthly donation", "monthly donations")} stopped after three declined tries. The donors were emailed a link to put in a new card.`);
   if (jobs.payoutsFailed) lines.push("The deposit report could not be updated today. It tries again tomorrow.");
   if (c.stuckPending) lines.push(`${n(c.stuckPending, "payment has", "payments have")} been pending for more than 3 days.`);
+  if (c.privacyRequests?.open) {
+    const since = c.privacyRequests.oldestAt ? ` (the oldest from ${formatDate(c.privacyRequests.oldestAt)})` : "";
+    lines.push(`${n(c.privacyRequests.open, "privacy request is", "privacy requests are")} waiting for an answer${since}. See Admin, Privacy requests.`);
+  }
+  if (c.charityRequests?.lastDay) {
+    lines.push(`${n(c.charityRequests.lastDay, "donor asked", "donors asked")} for a charity that isn't on Givezy yet. ${n(c.charityRequests.waiting, "request waits", "requests wait")} for a look in Admin, Charity requests.`);
+  }
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
   if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));
   if (c.confirmations.failedAgain) lines.push(`${n(c.confirmations.failedAgain, "confirmation email", "confirmation emails")} to donors still could not be sent.`);
-  for (const [action, count] of Object.entries(c.held)) lines.push(`${heldLabel[action] ?? action}: ${count}`);
+  for (const [action, count] of Object.entries(c.held)) {
+    // Listed above, one line each with the amount and charity, every day until settled.
+    if (action === "monthly.waiting_on_provider") continue;
+    lines.push(`${heldLabel[action] ?? action}: ${count}`);
+  }
   return lines;
 }

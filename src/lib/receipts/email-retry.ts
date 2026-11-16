@@ -39,8 +39,9 @@ export async function retryReceiptEmail(receiptId: string, signal: AbortSignal):
     await store.releaseEmail(r);
     return "skipped";
   } catch (e) {
-    // A send cut off at the time limit may have gone: the claim stays, so nothing sends it again straight away,
-    // and the daily job flags it for a person (email.retry_unknown). Any other failure frees it for the next try.
+    // A send cut off at the time limit, or a dropped connection, may have gone: the claim stays, so nothing sends it
+    // again straight away, and the daily job flags it for a person (email.retry_unknown). Only a refusal from the
+    // email service (sure not to have gone) frees it for the next try.
     if (!wasCutOff(e)) await store.releaseEmail(r).catch(() => undefined);
     throw e;
   }

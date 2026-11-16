@@ -215,6 +215,17 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
     },
 
     async claimEmail(receipt) {
+      // A send that may already have gone (cut off or dropped mid-way, 13/11/2026) is never sent again by a run: it is
+      // flagged for a person (email_retries "unknown", in Givezy's daily email), whatever the age of its claim.
+      const { data: maybeSent, error: retryError } = await db
+        .from("email_retries")
+        .select("id")
+        .eq("kind", "s18a_receipt")
+        .eq("ref_id", receipt.id)
+        .eq("status", "unknown")
+        .limit(1);
+      if (retryError) throw new Error(retryError.message);
+      if (maybeSent?.length) return false;
       // The claim is a lock for the minutes a send takes. One older than that was cut off mid-send: take it over.
       const stale = new Date(Date.now() - EMAIL_CLAIM_MINUTES * 60_000).toISOString();
       const { data, error } = await db

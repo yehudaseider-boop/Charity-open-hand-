@@ -8,6 +8,7 @@ import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
 import type { ImportPreview } from "./record-actions";
 import { blueAction, field } from "@/components/dash";
+import { decodeCsvBytes } from "@/lib/csv-file";
 
 const methods = Object.entries(RECORDED_METHODS).map(([value, label]) => ({ value, label }));
 
@@ -121,9 +122,10 @@ export function ImportGiftsForm({
     if (!/\.(csv|txt)$/i.test(file.name)) return setReadError("Choose a CSV file. In Excel: File, Save as, CSV (comma delimited).");
     setFileName(file.name);
     const reader = new FileReader();
-    reader.onload = () => setText(String(reader.result ?? ""));
+    // Read as bytes: a CSV from Excel on Windows is often Windows-1252, not UTF-8 (André, Zoë). decodeCsvBytes picks.
+    reader.onload = () => setText(reader.result instanceof ArrayBuffer ? decodeCsvBytes(reader.result) : "");
     reader.onerror = () => setReadError("We couldn't read this file. Save it again as CSV and choose it again.");
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (

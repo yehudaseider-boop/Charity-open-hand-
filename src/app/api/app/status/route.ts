@@ -4,6 +4,9 @@ import { confirmPayment } from "@/lib/donations/confirm";
 import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { hitRateLimit } from "@/lib/rate-limit";
 
+/** The longest this may run (13/11/2026): checking a payment with the provider can take up to 20 seconds. */
+export const maxDuration = 60;
+
 /**
  * After the payment page closes, the app asks whether the payment went through, so it can thank
  * the donor or keep their form for another try. Only the outcome is returned, never details, and

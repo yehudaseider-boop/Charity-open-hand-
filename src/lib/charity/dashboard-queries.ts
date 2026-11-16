@@ -53,7 +53,8 @@ export type DonorRow = {
   donor_id: string;
   donor_type: string;
   display_name: string;
-  email: string;
+  /** Null when the viewer's role can't see contact details (charity_contact_or_null). */
+  email: string | null;
   phone: string | null;
   donation_count: number;
   total_cents: number;
@@ -68,7 +69,14 @@ export async function loadDonors(charityId: string): Promise<DonorRow[]> {
   // The database answers at most 1 000 rows at a time, so a long list is read page by page.
   const rows: DonorRow[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.rpc("charity_donor_list", { p_charity_id: charityId }).range(from, from + 999);
+    // The database's own order (largest total, then latest gift), with the donor id last so the order is unique and
+    // no donor repeats or goes missing between pages.
+    const { data, error } = await supabase
+      .rpc("charity_donor_list", { p_charity_id: charityId })
+      .order("total_cents", { ascending: false })
+      .order("last_paid_at", { ascending: false })
+      .order("donor_id")
+      .range(from, from + 999);
     if (error) throw new Error(error.message);
     rows.push(...((data ?? []) as DonorRow[]));
     if (!data || data.length < 1000) break;
@@ -100,6 +108,15 @@ async function allCharityDonations<T>(charityId: string, fields: string, narrow:
     if (!data || data.length < 1000) break;
   }
   return rows;
+}
+
+/** Refunds and chargebacks since a moment (by when they were refunded or charged back), for "Needs you this week". */
+export function loadReversalsSince(charityId: string, since: string) {
+  return allCharityDonations<{ status: string; amount_cents: number | string; refunded_at: string | null; charged_back_at: string | null }>(
+    charityId,
+    "status, amount_cents, refunded_at, charged_back_at",
+    (q) => q.in("status", ["refunded", "charged_back"]).or(`refunded_at.gte.${since},charged_back_at.gte.${since}`),
+  );
 }
 
 /** Each donor's monthly payments, to mark who gives monthly on the donor list. */

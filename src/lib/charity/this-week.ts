@@ -2,6 +2,7 @@ import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
 import { progressPercent } from "./campaigns";
+import { RECENT_DAYS } from "./insights";
 
 /**
  * "Needs you this week" on the charity overview (CRM step 17, 10/11/2026): what needs a person, each line with one
@@ -28,8 +29,10 @@ export type ThisWeekFacts = {
   lapsed: { count: number; periodText: string };
   followUps: { id: string; donor_id: string; donor_name: string; what: string; due_on: string }[];
   endingSoon: { id: string; title: string; endsAt: string | null; raisedCents: number; targetCents: number | null }[];
-  refunded: { count: number; cents: number };
-  chargedBack: number;
+  /** Donations refunded in the last 30 days (by when they were refunded), from `recentReversals`. Null: couldn't read. */
+  refunded: { count: number; cents: number } | null;
+  /** Donations charged back in the last 30 days (by when they were charged back). Null: couldn't read. */
+  chargedBack: number | null;
 };
 
 /** The names used in "We couldn't check …" when a fact couldn't be read. */
@@ -38,6 +41,7 @@ export const WEEK_SOURCE_NAMES = {
   monthly: "monthly donations",
   stopped: "monthly donors who stopped",
   s18aMissing: "missing s18A details",
+  reversals: "refunds and chargebacks",
 } as const;
 
 const SHOWN_FOLLOW_UPS = 5;
@@ -98,10 +102,32 @@ export function thisWeek(f: ThisWeekFacts): ThisWeek {
     const goal = c.targetCents ? `, at ${progressPercent(c.raisedCents, c.targetCents)}% of its goal` : "";
     items.push({ key: `c-${c.id}`, text: `"${c.title}" ends on ${formatDate(c.endsAt as string)}${goal}`, href: `${b}/campaigns`, link: "Share it again" });
   }
-  if (f.refunded.count > 0) items.push({ key: "refund", text: `${plural(f.refunded.count, "donation")} refunded (${formatRand(f.refunded.cents)})`, href: `${b}/donations?status=refunded`, link: "See them" });
-  if (f.chargedBack > 0) items.push({ key: "cb", text: `${plural(f.chargedBack, "donation")} charged back`, href: `${b}/donations?status=charged_back`, link: "See them" });
+  if (f.refunded === null || f.chargedBack === null) unavailable.push(WEEK_SOURCE_NAMES.reversals);
+  if (f.refunded && f.refunded.count > 0) items.push({ key: "refund", text: `${plural(f.refunded.count, "donation")} refunded in the last ${RECENT_DAYS} days (${formatRand(f.refunded.cents)})`, href: `${b}/donations?status=refunded`, link: "See them" });
+  if (f.chargedBack) items.push({ key: "cb", text: `${plural(f.chargedBack, "donation")} charged back in the last ${RECENT_DAYS} days`, href: `${b}/donations?status=charged_back`, link: "See them" });
 
   return { items, unavailable };
+}
+
+/** Where the last 30 days start: the same rolling window as the card's other "last 30 days" lines. */
+export function reversalsSince(now: Date): string {
+  return new Date(now.getTime() - RECENT_DAYS * 86_400_000).toISOString();
+}
+
+export type ReversalRow = { status: string; amount_cents: number | string; refunded_at: string | null; charged_back_at: string | null };
+
+/**
+ * Refunds and chargebacks for the card, counted only when they happened in the last 30 days (Yehuda's decision),
+ * not all time: an old refund needs nobody this week. Whole cents only.
+ */
+export function recentReversals(rows: ReversalRow[], now: Date): { refunded: { count: number; cents: number }; chargedBack: number } {
+  const since = Date.parse(reversalsSince(now));
+  const within = (iso: string | null) => Boolean(iso) && Date.parse(iso as string) >= since && Date.parse(iso as string) <= now.getTime();
+  const refunds = rows.filter((r) => r.status === "refunded" && within(r.refunded_at));
+  return {
+    refunded: { count: refunds.length, cents: refunds.reduce((t, r) => t + Number(r.amount_cents), 0) },
+    chargedBack: rows.filter((r) => r.status === "charged_back" && within(r.charged_back_at)).length,
+  };
 }
 
 /** "new donors to thank and monthly donations": the names joined for one sentence. */
@@ -118,7 +144,7 @@ export const TO_THANK_DAYS = 7;
  * address we can email (not erased, not a gift the charity only recorded), not thanked personally since that gift and
  * not someone who asked not to get thank-you emails. Pure, so the store only reads the facts.
  */
-export function donorsToThank<T extends { donor_id: string; first_paid_at: string; email: string }>(
+export function donorsToThank<T extends { donor_id: string; first_paid_at: string; email: string | null }>(
   donors: T[],
   now: Date,
   facts: { canEmail: (email: string) => boolean; lastThankedAt: ReadonlyMap<string, string>; optedOut: ReadonlySet<string> },
@@ -127,7 +153,8 @@ export function donorsToThank<T extends { donor_id: string; first_paid_at: strin
   return donors.filter((d) => {
     const first = new Date(d.first_paid_at).getTime();
     if (!(first >= since && first <= now.getTime())) return false;
-    if (!facts.canEmail(d.email)) return false;
+    // No address: erased, or the viewer's role can't see contact details.
+    if (!d.email || !facts.canEmail(d.email)) return false;
     if (facts.optedOut.has(d.email.trim().toLowerCase())) return false;
     const thanked = facts.lastThankedAt.get(d.donor_id);
     return !(thanked && new Date(thanked).getTime() >= first);
