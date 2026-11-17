@@ -74,10 +74,10 @@ export function CharityNav({ id, base: baseOverride, hidden = [] }: { id: string
         })}
       </ul>
       {/* Laptop: grouped, down the side. */}
-      <div className="hidden space-y-6 lg:block">
+      <div className="hidden space-y-4 lg:block">
         {groups.map((g) => (
-          <div key={g.title} className="space-y-1.5">
-            <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted">{g.title}</p>
+          <div key={g.title} className="space-y-1">
+            <p className="px-3 text-xs font-semibold text-muted">{g.title}</p>
             <ul className="space-y-0.5">
               {g.tabs.filter((t) => !hidden.includes(t.href)).map((t) => {
                 const active = isActive(t);
@@ -86,7 +86,7 @@ export function CharityNav({ id, base: baseOverride, hidden = [] }: { id: string
                     <Link
                       href={`${base}${t.href}`}
                       aria-current={active ? "page" : undefined}
-                      className={`block rounded-control px-3 py-2 text-[15px] font-semibold transition ${active ? "bg-brand text-white" : "text-navy hover:bg-honey-soft"}`}
+                      className={`block rounded-control px-3 py-1.5 text-[15px] font-semibold transition ${active ? "bg-brand text-white" : "text-navy hover:bg-honey-soft"}`}
                     >
                       {t.label}
                     </Link>

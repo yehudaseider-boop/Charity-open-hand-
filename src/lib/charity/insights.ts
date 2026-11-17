@@ -104,12 +104,12 @@ export function lastMonths(rows: MonthTotal[], todaySa: string, n = 12): MonthTo
   return out.reverse();
 }
 
-export type MonthlyTrendPoint = { month: string; running: number; runningCents: number; started: number; stopped: number };
+export type MonthlyTrendPoint = { month: string; running: number; runningCents: number; started: number; stopped: number; paused: number };
 
 /**
  * How monthly giving moved over the last `n` Johannesburg months, oldest first: the monthly donors still
  * giving at the end of each month (today, for this month), their combined monthly amount, how many began
- * that month and how many stopped or were cancelled. Built from each monthly donation's own dates, so a
+ * that month, how many stopped or were cancelled and how many paused. Built from each monthly donation's own dates, so a
  * donor who is paused now counts as paused from the day they paused (when they resumed isn't recorded).
  */
 export function monthlyTrend(
@@ -129,7 +129,7 @@ export function monthlyTrend(
     const from = startOf(key);
     const to = startOf(nextKey(key));
     const cutoff = Math.min(to, now.getTime());
-    let running = 0, runningCents = 0, started = 0, stopped = 0;
+    let running = 0, runningCents = 0, started = 0, stopped = 0, pausedIn = 0;
     for (const r of rows) {
       const began = at(r.started_at);
       // Without a recorded date, a paused or stopped donor still isn't giving today, so the latest month agrees with the summary.
@@ -138,10 +138,11 @@ export function monthlyTrend(
       const paused = r.status === "paused" ? (at(r.paused_at) ?? unknown) : null;
       if (began !== null && began >= from && began < to) started += 1;
       if (ended !== null && ended >= from && ended < to && ended !== unknown) stopped += 1;
+      if (paused !== null && paused >= from && paused < to && paused !== unknown) pausedIn += 1;
       const live = began !== null && began < cutoff && (ended === null || ended >= cutoff) && (paused === null || paused >= cutoff);
       if (live) { running += 1; runningCents += Number(r.amount_cents); }
     }
-    return { month: `${key}-01`, running, runningCents, started, stopped };
+    return { month: `${key}-01`, running, runningCents, started, stopped, paused: pausedIn };
   });
 }
 

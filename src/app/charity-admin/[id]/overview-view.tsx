@@ -131,7 +131,7 @@ export function OverviewView(p: OverviewProps) {
           value={formatRand(regular.runningCentsPerMonth)}
           note={`from ${plural(regular.runningCount, "monthly donor")}`}
           change={changeSince(trend[trend.length - 1].runningCents, trend[trend.length - 2]?.runningCents ?? 0)}
-          changeNote="on the end of last month"
+          changeNote="on last month"
           trend={trend.slice(-6).map((p) => p.runningCents)}
         />
         <Kpi href={`${base}/donors`} label="Donors" value={String(all.donor_count)} note={`${formatRand(all.paid_cents)} given in all`} />
@@ -256,8 +256,9 @@ export function OverviewView(p: OverviewProps) {
               </ul>
               <ul className="mt-4 space-y-1.5 text-sm">
                 <li>
-                  <span className="font-semibold">{repeatPercent(insights.repeatDonors, insights.allDonors)}%</span> of your donors have given more than once
-                  <span className="text-muted"> ({insights.repeatDonors} of {insights.allDonors})</span>.
+                  <span className="font-semibold">{repeatPercent(insights.repeatDonors, insights.allDonors)}%</span> of all your donors have given more than once, at any time
+                  {/* Not the same as "Coming back" above, which leaves out new donors and those with nothing in the last year (17/11/2026). */}
+                  <span className="text-muted"> ({insights.repeatDonors} of {insights.allDonors}, new and lapsed donors included)</span>.
                 </li>
                 {perDonor ? (
                   <li>
