@@ -2024,3 +2024,9 @@ An independent check of the dashboard (and its demo) at 390, 810, 1080 and 1440 
 - The preview became `/`. It uses the site's own header (`HeaderNav tone="dark"`), so Account, Charity dashboard and Givezy admin show on it exactly as on every other page. `/home-preview` now redirects to `/`; preview 2 is deleted.
 - Still unchanged: `COMING_SOON_HOSTS=givezy.co.za` keeps the public address on the coming-soon page, and `SITE_URL` forwards other addresses. Putting the site on givezy.co.za is a go-live step (see the short path at the top of `docs/go-live-checklist.md`), not done here.
 - The new home states no store date; the launch month comes from `appLinks.launchMonth`.
+
+## 17/11/2026: two sign-up links on the coming-soon page (Yehuda)
+
+- The public address (givezy.co.za) keeps its coming-soon page, now with "Apply to list your charity" (charities) and "Notify me at launch" (givers, the app). Privacy and Terms are linked in its footer.
+- The charity sign-up path stays open on a coming-soon address: /apply, /login, /auth, /charity-admin, /mfa, /agree, /documents, /privacy, /terms, /launch-list/stop, plus GET /api/viewer. Everything else (giving, the charity list, the app's and payment provider's calls) stays closed (`src/lib/coming-soon.ts`, tests in `tests/coming-soon.test.ts`).
+- The giver list opens with `LAUNCH_LIST=yes` on the server (no code change). Until then the page says "The Givezy app is coming soon."

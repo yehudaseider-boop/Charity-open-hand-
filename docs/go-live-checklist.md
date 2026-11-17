@@ -342,3 +342,11 @@ HTML version of the confirmation email, yahrzeit giving, real charity photos fro
 - [ ] **Email sending (needs Yehuda's approval, may cost money):** create the Resend account under Givezy, add the givezy.co.za sending records (SPF and DKIM) in GoDaddy DNS so emails don't land in spam, then set `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY` and `EMAIL_FROM` (for example hello@givezy.co.za, a real inbox someone reads) on the server. Keep `EMAIL_ALLOWLIST` set on the test site. Send one of each email to a test address before launch: the Resend code has never run against Resend itself. Check Resend's current price before signing up.
 - [ ] **One-click stop in Gmail (added 02/11/2026):** charities' news, appeals and thank-yous now carry `List-Unsubscribe` and `List-Unsubscribe-Post` (Gmail and Yahoo require them for bulk mail). Once Resend is live, send one appeal and one thank-you to a Gmail address, check Gmail shows its own Unsubscribe next to the sender, press it, and check that donor is left out of the next send. Also check in Resend that the headers arrive as sent (the code uses Resend's `headers` field, not yet run against Resend).
 - [ ] **Phone app packages:** `npm audit` in `apps/mobile` lists three vulnerable packages pulled in by Expo 57 (braces, decode-uri-component, node-forge). Upgrade Expo when the patched SDK is out, then re-run the audit; `npm audit fix --force` would break the app today.
+
+## Before the two sign-up links go live on givezy.co.za (17/11/2026)
+
+- [ ] Email sending (Resend) works: a charity signs in with an emailed code, so without it nobody can apply. Set EMAIL_TRANSPORT, remove the test-only EMAIL_ALLOWLIST.
+- [ ] Migration 20261110000012_launch_list.sql is on the live database, then set `LAUNCH_LIST=yes`. Until then the giver form is hidden.
+- [ ] Yosef approves the launch list consent wording (draft in `src/lib/launch-list.ts`) and the Privacy and Terms pages.
+- [ ] Supabase redirect URLs include https://givezy.co.za, and SITE_URL stays on a working address while COMING_SOON_HOSTS is set.
+- [ ] Someone reads each charity application before anything is listed (already the rule: every charity is looked at by a person).
