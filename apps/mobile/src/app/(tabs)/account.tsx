@@ -154,7 +154,7 @@ export default function Account() {
               title="Your information"
               cells={[
                 { label: "Download my information", onPress: open("/account/data") },
-                { label: "Delete my account", onPress: open("/account/data") },
+                { label: "Delete my account", onPress: open("/account/data/delete") },
               ]}
             />
             <SettingsGroup

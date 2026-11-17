@@ -149,6 +149,7 @@ export function Agree() {
         onPress={() => step(setBusy, setError, () => account.agree())}
       />
       <TextLink label="Sign out" onPress={() => account.signOut()} />
+      <TextLink label="Delete my account" onPress={() => open("/account/data/delete")} />
     </View>
   );
 }

@@ -312,3 +312,5 @@ const styles = StyleSheet.create({
   fade: { position: "absolute", left: 0, right: 0, top: -28, height: 28 },
 });
 
+
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

@@ -1403,3 +1403,5 @@ const styles = StyleSheet.create({
   stateTitle: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: colors.navy },
   key: { color: colors.blue },
 });
+
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

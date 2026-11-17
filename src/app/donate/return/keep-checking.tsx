@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { APP_RETURN_LINK } from "@/lib/donations/reference";
 
 /**
  * While a payment is still being confirmed, check again every few seconds (up to about a minute).
  * After that, say plainly that closing the payment page without paying charged nothing, and offer to try again.
  */
-export function KeepChecking({ retryHref }: { retryHref: string }) {
+export function KeepChecking({ retryHref, fromApp = false }: { retryHref: string; fromApp?: boolean }) {
   const router = useRouter();
   const [tries, setTries] = useState(0);
   useEffect(() => {
@@ -28,9 +29,15 @@ export function KeepChecking({ retryHref }: { retryHref: string }) {
         Your payment hasn&apos;t come through yet. If you paid, it can take a few minutes: refresh this page later, and your confirmation email will follow.
         If you closed the payment page without paying, nothing was charged.
       </p>
-      <Link href={retryHref} className="inline-block rounded-control border-2 border-border px-5 py-2.5 font-bold text-brand hover:border-brand">
-        I didn&apos;t pay: try again
-      </Link>
+      {fromApp ? (
+        <a href={APP_RETURN_LINK} className="pressable block rounded-control bg-brand px-4 py-3.5 text-center font-bold text-brand-contrast">
+          Back to the Givezy app
+        </a>
+      ) : (
+        <Link href={retryHref} className="inline-block rounded-control border-2 border-border px-5 py-2.5 font-bold text-brand hover:border-brand">
+          I didn&apos;t pay: try again
+        </Link>
+      )}
     </div>
   );
 }

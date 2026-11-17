@@ -368,3 +368,5 @@ const styles = StyleSheet.create({
   tileValue: { ...tabular, fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 30, color: colors.navy },
   split: { flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: colors.surface, marginVertical: 2 },
 });
+
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";
