@@ -107,7 +107,8 @@ function NewGift() {
       <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[13px] font-bold text-brand">AS</span>
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-bold leading-tight">New gift: R250</span>
-        <span className="text-[12px] text-muted">Aisha S. · from the app · just now</span>
+        <span className="block text-[12px] leading-snug text-muted">Aisha S.</span>
+        <span className="block text-[12px] leading-snug text-muted">From the app, just now</span>
       </span>
       <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-bold text-success">Paid</span>
     </div>
@@ -160,7 +161,7 @@ const comparison: [string, string, string][] = [
 
 const footerGroups: [string, [string, string][]][] = [
   ["For donors", [["/charities", "Find a charity"], ["/for-donors", "How giving works"], ["/login", "Sign in"]]],
-  ["For charities", [["/for-charities", "What charities get"], ["/apply", "Apply to list your charity"], ["/demo/dashboard", "Try the dashboard"]]],
+  ["For charities", [["/for-charities", "What charities get"], ["/apply", "Apply to list your charity"], ["/demo/dashboard", "Try the demo dashboard"]]],
   [appName, [["/faq", "Questions"], ["/privacy", "Privacy"], ["/terms", "Terms"]]],
 ];
 
@@ -212,9 +213,9 @@ export default function HomePreview() {
           {/* One gift, in order: given on the phone, seen by the charity, thanked in the inbox, kept for tax time. */}
           <figure className="relative mx-auto w-full max-w-[36rem]">
             <figcaption className="sr-only">One gift with {appName}: a donor gives R250 on their phone; it shows on the charity&apos;s dashboard straight away; the donor gets a thank-you email; and the gift is on their s18A receipt at tax time. Made-up example.</figcaption>
-            <div aria-hidden className="relative grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_15.5rem]">
+            <div aria-hidden className="relative grid items-start gap-6 sm:grid-cols-[15.5rem_minmax(0,1fr)]">
               <span className="absolute -right-10 top-4 h-72 w-72 rounded-full border-[40px] border-honey/25" />
-              <div className="hero-rise relative order-first mx-auto w-[15rem] sm:order-last sm:w-full" style={{ animationDelay: "120ms" }}>
+              <div className="hero-rise relative mx-auto w-[15rem] sm:w-full" style={{ animationDelay: "120ms" }}>
                 <div className="bob-slow"><Where n={1}>On the donor&apos;s phone</Where><GivePhone /></div>
               </div>
               <div className="relative flex flex-col gap-5">
@@ -248,8 +249,8 @@ export default function HomePreview() {
               ["bg-honey-soft", "I give", "Find a checked charity, give in a few taps, and keep every s18A receipt in one place.", "#donors", "How giving works", "/charities", "Find a charity", "loveIt", "hearts"],
               ["bg-peach", "I run a charity", "Get found, get given to and keep your donors, with s18A receipts done for you.", "#charities", "See the dashboard", "/apply", "Apply to list your charity", "workingTogether", "stars"],
             ] as const).map(([bg, title, body, more, moreLabel, href, cta, art, sparkle]) => (
-              <li key={title} className={`lift relative flex min-h-[22rem] flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:p-10 ${bg}`}>
-                <Illustration name={art} sparkle={sparkle} className="absolute right-5 top-6 w-24 sm:right-8 sm:top-8 sm:w-40" />
+              <li key={title} className={`lift relative flex flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:p-10 lg:min-h-[22rem] ${bg}`}>
+                <Illustration name={art} sparkle={sparkle} className={`absolute right-5 top-6 sm:right-8 sm:top-8 ${art === "loveIt" ? "w-20 sm:w-32" : "w-28 sm:w-44"}`} />
                 <div className="relative flex flex-col gap-3 pr-24 sm:pr-48">
                   <h3 className="font-display text-[clamp(2rem,3.4vw,2.75rem)] font-bold! leading-none tracking-[-0.03em]!">{title}</h3>
                   <p className="text-[17px] leading-relaxed text-navy/80">{body}</p>
@@ -277,7 +278,7 @@ export default function HomePreview() {
             </ol>
             <div className="flex flex-wrap items-center gap-4">
               <Link href="/charities" className={inkBtn}>Find a charity</Link>
-              <Link href="/for-donors" className={lineBtn}>How giving works</Link>
+              <Link href="/for-donors" className={lineBtn}>More about giving</Link>
             </div>
           </div>
           <div className="relative min-w-0">
@@ -296,7 +297,7 @@ export default function HomePreview() {
             <H size="h2" dark>Your charity&apos;s giving, <Em dark>all in one place.</Em></H>
             <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-white/85">Click around the real dashboard. The charity and its donors are made up.</p>
           </Reveal>
-          <Reveal className="mx-auto mt-12 max-w-[72rem] text-navy">
+          <Reveal className="mx-auto mt-12 max-w-[80rem] text-navy">
             <LiveWindow
               label="The charity dashboard, with sample data"
               menuFrom="lg"
@@ -304,13 +305,13 @@ export default function HomePreview() {
                 { label: "Overview", screen: <Screen name="overview" alt="The overview: what needs you this week, this month's total and the tax year so far. Sample data." /> },
                 { label: "Donations", screen: <Screen name="donations" alt="The donations list: every gift with who gave, what for, where it came from and the date. Sample data." /> },
                 { label: "Monthly donations", screen: <Screen name="monthly" alt="Monthly donations: what comes in each month, and each monthly donor. Sample data." /> },
-                { label: "Thank-yous", screen: <Screen name="thank" alt="Thank donors: your own note, and a preview of the email the donor gets. Sample data." /> },
+                { label: "Thank donors", screen: <Screen name="thank" alt="Thank donors: your own note, and a preview of the email the donor gets. Sample data." /> },
                 { label: "s18A receipts", screen: <Screen name="receipts" alt="s18A receipts: the yearly list, ready to check and approve. Sample data." /> },
                 { label: "Campaigns", screen: <Screen name="campaigns" alt="Campaigns: each one with its goal and how close it is. Sample data." /> },
               ]}
             />
           </Reveal>
-          <ul className="mx-auto mt-14 grid max-w-[72rem] gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="mx-auto mt-14 grid max-w-[80rem] gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
             {([
               ["receipt", "s18A receipts, done for you", "Preview and approve each one. The SARS IT3(d) file is ready when you are."],
               ["heart", "Thank-yous in your words", "Change the thank-you that goes with every gift, and send a personal one with a click."],
@@ -325,7 +326,7 @@ export default function HomePreview() {
             ))}
           </ul>
           <div className="mt-12 flex flex-wrap justify-center gap-3">
-            <Link href="/demo/dashboard" className={whiteBtn}>Try the full demo</Link>
+            <Link href="/demo/dashboard" className={whiteBtn}>Try the demo dashboard</Link>
             <Link href="/apply" className={lineBtnDark}>Apply to list your charity</Link>
           </div>
         </div>
@@ -342,7 +343,7 @@ export default function HomePreview() {
             {([
               ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
               ["0", `card details seen or stored by ${appName}. You type your card on the payment provider's own page.`],
-              ["Every", "charity is looked at by a person: registration documents and bank details are checked before it can take a gift."],
+              ["100%", "of charities are looked at by a person: registration documents and bank details are checked before they can take a gift."],
             ] as [string, string][]).map(([big, text]) => (
               <li key={big} className="flex flex-col gap-4 border-t-2 border-navy/15 pt-6">
                 <span className="font-display text-[clamp(4.5rem,9vw,7.5rem)] font-bold leading-[0.9] tracking-[-0.045em] text-brand">{big}</span>
@@ -390,13 +391,14 @@ export default function HomePreview() {
         title={<>Good to <em className="font-extrabold not-italic text-brand">know</em>.</>}
         faqs={withoutCostQuestions([...donorFaqs.slice(0, 2), ...donorFaqs.filter((f) => /s18A|monthly|every month/i.test(f.q)), ...charityFaqs])}
         more={<Link href="/faq" className={arrowLink}>All questions<ArrowRight /></Link>}
+        width="max-w-[80rem]"
       />
 
       {/* 8. The close. */}
       <section className="hero-glow relative overflow-hidden bg-brand text-white">
         <Reveal className="mx-auto flex max-w-[80rem] flex-col items-center gap-8 px-4 py-24 text-center sm:px-6 md:py-36">
-          <Splash className="w-20 md:w-24" />
-          <H size="h1" dark className="max-w-[56rem]">Giving, <Em dark>made easy.</Em></H>
+          <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-32 md:w-32"><Splash className="w-16 md:w-20" /></span>
+          <H size="h1" dark className="max-w-[56rem]">Ready when <Em dark>you are.</Em></H>
           <p className="max-w-[32rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Give to a checked charity in a few taps, or list yours and let the receipts take care of themselves.</p>
           <div className="flex flex-wrap justify-center gap-3">
             <Link href="/charities" className={orangeBtn}>Find a charity</Link>
@@ -422,7 +424,7 @@ export default function HomePreview() {
             </nav>
           ))}
         </div>
-        <p className="mx-auto max-w-[80rem] border-t border-white/15 px-4 py-6 text-[14px] text-white/70 sm:px-6">© {new Date().getFullYear()} {appName}</p>
+        <div className="mx-auto max-w-[80rem] px-4 sm:px-6"><p className="border-t border-white/15 py-6 text-[14px] text-white/70">© {new Date().getFullYear()} {appName}</p></div>
       </footer>
     </div>
   );

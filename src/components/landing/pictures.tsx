@@ -52,7 +52,7 @@ export function PhonePicture() {
         <div className="mt-4 rounded-[1.25rem] bg-brand p-4 text-white">
           <p className="text-[13px] opacity-80">This tax year</p>
           <p className="font-display text-[2rem] font-extrabold leading-tight">R1 290</p>
-          <p className="text-[13px] opacity-80">2 s18A receipts ready</p>
+          <p className="text-[13px] opacity-80">Towards 2 s18A receipts</p>
         </div>
         <ul className="mt-3 flex flex-col">
           {gifts.map((g) => (

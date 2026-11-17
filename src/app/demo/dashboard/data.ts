@@ -8,8 +8,10 @@ import { saDate, type MonthlyRow } from "@/lib/charity/dashboard";
  * Generated from a fixed seed, with months counted back from today, so the demo always looks current.
  */
 
-const FIRST = ["Naledi", "Thabo", "Sarah", "Priya", "David", "Aisha", "Johan", "Lerato", "Michael", "Zanele", "Ruth", "Sipho", "Leah", "Pieter", "Fatima", "Daniel", "Nomsa", "Ari"];
-export const DEMO_INITIALS = ["M.", "N.", "D.", "K.", "B.", "S.", "V."];
+const FIRST = ["Naledi", "Thabo", "Sarah", "Priya", "David", "Aisha", "Johan", "Lerato", "Michael", "Zanele", "Sipho", "Pieter", "Fatima", "Nomsa", "Kagiso", "Anele", "Ruan", "Megan", "Bongani", "Lindiwe", "Tshepo", "Chloe", "Mandla", "Karabo", "Riaan", "Nadia", "Themba", "Busisiwe", "Liam", "Refilwe", "Yusuf", "Mpho", "Carmen", "Sizwe", "Annelie", "Kyle", "Palesa", "Vusi", "Jessica", "Tumelo", "Grace", "Dineo"];
+// 42 first names and 3 initials: 126 donors, each name only three times, so a list reads like real people
+// (17/11/2026: with 18 names, a page showed six Leratos).
+export const DEMO_INITIALS = ["M.", "N.", "K."];
 const LAST = DEMO_INITIALS;
 export const DEMO_DONOR_COUNT = FIRST.length * LAST.length; // 126
 
@@ -55,15 +57,22 @@ const DAY = 86_400_000;
 
 /** One monthly donation: whose, how much, from which month (0 = eleven months ago) and what has happened since. */
 const MONTHLY: { donor: number; rand: number; start: number; pausedFrom?: number; endedFrom?: number; retrying?: boolean }[] = [
-  ...[0, 1, 2, 3, 4, 5].map((donor) => ({ donor, rand: 350, start: 0 })),
+  // Different amounts and start months, so the top supporters and the s18A list don't show identical rows
+  // (17/11/2026). The running ones still come to R4 200 a month from 14 donors.
+  { donor: 0, rand: 500, start: 0 },
+  { donor: 1, rand: 350, start: 2 },
+  { donor: 2, rand: 300, start: 0 },
+  { donor: 3, rand: 450, start: 4 },
+  { donor: 4, rand: 250, start: 1 },
+  { donor: 5, rand: 400, start: 3 },
   { donor: 6, rand: 350, start: 0, retrying: true },
-  { donor: 7, rand: 350, start: 0, retrying: true },
+  { donor: 7, rand: 300, start: 2, retrying: true },
   { donor: 8, rand: 200, start: 1 },
-  { donor: 9, rand: 200, start: 3 },
+  { donor: 9, rand: 150, start: 3 },
   { donor: 10, rand: 250, start: 5 },
-  { donor: 11, rand: 250, start: 7 },
-  { donor: 12, rand: 250, start: 9 },
-  { donor: 13, rand: 250, start: 10 },
+  { donor: 11, rand: 300, start: 7 },
+  { donor: 12, rand: 200, start: 9 },
+  { donor: 13, rand: 200, start: 10 },
   { donor: 120, rand: 200, start: 2, pausedFrom: 8 },
   { donor: 121, rand: 150, start: 1, endedFrom: 6 },
 ];
