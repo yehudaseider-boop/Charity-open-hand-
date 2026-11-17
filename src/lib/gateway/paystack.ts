@@ -141,6 +141,13 @@ function splitOrNone(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountR
   return {};
 }
 
+/** The method word the provider reports, kept only if it is plain (lower case letters, digits, underscores, up to 40). */
+export function cleanChannel(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const word = raw.trim().toLowerCase();
+  return /^[a-z0-9_]{1,40}$/.test(word) ? word : null;
+}
+
 /** Paystack's card authorisation, as we keep it. Not reusable (or no code): treated as none. */
 function toAuthorization(a: { authorization_code?: string; reusable?: boolean; last4?: string; card_type?: string; brand?: string; exp_month?: string; exp_year?: string } | null | undefined): CardAuthorization | null {
   if (!a?.authorization_code) return null;
@@ -248,6 +255,7 @@ export const paystackGateway: PaymentGateway = {
       currency: string;
       reference: string;
       paid_at?: string | null;
+      channel?: string | null;
       authorization?: { authorization_code?: string; reusable?: boolean; last4?: string; card_type?: string; brand?: string; exp_month?: string; exp_year?: string } | null;
     }>(
       `/transaction/verify/${encodeURIComponent(reference)}`,
@@ -263,6 +271,7 @@ export const paystackGateway: PaymentGateway = {
       gatewayTransactionId: String(data.id),
       paidAt: data.paid_at ?? null,
       authorization: toAuthorization(data.authorization),
+      channel: cleanChannel(data.channel),
       abandoned: data.status === "abandoned",
     };
   },

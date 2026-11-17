@@ -81,6 +81,8 @@ export const testGateway: PaymentGateway = {
       currency: "ZAR",
       gatewayTransactionId: `test_${reference}`,
       authorization: p?.authorization ?? null,
+      // The test gateway only ever "takes" cards.
+      channel: p?.outcome === "success" ? "card" : null,
     };
   },
 

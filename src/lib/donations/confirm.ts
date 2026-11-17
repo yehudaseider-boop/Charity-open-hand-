@@ -123,7 +123,8 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
     await oweDonorConfirmation(donation.id);
     const { data: updated, error } = await db
       .from("donations")
-      .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt) })
+      // payment_channel: how the provider says it was paid (null if it doesn't say), for the s18A receipt's nature of donation.
+      .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt), payment_channel: tx.channel ?? null })
       .eq("id", donation.id)
       .in("status", ["pending", "failed"])
       .select("id");

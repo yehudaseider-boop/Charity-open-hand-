@@ -185,6 +185,19 @@ describe("reading a payment's status", () => {
     expect(await verify("success")).toMatchObject({ status: "success", amountCents: 20_345, currency: "ZAR", gatewayTransactionId: "42" });
   });
 
+  it("keeps how the payment was made, as the provider says it, and only if it is a plain word", async () => {
+    const withChannel = async (channel: unknown) => {
+      answers["/transaction/verify"] = { id: 42, status: "success", amount: 20_345, currency: "ZAR", reference: base.reference, paid_at: "2026-10-13T08:00:00.000Z", channel };
+      return (await paystackGateway.verifyTransaction(base.reference)).channel;
+    };
+    expect(await withChannel("card")).toBe("card");
+    expect(await withChannel(" Apple_Pay ")).toBe("apple_pay");
+    expect(await withChannel(undefined)).toBeNull();
+    expect(await withChannel("<script>")).toBeNull();
+    expect(await withChannel("x".repeat(41))).toBeNull();
+    expect(await withChannel(7)).toBeNull();
+  });
+
   it("failed and reversed are failed", async () => {
     expect((await verify("failed")).status).toBe("failed");
     expect((await verify("reversed")).status).toBe("failed");

@@ -25,7 +25,7 @@ export interface ReceiptStore {
   /** The charity's decision on each planned certificate (09/11/2026); one charity's only, when given. */
   listDecisions(taxYear: number, charityId?: string): Promise<StoredDecision[]>;
   /** The donor details typed with a donation, plus when it was paid. */
-  donorDetailsFor(donationIds: string[]): Promise<{ id: string; paidAt: string; amountCents: number; recordedMethod: string | null; donor: DonorRow }[]>;
+  donorDetailsFor(donationIds: string[]): Promise<{ id: string; paidAt: string; amountCents: number; recordedMethod: string | null; paymentChannel?: string | null; donor: DonorRow }[]>;
   issue(receipt: PlannedReceipt, charity: CharityRow, details: ReceiptDetails): Promise<IssuedReceipt>;
   listIssuedWithoutPdf(taxYear: number, charityId?: string): Promise<IssuedReceipt[]>;
   savePdf(receipt: IssuedReceipt, pdf: Buffer): Promise<void>;
