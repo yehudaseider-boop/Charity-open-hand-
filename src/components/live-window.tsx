@@ -9,7 +9,8 @@ export type LiveTab = { label: string; screen: React.ReactNode };
  * left, or the tabs above on a phone, swap the sample screen inside. Every screen is sample content drawn on the
  * server; this only chooses which one shows. Keyboard: arrow keys move between tabs, as in any tab list.
  */
-export function LiveWindow({ tabs, label }: { tabs: LiveTab[]; label: string }) {
+/** `menuFrom`: from which width the menu sits on the left ("lg" keeps the tabs on top on tablets, for wide screens inside). */
+export function LiveWindow({ tabs, label, menuFrom = "sm" }: { tabs: LiveTab[]; label: string; menuFrom?: "sm" | "lg" }) {
   const [active, setActive] = useState(0);
   const id = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
@@ -70,11 +71,11 @@ export function LiveWindow({ tabs, label }: { tabs: LiveTab[]; label: string }) 
         <span className="ml-4 h-6 flex-1 rounded-full bg-honey-soft" />
       </div>
       {/* Phone: the tabs sit above the screen and scroll sideways. */}
-      <div role="tablist" aria-label={label} onKeyDown={onPhoneKey} className="no-scrollbar flex gap-2 overflow-x-auto border-b border-border px-4 py-3 sm:hidden">
+      <div role="tablist" aria-label={label} onKeyDown={onPhoneKey} className={`no-scrollbar flex gap-2 overflow-x-auto border-b border-border px-4 py-3 ${menuFrom === "lg" ? "lg:hidden" : "sm:hidden"}`}>
         {tabs.map((t, i) => tab(t, i, true))}
       </div>
       <div className="flex min-h-[21rem]">
-        <div className="hidden w-44 shrink-0 flex-col gap-1 border-r border-border p-4 text-sm sm:flex">
+        <div className={`hidden w-44 shrink-0 flex-col gap-1 border-r border-border p-4 text-sm ${menuFrom === "lg" ? "lg:flex" : "sm:flex"}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={97} height={32} className="mb-3 ml-3 h-6 w-auto" />
           <div role="tablist" aria-label={label} aria-orientation="vertical" onKeyDown={onKey} className="flex flex-col gap-1">
