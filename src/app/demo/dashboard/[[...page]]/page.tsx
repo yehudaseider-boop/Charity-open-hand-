@@ -27,7 +27,8 @@ export default async function DemoDashboard({ params, searchParams }: PageProps<
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   const path = page.join("/");
   let body: React.ReactNode;
-  if (page.length === 0) body = <OverviewView {...demoOverview(now, data)} />;
+  // The share links point at the demo itself: the demo charity has no real page to share (17/11/2026: they were empty).
+  if (page.length === 0) body = <OverviewView {...demoOverview(now, data)} publicLink={`${site}${DEMO_BASE}`} />;
   else if (first === "donations" && !second) body = <DemoDonations data={data} sp={sp} />;
   else if (first === "donations" && second && !["record", "import", "deposits"].includes(second)) body = <DemoDonation data={data} id={second} />;
   else if (first === "donors" && !second) body = <DemoDonors data={data} sp={sp} />;
