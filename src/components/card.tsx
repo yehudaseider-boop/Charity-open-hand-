@@ -26,7 +26,7 @@ export function Card({
     <section className={`rounded-card border-2 border-border bg-surface p-5 sm:p-6 ${lights ? glow : ""}`}>
       {title ? (
         <div className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-          <Heading className={headingLevel === 1 ? "font-display text-2xl font-bold text-indigo" : "font-display text-xl font-bold text-indigo"}>{title}</Heading>
+          <Heading className={headingLevel === 1 ? "font-display text-2xl font-bold text-balance text-indigo" : "font-display text-xl font-bold text-balance text-indigo"}>{title}</Heading>
           {/* A text link here keeps its look and gets a 44 px tap area. */}
           {aside ? <div className="shrink-0 [&>a]:hit">{aside}</div> : null}
         </div>

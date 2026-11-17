@@ -63,8 +63,8 @@ export const field = "min-h-11 rounded-control border-2 border-border bg-surface
 export const table = {
   wrap: "-mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6",
   table: "w-full border-collapse text-sm",
-  headRow: "whitespace-nowrap border-b-2 border-border text-left text-xs font-bold uppercase tracking-wide text-muted",
-  th: "pb-2 pr-3 font-bold",
+  headRow: "whitespace-nowrap border-b-2 border-border text-left text-xs font-semibold text-muted",
+  th: "pb-2 pr-3 font-semibold",
   row: "group border-b border-border transition last:border-0 hover:bg-honey-soft focus-within:bg-honey-soft",
   td: "py-2.5 pr-3 align-middle",
   num: "py-2.5 text-right font-semibold tabular-nums",

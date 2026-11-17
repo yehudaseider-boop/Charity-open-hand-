@@ -6,13 +6,19 @@ import { monthlyTrend } from "@/lib/charity/insights";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "Nov" for yyyy-mm-01. */
+const shortMonth = (month: string) => MONTHS[Number(month.slice(5, 7)) - 1];
+/** "Nov 2026" for yyyy-mm-01. */
+const monthLabel = (month: string) => `${shortMonth(month)} ${month.slice(0, 4)}`;
+
 /** Monthly giving over the last 12 months: how many donors give monthly, what they bring in, who joined and who left. */
 export function MonthlyTrend({ rows, now, seeAllHref }: { rows: MonthlyRow[]; now: Date; seeAllHref?: string }) {
   const points = monthlyTrend(rows, saDate(now), now, 12);
   const current = points[points.length - 1];
   const before = points[points.length - 2];
-  const max = Math.max(1, ...points.map((p) => p.running));
-  const anything = points.some((p) => p.running > 0 || p.started > 0 || p.stopped > 0);
+  const max = Math.max(1, ...points.map((p) => p.runningCents));
+  const anything = points.some((p) => p.running > 0 || p.started > 0 || p.stopped > 0 || p.paused > 0);
 
   return (
     <Card title="Monthly giving over time">
@@ -26,28 +32,34 @@ export function MonthlyTrend({ rows, now, seeAllHref }: { rows: MonthlyRow[]; no
               <span className="text-muted"> {current.running > before.running ? `Up ${current.running - before.running}` : `Down ${before.running - current.running}`} on the end of last month.</span>
             ) : null}
           </p>
-          {/* Bars for the eye; the list underneath is what screen readers read. */}
-          <div className="mt-4 flex h-32 items-end gap-1.5" aria-hidden>
-            {points.map((p, i) => (
-              <div key={p.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+          {/* Bars for the eye, each as tall as its month's monthly amount against the biggest month (17/11/2026: the
+              labels used to share the bars' column, so every bar above about 85% was squashed to the same height).
+              The list underneath is what screen readers read. Both run oldest to newest, this month last. */}
+          <div aria-hidden className="mt-4">
+            <div className="flex h-32 items-end gap-1.5">
+              {points.map((p, i) => (
                 <div
-                  title={`${plural(p.running, "monthly donor")}, ${formatRand(p.runningCents)} a month`}
-                  className={`w-full rounded-t-lg ${p.running ? "bg-brand" : "bg-border"} ${i === points.length - 1 ? "ring-2 ring-coral ring-offset-1" : ""}`}
-                  style={{ height: p.running ? `${Math.max(4, Math.round((p.running / max) * 100))}%` : "2px" }}
+                  key={p.month}
+                  title={`${monthLabel(p.month)}: ${plural(p.running, "monthly donor")}, ${formatRand(p.runningCents)} a month`}
+                  className={`min-w-0 flex-1 rounded-t-lg ${p.runningCents ? "bg-brand" : "bg-border"} ${i === points.length - 1 ? "ring-2 ring-coral ring-offset-1" : ""}`}
+                  style={{ height: p.runningCents ? `${Math.max(4, Math.round((p.runningCents / max) * 100))}%` : "2px" }}
                 />
-                <span className={`text-[11px] ${i === points.length - 1 ? "font-semibold text-indigo" : "text-muted"}`}>{p.month.slice(5, 7)}</span>
-              </div>
-            ))}
+              ))}
+            </div>
+            <div className="mt-1 flex gap-1.5">
+              {points.map((p, i) => (
+                <span key={p.month} className={`min-w-0 flex-1 text-center text-[11px] ${i === points.length - 1 ? "font-semibold text-indigo" : "text-muted"}`}>{shortMonth(p.month)}</span>
+              ))}
+            </div>
           </div>
           <ul className="mt-4 space-y-1 text-sm">
-            {[...points].reverse().filter((p) => p.running > 0 || p.started > 0 || p.stopped > 0).map((p) => {
-              const [y, mm] = p.month.split("-");
-              const moves = [p.started ? `${p.started} new` : "", p.stopped ? `${p.stopped} stopped` : ""].filter(Boolean).join(", ");
+            {points.filter((p) => p.running > 0 || p.started > 0 || p.stopped > 0 || p.paused > 0).map((p, i, shown) => {
+              const moves = [p.started ? `${p.started} new` : "", p.stopped ? `${p.stopped} stopped` : "", p.paused ? `${p.paused} paused` : ""].filter(Boolean).join(", ");
               return (
-                <li key={p.month} className="flex justify-between gap-3">
-                  <span>{mm}/{y}</span>
-                  <span>
-                    {plural(p.running, "donor")}, {formatRand(p.runningCents)} <span className="text-muted">{moves ? `(${moves})` : ""}</span>
+                <li key={p.month} className={`flex justify-between gap-3 ${i === shown.length - 1 ? "font-semibold" : ""}`}>
+                  <span>{monthLabel(p.month)}{i === shown.length - 1 && p.month === current.month ? " so far" : ""}</span>
+                  <span className="text-right">
+                    {plural(p.running, "donor")}, {formatRand(p.runningCents)} <span className="font-normal text-muted">{moves ? `(${moves})` : ""}</span>
                   </span>
                 </li>
               );

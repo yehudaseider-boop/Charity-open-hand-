@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeSince, chartScale, giftSourceCounts, monthsFrom } from "@/lib/charity/overview";
+import { changeSince, chartScale, giftSourceCounts, monthsFrom, wholePercents } from "@/lib/charity/overview";
 
 describe("where gifts came from", () => {
   it("counts every gift once, most first, with whole-number percentages", () => {
@@ -25,6 +25,27 @@ describe("where gifts came from", () => {
   });
   it("is empty with no gifts, never dividing by zero", () => {
     expect(giftSourceCounts([])).toEqual([]);
+  });
+  it("adds its percentages up to exactly 100, where plain rounding gave 101", () => {
+    // 94, 66, 30, 15, 14, 6 and 6 of 231: plain rounding gives 41+29+13+6+6+3+3 = 101.
+    const rows = [[94, "website"], [66, "app"], [30, "share_link"], [15, "qr"], [14, "whatsapp"], [6, "recorded"], [6, "website_button"]]
+      .flatMap(([n, k]) => Array(n as number).fill({ came_from: k }));
+    const out = giftSourceCounts(rows);
+    expect(out.reduce((t, r) => t + r.percent, 0)).toBe(100);
+    expect(out.map((r) => r.percent)).toEqual([41, 28, 13, 6, 6, 3, 3]);
+  });
+});
+
+describe("whole percentages", () => {
+  it("gives the leftover points to the largest remainders, earliest first on a tie", () => {
+    expect(wholePercents([1, 1, 1])).toEqual([34, 33, 33]);
+    expect(wholePercents([2, 1])).toEqual([67, 33]);
+    expect(wholePercents([5, 3, 1, 1])).toEqual([50, 30, 10, 10]);
+    expect(wholePercents([1, 0])).toEqual([100, 0]);
+  });
+  it("is all zeros with nothing to share", () => {
+    expect(wholePercents([])).toEqual([]);
+    expect(wholePercents([0, 0])).toEqual([0, 0]);
   });
 });
 

@@ -89,7 +89,7 @@ export function DonationsChart({ months, current, donationsBase, taxYearFrom, ta
         <div>
           <p className="font-display text-3xl font-extrabold leading-none tracking-tight tabular-nums">{formatRand(total)}</p>
           <p className="mt-1 text-sm text-muted">
-            {n ? `${shortMonth(shown[0].month)} ${shown[0].month.slice(0, 4)} to ${shortMonth(shown[n - 1].month)} ${shown[n - 1].month.slice(0, 4)}` : ""} · {gifts(count)}
+            {n ? `${shortMonth(shown[0].month)} ${shown[0].month.slice(0, 4)} to ${shortMonth(shown[n - 1].month)} ${shown[n - 1].month.slice(0, 4)}` : ""} · {count} paid {count === 1 ? "donation" : "donations"}
             {period === "tax" ? ` · ${taxYearName} tax year` : ""}
           </p>
         </div>
