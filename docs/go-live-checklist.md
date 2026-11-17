@@ -7,6 +7,7 @@ The order to do these in, and what to bring to the first session, is in `docs/la
 The long lists below are the full record. This is the order that matters, in three stages. Each stage can start once the one before it is done.
 
 **Stage 1. Charities can apply and be approved (do first: charities need time to onboard before January).**
+*Decision 17/11/2026: the live Supabase project (about USD 10 a month extra) and the second Vercel project wait until launch, so items 5 and 6 below, and with them real charity applications, wait too. Until then do not send real charities to /apply: there is only the test database. Email, `ADMIN_NOTIFY_EMAIL` and Resend (item 2, test site) are done.*
 1. Givezy's company details (registered name and number) into `src/config/legal.ts`. Needed for Paystack, the Privacy Policy and Terms.
 2. Email on: a Resend account, the SPF, DKIM and DMARC records for givezy.co.za at GoDaddy, `EMAIL_TRANSPORT=resend` and `EMAIL_FROM`. Today emails only go to the log, so no application or approval email would reach a charity. Send one of each to yourself first.
 3. The fee wording for charities (decided 13/11/2026 as a monthly fee, wording not approved). Charities will ask the cost before they apply. Then approve the charity sign-up emails in `src/lib/charity/emails.ts` and the For charities page.
