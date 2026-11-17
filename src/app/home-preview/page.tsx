@@ -221,7 +221,7 @@ export default function HomePreview() {
                 <div className="hero-rise sm:mr-6" style={{ animationDelay: "380ms" }}>
                   <div className="bob"><Where n={2}>On the charity&apos;s dashboard</Where><NewGift /></div>
                 </div>
-                <div className="hero-rise max-sm:hidden sm:ml-6" style={{ animationDelay: "620ms" }}>
+                <div className="hero-rise sm:ml-6" style={{ animationDelay: "620ms" }}>
                   <div className="bob-slow"><Where n={3}>In the donor&apos;s inbox</Where>
                     <div className={`${card} overflow-hidden p-1.5`}><Image src="/home/email-v3.webp" width={1056} height={706} alt="" sizes="300px" priority className="block h-auto w-full rounded-[1rem]" /></div>
                   </div>
