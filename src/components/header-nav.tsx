@@ -74,7 +74,8 @@ async function refresh() {
   }
 }
 
-export function HeaderNav() {
+/** `tone="dark"`: for a header on a blue ground (the home page). The links and who sees what are the same. */
+export function HeaderNav({ tone = "light" }: { tone?: "light" | "dark" }) {
   const path = usePathname();
   // The server (and the cache) always draw the signed-out header; the browser fills in who is looking.
   const viewer = useSyncExternalStore(subscribe, current, () => null);
@@ -88,6 +89,7 @@ export function HeaderNav() {
     <nav aria-label="Main" className="flex items-center gap-1 whitespace-nowrap text-[15px] sm:gap-2">
       {/* Phones: one Menu button holds every part of the site, so no page is a dead end (30/10/2026). */}
       <MobileMenu
+        tone={tone}
         items={[
           { href: "/", label: "Home" },
           { href: "/charities", label: "Find a charity" },
@@ -97,17 +99,17 @@ export function HeaderNav() {
           ...(signedIn ? [{ href: "/account", label: "Account" }] : []),
         ]}
       />
-      <NavLink href="/charities" className="max-sm:hidden">Charities</NavLink>
-      <NavLink href="/for-donors" className="max-md:hidden">For donors</NavLink>
-      <NavLink href="/for-charities" className="max-sm:hidden">For charities</NavLink>
+      <NavLink tone={tone} href="/charities" className="max-sm:hidden">Charities</NavLink>
+      <NavLink tone={tone} href="/for-donors" className="max-md:hidden">For donors</NavLink>
+      <NavLink tone={tone} href="/for-charities" className="max-sm:hidden">For charities</NavLink>
       {/* A charity admin or Givezy staff can always get back to their area from any public page. */}
       {dashboards.map((d) => (
-        <NavLink key={d.href} href={d.href} className="max-sm:hidden">{d.label}</NavLink>
+        <NavLink key={d.href} tone={tone} href={d.href} className="max-sm:hidden">{d.label}</NavLink>
       ))}
       {signedIn ? (
-        <NavLink href="/account" className="max-sm:hidden">Account</NavLink>
+        <NavLink tone={tone} href="/account" className="max-sm:hidden">Account</NavLink>
       ) : (
-        <Link href="/login" className="ml-1 inline-flex min-h-11 items-center rounded-full bg-brand px-4 font-semibold text-brand-contrast transition-colors hover:bg-navy">
+        <Link href="/login" className={`ml-1 inline-flex min-h-11 items-center rounded-full px-4 font-semibold transition-colors ${tone === "dark" ? "bg-white text-brand hover:bg-honey-soft" : "bg-brand text-brand-contrast hover:bg-navy"}`}>
           Sign in
         </Link>
       )}
