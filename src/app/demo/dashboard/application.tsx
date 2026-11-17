@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/dash";
 import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/charity-summary";
 import { ContactForm } from "@/app/charity-admin/[id]/application/forms";
 import type { FormState } from "@/lib/form";
+import { DEMO_CHARITY } from "./sample";
 import { pause, useDemo } from "./store";
 
 /**
@@ -39,12 +40,12 @@ export function DemoApplication({ approvedOn, uploadedOn }: { approvedOn: string
   return (
     <div className="space-y-5">
       <PageHeader title="Application" intro={<Badge tone="success">Approved</Badge>} />
-      <Notice>Givezy checked these details and documents by hand, and approved Sample Charity on {approvedOn}. Every detail here is made up.</Notice>
+      <Notice>Givezy checked these details and documents by hand, and approved {DEMO_CHARITY.name_en} on {approvedOn}. Every detail here is made up.</Notice>
       <Card title="Organisation">
-        <OrganisationSummary c={{ name_en: "Sample Charity", legal_name_en: "Sample Charity NPC", npo_number: "000-000 NPO", pbo_number: "930000000", s18a_reference: "930000000", address_line1: "1 Sample Street", address_line2: null, suburb: "Sampleton", city: "Johannesburg", postal_code: "2000" }} />
+        <OrganisationSummary c={{ name_en: DEMO_CHARITY.name_en, legal_name_en: `${DEMO_CHARITY.name_en} NPC`, npo_number: "000-000 NPO", pbo_number: "930000000", s18a_reference: "930000000", address_line1: "1 Sample Street", address_line2: null, suburb: "Sampleton", city: "Johannesburg", postal_code: "2000" }} />
       </Card>
       <Card title="Contact and bank">
-        <PrivateSummary p={{ ...contact, bank_name: "Sample Bank", bank_account_holder: "Sample Charity NPC", bank_account_last4: "0000", bank_branch_code: "000000", bank_verified_at: `${uploadedOn}T12:00:00+02:00` }} />
+        <PrivateSummary p={{ ...contact, bank_name: "Sample Bank", bank_account_holder: `${DEMO_CHARITY.name_en} NPC`, bank_account_last4: "0000", bank_branch_code: "000000", bank_verified_at: `${uploadedOn}T12:00:00+02:00` }} />
       </Card>
       <Card title="Contact person">
         <p className="mb-3 text-sm text-muted">Who we email about your charity. If you change the email or phone number, we let the old address know too.</p>

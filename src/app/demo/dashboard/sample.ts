@@ -6,8 +6,11 @@ import { taxYearRange } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { demoData, donorFacts, type DemoData, type DemoGift } from "./data";
 
-/** The demo charity: made up, and only ever shown at `/demo/dashboard`. */
-export const DEMO_CHARITY = { name_en: "Sample Charity", slug: "sample-charity", status: "approved" } as const;
+/**
+ * The demo charity: made up, and only ever shown at `/demo/dashboard` and in pictures of it. The name was checked
+ * on 17/11/2026 not to be a South African charity's; its registration numbers and address stay obviously fake.
+ */
+export const DEMO_CHARITY = { name_en: "Kestrel Ridge Community Trust", slug: "sample-charity", status: "approved" } as const;
 export const DEMO_BASE = "/demo/dashboard";
 /** The demo treats donors as lapsed after a year, the dashboard's own default. */
 export const DEMO_LAPSED_DAYS = 365;

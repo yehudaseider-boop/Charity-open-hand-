@@ -574,7 +574,7 @@ export function DemoWebsiteButtonPage({ data, site }: { data: DemoData; site: st
         intro={<>Put a &quot;Give with Givezy&quot; button on your own website. Donors who press it land on your Givezy page and see only your charity, with no other charities to wander off to. Gifts made this way show as &quot;Website button&quot; on your Donations page.</>}
       />
       <Card title="Make your button">
-        <ButtonBuilder site={site} slug="sample-charity" charityName="Sample Charity" campaigns={data.campaigns.map((c) => ({ id: c.id, title: c.title }))} previewHref={base} />
+        <ButtonBuilder site={site} slug="sample-charity" charityName={DEMO_CHARITY.name_en} campaigns={data.campaigns.map((c) => ({ id: c.id, title: c.title }))} previewHref={base} />
       </Card>
       <Card title="2. Add it to your website">
         <p className="mb-4 text-sm text-muted">Find the one your website is built with. It takes about five minutes, and you can take the button off again the same way.</p>
@@ -589,14 +589,14 @@ export function DemoWebsiteButtonPage({ data, site }: { data: DemoData; site: st
             </details>
           ))}
         </div>
-        <p className="mt-4 text-sm text-muted">In the demo the code points to Sample Charity, which isn&apos;t a real page. Your own button opens your Givezy page.</p>
+        <p className="mt-4 text-sm text-muted">In the demo the code points to {DEMO_CHARITY.name_en}, which isn&apos;t a real page. Your own button opens your Givezy page.</p>
       </Card>
     </div>
   );
 }
 
 export function DemoPosterPage({ sp, site }: { sp: Params; site: string }) {
-  return <PosterView name="Sample Charity" slug="sample-charity" issues18a sp={sp} backHref={base} demoHref={`${site.replace(/\/+$/, "")}${base}`} />;
+  return <PosterView name={DEMO_CHARITY.name_en} slug="sample-charity" issues18a sp={sp} backHref={base} demoHref={`${site.replace(/\/+$/, "")}${base}`} />;
 }
 
 const FEE_NOTE = "The card fee comes off each gift before the deposit. In this demo it shows as \"to be confirmed\": Givezy never makes up a fee.";

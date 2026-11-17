@@ -13,9 +13,9 @@ export function GET() {
   const row = (date: string, amount: string, method: string, first: string, last: string, email: string, ref: string) =>
     [date, amount, method, "individual", first, last, "", "", email, "", "no", "", "", "", "", "", "", "", "", ref];
   const rows = [
-    row(day(2), "500.00", "EFT", "Sarah", "Example", "sarah.example@example.test", "DEMO-EFT-1"),
-    row(day(3), "250.00", "Cash", "Thabo", "Sample", "thabo.sample@example.test", "DEMO-CASH-1"),
-    row(day(5), "1250.00", "EFT", "Priya", "Demo", "priya.demo@example.test", "DEMO-EFT-2"),
+    row(day(2), "500.00", "EFT", "Sarah", "M.", "sarah.m@example.test", "DEMO-EFT-1"),
+    row(day(3), "250.00", "Cash", "Thabo", "N.", "thabo.n@example.test", "DEMO-CASH-1"),
+    row(day(5), "1250.00", "EFT", "Priya", "D.", "priya.d@example.test", "DEMO-EFT-2"),
   ];
   return new Response(toCsv(TEMPLATE_HEADINGS, rows), {
     headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="givezy-demo-gifts.csv"', "cache-control": "no-store" },
