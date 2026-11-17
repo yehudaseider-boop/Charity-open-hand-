@@ -201,12 +201,12 @@ export default function HomePreview() {
             {appLinks.launchMonth ? (
               <p className="inline-flex items-center gap-2.5 rounded-full bg-white/12 px-4 py-2 text-[14px] font-semibold text-white ring-1 ring-white/20">
                 <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-coral" />
-                Launching in South Africa, {appLinks.launchMonth}.
+                Coming {appLinks.launchMonth}
               </p>
             ) : null}
             <H as="h1" size="h1" dark>Giving, <Em dark>made easy.</Em></H>
             <p className="max-w-[30rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
-              One place to give to South African charities, and for charities to look after the people who give.
+              Find a charity you trust, give in a few taps, and never chase an s18A receipt again. For charities: every gift, every donor and every receipt in one place.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/charities" className={orangeBtn}>Find a charity</Link>
@@ -220,19 +220,19 @@ export default function HomePreview() {
             <div aria-hidden className="relative grid items-start gap-6 sm:grid-cols-[15.5rem_minmax(0,1fr)]">
               <span className="absolute -right-10 top-4 h-72 w-72 rounded-full border-[40px] border-honey/25" />
               <div className="hero-rise relative mx-auto w-[15rem] sm:w-full" style={{ animationDelay: "120ms" }}>
-                <div className="bob-slow"><Where n={1}>On the donor&apos;s phone</Where><GivePhone /></div>
+                <div className="bob-slow"><Where n={1}>You give</Where><GivePhone /></div>
               </div>
               <div className="relative flex flex-col gap-5">
                 <div className="hero-rise sm:mr-6" style={{ animationDelay: "380ms" }}>
-                  <div className="bob"><Where n={2}>On the charity&apos;s dashboard</Where><NewGift /></div>
+                  <div className="bob"><Where n={2}>They see it</Where><NewGift /></div>
                 </div>
                 <div className="hero-rise sm:ml-6" style={{ animationDelay: "620ms" }}>
-                  <div className="bob-slow"><Where n={3}>In the donor&apos;s inbox</Where>
+                  <div className="bob-slow"><Where n={3}>You&apos;re thanked</Where>
                     <div className={`${card} overflow-hidden p-1.5`}><Image src="/home/email-v5.webp" width={1056} height={868} alt="" unoptimized priority className="block h-auto w-full rounded-[1rem]" /></div>
                   </div>
                 </div>
                 <div className="hero-rise sm:mr-10" style={{ animationDelay: "860ms" }}>
-                  <div className="bob"><Where n={4}>At tax time</Where><Receipt /></div>
+                  <div className="bob"><Where n={4}>Tax time, sorted</Where><Receipt /></div>
                 </div>
               </div>
             </div>
@@ -246,12 +246,12 @@ export default function HomePreview() {
         <Reveal className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <div className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
             <Eyebrow center>Two sides, one place</Eyebrow>
-            <H size="h2">Giving should be easy, <Em>for everyone involved.</Em></H>
+            <H size="h2">Two sides of every gift, <Em>finally on the same page.</Em></H>
           </div>
           <ul className="mt-14 grid gap-5 lg:grid-cols-2">
             {([
-              ["bg-honey-soft", "I give", "Find a checked charity, give in a few taps, and keep every s18A receipt in one place.", "#donors", "How giving works", "/charities", "Find a charity", "loveIt", "hearts"],
-              ["bg-peach", "I run a charity", "Get found, get given to and keep your donors, with s18A receipts done for you.", "#charities", "See the dashboard", "/apply", "Apply to list your charity", "workingTogether", "stars"],
+              ["bg-honey-soft", "I give", "Every charity checked by a real person. Every gift and every s18A receipt in one account, ready when SARS asks.", "#donors", "How giving works", "/charities", "Find a charity", "loveIt", "hearts"],
+              ["bg-peach", "I run a charity", "Get found, get given to and keep your donors. The receipts, the reminders and the record-keeping are done for you.", "#charities", "See the dashboard", "/apply", "Apply to list your charity", "workingTogether", "stars"],
             ] as const).map(([bg, title, body, more, moreLabel, href, cta, art, sparkle]) => (
               <li key={title} className={`lift relative flex flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:p-10 lg:min-h-[22rem] ${bg}`}>
                 <Illustration name={art} sparkle={sparkle} className={`absolute right-5 top-6 sm:right-8 sm:top-8 ${art === "loveIt" ? "w-20 sm:w-32" : "w-28 sm:w-44"}`} />
@@ -276,9 +276,9 @@ export default function HomePreview() {
             <Eyebrow>For donors</Eyebrow>
             <H size="h2">Give in a few taps. <Em>Keep every receipt.</Em></H>
             <ol className="flex flex-col gap-6">
-              <Step n="1" title="Find a charity" body="Search by name, cause or area. Every charity is checked by a person before it can take a gift." />
+              <Step n="1" title="Find a charity you can trust" body="Search by name, cause or area. A person checks every charity before it can take a single rand." />
               <Step n="2" title="Give once or every month" body={`You pay on the payment provider's own secure page. ${appName} never sees your card.`} />
-              <Step n="3" title="Keep the record" body="Every gift lands in your account, with your s18A receipt once the tax year ends." />
+              <Step n="3" title="Let tax time take care of itself" body="Every gift lands in your account, and your s18A receipt follows once the tax year ends." />
             </ol>
             <div className="flex flex-wrap items-center gap-4">
               <Link href="/charities" className={inkBtn}>Find a charity</Link>
@@ -299,7 +299,7 @@ export default function HomePreview() {
           <Reveal className="mx-auto flex max-w-[52rem] flex-col items-center gap-6 text-center">
             <Eyebrow dark center>For charities</Eyebrow>
             <H size="h2" dark>Your charity&apos;s giving, <Em dark>all in one place.</Em></H>
-            <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-white/85">Click around the real dashboard. The charity and its donors are made up.</p>
+            <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-white/85">This is the real dashboard, with a made-up charity. Click around: it&apos;s what you&apos;ll use from launch day.</p>
           </Reveal>
           <Reveal className="mx-auto mt-12 max-w-[80rem] text-navy">
             <LiveWindow
@@ -318,9 +318,9 @@ export default function HomePreview() {
           <ul className="mx-auto mt-14 grid max-w-[80rem] gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
             {([
               ["receipt", "s18A receipts, done for you", "Preview and approve each one. The SARS IT3(d) file is ready when you are."],
-              ["heart", "Thank-yous in your words", "Change the thank-you that goes with every gift, and send a personal one with a click."],
+              ["heart", "Thank-yous in your words", "One note a month reaches everyone who gave, each by their first name."],
               ["repeat", "Monthly donations looked after", "A declined card is tried again automatically."],
-              ["user", "Your team, each with the right access", "Owner, admin, finance, fundraiser or viewer."],
+              ["user", "Your whole team, each with the right access", "Owner, admin, finance, fundraiser or viewer."],
             ] as [IconName, string, string][]).map(([icon, title, body]) => (
               <li key={title} className="flex flex-col gap-2 border-t border-white/25 pt-5">
                 <Icon name={icon} className="stroke-white" size={22} />
@@ -402,7 +402,7 @@ export default function HomePreview() {
       <section className="hero-glow relative overflow-hidden bg-brand text-white">
         <Reveal className="mx-auto flex max-w-[80rem] flex-col items-center gap-8 px-4 py-24 text-center sm:px-6 md:py-36">
           <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-32 md:w-32"><Splash className="w-16 md:w-20" /></span>
-          <H size="h1" dark className="max-w-[56rem]">Ready when <Em dark>you are.</Em></H>
+          <H size="h1" dark className="max-w-[56rem]">January is close. <Em dark>Be there from day one.</Em></H>
           <p className="max-w-[32rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Give to a checked charity in a few taps, or list yours and let the receipts take care of themselves.</p>
           <div className="flex flex-wrap justify-center gap-3">
             <Link href="/charities" className={orangeBtn}>Find a charity</Link>
