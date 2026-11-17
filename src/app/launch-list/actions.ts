@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import { appLinks } from "@/config/app-links";
+import { launchListOpen } from "@/config/app-links";
 import { clientIp } from "@/lib/client-ip";
 import type { FormState } from "@/lib/form";
 import { LAUNCH_LIST_CONSENT, LAUNCH_LIST_LIMIT, LAUNCH_LIST_MESSAGES, checkLaunchListEmail, isBot, isStopToken } from "@/lib/launch-list";
@@ -17,7 +17,7 @@ const notSetUp = (code: string | undefined) => code === "PGRST205" || code === "
  * the form never reveals who signed up. Nothing is emailed now.
  */
 export async function joinLaunchList(_prev: FormState, formData: FormData): Promise<FormState> {
-  if (!appLinks.launchListOpen) return { ok: false, message: LAUNCH_LIST_MESSAGES.closed };
+  if (!launchListOpen()) return { ok: false, message: LAUNCH_LIST_MESSAGES.closed };
   const typed = formData.get("email");
   if (isBot(formData.get("website"))) return { ok: true, message: LAUNCH_LIST_MESSAGES.done };
   const checked = checkLaunchListEmail(typed);

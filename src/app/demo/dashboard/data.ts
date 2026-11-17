@@ -2,13 +2,17 @@ import { saDate, type MonthlyRow } from "@/lib/charity/dashboard";
 
 /**
  * Made-up records for the public dashboard demo (`/demo/dashboard`): 126 donors, a year of gifts, 16 monthly
- * donations and two campaigns. No database and no real person: every surname is a placeholder word and every
- * address ends in example.test. The same records feed every demo page, so the figures agree from page to page.
+ * donations and two campaigns. No database and no real person: every donor is a first name and a surname initial
+ * ("Aisha M.", Yehuda 17/11/2026: so the demo reads like a real list, where placeholder surnames such as "Testcase"
+ * looked like test data), and every address ends in example.test, which can never receive mail. The same records feed every demo page, so the figures agree from page to page.
  * Generated from a fixed seed, with months counted back from today, so the demo always looks current.
  */
 
-const FIRST = ["Naledi", "Thabo", "Sarah", "Priya", "David", "Aisha", "Johan", "Lerato", "Michael", "Zanele", "Ruth", "Sipho", "Leah", "Pieter", "Fatima", "Daniel", "Nomsa", "Ari"];
-const LAST = ["Example", "Sample", "Demo", "Placeholder", "Specimen", "Mock", "Testcase"];
+const FIRST = ["Naledi", "Thabo", "Sarah", "Priya", "David", "Aisha", "Johan", "Lerato", "Michael", "Zanele", "Sipho", "Pieter", "Fatima", "Nomsa", "Kagiso", "Anele", "Ruan", "Megan", "Bongani", "Lindiwe", "Tshepo", "Chloe", "Mandla", "Karabo", "Riaan", "Nadia", "Themba", "Busisiwe", "Liam", "Refilwe", "Yusuf", "Mpho", "Carmen", "Sizwe", "Annelie", "Kyle", "Palesa", "Vusi", "Jessica", "Tumelo", "Grace", "Dineo"];
+// 42 first names and 3 initials: 126 donors, each name only three times, so a list reads like real people
+// (17/11/2026: with 18 names, a page showed six Leratos).
+export const DEMO_INITIALS = ["M.", "N.", "K."];
+const LAST = DEMO_INITIALS;
 export const DEMO_DONOR_COUNT = FIRST.length * LAST.length; // 126
 
 export type DemoDonor = { id: string; first: string; last: string; name: string; email: string; wants18a: boolean };
@@ -53,15 +57,22 @@ const DAY = 86_400_000;
 
 /** One monthly donation: whose, how much, from which month (0 = eleven months ago) and what has happened since. */
 const MONTHLY: { donor: number; rand: number; start: number; pausedFrom?: number; endedFrom?: number; retrying?: boolean }[] = [
-  ...[0, 1, 2, 3, 4, 5].map((donor) => ({ donor, rand: 350, start: 0 })),
+  // Different amounts and start months, so the top supporters and the s18A list don't show identical rows
+  // (17/11/2026). The running ones still come to R4 200 a month from 14 donors.
+  { donor: 0, rand: 500, start: 0 },
+  { donor: 1, rand: 350, start: 2 },
+  { donor: 2, rand: 300, start: 0 },
+  { donor: 3, rand: 450, start: 4 },
+  { donor: 4, rand: 250, start: 1 },
+  { donor: 5, rand: 400, start: 3 },
   { donor: 6, rand: 350, start: 0, retrying: true },
-  { donor: 7, rand: 350, start: 0, retrying: true },
+  { donor: 7, rand: 300, start: 2, retrying: true },
   { donor: 8, rand: 200, start: 1 },
-  { donor: 9, rand: 200, start: 3 },
+  { donor: 9, rand: 150, start: 3 },
   { donor: 10, rand: 250, start: 5 },
-  { donor: 11, rand: 250, start: 7 },
-  { donor: 12, rand: 250, start: 9 },
-  { donor: 13, rand: 250, start: 10 },
+  { donor: 11, rand: 300, start: 7 },
+  { donor: 12, rand: 200, start: 9 },
+  { donor: 13, rand: 200, start: 10 },
   { donor: 120, rand: 200, start: 2, pausedFrom: 8 },
   { donor: 121, rand: 150, start: 1, endedFrom: 6 },
 ];
@@ -101,8 +112,10 @@ export function demoData(now: Date = new Date()): DemoData {
 
   const donors: DemoDonor[] = Array.from({ length: DEMO_DONOR_COUNT }, (_, i) => {
     const first = FIRST[i % FIRST.length];
-    const last = LAST[Math.floor(i / FIRST.length)];
-    return { id: `demo-donor-${i}`, first, last, name: `${first} ${last}`, email: `${first}.${last}.${i}@example.test`.toLowerCase(), wants18a: rand() < 0.55 };
+    // Neighbours get different initials, so a list never reads "Naledi M., Thabo M., Sarah M.". Still one donor per
+    // first name and initial: 5 and 7 share no factor, so each first name meets every initial exactly once.
+    const last = LAST[(5 * Math.floor(i / FIRST.length) + (i % FIRST.length)) % LAST.length];
+    return { id: `demo-donor-${i}`, first, last, name: `${first} ${last}`, email: `${first}.${last.replace(".", "")}.${i}@example.test`.toLowerCase(), wants18a: rand() < 0.55 };
   });
 
   const campaigns = [

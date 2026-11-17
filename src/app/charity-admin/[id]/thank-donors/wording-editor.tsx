@@ -1,13 +1,13 @@
 "use client";
 
-import { startTransition, useActionState, useId, useMemo, useState } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cleanThankYouNote, THANK_YOU_NOTE_MAX } from "@/lib/charity/thank-you-note";
 import { confirmationEmail } from "@/lib/donations/confirmation-email";
 import { textEmailHtml } from "@/lib/email/html";
 import { initialFormState, type FormState } from "@/lib/form";
 
 /** A made-up gift for the preview: never a real donor's. */
-const SAMPLE = { id: "00000000-0000-4000-8000-000000000000", amountCents: 25_000 };
+const SAMPLE = { id: "7c3e9a21-4b6d-4f08-9e2a-5d1b3c8f0a47", amountCents: 25_000 }; // reference GZ-7C3E9A21 (17/11/2026: all zeros looked unfinished)
 
 /**
  * The charity's own paragraph in the thank-you email after each gift, with the whole email shown beside it
@@ -69,6 +69,35 @@ export function WordingEditor({
     [charityName, note, sampleDate],
   );
   const html = useMemo(() => textEmailHtml({ subject: email.subject, text: email.text, siteUrl, quoted: email.quoted }), [email, siteUrl]);
+
+  // The preview frame's height: the email's own height once it has loaded, and again when the frame's width changes.
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const fit = useCallback(() => {
+    try {
+      const doc = frame.current?.contentDocument;
+      if (!doc?.body) return;
+      // The body's own height (it has no margin), so the frame can shrink again when the note gets shorter.
+      const h = Math.ceil(doc.body.getBoundingClientRect().height) + 4; // + the border
+      if (h > 50) setHeight(h);
+    } catch {
+      // A browser that won't let the page read the frame keeps the fixed, scrollable height.
+    }
+  }, []);
+  useEffect(() => {
+    const el = frame.current;
+    // The frame may have loaded before this page's code was ready to hear it.
+    fit();
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const watch = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      requestAnimationFrame(fit);
+    });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [fit]);
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -161,11 +190,16 @@ export function WordingEditor({
           <span className="text-muted">Subject: </span>
           <span dir="auto">{email.subject}</span>
         </p>
-        {/* The real email's HTML, shut in a frame that can run nothing and open nothing. */}
+        {/* The real email's HTML, shut in a frame that can run nothing and open nothing (no scripts, no pop-ups, no
+            navigation). Same-origin only so this page can measure it: the frame grows to the whole email, so it never
+            ends mid-sentence (17/11/2026). Without measuring (an old browser), it stays scrollable at its first height. */}
         <iframe
+          ref={frame}
           title="Preview of the thank-you email"
-          sandbox=""
+          sandbox="allow-same-origin"
           srcDoc={html}
+          onLoad={fit}
+          style={height ? { height } : undefined}
           className="h-[34rem] w-full rounded-control border-2 border-border bg-white"
         />
       </section>

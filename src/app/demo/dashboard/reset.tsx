@@ -7,7 +7,8 @@ import { resetDemo } from "./store";
 export function DemoReset() {
   const [asking, setAsking] = useState(false);
   if (!asking) {
-    return <button type="button" onClick={() => setAsking(true)} className="ml-1 inline-flex min-h-11 items-center font-semibold text-brand underline">Reset the demo</button>;
+    // The negative margin keeps the 44px tap area without pushing its line lower than the others (17/11/2026).
+    return <button type="button" onClick={() => setAsking(true)} className="-my-3 ml-1 inline-flex min-h-11 items-center align-middle font-semibold text-brand underline">Reset the demo</button>;
   }
   return (
     <span role="alertdialog" aria-label="Please confirm" className="mt-2 flex flex-wrap items-center gap-3">

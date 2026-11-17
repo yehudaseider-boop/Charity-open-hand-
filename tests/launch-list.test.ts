@@ -10,6 +10,7 @@ import { initialFormState } from "@/lib/form";
 const state = vi.hoisted(() => ({ open: false, limited: false, upsert: vi.fn(), del: vi.fn(), upsertError: null as null | { code?: string; message: string } }));
 
 vi.mock("@/config/app-links", () => ({
+  launchListOpen: () => state.open,
   get appLinks() {
     return { appStoreUrl: null, playStoreUrl: null, launchMonth: "January 2027", launchListOpen: state.open };
   },

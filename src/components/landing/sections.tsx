@@ -153,9 +153,10 @@ export function BlueBlock({ id, kicker, title, body, points, children }: { id?: 
 }
 
 /** Questions that open in place, in the FAQ page's style. */
-export function Questions({ id, title, faqs, more }: { id?: string; title: React.ReactNode; faqs: Faq[]; more?: React.ReactNode }) {
+/** `width`: the page's content width, so the questions line up with the sections around them. */
+export function Questions({ id, title, faqs, more, width = "max-w-[75rem]" }: { id?: string; title: React.ReactNode; faqs: Faq[]; more?: React.ReactNode; width?: "max-w-[75rem]" | "max-w-[80rem]" }) {
   return (
-    <Reveal as="section" id={id} className="mx-auto grid max-w-[75rem] scroll-mt-24 gap-10 px-4 py-14 sm:px-6 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] md:py-20">
+    <Reveal as="section" id={id} className={`mx-auto grid ${width} scroll-mt-24 gap-10 px-4 py-14 sm:px-6 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] md:py-20`}>
       <div className="flex flex-col items-start gap-4">
         <Kicker text="Questions" />
         <h2 className={chapterTitle}>{title}</h2>

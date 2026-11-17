@@ -68,16 +68,41 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
           <Link href={filter === "all" ? donationsHref : `${donationsHref}?status=${filter}`} className="font-semibold text-brand underline">See every {filter === "all" ? "donation" : FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} one</Link>.
         </p>
       ) : (
+        <>
+        {/* On a phone the table's last columns ran off the screen, the amount among them: one row per gift
+            instead, name and amount first, then the date and status (17/11/2026). The table is unchanged from sm up. */}
+        <ul className="divide-y divide-border sm:hidden">
+          {shown.map((r, i) => (
+            <li key={r.id}>
+              <Link href={r.href} className="group -mx-2 flex items-center gap-3 rounded-control px-2 py-2.5 text-sm transition hover:bg-honey-soft focus-visible:bg-honey-soft">
+                <span aria-hidden className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold text-navy ${tints[i % tints.length]}`}>{r.initials}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate font-semibold text-indigo group-hover:text-brand group-hover:underline"><bdi>{r.donor}</bdi></span>
+                    <span className="shrink-0 font-semibold tabular-nums">{r.amount}</span>
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                    <span className="tabular-nums">{r.date}</span>
+                    <Badge tone={r.tone}>{r.statusLabel}</Badge>
+                    {r.wants18a ? <span className="rounded-md bg-success-soft px-1.5 py-0.5 text-[11px] font-semibold text-success">s18A</span> : null}
+                    <span className="min-w-0 truncate">{r.forWhat}</span>
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden sm:block">
         <TableScroll label="Recent donations table">
           <table className="w-full min-w-[38rem] border-collapse text-sm">
             <thead>
-              <tr className="whitespace-nowrap border-b-2 border-border text-left text-xs font-bold uppercase tracking-wide text-muted">
-                <th className="pb-2 pr-3 font-bold">Status</th>
-                <th className="pb-2 pr-3 font-bold">Donor</th>
-                <th className="pb-2 pr-3 font-bold">For</th>
-                <th className="pb-2 pr-3 font-bold">From</th>
-                <th className="pb-2 pr-3 font-bold">Date</th>
-                <th className="pb-2 text-right font-bold">Amount</th>
+              <tr className="whitespace-nowrap border-b-2 border-border text-left text-xs font-semibold text-muted">
+                <th className="pb-2 pr-3 font-semibold">Status</th>
+                <th className="pb-2 pr-3 font-semibold">Donor</th>
+                <th className="pb-2 pr-3 font-semibold">For</th>
+                <th className="pb-2 pr-3 font-semibold">From</th>
+                <th className="pb-2 pr-3 font-semibold">Date</th>
+                <th className="pb-2 text-right font-semibold">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -102,6 +127,8 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
             </tbody>
           </table>
         </TableScroll>
+        </div>
+        </>
       )}
     </div>
   );

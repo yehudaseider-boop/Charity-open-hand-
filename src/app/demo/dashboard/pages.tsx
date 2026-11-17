@@ -90,7 +90,11 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
   const PAGE = 25;
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const shown = rows.slice((Math.min(page, pages) - 1) * PAGE, Math.min(page, pages) * PAGE);
-  const paidTotal = sum(rows.filter((g) => g.status === "paid"));
+  // As on the real page: the total and its count are paid gifts only, with refunds and chargebacks said apart,
+  // so the count agrees with the Overview's chart (17/11/2026: "306 donations" here against 303 there).
+  const paid = rows.filter((g) => g.status === "paid");
+  const paidTotal = sum(paid);
+  const reversed = rows.filter((g) => g.status !== "paid");
   const keep = (over: Record<string, string>) => {
     const p = new URLSearchParams();
     const all: Record<string, string> = { status, period, from, to, source, campaign, q: one(sp.q), ...over };
@@ -142,13 +146,41 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
         <p className="text-sm text-muted">
           <span className="font-display text-2xl font-extrabold text-indigo">{formatRand(paidTotal)}</span> received, {range}
           {source ? `, from ${source === "recorded" ? "gifts you recorded" : giftSourceLabel(source)}` : ""}
-          {campaign ? `, ${campaign === "none" ? "no campaign" : campaignTitle(data, campaign)}` : ""} · {plural(rows.length, "donation")}
+          {campaign ? `, ${campaign === "none" ? "no campaign" : campaignTitle(data, campaign)}` : ""} · {plural(paid.length, "paid donation")}
+          {reversed.length ? <span className="block sm:text-right">Not counted: {formatRand(sum(reversed))} refunded or charged back ({reversed.length}).</span> : null}
         </p>
       </div>
       {shown.length === 0 ? (
         <EmptyState title="No matches" action={<ActionLink href={`${base}/donations`}>Show every donation</ActionLink>}>No donations match these filters. Try a wider period or clear the search.</EmptyState>
       ) : (
         <Card lights>
+          {/* On a phone, one row per gift with the amount always in view, as the real Donations page does (17/11/2026). */}
+          <ul className="divide-y divide-border sm:hidden">
+            {shown.map((g, i) => {
+              const d = data.donor(g.donorId)!;
+              const st = donationStatus[g.status];
+              return (
+                <li key={g.id}>
+                  <Link href={`${base}/donations/${g.id}`} className="group -mx-2 flex items-center gap-3 rounded-control px-2 py-2.5 text-sm transition hover:bg-honey-soft focus-visible:bg-honey-soft">
+                    <Avatar name={d.name} i={i} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 truncate font-semibold text-indigo group-hover:text-brand group-hover:underline"><bdi>{d.name}</bdi></span>
+                        <span className="shrink-0 font-semibold tabular-nums">{formatRand(g.amountCents)}</span>
+                      </span>
+                      <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                        <span className="tabular-nums">{formatDate(g.paidAt)}</span>
+                        <Badge tone={st.tone}>{st.label}</Badge>
+                        {g.wants18a ? <span className="rounded-md bg-success-soft px-1.5 py-0.5 text-[11px] font-semibold text-success">s18A</span> : null}
+                        <span className="min-w-0 truncate">{campaignTitle(data, g.campaignId)}{g.recurringId ? ", monthly" : ""}</span>
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden sm:block">
           <TableScroll label="Donations table">
             <table className={`${table.table} min-w-[40rem]`}>
               <thead><tr className={table.headRow}><th className={table.th}>Status</th><th className={table.th}>Donor</th><th className={table.th}>For</th><th className={table.th}>From</th><th className={table.th}>Date</th><th className={`${table.th} text-right`}>Amount</th></tr></thead>
@@ -174,6 +206,7 @@ export function DemoDonations({ data, sp }: { data: DemoData; sp: Params }) {
               </tbody>
             </table>
           </TableScroll>
+          </div>
         </Card>
       )}
       {pages > 1 ? (
@@ -275,8 +308,10 @@ export function DemoDonors({ data, sp }: { data: DemoData; sp: Params }) {
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-indigo group-hover:text-brand group-hover:underline">{f.display_name}</span>
                       <span className="block truncate text-xs text-muted">{plural(f.donation_count, "donation")} · last {formatDate(f.last_paid_at)}</span>
+                      {/* On a phone the tag goes under the date, so it never squeezes it (17/11/2026). */}
+                      {monthlyIds.has(f.email) ? <span className="mt-1 block sm:hidden"><Badge tone="success">Gives monthly</Badge></span> : null}
                     </span>
-                    {monthlyIds.has(f.email) ? <Badge tone="success">Gives monthly</Badge> : null}
+                    {monthlyIds.has(f.email) ? <span className="hidden shrink-0 whitespace-nowrap sm:inline"><Badge tone="success">Gives monthly</Badge></span> : null}
                     {tagsOf(f.donor_id).slice(0, 1).map((t) => <span key={t} className="hidden sm:inline"><Badge>{t}</Badge></span>)}
                   </span>
                   <span className="shrink-0 font-display text-lg font-bold tabular-nums">{formatRand(f.total_cents)}</span>
@@ -574,7 +609,7 @@ export function DemoWebsiteButtonPage({ data, site }: { data: DemoData; site: st
         intro={<>Put a &quot;Give with Givezy&quot; button on your own website. Donors who press it land on your Givezy page and see only your charity, with no other charities to wander off to. Gifts made this way show as &quot;Website button&quot; on your Donations page.</>}
       />
       <Card title="Make your button">
-        <ButtonBuilder site={site} slug="sample-charity" charityName="Sample Charity" campaigns={data.campaigns.map((c) => ({ id: c.id, title: c.title }))} previewHref={base} />
+        <ButtonBuilder site={site} slug="sample-charity" charityName={DEMO_CHARITY.name_en} campaigns={data.campaigns.map((c) => ({ id: c.id, title: c.title }))} previewHref={base} />
       </Card>
       <Card title="2. Add it to your website">
         <p className="mb-4 text-sm text-muted">Find the one your website is built with. It takes about five minutes, and you can take the button off again the same way.</p>
@@ -589,14 +624,14 @@ export function DemoWebsiteButtonPage({ data, site }: { data: DemoData; site: st
             </details>
           ))}
         </div>
-        <p className="mt-4 text-sm text-muted">In the demo the code points to Sample Charity, which isn&apos;t a real page. Your own button opens your Givezy page.</p>
+        <p className="mt-4 text-sm text-muted">In the demo the code points to {DEMO_CHARITY.name_en}, which isn&apos;t a real page. Your own button opens your Givezy page.</p>
       </Card>
     </div>
   );
 }
 
 export function DemoPosterPage({ sp, site }: { sp: Params; site: string }) {
-  return <PosterView name="Sample Charity" slug="sample-charity" issues18a sp={sp} backHref={base} demoHref={`${site.replace(/\/+$/, "")}${base}`} />;
+  return <PosterView name={DEMO_CHARITY.name_en} slug="sample-charity" issues18a sp={sp} backHref={base} demoHref={`${site.replace(/\/+$/, "")}${base}`} />;
 }
 
 const FEE_NOTE = "The card fee comes off each gift before the deposit. In this demo it shows as \"to be confirmed\": Givezy never makes up a fee.";

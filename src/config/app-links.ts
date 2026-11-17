@@ -26,3 +26,8 @@ export const appLinks: { appStoreUrl: string | null; playStoreUrl: string | null
 export function charityRequestsOpen(env: Record<string, string | undefined> = process.env): boolean {
   return appLinks.charityRequestsOpen || env.CHARITY_REQUESTS === "yes";
 }
+
+/** Whether "Notify me at launch" is open: the switch above, or LAUNCH_LIST=yes on the server (no code change). */
+export function launchListOpen(env: Record<string, string | undefined> = process.env): boolean {
+  return appLinks.launchListOpen || env.LAUNCH_LIST === "yes";
+}

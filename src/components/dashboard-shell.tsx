@@ -43,14 +43,20 @@ export function DashboardShell({
     // full-bleed: the dashboard breaks out of the site's narrow column (see globals.css).
     <div className="full-bleed overflow-x-clip bg-honey-soft/60 print:bg-transparent">
       <div className="mx-auto grid max-w-[90rem] grid-cols-[minmax(0,1fr)] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[14.5rem_minmax(0,1fr)] lg:gap-8 lg:py-8">
-        <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain print:hidden">
-          <div className="rounded-card border-2 border-border bg-surface p-4">
+        {/* On a laptop the side stays in view; when the menu is taller than the window, only the menu box scrolls,
+            inside its own rounded border, with a fade at the bottom so it shows there is more (17/11/2026). */}
+        <aside className="space-y-4 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:flex-col lg:space-y-0 lg:gap-4 lg:self-start print:hidden">
+          <div className="rounded-card border-2 border-border bg-surface p-4 lg:shrink-0">
             <p className="text-xs font-bold text-muted">Charity dashboard</p>
             <p className="mt-0.5 font-display text-lg font-bold leading-snug text-indigo [overflow-wrap:anywhere]"><bdi>{charity.name_en}</bdi></p>
             <span className={`mt-2 inline-block rounded-full border-2 px-2.5 py-0.5 text-xs font-semibold ${statusChip[status.tone]}`}>{status.label}</span>
           </div>
-          <div className="lg:rounded-card lg:border-2 lg:border-border lg:bg-surface lg:p-3">
-            <CharityNav id={id} base={base} hidden={hiddenTabs} />
+          <div className="lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-card lg:border-2 lg:border-border lg:bg-surface">
+            <div className="lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pt-3">
+              <CharityNav id={id} base={base} hidden={hiddenTabs} />
+              {/* Sticks to the bottom of the box while there is more below; at the very end it lies over empty space. */}
+              <div aria-hidden className="pointer-events-none sticky bottom-0 hidden h-6 bg-gradient-to-t from-surface to-transparent lg:block" />
+            </div>
           </div>
         </aside>
         <div className="min-w-0 space-y-5">
@@ -65,9 +71,13 @@ export function DashboardShell({
                   name="q"
                   type="search"
                   maxLength={60}
-                  placeholder="Search donations by name or email"
-                  className="h-11 w-full rounded-control border-2 border-border bg-surface pl-11 pr-3 text-sm text-navy placeholder:text-muted focus:border-brand"
+                  placeholder=" "
+                  className="peer h-11 w-full rounded-control border-2 border-border bg-surface pl-11 pr-3 text-sm text-navy focus:border-brand"
                 />
+                {/* The hint, shorter on a phone so it isn't cut off (17/11/2026); gone once something is typed. */}
+                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-11 right-3 hidden items-center truncate text-sm text-muted peer-placeholder-shown:flex">
+                  Search donations<span className="hidden sm:inline">&nbsp;by name or email</span>
+                </span>
               </form>
             ) : null}
             <span className="flex-1" />

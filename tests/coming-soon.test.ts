@@ -43,7 +43,7 @@ describe("comingSoonAction", () => {
   });
 
   it("sends every other page back to the front page", () => {
-    for (const p of ["/charities", "/login", "/for-donors", "/for-charities", "/c/some-charity", "/c/some-charity/donate", "/apply", "/admin", "/demo/dashboard", "/privacy", "/terms", "/faq", "/sitemap.xml", "/llms.txt", "/coming-soon", "/thanks/abc", "/auth/callback"]) {
+    for (const p of ["/charities", "/for-donors", "/for-charities", "/c/some-charity", "/c/some-charity/donate", "/admin", "/demo/dashboard", "/faq", "/sitemap.xml", "/llms.txt", "/coming-soon", "/thanks/abc", "/applyx", "/login-help"]) {
       expect(act(`https://givezy.co.za${p}`), p).toBe("redirect-home");
     }
     expect(act("https://givezy.co.za/charities", "HEAD")).toBe("redirect-home");
@@ -60,8 +60,18 @@ describe("comingSoonAction", () => {
   it("refuses anything that is not a page visit (a form post, a server action)", () => {
     expect(act("https://givezy.co.za/", "POST")).toBe("not-found");
     expect(act("https://givezy.co.za/charities", "POST")).toBe("not-found");
-    expect(act("https://givezy.co.za/login", "PUT")).toBe("not-found");
+    expect(act("https://givezy.co.za/for-donors", "PUT")).toBe("not-found");
     expect(act("https://givezy.co.za/", "OPTIONS")).toBe("not-found");
+  });
+
+  it("keeps the charity sign-up path open, for any method, and nothing around it", () => {
+    for (const p of ["/apply", "/apply?invite=abc", "/login", "/login/sent", "/auth/callback", "/charity-admin", "/charity-admin/abc/settings", "/mfa", "/agree", "/documents/abc", "/privacy", "/terms", "/launch-list/stop"]) {
+      for (const m of ["GET", "HEAD", "POST"]) expect(act(`https://givezy.co.za${p}`, m), `${m} ${p}`).toBe("pass-through");
+    }
+    expect(act("https://givezy.co.za/api/viewer")).toBe("pass-through");
+    expect(act("https://givezy.co.za/api/viewer", "POST")).toBe("not-found");
+    expect(act("https://givezy.co.za/api/app/quote")).toBe("not-found");
+    expect(act("https://givezy.co.za/applications")).toBe("redirect-home");
   });
 
   it("still serves the technical files", () => {
@@ -95,7 +105,7 @@ describe("comingSoonAction", () => {
 
   it("works with more than one listed address", () => {
     const s = "givezy.co.za, givezy.africa";
-    expect(act("https://givezy.africa/login", "GET", s)).toBe("redirect-home");
+    expect(act("https://givezy.africa/charities", "GET", s)).toBe("redirect-home");
     expect(act("https://givezy.co.za/", "GET", s)).toBe("serve");
     expect(act("https://test.givezy.co.za/login", "GET", s)).toBe("pass-through");
   });

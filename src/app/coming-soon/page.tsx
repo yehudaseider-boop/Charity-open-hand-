@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import { ChromeMark } from "@/components/chrome-mark";
 import { Icon, type IconName } from "@/components/marketing";
 import { Splash } from "@/components/splash";
-import { appLinks } from "@/config/app-links";
+import Link from "next/link";
+import { NotifyForm } from "@/components/landing/notify-form";
+import { appLinks, launchListOpen } from "@/config/app-links";
 import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 
 // The public address's one page until launch (Yehuda, 11/11/2026): givezy.co.za shows this and nothing else (see
-// lib/coming-soon.ts and proxy.ts). It links nowhere: no sign-in, no charity list, no application, no policies.
+// lib/coming-soon.ts and proxy.ts). Since 17/11/2026 it has two ways in (Yehuda): "Apply to list your charity" for
+// charities, and "Notify me at launch" for givers (when the list is open). No charity list, no giving.
 // Everything it says is already said on the landing page; nothing about fees. DRAFT WORDING for Yehuda to approve.
 // Never listed by search engines, whatever SITE_INDEXING says: robots below is set on the page itself.
 
@@ -32,7 +35,7 @@ const CHARITY: Point[] = [
 ];
 
 /** One side of Givezy, shown in full: no button, no link. */
-function Side({ tone, title, line, points }: { tone: "give" | "charity"; title: string; line: string; points: Point[] }) {
+function Side({ tone, title, line, points, action }: { tone: "give" | "charity"; title: string; line: string; points: Point[]; action?: React.ReactNode }) {
   const give = tone === "give";
   return (
     <section
@@ -59,6 +62,7 @@ function Side({ tone, title, line, points }: { tone: "give" | "charity"; title: 
           </li>
         ))}
       </ul>
+      {action}
     </section>
   );
 }
@@ -100,14 +104,43 @@ export default function ComingSoon() {
         </section>
 
         <div className="mx-auto grid max-w-[75rem] gap-4 px-4 pb-16 sm:px-6 md:grid-cols-2 md:gap-6 md:pb-24">
-          <Side tone="give" title="I give" line="Give to causes you care about, and keep every receipt in one place." points={GIVE} />
-          <Side tone="charity" title="I run a charity" line="Get found, get given to, and keep the people who give." points={CHARITY} />
+          <Side
+            tone="give"
+            title="I give"
+            line="Give to causes you care about, and keep every receipt in one place."
+            points={GIVE}
+            action={
+              launchListOpen() ? (
+                <div className="rounded-[1.5rem] bg-white p-5 text-navy">
+                  <p className="mb-3 font-display text-[1.25rem] font-bold leading-tight">Hear when the app is ready</p>
+                  <NotifyForm />
+                </div>
+              ) : (
+                <p className="text-[16px] font-semibold text-white/90">The Givezy app is coming soon.</p>
+              )
+            }
+          />
+          <Side
+            tone="charity"
+            title="I run a charity"
+            line="Get found, get given to, and keep the people who give."
+            points={CHARITY}
+            action={
+              <Link href="/apply" className="pressable inline-flex min-h-14 w-fit items-center justify-center rounded-[1.125rem] bg-coral px-7 text-[17px] font-bold text-navy">
+                Apply to list your charity
+              </Link>
+            }
+          />
         </div>
       </div>
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[75rem] flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-6 text-[14px] text-muted sm:px-6">
           <p>© {new Date().getFullYear()} {platformConfig.appName}</p>
+          <nav aria-label="Policies" className="flex gap-5">
+            <Link href="/privacy" className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Privacy</Link>
+            <Link href="/terms" className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Terms</Link>
+          </nav>
           {contact ? (
             <a href={`mailto:${contact}`} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Contact</a>
           ) : null}

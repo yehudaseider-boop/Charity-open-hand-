@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { demoData, donorFacts, DEMO_DONOR_COUNT } from "@/app/demo/dashboard/data";
+import { demoData, donorFacts, DEMO_DONOR_COUNT, DEMO_INITIALS } from "@/app/demo/dashboard/data";
 import { demoOverview, monthOf } from "@/app/demo/dashboard/sample";
 import { taxYearRange } from "@/lib/dates";
 
@@ -13,7 +13,7 @@ describe("the public dashboard demo", () => {
   it("is the same on every visit, and only ever made-up people", () => {
     expect(demoData(now).gifts.map((g) => [g.id, g.amountCents])).toEqual(data.gifts.map((g) => [g.id, g.amountCents]));
     expect(data.donors).toHaveLength(DEMO_DONOR_COUNT);
-    expect(data.donors.every((d) => ["Example", "Sample", "Demo", "Placeholder", "Specimen", "Mock", "Testcase"].includes(d.last))).toBe(true);
+    expect(data.donors.every((d) => DEMO_INITIALS.includes(d.last))).toBe(true);
     expect(data.donors.every((d) => d.email.endsWith("@example.test"))).toBe(true);
   });
 

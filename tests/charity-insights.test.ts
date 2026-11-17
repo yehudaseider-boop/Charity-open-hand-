@@ -88,6 +88,11 @@ describe("monthly giving trend", () => {
   it("counts a paused donor as paused from the day they paused", () => {
     const t = trend([row("paused", "2026-07-01T10:00:00+02:00", { paused: "2026-10-02T10:00:00+02:00" })]);
     expect(t.map((p) => p.running)).toEqual([1, 1, 0]);
+    expect(t.map((p) => p.paused)).toEqual([0, 0, 1]);
+  });
+  it("doesn't count a pause in any month when its date isn't known", () => {
+    const t = trend([row("paused", "2026-07-01T10:00:00+02:00")]);
+    expect(t.map((p) => p.paused)).toEqual([0, 0, 0]);
   });
   it("counts this month up to today, so a donor starting later this month isn't counted yet", () => {
     expect(trend([row("active", "2026-10-20T10:00:00+02:00")]).map((p) => p.running)).toEqual([0, 0, 0]);

@@ -48,6 +48,18 @@ export function isComingSoonHost(hostname: string, setting: string | undefined):
   return list.some((h) => host === h || host === `www.${h}`);
 }
 
+/**
+ * The charity sign-up path stays open on a coming-soon address (Yehuda, 17/11/2026): a charity can apply, sign in with
+ * the emailed code, finish its application and read the policies. Everything else (donating, the charity list, the
+ * app's and payment provider's calls) stays closed. These pages post to themselves (server actions), so they take
+ * any method.
+ */
+const CHARITY_SIGN_UP_PATHS = ["/apply", "/login", "/auth", "/charity-admin", "/mfa", "/agree", "/documents", "/privacy", "/terms", "/launch-list/stop"];
+
+function isCharitySignUp(pathname: string): boolean {
+  return CHARITY_SIGN_UP_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 /** A path a coming-soon address still serves as it is. */
 function isAllowedFile(pathname: string): boolean {
   return (
@@ -69,6 +81,8 @@ export function comingSoonAction(url: URL, method: string, setting: string | und
   const pathname = url.pathname;
   // Technical files first, so robots.txt and the logo work for any method a browser or crawler uses.
   if (isAllowedFile(pathname) && (method === "GET" || method === "HEAD")) return "pass-through";
+  // The charity sign-up path (see above), and the one call its header makes to know who is signed in.
+  if (isCharitySignUp(pathname) || (pathname === "/api/viewer" && (method === "GET" || method === "HEAD"))) return "pass-through";
   // The app's and the payment provider's calls never come here (they use the other addresses): refuse them, don't redirect
   // them, because a redirect would be followed as if it were an answer.
   if (pathname === "/api" || pathname.startsWith("/api/")) return "not-found";

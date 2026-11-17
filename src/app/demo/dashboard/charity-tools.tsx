@@ -14,7 +14,7 @@ import { MAX_PHOTOS } from "@/lib/charity/validation";
 import type { FormState } from "@/lib/form";
 import { formatRand, parseRandToCents } from "@/lib/money";
 import { platformConfig } from "@/config/platform";
-import { DEMO_BASE as base } from "./sample";
+import { DEMO_BASE as base, DEMO_CHARITY } from "./sample";
 import { demoId, demoNow, pause, useDemo } from "./store";
 
 /**
@@ -90,7 +90,7 @@ type Profile = {
   categories: string[]; notify: boolean; logo: string | null; cover: string | null; savedAt: number;
 };
 const START_PROFILE: Profile = {
-  name_en: "Sample Charity",
+  name_en: DEMO_CHARITY.name_en,
   description_en: "We run a weekly food programme and an after-school homework club for families in our area.",
   funds_use_en: "Donations buy food for the weekly parcels and pay for the homework club's teacher.",
   thank_you_en: "Thank you for standing with families in our community.",

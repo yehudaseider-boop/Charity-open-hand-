@@ -2,6 +2,30 @@
 
 The order to do these in, and what to bring to the first session, is in `docs/launch-plan.md` (22/10/2026).
 
+## The short path to launch (17/11/2026, after the test-site check)
+
+The long lists below are the full record. This is the order that matters, in three stages. Each stage can start once the one before it is done.
+
+**Stage 1. Charities can apply and be approved (do first: charities need time to onboard before January).**
+1. Givezy's company details (registered name and number) into `src/config/legal.ts`. Needed for Paystack, the Privacy Policy and Terms.
+2. Email on: a Resend account, the SPF, DKIM and DMARC records for givezy.co.za at GoDaddy, `EMAIL_TRANSPORT=resend` and `EMAIL_FROM`. Today emails only go to the log, so no application or approval email would reach a charity. Send one of each to yourself first.
+3. The fee wording for charities (decided 13/11/2026 as a monthly fee, wording not approved). Charities will ask the cost before they apply. Then approve the charity sign-up emails in `src/lib/charity/emails.ts` and the For charities page.
+4. `ADMIN_NOTIFY_EMAIL` set to the address that hears about new applications, and someone checking applications every 2 working days (the page promises it). Write down what a person checks before approving (the "Fake-charity checks" item in A).
+5. The live Supabase project: plan (Pro from about $25 a month, as noted below), all migrations run in order, the causes added. Vercel on a paid plan (Hobby is non-commercial only).
+6. `SITE_URL` set to https://givezy.co.za, the same address in Supabase's allowed redirects, and `/apply` reachable on the live address (coming-soon mode currently sends every other page to the front page).
+7. The Next.js security update, tested.
+
+**Stage 2. Charities can receive money.**
+8. Paystack live sign-up (needs item 1), then the checks on the real account: split payments to a charity's bank, monthly collections, declined cards, refunds. Connect each approved charity in Admin before opening.
+9. Yosef: Privacy Policy and Terms approved, and the open POPIA points (Information Officer registered, what an erasure keeps).
+10. Fees: the exact words on every page, then take the "hidden" notes off.
+
+**Stage 3. Donors can give (the January launch).**
+11. Error alerts and an incident plan, two-step sign-in on every account that matters, a load test, the accessibility check of the give journey.
+12. The app: store builds submitted, giving through the website at first (in-app giving stays off until Apple and Google confirm in writing).
+13. Section C below: one real small gift, a refund, a replayed webhook, then a week of watching Admin, Payments.
+14. Then, and only then, the launch list, the home page switch (the new design is at `/home-preview`) and `COMING_SOON_HOSTS` off.
+
 Started 12/10/2026. Nothing here has been done on the real (live) systems yet. Tick items off as they are done and note the date. Items marked "decision" need Yehuda or Yosef before anyone builds or switches anything on.
 
 ## A. Decisions still open (nothing goes live until these are settled)
@@ -293,6 +317,9 @@ Paystack support (13/11/2026): Google Pay is available to South African business
   - **`new-card` route** is not behind the in-app giving switch: confirm the app opens it in the phone's browser in store builds, or put it behind the switch.
   - **Sign-in code lifetime:** the local setting is an hour while the screen says "expires soon"; set about 10 minutes on the hosted project and confirm its limits.
 
+- [ ] **The site's own address (found 17/11/2026).** Today givezy.co.za, www.givezy.co.za and test.givezy.co.za all forward visitors to charity-open-hand.vercel.app, because the server setting `SITE_URL` is that address (sign-in links only work on the address in `SITE_URL`, so every other address forwards there on purpose). Before launch: set `SITE_URL` on the live site to https://givezy.co.za (and on the test site to https://test.givezy.co.za if it should keep its own address), update the sign-in email links in Supabase's allowed redirect addresses to match, then check a sign-in link end to end. Needs Yehuda's yes: it changes where everyone lands.
+- [ ] **Next.js security update (found 17/11/2026).** The local development server warns that the installed Next.js has a known security vulnerability. Check the advisory, update Next.js on a branch, run every test and click through the test site before launch. Not done yet: no upgrade was run.
+
 ## C. First live day
 
 - [ ] One small real donation with Yehuda's own card. Check: the thank-you page, the confirmation email, the donation shows as paid, the charity sees it without the donor's private choice, and the s18A flow behaves as agreed.
@@ -315,3 +342,11 @@ HTML version of the confirmation email, yahrzeit giving, real charity photos fro
 - [ ] **Email sending (needs Yehuda's approval, may cost money):** create the Resend account under Givezy, add the givezy.co.za sending records (SPF and DKIM) in GoDaddy DNS so emails don't land in spam, then set `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY` and `EMAIL_FROM` (for example hello@givezy.co.za, a real inbox someone reads) on the server. Keep `EMAIL_ALLOWLIST` set on the test site. Send one of each email to a test address before launch: the Resend code has never run against Resend itself. Check Resend's current price before signing up.
 - [ ] **One-click stop in Gmail (added 02/11/2026):** charities' news, appeals and thank-yous now carry `List-Unsubscribe` and `List-Unsubscribe-Post` (Gmail and Yahoo require them for bulk mail). Once Resend is live, send one appeal and one thank-you to a Gmail address, check Gmail shows its own Unsubscribe next to the sender, press it, and check that donor is left out of the next send. Also check in Resend that the headers arrive as sent (the code uses Resend's `headers` field, not yet run against Resend).
 - [ ] **Phone app packages:** `npm audit` in `apps/mobile` lists three vulnerable packages pulled in by Expo 57 (braces, decode-uri-component, node-forge). Upgrade Expo when the patched SDK is out, then re-run the audit; `npm audit fix --force` would break the app today.
+
+## Before the two sign-up links go live on givezy.co.za (17/11/2026)
+
+- [ ] Email sending (Resend) works: a charity signs in with an emailed code, so without it nobody can apply. Set EMAIL_TRANSPORT, remove the test-only EMAIL_ALLOWLIST.
+- [ ] Migration 20261110000012_launch_list.sql is on the live database, then set `LAUNCH_LIST=yes`. Until then the giver form is hidden.
+- [ ] Yosef approves the launch list consent wording (draft in `src/lib/launch-list.ts`) and the Privacy and Terms pages.
+- [ ] Supabase redirect URLs include https://givezy.co.za, and SITE_URL stays on a working address while COMING_SOON_HOSTS is set.
+- [ ] Someone reads each charity application before anything is listed (already the rule: every charity is looked at by a person).
