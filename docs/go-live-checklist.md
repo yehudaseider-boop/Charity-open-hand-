@@ -31,6 +31,8 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
 
 ## A. Decisions still open (nothing goes live until these are settled)
 
+- [ ] **Payment provider: stay on Paystack, or test Stitch? (17/11/2026, open; Paystack stays until decided.)** Only matters if the call with Stitch answers yes on: how fast they set up each charity, skipping 3DS on monthly saved-card charges, Apple Pay in the app's payment sheet, and taking a donations platform. See decisions.md.
+
 - [ ] **Deploy order for the review fixes of 12/11/2026 (migration applied on TEST 12/11/2026; the code can now be pushed to TEST).** Migration `20261112100001_saved_id_started_by.sql` must be applied on TEST (Yehuda's yes) **before** this code is pushed: every gift by a signed-in donor writes the new column, and without it those gifts fail. Migration `20261112100002_charity_profile_checks.sql` is independent (no code needs it); apply it any time with Yehuda's yes. Live: the same order.
 - [ ] **Sign-in limits: Yehuda to confirm the values (12/11/2026).** A determined stranger using several internet addresses can still keep one person from signing in on the website for up to an hour: 50 wrong codes or 30 link requests per email per hour, from anywhere (the link already in their inbox still works). Lower ceilings block real people on shared connections sooner; higher ones make this lockout cheaper. Values in `platformConfig.signInGuard`.
 - [ ] **Charity search and accents (12/11/2026):** "Cafe" does not find "Café" (and the other way round). Fixing it needs the database's `unaccent` extension and a search function: a database change for Yehuda's yes. Words with signs between them ("Save-a-Life", "Boys & Girls") are found already.
