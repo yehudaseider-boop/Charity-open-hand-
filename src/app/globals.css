@@ -20,6 +20,7 @@
   --sage: #2e9d6b; /* s18A badge and progress, graphics only */
   --navy: #0e1b3d; /* deep ink: body text and headlines, text on orange */
   --peach: #ffebdd; /* background splashes only */
+  --brand-deep: #0b2a73; /* the blue buttons' bottom edge, also the deep blue of footers and dark panels on the home page */
 
   --bg: #ffffff; /* white */
   --surface: #ffffff;
@@ -44,6 +45,7 @@
   --color-brand: var(--brand);
   --color-brand-contrast: var(--brand-contrast);
   --color-brand-soft: var(--brand-soft);
+  --color-brand-deep: var(--brand-deep);
   --color-accent: var(--accent);
   --color-coral: var(--coral);
   --color-honey: var(--honey);
@@ -639,4 +641,31 @@ body:has([data-chrome="landing"]) .chrome-full {
 }
 @media (prefers-reduced-motion: reduce) {
   .wash-blob, .float-tilt { animation: none; }
+}
+
+/* Home page preview 1, second version (17/11/2026), after a close look at the reference: a blue hero with a soft glow, and
+   columns of sample tiles that drift up and down at different speeds behind a fade at the top and bottom. Still for
+   reduced motion. */
+.hero-glow {
+  background-image:
+    radial-gradient(60rem 36rem at 85% 10%, rgba(201, 180, 250, 0.28), transparent 60%),
+    radial-gradient(44rem 30rem at 0% 100%, rgba(11, 42, 115, 0.85), transparent 65%);
+}
+.tile-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+}
+@keyframes col-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@keyframes col-down {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+.col-up { animation: col-up 64s linear infinite; }
+.col-down { animation: col-down 78s linear infinite; }
+.col-slow { animation: col-up 92s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .col-up, .col-down, .col-slow { animation: none; }
 }

@@ -61,7 +61,9 @@ const NAV = {
 async function shot(name, map = {}) {
   const r = await rects({ ...NAV, ...map });
   const missing = Object.entries(r).filter(([, v]) => !v).map(([k]) => k);
-  if (missing.length) throw new Error(`${name}: could not find ${missing.join(", ")}`);
+  for (const k of missing) r[k] = { x: 0, y: 0, w: 0, h: 0 };
+  // The demo's sample figures move with the date, so a lookup by exact text can miss: warn, and keep the picture.
+  if (missing.length) console.warn(`${name}: could not find ${missing.join(", ")} (picture kept; the video's cursor targets may need a look)`);
   await page.screenshot({ path: join(dir, `${name}.png`) });
   manifest[name] = r;
   console.log("shot", name);
