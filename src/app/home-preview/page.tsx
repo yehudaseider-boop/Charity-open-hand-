@@ -90,11 +90,10 @@ function GivePhone() {
         </div>
         <p className="mt-4 flex items-center gap-2 text-[13px] font-semibold">
           <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-md bg-sage"><Icon name="check" className="stroke-white" size={12} /></span>
-          s18A receipt for my tax
+          I&apos;d like an s18A receipt
         </p>
         <div className="relative mt-5 overflow-hidden rounded-[1rem] bg-coral py-3.5 text-center text-[15px] font-extrabold text-navy shadow-[0_5px_0_#d9621c]">
-          <span aria-hidden className="give-hold absolute inset-y-0 left-0 bg-white/35" />
-          <span className="relative">Hold to give R250</span>
+          <span className="relative">Give R250</span>
         </div>
       </div>
     </div>
@@ -108,7 +107,7 @@ function NewGift() {
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-bold leading-tight">New gift: R250</span>
         <span className="block text-[12px] leading-snug text-muted">Aisha S.</span>
-        <span className="block text-[12px] leading-snug text-muted">From the app, just now</span>
+        <span className="block text-[12px] leading-snug text-muted">From your Givezy page, just now</span>
       </span>
       <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-bold text-success">Paid</span>
     </div>
@@ -122,7 +121,7 @@ function Receipt() {
       <p className="mt-2 font-display text-[1.0625rem] font-extrabold leading-tight">Aisha S.</p>
       <p className="text-[12px] leading-snug text-muted">{charity}</p>
       <p className="mt-2 font-display text-[1.75rem] font-extrabold leading-none text-brand">R250</p>
-      <p className="mt-2 text-[11px] text-muted">Ready after the tax year ends, 28/02/2027</p>
+      <p className="mt-2 text-[11px] text-muted">Sent after the tax year ends in February</p>
     </div>
   );
 }
@@ -157,7 +156,7 @@ function Screen({ name, alt }: { name: string; alt: string }) {
 
 const comparison: [string, string, string][] = [
   ["s18A receipts", "Typed one by one", "Preview, then approve each one"],
-  ["The SARS IT3(d) file", "Put together by hand", "Made for you from the same receipts"],
+  ["The SARS IT3(d) file", "Put together by hand", "Prepared for you from the same receipts"],
   ["Monthly donations", "Checked against the bank statement", "Tracked for you, and a declined card is tried again"],
   ["Thank-yous", "Written and sent one at a time", "Your words, sent to everyone who gave that month"],
   ["Who gave", "Spread across bank references and spreadsheets", "Every gift in one list"],
@@ -205,7 +204,7 @@ export default function HomePreview() {
               </p>
             ) : null}
             <H as="h1" size="h1" dark>Giving, <Em dark>made easy.</Em></H>
-            <p className="max-w-[30rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
+            <p className="max-w-[32rem] text-pretty text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
               Find a charity you trust, give in a few taps, and never chase an s18A receipt again. For charities: every gift, every donor and every receipt in one place.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -216,7 +215,7 @@ export default function HomePreview() {
 
           {/* One gift, in order: given on the phone, seen by the charity, thanked in the inbox, kept for tax time. */}
           <figure className="relative mx-auto w-full max-w-[36rem]">
-            <figcaption className="sr-only">One gift with {appName}: a donor gives R250 on their phone; it shows on the charity&apos;s dashboard straight away; the donor gets a thank-you email; and the gift is on their s18A receipt at tax time. Made-up example.</figcaption>
+            <figcaption className="sr-only">One gift with {appName}: a donor gives R250 from their phone; it shows on the charity&apos;s dashboard straight away; the donor gets a thank-you email; and the gift is on their s18A receipt at tax time. Made-up example.</figcaption>
             <div aria-hidden className="relative grid items-start gap-6 sm:grid-cols-[15.5rem_minmax(0,1fr)]">
               <span className="absolute -right-10 top-4 h-72 w-72 rounded-full border-[40px] border-honey/25" />
               <div className="hero-rise relative mx-auto w-[15rem] sm:w-full" style={{ animationDelay: "120ms" }}>
@@ -251,7 +250,7 @@ export default function HomePreview() {
           <ul className="mt-14 grid gap-5 lg:grid-cols-2">
             {([
               ["bg-honey-soft", "I give", "Every charity checked by a real person. Every gift and every s18A receipt in one account, ready when SARS asks.", "#donors", "How giving works", "/charities", "Find a charity", "loveIt", "hearts"],
-              ["bg-peach", "I run a charity", "Get found, get given to and keep your donors. The receipts, the reminders and the record-keeping are done for you.", "#charities", "See the dashboard", "/apply", "Apply to list your charity", "workingTogether", "stars"],
+              ["bg-peach", "I run a charity", "Get found, get given to and keep your donors. The receipts, the reminders and the record-keeping, done with you.", "#charities", "See the dashboard", "/apply", "Apply to list your charity", "workingTogether", "stars"],
             ] as const).map(([bg, title, body, more, moreLabel, href, cta, art, sparkle]) => (
               <li key={title} className={`lift relative flex flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:p-10 lg:min-h-[22rem] ${bg}`}>
                 <Illustration name={art} sparkle={sparkle} className={`absolute right-5 top-6 sm:right-8 sm:top-8 ${art === "loveIt" ? "w-20 sm:w-32" : "w-28 sm:w-44"}`} />
@@ -277,8 +276,8 @@ export default function HomePreview() {
             <H size="h2">Give in a few taps. <Em>Keep every receipt.</Em></H>
             <ol className="flex flex-col gap-6">
               <Step n="1" title="Find a charity you can trust" body="Search by name, cause or area. A person checks every charity before it can take a single rand." />
-              <Step n="2" title="Give once or every month" body={`You pay on the payment provider's own secure page. ${appName} never sees your card.`} />
-              <Step n="3" title="Let tax time take care of itself" body="Every gift lands in your account, and your s18A receipt follows once the tax year ends." />
+              <Step n="2" title="Give once or every month, and watch it grow" body={`In the ${appName} app, see how much you've given this tax year, set a giving goal if you like, and watch your ring fill up.`} />
+              <Step n="3" title="Let tax time take care of itself" body="Sign in with the email you gave with: every gift is in one place, and your s18A receipt follows after the tax year ends." />
             </ol>
             <div className="flex flex-wrap items-center gap-4">
               <Link href="/charities" className={inkBtn}>Find a charity</Link>
@@ -317,7 +316,7 @@ export default function HomePreview() {
           </Reveal>
           <ul className="mx-auto mt-14 grid max-w-[80rem] gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
             {([
-              ["receipt", "s18A receipts, done for you", "Preview and approve each one. The SARS IT3(d) file is ready when you are."],
+              ["receipt", "s18A receipts, done with you", "Preview and approve each one, and we prepare your IT3(d) file for SARS."],
               ["heart", "Thank-yous in your words", "One note a month reaches everyone who gave, each by their first name."],
               ["repeat", "Monthly donations looked after", "A declined card is tried again automatically."],
               ["user", "Your whole team, each with the right access", "Owner, admin, finance, fundraiser or viewer."],
@@ -403,7 +402,7 @@ export default function HomePreview() {
         <Reveal className="mx-auto flex max-w-[80rem] flex-col items-center gap-8 px-4 py-24 text-center sm:px-6 md:py-36">
           <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-32 md:w-32"><Splash className="w-16 md:w-20" /></span>
           <H size="h1" dark className="max-w-[56rem]">January is close. <Em dark>Be there from day one.</Em></H>
-          <p className="max-w-[32rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Give to a checked charity in a few taps, or list yours and let the receipts take care of themselves.</p>
+          <p className="max-w-[32rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Find a charity you trust and give in a few taps, or list yours and let the receipts take care of themselves.</p>
           <div className="flex flex-wrap justify-center gap-3">
             <Link href="/charities" className={orangeBtn}>Find a charity</Link>
             <Link href="/apply" className={lineBtnDark}>Apply to list your charity</Link>

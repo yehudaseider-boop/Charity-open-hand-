@@ -626,20 +626,9 @@ body:has([data-chrome="landing"]) .chrome-full {
   .wash-blob, .float-tilt { animation: none; }
 }
 
-/* Home page preview (17/11/2026): a blue hero with a soft glow, and the phone's "Hold to give" button filling slowly,
-   the way the app's button fills under a finger. Still (part-filled) for reduced motion. */
+/* Home page preview (17/11/2026): a blue hero with a soft glow. */
 .hero-glow {
   background-image:
     radial-gradient(60rem 36rem at 85% 10%, rgba(201, 180, 250, 0.28), transparent 60%),
     radial-gradient(44rem 30rem at 0% 100%, rgba(11, 42, 115, 0.85), transparent 65%);
-}
-@keyframes give-hold {
-  0%, 15% { width: 0; }
-  70%, 100% { width: 100%; }
-}
-.give-hold {
-  animation: give-hold 3.2s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .give-hold { animation: none; width: 60%; }
 }
