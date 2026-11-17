@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { platformConfig } from "@/config/platform";
 import { PageFooter } from "@/components/page-footer";
 import { SmoothSectionLinks } from "@/components/smooth-section-links";
@@ -9,8 +9,28 @@ import { siteIndexable } from "@/lib/seo/indexing";
 import "./globals.css";
 
 // The brand fonts: Bricolage Grotesque for headlines and amounts (from 25/10/2026), DM Sans for everything else.
-const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-const bricolage = Bricolage_Grotesque({ variable: "--font-bricolage", subsets: ["latin"], weight: ["500", "700", "800"] });
+// Kept as our own files in src/fonts (both are open-licence fonts, licences beside them) instead of downloaded from
+// Google while the site is built (17/11/2026): a failed download had stopped three builds in a row. Latin letters
+// only, the same as before. The weights are exactly those the site uses.
+const dmSans = localFont({
+  variable: "--font-dm-sans",
+  display: "swap",
+  src: [
+    { path: "../fonts/dm-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/dm-sans-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../fonts/dm-sans-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../fonts/dm-sans-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
+});
+const bricolage = localFont({
+  variable: "--font-bricolage",
+  display: "swap",
+  src: [
+    { path: "../fonts/bricolage-grotesque-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../fonts/bricolage-grotesque-latin-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "../fonts/bricolage-grotesque-latin-800-normal.woff2", weight: "800", style: "normal" },
+  ],
+});
 
 export const metadata: Metadata = {
   title: { default: platformConfig.appName, template: `%s | ${platformConfig.appName}` },
