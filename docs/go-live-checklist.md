@@ -293,6 +293,9 @@ Paystack support (13/11/2026): Google Pay is available to South African business
   - **`new-card` route** is not behind the in-app giving switch: confirm the app opens it in the phone's browser in store builds, or put it behind the switch.
   - **Sign-in code lifetime:** the local setting is an hour while the screen says "expires soon"; set about 10 minutes on the hosted project and confirm its limits.
 
+- [ ] **The site's own address (found 17/11/2026).** Today givezy.co.za, www.givezy.co.za and test.givezy.co.za all forward visitors to charity-open-hand.vercel.app, because the server setting `SITE_URL` is that address (sign-in links only work on the address in `SITE_URL`, so every other address forwards there on purpose). Before launch: set `SITE_URL` on the live site to https://givezy.co.za (and on the test site to https://test.givezy.co.za if it should keep its own address), update the sign-in email links in Supabase's allowed redirect addresses to match, then check a sign-in link end to end. Needs Yehuda's yes: it changes where everyone lands.
+- [ ] **Next.js security update (found 17/11/2026).** The local development server warns that the installed Next.js has a known security vulnerability. Check the advisory, update Next.js on a branch, run every test and click through the test site before launch. Not done yet: no upgrade was run.
+
 ## C. First live day
 
 - [ ] One small real donation with Yehuda's own card. Check: the thank-you page, the confirmation email, the donation shows as paid, the charity sees it without the donor's private choice, and the s18A flow behaves as agreed.

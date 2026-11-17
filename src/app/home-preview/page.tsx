@@ -141,13 +141,17 @@ function Step({ n, title, body }: { n: string; title: string; body: string }) {
   );
 }
 
-/** One tab of the dashboard window: a real screen from the dashboard demo. */
+/**
+ * One tab of the dashboard window: the real dashboard demo, phone-sized on phones and full-sized from tablets up.
+ * Shot at retina size (3x phone, 2x desktop) and served as they are (`unoptimized`), so small text stays sharp
+ * (Yehuda, 17/11/2026: "it must be clear as ultra HD"). Only the open tab's picture loads.
+ */
 function Screen({ name, alt }: { name: string; alt: string }) {
-  // Phones see the top-left of the screen at a size they can read; wider screens see all of it.
   return (
-    <div className="overflow-hidden rounded-[0.75rem] border border-border max-sm:aspect-[4/3]">
-      <Image src={`/home/screen-${name}-v3.webp`} width={1400} height={862} alt={alt} sizes="(min-width: 1024px) 960px, (min-width: 640px) 92vw, 215vw" className="block h-auto w-full max-sm:w-[215%] max-sm:max-w-none" />
-    </div>
+    <>
+      <Image src={`/home/screen-${name}-phone-v5.webp`} width={1170} height={1650} alt={alt} unoptimized className="block h-auto w-full rounded-[0.75rem] border border-border sm:hidden" />
+      <Image src={`/home/screen-${name}-v5.webp`} width={2340} height={1440} alt={alt} unoptimized className="hidden h-auto w-full rounded-[0.75rem] border border-border sm:block" />
+    </>
   );
 }
 
@@ -224,7 +228,7 @@ export default function HomePreview() {
                 </div>
                 <div className="hero-rise sm:ml-6" style={{ animationDelay: "620ms" }}>
                   <div className="bob-slow"><Where n={3}>In the donor&apos;s inbox</Where>
-                    <div className={`${card} overflow-hidden p-1.5`}><Image src="/home/email-v3.webp" width={1056} height={706} alt="" sizes="300px" priority className="block h-auto w-full rounded-[1rem]" /></div>
+                    <div className={`${card} overflow-hidden p-1.5`}><Image src="/home/email-v5.webp" width={1056} height={868} alt="" unoptimized priority className="block h-auto w-full rounded-[1rem]" /></div>
                   </div>
                 </div>
                 <div className="hero-rise sm:mr-10" style={{ animationDelay: "860ms" }}>

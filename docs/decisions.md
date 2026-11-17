@@ -2002,3 +2002,13 @@ An independent check of the dashboard (and its demo) at 390, 810, 1080 and 1440 
 - **Demo notice:** "Reset the demo" keeps its 44 px tap area without pushing its line lower than the others.
 - Not changed: the share box on the Overview already shows the start of the address (it showed only "?src=link" while the demo's link was empty, fixed earlier today). The Donor journey page's email preview has the same fixed-height frame; not part of this check.
 - **Checked:** lint, typecheck, tests without the local database; the demo at 390, 810, 1080 and 1440 px.
+
+## Full check of the test site and the home page preview (17/11/2026, Yehuda: "make sure everything is connected... mistakes like that can't be")
+
+- **Found by Yehuda on his phone:** the home preview's story steps read 1, 2, 4 (step 3 was hidden on phones). Now all four show everywhere, and on wider screens the phone sits first so the numbers read 1, 2, 3, 4 from the top.
+- **Robot crawl of the live test site:** 120 pages and every link on them, as a visitor. No crashes, no broken pictures, no script errors, no wording slips. Found and fixed: "/charities\\" (a stray backslash) crashed with an error page, now it forwards to the clean address; the demo Overview's "Download paid donations (CSV)" opened the Overview again, now it downloads the made-up gifts; the demo's Copy link and Share on WhatsApp carried no address, now they point at the demo.
+- **Server error log, last 7 days:** only the backslash crash above. The app's server addresses answer.
+- **Independent visual check on an iPhone, an iPad both ways and a desktop:** 26 findings. Dashboard ones fixed in the shared dashboard (entry above). Home preview: one name for the demo ("Try the demo dashboard", "Thank donors"), one content width, doors sized to their words on tablets, "100%" instead of a word among numbers, the closing logo on white so its blue drop shows, a different closing line from the hero, "Towards 2 s18A receipts" on the phone picture (shared with the live home and For donors), and phones see the real phone-sized dashboard in the window. Demo data: 42 first names (each three times at most) and varied monthly amounts, still R4 200 a month from 14 donors.
+- **Sharpness (Yehuda: "clear as ultra HD"):** the dashboard pictures are shot at retina size (3x phone, 2x desktop: 1170 and 2340 px wide) and served as they are, without the image service re-compressing them. 70 to 180 KB each; only the open tab's picture loads.
+- **Checked:** lint, typecheck, 1 884 tests (no database here); ten widths from 360 to 1920 px; every tab on phone and desktop shows its own sharp picture; motion still for reduced motion.
+- **For the go-live list:** the site's own address (`SITE_URL`) and a Next.js security update.
