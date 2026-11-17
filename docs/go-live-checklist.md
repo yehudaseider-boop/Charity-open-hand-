@@ -2,6 +2,30 @@
 
 The order to do these in, and what to bring to the first session, is in `docs/launch-plan.md` (22/10/2026).
 
+## The short path to launch (17/11/2026, after the test-site check)
+
+The long lists below are the full record. This is the order that matters, in three stages. Each stage can start once the one before it is done.
+
+**Stage 1. Charities can apply and be approved (do first: charities need time to onboard before January).**
+1. Givezy's company details (registered name and number) into `src/config/legal.ts`. Needed for Paystack, the Privacy Policy and Terms.
+2. Email on: a Resend account, the SPF, DKIM and DMARC records for givezy.co.za at GoDaddy, `EMAIL_TRANSPORT=resend` and `EMAIL_FROM`. Today emails only go to the log, so no application or approval email would reach a charity. Send one of each to yourself first.
+3. The fee wording for charities (decided 13/11/2026 as a monthly fee, wording not approved). Charities will ask the cost before they apply. Then approve the charity sign-up emails in `src/lib/charity/emails.ts` and the For charities page.
+4. `ADMIN_NOTIFY_EMAIL` set to the address that hears about new applications, and someone checking applications every 2 working days (the page promises it). Write down what a person checks before approving (the "Fake-charity checks" item in A).
+5. The live Supabase project: plan (Pro from about $25 a month, as noted below), all migrations run in order, the causes added. Vercel on a paid plan (Hobby is non-commercial only).
+6. `SITE_URL` set to https://givezy.co.za, the same address in Supabase's allowed redirects, and `/apply` reachable on the live address (coming-soon mode currently sends every other page to the front page).
+7. The Next.js security update, tested.
+
+**Stage 2. Charities can receive money.**
+8. Paystack live sign-up (needs item 1), then the checks on the real account: split payments to a charity's bank, monthly collections, declined cards, refunds. Connect each approved charity in Admin before opening.
+9. Yosef: Privacy Policy and Terms approved, and the open POPIA points (Information Officer registered, what an erasure keeps).
+10. Fees: the exact words on every page, then take the "hidden" notes off.
+
+**Stage 3. Donors can give (the January launch).**
+11. Error alerts and an incident plan, two-step sign-in on every account that matters, a load test, the accessibility check of the give journey.
+12. The app: store builds submitted, giving through the website at first (in-app giving stays off until Apple and Google confirm in writing).
+13. Section C below: one real small gift, a refund, a replayed webhook, then a week of watching Admin, Payments.
+14. Then, and only then, the launch list, the home page switch (the new design is at `/home-preview`) and `COMING_SOON_HOSTS` off.
+
 Started 12/10/2026. Nothing here has been done on the real (live) systems yet. Tick items off as they are done and note the date. Items marked "decision" need Yehuda or Yosef before anyone builds or switches anything on.
 
 ## A. Decisions still open (nothing goes live until these are settled)
