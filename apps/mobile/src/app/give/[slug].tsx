@@ -43,6 +43,7 @@ import { useStoredRecord } from "@/lib/use-stored-record";
 import { tapAmounts } from "@shared/charity/suggested-amounts";
 import { charityShareText } from "@/lib/share";
 import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow";
+import { CHECKOUT_ORIGINS } from "@shared/gateway/checkout-origins";
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { celebrates, stageLabel, TICK_MS, type GiveStage } from "@/lib/give-stage";
@@ -50,7 +51,7 @@ import { confirmThen, openSite, openUrl } from "@/lib/open-site";
 import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
 import { inHistory, settles, type GiftSnapshot, type PendingGift } from "@/lib/pending-gift";
-import { dropPendingGift, keepPendingGift, loadPendingGift, markDetailsLater } from "@/lib/pending-gift-store";
+import { dropPendingAttempt, dropPendingGift, keepPendingGift, loadPendingGift, markDetailsLater } from "@/lib/pending-gift-store";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -84,6 +85,18 @@ const SECTION_OF: Record<string, string> = {
  */
 /** Exactly what one tap of Give sent, kept for the thank-you and for holding an unresolved saved-card attempt. */
 type Snapshot = GiftSnapshot;
+
+/** Where a payment page may be: each payment provider's own page, and our own site (the test gateway's page). */
+function paymentPageOrigins(site: string): string[] {
+  const own = (() => {
+    try {
+      return new URL(site).origin;
+    } catch {
+      return null;
+    }
+  })();
+  return [...Object.values(CHECKOUT_ORIGINS).flat(), ...(own ? [own] : [])];
+}
 
 export default function Give() {
   const insets = useSafeAreaInsets();
@@ -280,6 +293,7 @@ export default function Give() {
       setBusy(false);
       if (settles(outcome)) {
         attemptRef.current = null;
+        setHeldAttempt(null);
         void dropPendingGift(owner, slug);
       }
       if (outcome === "paid") {
@@ -607,9 +621,9 @@ export default function Give() {
   }
 
   /** A saved-card charge with no answer yet: kept on the phone under its attempt id, so it is asked about again, never charged twice. */
-  async function keepAttempt(s: Snapshot) {
-    if (!attemptRef.current) return;
-    await keepPendingGift(owner, {
+  async function keepAttempt(s: Snapshot): Promise<boolean> {
+    if (!attemptRef.current) return false;
+    return keepPendingGift(owner, {
       slug: charity!.slug,
       charityName: charity!.nameEn,
       reference: null,
@@ -670,6 +684,17 @@ export default function Give() {
       popia_consent: agreed,
     };
     const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extraChoice === "other" ? extraAmount : "", extraChoice };
+    // A saved-card charge is kept on the phone under its attempt id *before* it is sent (review 16/11/2026): if the app
+    // is closed or the phone dies while the charge is on its way, the next visit asks about that same attempt instead of
+    // starting a new one, so the card can never be charged twice. A storage failure doesn't stop the gift (as before).
+    let keptFirst = false;
+    // A brand-new attempt id: if the server then answers plainly (not "no reply" or "still checking"), nothing can
+    // have been charged under it, so a refusal frees it (review 18/11/2026: otherwise an ordinary refusal held it for ever).
+    const freshAttempt = payWithSaved && attemptRef.current === null;
+    if (payWithSaved) {
+      attemptRef.current ??= newAttemptId();
+      keptFirst = await keepAttempt(sent);
+    }
     // Anything that goes wrong before our server answers (the sign-in token, a bad address) has charged nothing:
     // say so, and free the Give button, instead of leaving it stuck on "Opening the payment page…".
     let r: Awaited<ReturnType<typeof startPayment>>;
@@ -686,7 +711,7 @@ export default function Give() {
           useSavedId: usingSavedId || undefined,
           saveCard: (offerSave && saveCard) || undefined,
           useSavedCard: payWithSaved || undefined,
-          attemptId: payWithSaved ? (attemptRef.current ??= newAttemptId()) : undefined,
+          attemptId: payWithSaved ? (attemptRef.current ?? undefined) : undefined,
           details,
         },
         undefined,
@@ -711,17 +736,29 @@ export default function Give() {
     // used with other details": the first tap may have charged, so a changed amount keeps hitting
     // the same id (and the server's refusal) until this screen is closed. A saved-card charge keeps
     // its id until we know it was paid or declined (below), so "try again" can never charge twice.
-    if (!r.ok && !("noReply" in r) && !r.attemptMismatch) attemptRef.current = null;
+    // With a saved card, only an answer that says plainly nothing was charged ends the attempt (declined, or refused
+    // for another reason): any other refusal ("still sending", "couldn't check", sign in again) may come while an
+    // earlier charge under this id is still on its way, so the id is kept and the next tap asks about it again
+    // (review 18/11/2026: dropping it there could charge twice).
+    const sentAttempt = attemptRef.current;
+    const nothingCharged = !r.ok && (r.savedCardDeclined === true || r.offerPaymentPage === true || (freshAttempt && !("noReply" in r) && !r.stillChecking && !r.attemptMismatch));
+    if (!r.ok && !("noReply" in r) && !r.attemptMismatch && (!payWithSaved || nothingCharged)) attemptRef.current = null;
     if (r.ok && !r.charged) attemptRef.current = null;
-    if (attemptRef.current === null && heldAttempt) {
+    if (attemptRef.current === null && (heldAttempt || keptFirst)) {
       setHeldAttempt(null);
-      // The held saved-card attempt is over (refused, or this tap opened a payment page instead).
-      if (!r.ok) void dropPendingGift(owner, charity!.slug);
+      // The held (or just kept) saved-card attempt is over: refused with nothing charged, or a payment page instead.
+      if (!r.ok && sentAttempt) void dropPendingAttempt(owner, charity!.slug, sentAttempt);
+    }
+    // Kept after a refusal: held exactly as sent, so a changed amount can't start a second charge.
+    if (!r.ok && payWithSaved && attemptRef.current !== null && !("noReply" in r) && !r.attemptMismatch) {
+      setHeldAttempt(heldAttempt ?? sent);
+      if (!keptFirst) await keepAttempt(heldAttempt ?? sent);
     }
     if (!r.ok) {
       setBusy(false);
       // A declined saved card: offer the payment page, where another card can be used.
-      if (r.savedCardDeclined) setUseSavedCard(false);
+      // The provider turned the saved card down for another reason (nothing charged): the payment page too.
+      if (r.savedCardDeclined || r.offerPaymentPage) setUseSavedCard(false);
       if ("noReply" in r) {
         if (payWithSaved) {
           setHeldAttempt(sent);
@@ -761,7 +798,7 @@ export default function Give() {
         showProblems(r.fieldErrors);
         return;
       }
-      setMessage(r.message, "error", !r.quote);
+      setMessage(r.message, r.stillChecking ? "wait" : "error", !r.quote);
       if (r.quote) setAuthorisedTotal(null);
       return;
     }
@@ -791,7 +828,7 @@ export default function Give() {
     // Paid with the saved card: there is no payment page, only the check below.
     if (!r.charged) {
       try {
-        shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
+        shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }), paymentPageOrigins(site));
       } catch {
         setBusy(false);
         void dropPendingGift(owner, charity!.slug);
@@ -820,6 +857,8 @@ export default function Give() {
       attemptRef.current = null;
       setHeldAttempt(null);
     }
+    // Still unsettled: held exactly as sent, so the amount can't change and the payment page can't replace it.
+    else if (r.charged) setHeldAttempt(sent);
     if (!finished) {
       haptic.tap();
       const o = outcome === "paid" || outcome === "unknown" ? "pending" : outcome;

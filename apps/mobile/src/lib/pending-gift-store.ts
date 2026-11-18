@@ -59,6 +59,24 @@ export function keepPendingGift(userId: string | null, gift: PendingGift): Promi
   });
 }
 
+/**
+ * Forget a saved-card attempt, but only if the gift kept for this charity is still that attempt: an older waiting
+ * gift (a payment page still being confirmed) is never dropped by mistake (review 18/11/2026).
+ */
+export function dropPendingAttempt(userId: string | null, slug: string, attemptId: string): Promise<void> {
+  return serial(async () => {
+    try {
+      const all = await readAll(userId);
+      if (all[slug]?.attemptId !== attemptId) return;
+      delete all[slug];
+      await saveOwned(KEY, userId, JSON.stringify(all));
+      listeners.forEach((l) => l());
+    } catch {
+      // Kept: asked about again later, which never charges twice.
+    }
+  });
+}
+
 /** Forget the waiting gift for this charity: paid, declined, not found, or the donor started again. */
 export function dropPendingGift(userId: string | null, slug: string): Promise<void> {
   return serial(async () => {

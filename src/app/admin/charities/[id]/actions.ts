@@ -377,6 +377,10 @@ export async function resetSecondStep(id: string, userId: string, _prev: FormSta
   const db = createAdminClient();
   const member = await db.from("charity_admins").select("user_id").eq("charity_id", id).eq("user_id", userId).maybeSingle();
   if (!member.data) return { ok: false, message: "That person doesn't manage this charity." };
+  // A Givezy admin's second step is never reset from a charity's page (security review 18/11/2026).
+  const target = await db.from("profiles").select("role").eq("id", userId).maybeSingle();
+  if (target.error) return failed(target.error);
+  if (target.data?.role === "platform_admin") return { ok: false, message: "That person is a Givezy admin. Their second step can't be reset here." };
   const factors = await db.auth.admin.mfa.listFactors({ userId });
   if (factors.error) return failed(factors.error);
   const list = factors.data.factors ?? [];

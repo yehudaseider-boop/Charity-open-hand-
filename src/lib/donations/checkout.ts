@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 import { encrypt, last4, receiptIdentity } from "@/lib/crypto";
-import { getGateway, GatewayError, isGatewayRefusal } from "@/lib/gateway";
+import { getGateway, GatewayError, isGatewayDecline, isGatewayRefusal } from "@/lib/gateway";
 import { savedAddress, savedIdNumber } from "./saved-id";
 import { savedCardsOpen } from "./app-api";
 import { loadSavedCardToken, requestCardSave } from "./saved-card";
@@ -19,6 +19,7 @@ import { cameFromOf } from "./source";
 import { optOutAtCheckout } from "@/lib/charity/appeals";
 import { checkDonorDetails, givingLabelOf, s18aDetailsLater, type CheckoutInput } from "./validation";
 import { isUuid } from "@/lib/ids";
+import { logAudit } from "@/lib/audit";
 import { parseDedication } from "./dedication";
 
 // The pricing itself is shared with the give form's live total (quote.ts), so both always agree.
@@ -33,7 +34,7 @@ export type StartResult =
    */
   | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
   /** `savedCardDeclined`: the provider refused the saved card, so the app should offer the payment page with another card. */
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean; attemptMismatch?: boolean; providerDown?: boolean; campaignEnded?: boolean; limited?: boolean };
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Quote; savedCardDeclined?: boolean; offerPaymentPage?: boolean; stillChecking?: boolean; attemptMismatch?: boolean; providerDown?: boolean; campaignEnded?: boolean; limited?: boolean };
 
 /**
  * Record a pending donation and hand the donor to the gateway.
@@ -148,19 +149,28 @@ export async function startDonation(args: {
   if (attemptId) {
     const { data: prior, error: priorError } = await db
       .from("donations")
-      .select("status, charity_id, total_charged_cents, created_at, donation_checkout_details(email)")
+      .select("status, charity_id, total_charged_cents, created_at, donation_checkout_details(email, started_by_user)")
       .eq("id", attemptId)
       .maybeSingle();
     if (priorError) throw priorError;
     if (prior) {
-      const details = prior.donation_checkout_details as { email: string | null } | { email: string | null }[] | null;
-      const priorEmail = (Array.isArray(details) ? details[0]?.email : details?.email) ?? "";
-      if (prior.charity_id !== charity.id || priorEmail.toLowerCase() !== v.email.toLowerCase() || Number(prior.total_charged_cents) !== fees.totalCents) {
+      type PriorDetails = { email: string | null; started_by_user?: string | null };
+      const raw = prior.donation_checkout_details as PriorDetails | PriorDetails[] | null;
+      const details = Array.isArray(raw) ? raw[0] : raw;
+      const priorEmail = details?.email ?? "";
+      // The earlier attempt must have been started by this same account (review 16/11/2026): an attempt id is only
+      // ever asked about again by the account whose saved card it charged.
+      const priorOwner = details?.started_by_user ?? null;
+      const ownerMatches = !args.useSavedCardOf || priorOwner === args.useSavedCardOf.userId;
+      if (!ownerMatches || prior.charity_id !== charity.id || priorEmail.toLowerCase() !== v.email.toLowerCase() || Number(prior.total_charged_cents) !== fees.totalCents) {
         // The same attempt with different details: the app keeps the attempt id, so a changed
         // amount can never become a second charge on this screen.
         return { ok: false, attemptMismatch: true, message: "Something went wrong. Please close this screen and try again." };
       }
       if (prior.status === "failed") {
+        // Failed for a reason that isn't the card (the provider refused it for another reason, or it never reached the
+        // provider and was closed): nothing was charged, and the donor is never told the card was declined.
+        if (await failedNotByCard(attemptId)) return { ok: false, offerPaymentPage: true, message: NOT_CHARGED_TRY_PAGE };
         return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
       }
       if (prior.status === "pending") {
@@ -169,13 +179,13 @@ export async function startDonation(args: {
         // same reference, so the provider itself refuses a second charge if the first one did go out.
         const reached = await providerKnows(attemptId);
         if (reached === "unknown") {
-          return { ok: false, message: "We couldn't check this gift with the payment provider. Please wait a minute and try again. Your card won't be charged twice." };
+          return { ok: false, stillChecking: true, message: "We couldn't check this gift with the payment provider. Please wait a minute and try again. Your card won't be charged twice." };
         }
         if (reached === "no" && savedToken) {
           const startedAt = new Date(String(prior.created_at ?? "")).getTime();
           // A first try still on its way to the provider: never race it.
           if (!Number.isFinite(startedAt) || Date.now() - startedAt < RESUME_AFTER_MS) {
-            return { ok: false, message: "We're still sending this gift to the payment provider. Please wait a minute and try again. Your card won't be charged twice." };
+            return { ok: false, stillChecking: true, message: "We're still sending this gift to the payment provider. Please wait a minute and try again. Your card won't be charged twice." };
           }
           await finishSavedCardRecords(attemptId, v);
           return chargeSavedCard({ donationId: attemptId, savedToken, v, fees, charity, token: await reissueConfirmationToken(attemptId), resumed: true });
@@ -390,6 +400,25 @@ export async function startDonation(args: {
   }
 }
 
+/** A saved-card charge the provider turned down for a reason that isn't the card (review 16/11/2026). */
+export const SAVED_CARD_REFUSED =
+  "The payment provider couldn't take this payment from your saved card, so nothing was charged. It wasn't your card: we've been told and will look into it. Please pay on the payment page for now.";
+
+/** An earlier attempt that failed without the card being declined, retried under the same id (review 18/11/2026). */
+const NOT_CHARGED_TRY_PAGE = "This gift didn't go through, so nothing was charged. Please pay on the payment page.";
+
+/** Did this failed gift fail for a reason other than the card (refused for another reason, or closed unreceived)? */
+async function failedNotByCard(donationId: string): Promise<boolean> {
+  const { data, error } = await createAdminClient()
+    .from("audit_log")
+    .select("id")
+    .eq("entity_id", donationId)
+    .in("action", ["donation.saved_card_refused", "donation.checkout_closed"])
+    .limit(1);
+  if (error) throw error;
+  return Boolean(data?.length);
+}
+
 /** A saved-card gift recorded this recently may still be on its way to the provider: it is never charged from a retry. */
 const RESUME_AFTER_MS = 2 * 60_000;
 
@@ -428,9 +457,13 @@ async function finishSavedCardRecords(donationId: string, v: CheckoutInput): Pro
 }
 
 /**
- * Charge the donor's saved card: no payment page. A refusal (declined, expired) ends this gift; anything else
- * (a timeout, an outage) leaves it pending, because the charge may have gone through and a second charge must
- * never follow. Either way the answer only counts once confirmed with the provider (api/app/status).
+ * Charge the donor's saved card: no payment page. A refusal that names the card (declined, expired: see
+ * `isGatewayDecline`) ends this gift as declined. Any other refusal (a split or amount the provider turned down)
+ * also charged nothing and ends the gift, but never tells the donor their card was declined: a person is told
+ * (`donation.saved_card_refused`) and the donor is offered the payment page (review 16/11/2026, the same rule as
+ * monthly collections). Anything else (a timeout, an outage) leaves it pending, because the charge may have gone
+ * through and a second charge must never follow. Either way the answer only counts once confirmed with the provider
+ * (api/app/status).
  */
 async function chargeSavedCard(a: {
   donationId: string;
@@ -444,7 +477,7 @@ async function chargeSavedCard(a: {
 }): Promise<StartResult> {
   const db = createAdminClient();
   const gateway = getGateway();
-  const failGift = async (): Promise<StartResult> => {
+  const failGift = async (why: "declined" | "refused" = "declined", said: string | null = null): Promise<StartResult> => {
     // A retried charge the provider turned down may have been turned down because the first one did reach it
     // after all (the same reference twice): then the provider's own record decides. A payment it holds as paid or
     // still going is answered as charged (the status check settles it); one it holds as declined is declined; one
@@ -453,8 +486,24 @@ async function chargeSavedCard(a: {
       const known = await providerKnows(a.donationId);
       if (known === "success" || known === "pending") return { ok: true, charged: true, reference: a.donationId, token: a.token };
       if (known === "unknown") {
-        return { ok: false, message: "We couldn't check this gift with the payment provider. Please wait a minute and try again. Your card won't be charged twice." };
+        return { ok: false, stillChecking: true, message: "We couldn't check this gift with the payment provider. Please wait a minute and try again. Your card won't be charged twice." };
       }
+      // The provider holds the first try as declined: this retry was turned down for that reason, so it is a decline.
+      if (known === "failed") why = "declined";
+    }
+    if (why === "refused") {
+      // Not about the card: a person looks at it (Admin, Payments and the daily email). Noted *before* the gift is marked
+      // failed, because a retry reads this note to avoid saying "declined" (review 18/11/2026): if the note can't be
+      // written, the gift stays pending and the app hears "no reply", so it asks again under the same id.
+      await logAudit({
+        actorUserId: null,
+        action: "donation.saved_card_refused",
+        entityType: "donation",
+        entityId: a.donationId,
+        details: { said: said?.slice(0, 300) ?? null },
+      });
+      await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", a.donationId).eq("status", "pending");
+      return { ok: false, offerPaymentPage: true, message: SAVED_CARD_REFUSED };
     }
     await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", a.donationId).eq("status", "pending");
     return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
@@ -473,7 +522,8 @@ async function chargeSavedCard(a: {
     });
     if (status === "failed") return await failGift();
   } catch (e) {
-    if (isGatewayRefusal(e)) return await failGift();
+    if (isGatewayDecline(e)) return await failGift("declined");
+    if (isGatewayRefusal(e)) return await failGift("refused", e instanceof GatewayError ? e.said : null);
     console.error(e);
   }
   return { ok: true, charged: true, reference: a.donationId, token: a.token };

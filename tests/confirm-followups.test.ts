@@ -171,6 +171,42 @@ describe("old checkouts the donor never paid (daily check only)", () => {
   });
 });
 
+describe("the app's check of a once-off gift the provider never received (review 22/10/2026)", () => {
+  const closeNeverReceivedBefore = new Date(NOW.getTime() - 15 * 60_000);
+  const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
+
+  it("is closed as failed after 15 minutes, so the app stops saying it couldn't check, and is not a declined card", async () => {
+    donation.created_at = minutesAgo(20);
+    verify.mockRejectedValue(new GatewayError("not found", { notFound: true }));
+    expect(await confirmPayment(REF, { closeNeverReceivedBefore })).toBe("failed");
+    expect(donation.status).toBe("failed");
+    expect(events).not.toContain("decline counted");
+    expect(audits[0]).toMatchObject({ action: "donation.checkout_closed", details: { why: "never_received" } });
+  });
+
+  it("a recent one may still be on its way to the provider: left pending", async () => {
+    donation.created_at = minutesAgo(5);
+    verify.mockRejectedValue(new GatewayError("not found", { notFound: true }));
+    await expect(confirmPayment(REF, { closeNeverReceivedBefore })).rejects.toThrow(/not found/);
+    expect(donation.status).toBe("pending");
+  });
+
+  it("only when the provider says it never received it: an outage closes nothing", async () => {
+    donation.created_at = minutesAgo(60);
+    verify.mockRejectedValue(new GatewayError("down", { unreachable: true }));
+    await expect(confirmPayment(REF, { closeNeverReceivedBefore })).rejects.toThrow(/down/);
+    expect(donation.status).toBe("pending");
+  });
+
+  it("never a monthly donation's payment", async () => {
+    donation.created_at = minutesAgo(60);
+    donation.recurring_id = "rec1";
+    verify.mockRejectedValue(new GatewayError("not found", { notFound: true }));
+    await expect(confirmPayment(REF, { closeNeverReceivedBefore })).rejects.toThrow(/not found/);
+    expect(donation.status).toBe("pending");
+  });
+});
+
 describe("monthly collection tries", () => {
   const { attemptDonationId } = schedule;
   const second = attemptDonationId("rec1", "2026-11", 1);

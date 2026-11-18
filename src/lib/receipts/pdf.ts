@@ -46,7 +46,10 @@ async function chrome(): Promise<{ executablePath: string; args: string[] }> {
 export async function htmlToPdf(html: string): Promise<Buffer> {
   const browser = await chromium.launch(await chrome());
   try {
-    const page = await browser.newPage();
+    // No scripts and no network: the receipt is plain escaped HTML with its fonts and logo inside it, so a field that
+    // ever slipped through unescaped could neither run nor reach anything (security review 18/11/2026).
+    const page = await browser.newPage({ javaScriptEnabled: false });
+    await page.route("**/*", (route) => (route.request().url().startsWith("data:") ? route.continue() : route.abort()));
     await page.setContent(html, { waitUntil: "load" });
     return await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true });
   } finally {

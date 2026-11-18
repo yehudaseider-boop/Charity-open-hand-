@@ -12,6 +12,9 @@ describe("the in-app giving switch", () => {
   });
 });
 
+/** The payment pages these tests may open. */
+const OK = ["https://example.co.za", "https://pay.example"];
+
 describe("opening the payment page", () => {
   it("uses the same return link as the website's payment page", () => {
     expect(APP_RETURN_LINK).toBe(WEBSITE_RETURN_LINK);
@@ -19,25 +22,41 @@ describe("opening the payment page", () => {
 
   it("opens the page with the return link, and says 'returned' when the donor comes back from it", async () => {
     const open = vi.fn(async () => ({ type: "success" }));
-    expect(await openGivingPage("https://example.co.za/c/x/donate?kind=maaser&from=app", open)).toBe("returned");
+    expect(await openGivingPage("https://example.co.za/c/x/donate?kind=maaser&from=app", open, OK)).toBe("returned");
     expect(open).toHaveBeenCalledWith("https://example.co.za/c/x/donate?kind=maaser&from=app", "nedivlev://giving");
   });
 
   it("says 'closed' when the donor closes the sheet", async () => {
     for (const type of ["cancel", "dismiss", "locked"]) {
-      expect(await openGivingPage("https://example.co.za/x", async () => ({ type }))).toBe("closed");
+      expect(await openGivingPage("https://example.co.za/x", async () => ({ type }), OK)).toBe("closed");
     }
   });
 
   it("refuses an address that is not https, without opening anything", async () => {
     const open = vi.fn();
-    await expect(openGivingPage("http://example.co.za/x", open)).rejects.toThrow(/secure address/);
-    await expect(openGivingPage("javascript:alert(1)", open)).rejects.toThrow();
+    await expect(openGivingPage("http://example.co.za/x", open, OK)).rejects.toThrow(/secure address/);
+    await expect(openGivingPage("javascript:alert(1)", open, OK)).rejects.toThrow();
     expect(open).not.toHaveBeenCalled();
   });
 
+  it("refuses any address that isn't a known payment page, without opening anything (security review 18/11/2026)", async () => {
+    const open = vi.fn();
+    for (const url of [
+      "https://evil.example/pay",
+      "https://example.co.za.evil.example/pay",
+      "https://user:pw@example.co.za/pay",
+      "https://example.co.za:8443/pay",
+      "not a url",
+    ]) {
+      await expect(openGivingPage(url, open, OK)).rejects.toThrow();
+    }
+    expect(open).not.toHaveBeenCalled();
+    const { isAllowedPaymentPage } = await import("../apps/mobile/src/lib/give-flow");
+    expect(isAllowedPaymentPage("https://checkout.paystack.com/abc", ["https://checkout.paystack.com"])).toBe(true);
+  });
+
   it("passes on a failure to open", async () => {
-    await expect(openGivingPage("https://example.co.za/x", async () => Promise.reject(new Error("no browser")))).rejects.toThrow("no browser");
+    await expect(openGivingPage("https://example.co.za/x", async () => Promise.reject(new Error("no browser")), OK)).rejects.toThrow("no browser");
   });
 });
 
@@ -65,13 +84,13 @@ describe("the payment sheet's return link", () => {
     await openGivingPage("https://pay.example/x", async () => {
       during = [isSheetReturn("nedivlev://giving", false), isSheetReturn("/giving", false), isSheetReturn("nedivlev://giving", true), isSheetReturn("/account", false)];
       return { type: "success" };
-    });
+    }, OK);
     expect(during).toEqual([true, true, false, false]);
     expect(isSheetReturn("nedivlev://giving", false)).toBe(false);
   });
   it("is released even if the sheet fails to open", async () => {
     const { isSheetReturn } = await import("../apps/mobile/src/lib/give-flow");
-    await expect(openGivingPage("https://pay.example/x", async () => { throw new Error("no browser"); })).rejects.toThrow();
+    await expect(openGivingPage("https://pay.example/x", async () => { throw new Error("no browser"); }, OK)).rejects.toThrow();
     expect(isSheetReturn("nedivlev://giving", false)).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ export type CheckoutReply =
   /** Paid with the saved card: no payment page. Ask for the outcome (the charge is only a first indication). */
   | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
   /** `attemptMismatch`: this attempt id was already used with other details, so the app keeps the id (see give screen). */
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing; savedCardDeclined?: boolean; attemptMismatch?: boolean };
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing; savedCardDeclined?: boolean; offerPaymentPage?: boolean; stillChecking?: boolean; attemptMismatch?: boolean };
 
 /** The card kept for next time: what is safe to show ("Visa ending 4242"), never the card itself. */
 export type SavedCard = { brand: string | null; last4: string | null; expires: string | null };

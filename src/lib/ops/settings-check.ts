@@ -41,7 +41,7 @@ export function settingsCheck(env: Env): SettingCheck[] {
 
   // Encryption
   const enc = env.ENCRYPTION_KEY ?? "";
-  if (!enc) add("ENCRYPTION_KEY", "fix", "Missing. Bank, ID and tax numbers can't be saved or read.");
+  if (!enc) add("ENCRYPTION_KEY", "fix", "Missing. Bank, ID and tax numbers can't be saved or read, and the limits by internet address and email (sign-in codes, forms, checkout) are switched off.");
   else if (Buffer.from(enc, "base64").length !== 32) add("ENCRYPTION_KEY", "fix", "Wrong length: it must be 32 random bytes in base64 (44 characters ending in =).");
   else add("ENCRYPTION_KEY", "ok", "Set. Keep the backup copy safe: without it, saved bank, ID and tax numbers can't be read.");
 

@@ -8,6 +8,7 @@ const mails: { to: string; subject: string }[] = [];
 const deleted: string[] = [];
 const updates: Record<string, unknown>[] = [];
 let memberRow: unknown = { user_id: "u2" };
+let targetRole = "donor";
 let factors = [{ id: "f1" }];
 let charity: Record<string, unknown> = {};
 let documents: { document_type: string; signed_on?: string; storage_path: string }[] = [];
@@ -34,7 +35,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         updates.push({ table, ...row });
         return { eq: async () => ({ error: null }) };
       };
-      b.maybeSingle = async () => ({ data: table === "profiles" ? { email: "p@x.co" } : table === "charity_admins" ? memberRow : { name_en: "Meals Fund" }, error: null });
+      b.maybeSingle = async () => ({ data: table === "profiles" ? { email: "p@x.co", role: targetRole } : table === "charity_admins" ? memberRow : { name_en: "Meals Fund" }, error: null });
       return b;
     },
     auth: {
@@ -58,6 +59,7 @@ const form = (o: Record<string, string>) => {
 beforeEach(() => {
   audits.length = mails.length = deleted.length = updates.length = 0;
   memberRow = { user_id: U2 };
+  targetRole = "donor";
   factors = [{ id: "f1" }];
   charity = { status: "approved", name_en: "Meals Fund", slug: "meals", is_s18a: false, mandate_signed_at: null, s18a_reference: null };
   documents = [];
@@ -99,6 +101,12 @@ describe("reset a lost authenticator", () => {
     expect((await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Called them" }))).ok).toBe(false);
     memberRow = { user_id: ADMIN };
     expect((await resetSecondStep(CH, ADMIN, { ok: false }, form({ reason: "Called them" }))).ok).toBe(false);
+    expect(deleted).toHaveLength(0);
+  });
+  it("never for another Givezy admin, even one who is on this charity's team (security review 18/11/2026)", async () => {
+    targetRole = "platform_admin";
+    const r = await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Called them on the number we have" }));
+    expect(r).toMatchObject({ ok: false, message: expect.stringMatching(/Givezy admin/) });
     expect(deleted).toHaveLength(0);
   });
 });
