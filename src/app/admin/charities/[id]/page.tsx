@@ -7,6 +7,7 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { bankCheckLines, loadBankCheck } from "@/lib/charity/bank-check";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { charityBadges } from "@/lib/charities";
+import { registrationKey } from "@/lib/charity/vetting";
 import { loadCharityForManager, publicImageUrl } from "@/lib/charity/queries";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 import { formatDate } from "@/lib/dates";
@@ -69,13 +70,22 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
   const contactChangedAt = (contactChanges?.[0]?.created_at as string | undefined) ?? null;
 
   // Another charity already listed under the same registration number: a copy, a typo, or someone borrowing a real
-  // charity's number. A person looks before approving (18/11/2026).
+  // charity's number. A person looks before approving (18/11/2026). Compared without spaces, dashes or slashes and in
+  // any case, so "930 012 345" and "930012345" count as the same number.
   const sameNumber = new Map<string, { name: string; status: string }>();
-  for (const [column, value] of [["npo_number", charity.npo_number], ["pbo_number", charity.pbo_number]] as const) {
-    const v = typeof value === "string" ? value.trim() : "";
-    if (!v) continue;
-    const { data } = await supabase.from("charities").select("id, name_en, status").eq(column, v).neq("id", id).limit(5);
-    for (const o of data ?? []) sameNumber.set(o.id as string, { name: o.name_en as string, status: o.status as string });
+  const mine = [charity.npo_number, charity.pbo_number].map(registrationKey).filter(Boolean);
+  if (mine.length) {
+    // Page by page: the database hands out at most 1 000 rows at a time.
+    const others: { id: string; name_en: string; status: string; npo_number: string | null; pbo_number: string | null }[] = [];
+    for (let from = 0; from < 20_000; from += 1000) {
+      const { data } = await supabase.from("charities").select("id, name_en, status, npo_number, pbo_number").neq("id", id).order("id").range(from, from + 999);
+      others.push(...((data ?? []) as typeof others));
+      if (!data || data.length < 1000) break;
+    }
+    for (const o of others) {
+      const theirs = [o.npo_number, o.pbo_number].map(registrationKey).filter(Boolean);
+      if (theirs.some((n) => mine.includes(n))) sameNumber.set(o.id as string, { name: o.name_en as string, status: o.status as string });
+    }
   }
 
   // charity_admins links to auth users, so look up their emails separately.

@@ -50,3 +50,8 @@ export function readVetting(formData: FormData): VettingResult {
   }
   return { ok: true, ticked: vettingChecks.map((c) => c.key), spokeTo: spokeTo.slice(0, SPOKE_TO_MAX) };
 }
+
+/** A registration number reduced to its letters and digits, upper case, for comparing ("930-012 345" = "930012345"). */
+export function registrationKey(value: unknown): string {
+  return typeof value === "string" ? value.replace(/[^0-9a-z]/gi, "").toUpperCase() : "";
+}

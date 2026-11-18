@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readVetting, vettingChecks, vettingField, SPOKE_TO_FIELD } from "../src/lib/charity/vetting";
+import { readVetting, registrationKey, vettingChecks, vettingField, SPOKE_TO_FIELD } from "../src/lib/charity/vetting";
 
 function form(entries: Record<string, string>) {
   const f = new FormData();
@@ -39,5 +39,19 @@ describe("approving a charity needs every vetting check and who was spoken to", 
     const note = (r as { spokeTo: string }).spokeTo;
     expect(note.startsWith("Jo Smith by phone")).toBe(true);
     expect(note.length).toBe(300);
+  });
+});
+
+describe("comparing registration numbers for the same-number warning", () => {
+  it("ignores spaces, dashes, slashes and case", () => {
+    expect(registrationKey("930 012 345")).toBe(registrationKey("930012345"));
+    expect(registrationKey("930-012-345")).toBe("930012345");
+    expect(registrationKey("123-456 npo")).toBe(registrationKey("123456NPO"));
+    expect(registrationKey("2020/123456/08")).toBe("202012345608");
+  });
+  it("treats an empty or missing number as nothing (never a match)", () => {
+    expect(registrationKey("")).toBe("");
+    expect(registrationKey(null)).toBe("");
+    expect(registrationKey("  - ")).toBe("");
   });
 });
