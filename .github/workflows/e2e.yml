@@ -3,7 +3,8 @@
 # with a real code (no email is sent: Supabase hands the robot the code). Nothing is paid.
 #
 # Runs after every successful deploy of the test site (Vercel tells GitHub), every morning, and on demand
-# (Actions, End-to-end checks, Run workflow). One secret is needed: E2E_SUPABASE_SECRET_KEY, the TEST project's
+# (Actions, End-to-end checks, Run workflow). GitHub only offers the morning run and the button once this file is
+# also on the default branch (main); until then it runs after each test-site deploy. One secret is needed: E2E_SUPABASE_SECRET_KEY, the TEST project's
 # secret key (Settings, Secrets and variables, Actions). Without it the sign-in checks are skipped, with a note.
 # Never the live project: the robot makes its own test account there and agrees to the Terms.
 name: End-to-end checks
@@ -29,7 +30,6 @@ jobs:
       # The TEST project's address and public key (public by design: the app and website ship them).
       E2E_SUPABASE_URL: https://bodfyjskiwrwxhagtkxt.supabase.co
       E2E_SUPABASE_PUBLISHABLE_KEY: sb_publishable_5tktt_ZO7_X3a5avySXu9A_2VcYYaFJ
-      E2E_SUPABASE_SECRET_KEY: ${{ secrets.E2E_SUPABASE_SECRET_KEY }}
       E2E_APP_URL: http://127.0.0.1:8089
     steps:
       - uses: actions/checkout@v4
@@ -73,4 +73,7 @@ jobs:
           echo "The test site's health check did not answer." && exit 1
 
       - name: End-to-end checks
+        # The secret key only here, never during installs or the app build.
+        env:
+          E2E_SUPABASE_SECRET_KEY: ${{ secrets.E2E_SUPABASE_SECRET_KEY }}
         run: npm run test:e2e

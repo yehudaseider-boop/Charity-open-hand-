@@ -34,4 +34,32 @@ describe("the database client's time limit (weak signal)", () => {
     mine.abort(new Error("cancelled by the screen"));
     await expect(p).rejects.toThrow(/cancelled by the screen/);
   });
+
+  it("also fails an answer that starts but then stalls halfway", async () => {
+    vi.useFakeTimers();
+    const stallingBody = ((_: unknown, init: RequestInit = {}) =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(c) {
+              c.enqueue(new TextEncoder().encode("[{"));
+              init.signal?.addEventListener("abort", () => c.error(init.signal?.reason));
+            },
+          }),
+        ),
+      )) as typeof fetch;
+    const p = timedFetch(20_000, stallingBody)("https://x.test");
+    const seen = expect(p).rejects.toMatchObject({ name: "AbortError" });
+    await vi.advanceTimersByTimeAsync(20_000);
+    await seen;
+    vi.useRealTimers();
+  });
+
+  it("keeps the status and headers of a normal answer", async () => {
+    const base = (async () => new Response('{"a":1}', { status: 201, headers: { "content-type": "application/json" } })) as typeof fetch;
+    const r = await timedFetch(1_000, base)("https://x.test");
+    expect(r.status).toBe(201);
+    expect(r.headers.get("content-type")).toBe("application/json");
+    expect(await r.json()).toEqual({ a: 1 });
+  });
 });

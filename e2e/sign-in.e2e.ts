@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Browser } from "playwright-core";
 import { cleanCode } from "../apps/mobile/src/lib/live-giving";
 import { SIGN_IN_CODE } from "../src/lib/sign-in-code";
-import { BROKEN, SITE, canSignIn, ensureRobot, freshSignIn, openBrowser } from "./setup";
+import { BROKEN, SITE, canSignIn, ensureRobot, freshSignIn, openBrowser, signedInCookies } from "./setup";
 
 let browser: Browser;
 beforeAll(async () => {
@@ -27,12 +27,22 @@ describe.skipIf(!canSignIn)("signing in with the code Supabase really sends", ()
     expect(cleanCode(`${code.slice(0, 4)} ${code.slice(4)}`)).toBe(code);
   });
 
-  it("signs in on the website, and the account page loads without an error", async () => {
-    const { tokenHash } = await freshSignIn();
-    const page = await browser.newPage({ viewport: { width: 375, height: 800 } });
+  it("the code signs in once, and is refused the second time", async () => {
+    const { code } = await freshSignIn();
+    expect((await signedInCookies(code)).error).toBeNull();
+    expect((await signedInCookies(code)).error).not.toBeNull();
+  });
+
+  it("signed in on the website, the account page loads without an error", async () => {
+    const { cookies, error } = await signedInCookies();
+    expect(error).toBeNull();
+    expect(cookies.length).toBeGreaterThan(0);
+    const context = await browser.newContext({ viewport: { width: 375, height: 800 } });
+    await context.addCookies(cookies);
+    const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    await page.goto(`${SITE}/auth/callback?token_hash=${tokenHash}&type=email&next=/account`, { waitUntil: "networkidle" });
+    await page.goto(`${SITE}/account`, { waitUntil: "networkidle" });
     // A first sign-in asks to agree to the Terms once.
     if (new URL(page.url()).pathname === "/agree") {
       await page.locator('input[name="agree"]').check();
@@ -46,16 +56,6 @@ describe.skipIf(!canSignIn)("signing in with the code Supabase really sends", ()
     // Signed in: not sent back to the sign-in form.
     expect(text).not.toMatch(/Email me a sign-in code/);
     expect(errors).toEqual([]);
-    await page.close();
-  });
-
-  it("refuses a code that has already been used", async () => {
-    const { tokenHash } = await freshSignIn();
-    const page = await browser.newPage();
-    await page.goto(`${SITE}/auth/callback?token_hash=${tokenHash}&type=email&next=/account`, { waitUntil: "networkidle" });
-    await page.context().clearCookies();
-    await page.goto(`${SITE}/auth/callback?token_hash=${tokenHash}&type=email&next=/account`, { waitUntil: "networkidle" });
-    expect(new URL(page.url()).pathname).toBe("/login");
-    await page.close();
+    await context.close();
   });
 });

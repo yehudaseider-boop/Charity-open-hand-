@@ -14,15 +14,25 @@ export function timedOut(): Error {
 }
 
 export function timedFetch(limitMs: number = DB_TIME_LIMIT_MS, base: typeof fetch = fetch): typeof fetch {
-  return (input, init = {}) => {
+  return async (input, init = {}) => {
     const stop = new AbortController();
     // Named like a cancel, so the database library doesn't quietly try 3 more times (4 x the wait) before saying so.
     const timer = setTimeout(() => stop.abort(timedOut()), limitMs);
     const theirs = init.signal;
+    const passOn = () => stop.abort(theirs?.reason);
     if (theirs) {
-      if (theirs.aborted) stop.abort(theirs.reason);
-      else theirs.addEventListener("abort", () => stop.abort(theirs.reason), { once: true });
+      if (theirs.aborted) passOn();
+      else theirs.addEventListener("abort", passOn, { once: true });
     }
-    return base(input, { ...init, signal: stop.signal }).finally(() => clearTimeout(timer));
+    try {
+      const res = await base(input, { ...init, signal: stop.signal });
+      // The limit covers the whole answer, not only its start: a reply that stalls halfway fails too. The database's
+      // answers are small, so reading them here first costs nothing.
+      const body = await res.arrayBuffer();
+      return new Response(res.status === 204 || res.status === 304 ? null : body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    } finally {
+      clearTimeout(timer);
+      theirs?.removeEventListener("abort", passOn);
+    }
   };
 }
