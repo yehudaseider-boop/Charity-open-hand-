@@ -223,7 +223,9 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
   const ext = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" }[file.type];
   const path = `${charityId}/${type}-${crypto.randomUUID()}.${ext}`;
   const supabase = await createClient();
-  const upload = await supabase.storage
+  // Uploaded by the server, after who, role, open application and a real file have been checked above: a browser has no
+  // direct write to storage (18/11/2026).
+  const upload = await createAdminClient().storage
     .from("charity-documents")
     .upload(path, file, { contentType: file.type, upsert: false });
   if (upload.error) {
