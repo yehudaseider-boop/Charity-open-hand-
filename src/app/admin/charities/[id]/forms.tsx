@@ -3,6 +3,7 @@
 import { ActionForm } from "@/components/forms/action-form";
 import { SelectField, TextArea, TextField } from "@/components/forms/fields";
 import { bankNames } from "@/lib/charity/validation";
+import { SPOKE_TO_FIELD, SPOKE_TO_MAX, vettingChecks, vettingField } from "@/lib/charity/vetting";
 import type { FormState } from "@/lib/form";
 
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
@@ -19,10 +20,19 @@ function Check({ name, children }: { name: string; children: React.ReactNode }) 
 export function ApproveForm({ action, hasS18a, hasMandate }: { action: Action; hasS18a: boolean; hasMandate: boolean }) {
   return (
     <ActionForm action={action} submitLabel="Approve" confirm="Approve this charity and make it public?">
-      <Check name="confirm_verified">
-        I have vetted this organisation: its registration, documents and bank confirmation letter match the details
-        entered. (Gives the &quot;Verified&quot; badge.)
-      </Check>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Vetting: tick each one only when you have done it. (Gives the &quot;Verified&quot; badge.)</legend>
+        {vettingChecks.map((c) => (
+          <Check key={c.key} name={vettingField(c.key)}>{c.label}</Check>
+        ))}
+      </fieldset>
+      <TextField
+        name={SPOKE_TO_FIELD}
+        label="Who you spoke to, and when"
+        required
+        maxLength={SPOKE_TO_MAX}
+        hint="At least 5 characters. For example: Jo Smith, treasurer, by phone on 19/11/2026. Kept in the audit trail."
+      />
       {hasS18a ? (
         <Check name="confirm_s18a">I have confirmed the s18A approval with SARS documents.</Check>
       ) : null}

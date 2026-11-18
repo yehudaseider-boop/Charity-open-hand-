@@ -1,5 +1,6 @@
 "use server";
 
+import { readVetting } from "@/lib/charity/vetting";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { checkCharityBank } from "@/lib/charity/bank-check";
@@ -46,9 +47,9 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
 
   const checklist = applicationChecklist({ charity, priv, documentTypes: documents.map((d) => d.document_type) });
   if (!isComplete(checklist)) return { ok: false, message: "The application is incomplete." };
-  if (formData.get("confirm_verified") !== "on") {
-    return { ok: false, message: "Tick the box confirming you have vetted the organisation and its documents." };
-  }
+  // Every check ticked, and who was spoken to (18/11/2026): one blanket tick was too easy to give without looking.
+  const vetting = readVetting(formData);
+  if (!vetting.ok) return { ok: false, message: vetting.message };
 
   const now = new Date().toISOString();
   const update: Record<string, unknown> = {
@@ -87,7 +88,7 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
     action: "charity.approved",
     entityType: "charity",
     entityId: id,
-    details: { s18a_confirmed: confirmS18a, mandate_confirmed: confirmMandate },
+    details: { s18a_confirmed: confirmS18a, mandate_confirmed: confirmMandate, vetting_checks: vetting.ticked, spoke_to: vetting.spokeTo },
   });
   if (contactEmail) await notifyCharity(approvedEmail(contactEmail, charity.name_en, id, confirmS18a && confirmMandate));
   refresh(id, charity.slug);
