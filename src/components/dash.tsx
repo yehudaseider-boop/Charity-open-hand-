@@ -57,7 +57,7 @@ export function Tabs({ label, items }: { label: string; items: { href: string; l
 }
 
 /** Classes for text boxes and menus, so every field looks the same. */
-export const field = "min-h-11 rounded-control border-2 border-border bg-surface px-3 text-sm text-navy placeholder:text-muted focus:border-brand";
+export const field = "min-h-11 rounded-control border-2 border-outline bg-surface px-3 text-sm text-navy placeholder:text-muted focus:border-brand";
 
 /** Classes for a table in a card: header, rows that light up, cells. Wrap the <table> in `table.wrap` so it scrolls on a phone. */
 export const table = {

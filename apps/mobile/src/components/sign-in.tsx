@@ -183,6 +183,6 @@ const styles = StyleSheet.create({
   rule: { flex: 1, height: 1.5, backgroundColor: colors.lightPurple },
   title: { fontSize: 24, lineHeight: 30 },
   check: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44 },
-  box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: colors.lilac, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginTop: 1 },
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
 });

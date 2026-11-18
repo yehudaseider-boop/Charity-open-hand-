@@ -121,7 +121,7 @@ function CampaignSelect({ campaigns, defaultValue }: { campaigns: { id: string; 
     <div className="space-y-1">
       <label htmlFor={id} className="block text-sm font-semibold">Campaign <span className="font-normal text-muted">(optional)</span></label>
       <select id={id} name="campaign_id" defaultValue={defaultValue} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : `${id}-hint`}
-        className="w-full rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger">
+        className="w-full rounded-[0.875rem] border-2 border-outline bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger">
         <option value="">No campaign: gifts go to your general giving</option>
         {campaigns.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
       </select>

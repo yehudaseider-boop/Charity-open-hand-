@@ -928,7 +928,7 @@ const styles = StyleSheet.create({
   monthGift: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.lightPurple },
   monthGiftAmount: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.ink },
   goalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
+  goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.surface, justifyContent: "center" },
   goalChipAdd: { borderStyle: "dashed", borderColor: colors.blue },
   goalChipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   yearChips: { gap: 8, paddingHorizontal: space.gutter },

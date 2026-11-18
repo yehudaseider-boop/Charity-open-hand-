@@ -51,7 +51,7 @@ export function NotifyForm() {
           required
           aria-invalid={error ? true : undefined}
           aria-describedby="launch-consent launch-answer"
-          className="min-h-14 min-w-0 flex-1 rounded-[1.125rem] border-2 border-border bg-white px-4 text-[17px] text-navy outline-none focus:border-brand focus:ring-4 focus:ring-brand-soft aria-[invalid=true]:border-danger"
+          className="min-h-14 min-w-0 flex-1 rounded-[1.125rem] border-2 border-outline bg-white px-4 text-[17px] text-navy outline-none focus:border-brand focus:ring-4 focus:ring-brand-soft aria-[invalid=true]:border-danger"
         />
         {/* A hidden field people never see: a bot that fills it is told "done" and nothing is saved. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />

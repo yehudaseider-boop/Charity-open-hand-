@@ -45,3 +45,26 @@ describe("the Give button on a charity's page", () => {
     expect(link).toContain(">Give </span>");
   });
 });
+
+describe("outlines you can see (WCAG 1.4.11, 3:1)", () => {
+  it("the controls in the give form use the outline colour, not the pale card border", () => {
+    const flow = read("src/app/c/[slug]/donate/donate-flow.tsx");
+    const fields = read("src/components/forms/fields.tsx");
+    expect(read("src/app/globals.css")).toContain("--outline: #7a86a5");
+    expect(fields).toMatch(/border-2 border-outline bg-surface px-3\.5/);
+    expect(flow).toMatch(/rounded-2xl border-2 border-outline bg-surface/); // contribution choices
+    expect(flow).toMatch(/: "border-outline bg-surface text-navy hover:-translate-y-0\.5/); // amount presets
+  });
+
+  it("the app has the same outline colour, at 3:1 or more on white", () => {
+    const tokens = read("apps/mobile/src/theme/tokens.ts");
+    expect(tokens).toContain('outline: "#7A86A5"');
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a: string, b: string) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+    expect(ratio("#7A86A5", "#FFFFFF")).toBeGreaterThanOrEqual(3);
+    expect(ratio("#7A86A5", "#F4F1FF")).toBeGreaterThanOrEqual(3);
+  });
+});

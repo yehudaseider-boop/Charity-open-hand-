@@ -63,9 +63,9 @@ const styles = StyleSheet.create({
   box: {
     minHeight: touch + 4,
     borderRadius: radius.control,
-    // Like the website's fields: a 2px light purple border, blue while typing, red when it needs fixing.
+    // A 2px outline you can see (3:1), blue while typing, red when it needs fixing.
     borderWidth: 2,
-    borderColor: colors.lightPurple,
+    borderColor: colors.outline,
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",

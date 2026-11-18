@@ -24,7 +24,7 @@ export function TryDemo({ now }: { now?: Date }) {
   });
 
   const chip =
-    "flex min-h-12 cursor-pointer items-center justify-center rounded-full border-2 border-border bg-white px-4 text-[16px] font-bold text-navy transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-brand-contrast peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-coral";
+    "flex min-h-12 cursor-pointer items-center justify-center rounded-full border-2 border-outline bg-white px-4 text-[16px] font-bold text-navy transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-brand-contrast peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-coral";
 
   return (
     <form onSubmit={(e) => e.preventDefault()} aria-labelledby={`${id}-title`} className="flex flex-col gap-6 rounded-[1.75rem] border-[1.5px] border-border bg-white p-5 shadow-[0_24px_60px_rgba(14,27,61,0.08)] sm:p-7">

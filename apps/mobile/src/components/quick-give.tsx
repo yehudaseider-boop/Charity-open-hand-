@@ -122,7 +122,7 @@ function Row({ charity, live, last, onPress }: { charity: Charity; live: boolean
 const styles = StyleSheet.create({
   title: { fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: colors.navy },
   key: { color: colors.blue },
-  search: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lilacSoft, backgroundColor: colors.lilacSoft },
+  search: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.lilacSoft },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 17, color: colors.ink, paddingVertical: 10, outlineStyle: "none" } as object,
   head: { fontFamily: fonts.display, fontSize: 18, lineHeight: 23, color: colors.navy },
   face: { width: 88, gap: 8, alignItems: "center", paddingVertical: 4 },

@@ -9,9 +9,9 @@ export function useFieldId(name: string) {
   return `${name}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 
-// The style guide's field: a soft border, a blue border and ring when focused, red when it has a problem.
+// The style guide's field: an outline you can see (3:1), a blue border and ring when focused, red when it has a problem.
 const inputClass =
-  "w-full rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger";
+  "w-full rounded-[0.875rem] border-2 border-outline bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger";
 
 type Base = {
   name: string;
@@ -203,7 +203,7 @@ export function CheckboxGroup({
         {options.map((o) => (
           <label
             key={o.value}
-            className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft"
+            className="flex items-center gap-2 rounded-full border border-outline px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-soft"
           >
             <input type="checkbox" name={name} value={o.value} defaultChecked={defaultValues.includes(o.value)} />
             {o.label}

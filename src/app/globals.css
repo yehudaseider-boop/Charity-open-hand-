@@ -26,7 +26,8 @@
   --surface: #ffffff;
   --text: #0e1b3d; /* deep ink */
   --text-muted: #4a5878; /* slate (7.1:1 on white) */
-  --border: #ece8f6; /* light purple */
+  --border: #ece8f6; /* light purple: card borders and dividers */
+  --outline: #7a86a5; /* the outline of a control you type in or press (fields, chips): 3.6:1 on white (WCAG 1.4.11, 18/11/2026) */
 
   --success: #1f6b4a; /* darker green, for small text */
   --success-soft: #e3f2ea;
@@ -58,6 +59,7 @@
   --color-text: var(--text);
   --color-muted: var(--text-muted);
   --color-border: var(--border);
+  --color-outline: var(--outline);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
