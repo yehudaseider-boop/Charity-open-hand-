@@ -66,7 +66,7 @@ export function DonorPeekLink({ charityId, donorId, href, children, stretch = fa
           >
             <div className="sticky top-0 flex items-center justify-between gap-3 border-b-2 border-border bg-surface px-5 py-3">
               <p className="text-sm font-semibold text-muted">Donor</p>
-              <button ref={closer} type="button" onClick={close} className="inline-flex min-h-11 items-center rounded-full border-2 border-border px-4 text-sm font-semibold text-brand transition hover:border-brand focus-visible:border-brand">
+              <button ref={closer} type="button" onClick={close} className="inline-flex min-h-11 items-center rounded-full border-2 border-outline px-4 text-sm font-semibold text-brand transition hover:border-brand focus-visible:border-brand">
                 Close
               </button>
             </div>

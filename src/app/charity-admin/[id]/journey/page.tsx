@@ -125,7 +125,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
               <ul className="flex flex-wrap gap-2">
                 {withoutJourney.map((c) => (
                   <li key={c.id}>
-                    <Link href={href({ kind: "campaign", campaignId: c.id })} dir="auto" className="inline-flex min-h-11 items-center rounded-control border-2 border-border px-3 font-semibold text-brand [overflow-wrap:anywhere]">
+                    <Link href={href({ kind: "campaign", campaignId: c.id })} dir="auto" className="inline-flex min-h-11 items-center rounded-control border-2 border-outline px-3 font-semibold text-brand [overflow-wrap:anywhere]">
                       {c.title}
                     </Link>
                   </li>

@@ -214,7 +214,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             // A first-time donor isn't signed in: show where this gift is kept, the same way the account page puts it.
             <Link href="/login?next=%2Faccount" className="inline-flex min-h-12 items-center rounded-full bg-brand px-5 font-semibold text-brand-contrast transition-colors hover:bg-navy">See this gift in your account</Link>
           )}
-          <Link href={`/c/${charity.slug}`} className="inline-flex min-h-12 max-w-full items-center rounded-full border-2 border-border px-5 font-semibold text-brand transition-colors hover:border-brand"><span className="truncate">Back to <bdi>{charity.name_en}</bdi></span></Link>
+          <Link href={`/c/${charity.slug}`} className="inline-flex min-h-12 max-w-full items-center rounded-full border-2 border-outline px-5 font-semibold text-brand transition-colors hover:border-brand"><span className="truncate">Back to <bdi>{charity.name_en}</bdi></span></Link>
         </p>
         {viewer ? null : <p className="mt-2 text-sm text-muted">Sign in with the same email address you gave with.</p>}
       </Result>

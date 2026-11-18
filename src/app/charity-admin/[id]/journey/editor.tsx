@@ -166,7 +166,7 @@ export function JourneyEditor({
               >
                 Start from our suggested wording
               </button>
-              <button type="button" onClick={add} className="inline-flex min-h-11 items-center rounded-control border-2 border-border px-4 text-sm font-semibold text-brand">
+              <button type="button" onClick={add} className="inline-flex min-h-11 items-center rounded-control border-2 border-outline px-4 text-sm font-semibold text-brand">
                 Write my own
               </button>
             </div>
@@ -249,7 +249,7 @@ export function JourneyEditor({
         })}
 
         {drafts.length > 0 && drafts.length < JOURNEY_MAX_STEPS ? (
-          <button type="button" onClick={add} className="inline-flex min-h-11 items-center rounded-control border-2 border-border px-4 text-sm font-semibold text-brand">
+          <button type="button" onClick={add} className="inline-flex min-h-11 items-center rounded-control border-2 border-outline px-4 text-sm font-semibold text-brand">
             Add email {drafts.length + 1}
           </button>
         ) : drafts.length >= JOURNEY_MAX_STEPS ? (

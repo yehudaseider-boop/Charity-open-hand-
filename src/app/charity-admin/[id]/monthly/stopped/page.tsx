@@ -136,7 +136,7 @@ export default async function StoppedMonthlyPage({ params, searchParams }: PageP
             })}
           </ul>
           {canWinBack ? (
-            <button className="inline-flex min-h-11 items-center rounded-control border-2 border-border px-4 text-sm font-semibold text-brand">Add ticked donors to win-back journey</button>
+            <button className="inline-flex min-h-11 items-center rounded-control border-2 border-outline px-4 text-sm font-semibold text-brand">Add ticked donors to win-back journey</button>
           ) : null}
           </form>
 

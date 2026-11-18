@@ -180,7 +180,7 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
                 })}
               </ul>
               {canWinBack ? (
-                <button className="inline-flex min-h-11 items-center rounded-control border-2 border-border px-4 text-sm font-semibold text-brand">Add ticked donors to win-back journey</button>
+                <button className="inline-flex min-h-11 items-center rounded-control border-2 border-outline px-4 text-sm font-semibold text-brand">Add ticked donors to win-back journey</button>
               ) : null}
               </form>
               {pages > 1 ? (

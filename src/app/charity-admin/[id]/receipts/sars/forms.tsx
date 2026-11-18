@@ -31,7 +31,7 @@ function LegalForm({ value, onChange }: { value: string; onChange: (v: string) =
       <legend className="text-sm font-semibold">Legal form <span className="font-normal text-muted">(as SARS has you registered)</span></legend>
       <div className="grid gap-2 sm:grid-cols-2">
         {LEGAL_FORMS.map((f) => (
-          <label key={f.code} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border-2 border-border px-3 py-2 text-sm has-checked:border-brand has-checked:bg-honey-soft">
+          <label key={f.code} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border-2 border-outline px-3 py-2 text-sm has-checked:border-brand has-checked:bg-honey-soft">
             <input type="radio" name="legal_form" value={f.code} checked={value === f.code} onChange={() => onChange(f.code)} />
             <span>{f.label}</span>
           </label>

@@ -72,7 +72,7 @@ export function DashboardShell({
                   type="search"
                   maxLength={60}
                   placeholder=" "
-                  className="peer h-11 w-full rounded-control border-2 border-border bg-surface pl-11 pr-3 text-sm text-navy focus:border-brand"
+                  className="peer h-11 w-full rounded-control border-2 border-outline bg-surface pl-11 pr-3 text-sm text-navy focus:border-brand"
                 />
                 {/* The hint, shorter on a phone so it isn't cut off (17/11/2026); gone once something is typed. */}
                 <span aria-hidden className="pointer-events-none absolute inset-y-0 left-11 right-3 hidden items-center truncate text-sm text-muted peer-placeholder-shown:flex">
@@ -82,7 +82,7 @@ export function DashboardShell({
             ) : null}
             <span className="flex-1" />
             {publicLink ? (
-              <Link href={publicLink} className="inline-flex min-h-11 items-center rounded-control border-2 border-border bg-surface px-4 text-sm font-semibold text-brand hover:border-brand">
+              <Link href={publicLink} className="inline-flex min-h-11 items-center rounded-control border-2 border-outline bg-surface px-4 text-sm font-semibold text-brand hover:border-brand">
                 See your public page
               </Link>
             ) : null}

@@ -34,7 +34,7 @@ export function KeepChecking({ retryHref, fromApp = false }: { retryHref: string
           Back to the Givezy app
         </a>
       ) : (
-        <Link href={retryHref} className="inline-block rounded-control border-2 border-border px-5 py-2.5 font-bold text-brand hover:border-brand">
+        <Link href={retryHref} className="inline-block rounded-control border-2 border-outline px-5 py-2.5 font-bold text-brand hover:border-brand">
           I didn&apos;t pay: try again
         </Link>
       )}

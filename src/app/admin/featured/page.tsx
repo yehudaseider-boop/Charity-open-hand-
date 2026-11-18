@@ -67,7 +67,7 @@ export default async function FeaturedPage({ searchParams }: PageProps<"/admin/f
                     <form action={setFeatured} className="flex min-w-0 flex-1 flex-wrap gap-2">
                       <input type="hidden" name="week" value={w} />
                       <label className="sr-only" htmlFor={`c-${w}`}>Charity for the week of {shown(w)}</label>
-                      <select id={`c-${w}`} name="charity_id" defaultValue={pick ?? ""} required className="min-w-0 max-w-full flex-1 rounded-control border border-border bg-surface px-3 py-2">
+                      <select id={`c-${w}`} name="charity_id" defaultValue={pick ?? ""} required className="min-w-0 max-w-full flex-1 rounded-control border border-outline bg-surface px-3 py-2">
                         <option value="" disabled>Choose a charity</option>
                         {(charities ?? []).map((c) => <option key={c.id as string} value={c.id as string}>{c.name_en as string}</option>)}
                       </select>
@@ -76,7 +76,7 @@ export default async function FeaturedPage({ searchParams }: PageProps<"/admin/f
                     {pick ? (
                       <form action={clearFeatured}>
                         <input type="hidden" name="week" value={w} />
-                        <PendingButton pendingLabel="Clearing…" className="rounded-control border border-border px-3 py-2">Clear</PendingButton>
+                        <PendingButton pendingLabel="Clearing…" className="rounded-control border border-outline px-3 py-2">Clear</PendingButton>
                       </form>
                     ) : null}
                   </div>

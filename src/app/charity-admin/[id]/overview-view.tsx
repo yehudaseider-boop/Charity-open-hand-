@@ -90,7 +90,7 @@ export function OverviewView(p: OverviewProps) {
       href: `${base}/donations/${d.id}`,
     };
   });
-  const pill = "inline-flex min-h-11 items-center rounded-control border-2 border-border bg-surface px-4 text-sm font-semibold text-brand hover:border-brand";
+  const pill = "inline-flex min-h-11 items-center rounded-control border-2 border-outline bg-surface px-4 text-sm font-semibold text-brand hover:border-brand";
 
   return (
     <div className="space-y-5">
@@ -323,7 +323,7 @@ export function OverviewView(p: OverviewProps) {
       <MonthlyTrend rows={recurring} now={now} seeAllHref={`${base}/monthly`} />
 
       <div className="flex flex-wrap gap-2 text-sm">
-        <a href={`${base}/export/donations`} className="inline-flex min-h-11 items-center rounded-full border-2 border-border bg-surface px-4 font-semibold text-brand hover:border-brand">Download paid donations (CSV)</a>
+        <a href={`${base}/export/donations`} className="inline-flex min-h-11 items-center rounded-full border-2 border-outline bg-surface px-4 font-semibold text-brand hover:border-brand">Download paid donations (CSV)</a>
       </div>
     </div>
   );

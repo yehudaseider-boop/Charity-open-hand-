@@ -101,7 +101,7 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
         <form method="get" className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label htmlFor="year" className="block text-sm font-semibold">Tax year</label>
-            <select id="year" name="year" defaultValue={choice.taxYear} className="min-h-11 rounded-control border-2 border-border bg-surface px-3 text-sm">
+            <select id="year" name="year" defaultValue={choice.taxYear} className="min-h-11 rounded-control border-2 border-outline bg-surface px-3 text-sm">
               {yearChoices.map((y) => <option key={y} value={y}>{taxYearName(y)} (SARS year {y})</option>)}
             </select>
           </div>
@@ -109,14 +109,14 @@ export default async function SarsPage({ params, searchParams }: PageProps<"/cha
             <legend className="text-sm font-semibold">Period</legend>
             <div className="flex flex-wrap gap-2">
               {(["first_half", "full_year"] as const).map((p) => (
-                <label key={p} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-border px-4 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
+                <label key={p} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-outline px-4 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
                   <input type="radio" name="period" value={p} defaultChecked={choice.period === p} />
                   {PERIOD_LABELS[p]}
                 </label>
               ))}
             </div>
           </fieldset>
-          <button type="submit" className="inline-flex min-h-11 items-center rounded-control border-2 border-border bg-surface px-4 text-sm font-semibold text-brand hover:border-brand">Check this period</button>
+          <button type="submit" className="inline-flex min-h-11 items-center rounded-control border-2 border-outline bg-surface px-4 text-sm font-semibold text-brand hover:border-brand">Check this period</button>
         </form>
         <p className="mt-3 text-sm text-muted">
           Showing {periodName}. First six months is 1 March to 31 August; the full tax year is 1 March to the end of February.

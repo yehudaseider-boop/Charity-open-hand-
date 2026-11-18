@@ -25,7 +25,7 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
             </p>
             <div className="flex flex-wrap gap-3">
               <button onClick={() => retry()} className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Try again</button>
-              <Link href="/" className="rounded-control border border-border px-4 py-2.5 font-medium">Go to the home page</Link>
+              <Link href="/" className="rounded-control border border-outline px-4 py-2.5 font-medium">Go to the home page</Link>
             </div>
           </div>
         </main>

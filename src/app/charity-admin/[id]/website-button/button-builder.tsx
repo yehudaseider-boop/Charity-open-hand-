@@ -65,7 +65,7 @@ function Choice<T extends string>({ legend, name, options, value, onChange }: { 
       <legend className="text-sm font-semibold text-navy">{legend}</legend>
       <div className="flex flex-wrap gap-2">
         {(Object.keys(options) as T[]).map((k) => (
-          <label key={k} className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 px-4 text-[15px] transition focus-within:border-brand ${value === k ? "border-brand bg-honey-soft font-semibold text-brand" : "border-border bg-surface hover:border-brand hover:text-brand"}`}>
+          <label key={k} className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 px-4 text-[15px] transition focus-within:border-brand ${value === k ? "border-brand bg-honey-soft font-semibold text-brand" : "border-outline bg-surface hover:border-brand hover:text-brand"}`}>
             <input type="radio" name={name} value={k} checked={value === k} onChange={() => onChange(k)} className="accent-[var(--brand)]" />
             {options[k]}
           </label>
@@ -86,7 +86,7 @@ function CopyBox({ title, note, text, button, multiline, primary }: { title: str
       setState("failed");
     }
   };
-  const field = "block w-full min-w-0 rounded-control border-2 border-border bg-surface px-3 py-2 font-mono text-xs text-navy transition focus:border-brand";
+  const field = "block w-full min-w-0 rounded-control border-2 border-outline bg-surface px-3 py-2 font-mono text-xs text-navy transition focus:border-brand";
   return (
     <div className="space-y-2">
       <div>

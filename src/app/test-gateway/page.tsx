@@ -32,7 +32,7 @@ export default async function TestGatewayPage({ searchParams }: PageProps<"/test
         <button name="outcome" value="success" className="w-full rounded-control bg-brand px-4 py-3 font-medium text-brand-contrast">
           Pay (simulate success)
         </button>
-        <button name="outcome" value="failed" className="w-full rounded-control border border-border px-4 py-3">
+        <button name="outcome" value="failed" className="w-full rounded-control border border-outline px-4 py-3">
           Decline (simulate failure)
         </button>
       </form>

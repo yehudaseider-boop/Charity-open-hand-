@@ -48,13 +48,13 @@ export default async function CausesPage({ searchParams }: PageProps<"/admin/cau
         <form action={addCause} className="flex flex-wrap items-end gap-2">
           <div className="min-w-0 flex-1">
             <label htmlFor="new-cause" className="mb-1 block text-sm font-medium">Name</label>
-            <input id="new-cause" name="name" required maxLength={40} placeholder="For example: Food and welfare" className="w-full min-w-0 rounded-control border-2 border-border bg-surface px-3 py-2" />
+            <input id="new-cause" name="name" required maxLength={40} placeholder="For example: Food and welfare" className="w-full min-w-0 rounded-control border-2 border-outline bg-surface px-3 py-2" />
           </div>
           <PendingButton pendingLabel="Adding…" className="pressable rounded-control bg-brand px-4 py-2 font-semibold text-brand-contrast">Add</PendingButton>
         </form>
         <form action={addSuggestedCauses} className="mt-4 border-t border-border pt-4">
           <p className="text-sm text-muted">The launch list: {SUGGESTED_CAUSES.join(", ")}.</p>
-          <PendingButton pendingLabel="Adding…" className="mt-2 rounded-control border-2 border-border px-4 py-2 text-sm font-semibold text-brand hover:border-brand">Add the launch list (only the missing ones)</PendingButton>
+          <PendingButton pendingLabel="Adding…" className="mt-2 rounded-control border-2 border-outline px-4 py-2 text-sm font-semibold text-brand hover:border-brand">Add the launch list (only the missing ones)</PendingButton>
         </form>
       </Card>
 
@@ -73,21 +73,21 @@ export default async function CausesPage({ searchParams }: PageProps<"/admin/cau
                     <form action={renameCause} className="flex min-w-0 gap-2 sm:flex-1">
                       <input type="hidden" name="id" value={c.id as string} />
                       <label className="sr-only" htmlFor={`name-${c.id}`}>New name for {c.name_en as string}</label>
-                      <input id={`name-${c.id}`} name="name" defaultValue={c.name_en as string} required maxLength={40} className="min-w-0 flex-1 rounded-control border-2 border-border bg-surface px-3 py-1.5 text-sm" />
-                      <PendingButton pendingLabel="Saving…" className="rounded-control border-2 border-border px-3 py-1.5 text-sm font-semibold text-brand hover:border-brand">Rename</PendingButton>
+                      <input id={`name-${c.id}`} name="name" defaultValue={c.name_en as string} required maxLength={40} className="min-w-0 flex-1 rounded-control border-2 border-outline bg-surface px-3 py-1.5 text-sm" />
+                      <PendingButton pendingLabel="Saving…" className="rounded-control border-2 border-outline px-3 py-1.5 text-sm font-semibold text-brand hover:border-brand">Rename</PendingButton>
                     </form>
                     <div className="flex flex-wrap gap-2">
                     <form action={moveCause}>
                       <input type="hidden" name="id" value={c.id as string} />
                       <input type="hidden" name="dir" value="up" />
-                      <PendingButton pendingLabel="…" className="rounded-control border-2 border-border px-3 py-1.5 text-sm disabled:opacity-40">
+                      <PendingButton pendingLabel="…" className="rounded-control border-2 border-outline px-3 py-1.5 text-sm disabled:opacity-40">
                         <span aria-label={`Move ${c.name_en as string} up`}>Up</span>
                       </PendingButton>
                     </form>
                     <form action={moveCause}>
                       <input type="hidden" name="id" value={c.id as string} />
                       <input type="hidden" name="dir" value="down" />
-                      <PendingButton pendingLabel="…" className="rounded-control border-2 border-border px-3 py-1.5 text-sm">
+                      <PendingButton pendingLabel="…" className="rounded-control border-2 border-outline px-3 py-1.5 text-sm">
                         <span aria-label={`Move ${c.name_en as string} down`}>Down</span>
                       </PendingButton>
                     </form>
