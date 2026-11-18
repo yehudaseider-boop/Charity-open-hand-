@@ -22,7 +22,8 @@ concurrency:
 jobs:
   e2e:
     # After a deploy: only when the test site's deploy succeeded.
-    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
+    # (Vercel names it "Production – <project>", so match on the word; preview deploys are left out.)
+    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && startsWith(github.event.deployment.environment, 'Production'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:

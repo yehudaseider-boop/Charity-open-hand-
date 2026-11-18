@@ -148,6 +148,9 @@ export default function Give() {
   // never suggests a figure of its own, so a new donor at a charity that chose none types the amount.
   const quick = tapAmounts(pastAmounts, ready?.ok ? ready.suggestedCents : []);
   const [readyAttempt, setReadyAttempt] = useState(0);
+  // A campaign that ends while the donor is on this screen (the server says so when they give) is dropped: the gift goes
+  // to the charity. Declared up here with the other state: never after an early return (React's rule of hooks).
+  const [campaignClosed, setCampaignClosed] = useState(false);
   // Starts empty, or with the amount from "Make it monthly" after a gift (the donor's own figure, never ours).
   const [amount, setAmount] = useState(() => {
     const c = amountFromParam(amountParam);
@@ -478,8 +481,6 @@ export default function Give() {
 
   // The campaign counts only once the server says it is still running (so a gift never quietly
   // goes to the charity in general because the app hadn't loaded it yet). The preview has no server.
-  // A campaign that ends while the donor is on this screen (the server says so when they give) is dropped: the gift goes to the charity.
-  const [campaignClosed, setCampaignClosed] = useState(false);
   const campaignId = campaignParam && !campaignClosed && (server ? server.campaignOpen : (charity.campaigns ?? []).some((c) => c.id === campaignParam)) ? campaignParam : undefined;
   const campaignEnded = Boolean(campaignParam) && !campaignId;
   const campaign = campaignId ? ((charity.campaigns ?? []).find((c) => c.id === campaignId) ?? null) : null;
