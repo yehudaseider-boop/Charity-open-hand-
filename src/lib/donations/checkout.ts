@@ -105,6 +105,11 @@ export async function startDonation(args: {
 
   // Saved cards: once-off gifts only, signed-in account only, and only the account's own email.
   const cardAccount = args.saveCardFor ?? args.useSavedCardOf;
+  // A gateway that can't save a card yet (Stitch, until its test system settles how) takes once-off gifts only: said
+  // plainly before anything is recorded, never as "we couldn't reach the provider" (review 18/11/2026).
+  if ((input.monthly === "on" || cardAccount) && getGateway().supportsSavedCards === false) {
+    return { ok: false, message: "Monthly giving and saved cards aren't available just yet, so nothing was charged. You can still give once, now." };
+  }
   let savedToken: { code: string; gateway: string } | null = null;
   if (cardAccount) {
     if (!savedCardsOpen()) return { ok: false, message: "Saving a card isn't switched on yet. Please pay on the payment page." };

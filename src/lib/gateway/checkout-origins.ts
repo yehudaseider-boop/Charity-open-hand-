@@ -6,6 +6,8 @@
  */
 export const CHECKOUT_ORIGINS: Record<string, string[]> = {
   paystack: ["https://checkout.paystack.com"],
+  // VERIFY with Stitch's test system: the host of the payment page address Stitch returns (its sign-in host is secure.stitch.money).
+  stitch: ["https://secure.stitch.money"],
   test: [],
 };
 

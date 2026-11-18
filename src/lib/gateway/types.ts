@@ -165,6 +165,11 @@ export interface PaymentGateway {
    * confirmed for South African merchants.
    */
   readonly splitsPayments: boolean;
+  /**
+   * False when this gateway cannot yet save a card or charge one later (monthly gifts and saved cards). Said to the donor
+   * before anything is recorded. Left out, it means it can.
+   */
+  readonly supportsSavedCards?: boolean;
   /** Start a hosted checkout. Returns the page to send the donor to. */
   createCheckout(req: CheckoutRequest): Promise<{ redirectUrl: string }>;
   /**

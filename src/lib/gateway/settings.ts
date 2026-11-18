@@ -19,7 +19,26 @@ export function gatewaySettings(env: Env, site: "live" | "test" | "unknown"): Se
     out.push(env.ALLOW_TEST_GATEWAY === "yes" ? { name: "ALLOW_TEST_GATEWAY", status: "ok", says: "Set to yes." } : { name: "ALLOW_TEST_GATEWAY", status: "fix", says: "Must be yes while the test gateway is in use, or every gift stops with an error." });
     return out;
   }
-  if (gateway !== "paystack") return [{ name: "PAYMENT_GATEWAY", status: "fix", says: "Not a gateway we know. Use test or paystack." }];
+  if (gateway === "stitch") {
+    out.push({ name: "PAYMENT_GATEWAY", status: "ok", says: "The payment provider (Stitch)." });
+    for (const [name, what] of [["STITCH_CLIENT_ID", "Stitch's client id"], ["STITCH_CLIENT_SECRET", "Stitch's client secret"]] as const) {
+      out.push(env[name] ? { name, status: "ok", says: "Set." } : { name, status: "fix", says: `Missing. No gift can start without ${what}.` });
+    }
+    const secret = env.STITCH_WEBHOOK_SECRET ?? "";
+    if (!secret) out.push({ name: "STITCH_WEBHOOK_SECRET", status: "fix", says: "Missing. Payment messages from Stitch can't be checked, so no gift would ever be marked paid by them." });
+    else if (!secret.startsWith("whsec_")) out.push({ name: "STITCH_WEBHOOK_SECRET", status: "fix", says: "Doesn't look like Stitch's signing secret. It starts with whsec_." });
+    else out.push({ name: "STITCH_WEBHOOK_SECRET", status: "ok", says: "Set." });
+    out.push({ name: "STITCH_SPLITS", status: env.STITCH_SPLITS === "yes" ? "ok" : "later", says: env.STITCH_SPLITS === "yes" ? "On: each gift is split to the charity's own Stitch account." : "Off: Stitch takes no gifts, because it only takes them as a split to a charity." });
+    for (const name of ["TEST_GATEWAY_SECRET", "ALLOW_TEST_GATEWAY"]) {
+      if (env[name]) out.push({ name, status: "fix", says: "Only for the test gateway. Remove it now that payments go to Stitch." });
+    }
+    // Paystack stays set as the fallback until Stitch has passed its checks (decisions.md, 18/11/2026).
+    for (const name of ["PAYSTACK_SECRET_KEY", "PAYSTACK_SPLITS"]) {
+      if (env[name]) out.push({ name, status: "later", says: "Paystack is still set, as the fallback until Stitch has passed its checks. Remove it once Paystack is switched off for good." });
+    }
+    return out;
+  }
+  if (gateway !== "paystack") return [{ name: "PAYMENT_GATEWAY", status: "fix", says: "Not a gateway we know. Use test, paystack or stitch." }];
 
   out.push({ name: "PAYMENT_GATEWAY", status: "ok", says: "The payment provider." });
   const key = env.PAYSTACK_SECRET_KEY ?? "";

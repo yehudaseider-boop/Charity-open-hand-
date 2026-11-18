@@ -15,6 +15,8 @@ let chargeResult: () => Promise<{ status: string }> = async () => ({ status: "pe
 let refusal = false;
 /** The refusal names the card (declined, expired). */
 let decline = false;
+/** False: a gateway that can't save a card yet (Stitch, until its test system). */
+let canSaveCards = true;
 let stored: { code: string; gateway: string } | null = { code: "AUTH_SECRET", gateway: "test" };
 const requests: { donationId: string; userId: string }[] = [];
 /** A donation already recorded under the attempt id the app sends. */
@@ -75,6 +77,7 @@ vi.mock("@/lib/gateway", () => ({
   isGatewayDecline: () => refusal && decline,
   getGateway: () => ({
     name: "test",
+    supportsSavedCards: canSaveCards ? undefined : false,
     verifyTransaction: async (reference: string) => {
       verified.push(reference);
       if (providerHas === "no") throw new FakeGatewayError("not found", { notFound: true });
@@ -101,6 +104,7 @@ beforeEach(() => {
   chargeResult = async () => ({ status: "pending" });
   refusal = false;
   decline = false;
+  canSaveCards = true;
   prior = null;
   auditRows = [];
   limitsUsedUp = false;
@@ -148,6 +152,32 @@ describe("saved cards: switch and sign-in", () => {
     expect(both.status).toBe(409);
     expect(ops).toHaveLength(0);
     expect(charges).toHaveLength(0);
+  });
+});
+
+describe("a payment provider that can't save cards yet", () => {
+  it("says so plainly before anything is recorded, for a saved card, a new card to save, or a monthly gift", async () => {
+    canSaveCards = false;
+    for (const body of [
+      { ...gift, saveCard: true, details },
+      { ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details },
+      { ...gift, details: { ...details, monthly: true, monthly_authorised: true } },
+    ]) {
+      const res = await call(body);
+      const json = await res.json();
+      expect(json.ok).toBe(false);
+      expect(json.message).toMatch(/aren't available just yet, so nothing was charged/);
+    }
+    expect(ops).toHaveLength(0);
+    expect(charges).toHaveLength(0);
+    expect(checkouts).toHaveLength(0);
+  });
+
+  it("a once-off gift on the payment page still goes ahead", async () => {
+    canSaveCards = false;
+    const res = await call({ ...gift, details });
+    expect((await res.json()).ok).toBe(true);
+    expect(checkouts).toHaveLength(1);
   });
 });
 
