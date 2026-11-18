@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { AppState } from "react-native";
 import { secureStorage } from "./secure-storage";
+import { timedFetch } from "./timed-fetch";
 
 /**
  * The app talks to the same database as the website, with the public
@@ -18,6 +19,8 @@ export const supabase: SupabaseClient | null =
     ? createClient(url, key, {
         // pkce: Google and Apple sign-in come back with a one-time code, swapped for a session here.
         auth: { storage: secureStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false, flowType: "pkce" },
+        // A stalled request on a weak signal fails after a time limit, so screens show "couldn't load" instead of loading for ever.
+        global: { fetch: timedFetch() },
       })
     : null;
 
