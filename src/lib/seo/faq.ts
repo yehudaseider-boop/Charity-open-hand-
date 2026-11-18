@@ -42,7 +42,7 @@ export const donorFaqs: Faq[] = [
   },
   {
     q: "Who sees my details?",
-    a: `The charity sees what it needs to thank you and record your gift. The rest stays between you and ${appName}. Charities never see your ID number. You can also give anonymously: your name then won't appear on public pages, campaign lists or live totals.`,
+    a: `The charity sees what it needs to thank you and record your gift. The rest stays between you and ${appName}. Charities don't see your ID number, except in the SARS return the law requires for s18A receipts. You can also give anonymously: your name then won't appear on public pages, campaign lists or live totals.`,
   },
 ];
 

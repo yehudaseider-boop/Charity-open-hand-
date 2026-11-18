@@ -42,6 +42,7 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
   const viewer = await getViewer();
   const allowed = newCardLinkValid(m, e, s, now) || (viewer ? await ownsMonthly(viewer.userId, m).catch(() => false) : false);
   const problem = tryMessage(first(sp.x));
+  const fromApp = first(sp.from) === "app";
 
   if (!allowed) {
     return (
@@ -63,7 +64,7 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
     return (
       <Shell title="We couldn't load this just now">
         <p>Nothing was charged and your monthly donation is unchanged. Please try again in a minute.</p>
-        <Link href={`/monthly/new-card?${new URLSearchParams({ m, ...(e && s ? { e, s } : {}) })}`} className="pressable mt-5 inline-block rounded-control bg-brand px-6 py-3 font-bold text-brand-contrast">
+        <Link href={`/monthly/new-card?${new URLSearchParams({ m, ...(e && s ? { e, s } : {}), ...(fromApp ? { from: "app" } : {}) })}`} className="pressable mt-5 inline-block rounded-control bg-brand px-6 py-3 font-bold text-brand-contrast">
           Try again
         </Link>
         <p className="mt-4 text-sm text-muted">Need help? <SupportContact />.</p>
@@ -105,6 +106,7 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
         <input type="hidden" name="m" value={m} />
         <input type="hidden" name="e" value={e} />
         <input type="hidden" name="s" value={s} />
+        {fromApp ? <input type="hidden" name="from" value="app" /> : null}
         <PendingButton pendingLabel="Opening the payment page…" className="pressable w-full rounded-control bg-coral px-4 py-3.5 font-bold text-navy">
           Pay {formatRand(offer.totalCents)} with a new card
         </PendingButton>

@@ -332,7 +332,7 @@ export async function startDonation(args: {
                   taxReference: v.tax_reference,
                   registrationNumber: v.registration_number,
                 }),
-                id_number_encrypted: v.id_number ? encrypt(v.id_number.replace(/\s/g, "")) : null,
+                id_number_encrypted: v.id_number ? encrypt(v.id_number.replace(/[\s-]/g, "")) : null,
                 id_number_last4: v.id_number ? last4(v.id_number) : null,
                 tax_reference_encrypted: v.tax_reference ? encrypt(v.tax_reference) : null,
                 tax_reference_last4: v.tax_reference ? last4(v.tax_reference) : null,

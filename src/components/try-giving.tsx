@@ -7,13 +7,13 @@ import { formatRand, parseRandToCents } from "@/lib/money";
  * "Try it" on the home page: type an amount, switch monthly on or off, and see what it comes to over a year.
  * Nothing is sent anywhere. Givezy never suggests an amount of its own, so the box starts empty.
  */
-export function TryGiving({ minCents }: { minCents: number }) {
+export function TryGiving({ minCents, maxCents }: { minCents: number; /** platformConfig.maxDonationCents, passed in (never hard-coded here). */ maxCents: number }) {
   const id = useId();
   const [typed, setTyped] = useState("");
   const [monthly, setMonthly] = useState(true);
   const cents = typed.trim() ? parseRandToCents(typed) : null;
   const tooSmall = cents !== null && cents < minCents;
-  const tooBig = cents !== null && cents > 100_000_000;
+  const tooBig = cents !== null && cents > maxCents;
 
   let line: React.ReactNode = <span className="text-muted">Type any amount to see what it adds up to.</span>;
   if (typed.trim() && cents === null) line = <span className="text-danger">Enter an amount in Rand, for example 180 or 180.50.</span>;

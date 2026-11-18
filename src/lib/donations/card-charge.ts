@@ -1,5 +1,5 @@
 import { platformConfig } from "@/config/platform";
-import { cardChargeToCover, type CardChargeRates } from "@/lib/fees";
+import { monthlyCardChargeAt, type CardChargeRates } from "@/lib/fees";
 import { percentToPpm } from "@/lib/money";
 
 type FeeSettings = {
@@ -32,5 +32,6 @@ export function cardChargeRates(
  * so a change in the provider's rates is followed. Nothing when the rates are not known.
  */
 export function monthlyCardCharge(amountCents: number, contributionCents: number, covers: boolean, rates: CardChargeRates | null = cardChargeRates()): number {
-  return covers && rates ? cardChargeToCover(rates.coverGiftOnly ? amountCents : amountCents + contributionCents, rates) : 0;
+  // The working-out lives in the dependency-free fees.ts, so the phone app shows the same figure.
+  return monthlyCardChargeAt(amountCents, contributionCents, covers, rates);
 }

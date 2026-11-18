@@ -179,20 +179,6 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     accountDeleted: false,
   };
 
-  // Tell them once it is done and something was erased (the address is gone from our records now,
-  // so we use the one we read before).
-  if (email && summary.donors > 0) {
-    try {
-      await getEmailTransport().send({
-        to: email,
-        subject: "Your information has been erased",
-        text: `As you asked, we have erased the information that identifies you from Givezy.\n\n${ERASE_KEPT_TEXT}\n\nGivezy`,
-      });
-    } catch (e) {
-      console.error("[erase] confirmation email not sent", e);
-    }
-  }
-
   if (userId) {
     // Their own records kept against the account go in every case, also when the account itself has to stay
     // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, giving-target settings, the saved card.
@@ -216,6 +202,21 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       // Running the erasure again after the account is gone is not a failure.
       if (delError && delError.status !== 404) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
       else summary.accountDeleted = true;
+    }
+  }
+
+  // Tell them once it is done and something was erased: donor records, or the sign-in account itself (someone who
+  // signed in but never gave was promised an email too, sweep of 18/11/2026). The address is gone from our records
+  // now, so we use the one we read before.
+  if (email && (summary.donors > 0 || summary.accountDeleted)) {
+    try {
+      await getEmailTransport().send({
+        to: email,
+        subject: "Your information has been erased",
+        text: `As you asked, we have erased the information that identifies you from Givezy.\n\n${ERASE_KEPT_TEXT}\n\nGivezy`,
+      });
+    } catch (e) {
+      console.error("[erase] confirmation email not sent", e);
     }
   }
 

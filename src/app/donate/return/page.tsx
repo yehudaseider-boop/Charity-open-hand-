@@ -257,7 +257,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "review") {
     return (
       <Result tone="wait" title="We're checking this payment">
-        <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
+        <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. A person will look at it. To ask about it, contact us.</p>
         <p className="mt-3 text-sm text-muted">Questions in the meantime: <HelpLine /></p>
         <p className="mt-4 flex flex-wrap gap-4 text-sm">
           <Link href={elsewhere.href} className="font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>

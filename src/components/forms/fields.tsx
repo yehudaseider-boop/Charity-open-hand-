@@ -99,9 +99,10 @@ export function DateField({ defaultValue, hint, ...base }: Base & { defaultValue
 export function TextArea({
   defaultValue,
   rows = 5,
+  minLength,
   maxLength,
   ...base
-}: Base & { defaultValue?: string | null; rows?: number; maxLength?: number }) {
+}: Base & { defaultValue?: string | null; rows?: number; minLength?: number; maxLength?: number }) {
   const error = useFieldError(base.name);
   const id = useFieldId(base.name);
   return (
@@ -110,6 +111,7 @@ export function TextArea({
         id={id}
         name={base.name}
         rows={rows}
+        minLength={minLength}
         maxLength={maxLength}
         defaultValue={defaultValue ?? ""}
         required={base.required}

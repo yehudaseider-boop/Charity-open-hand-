@@ -70,7 +70,7 @@ export function confirmationEmail(d: {
 }
 
 function monthlyLines(d: { monthly?: Parameters<typeof confirmationEmail>[0]["monthly"]; manageUrl?: string; totalCents: number }): string[] {
-  const manage = `You can pause or cancel at any time in the Givezy app (Giving tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`;
+  const manage = `You can pause or cancel at any time in the Givezy app (Progress tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`;
   if (!d.monthly) return [];
   if (d.monthly.kind === "first") {
     return [

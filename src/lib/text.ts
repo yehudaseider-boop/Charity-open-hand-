@@ -7,3 +7,10 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n ==
  * around it. For words on a page only: plain-text emails get the name as typed.
  */
 export const isolate = (name: string): string => `⁨${name}⁩`;
+
+/**
+ * Line breaks as one character each. A browser counts a line break in a text box as 1 towards its maxLength but
+ * sends it as \r\n (2), so a full box would be refused by a server limit of the same number. Use before checking
+ * the length of anything typed in a text box (as checkThankYou does).
+ */
+export const normaliseLineBreaks = (s: string): string => s.replace(/\r\n?/g, "\n");

@@ -13,7 +13,9 @@ export async function payWithNewCard(formData: FormData) {
   const m = String(formData.get("m") ?? "");
   const e = String(formData.get("e") ?? "");
   const s = String(formData.get("s") ?? "");
-  const back = (x: string) => `/monthly/new-card?${new URLSearchParams({ m, ...(e && s ? { e, s } : {}), x })}`;
+  // Asked for from the phone app: after paying, the return page offers "Back to the app" (sweep of 18/11/2026).
+  const fromApp = String(formData.get("from") ?? "") === "app";
+  const back = (x: string) => `/monthly/new-card?${new URLSearchParams({ m, ...(e && s ? { e, s } : {}), ...(fromApp ? { from: "app" } : {}), x })}`;
   const now = new Date();
   const viewer = await getViewer();
   const allowed = newCardLinkValid(m, e, s, now) || (viewer ? await ownsMonthly(viewer.userId, m) : false);
@@ -25,7 +27,7 @@ export async function payWithNewCard(formData: FormData) {
   if (limited) redirect(back("limit"));
   let target: string;
   try {
-    const r = await startNewCardPayment(m, now);
+    const r = await startNewCardPayment(m, now, { fromApp });
     if (!r.ok) redirect(back(r.reason));
     target = r.redirectUrl;
   } catch (err) {

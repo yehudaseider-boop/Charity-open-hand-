@@ -2,6 +2,7 @@ import "server-only";
 import { gatewayTimeoutOverride } from "./timeout";
 import { createHash, createHmac } from "node:crypto";
 import { sameSecret } from "@/lib/secret-compare";
+import { isoDateInJhb } from "@/lib/dates";
 import { GatewayError, type BankAccountCheck, type Payout, type PayoutLine, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /** Paystack's name for each bank our application offers (lower case). Banks not listed here are matched by name. */
@@ -177,6 +178,21 @@ async function findBank(bankName: string, { forChecks = false }: { forChecks?: b
   if (candidates.length === 0) throw new GatewayError(forChecks ? `Paystack can't check accounts at "${bankName}".` : `Paystack has no bank matching "${bankName}".`);
   if (candidates.length > 1) throw new GatewayError(`More than one Paystack bank matches "${bankName}": ${candidates.map((b) => b.name).join(", ")}. Use the exact bank name.`);
   return candidates[0];
+}
+
+/**
+ * The Johannesburg day a settlement was paid out, as yyyy-mm-dd. A bare date is used as it is. A timestamp with a
+ * time zone (2026-10-20T22:30:00Z) is turned into the Johannesburg date (21/10/2026), not cut to its UTC day.
+ * Anything else falls back to its first ten characters, which the caller checks.
+ */
+export function settlementDay(v: unknown): string {
+  const text = String(v ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(text)) {
+    const at = new Date(text.replace(" ", "T"));
+    if (!Number.isNaN(at.getTime())) return isoDateInJhb(at);
+  }
+  return text.slice(0, 10);
 }
 
 /**
@@ -424,7 +440,7 @@ export const paystackGateway: PaymentGateway = {
         if (deadline !== undefined && Date.now() > deadline) return out;
         // Already kept as final (paid out or failed): its lines don't change, so they aren't read again.
         if (skipRefs?.has(String(st.id))) continue;
-        const day = String(st.settlement_date ?? st.createdAt ?? "").slice(0, 10);
+        const day = settlementDay(st.settlement_date ?? st.createdAt);
         const dated = /^\d{4}-\d{2}-\d{2}$/.test(day);
         // Before `since`: not asked for (the filter may have been ignored).
         if (dated && day < since) continue;

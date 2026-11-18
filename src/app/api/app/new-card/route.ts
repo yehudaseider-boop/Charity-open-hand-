@@ -29,5 +29,5 @@ export async function POST(request: NextRequest) {
   const owns = await ownsMonthly(account.userId, parsed.data.id).catch(() => null);
   if (owns === null) return NextResponse.json({ ok: false, message: "We couldn't check just now. Please try again." }, { status: 503 });
   if (!owns) return NextResponse.json({ ok: false, message: "We couldn't find this monthly donation." }, { status: 404 });
-  return NextResponse.json({ ok: true, path: newCardPath(parsed.data.id, new Date()) }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, path: `${newCardPath(parsed.data.id, new Date())}&from=app` }, { headers: { "Cache-Control": "no-store" } });
 }

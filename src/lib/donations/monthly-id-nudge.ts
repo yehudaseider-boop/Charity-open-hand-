@@ -1,4 +1,4 @@
-import { isValidSaIdNumber } from "@/lib/sa-id";
+import { isValidSaIdNumber, saIdDigits } from "@/lib/sa-id";
 
 /**
  * Adding an SA ID number to a monthly donation set up before 03/11/2026 with only an income tax number
@@ -46,7 +46,7 @@ export function needsIdNudge(m: MonthlyForNudge, details: SourceDetails | null |
 
 /** The ID number as typed, cleaned, or a plain reason it was refused. */
 export function cleanSaIdNumber(raw: unknown): { ok: true; id: string } | { ok: false; message: string } {
-  const typed = typeof raw === "string" ? raw.replace(/\s/g, "") : "";
+  const typed = typeof raw === "string" ? saIdDigits(raw) : "";
   if (!typed) return { ok: false, message: "Enter your SA ID number. SARS needs it for an s18A receipt" };
   if (!isValidSaIdNumber(typed)) return { ok: false, message: "That doesn't look like a valid SA ID number" };
   return { ok: true, id: typed };

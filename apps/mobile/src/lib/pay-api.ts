@@ -12,7 +12,9 @@ export type CheckoutReply =
   /** Paid with the saved card: no payment page. Ask for the outcome (the charge is only a first indication). */
   | { ok: true; charged: true; redirectUrl?: undefined; reference: string; token: string }
   /** `attemptMismatch`: this attempt id was already used with other details, so the app keeps the id (see give screen). */
-  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing; savedCardDeclined?: boolean; offerPaymentPage?: boolean; stillChecking?: boolean; attemptMismatch?: boolean };
+  | { ok: false; message: string; fieldErrors?: Record<string, string>; quote?: Pricing; savedCardDeclined?: boolean; offerPaymentPage?: boolean; stillChecking?: boolean; attemptMismatch?: boolean;
+      /** The campaign ended while the donor was on the give screen: the gift can still go to the charity. */
+      campaignEnded?: boolean };
 
 /** The card kept for next time: what is safe to show ("Visa ending 4242"), never the card itself. */
 export type SavedCard = { brand: string | null; last4: string | null; expires: string | null };
@@ -157,10 +159,20 @@ export async function checkReady(site: string, slug: string, campaignId: string 
         ...cleanContribution(j.contributionPresetsCents, j.contributionDefaultCents, j.minContributionCents),
       };
     }
+    // The server's own plain words (too many tries, sign in again) rather than "check your connection" (sweep of 18/11/2026).
+    const said = serverMessage(status, j);
+    if (said) return { ok: false, message: said };
   } catch {
     // fall through
   }
   return { ok: false, message: NETWORK };
+}
+
+/** A refusal's plain message from our server (a 4xx with `message`), or null. Short text only; never raw errors. */
+export function serverMessage(status: number, json: unknown): string | null {
+  if (status < 400 || status >= 500) return null;
+  const m = (json as { message?: unknown } | null)?.message;
+  return typeof m === "string" && m.trim() && m.length <= 300 ? m.trim() : null;
 }
 
 /** The contribution buttons as the server sends them: whole cents from the minimum, at most four; the default only when it is one of them. */
@@ -186,7 +198,9 @@ export function cleanSavedCard(v: unknown): SavedCard | null {
   const last4 = typeof o.last4 === "string" && /^\d{4}$/.test(o.last4) ? o.last4 : null;
   if (!last4) return null;
   const brand = typeof o.brand === "string" && o.brand.trim() ? o.brand.trim().slice(0, 20) : null;
-  const expires = typeof o.expires === "string" && /^\d{2}\/\d{4}$/.test(o.expires) ? o.expires : null;
+  // The server writes month/year from the provider's fields; a month sent as "9" rather than "09" is padded, not hidden.
+  const m = typeof o.expires === "string" ? /^(\d{1,2})\/(\d{4})$/.exec(o.expires) : null;
+  const expires = m && Number(m[1]) >= 1 && Number(m[1]) <= 12 ? `${m[1].padStart(2, "0")}/${m[2]}` : null;
   return { brand, last4, expires };
 }
 
@@ -209,6 +223,8 @@ export async function fetchSavedCard(site: string, token: string, send: Send = f
     const { status, json } = await send("GET", api(site, "saved-card"), token);
     if (status === 404) return { ok: false, closed: true, message: "Saved cards aren't switched on yet." };
     if ((json as { ok?: unknown } | null)?.ok === true) return { ok: true, card: cleanSavedCard((json as { card?: unknown }).card) };
+    const said = serverMessage(status, json);
+    if (said) return { ok: false, message: said };
   } catch {
     // fall through
   }
@@ -286,7 +302,7 @@ export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, sa
   if (outcome === "failed") return "This payment didn't go through, so nothing was charged. This usually means the card was declined or the payment page was closed. Your details are still here: tap Give to try again, or use another card.";
   if (outcome === "reversed") return "This donation was refunded, so nothing is owed on it. Your details are still here if you'd like to give again.";
   if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: tap Give to try again.";
-  if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.${last}`;
+  if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. A person will look at it. To ask about it, contact us.${last}`;
   if (savedCard) return `Your bank is still confirming this payment. Please don't give again: tap Check again in a minute. We'll also email you when it's through.${last}`;
   return `We're still waiting to hear whether your payment went through. If you finished paying, please don't pay again: tap Check again in a minute, or wait for your confirmation email. If you closed the page without paying, nothing was charged.${last}`;
 }

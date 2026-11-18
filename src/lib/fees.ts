@@ -73,6 +73,15 @@ export function cardChargeToCover(baseCents: number, r: CardChargeRates): number
   throw new Error("Card charge cover did not settle.");
 }
 
+/**
+ * The card charge a monthly donation collects each month when the donor chose to cover it, worked out from the
+ * rates of the day (so a change in the provider's rates is followed). 0 when not covered or the rates are not
+ * known (null: we never guess a rate). Each month collects gift + contribution + this.
+ */
+export function monthlyCardChargeAt(amountCents: number, contributionCents: number, covers: boolean, rates: CardChargeRates | null): number {
+  return covers && rates ? cardChargeToCover(rates.coverGiftOnly ? amountCents : amountCents + contributionCents, rates) : 0;
+}
+
 export class FeeError extends Error {
   constructor(
     public code: "invalid_amount" | "below_minimum" | "above_maximum" | "contribution_below_minimum",

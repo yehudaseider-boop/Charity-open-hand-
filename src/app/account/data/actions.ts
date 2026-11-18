@@ -8,6 +8,7 @@ import { requireViewer } from "@/lib/auth";
 import { getEmailTransport } from "@/lib/email";
 import type { FormState } from "@/lib/form";
 import { hitRateLimit } from "@/lib/rate-limit";
+import { normaliseLineBreaks } from "@/lib/text";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const schema = z.object({
@@ -18,7 +19,7 @@ const schema = z.object({
 /** A request to correct, delete or stop using the person's information (POPIA sections 11, 23 and 24). */
 export async function sendDataRequest(_prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer("/account/data");
-  const parsed = schema.safeParse({ kind: formData.get("kind"), details: String(formData.get("details") ?? "").trim() || undefined });
+  const parsed = schema.safeParse({ kind: formData.get("kind"), details: normaliseLineBreaks(String(formData.get("details") ?? "")).trim() || undefined });
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Please check the form." };
   if (await hitRateLimit("data-request", [`user:${viewer.userId}`], 3, 24 * 60)) {
     return { ok: false, message: "You've sent several requests today. We'll respond to those first." };

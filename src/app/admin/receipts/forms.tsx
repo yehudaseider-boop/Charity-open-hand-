@@ -11,7 +11,7 @@ export function VoidForm({ action }: { action: (state: FormState, formData: Form
       submitLabel="Withdraw receipt"
       confirm="Withdraw this receipt? The donor can no longer download it. It stays on record."
     >
-      <TextArea name="reason" label="Reason (kept on record)" required rows={2} />
+      <TextArea name="reason" label="Reason (kept on record)" required rows={2} minLength={5} maxLength={2000} hint="At least 5 characters." />
     </ActionForm>
   );
 }
@@ -31,7 +31,7 @@ export function SignOffForm({ action, count, total }: { action: (s: FormState, f
 export function SendBackForm({ action }: { action: (s: FormState, f: FormData) => Promise<FormState> }) {
   return (
     <ActionForm action={action} submitLabel="Send back to the charity" pendingLabel="Sending back…">
-      <TextArea name="reason" label="Why (the charity sees this)" required rows={2} maxLength={300} />
+      <TextArea name="reason" label="Why (the charity sees this)" required rows={2} minLength={5} maxLength={300} hint="At least 5 characters." />
     </ActionForm>
   );
 }

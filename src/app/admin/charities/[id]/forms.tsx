@@ -36,7 +36,7 @@ export function ApproveForm({ action, hasS18a, hasMandate }: { action: Action; h
 export function ReasonForm({ action, label, submitLabel, confirm }: { action: Action; label: string; submitLabel: string; confirm?: string }) {
   return (
     <ActionForm action={action} submitLabel={submitLabel} confirm={confirm}>
-      <TextArea name="reason" label={label} required rows={3} />
+      <TextArea name="reason" label={label} required rows={3} minLength={5} maxLength={2000} hint="At least 5 characters." />
     </ActionForm>
   );
 }
@@ -72,7 +72,7 @@ export function ChangeBankForm({ action, current }: { action: Action; current: {
 export function ReceiptsForm({ action, reference, s18aDone, mandateDone }: { action: Action; reference: string | null; s18aDone: boolean; mandateDone: boolean }) {
   return (
     <ActionForm action={action} submitLabel="Save" confirm="Save these s18A details? Receipts start once both are confirmed.">
-      <TextField name="s18a_reference" label="s18A reference number" required defaultValue={reference ?? ""} hint="From the SARS approval letter." />
+      <TextField name="s18a_reference" label="s18A reference number" required maxLength={40} defaultValue={reference ?? ""} hint="From the SARS approval letter." />
       {s18aDone ? null : <Check name="confirm_s18a">I have confirmed the s18A approval with the SARS letter uploaded below.</Check>}
       {mandateDone ? null : <Check name="confirm_mandate">The receipting mandate uploaded below is properly signed.</Check>}
     </ActionForm>

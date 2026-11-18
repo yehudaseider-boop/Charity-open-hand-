@@ -104,7 +104,7 @@ export async function rejectCharity(id: string, _prev: FormState, formData: Form
   const { charity, priv } = await loadCharityForManager(id);
   if (charity.status !== "pending_review") return { ok: false, message: "Only applications waiting for review can be sent back." };
   const reason = reasonFrom(formData);
-  if (!reason) return { ok: false, fieldErrors: { reason: "Explain what the charity needs to fix" } };
+  if (!reason) return { ok: false, fieldErrors: { reason: "Explain what the charity needs to fix, in at least 5 characters" } };
 
   const { data, error } = await createAdminClient()
     .from("charities")
@@ -125,7 +125,7 @@ export async function suspendCharity(id: string, _prev: FormState, formData: For
   const { charity, priv } = await loadCharityForManager(id);
   if (charity.status !== "approved") return { ok: false, message: "Only approved charities can be suspended." };
   const reason = reasonFrom(formData);
-  if (!reason) return { ok: false, fieldErrors: { reason: "Give a reason for the record" } };
+  if (!reason) return { ok: false, fieldErrors: { reason: "Give a reason for the record, at least 5 characters" } };
 
   const { data, error } = await createAdminClient()
     .from("charities")
@@ -164,7 +164,7 @@ export async function revokeS18a(id: string, _prev: FormState, formData: FormDat
   const { charity } = await loadCharityForManager(id);
   if (!charity.is_s18a) return { ok: false, message: "This charity is not marked s18A." };
   const reason = reasonFrom(formData);
-  if (!reason) return { ok: false, fieldErrors: { reason: "Give a reason for the record" } };
+  if (!reason) return { ok: false, fieldErrors: { reason: "Give a reason for the record, at least 5 characters" } };
   const { error } = await createAdminClient()
     .from("charities")
     .update({ is_s18a: false, s18a_confirmed_at: null })
@@ -372,7 +372,7 @@ export async function resetSecondStep(id: string, userId: string, _prev: FormSta
   const admin = await requirePlatformAdmin();
   if (!isUuid(id) || !isUuid(userId)) return { ok: false, message: "Unknown admin." };
   const how = String(formData.get("reason") ?? "").trim();
-  if (how.length < 5) return { ok: false, fieldErrors: { reason: "Say how you checked it was really them" } };
+  if (how.length < 5) return { ok: false, fieldErrors: { reason: "Say how you checked it was really them, in at least 5 characters" } };
   if (userId === admin.userId) return { ok: false, message: "You can't reset your own second step here. Ask another platform admin." };
   const db = createAdminClient();
   const member = await db.from("charity_admins").select("user_id").eq("charity_id", id).eq("user_id", userId).maybeSingle();
@@ -446,8 +446,10 @@ export async function setUpReceipts(id: string, _prev: FormState, formData: Form
   const admin = await requirePlatformAdmin();
   const { charity, priv, documents } = await loadCharityForManager(id);
   if (charity.status !== "approved" && charity.status !== "suspended") return { ok: false, message: "Use the approval form for applications." };
-  const reference = String(formData.get("s18a_reference") ?? "").trim().slice(0, 60);
+  const reference = String(formData.get("s18a_reference") ?? "").trim();
   if (!reference) return { ok: false, fieldErrors: { s18a_reference: "Enter the s18A reference number from the SARS letter" } };
+  // The same limit as the database (charity_numbers_length) and the charity's own form: never cut silently.
+  if (reference.length > 40) return { ok: false, fieldErrors: { s18a_reference: "The s18A reference number is at most 40 characters. Check it against the SARS letter" } };
   const confirmS18a = formData.get("confirm_s18a") === "on";
   const confirmMandate = formData.get("confirm_mandate") === "on";
   if (!confirmS18a && !confirmMandate) return { ok: false, message: "Tick what you have confirmed." };

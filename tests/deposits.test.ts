@@ -36,6 +36,22 @@ describe("a deposit", () => {
     expect(d.problems[0]).toBe("R500 gift less a R15 fee should be R485, but the payment provider shows R525. Tell us and we'll look into it.");
   });
 
+  it("a gift whose donor covered the card charge: the charity's share is gift + charge less the fee, and it adds up (refund too)", () => {
+    // Made-up figures: R500 gift, R16 card charge covered by the donor, R15 fee.
+    const covered = new Map<string, GiftIn>([["a", { ...gifts.get("a")!, cardChargeCents: 1_600 }]]);
+    const d = buildDeposit(50_100, [{ kind: "payment", donationId: "a", grossCents: 51_600, feeCents: 1_500, netCents: 50_100 }], covered);
+    expect(d).toMatchObject({ balances: true, problems: [], giftsCents: 50_000 });
+    // The gift column stays the gift (what the s18A receipt is for), not gift + charge.
+    expect(d.rows[0]).toMatchObject({ giftCents: 50_000, feeCents: 1_500, netCents: 50_100, problem: null });
+
+    const refund = buildDeposit(-51_600, [{ kind: "refund", donationId: "a", grossCents: -51_600, feeCents: 0, netCents: -51_600 }], covered);
+    expect(refund.balances).toBe(true);
+    expect(refund.rows[0]).toMatchObject({ giftCents: -50_000, netCents: -51_600, problem: null });
+
+    const wrong = buildDeposit(48_500, [{ kind: "payment", donationId: "a", grossCents: 50_000, feeCents: 1_500, netCents: 48_500 }], covered);
+    expect(wrong.problems[0]).toBe("R500 gift plus the R16 card charge the donor covered less a R15 fee should be R501, but the payment provider shows R485. Tell us and we'll look into it.");
+  });
+
   it("says plainly when a line isn't one of the charity's gifts, or the lines don't add up to the deposit", () => {
     const d = buildDeposit(10_000, [{ kind: "payment", donationId: null, grossCents: 9_000, feeCents: 0, netCents: 9_000 }], gifts);
     expect(d.rows[0]).toMatchObject({ donorName: "Not one of your Givezy gifts", giftCents: null });

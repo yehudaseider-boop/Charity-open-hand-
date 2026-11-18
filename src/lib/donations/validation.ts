@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { isValidSaIdNumber } from "@/lib/sa-id";
+import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
+import { isValidSaIdNumber, saIdDigits } from "@/lib/sa-id";
 import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
+import { normaliseLineBreaks } from "@/lib/text";
 import { cleanDedicationName, parseDedication } from "./dedication";
-import { cleanLabel } from "./labels";
+import { cleanLabel, LABEL_MAX } from "./labels";
 
 /** An optional text field, with a plain message when it is too long. */
 const str = (max: number, what: string) => z.string().max(max, `Please keep ${what} to ${max} characters or fewer`).optional();
@@ -11,6 +13,9 @@ const str = (max: number, what: string) => z.string().max(max, `Please keep ${wh
  * spaces. These are printed in emails and on receipts, where a typed line break could pass off extra text.
  */
 const line = (max: number, what: string) => str(max, what).transform((v) => (v === undefined ? v : cleanDedicationName(v)));
+/** A text box (more than one line): a line break counts as one character, as the browser's maxLength counts it. */
+const box = (max: number, what: string) =>
+  z.preprocess((v) => (typeof v === "string" ? normaliseLineBreaks(v) : v), z.string().max(max, `Please keep ${what} to ${max} characters or fewer`)).optional();
 const yes = z.literal("on").optional();
 
 /** The old fixed choice, still accepted from older app versions and links (read as a label). */
@@ -31,19 +36,20 @@ export const checkoutSchema = z.object({
    * paying, the ID or registration number and the address are added on the thank-you page or from the account.
    */
   s18a_when: z.enum(["now", "later"]).optional(),
-  id_number: str(20, "the ID number"),
+  /** Kept without spaces or dashes: "850101-5009-087" is 8501015009087. */
+  id_number: str(20, "the ID number").transform((v) => (v === undefined ? v : saIdDigits(v) || undefined)),
   tax_reference: str(20, "the income tax number"),
   address_line1: line(200, "the street address"),
   address_line2: line(200, "this line"),
   suburb: line(80, "the suburb"),
   city: line(80, "the city or town"),
   postal_code: z.string().max(4, "Postal codes are 4 digits").optional(),
-  message: str(500, "your message"),
+  message: box(500, "your message"),
   /** Optional: given in honour of, or in memory of, someone (the name is checked in checkDonorDetails). */
   dedication_kind: z.enum(["none", "honour", "memory"]).optional(),
   dedication_name: str(80, "their name"),
   /** The donor's own label for this gift, optional and private to them ("Work giving", "Family"). */
-  giving_label: str(80, "your label"),
+  giving_label: str(LABEL_MAX, "your label"),
   /** Older app versions send the fixed choice instead; it becomes the label. */
   giving_kind: z.enum(["maaser", "chomesh", "tzedaka"]).optional(),
   is_anonymous: yes,
@@ -77,7 +83,7 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
     }
   }
 
-  if (v.phone && !/^(\+27|0)\d{9}$/.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
+  if (v.phone && !SA_PHONE.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
 
   // s18A details: the donor's address (section 18A(2) asks for the donor's name and address on the receipt; the
   // receipt job refuses one without it), and a person's SA ID number, which SARS needs to report the receipt
@@ -132,8 +138,9 @@ export function agreementErrors(fieldErrors: Record<string, string>, singleTick:
   return { ...rest, agreement: AGREEMENT_ERROR };
 }
 
+/** The phone as kept: the same rule as the charity's forms and imports (src/lib/phone.ts). */
 export function cleanPhone(v: string | undefined) {
-  return v?.replace(/[\s()-]/g, "") || undefined;
+  return v === undefined ? undefined : normaliseSaPhone(v) || undefined;
 }
 
 /** The label to keep with a gift: what the donor typed. An older app's fixed choice (giving_kind) is accepted but never kept as a label. */

@@ -89,7 +89,7 @@ export default function ForDonorsPage() {
         body={`You pay on the payment provider's secure page. ${appName} never sees your card and never holds your money.`}
         points={[
           { icon: "lock", title: "Your card stays private", body: `You type it on the provider's own page. ${appName} never sees or stores it.` },
-          { icon: "eye", title: "Charities see only what they need", body: "Enough to thank you and record your gift. They never see your ID number." },
+          { icon: "eye", title: "Charities see only what they need", body: "Enough to thank you and record your gift. They don't see your ID number, except in the SARS return the law requires." },
           { icon: "user", title: "Give anonymously", body: "Your name then won't appear on public pages, campaign lists or live totals." },
           { icon: "shield", title: "Your information is yours", body: "See and download everything we hold about you, and ask us to correct or delete it." },
         ]}

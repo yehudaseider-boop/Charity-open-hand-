@@ -83,9 +83,10 @@ describe("remove a charity admin", () => {
 });
 
 describe("reset a lost authenticator", () => {
-  it("needs a note of how the admin checked who it was", async () => {
+  it("needs a note of how the admin checked who it was, and says how long", async () => {
     const r = await resetSecondStep(CH, U2, { ok: false }, form({ reason: "" }));
-    expect(r.fieldErrors?.reason).toBeTruthy();
+    expect(r.fieldErrors?.reason).toMatch(/at least 5 characters/);
+    expect((await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Call" }))).fieldErrors?.reason).toMatch(/at least 5 characters/);
     expect(deleted).toHaveLength(0);
   });
   it("removes their factors, records the check and emails them", async () => {
@@ -126,6 +127,14 @@ describe("set up s18A after approval", () => {
     expect(r.ok).toBe(true);
     expect(updates[0]).toMatchObject({ table: "charities", s18a_reference: "930/123/45/6", is_s18a: true, mandate_signed_at: "2026-10-01T00:00:00+02:00", mandate_document_path: "c/m.pdf" });
     expect(mails[0].subject).toMatch(/s18A receipts are set up/);
+  });
+  it("refuses a reference over 40 characters (the database's limit) instead of cutting it", async () => {
+    documents = [{ document_type: "s18a_approval", storage_path: "c/s.pdf" }];
+    const r = await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "9".repeat(41), confirm_s18a: "on" }));
+    expect(r.fieldErrors?.s18a_reference).toMatch(/at most 40 characters/);
+    expect(updates).toHaveLength(0);
+    await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "9".repeat(40), confirm_s18a: "on" }));
+    expect(updates[0]).toMatchObject({ s18a_reference: "9".repeat(40) });
   });
   it("one half alone saves but doesn't promise receipts", async () => {
     documents = [{ document_type: "s18a_approval", storage_path: "c/s.pdf" }];

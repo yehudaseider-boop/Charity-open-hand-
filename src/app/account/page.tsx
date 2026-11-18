@@ -7,6 +7,7 @@ import { requireViewer } from "@/lib/auth";
 import { formatDate, taxYearFor, taxYearLabel, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
+import { monthlyCardCharge } from "@/lib/donations/card-charge";
 import { MonthlyButton } from "./monthly-button";
 import { isMonthlyChange, monthlyResult as monthlyResultFor } from "@/lib/donations/monthly-result";
 import { MonthlyIdForm } from "./monthly-id-form";
@@ -41,7 +42,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const { data: monthlyGifts, error: monthlyError } = donorIds.length
     ? await supabase
         .from("recurring_donations")
-        .select("id, amount_cents, contribution_cents, status, next_charge_at, card_last4, ended_reason, failed_attempts, held_reason, wants_18a, first_donation_id, id_number_carry_last4, charities(name_en, slug)")
+        .select("id, amount_cents, contribution_cents, covers_card_charge, status, next_charge_at, card_last4, ended_reason, failed_attempts, held_reason, wants_18a, first_donation_id, id_number_carry_last4, charities(name_en, slug)")
         .in("donor_id", donorIds)
         .in("status", ["active", "paused", "failed"])
         .order("created_at", { ascending: false })
@@ -214,7 +215,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
               const charity = (Array.isArray(m.charities) ? m.charities[0] : m.charities) as { name_en: string; slug: string } | null;
               return (
                 <li key={m.id} className="rounded-control border-2 border-border p-3 text-sm">
-                  <p className="font-medium">{charity ? <Link href={`/c/${charity.slug}`} className="underline underline-offset-4"><bdi>{charity.name_en}</bdi></Link> : "Charity"}: {formatRand(Number(m.amount_cents) + Number(m.contribution_cents))} a month</p>
+                  <p className="font-medium">{charity ? <Link href={`/c/${charity.slug}`} className="underline underline-offset-4"><bdi>{charity.name_en}</bdi></Link> : "Charity"}: {formatRand(monthlyTotal(m))} a month</p>
                   <p className="text-muted">
                     {m.status === "active" && m.failed_attempts > 0 ? "Your card was declined this month. We'll try it again, or you can put in a new card. " : null}
                     {m.status === "active" && m.next_charge_at ? `${m.failed_attempts > 0 ? "Next try" : "Next payment"} on ${formatDate(m.next_charge_at)}` : null}
@@ -330,4 +331,14 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       </div>
     </div>
   );
+}
+
+/**
+ * What each month collects: the gift, the contribution to Givezy and, when the donor chose to cover it, the card
+ * charge at today's rates (as the monthly run and the confirmation email work it out). The app shows the same.
+ */
+function monthlyTotal(m: { amount_cents: number | string; contribution_cents: number | string; covers_card_charge?: boolean | null }): number {
+  const amount = Number(m.amount_cents);
+  const contribution = Number(m.contribution_cents);
+  return amount + contribution + monthlyCardCharge(amount, contribution, m.covers_card_charge === true);
 }

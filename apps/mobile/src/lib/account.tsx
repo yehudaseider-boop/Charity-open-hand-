@@ -15,6 +15,7 @@ import { supabase } from "./supabase";
 import { TEST_BUILD } from "./test-build";
 import { setDirectoryDemo } from "./directory";
 import { SITE_URL, siteUrl } from "./website";
+import { fetchCardChargeRates } from "./card-rates";
 
 /**
  * Who is using the app, and their real giving.
@@ -115,7 +116,13 @@ async function loadLive(userId: string): Promise<Live> {
         .order("id")
         .range(a, b),
     ),
-    db.from("recurring_donations").select("id, amount_cents, contribution_cents, status, needs_gateway_sync, failed_attempts, ended_reason, next_charge_at, charities(slug, name_en)").in("donor_id", donorIds),
+    (async () => {
+      const columns = "id, amount_cents, contribution_cents, status, needs_gateway_sync, failed_attempts, ended_reason, next_charge_at, charities(slug, name_en)";
+      // Whether the donor covers the card charge (readable since migration 20261118120001). A server without that
+      // migration yet refuses the column: read the rest rather than lose the whole list.
+      const withCover = await db.from("recurring_donations").select(`${columns}, covers_card_charge`).in("donor_id", donorIds);
+      return withCover.error ? db.from("recurring_donations").select(columns).in("donor_id", donorIds) : withCover;
+    })(),
     db
       .from("s18a_receipts")
       .select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en")
@@ -127,9 +134,12 @@ async function loadLive(userId: string): Promise<Live> {
     const k = Array.isArray(d.donation_giving_kinds) ? d.donation_giving_kinds[0] : d.donation_giving_kinds;
     return k ? [{ donation_id: d.id, kind: k.kind, label: k.label }] : [];
   });
+  const recurringRows = (recurring.data ?? []) as unknown as RecurringRow[];
+  // Only asked when a monthly donation covers the card charge, so its true monthly amount shows (as on the website).
+  const rates = recurringRows.some((r) => r.covers_card_charge === true) ? await fetchCardChargeRates(SITE_URL) : ({ known: false } as const);
   return {
     gifts: toGifts(donations, kinds),
-    recurring: toRecurring((recurring.data ?? []) as unknown as RecurringRow[]),
+    recurring: toRecurring(recurringRows, rates),
     receipts: toReceipts((receipts.data ?? []) as unknown as ReceiptRow[]),
     elsewhere: loggedElsewhere,
     loadedAt: new Date(),
@@ -394,14 +404,14 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, ...(back ? { emailRedirectTo: back } : {}) } });
         if (!error) return { ok: true };
         if (isNetworkError(error)) return { ok: false, message: NO_CONNECTION };
-        if (error.status === 429) return { ok: false, message: "We've just sent you a code. Please wait a minute before asking for another." };
+        if (error.status === 429) return { ok: false, message: "Too many sign-in emails for now. Please use the newest code you have, or try again later." };
         return { ok: false, message: "We couldn't send the code. Please check the address and try again in a minute." };
       },
       async verifyCode(email, code) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
         const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
         if (!error) return { ok: true };
-        if (isNetworkError(error)) return { ok: false, message: `${NO_CONNECTION} Your code still works for a few minutes.` };
+        if (isNetworkError(error)) return { ok: false, message: `${NO_CONNECTION} Your code still works for a short while, so try again once you're connected.` };
         return { ok: false, message: "That code didn't work or has expired. Check it, or tap Send a new code." };
       },
       async signInWith(provider) {
@@ -462,8 +472,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       async setRecurringStatus(id, status) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
         const { error } = await supabase.rpc("set_my_recurring_status", { p_id: id, p_status: status });
-        // A monthly donation held while a disputed payment is looked into says so (from the database).
-        if (error) return { ok: false, message: /looked into/.test(error.message) ? error.message : "We couldn't change that. Please try again." };
+        // A monthly donation held while a disputed payment is looked into, or with no card left to charge, says so (from the database).
+        if (error) return { ok: false, message: /looked into|no card to charge/.test(error.message) ? error.message : "We couldn't change that. Please try again." };
         await refresh();
         return { ok: true };
       },

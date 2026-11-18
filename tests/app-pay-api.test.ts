@@ -175,3 +175,23 @@ describe("a stalled network", () => {
     expect(await paymentStatus("https://givezy.example", "ref", "tok", post)).toBe("unknown");
   });
 });
+
+describe("the server's own words reach the donor (sweep of 18/11/2026)", () => {
+  it("passes a refusal's plain message through instead of 'check your connection'", async () => {
+    const r = await checkReady("https://x.test", "a", undefined, async () => ({ status: 429, json: { ok: false, message: "Too many tries from this connection. Please wait a few minutes." } }));
+    expect(r).toEqual({ ok: false, message: "Too many tries from this connection. Please wait a few minutes." });
+    const s = await fetchSavedCard("https://x.test", "t", async () => ({ status: 401, json: { ok: false, message: "Please sign in again." } }));
+    expect(s).toEqual({ ok: false, message: "Please sign in again." });
+  });
+
+  it("still says 'check your connection' for a server fault or no message", async () => {
+    const r = await checkReady("https://x.test", "a", undefined, async () => ({ status: 500, json: { ok: false, message: "boom" } }));
+    expect(r.ok).toBe(false);
+    expect((r as { message: string }).message).not.toBe("boom");
+  });
+
+  it("shows a card expiry sent as a single-digit month", () => {
+    expect(cleanSavedCard({ last4: "4242", brand: "visa", expires: "9/2028" })?.expires).toBe("09/2028");
+    expect(cleanSavedCard({ last4: "4242", brand: "visa", expires: "13/2028" })?.expires).toBeNull();
+  });
+});

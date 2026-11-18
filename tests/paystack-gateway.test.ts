@@ -474,13 +474,44 @@ describe("deposits: settlements are kept to this charity's own money", () => {
   it("drops anything paid out before the day asked for", async () => {
     answer(
       [
-        { id: 20, status: "success", settlement_date: "2026-09-30T23:00:00Z", subaccount: ours },
+        // 21:00 UTC on 30/09 is 23:00 in Johannesburg: still 30/09, so before the day asked for.
+        { id: 20, status: "success", settlement_date: "2026-09-30T21:00:00Z", subaccount: ours },
         { id: 21, status: "success", settlement_date: "2026-10-01", subaccount: ours },
       ],
       { "20": [tx("d0", ours)], "21": [tx("d1", ours)] },
     );
     const out = await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: ours, since: "2026-10-01" });
     expect(out.map((p) => [p.ref, p.paidOutOn])).toEqual([["21", "2026-10-01"]]);
+  });
+});
+
+describe("the day a settlement was paid out", () => {
+  it("is the Johannesburg date, not the UTC day, when Paystack sends a time", async () => {
+    const { settlementDay } = await import("@/lib/gateway/paystack");
+    expect(settlementDay("2026-10-20T22:30:00Z")).toBe("2026-10-21");
+    expect(settlementDay("2026-10-20T21:59:59.000Z")).toBe("2026-10-20");
+    expect(settlementDay("2026-10-20T23:30:00+02:00")).toBe("2026-10-20");
+    expect(settlementDay("2026-10-20")).toBe("2026-10-20");
+    expect(settlementDay(undefined)).toBe("");
+    expect(settlementDay("not a date")).toBe("not a date");
+  });
+
+  it("dates the deposit by that Johannesburg day", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const path = url.replace("https://api.paystack.co", "");
+        calls.push({ url: path, body: null });
+        const data = /^\/settlement\/40\/transactions/.test(path)
+          ? [{ reference: "d1", amount: 10_000, fees: 300, subaccount: "ACCT_ours" }]
+          : path.startsWith("/settlement?")
+            ? [{ id: 40, status: "success", settlement_date: "2026-10-20T22:30:00Z", total_amount: 9_700, subaccount: "ACCT_ours" }]
+            : [];
+        return new Response(JSON.stringify({ status: true, data }), { status: 200 });
+      }),
+    );
+    const out = await paystackGateway.listPayouts({ charityId: "c1", charityAccountRef: "ACCT_ours", since: "2026-10-01" });
+    expect(out.map((p) => p.paidOutOn)).toEqual(["2026-10-21"]);
   });
 });
 

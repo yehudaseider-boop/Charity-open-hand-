@@ -175,7 +175,7 @@ export function checkS18aCompletion(
   const e: Record<string, string> = {};
   const value: S18aCompletion = {};
   if (donorType === "individual") {
-    const typed = typeof raw.id_number === "string" ? raw.id_number.replace(/\s/g, "") : "";
+    const typed = typeof raw.id_number === "string" ? raw.id_number.replace(/[\s-]/g, "") : "";
     if (missing.includes("id_number") || typed) {
       const id = cleanSaIdNumber(raw.id_number);
       if (!id.ok) e.id_number = id.message;

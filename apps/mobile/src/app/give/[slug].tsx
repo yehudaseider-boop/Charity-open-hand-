@@ -285,7 +285,7 @@ export default function Give() {
         setMonthly(false);
       }
       if (!p.reference || !p.token) {
-        setMessage(`Your gift of ${rand(p.summary.cents + p.summary.contributionCents)} from your saved card may still be going through. Tap Give: we check first, and never charge twice.`, "wait", true);
+        setMessage(`Your gift of ${rand(p.summary.cents + p.summary.contributionCents)} from your saved card may still be going through. Hold to give again: we check first, and never charge twice.`, "wait", true);
         return;
       }
       setUnsettled({ reference: p.reference, token: p.token, charged: p.charged, summary: p.summary });
@@ -478,7 +478,9 @@ export default function Give() {
 
   // The campaign counts only once the server says it is still running (so a gift never quietly
   // goes to the charity in general because the app hadn't loaded it yet). The preview has no server.
-  const campaignId = campaignParam && (server ? server.campaignOpen : (charity.campaigns ?? []).some((c) => c.id === campaignParam)) ? campaignParam : undefined;
+  // A campaign that ends while the donor is on this screen (the server says so when they give) is dropped: the gift goes to the charity.
+  const [campaignClosed, setCampaignClosed] = useState(false);
+  const campaignId = campaignParam && !campaignClosed && (server ? server.campaignOpen : (charity.campaigns ?? []).some((c) => c.id === campaignParam)) ? campaignParam : undefined;
   const campaignEnded = Boolean(campaignParam) && !campaignId;
   const campaign = campaignId ? ((charity.campaigns ?? []).find((c) => c.id === campaignId) ?? null) : null;
   const minGift = server?.minGiftCents ?? 0;
@@ -720,7 +722,9 @@ export default function Give() {
           details,
         },
         undefined,
-        usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
+        // Always sent while signed in: a gift given with the donor's own email counts as theirs, so next time we can offer
+        // "Use my ID ending 1234" (sweep of 18/11/2026). A guest has no token.
+        await account.accessToken(),
       );
     } catch {
       setBusy(false);
@@ -730,8 +734,8 @@ export default function Give() {
       }
       setMessage(
         payWithSaved
-          ? "Something went wrong before we could check your card, and we don't know yet whether it was charged. Your gift is held as it was. Tap Give again: we check first, and never charge twice."
-          : "Something went wrong before the payment page opened, so nothing was charged. Your details are still here: tap Give to try again.",
+          ? "Something went wrong before we could check your card, and we don't know yet whether it was charged. Your gift is held as it was. Hold to give again: we check first, and never charge twice."
+          : "Something went wrong before the payment page opened, so nothing was charged. Your details are still here. Hold to give when you're ready to try again.",
         payWithSaved ? "wait" : "error",
         true,
       );
@@ -771,8 +775,8 @@ export default function Give() {
         }
         setMessage(
           payWithSaved
-            ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your gift is held exactly as it was. Tap Give again: we check first, and never charge twice."
-            : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and tap Give again.",
+            ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your gift is held exactly as it was. Hold to give again: we check first, and never charge twice."
+            : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and hold to give again.",
           payWithSaved ? "wait" : "error",
           true,
         );
@@ -790,10 +794,15 @@ export default function Give() {
         setEmail(held.email);
         setMonthly(false);
         setMessage(
-          `We're still checking your earlier gift of ${rand(held.cents + held.contributionCents)} from your saved card, so it has been put back as it was. Tap Give again: we check first, and never charge twice.`,
+          `We're still checking your earlier gift of ${rand(held.cents + held.contributionCents)} from your saved card, so it has been put back as it was. Hold to give again: we check first, and never charge twice.`,
           "wait",
           true,
         );
+        return;
+      }
+      if (r.campaignEnded) {
+        setCampaignClosed(true);
+        setMessage("That campaign has just ended. Nothing was charged. Hold to give again and your gift goes to " + charity!.nameEn + ".", "error", true);
         return;
       }
       if (r.fieldErrors) {
@@ -837,7 +846,7 @@ export default function Give() {
       } catch {
         setBusy(false);
         void dropPendingGift(owner, charity!.slug);
-        setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here: tap Give to try again.", "error", true);
+        setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here. Hold to give when you're ready to try again.", "error", true);
         return;
       }
     }
@@ -1147,9 +1156,9 @@ export default function Give() {
           {showDetailFields ? (
             <View style={[styles.softCard, { gap: 14 }]} onLayout={at("details")}>
               <Text style={styles.sectionTitle} accessibilityRole="header">About you</Text>
-              <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" textContentType="givenName" autoCapitalize="words" returnKeyType="next" error={err("first_name")} />
-              <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" textContentType="familyName" autoCapitalize="words" returnKeyType="next" error={err("last_name")} />
-              <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" returnKeyType="next" error={err("email")} helper="Your confirmation is sent here." />
+              <Field label="First name" value={first} onChangeText={setFirst} maxLength={80} autoComplete="given-name" textContentType="givenName" autoCapitalize="words" returnKeyType="next" error={err("first_name")} />
+              <Field label="Surname" value={last} onChangeText={setLast} maxLength={80} autoComplete="family-name" textContentType="familyName" autoCapitalize="words" returnKeyType="next" error={err("last_name")} />
+              <Field label="Email" value={email} onChangeText={setEmail} maxLength={254} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" returnKeyType="next" error={err("email")} helper="Your confirmation is sent here." />
               <SwitchRow label="Remember my details" description="So you don't type them next time." more="Your name and email are kept on this phone only, never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
             </View>
           ) : (
@@ -1201,15 +1210,15 @@ export default function Give() {
                   {useSavedId && err("id_number") ? <Text variant="label" style={{ color: colors.danger }}>{err("id_number")}</Text> : null}
                 </View>
               ) : null}
-              {want18a && !detailsLater && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" maxLength={13} error={err("id_number")} helper="13 digits. Kept safely on our server for your receipt, never on this phone." /> : null}
+              {want18a && !detailsLater && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" maxLength={17} error={err("id_number")} helper="13 digits. Kept safely on our server for your receipt, never on this phone." /> : null}
               {want18a && !detailsLater ? (
                 <View style={{ gap: 10 }}>
                   <Text variant="label">
                     Your address. SARS needs it on the receipt.{usingSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
                   </Text>
-                  <Field label="Street address" value={street} onChangeText={setStreet} autoComplete="street-address" error={err("address_line1")} />
-                  <Field label="Suburb" value={suburb} onChangeText={setSuburb} error={err("suburb")} />
-                  <Field label="City or town" value={town} onChangeText={setTown} autoComplete="postal-address-locality" error={err("city")} />
+                  <Field label="Street address" value={street} onChangeText={setStreet} maxLength={200} autoComplete="street-address" error={err("address_line1")} />
+                  <Field label="Suburb" value={suburb} onChangeText={setSuburb} maxLength={80} error={err("suburb")} />
+                  <Field label="City or town" value={town} onChangeText={setTown} maxLength={80} autoComplete="postal-address-locality" error={err("city")} />
                   <Field label="Postal code" value={postal} onChangeText={setPostal} keyboardType="number-pad" autoComplete="postal-code" maxLength={4} error={err("postal_code")} />
                 </View>
               ) : null}
@@ -1280,7 +1289,7 @@ export default function Give() {
             <SwitchRow
               label={`No news or appeals from ${charity.nameEn}`}
               description="Turn on to stop their emails."
-              more={`${charity.nameEn} can email you news and appeals through Givezy, at most 4 a month. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
+              more={`${charity.nameEn} can email you news and appeals through Givezy, at most one a week. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
               value={noNews}
               onChange={setNoNews}
             />
