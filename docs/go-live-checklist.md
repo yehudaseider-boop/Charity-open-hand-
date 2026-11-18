@@ -14,7 +14,7 @@ The long lists below are the full record. This is the order that matters, in thr
 4. `ADMIN_NOTIFY_EMAIL` set to the address that hears about new applications, and someone checking applications every 2 working days (the page promises it). Write down what a person checks before approving (the "Fake-charity checks" item in A).
 5. The live Supabase project: plan (Pro from about $25 a month, as noted below), all migrations run in order, the causes added. Vercel on a paid plan (Hobby is non-commercial only).
 6. `SITE_URL` set to https://givezy.co.za, the same address in Supabase's allowed redirects, and `/apply` reachable on the live address (coming-soon mode currently sends every other page to the front page).
-7. The Next.js security update, tested.
+7. ~~The Next.js security update, tested.~~ Done 18/11/2026 (16.4.6; check the test site after the push).
 
 **Stage 2. Charities can receive money.**
 8. Paystack live sign-up (needs item 1), then the checks on the real account: split payments to a charity's bank, monthly collections, declined cards, refunds. Connect each approved charity in Admin before opening.
@@ -326,7 +326,7 @@ Paystack support (13/11/2026): Google Pay is available to South African business
   - **Sign-in code lifetime:** the local setting is an hour while the screen says "expires soon"; set about 10 minutes on the hosted project and confirm its limits.
 
 - [ ] **The site's own address (found 17/11/2026).** Today givezy.co.za, www.givezy.co.za and test.givezy.co.za all forward visitors to charity-open-hand.vercel.app, because the server setting `SITE_URL` is that address (sign-in links only work on the address in `SITE_URL`, so every other address forwards there on purpose). Before launch: set `SITE_URL` on the live site to https://givezy.co.za (and on the test site to https://test.givezy.co.za if it should keep its own address), update the sign-in email links in Supabase's allowed redirect addresses to match, then check a sign-in link end to end. Needs Yehuda's yes: it changes where everyone lands.
-- [ ] **Next.js security update (found 17/11/2026).** The local development server warns that the installed Next.js has a known security vulnerability. Check the advisory, update Next.js on a branch, run every test and click through the test site before launch. Not done yet: no upgrade was run.
+- [x] **Next.js security update (found 17/11/2026; done 18/11/2026: 16.4.6, see decisions.md).** The local development server warns that the installed Next.js has a known security vulnerability. Check the advisory, update Next.js on a branch, run every test and click through the test site before launch. Not done yet: no upgrade was run.
 
 ## C. First live day
 
