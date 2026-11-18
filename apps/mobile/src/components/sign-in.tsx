@@ -41,7 +41,7 @@ async function step(
 }
 
 /**
- * Sign in: Google or Apple when switched on, else an emailed 6-digit code. No password. The same
+ * Sign in: Google or Apple when switched on, else an emailed code. No password. The same
  * account as the website. Sits under the blue "Let's get you set up." header on Account.
  */
 export function SignIn() {
@@ -92,15 +92,15 @@ export function SignIn() {
       <CornerRing />
       <Text variant="h2" style={styles.title}>Check your email</Text>
       <Text variant="bodyMuted">
-        {resent ? `We sent a new code to ${sentTo}. Use the newest one: older codes no longer work.` : `We sent a 6-digit code to ${sentTo}. It works once and expires soon.`}
+        {resent ? `We sent a new code to ${sentTo}. Use the newest one: older codes no longer work.` : `We sent a code to ${sentTo}. It works once and expires soon.`}
       </Text>
-      <Field label="Code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={7} error={error ?? undefined} />
+      <Field label="Code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={14} error={error ?? undefined} />
       <Button
         label={busy ? "Checking…" : "Sign in"}
         disabled={busy}
         onPress={async () => {
           const c = cleanCode(code);
-          if (!c) return setError("Enter the 6 digits from the email.");
+          if (!c) return setError("Enter the code from the email, numbers only.");
           await step(setBusy, setError, () => account.verifyCode(sentTo, c));
         }}
       />

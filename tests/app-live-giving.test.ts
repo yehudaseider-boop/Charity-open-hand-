@@ -50,6 +50,12 @@ describe("sign-in helpers", () => {
     expect(looksLikeEmail("sarah@")).toBe(false);
     expect(cleanCode("123 456")).toBe("123456");
     expect(cleanCode("12345")).toBeNull();
+    // Supabase sends 6 to 10 digits depending on the project's setting; the test project sent 8 (18/11/2026).
+    expect(cleanCode("12345678")).toBe("12345678");
+    expect(cleanCode("1234 5678")).toBe("12345678");
+    expect(cleanCode("1234-5678")).toBe("12345678");
+    expect(cleanCode("1234567890")).toBe("1234567890");
+    expect(cleanCode("12345678901")).toBeNull();
     expect(cleanCode("12a456")).toBeNull();
   });
 });

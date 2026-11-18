@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Back to the app", robots: { index: f
 
 /**
  * Where the link in a sign-in email lands when the person asked for it in the Givezy app (18/11/2026).
- * The app signs in with the 6‑digit code from the same email, so this page only says that, plainly.
+ * The app signs in with the code from the same email, so this page only says that, plainly.
  * It signs nobody in on the website: the website's own sign-in uses /auth/callback.
  */
 export default function BackToAppPage() {
@@ -18,7 +18,7 @@ export default function BackToAppPage() {
       <div className="w-full rounded-[1.75rem] border-2 border-border bg-surface p-6 sm:p-8">
         <h1 className="text-[2rem] leading-tight">Go back to the app</h1>
         <p className="mt-3 text-[15px] text-muted">
-          You asked to sign in from the Givezy app. Open the app and type the 6‑digit code from the same email.
+          You asked to sign in from the Givezy app. Open the app and type the code from the same email.
           Nothing else is needed on this page.
         </p>
         <p className="mt-4 text-sm text-muted">

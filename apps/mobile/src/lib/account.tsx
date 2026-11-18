@@ -388,7 +388,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       accessToken,
       async sendCode(email) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
-        // The email holds a 6-digit code (typed here) and a link for website sign-ins. A link tapped from an
+        // The email holds a code (typed here) and a link for website sign-ins. A link tapped from an
         // app request lands on a website page that says to go back and type the code (18/11/2026).
         const back = siteUrl(SITE_URL, "/login/app");
         const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, ...(back ? { emailRedirectTo: back } : {}) } });

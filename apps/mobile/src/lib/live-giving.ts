@@ -124,10 +124,14 @@ export function looksLikeEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
-/** The 6-digit code from the sign-in email, ignoring spaces. */
+/**
+ * The code from the sign-in email, ignoring spaces and dashes. Supabase sends 6 to 10 digits depending on the
+ * project's "Email OTP length" (the test project sent 8 on 18/11/2026), so any of those lengths is accepted,
+ * the same as the website (src/app/login/actions.ts).
+ */
 export function cleanCode(v: string): string | null {
-  const c = v.replace(/\s/g, "");
-  return /^\d{6}$/.test(c) ? c : null;
+  const c = v.replace(/[\s-]/g, "");
+  return /^\d{6,10}$/.test(c) ? c : null;
 }
 
 /**

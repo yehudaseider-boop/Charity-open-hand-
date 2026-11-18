@@ -70,7 +70,7 @@ export async function sendLoginLink(formData: FormData) {
 }
 
 /**
- * The 6-digit code from the same email. Works on any device, unlike the link, which only opens
+ * The code from the same email (6 to 10 digits: Supabase's "Email OTP length" decides). Works on any device, unlike the link, which only opens
  * in the browser that asked for it (a link tapped in the Gmail app opens in another one).
  *
  * Only wrong codes count towards the limits, per email on this connection, with a much higher ceiling per email and
