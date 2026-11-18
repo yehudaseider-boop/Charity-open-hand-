@@ -29,7 +29,7 @@ The long lists below are the full record. This is the order that matters, in thr
 
 Started 12/10/2026. Nothing here has been done on the real (live) systems yet. Tick items off as they are done and note the date. Items marked "decision" need Yehuda or Yosef before anyone builds or switches anything on.
 
-- [ ] **End-to-end checks: add the robot's key (18/11/2026).** GitHub, the repository, Settings, Secrets and variables, Actions, New repository secret: name `E2E_SUPABASE_SECRET_KEY`, value the TEST project's secret key (Supabase, TEST project, Settings, API Keys). Never the live project's. Then Actions, End-to-end checks, Run workflow, and check it is green. At launch, decide whether the robot also checks the live site (read-only pages only).
+- [x] **End-to-end checks: the robot's key is in (done 18/11/2026, Yehuda; first full run green: 18 of 18, including real sign-in on the website and in the app).** Original note, kept for the live project:  GitHub, the repository, Settings, Secrets and variables, Actions, New repository secret: name `E2E_SUPABASE_SECRET_KEY`, value the TEST project's secret key (Supabase, TEST project, Settings, API Keys). Never the live project's. Then Actions, End-to-end checks, Run workflow, and check it is green. At launch, decide whether the robot also checks the live site (read-only pages only).
 
 ## A. Decisions still open (nothing goes live until these are settled)
 
