@@ -29,6 +29,8 @@ The long lists below are the full record. This is the order that matters, in thr
 
 Started 12/10/2026. Nothing here has been done on the real (live) systems yet. Tick items off as they are done and note the date. Items marked "decision" need Yehuda or Yosef before anyone builds or switches anything on.
 
+- [ ] **End-to-end checks: add the robot's key (18/11/2026).** GitHub, the repository, Settings, Secrets and variables, Actions, New repository secret: name `E2E_SUPABASE_SECRET_KEY`, value the TEST project's secret key (Supabase, TEST project, Settings, API Keys). Never the live project's. Then Actions, End-to-end checks, Run workflow, and check it is green. At launch, decide whether the robot also checks the live site (read-only pages only).
+
 ## A. Decisions still open (nothing goes live until these are settled)
 
 - [ ] **Security check of 18/11/2026: two decisions.** (1) Charities' appeal and thank-you emails: the plain-text version keeps any web address the charity typed, and mail apps make it clickable (the HTML version shows no links). Allow it, or block or flag links at review? (2) Should a team "viewer" see the charity's own contact details, tax reference and registration numbers (today yes)?

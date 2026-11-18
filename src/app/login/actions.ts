@@ -8,6 +8,7 @@ import { forgetAttempts, hitRateLimit, takeAttempt } from "@/lib/rate-limit";
 import { siteOrigin } from "@/lib/request-origin";
 import { safeNextPath } from "@/lib/safe-path";
 import { looksLikeEmail, sentPageUrl, signInKeys } from "@/lib/sign-in";
+import { SIGN_IN_CODE } from "@/lib/sign-in-code";
 import { createClient } from "@/lib/supabase/server";
 import { linkDonorsToUser } from "@/lib/donors/link";
 
@@ -83,7 +84,7 @@ export async function verifyLoginCode(formData: FormData) {
   // Back to the code box: the address stays only with the proof the page already had (never a new one from here).
   const proof = String(formData.get("s") ?? "");
   const back = (error: "code" | "tries") => sentPageUrl(email, next, { error }, proof);
-  if (email.length > 254 || !looksLikeEmail(email) || !/^\d{6,10}$/.test(code)) redirect(back("code"));
+  if (email.length > 254 || !looksLikeEmail(email) || !SIGN_IN_CODE.test(code)) redirect(back("code"));
   const keys = signInKeys(email, clientIp(await headers()));
   // Counted before the code is checked, so parallel guesses can't all slip under the limit; a right code takes its
   // count back below, so only wrong codes use up the allowance (review 12/11/2026).

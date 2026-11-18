@@ -2,6 +2,7 @@
  * Turning the donor's own rows from the database into what the screens show.
  * Pure functions (no React Native), so the website's test suite can check them.
  */
+import { cleanSignInCode } from "@shared/sign-in-code";
 import { DECLINED_REASON } from "@shared/donations/monthly-reasons";
 import type { Gift, Receipt, Recurring } from "../data/giving";
 import { cleanLabel, labelOf } from "@shared/donations/labels";
@@ -167,15 +168,8 @@ export function looksLikeEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
-/**
- * The code from the sign-in email, ignoring spaces and dashes. Supabase sends 6 to 10 digits depending on the
- * project's "Email OTP length" (the test project sent 8 on 18/11/2026), so any of those lengths is accepted,
- * the same as the website (src/app/login/actions.ts).
- */
-export function cleanCode(v: string): string | null {
-  const c = v.replace(/[\s-]/g, "");
-  return /^\d{6,10}$/.test(c) ? c : null;
-}
+/** The code from the sign-in email, ignoring spaces and dashes: the website's own rule (src/lib/sign-in-code.ts). */
+export const cleanCode = cleanSignInCode;
 
 /**
  * Donations that arrived since the donor last looked, to thank them for.
