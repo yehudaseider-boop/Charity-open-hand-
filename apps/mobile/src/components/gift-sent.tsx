@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { rand } from "@/lib/format";
 import { colors, fonts, radius, space } from "@/theme/tokens";
@@ -93,6 +93,11 @@ export function GiftSent({
     }
   }, [shown]);
   const progress = made && invite ? invite.progressFor(made) : null;
+  // Spoken when the screen opens (VoiceOver doesn't announce a new screen's state by itself): what happened to the gift.
+  const confirmingNow = gift.confirming;
+  useEffect(() => {
+    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(confirmingNow ? "Confirming your gift. Please don't pay again." : "Thank you. Your gift went through.");
+  }, [confirmingNow]);
   const kickerLine = gift.monthly
     ? gift.confirming
       ? `Confirming your monthly donation · ${rand(gift.cents)} a month`

@@ -6,7 +6,7 @@ import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AmountSwipe } from "@/components/amount-swipe";
 import { Button, TextLink } from "@/components/button";
@@ -207,6 +207,11 @@ export default function Give() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   // What happened, as a red error or a calm note while we wait; `help` adds how to reach a person.
   const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean } | null>(null);
+  // iPhone VoiceOver often doesn't speak a live region that appears on its own, so each message (what went wrong, "checking
+  // your payment", "declined") is also spoken. Android reads the live region itself.
+  useEffect(() => {
+    if (message && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message.text);
+  }, [message]);
   const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => setMessageState(text ? { text, tone, help } : null);
   // A payment we haven't heard back about: the footer offers "Check again" instead of a second gift.
   const [unsettled, setUnsettled] = useState<{ reference: string; token: string; charged: boolean; summary: Snapshot } | null>(null);
@@ -968,8 +973,9 @@ export default function Give() {
                 // Lets a sideways slide across the digits nudge the amount (AmountSwipe); iOS otherwise keeps the touch.
                 rejectResponderTermination={false}
                 placeholder="0"
-                placeholderTextColor={colors.lilac}
+                placeholderTextColor={colors.lilacSoft}
                 accessibilityLabel="Amount in Rand"
+                accessibilityHint={minGift ? `At least ${rand(minGift)}` : undefined}
                 style={[styles.amountInput, amount.length > 9 ? { fontSize: 34, lineHeight: 44 } : amount.length > 6 ? { fontSize: 44, lineHeight: 54 } : null]}
               />
             </View>
@@ -1003,7 +1009,7 @@ export default function Give() {
             {quick.filter((c) => c !== lastGift?.cents).map((c) => {
               const on = gift === c;
               return (
-                <Pressable key={c} disabled={locked} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Set the amount to ${rand(c)}`} accessibilityState={{ selected: on, disabled: locked }} style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}>
+                <Pressable key={c} disabled={locked} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`${rand(c)}, set as the amount`} accessibilityState={{ selected: on, disabled: locked }} style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}>
                   {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                   <Text style={[styles.chipText, on && { color: colors.onInk }]}>{rand(c)}</Text>
                 </Pressable>
@@ -1061,7 +1067,8 @@ export default function Give() {
                 {([true, false] as const).map((yes) => {
                   const on = counting === yes;
                   return (
-                    <Pressable key={String(yes)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setLabel(yes ? goalLabel : null); }} style={[styles.chip, on && styles.chipOn]}>
+                    <Pressable key={String(yes)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setLabel(yes ? goalLabel : null); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                      {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                       <Text style={[styles.chipText, on && { color: colors.onInk }]}>{yes ? "Yes, count it" : "Not this time"}</Text>
                     </Pressable>
                   );
@@ -1140,9 +1147,9 @@ export default function Give() {
           {showDetailFields ? (
             <View style={[styles.softCard, { gap: 14 }]} onLayout={at("details")}>
               <Text style={styles.sectionTitle} accessibilityRole="header">About you</Text>
-              <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
-              <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
-              <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={err("email")} helper="Your confirmation is sent here." />
+              <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" textContentType="givenName" autoCapitalize="words" returnKeyType="next" error={err("first_name")} />
+              <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" textContentType="familyName" autoCapitalize="words" returnKeyType="next" error={err("last_name")} />
+              <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" returnKeyType="next" error={err("email")} helper="Your confirmation is sent here." />
               <SwitchRow label="Remember my details" description="So you don't type them next time." more="Your name and email are kept on this phone only, never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
             </View>
           ) : (
@@ -1152,7 +1159,7 @@ export default function Give() {
                 <Text style={styles.giverName} numberOfLines={1}>{first} {last}</Text>
                 <Text variant="label" numberOfLines={1}>{email}</Text>
               </View>
-              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" hitSlop={14} style={styles.changeTap}>
+              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" accessibilityLabel="Change, giver details" hitSlop={14} style={styles.changeTap}>
                 <Text style={styles.changeText}>Change</Text>
               </Pressable>
             </View>
@@ -1167,7 +1174,8 @@ export default function Give() {
                     {(["later", "now"] as const).map((when) => {
                       const on = (when === "later") === detailsLater;
                       return (
-                        <Pressable key={when} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setS18aWhen(when); }} style={[styles.chip, on && styles.chipOn]}>
+                        <Pressable key={when} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setS18aWhen(when); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                          {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                           <Text style={[styles.chipText, on && { color: colors.onInk }]}>{when === "later" ? "Add my details after paying" : "Add them now"}</Text>
                         </Pressable>
                       );
@@ -1182,7 +1190,8 @@ export default function Give() {
                     {([true, false] as const).map((saved) => {
                       const on = useSavedId === saved;
                       return (
-                        <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setUseSavedId(saved); }} style={[styles.chip, on && styles.chipOn]}>
+                        <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setUseSavedId(saved); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                          {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                           <Text style={[styles.chipText, on && { color: colors.onInk }]}>{saved ? `My ID ending ${savedLast4}` : "A different number"}</Text>
                         </Pressable>
                       );
@@ -1215,7 +1224,8 @@ export default function Give() {
                   {([true, false] as const).map((saved) => {
                     const on = useSavedCard === saved;
                     return (
-                      <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: heldAttempt !== null }} onPress={() => { if (heldAttempt) return; haptic.tap(); setUseSavedCard(saved); }} style={[styles.chip, on && styles.chipOn, heldAttempt && !on && { opacity: 0.4 }]}>
+                      <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: heldAttempt !== null }} onPress={() => { if (heldAttempt) return; haptic.tap(); setUseSavedCard(saved); }} style={[styles.chip, styles.chipRow, on && styles.chipOn, heldAttempt && !on && { opacity: 0.4 }]}>
+                        {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                         <Text style={[styles.chipText, on && { color: colors.onInk }]}>{saved ? cardLabel(savedCard) : "A different card"}</Text>
                       </Pressable>
                     );
@@ -1304,7 +1314,8 @@ export default function Give() {
                   {(["honour", "memory"] as const).map((k) => {
                     const on = dedicate === k;
                     return (
-                      <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.chip, on && styles.chipOn]}>
+                      <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                        {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                         <Text style={[styles.chipText, on && { color: colors.onInk }]}>{k === "honour" ? "In honour of" : "In memory of"}</Text>
                       </Pressable>
                     );
@@ -1413,12 +1424,12 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: space.gutter, paddingTop: 14, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1.5, borderTopColor: colors.hairline },
   footerLine: { textAlign: "center", fontSize: 14, lineHeight: 20 },
   amountCard: { paddingTop: 20, paddingBottom: 22, paddingHorizontal: 22, gap: 4, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
-  amountKicker: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.lilac },
+  amountKicker: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.lilacSoft },
   amountRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   amountR: { fontFamily: fonts.displayBold, fontSize: 44, lineHeight: 56, color: colors.onInk },
   amountInput: { flex: 1, fontFamily: fonts.displayBold, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
   amountImpact: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft, paddingRight: 40 },
-  amountSource: { color: colors.lilac, paddingRight: 40 },
+  amountSource: { color: colors.lilacSoft, paddingRight: 40 },
   question: { fontFamily: fonts.display, fontSize: 19, lineHeight: 24, color: colors.navy },
   softCard: { gap: 6, paddingVertical: 14, paddingHorizontal: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   sectionTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: colors.navy },

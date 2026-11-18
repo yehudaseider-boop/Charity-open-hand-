@@ -164,9 +164,9 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
               </div>
             ) : null}
             {give ? (
-              <Link id="give-button" href={give} aria-label={`Give to ${charity.name_en}`} className="pressable flex w-full min-w-0 flex-col items-center rounded-control bg-coral px-4 py-3.5 text-center text-navy">
+              <Link id="give-button" href={give} className="pressable flex w-full min-w-0 flex-col items-center rounded-control bg-coral px-4 py-3.5 text-center text-navy">
                 {/* "Give" stays big; the name sits on one smaller line, so a long name never makes a giant button. */}
-                <span className="text-lg font-bold leading-tight">Give</span>
+                <span className="text-lg font-bold leading-tight">Give </span>
                 <span className="block w-full min-w-0 truncate text-sm font-semibold">to <bdi>{charity.name_en}</bdi></span>
               </Link>
             ) : (

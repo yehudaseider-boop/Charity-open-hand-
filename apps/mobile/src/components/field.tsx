@@ -22,8 +22,10 @@ export function Field({
         {prefix ? <Text style={styles.prefix}>{prefix}</Text> : null}
         <TextInput
           placeholderTextColor={colors.muted}
-          accessibilityLabel={label}
           {...input}
+          // The problem is part of what a screen reader says on landing in the field, and the helper is its hint.
+          accessibilityLabel={input.accessibilityLabel ?? (error ? `${label}. ${error}` : label)}
+          accessibilityHint={input.accessibilityHint ?? (error ? undefined : helper)}
           onFocus={(e) => {
             setFocused(true);
             input.onFocus?.(e);

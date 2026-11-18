@@ -58,7 +58,7 @@ export function SwitchRow({ label, description, more, value, onChange }: { label
 export function CheckRow({ label, value, onChange, error }: { label: string; value: boolean; onChange: (v: boolean) => void; error?: string }) {
   return (
     <View style={{ gap: 4 }}>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={() => {
+      <Pressable accessibilityRole="checkbox" accessibilityLabel={error && !value ? `${label}. ${error}` : label} accessibilityState={{ checked: value }} onPress={() => {
         haptic.tap();
         onChange(!value);
       }} style={styles.checkRow}>
@@ -67,7 +67,7 @@ export function CheckRow({ label, value, onChange, error }: { label: string; val
         </View>
         <Text style={{ flex: 1, fontSize: 16, lineHeight: 22 }}>{label}</Text>
       </Pressable>
-      {error && !value ? <Text variant="label" style={{ color: colors.danger, marginLeft: 36 }}>{error}</Text> : null}
+      {error && !value ? <Text variant="label" style={{ color: colors.danger, marginLeft: 36 }} accessibilityLiveRegion="polite">{error}</Text> : null}
     </View>
   );
 }

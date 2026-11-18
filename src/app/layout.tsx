@@ -53,10 +53,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // case smooth scrolling is ever set in CSS again.
     <html lang="en-ZA" data-scroll-behavior="smooth" className={`${dmSans.variable} ${bricolage.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
+        <a href="#main" className="skip-link">Skip to main content</a>
         <RouteMemory />
         <SmoothSectionLinks />
         <SiteHeader />
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>
+        {/* tabIndex -1: the skip link moves keyboard focus here, so the next Tab lands on the first thing in the page. */}
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 outline-none">{children}</main>
         <PageFooter />
       </body>
     </html>
