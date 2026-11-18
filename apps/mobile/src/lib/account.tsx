@@ -14,6 +14,7 @@ import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceip
 import { supabase } from "./supabase";
 import { TEST_BUILD } from "./test-build";
 import { setDirectoryDemo } from "./directory";
+import { SITE_URL, siteUrl } from "./website";
 
 /**
  * Who is using the app, and their real giving.
@@ -387,7 +388,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       accessToken,
       async sendCode(email) {
         if (!supabase) return { ok: false, message: "Sign-in isn't available in this preview." };
-        const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
+        // The email holds a 6-digit code (typed here) and a link for website sign-ins. A link tapped from an
+        // app request lands on a website page that says to go back and type the code (18/11/2026).
+        const back = siteUrl(SITE_URL, "/login/app");
+        const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, ...(back ? { emailRedirectTo: back } : {}) } });
         if (!error) return { ok: true };
         if (isNetworkError(error)) return { ok: false, message: NO_CONNECTION };
         if (error.status === 429) return { ok: false, message: "We've just sent you a code. Please wait a minute before asking for another." };

@@ -1,0 +1,12 @@
+<!-- Givezy sign-in email (Supabase "Magic Link" and "Confirm signup" templates). Paste the same body into both.
+     Colours from src/lib/brand-colors.ts; Arial where a mail app can't load web fonts. -->
+<div style="margin:0;padding:24px 16px;background:#FFFFFF;font-family:'DM Sans',Arial,sans-serif;color:#0E1B3D;">
+  <div style="max-width:480px;margin:0 auto;border:2px solid #ECE8F6;border-radius:18px;padding:28px 24px;">
+    <p style="margin:0 0 4px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-size:22px;color:#1749B5;">Givezy</p>
+    <h1 style="margin:16px 0 8px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:700;font-size:24px;color:#0E1B3D;">Your sign-in code</h1>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#4A5878;">Type this code where you asked to sign in, in the app or on the website.</p>
+    <p style="margin:0 0 20px;padding:16px;background:#F4F1FF;border-radius:14px;text-align:center;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-size:34px;letter-spacing:8px;color:#0E1B3D;">{{ .Token }}</p>
+    <p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#4A5878;">On the website, you can tap this instead:<br><a href="{{ .ConfirmationURL }}" style="color:#1749B5;font-weight:700;">Sign in to Givezy</a></p>
+    <p style="margin:0;font-size:13px;line-height:1.5;color:#4A5878;">The code works once, for a short time. If you didn't ask to sign in, you can ignore this email. Nobody can sign in without the code.</p>
+  </div>
+</div>
