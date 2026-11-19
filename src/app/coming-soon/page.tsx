@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ChromeMark } from "@/components/chrome-mark";
+import { GiftJourney } from "@/components/landing/gift-journey";
 import { GivePhone, NewGift, Receipt, Screen, Where, storyCard } from "@/components/landing/gift-story";
 import { NotifyForm } from "@/components/landing/notify-form";
 import { ArrowRight, Questions } from "@/components/landing/sections";
@@ -163,6 +164,31 @@ export default function ComingSoon() {
           </figure>
         </div>
         <p className="mx-auto max-w-[80rem] px-4 pb-8 text-[13px] text-white/80 sm:px-6">Made-up example. {charity} and its donors are sample data from our dashboard demo.</p>
+      </section>
+
+      {/* 1b. One gift, start to finish: the story plays as you scroll (19/11/2026), then the charity's way in. */}
+      <section aria-labelledby="journey-title" className="relative bg-honey-soft">
+        <div className="mx-auto max-w-[80rem] px-4 pt-20 sm:px-6 md:pt-28">
+          <Reveal className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
+            <Eyebrow>For charities</Eyebrow>
+            <h2 id="journey-title" className="font-display text-[clamp(2.25rem,5vw,4rem)] font-medium! leading-[1.05] tracking-[-0.03em]! text-balance">
+              One gift. <Em>Start to finish.</Em>
+            </h2>
+            <p className="max-w-[34rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-muted">
+              Follow R250 from a donor&apos;s phone to your dashboard, their inbox and their s18A receipt.
+            </p>
+          </Reveal>
+        </div>
+        <div className="mx-auto max-w-[80rem] px-4 pb-6 pt-10 sm:px-6">
+          <GiftJourney />
+        </div>
+        <div className="mx-auto flex max-w-[80rem] flex-col items-center gap-4 px-4 pb-20 text-center sm:px-6 md:pb-28">
+          <p className="font-display text-[clamp(1.5rem,3vw,2.25rem)] font-extrabold leading-tight tracking-[-0.02em] text-balance">That&apos;s every gift, for every donor.</p>
+          <a href={charityHref} {...ext} className={orangeBtn + " gap-2"}>
+            {external ? <><WhatsAppMark size={20} />Talk to us about joining</> : "Apply to list your charity"}
+          </a>
+          <p className="text-[13px] text-muted">Made-up example. {charity} and Aisha S. are sample data from our dashboard demo.</p>
+        </div>
       </section>
 
       {/* 2. The two ways in, side by side. */}
