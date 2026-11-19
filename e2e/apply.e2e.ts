@@ -27,10 +27,17 @@ async function passAgree() {
   await page.waitForLoadState("networkidle");
 }
 
-async function save(label = "Save") {
+/**
+ * Presses a save button and waits for the server's answer (a server action posts without loading a new page), then
+ * for what it should lead to: the after-save address (`done=`) or a message on the page. Without that, an old
+ * message from an earlier try could be read as this one's.
+ */
+async function save(label: string, expectation: { saved: true } | { message: RegExp }) {
+  const answered = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/charity-admin/"), { timeout: 30_000 });
   await page.getByRole("button", { name: label, exact: true }).click();
-  await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(500);
+  await answered;
+  if ("saved" in expectation) await page.waitForURL(/[?&]done=/, { timeout: 30_000 });
+  else await page.getByText(expectation.message).first().waitFor({ timeout: 30_000 });
 }
 
 beforeAll(async () => {
@@ -44,12 +51,14 @@ beforeAll(async () => {
   page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
 
+  // A new robot account (or a new Terms version) is asked to agree first; do it before anything else.
+  await page.goto(`${SITE}/agree?next=/apply`, { waitUntil: "networkidle" });
+  await passAgree();
+
   id = (await applyRobotDraft(userId)) ?? "";
   if (!id) {
     // First run only: start the application the way a signed-in person does, on the apply page.
     await page.goto(`${SITE}/apply`, { waitUntil: "networkidle" });
-    await passAgree();
-    if (new URL(page.url()).pathname !== "/apply") await page.goto(`${SITE}/apply`, { waitUntil: "networkidle" });
     await page.getByLabel("Organisation name").fill(APPLY_ROBOT_CHARITY);
     await page.getByRole("button", { name: "Start application" }).click();
     await page.waitForURL(/\/charity-admin\/[0-9a-f-]+\/application/, { timeout: 30_000 });
@@ -81,26 +90,22 @@ describe.skipIf(!canSignIn)("a charity filling in its application", () => {
     await page.getByLabel("NPO number").fill("");
     await page.getByLabel("PBO reference number").fill("");
     await page.getByLabel("s18A reference number").fill("");
-    await save();
-    expect(await page.locator("body").innerText()).toMatch(/Enter an NPO number or a PBO reference number/);
+    await save("Save", { message: /Enter an NPO number or a PBO reference number/ });
     expect(await page.getByLabel("Name donors will see").inputValue()).toBe(APPLY_ROBOT_CHARITY);
   });
 
   it("refuses an s18A reference without a PBO number", async () => {
     await page.getByLabel("NPO number").fill("000-000 NPO");
     await page.getByLabel("s18A reference number").fill("TEST-18A");
-    await save();
-    expect(await page.locator("body").innerText()).toMatch(/must have a PBO reference number/);
+    await save("Save", { message: /must have a PBO reference number/ });
   });
 
   it("saves the organisation step and says so", async () => {
     await page.getByLabel("s18A reference number").fill("");
     await page.getByLabel("NPO number").fill("000-000 NPO");
-    await save();
-    const text = await page.locator("body").innerText();
-    expect(text).not.toMatch(BROKEN);
-    expect(text).not.toMatch(/Enter an NPO number or a PBO reference number/);
-    expect(text).toMatch(/Your organisation details are saved/);
+    await save("Save", { saved: true });
+    await page.getByText(/Your organisation details are saved/).first().waitFor();
+    expect(await page.locator("body").innerText()).not.toMatch(BROKEN);
     await page.goto(step("organisation"), { waitUntil: "networkidle" });
     expect(await page.getByLabel("NPO number").inputValue()).toBe("000-000 NPO");
   });
@@ -110,11 +115,10 @@ describe.skipIf(!canSignIn)("a charity filling in its application", () => {
     await page.getByLabel("Street address").fill("1 Test Street");
     await page.getByLabel("City").fill("Johannesburg");
     await page.getByLabel("Postal code").fill("12");
-    await save();
-    expect(await page.locator("body").innerText()).toMatch(/Postal code is 4 digits/);
+    await save("Save", { message: /Postal code is 4 digits/ });
     expect(await page.getByLabel("Street address").inputValue()).toBe("1 Test Street");
     await page.getByLabel("Postal code").fill("2000");
-    await save();
+    await save("Save", { saved: true });
     await page.goto(step("address"), { waitUntil: "networkidle" });
     expect(await page.getByLabel("Postal code").inputValue()).toBe("2000");
     expect(await page.getByLabel("City").inputValue()).toBe("Johannesburg");
@@ -124,7 +128,7 @@ describe.skipIf(!canSignIn)("a charity filling in its application", () => {
     await page.goto(step("contact"), { waitUntil: "networkidle" });
     await page.getByLabel("Full name").fill("Robot Tester");
     await page.getByLabel("Phone").fill("12345");
-    await save();
+    await save("Save", { message: /Use a South African number/ });
     const text = await page.locator("body").innerText();
     expect(text).toMatch(/Use a South African number/);
     expect(text).not.toMatch(BROKEN);
@@ -135,7 +139,7 @@ describe.skipIf(!canSignIn)("a charity filling in its application", () => {
     await page.getByLabel("Account holder").fill("Robot test charity");
     await page.getByLabel("Account number").fill("12");
     await page.getByLabel("Branch code").fill("1");
-    await save("Save bank details");
+    await save("Save bank details", { message: /Choose your bank|Account number is 6 to 16 digits|Branch code is 6 digits/ });
     const text = await page.locator("body").innerText();
     expect(text).toMatch(/Choose your bank|Account number is 6 to 16 digits|Branch code is 6 digits/);
     expect(text).not.toMatch(BROKEN);

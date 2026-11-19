@@ -1,3 +1,4 @@
+import { policyVersionLabel } from "@/lib/policy";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/card";
@@ -62,7 +63,7 @@ export default async function YourInformationPage() {
           <ul className="space-y-1 text-sm">
             {consents.map((c, i) => (
               <li key={i}>
-                Terms and Privacy Policy, version {c.policy_version}, on {formatDate(c.accepted_at)}
+                Terms and Privacy Policy, version of {policyVersionLabel(c.policy_version)}, on {formatDate(c.accepted_at)}
               </li>
             ))}
           </ul>
