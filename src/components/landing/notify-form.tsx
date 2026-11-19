@@ -4,6 +4,10 @@ import { startTransition, useActionState } from "react";
 import { joinLaunchList } from "@/app/launch-list/actions";
 import { initialFormState, type FormState } from "@/lib/form";
 import { LAUNCH_LIST_CONSENT } from "@/lib/launch-list";
+import { whatsAppShare } from "@/lib/whatsapp";
+
+/** What a friend gets when someone shares Givezy after joining the list. */
+const SHARE_TEXT = "I just joined the Givezy launch list: give to South African charities in a few taps, with every s18A receipt in one place. https://givezy.co.za";
 
 /**
  * "Notify me at launch" (10/11/2026). Shown only while the list is open (appLinks.launchListOpen). What was typed
@@ -23,10 +27,15 @@ export function NotifyForm() {
 
   if (state.ok) {
     return (
-      <p role="status" className="flex items-center gap-3 rounded-[1.25rem] bg-success-soft px-5 py-4 text-[16px] font-semibold text-success">
-        <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-success"><path d="M5 12l5 5L20 7" /></svg>
-        {state.message}
-      </p>
+      <div className="flex flex-col gap-3">
+        <p role="status" className="flex items-center gap-3 rounded-[1.25rem] bg-success-soft px-5 py-4 text-[16px] font-semibold text-success">
+          <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-success"><path d="M5 12l5 5L20 7" /></svg>
+          {state.message}
+        </p>
+        <a href={whatsAppShare(SHARE_TEXT)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-fit items-center gap-2 rounded-[1.125rem] border-[1.5px] border-navy/25 px-5 text-[16px] font-bold text-navy transition-colors hover:border-navy">
+          Tell a friend on WhatsApp
+        </a>
+      </div>
     );
   }
 
