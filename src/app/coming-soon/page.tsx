@@ -263,13 +263,15 @@ export default function ComingSoon() {
             <Eyebrow>Built to be trusted with money</Eyebrow>
             <H2>Safe for donors. <Em>Simple for charities.</Em></H2>
           </div>
-          <ul className="mx-auto mt-14 grid max-w-[56rem] gap-10 md:grid-cols-2 md:gap-8">
+          <ul className="mx-auto mt-14 grid max-w-[72rem] gap-10 lg:grid-cols-3 lg:gap-10">
             {([
               ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
               ["Every", "charity is checked by a person: its registration documents and bank details, before it can take a gift."],
+              // True of the build (19/11/2026): no Givezy page has a card field; both payment providers take the card on their own page.
+              ["0", "card numbers kept by Givezy. You pay on the payment provider's own secure page, never in a Givezy form."],
             ] as [string, string][]).map(([big, text]) => (
               <li key={big} className="flex flex-col gap-4 border-t-2 border-navy/15 pt-6">
-                <span className="font-display text-[clamp(4.5rem,9vw,7.5rem)] font-bold leading-[0.9] tracking-[-0.045em] text-brand">{big}</span>
+                <span className="font-display text-[clamp(4rem,6vw,6rem)] font-bold leading-[0.9] tracking-[-0.045em] text-brand">{big}</span>
                 <span className="max-w-[22rem] text-[17px] leading-relaxed text-muted">{text}</span>
               </li>
             ))}
