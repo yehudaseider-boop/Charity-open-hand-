@@ -23,6 +23,13 @@ const SECRET_KEY = process.env.E2E_SUPABASE_SECRET_KEY ?? "";
 export const APP_URL = (process.env.E2E_APP_URL ?? "").replace(/\/+$/, "");
 /** The robot's own address. Nothing is ever emailed to it: codes come straight from Supabase. */
 export const ROBOT_EMAIL = process.env.E2E_ROBOT_EMAIL ?? "e2e-robot@givezy.co.za";
+/**
+ * A second robot that applies as a charity (19/11/2026): it owns one draft application on TEST, reused every run and
+ * never submitted. Kept apart from ROBOT_EMAIL, which is a Viewer of the demo charity.
+ */
+export const APPLY_ROBOT_EMAIL = process.env.E2E_APPLY_ROBOT_EMAIL ?? "e2e-apply@givezy.co.za";
+/** The robot's draft charity's name: plainly a test, so nobody in Admin mistakes it for a real application. */
+export const APPLY_ROBOT_CHARITY = "Robot test charity (not real, do not approve)";
 /** The test site's demo charity. */
 export const CHARITY_SLUG = process.env.E2E_CHARITY ?? "demo-charity";
 
@@ -42,14 +49,14 @@ function adminClient(): SupabaseClient {
 }
 
 /** The robot's account exists (made once, already confirmed). */
-export async function ensureRobot(): Promise<void> {
-  const { error } = await adminClient().auth.admin.createUser({ email: ROBOT_EMAIL, email_confirm: true });
+export async function ensureRobot(email = ROBOT_EMAIL): Promise<void> {
+  const { error } = await adminClient().auth.admin.createUser({ email, email_confirm: true });
   if (error && !/already|registered|exists/i.test(error.message)) throw new Error(`Could not make the robot's account: ${error.message}`);
 }
 
 /** A fresh one-time sign-in code for the robot, exactly what the email would hold (nothing is emailed). */
-export async function freshSignIn(): Promise<{ code: string }> {
-  const { data, error } = await adminClient().auth.admin.generateLink({ type: "magiclink", email: ROBOT_EMAIL });
+export async function freshSignIn(email = ROBOT_EMAIL): Promise<{ code: string }> {
+  const { data, error } = await adminClient().auth.admin.generateLink({ type: "magiclink", email });
   if (error || !data?.properties?.email_otp) throw new Error(`Supabase gave no sign-in code: ${error?.message ?? "empty answer"}`);
   return { code: data.properties.email_otp };
 }
@@ -94,13 +101,13 @@ export async function charityId(slug = CHARITY_SLUG): Promise<string> {
  * that sign-in. The robot is a Viewer of the demo charity on TEST only (it can look, not change anything, and sees no
  * contact details). Each run removes the robot's old authenticator and adds a fresh one, so no secret has to be kept.
  */
-export async function charityViewerCookies(): Promise<{ cookies: SiteCookie[]; error: string | null }> {
-  const { code } = await freshSignIn();
+export async function charityViewerCookies(email = ROBOT_EMAIL): Promise<{ cookies: SiteCookie[]; error: string | null; userId?: string }> {
+  const { code } = await freshSignIn(email);
   let written: { name: string; value: string }[] = [];
   const client = createServerClient(SUPABASE_URL, PUBLISHABLE_KEY, {
     cookies: { getAll: () => written, setAll: (list) => void (written = [...written.filter((w) => !list.some((l) => l.name === w.name)), ...list.map(({ name, value }) => ({ name, value }))]) },
   });
-  const signIn = await client.auth.verifyOtp({ email: ROBOT_EMAIL, token: code, type: "email" });
+  const signIn = await client.auth.verifyOtp({ email, token: code, type: "email" });
   if (signIn.error || !signIn.data.user) return { cookies: [], error: signIn.error?.message ?? "no user" };
   const userId = signIn.data.user.id;
   // Old authenticators from earlier runs: their secrets are gone, so remove them.
@@ -111,14 +118,26 @@ export async function charityViewerCookies(): Promise<{ cookies: SiteCookie[]; e
   const verified = await client.auth.mfa.challengeAndVerify({ factorId: enrolled.data.id, code: totpCode(enrolled.data.totp.secret) });
   if (verified.error) return { cookies: [], error: `second step: ${verified.error.message}` };
   const domain = new URL(SITE).hostname;
-  return { error: null, cookies: written.map(({ name, value }) => ({ name, value, domain, path: "/", httpOnly: false, secure: true, sameSite: "Lax" })) };
+  return { error: null, userId, cookies: written.map(({ name, value }) => ({ name, value, domain, path: "/", httpOnly: false, secure: true, sameSite: "Lax" })) };
 }
 
 /** After the dashboard checks: the robot's authenticator is removed, so its plain sign-in tests stay as before. */
-export async function removeRobotAuthenticators(): Promise<void> {
+export async function removeRobotAuthenticators(email = ROBOT_EMAIL): Promise<void> {
   const { data } = await adminClient().auth.admin.listUsers({ page: 1, perPage: 200 });
-  const robot = data?.users.find((u) => u.email === ROBOT_EMAIL);
+  const robot = data?.users.find((u) => u.email === email);
   if (!robot) return;
   const old = await adminClient().auth.admin.mfa.listFactors({ userId: robot.id });
   for (const f of old.data?.factors ?? []) await adminClient().auth.admin.mfa.deleteFactor({ id: f.id, userId: robot.id });
+}
+
+/** The draft charity the apply robot owns from an earlier run, if any (reused, so drafts never pile up). */
+export async function applyRobotDraft(userId: string): Promise<string | null> {
+  const { data, error } = await adminClient()
+    .from("charity_admins")
+    .select("charity_id, charities!inner(status)")
+    .eq("user_id", userId)
+    .eq("role", "owner");
+  if (error) throw new Error(`Could not look up the apply robot's draft: ${error.message}`);
+  const rows = (data ?? []) as unknown as { charity_id: string; charities: { status: string } }[];
+  return rows.find((r) => r.charities.status === "draft")?.charity_id ?? null;
 }
