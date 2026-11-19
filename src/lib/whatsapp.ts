@@ -6,7 +6,10 @@
 
 /** A South African number in any common spelling, as WhatsApp wants it (country code, digits only), or null. */
 export function waNumber(sa: string | null | undefined): string | null {
-  const digits = (sa ?? "").replace(/\D/g, "");
+  let digits = (sa ?? "").replace(/\D/g, "");
+  // "0027 78 ..." (dialled from abroad) and "+27 (0)78 ..." (the 0 kept in brackets) are the same number.
+  if (/^0027\d{9,10}$/.test(digits)) digits = digits.slice(2);
+  if (/^270\d{9}$/.test(digits)) digits = `27${digits.slice(3)}`;
   if (/^0\d{9}$/.test(digits)) return `27${digits.slice(1)}`;
   if (/^27\d{9}$/.test(digits)) return digits;
   return null;

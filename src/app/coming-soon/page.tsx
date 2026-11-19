@@ -62,24 +62,25 @@ function WhatsAppMark({ size = 18 }: { size?: number }) {
   );
 }
 
-const QUESTIONS = [
-  {
-    q: "When does Givezy launch?",
-    a: launch ? `In ${launch}, in South Africa. Leave your email and we'll tell you the day it opens.` : "Soon, in South Africa. Leave your email and we'll tell you the day it opens.",
-  },
-  {
-    q: "Which charities can join?",
-    a: "South African charities with an NPO or PBO number and a bank account in the organisation's name. s18A receipts are for charities SARS has approved to issue them. A person on our team reads every application and checks the documents and bank details.",
-  },
-  {
-    q: "Where does my money go?",
-    a: `Straight to the charity. ${appName} holds none of a charity's gift: it is paid to the charity, not to us.`,
-  },
-  {
-    q: "What does it cost?",
-    a: "We'll publish our fees before launch, in plain Rand. Joining the launch list or applying to list your charity costs nothing.",
-  },
-];
+/** The page's questions. The launch answer says what is really there to sign up with (the list, or WhatsApp). */
+function questions(listOpen: boolean, hasWhatsApp: boolean) {
+  const hear = listOpen ? "Leave your email and we'll tell you the day it opens." : hasWhatsApp ? "Message us on WhatsApp and we'll tell you the day it opens." : "";
+  return [
+    {
+      q: "When does Givezy launch?",
+      a: `${launch ? `In ${launch}, in South Africa.` : "Soon, in South Africa."}${hear ? ` ${hear}` : ""}`,
+    },
+    {
+      q: "Which charities can join?",
+      a: "South African charities with an NPO or PBO number and a bank account in the organisation's name. s18A receipts are for charities SARS has approved to issue them. A person on our team reads every application and checks the documents and bank details.",
+    },
+    {
+      q: "Where does my money go?",
+      // No fee or "nothing taken" wording here until Yehuda approves exact words (decided 13/11/2026; review 19/11/2026).
+      a: "Straight to the charity's own bank account, through our payment provider.",
+    },
+  ];
+}
 
 export default function ComingSoon() {
   const email = legalConfig.supportEmail;
@@ -221,7 +222,7 @@ export default function ComingSoon() {
               </ul>
               <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <a href={charityHref} {...ext} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-[1.125rem] bg-white whitespace-nowrap px-7 text-[17px] font-bold text-brand shadow-[0_5px_0_#0b2a73] hover:bg-honey-soft">
-                  {external ? <><WhatsAppMark size={20} />Register on WhatsApp</> : "Apply to list your charity"}
+                  {external ? <><WhatsAppMark size={20} />Message us on WhatsApp</> : "Apply to list your charity"}
                 </a>
                 {applyOpen ? <Link href="/demo/dashboard" className={lineBtnDark}>Try the demo dashboard</Link> : null}
               </div>
@@ -260,11 +261,10 @@ export default function ComingSoon() {
             <Eyebrow>Built to be trusted with money</Eyebrow>
             <H2>Safe for donors. <Em>Simple for charities.</Em></H2>
           </div>
-          <ul className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
+          <ul className="mx-auto mt-14 grid max-w-[56rem] gap-10 md:grid-cols-2 md:gap-8">
             {([
               ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
-              ["0", "rand of a charity's gift held by Givezy. Your gift is paid to the charity, not to us."],
-              ["100%", "of charities are looked at by a person: registration documents and bank details are checked before they can take a gift."],
+              ["Every", "charity is checked by a person: its registration documents and bank details, before it can take a gift."],
             ] as [string, string][]).map(([big, text]) => (
               <li key={big} className="flex flex-col gap-4 border-t-2 border-navy/15 pt-6">
                 <span className="font-display text-[clamp(4.5rem,9vw,7.5rem)] font-bold leading-[0.9] tracking-[-0.045em] text-brand">{big}</span>
@@ -278,7 +278,7 @@ export default function ComingSoon() {
       {/* 5. Questions, and a person to ask. */}
       <Questions
         title={<>Good to <em className="font-extrabold not-italic text-brand">know</em>.</>}
-        faqs={QUESTIONS}
+        faqs={questions(listOpen, Boolean(whatsApp))}
         more={whatsApp ? (
           <a href={whatsApp} target="_blank" rel="noopener noreferrer" className={lineBtn}><WhatsAppMark size={20} />Ask us on WhatsApp</a>
         ) : null}
@@ -290,7 +290,7 @@ export default function ComingSoon() {
         <Reveal className="mx-auto flex max-w-[80rem] flex-col items-center gap-8 px-4 py-24 text-center sm:px-6 md:py-32">
           <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-32 md:w-32"><Splash className="w-16 md:w-20" /></span>
           <h2 className="max-w-[56rem] font-display text-[clamp(2.75rem,5.2vw,4.75rem)] font-medium! leading-[1.04] tracking-[-0.03em]! text-balance text-white!">
-            {launch ? `${launch.split(" ")[0]} is close.` : "Launch is close."} <Em dark>Be there from day one.</Em>
+            {launch ? `${launch} is close.` : "Launch is close."} <Em dark>Be there from day one.</Em>
           </h2>
           <div className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
             <a href="#join" className={orangeBtn}>{listOpen ? "Get early access" : "I give"}</a>

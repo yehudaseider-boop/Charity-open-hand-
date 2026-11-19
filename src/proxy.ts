@@ -4,7 +4,7 @@ import { CURRENT_PATH_HEADER } from "@/lib/current-path";
 import { SOURCE_PARAM } from "@/lib/donations/source";
 import { FOCUS_COOKIE, FOCUS_SECONDS, focusChange } from "@/lib/focus";
 import { backslashRedirect, canonicalRedirect } from "@/lib/canonical-host";
-import { COMING_SOON_ROUTE, comingSoonAction, isComingSoonHost } from "@/lib/coming-soon";
+import { COMING_SOON_ROUTE, comingSoonAction, staysOnComingSoonHost } from "@/lib/coming-soon";
 import { charitySignUpOpen, launchListOpen } from "@/config/app-links";
 import { audienceRedirect } from "@/lib/audience";
 import { hasSignInCookie } from "@/lib/header-viewer";
@@ -15,7 +15,8 @@ export async function proxy(request: NextRequest) {
   // "Coming soon" addresses (COMING_SOON_HOSTS, 11/11/2026) show one landing page and nothing else. First, so such an
   // address is never moved on to SITE_URL below. Unset, or on any other address, this does nothing.
   const signUp = charitySignUpOpen();
-  const soon = comingSoonAction(request.nextUrl, request.method, process.env.COMING_SOON_HOSTS, deployed, { signUp, policies: signUp || launchListOpen() });
+  const listOpen = launchListOpen();
+  const soon = comingSoonAction(request.nextUrl, request.method, process.env.COMING_SOON_HOSTS, deployed, { signUp, policies: signUp || listOpen, launchList: listOpen }, request.headers.has("next-action"));
   if (soon === "not-found") return new NextResponse("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
   if (soon === "redirect-home") {
     const home = request.nextUrl.clone();
@@ -32,7 +33,7 @@ export async function proxy(request: NextRequest) {
   // Every page on one address, so a sign-in link always lands where it was asked for.
   // Never from a coming-soon address: its open pages stay on it, so a visitor is never sent on to the test site
   // (19/11/2026: Privacy on givezy.co.za went to test.givezy.co.za, and its menu into the full test site).
-  const onSoonHost = deployed && isComingSoonHost(request.nextUrl.hostname, process.env.COMING_SOON_HOSTS);
+  const onSoonHost = staysOnComingSoonHost(request.nextUrl, process.env.COMING_SOON_HOSTS, deployed);
   const moveTo = onSoonHost ? null : canonicalRedirect(request.nextUrl, request.method, process.env.SITE_URL, deployed);
   // Temporary (307), so browsers do not remember it if SITE_URL later moves to our own domain.
   if (moveTo) return NextResponse.redirect(moveTo, 307);
@@ -91,5 +92,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Skips only the real static files (19/11/2026). Before, any address ending in .png or .svg skipped the proxy, so
+  // givezy.co.za/demo/dashboard/x.png showed a full page past the coming-soon rules.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|home/|app-preview/|logo\\.png$).*)"],
 };

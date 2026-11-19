@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comingSoonAction, comingSoonHosts, isComingSoonHost } from "@/lib/coming-soon";
+import { comingSoonAction, comingSoonHosts, isComingSoonHost, staysOnComingSoonHost } from "@/lib/coming-soon";
 
 const on = "givezy.co.za";
 const act = (url: string, method = "GET", setting: string | undefined | null = on, deployed = true, open = { signUp: true, policies: true }) => comingSoonAction(new URL(url), method, setting === null ? undefined : setting, deployed, open);
@@ -128,5 +128,37 @@ describe("comingSoonAction", () => {
     expect(act("https://givezy.africa/charities", "GET", s)).toBe("redirect-home");
     expect(act("https://givezy.co.za/", "GET", s)).toBe("serve");
     expect(act("https://test.givezy.co.za/login", "GET", s)).toBe("pass-through");
+  });
+});
+
+describe("review fixes of 19/11/2026", () => {
+  const list = { signUp: false, policies: true, launchList: true };
+  it("lets the launch list's form post reach the page while the list is open, and nothing else", () => {
+    expect(comingSoonAction(new URL("https://givezy.co.za/"), "POST", on, true, list, true)).toBe("serve");
+    // Not a server action, or the list is closed: refused as before.
+    expect(comingSoonAction(new URL("https://givezy.co.za/"), "POST", on, true, list, false)).toBe("not-found");
+    expect(comingSoonAction(new URL("https://givezy.co.za/"), "POST", on, true, { signUp: false, policies: false }, true)).toBe("not-found");
+    // Only the front page: a server action anywhere else is still refused.
+    expect(comingSoonAction(new URL("https://givezy.co.za/charities"), "POST", on, true, list, true)).toBe("not-found");
+    expect(comingSoonAction(new URL("https://givezy.co.za/api/app/checkout"), "POST", on, true, list, true)).toBe("not-found");
+  });
+
+  it("treats a deep address ending in .png as a page, so it goes home", () => {
+    expect(closed("https://givezy.co.za/demo/dashboard/x.png")).toBe("redirect-home");
+    expect(closed("https://givezy.co.za/donors.svg/x.png")).toBe("redirect-home");
+    expect(closed("https://givezy.co.za/charity-admin/abc/x.webp")).toBe("redirect-home");
+    // Real picture files still load.
+    expect(closed("https://givezy.co.za/icon.png")).toBe("pass-through");
+    expect(closed("https://givezy.co.za/apple-icon.png")).toBe("pass-through");
+    expect(closed("https://givezy.co.za/brand/logo-400.png")).toBe("pass-through");
+    expect(closed("https://givezy.co.za/home/email-v5.webp")).toBe("pass-through");
+  });
+
+  it("keeps visitors on the coming-soon address, never moving them on to SITE_URL", () => {
+    expect(staysOnComingSoonHost(new URL("https://givezy.co.za/privacy"), on, true)).toBe(true);
+    expect(staysOnComingSoonHost(new URL("https://www.givezy.co.za/terms"), on, true)).toBe(true);
+    expect(staysOnComingSoonHost(new URL("https://test.givezy.co.za/privacy"), on, true)).toBe(false);
+    expect(staysOnComingSoonHost(new URL("https://givezy.co.za/privacy"), on, false)).toBe(false);
+    expect(staysOnComingSoonHost(new URL("https://givezy.co.za/privacy"), undefined, true)).toBe(false);
   });
 });

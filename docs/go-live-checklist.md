@@ -375,12 +375,12 @@ HTML version of the confirmation email, yahrzeit giving, real charity photos fro
 ## Before the two sign-up links go live on givezy.co.za (17/11/2026)
 
 - [ ] Email sending (Resend) works: a charity signs in with an emailed code, so without it nobody can apply. Set EMAIL_TRANSPORT, remove the test-only EMAIL_ALLOWLIST.
-- [ ] Migration 20261110000012_launch_list.sql is on the live database, then set `LAUNCH_LIST=yes`. Until then the giver form is hidden.
+- [ ] Migration 20261110000012_launch_list.sql is on the live database, then set `LAUNCH_LIST=yes`. Until then the giver form is hidden. **Not before the live site has its own database:** givezy.co.za is served by the test deployment today, so emails typed there would be saved in the TEST database (review 19/11/2026). The form's post on givezy.co.za is let through once the list is on (tested in `tests/coming-soon.test.ts`); check it once by hand on the live address.
 - [ ] Yosef approves the launch list consent wording (draft in `src/lib/launch-list.ts`) and the Privacy and Terms pages.
 - [ ] Supabase redirect URLs include https://givezy.co.za, and SITE_URL stays on a working address while COMING_SOON_HOSTS is set.
 - [ ] **Daily job while the coming-soon page is on (sweep of 18/11/2026, unconfirmed risk):** the coming-soon address answers "not found" to `/api/...`. If Vercel's scheduler calls givezy.co.za, the daily job (monthly gifts, checks, payouts) silently doesn't run. After setting `COMING_SOON_HOSTS`: Vercel, Settings, Cron Jobs, run `/api/jobs/daily` once and check it answers 200, not 404.
 - [ ] Someone reads each charity application before anything is listed (already the rule: every charity is looked at by a person).
-- [ ] Charity sign-up on givezy.co.za: once the live database, email and address are ready, set `CHARITY_SIGNUP=yes` so the pre-launch page's charity buttons go to Apply instead of WhatsApp (19/11/2026).
+- [ ] Charity sign-up on givezy.co.za: once the live database, email and address are ready, set `CHARITY_SIGNUP=yes` so the pre-launch page's charity buttons go to Apply instead of WhatsApp (19/11/2026). **`SITE_URL` must already be https://givezy.co.za first** (review 19/11/2026): sign-in, sign-out and the dashboard's public links use `SITE_URL`, so with it still on the test site, charities signing in on givezy.co.za would be sent to test.givezy.co.za.
 - [ ] Decide on password protection for test.givezy.co.za and charity-open-hand.vercel.app, so customers only ever see givezy.co.za. The phone app's test builds call the test address, so plan that first (19/11/2026).
 - [ ] Before `LAUNCH_LIST=yes`: give Privacy and Terms the pre-launch look on givezy.co.za (today they would show the full site's menu) (19/11/2026).
 - [ ] The app's browser preview (`/app-preview`) is a copy of the app: rebuild it with `bash scripts/build-app-preview.sh` before sharing it, and remove `public/app-preview` at launch unless it is meant to stay (19/11/2026).

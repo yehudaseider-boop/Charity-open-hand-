@@ -22,7 +22,11 @@ export type ComingSoonAction =
 export const COMING_SOON_ROUTE = "/coming-soon";
 
 /** Files a coming-soon address still serves: the logo and pictures, the share picture, icons, robots.txt. */
-const STATIC_FILE = /\.(?:svg|png|jpe?g|gif|webp|ico)$/i;
+/**
+ * Picture files at the top of the site (icon.png, apple-icon.png, logo.png). Only there: a deeper address ending in .png
+ * is a page, not a file (19/11/2026: /demo/dashboard/x.png rendered the demo dashboard past these rules).
+ */
+const STATIC_FILE = /^\/[^/]+\.(?:svg|png|jpe?g|gif|webp|ico)$/i;
 
 /** The addresses in the setting as bare lower-case host names ("https://Givezy.co.za:443/x" becomes "givezy.co.za"). */
 export function comingSoonHosts(setting: string | undefined): string[] {
@@ -65,8 +69,8 @@ const under = (list: string[], pathname: string) => list.some((p) => pathname ==
  * page and nothing else, so nobody ever lands on the full site from it. `signUp` follows CHARITY_SIGNUP=yes,
  * `policies` follows CHARITY_SIGNUP=yes or LAUNCH_LIST=yes (people giving their details must be able to read them).
  */
-export type ComingSoonOpen = { signUp: boolean; policies: boolean };
-const CLOSED: ComingSoonOpen = { signUp: false, policies: false };
+export type ComingSoonOpen = { signUp: boolean; policies: boolean; launchList?: boolean };
+const CLOSED: ComingSoonOpen = { signUp: false, policies: false, launchList: false };
 
 /** A path a coming-soon address still serves as it is. */
 function isAllowedFile(pathname: string): boolean {
@@ -79,6 +83,7 @@ function isAllowedFile(pathname: string): boolean {
     pathname === "/coming-soon/opengraph-image" ||
     pathname.startsWith("/coming-soon/opengraph-image-") ||
     pathname.startsWith("/brand/") ||
+    pathname.startsWith("/home/") ||
     STATIC_FILE.test(pathname)
   );
 }
@@ -87,7 +92,7 @@ function isAllowedFile(pathname: string): boolean {
  * What to do with a request. `deployed` is true only on the hosted production site (like the one-address rule in
  * canonical-host.ts), so a developer's own machine and every preview behave normally.
  */
-export function comingSoonAction(url: URL, method: string, setting: string | undefined, deployed: boolean, open: ComingSoonOpen = CLOSED): ComingSoonAction {
+export function comingSoonAction(url: URL, method: string, setting: string | undefined, deployed: boolean, open: ComingSoonOpen = CLOSED, serverAction = false): ComingSoonAction {
   if (!deployed || !isComingSoonHost(url.hostname, setting)) return "pass-through";
   const pathname = url.pathname;
   // Technical files first, so robots.txt and the logo work for any method a browser or crawler uses.
@@ -98,7 +103,19 @@ export function comingSoonAction(url: URL, method: string, setting: string | und
   // The app's and the payment provider's calls never come here (they use the other addresses): refuse them, don't redirect
   // them, because a redirect would be followed as if it were an answer.
   if (pathname === "/api" || pathname.startsWith("/api/")) return "not-found";
+  // The launch list's form posts to the page it is on (a server action, sent with a Next-Action header). While the
+  // list is open, that one post reaches the page; any other post to it is refused (review 19/11/2026: before, the
+  // first giver to type an email got "Not found").
+  if (pathname === "/" && method === "POST" && serverAction && open.launchList) return "serve";
   if (method !== "GET" && method !== "HEAD") return "not-found";
   if (pathname === "/") return "serve";
   return "redirect-home";
+}
+
+/**
+ * A coming-soon address keeps its visitors: its open pages are never moved on to SITE_URL (the test site until launch),
+ * so nobody is sent from givezy.co.za into the full test site (19/11/2026: Privacy there went to test.givezy.co.za).
+ */
+export function staysOnComingSoonHost(url: URL, setting: string | undefined, deployed: boolean): boolean {
+  return deployed && isComingSoonHost(url.hostname, setting);
 }

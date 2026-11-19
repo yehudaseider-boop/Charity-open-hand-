@@ -19,3 +19,14 @@ describe("whatsapp links", () => {
     expect(whatsAppShare("a b")).toBe("https://wa.me/?text=a%20b");
   });
 });
+
+describe("waNumber, more ways of writing the same number (review 19/11/2026)", () => {
+  it("reads +27 (0)78, 0027 78 and dashes as the same number", async () => {
+    const { waNumber } = await import("@/lib/whatsapp");
+    for (const n of ["+27 (0)78 616 0489", "0027 78 616 0489", "+27 78-616-0489", "078 616 0489", "27786160489"]) expect(waNumber(n), n).toBe("27786160489");
+  });
+  it("still refuses what isn't a South African mobile-length number", async () => {
+    const { waNumber } = await import("@/lib/whatsapp");
+    for (const n of ["", "12345", "+44 20 7946 0958", "0027 78 616 048"]) expect(waNumber(n), n).toBeNull();
+  });
+});
