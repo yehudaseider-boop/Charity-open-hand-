@@ -1442,7 +1442,7 @@ const styles = StyleSheet.create({
   amountKicker: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.lilacSoft },
   amountRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   amountR: { fontFamily: fonts.displayBold, fontSize: 44, lineHeight: 56, color: colors.onInk },
-  amountInput: { flex: 1, fontFamily: fonts.displayBold, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
+  amountInput: { flex: 1, minWidth: 0, fontFamily: fonts.displayBold, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
   amountImpact: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft, paddingRight: 40 },
   amountSource: { color: colors.lilacSoft, paddingRight: 40 },
   question: { fontFamily: fonts.display, fontSize: 19, lineHeight: 24, color: colors.navy },
