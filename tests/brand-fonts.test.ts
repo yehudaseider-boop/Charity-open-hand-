@@ -16,10 +16,10 @@ describe("brand fonts", () => {
     expect(layout).toMatch(/next\/font\/local/);
   });
 
+  // Bricolage only in 700 and 800, as the brand says (500 dropped 19/11/2026); DM Sans 400 to 700.
   it("have a file for every weight the layout names, and a licence beside them", () => {
     const paths = [...layout.matchAll(/path: "\.\.\/fonts\/([^"]+)"/g)].map((m) => m[1]);
     expect(paths.sort()).toEqual([
-      "bricolage-grotesque-latin-500-normal.woff2",
       "bricolage-grotesque-latin-700-normal.woff2",
       "bricolage-grotesque-latin-800-normal.woff2",
       "dm-sans-latin-400-normal.woff2",
