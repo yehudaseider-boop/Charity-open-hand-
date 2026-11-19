@@ -5,9 +5,12 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
 import { settingsCheck, siteKind, type SettingCheck } from "@/lib/ops/settings-check";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SampleEmailsForm } from "./sample-emails-form";
 
 export const metadata: Metadata = { title: "Settings check" };
 export const dynamic = "force-dynamic";
+// Sending every sample email takes about 30 seconds.
+export const maxDuration = 120;
 
 /** The newest database changes, each found by something it added. In date order: the last one in means all are. */
 const DATABASE_CHANGES: ({ label: string; table: string; column: string } | { label: string; rpc: string })[] = [
@@ -93,6 +96,9 @@ export default async function SettingsCheckPage() {
       </Card>
       <Card title="Database">
         <List items={database} plain />
+      </Card>
+      <Card title="Read every email">
+        <SampleEmailsForm />
       </Card>
     </div>
   );
