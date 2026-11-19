@@ -247,10 +247,28 @@ beforeEach(() => {
       gift("g6", "rec", { gateway: "recorded" }, { email: "rec@x.co" }),
       gift("g7", "other", { charity_id: "c2" }, { email: "other@x.co" }),
     ],
-    charity_email_opt_outs: [{ charity_id: "c1", email_hash: emailHash("stop@x.co") }],
+    charity_email_opt_outs: [
+      { charity_id: "c1", email_hash: emailHash("stop@x.co"), source: "stop_link" },
+      // The checkout tick "No news or appeals" promised news and appeals only: it must not stop this reminder (19/11/2026).
+      { charity_id: "c1", email_hash: emailHash("sarah@x.co"), source: "checkout" },
+    ],
     s18a_receipt_donations: [],
     thank_you_opt_outs: [],
   };
+});
+
+describe("who has turned off a charity's emails (review of 19/11/2026)", () => {
+  it("journeys and appeals count the checkout tick; only the s18A-details reminder ignores it", async () => {
+    const { optedOutHashes } = await import("@/lib/charity/s18a-reminder-send");
+    const sarah = emailHash("sarah@x.co");
+    const stop = emailHash("stop@x.co");
+    const all = await optedOutHashes("c1", [sarah, stop]);
+    expect(all.has(sarah)).toBe(true);
+    expect(all.has(stop)).toBe(true);
+    const forReminder = await optedOutHashes("c1", [sarah, stop], { forDetailsReminder: true });
+    expect(forReminder.has(sarah)).toBe(false);
+    expect(forReminder.has(stop)).toBe(true);
+  });
 });
 
 describe("finding donors with details missing", () => {
@@ -265,6 +283,8 @@ describe("sending reminders", () => {
   it("emails only donors with details missing, skipping erased, opted-out, complete and recorded-only donors and other charities' donors", async () => {
     const r = await sendS18aReminders(args(["sarah", "erased", "stop", "done", "noask", "rec", "other"]));
     expect(sent.map((m) => m.to)).toEqual(["sarah@x.co"]);
+    // The last day to add the details, from the gift's tax year (31 May after it ends).
+    expect(sent[0].text).toMatch(/by 31\/05\/\d{4}: after that the form closes/);
     expect(sent[0].text).toContain("https://g.test/account#s18a-details");
     expect(sent[0].text).toMatch(/https:\/\/g\.test\/news\/stop\?t=[A-Za-z0-9_-]{43}/);
     expect(r).toEqual({ sent: 1, failed: 0, unknown: 0, remaining: 0, skipped: { not_found: 1, erased: 1, complete: 2, recorded_only: 1, opted_out: 1, this_week: 0 }, interrupted: false, done: "act1" });

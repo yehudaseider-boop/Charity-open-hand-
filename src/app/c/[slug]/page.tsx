@@ -1,3 +1,4 @@
+import { GIVING_PAUSED_MESSAGE } from "@/lib/giving-pause";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -164,14 +165,14 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
               </div>
             ) : null}
             {give ? (
-              <Link id="give-button" href={give} aria-label={`Give to ${charity.name_en}`} className="pressable flex w-full min-w-0 flex-col items-center rounded-control bg-coral px-4 py-3.5 text-center text-navy">
+              <Link id="give-button" href={give} className="pressable flex w-full min-w-0 flex-col items-center rounded-control bg-coral px-4 py-3.5 text-center text-navy">
                 {/* "Give" stays big; the name sits on one smaller line, so a long name never makes a giant button. */}
-                <span className="text-lg font-bold leading-tight">Give</span>
+                <span className="text-lg font-bold leading-tight">Give </span>
                 <span className="block w-full min-w-0 truncate text-sm font-semibold">to <bdi>{charity.name_en}</bdi></span>
               </Link>
             ) : (
-              <p className="rounded-control bg-honey-soft p-4 text-center text-muted">
-                Online giving to <bdi>{charity.name_en}</bdi> opens soon.
+              <p role="status" className="rounded-control bg-honey-soft p-4 text-center text-muted">
+                {donatable?.givingPaused ? GIVING_PAUSED_MESSAGE : <>Online giving to <bdi>{charity.name_en}</bdi> opens soon.</>}
               </p>
             )}
             <ul className="space-y-2 text-sm">

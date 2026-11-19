@@ -16,6 +16,7 @@ import { impactLine, impactSource, type ImpactUnit } from "@/lib/charity/impact"
 import { platformConfig } from "@/config/platform";
 import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
 import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionLabel, startingChoice, type ContributionChoice } from "@/lib/donations/contribution";
+import { LABEL_MAX } from "@/lib/donations/labels";
 
 type Props = {
   slug: string;
@@ -244,7 +245,7 @@ export function DonateFlow({
                   changed();
                 }}
                 aria-pressed={picked === c}
-                className={`rounded-2xl border-2 px-2 py-3 text-[17px] font-bold tabular-nums transition active:scale-95 ${picked === c ? "border-brand bg-brand text-white shadow-[0_8px_20px_rgba(23,73,181,0.25)]" : "border-border bg-surface text-navy hover:-translate-y-0.5 hover:border-brand"}`}
+                className={`rounded-2xl border-2 px-2 py-3 text-[17px] font-bold tabular-nums transition active:scale-95 ${picked === c ? "border-brand bg-brand text-white shadow-[0_8px_20px_rgba(23,73,181,0.25)]" : "border-outline bg-surface text-navy hover:-translate-y-0.5 hover:border-brand"}`}
               >
                 {formatRand(c)}
               </button>
@@ -253,7 +254,7 @@ export function DonateFlow({
         ) : null}
         <div>
           {suggestedCents.length ? <p className="mb-1 text-sm font-semibold text-navy">Or type your own amount</p> : null}
-          <div className="flex min-w-0 items-center rounded-control border-2 border-border bg-surface px-4 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
+          <div className="flex min-w-0 items-center rounded-control border-2 border-outline bg-surface px-4 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
             <span className="font-display text-2xl text-indigo">R</span>
             <input
               id="amount"
@@ -315,7 +316,7 @@ export function DonateFlow({
             {[...contributionPresets, "other" as const].map((c) => (
               <label
                 key={c}
-                className="flex min-h-12 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-border bg-surface px-1 py-1.5 text-center font-bold tabular-nums text-navy transition hover:border-brand has-checked:border-brand has-checked:bg-brand has-checked:text-white has-focus-visible:ring-4 has-focus-visible:ring-brand-soft"
+                className="flex min-h-12 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-outline bg-surface px-1 py-1.5 text-center font-bold tabular-nums text-navy transition hover:border-brand has-checked:border-brand has-checked:bg-brand has-checked:text-white has-focus-visible:ring-4 has-focus-visible:ring-brand-soft"
               >
                 <input
                   type="radio"
@@ -350,7 +351,7 @@ export function DonateFlow({
           {contribChoice === "other" ? (
             <div>
               <label htmlFor="contribution" className="block text-sm font-medium">Your contribution to Givezy{monthlyOn ? ", each month" : ""}</label>
-              <div className="mt-1 flex items-center rounded-[0.875rem] border-2 border-border bg-surface px-3 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
+              <div className="mt-1 flex items-center rounded-[0.875rem] border-2 border-outline bg-surface px-3 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
                 <span className="text-muted">R</span>
                 <input
                   id="contribution"
@@ -396,7 +397,7 @@ export function DonateFlow({
           <legend className="text-sm font-semibold">Giving as</legend>
           <div className="flex flex-wrap gap-2">
             {(["individual", "company", "trust"] as const).map((t) => (
-              <label key={t} className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-border px-4 py-2 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
+              <label key={t} className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-outline px-4 py-2 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
                 <input type="radio" name="donor_type" value={t} checked={donorType === t} onChange={() => setDonorType(t)} />
                 {t === "individual" ? "Myself" : t === "company" ? "A company" : "A trust"}
               </label>
@@ -476,7 +477,7 @@ export function DonateFlow({
                   <fieldset hidden={org} disabled={org}>
                     <TextField name="id_number" label="SA ID number" required={detailsNow && !org} inputMode="numeric" hint="13 digits. SARS needs it to match your s18A receipt to you." maxLength={17} />
                   </fieldset>
-                  <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={10} hint="10 digits, if you have one." />
+                  <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={12} hint="10 digits, if you have one." />
                 </fieldset>
                 <fieldset className="space-y-3">
                   <legend className="text-sm font-semibold">{org ? "Registered address" : "Your address"}</legend>
@@ -520,7 +521,7 @@ export function DonateFlow({
             <TextField
               name="giving_label"
               label="Your label"
-              maxLength={80}
+              maxLength={LABEL_MAX}
               defaultValue={initialLabel}
               autoDirection
               hint="Only you see it, in your giving records. For example: Work giving, Family, or Birthday."
@@ -651,7 +652,7 @@ function Dedicate({ error }: { error?: string }) {
       <legend className="text-sm font-semibold">Dedicate this donation <span className="font-normal text-muted">(optional)</span></legend>
       <div className="flex flex-wrap gap-2">
         {([["none", "No"], ["honour", "In honour of"], ["memory", "In memory of"]] as const).map(([value, label]) => (
-          <label key={value} className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-border px-4 py-2 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
+          <label key={value} className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-outline px-4 py-2 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
             <input type="radio" name="dedication_kind" value={value} checked={kind === value} onChange={() => setKind(value)} aria-describedby={showError ? errorId : undefined} />
             {label}
           </label>

@@ -139,7 +139,7 @@ export async function GET(request: Request) {
   const savedCard = await loadSavedCardInfo(user.id).catch(() => null);
 
   const body = {
-    about: "Everything Givezy holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are UTC.",
+    about: "Everything Givezy holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are in UTC, the standard for data files: South African time is 2 hours ahead (a time of 08:00 UTC is 10:00 in South Africa).",
     downloaded_at: new Date().toISOString(),
     account: profile.data,
     // ID and tax numbers as their last 4 digits only: a donor record can be shared by everyone who gave with one email.

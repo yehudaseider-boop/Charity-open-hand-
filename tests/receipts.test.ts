@@ -120,6 +120,19 @@ describe("receipt contents", () => {
     expect(details.issued_on).toBe("02/03/2027");
   });
 
+  it("prints how an online gift was paid: card as card, any other method as an online payment (17/11/2026)", () => {
+    const d = buildReceiptDetails({
+      charity, donor,
+      donations: [
+        { paidAt: "2026-10-01T10:00:00Z", amountCents: 10_000, id: "3f9a2c71-0000-4000-8000-000000000001", paymentChannel: "card" },
+        { paidAt: "2026-10-02T10:00:00Z", amountCents: 10_000, id: "3f9a2c71-0000-4000-8000-000000000002", paymentChannel: "apple_pay" },
+        { paidAt: "2026-10-03T10:00:00Z", amountCents: 10_000, id: "3f9a2c71-0000-4000-8000-000000000003", paymentChannel: null },
+      ],
+      taxYear: 2027, periodStart: "2026-03-01", periodEnd: "2027-02-28", issuedAt: new Date("2027-03-02T08:00:00Z"),
+    });
+    expect(d.donations.map((x) => x.nature)).toEqual(["Card (online)", "Online payment", "Card (online)"]);
+  });
+
   it("names the charity in both places in the statement, including that gifts are used for its objects", () => {
     expect(details.wording.statement).not.toContain("{charity}");
     expect(details.wording.statement).toMatch(/used exclusively for the objects/);

@@ -38,6 +38,7 @@ import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
 import { confirmThen, notify, openUrl } from "@/lib/open-site";
 import { requestNewCardPage } from "@/lib/pay-api";
+import { monthlyAmountLine, monthlyAmountParts } from "@/lib/live-giving";
 import { SITE_URL } from "@/lib/website";
 import { RecordProblem } from "@/components/record-problem";
 import { useStoredRecord } from "@/lib/use-stored-record";
@@ -262,7 +263,7 @@ export default function Giving() {
     if (status === "paused") setUndo({ text: `Paused your monthly donation to ${name}. Nothing more is collected until you resume it.`, label: "Undo", run: () => void changeRecurring(id, "active") });
     else if (status === "active") setUndo({ text: `Resumed your monthly donation to ${name}.`, label: "Undo", run: () => void changeRecurring(id, "paused") });
     else if (which?.status === "failed") setUndo({ text: `Removed the stopped monthly donation to ${name} from your list.` });
-    else setUndo({ text: `Cancellation of your monthly donation to ${name} is requested. Nothing more is collected once the payment provider confirms.` });
+    else setUndo({ text: `Cancelled your monthly donation to ${name}. Nothing more will be collected and your card is forgotten.` });
   };
   const saveElsewhere = async (e: { cents: number; date: string; recipient: string; label: string | null }): Promise<string | null> => {
     const logged = `Logged ${rand(e.cents)} given to ${e.recipient}.`;
@@ -679,11 +680,11 @@ export default function Giving() {
               ) : (
                 <View style={styles.list}>
                   {recurring.map((r, i) => (
-                    <Pressable key={r.id} onPress={() => setOpen(r)} accessibilityRole="button" accessibilityLabel={`${r.charityName}, ${rand(r.cents)} a month, ${r.status}`} style={[styles.row, i > 0 && styles.divider]}>
+                    <Pressable key={r.id} onPress={() => setOpen(r)} accessibilityRole="button" accessibilityLabel={`${r.charityName}, ${monthlyAmountLine(r)}, ${r.status}`} style={[styles.row, i > 0 && styles.divider]}>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {rand(r.cents)} a month{r.contributionCents ? ` (+ ${rand(r.contributionCents)} to Givezy)` : ""} · {r.status === "failed" ? (r.needsCard ? "Stopped: the card was declined" : "Stopped: start a new monthly donation") : r.needsCard && r.status === "active" ? "Card declined: tap to update" : r.status === "cancelled" ? "Cancellation requested" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {monthlyAmountLine(r)} · {r.status === "failed" ? (r.needsCard ? "Stopped: the card was declined" : "Stopped: start a new monthly donation") : r.needsCard && r.status === "active" ? "Card declined: tap to update" : r.status === "cancelled" ? "Cancelled" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
                         </Text>
                       </View>
                       <ChevronIcon />
@@ -739,7 +740,8 @@ export default function Giving() {
             <View style={{ gap: 4 }}>
               <Text variant="label">Monthly donation</Text>
               <Text variant="h2">{open.charityName}</Text>
-              <Text variant="bodyMuted">{rand(open.cents)} a month{open.contributionCents ? ` (+ ${rand(open.contributionCents)} to Givezy)` : ""} · {open.status === "failed" ? "stopped" : open.status === "cancelled" ? "cancellation requested" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
+              <Text variant="bodyMuted">{monthlyAmountLine(open)} · {open.status === "failed" ? "stopped" : open.status === "cancelled" ? "cancelled" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
+              {monthlyAmountParts(open) ? <Text variant="label">Each month: {monthlyAmountParts(open)}.</Text> : null}
             </View>
             {!preview ? (
               <>
@@ -760,7 +762,7 @@ export default function Giving() {
                     <Button label={busy ? "Removing…" : "Remove it from my list"} disabled={busy} onPress={() => confirmThen("Remove this monthly donation?", "It has already stopped and nothing more is charged. It will no longer show in your list.", "Remove", () => changeRecurring(open.id, "cancelled"))} />
                   </View>
                 ) : open.status === "cancelled" ? (
-                  <Text>Cancellation requested. It is confirmed once the payment provider has stopped it.</Text>
+                  <Text>Cancelled. Nothing more will be collected.</Text>
                 ) : confirmCancel ? (
                   <View style={{ gap: 10 }}>
                     <Text style={{ fontSize: 17 }}>Cancel this monthly donation for good? You would need to set up a new one to give monthly again.</Text>
@@ -805,7 +807,7 @@ export default function Giving() {
                     setRecurring((rs) => rs.filter((r) => r.id !== open.id));
                     setOpen(null);
                     setConfirmCancel(false);
-                    setUndo({ text: `Cancellation of your monthly donation to ${name} is requested. Nothing more is collected once the payment provider confirms.` });
+                    setUndo({ text: `Cancelled your monthly donation to ${name}. Nothing more will be collected and your card is forgotten.` });
                   }}
                 />
                 <Button variant="secondary" label="Keep it" onPress={() => setConfirmCancel(false)} />
@@ -928,7 +930,7 @@ const styles = StyleSheet.create({
   monthGift: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.lightPurple },
   monthGiftAmount: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.ink },
   goalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
+  goalChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.surface, justifyContent: "center" },
   goalChipAdd: { borderStyle: "dashed", borderColor: colors.blue },
   goalChipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   yearChips: { gap: 8, paddingHorizontal: space.gutter },

@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     accepting,
+    // The pause switch (GIVING_PAUSED=yes): the app says so, instead of "not taking donations yet".
+    paused: Boolean(charity?.givingPaused),
     receiptsAvailable: Boolean(charity?.receiptsAvailable),
     campaignOpen,
     minGiftCents: platformConfig.minDonationCents,

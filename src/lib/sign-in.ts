@@ -10,10 +10,10 @@ import { hashedKey, ipKeys } from "@/lib/rate-limit";
 /** What went wrong, in plain words. One wording everywhere a sign-in email is asked for. */
 export const signInMessages: Record<string, string> = {
   email: "Please enter a valid email address.",
-  send: "We couldn't send the link. Please try again in a minute.",
+  send: "We couldn't send the email. Please try again in a minute.",
   link: "That sign-in link didn't work. It only opens in the browser you asked for it from. Ask for a new one and type the code from the email instead.",
   code: "That code didn't work. Check it, or ask for a new email and use the newest code.",
-  busy: "We've sent several links to this address in the last hour. Please use the latest one, or try again later.",
+  busy: "Too many sign-in emails have been asked for in the last hour, from this address or this connection. Please use the newest email you have, or try again in an hour.",
   tries: "That's too many wrong codes for now. Please wait an hour and try again, or ask for a new email and use the newest code.",
 };
 

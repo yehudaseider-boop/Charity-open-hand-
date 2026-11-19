@@ -39,7 +39,7 @@ export function AdminNav() {
               <Link
                 href={t.href}
                 aria-current={active ? "page" : undefined}
-                className={`inline-block rounded-full border-2 px-4 py-2 text-sm font-semibold transition ${active ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand"}`}
+                className={`inline-block rounded-full border-2 px-4 py-2 text-sm font-semibold transition ${active ? "border-brand bg-brand text-white" : "border-outline bg-surface text-navy hover:border-brand"}`}
               >
                 {t.label}
               </Link>

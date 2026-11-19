@@ -170,32 +170,43 @@ describe("fee_settings", () => {
   });
 });
 
-describe("storage paths", () => {
-  const put = (bucket: string, name: string) => run("insert into storage.objects (bucket_id, name) values ($1, $2)", [bucket, name]);
+describe("storage writes", () => {
+  // Security review 18/11/2026 (migration 20261118000001): files are uploaded by the website's server, after its own
+  // checks (who, role, a real image or document, the paths it makes itself, whether the application is open). A
+  // signed-in team member has no write to storage at all, whatever the path; they were allowed the right paths before.
+  const refusedWrite = /row-level security|permission denied/;
 
-  it("public files only where the website puts them", async () => {
+  it("a charity team member cannot write to either bucket, including the paths the website itself uses", async () => {
     await tx(async () => {
       await as(ids.mealsAdmin);
       const m = ids.meals;
-      for (const name of [`${m}/logo-1.png`, `${m}/cover-2.jpg`, `${m}/photos/3.webp`, `${m}/updates/4.jpg`]) await put("charity-public", name);
-      for (const name of [`${m}/other.png`, `${m}/secret/5.png`, `${m}/photos/a/6.png`, `${m}/photos/`, `${m}/updates/../logo.png`]) {
-        await refused("insert into storage.objects (bucket_id, name) values ($1, $2)", ["charity-public", name], /row-level security/);
+      for (const [bucket, name] of [
+        ["charity-public", `${m}/logo-1.png`],
+        ["charity-public", `${m}/cover-2.jpg`],
+        ["charity-public", `${m}/photos/3.webp`],
+        ["charity-public", `${m}/updates/4.jpg`],
+        ["charity-public", `${m}/other.png`],
+        ["charity-documents", `${m}/npo_certificate-1.pdf`],
+        ["charity-documents", `${m}/bank_confirmation-2.pdf`],
+      ]) {
+        await refused("insert into storage.objects (bucket_id, name) values ($1, $2)", [bucket, name], refusedWrite);
       }
     });
   });
 
-  it("documents only while the application is a draft or sent back", async () => {
+  it("while the application is a draft, too", async () => {
     await tx(async () => {
-      const name = (n: number) => `${ids.meals}/npo_certificate-${n}.pdf`;
+      await run("reset role");
+      await run("update public.charities set status = 'draft' where id = $1", [ids.meals]);
       await as(ids.mealsAdmin);
-      await refused("insert into storage.objects (bucket_id, name) values ($1, $2)", ["charity-documents", name(1)], /row-level security/); // approved
-      for (const [i, status] of (["draft", "rejected", "pending_review", "suspended"] as const).entries()) {
-        await run("reset role");
-        await run("update public.charities set status = $2 where id = $1", [ids.meals, status]);
-        await as(ids.mealsAdmin);
-        if (status === "draft" || status === "rejected") await put("charity-documents", name(i + 2));
-        else await refused("insert into storage.objects (bucket_id, name) values ($1, $2)", ["charity-documents", name(i + 2)], /row-level security/);
-      }
+      await refused("insert into storage.objects (bucket_id, name) values ($1, $2)", ["charity-documents", `${ids.meals}/npo_certificate-9.pdf`], refusedWrite);
+    });
+  });
+
+  it("nobody who isn't signed in can either", async () => {
+    await tx(async () => {
+      await as("anon");
+      await refused("insert into storage.objects (bucket_id, name) values ($1, $2)", ["charity-public", `${ids.meals}/logo-1.png`], refusedWrite);
     });
   });
 });

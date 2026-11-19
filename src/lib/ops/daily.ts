@@ -386,7 +386,7 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
     lines.push(`${n(c.privacyRequests.open, "privacy request is", "privacy requests are")} waiting for an answer${since}. See Admin, Privacy requests.`);
   }
   if (c.charityRequests?.lastDay) {
-    lines.push(`${n(c.charityRequests.lastDay, "donor asked", "donors asked")} for a charity that isn't on Givezy yet. ${n(c.charityRequests.waiting, "request waits", "requests wait")} for a look in Admin, Charity requests.`);
+    lines.push(`${n(c.charityRequests.lastDay, "donor asked", "donors asked")} for a charity that isn't on Givezy yet. ${n(c.charityRequests.waiting, "request waits", "requests wait")} for a look in Admin: Overview, then Charity requests.`);
   }
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
   if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));

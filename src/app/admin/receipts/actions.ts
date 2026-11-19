@@ -19,7 +19,7 @@ export async function voidReceipt(id: string, _prev: FormState, formData: FormDa
   const admin = await requirePlatformAdmin();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Receipt not found." };
   const reason = String(formData.get("reason") ?? "").trim();
-  if (reason.length < 5) return { ok: false, fieldErrors: { reason: "Give a reason for the record" } };
+  if (reason.length < 5) return { ok: false, fieldErrors: { reason: "Give a reason for the record, at least 5 characters" } };
 
   const { data, error } = await createAdminClient()
     .from("s18a_receipts")
@@ -96,7 +96,7 @@ export async function sendBackReceipts(runId: string, totalCents: number, _prev:
   const admin = await requirePlatformAdmin();
   if (!isId(runId)) return { ok: false, message: "Run not found." };
   const reason = String(formData.get("reason") ?? "").trim().replace(/\s+/g, " ");
-  if (reason.length < 5) return { ok: false, fieldErrors: { reason: "Tell the charity why, in a few words" } };
+  if (reason.length < 5) return { ok: false, fieldErrors: { reason: "Tell the charity why, in at least 5 characters" } };
   const ok = await cancelRun({ runId, userId: admin.userId, reason: reason.slice(0, 300) });
   revalidatePath("/admin/receipts");
   if (!ok) return { ok: false, message: "This run is no longer waiting for sign-off. Nothing was changed." };

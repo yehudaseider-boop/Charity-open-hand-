@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { appCheckoutSchema, appGivingOpen, toCheckoutInput } from "@/lib/donations/app-api";
+import { appCheckoutSchema, appFieldErrors, appGivingOpen, toCheckoutInput } from "@/lib/donations/app-api";
 import { startDonation } from "@/lib/donations/checkout";
 import { clientIp } from "@/lib/client-ip";
 import { appAccount } from "@/lib/app-auth";
@@ -22,12 +22,7 @@ export async function POST(request: NextRequest) {
   const body = appCheckoutSchema.safeParse(await request.json().catch(() => null));
   if (!body.success) {
     // Say which field, so the app can highlight it: a too-big amount or an over-long ID number, not "check the details".
-    const fieldErrors: Record<string, string> = {};
-    for (const i of body.error.issues) {
-      const key = i.path[0] === "details" ? String(i.path[1] ?? "") : i.path[0] === "giftCents" ? "amount" : i.path[0] === "contributionCents" ? "extra" : "";
-      if (!key || fieldErrors[key]) continue;
-      fieldErrors[key] = key === "amount" ? "That amount is above the most we can take in the app" : key === "extra" ? "Check your contribution" : "Check this detail";
-    }
+    const fieldErrors = appFieldErrors(body.error.issues);
     return NextResponse.json(
       Object.keys(fieldErrors).length ? { ok: false, message: "Please check the highlighted fields.", fieldErrors } : { ok: false, message: "Check the details and try again." },
       { status: 400 },

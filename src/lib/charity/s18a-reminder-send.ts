@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
 import { onIssuedReceipt } from "@/lib/donations/s18a-complete";
-import { canCompleteS18a, completionWindow, s18aDetailsMissing, type MissingDetail, type S18aDetailsRow } from "@/lib/donations/s18a-details";
+import { canCompleteS18a, completionWindow, lateDetailsDeadline, s18aDetailsMissing, type MissingDetail, type S18aDetailsRow } from "@/lib/donations/s18a-details";
 import { getEmailTransport } from "@/lib/email";
 import { mayHaveSent } from "@/lib/email/retry-plan";
 import { oneClickStopUrl } from "@/lib/email/headers";
@@ -31,8 +31,11 @@ export const REMINDER_KIND = "s18a_details_reminder";
  * Donors of this charity with at least one gift whose s18A details are still missing and can still be added (the
  * receipt run's "details missing": paid, asked for an s18A receipt, inside the completion window, not on an issued
  * receipt, not erased), with what is missing across those gifts.
+ *
+ * `earliestYear`, when given, is filled with each donor's earliest tax year that still needs details, so the reminder can
+ * name the last day to add them (31 May after that tax year).
  */
-export async function loadS18aMissing(charityId: string, now = new Date()): Promise<Map<string, MissingDetail[]>> {
+export async function loadS18aMissing(charityId: string, now = new Date(), earliestYear?: Map<string, number>): Promise<Map<string, MissingDetail[]>> {
   const window = completionWindow(now);
   const rows: { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; details: S18aDetailsRow | null }[] = [];
   for (let from = 0; ; from += 1000) {
@@ -60,6 +63,7 @@ export async function loadS18aMissing(charityId: string, now = new Date()): Prom
   for (const r of rows) {
     if (!canCompleteS18a(r, r.details, { window, onIssuedReceipt: issued })) continue;
     out.set(r.donor_id, mergeMissing(out.get(r.donor_id) ?? [], s18aDetailsMissing(r.details!)));
+    if (earliestYear && r.tax_year !== null) earliestYear.set(r.donor_id, Math.min(earliestYear.get(r.donor_id) ?? r.tax_year, r.tax_year));
   }
   return out;
 }
@@ -124,13 +128,20 @@ export async function contacts(charityId: string, donorIds: string[]): Promise<{
 }
 
 /** Addresses (as hashes) that turned off this charity's emails. */
-export async function optedOutHashes(charityId: string, hashes: string[]): Promise<Set<string>> {
+/**
+ * With `forDetailsReminder`, the checkout tick "No news or appeals" is not counted: it promised news and appeals only,
+ * and the s18A-details reminder is about the donor's own receipt (19/11/2026). Journeys and appeals count every source.
+ */
+export async function optedOutHashes(charityId: string, hashes: string[], opts: { forDetailsReminder?: boolean } = {}): Promise<Set<string>> {
   const out = new Set<string>();
   for (let i = 0; i < hashes.length; i += 200) {
     // This charity's opt-outs and "no emails from charities" overall, as appeals check (stoppedEmails).
     const chunk = hashes.slice(i, i + 200);
     const [mine, any] = await Promise.all([
-      db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("email_hash", chunk),
+      (opts.forDetailsReminder
+        ? db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("source", ["stop_link", "charity"])
+        : db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId)
+      ).in("email_hash", chunk),
       db().from("thank_you_opt_outs").select("email_hash").in("email_hash", chunk),
     ]);
     if (mine.error) throw mine.error;
@@ -176,12 +187,13 @@ export async function sendS18aReminders(args: {
   // Before anything is claimed: a sending set-up problem must not use up anyone's week.
   const transport = getEmailTransport();
   const donorIds = [...new Set(args.donorIds)];
-  const [missing, who] = await Promise.all([loadS18aMissing(args.charityId, now), contacts(args.charityId, donorIds)]);
+  const earliest = new Map<string, number>();
+  const [missing, who] = await Promise.all([loadS18aMissing(args.charityId, now, earliest), contacts(args.charityId, donorIds)]);
   const withEmail = donorIds.flatMap((id) => {
     const c = who.byDonor.get(id);
     return c ? [{ donorId: id, hash: emailHash(c.email) }] : [];
   });
-  const [stopped, recent] = await Promise.all([optedOutHashes(args.charityId, withEmail.map((d) => d.hash)), messagedThisWeek(args.charityId, withEmail, now)]);
+  const [stopped, recent] = await Promise.all([optedOutHashes(args.charityId, withEmail.map((d) => d.hash), { forDetailsReminder: true }), messagedThisWeek(args.charityId, withEmail, now)]);
   const candidates: (ReminderCandidate & { contact: Contact | null })[] = donorIds.map((id) => {
     const contact = who.byDonor.get(id) ?? null;
     return {
@@ -238,6 +250,7 @@ export async function sendS18aReminders(args: {
             charityName: args.charityName,
             firstName: c.contact!.greeting,
             missing: c.missing,
+            deadline: earliest.has(c.donorId) ? lateDetailsDeadline(earliest.get(c.donorId)!) : undefined,
             detailsUrl: detailsUrl(site),
             stopUrl: `${site}/news/stop?t=${token}`,
             oneClickUrl: oneClickStopUrl(site, "news", token),

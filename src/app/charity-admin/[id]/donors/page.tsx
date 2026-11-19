@@ -185,7 +185,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
                 key={t.id}
                 href={href(1, group, tag === t.id ? null : t.id)}
                 aria-current={tag === t.id ? "page" : undefined}
-                className={`${pill} [overflow-wrap:anywhere] ${tag === t.id ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand hover:text-brand focus-visible:border-brand"}`}
+                className={`${pill} [overflow-wrap:anywhere] ${tag === t.id ? "border-brand bg-brand text-white" : "border-outline bg-surface text-navy hover:border-brand hover:text-brand focus-visible:border-brand"}`}
               >
                 {t.name}
               </Link>

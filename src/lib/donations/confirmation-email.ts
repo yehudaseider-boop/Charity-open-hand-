@@ -20,6 +20,8 @@ export function confirmationEmail(d: {
   wants18a: boolean;
   /** Asked for an s18A receipt with "Add my details after paying" and hasn't added them yet (04/11/2026). */
   s18aDetailsMissing?: boolean;
+  /** The last day the details can be added (dd/mm/yyyy, 31 May after the gift's tax year), when they are missing. */
+  s18aDetailsDeadline?: string;
   /** The account page, where the donor adds them. */
   accountUrl?: string;
   /** Part of a monthly donation: its first payment, a later one, or a first payment whose card cannot be charged again. */
@@ -51,7 +53,7 @@ export function confirmationEmail(d: {
     ...(d.dedication ? [d.dedication] : []),
     "",
     d.wants18a && d.s18aDetailsMissing
-      ? `You asked for an s18A receipt. To get it, add your SA ID number (or registration number) and address: sign in${d.accountUrl ? ` at ${d.accountUrl}` : " to your Givezy account"} with this email address. Until then this donation can't go on your s18A receipt, which we send after the tax year closes at the end of February.`
+      ? `You asked for an s18A receipt. To get it, add your SA ID number (or registration number) and address: sign in${d.accountUrl ? ` at ${d.accountUrl}` : " to your Givezy account"} with this email address${d.s18aDetailsDeadline ? `, by ${d.s18aDetailsDeadline}` : ""}. Until then this donation can't go on your s18A receipt, which we send after the tax year closes at the end of February.`
       : d.wants18a
         ? "This donation will be on your annual s18A receipt, which we send after the tax year closes at the end of February."
         : "You did not ask for an s18A receipt for this donation.",
@@ -70,7 +72,7 @@ export function confirmationEmail(d: {
 }
 
 function monthlyLines(d: { monthly?: Parameters<typeof confirmationEmail>[0]["monthly"]; manageUrl?: string; totalCents: number }): string[] {
-  const manage = `You can pause or cancel at any time in the Givezy app (Giving tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`;
+  const manage = `You can pause or cancel at any time in the Givezy app (Progress tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`;
   if (!d.monthly) return [];
   if (d.monthly.kind === "first") {
     return [

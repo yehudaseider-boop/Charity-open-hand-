@@ -41,7 +41,7 @@ async function step(
 }
 
 /**
- * Sign in: Google or Apple when switched on, else an emailed 6-digit code. No password. The same
+ * Sign in: Google or Apple when switched on, else an emailed code. No password. The same
  * account as the website. Sits under the blue "Let's get you set up." header on Account.
  */
 export function SignIn() {
@@ -92,15 +92,15 @@ export function SignIn() {
       <CornerRing />
       <Text variant="h2" style={styles.title}>Check your email</Text>
       <Text variant="bodyMuted">
-        {resent ? `We sent a new code to ${sentTo}. Use the newest one: older codes no longer work.` : `We sent a 6-digit code to ${sentTo}. It works once and expires soon.`}
+        {resent ? `We sent a new code to ${sentTo}. Use the newest one: older codes no longer work.` : `We sent a code to ${sentTo}. It works once and expires soon.`}
       </Text>
-      <Field label="Code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={7} error={error ?? undefined} />
+      <Field label="Code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={14} error={error ?? undefined} />
       <Button
         label={busy ? "Checking…" : "Sign in"}
         disabled={busy}
         onPress={async () => {
           const c = cleanCode(code);
-          if (!c) return setError("Enter the 6 digits from the email.");
+          if (!c) return setError("Enter the code from the email, numbers only.");
           await step(setBusy, setError, () => account.verifyCode(sentTo, c));
         }}
       />
@@ -149,6 +149,7 @@ export function Agree() {
         onPress={() => step(setBusy, setError, () => account.agree())}
       />
       <TextLink label="Sign out" onPress={() => account.signOut()} />
+      <TextLink label="Delete my account" onPress={() => open("/account/data/delete")} />
     </View>
   );
 }
@@ -182,6 +183,6 @@ const styles = StyleSheet.create({
   rule: { flex: 1, height: 1.5, backgroundColor: colors.lightPurple },
   title: { fontSize: 24, lineHeight: 30 },
   check: { flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44 },
-  box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: colors.lilac, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginTop: 1 },
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
 });

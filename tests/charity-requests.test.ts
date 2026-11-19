@@ -103,6 +103,6 @@ describe("the daily email", () => {
   it("counts new requests, never who asked", () => {
     const c = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {}, charityRequests: { lastDay: 2, waiting: 5 } } as DailyChecks;
     const lines = dailyDigest(c, {} as Parameters<typeof dailyDigest>[1]);
-    expect(lines).toContainEqual("2 donors asked for a charity that isn't on Givezy yet. 5 requests wait for a look in Admin, Charity requests.");
+    expect(lines).toContainEqual("2 donors asked for a charity that isn't on Givezy yet. 5 requests wait for a look in Admin: Overview, then Charity requests.");
   });
 });

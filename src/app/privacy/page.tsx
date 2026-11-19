@@ -54,10 +54,10 @@ export default function PrivacyPage() {
           <li>To process your donation and send you a confirmation (to carry out what you asked for).</li>
           <li>To issue your annual s18A receipt on the charity&apos;s behalf, and keep the tax records the law requires.</li>
           <li>To show you your giving history, your labels and your giving goals in the app (with your consent).</li>
-          <li>To pass on a thank-you from a charity you gave to, at most once a month for each charity. It shows your first name only. Every one has a link to stop them, and stopping them doesn&apos;t affect your confirmations or receipts.</li>
+          <li>To pass on messages from a charity you gave to: thank-yous, news and appeals, at most one a week from each charity. Every one has a link to stop them, and stopping them doesn&apos;t affect your confirmations or receipts.</li>
           <li>To check charities before they are listed, and to stop fraud and misuse (our legitimate interest, and the law).</li>
         </ul>
-        <p>We do not sell your information, and we do not send you marketing.</p>
+        <p>We do not sell your information, and Givezy does not send you its own marketing.</p>
       </Section>
 
       <Section title="Who we share it with">

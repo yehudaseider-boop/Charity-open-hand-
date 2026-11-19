@@ -207,12 +207,14 @@ describe("charity documents", () => {
       for (const bucket of ["charity-public", "charity-documents"]) {
         for (const name of [`${ids.meals}/../${other}/pwn.png`, `${ids.meals}/a/../../${other}/pwn.png`, `${ids.meals}/..`, `${ids.meals}\\..\\${other}/pwn.png`, `/${ids.meals}/pwn.png`]) {
           await run("savepoint s");
-          // Refused by the policy (a name the folder check can't even read as a charity id is refused too).
-          await expect(put(bucket, name)).rejects.toThrow(/row-level security|invalid input syntax for type uuid/);
+          // Refused: a browser has no write to storage at all (migration 20261118000001; uploads are made by the server).
+          await expect(put(bucket, name)).rejects.toThrow(/row-level security|permission denied|invalid input syntax for type uuid/);
           await run("rollback to savepoint s");
         }
-        // Their own folder still works (documents only while the application is open: review-fixes-09-11-db.test.ts).
-        if (bucket === "charity-public") await put(bucket, `${ids.meals}/logo.png`);
+        // Their own folder too: only the website's server writes files.
+        await run("savepoint s");
+        await expect(put(bucket, `${ids.meals}/logo.png`)).rejects.toThrow(/row-level security|permission denied/);
+        await run("rollback to savepoint s");
       }
     });
   });

@@ -18,6 +18,7 @@ export const colors = {
   blueSoft: "#E5D9FF", // selected chips and quiet tints (light purple)
   muted: "#4A5878", // slate: secondary text (7.1:1 on white)
   hairline: "#ECE8F6", // light purple: card borders and dividers
+  outline: "#7A86A5", // the outline of a control you press or type in (chips, fields, switches): 3.6:1 on white, 3.3:1 on pale lilac (WCAG 1.4.11, 18/11/2026). Decorative card borders stay light.
   orange: "#FF8A3D", // the one call to action, splashes, goal rings, streaks (ink text on it, 7.2:1)
   orangeEdge: "#D9621C", // the solid edge under orange (the pressable look), e.g. round the cause of the week
   orangeText: "#B84A0A", // small orange text, if ever needed (5.1:1 on white)

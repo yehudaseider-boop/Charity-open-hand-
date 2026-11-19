@@ -29,7 +29,7 @@ export default function CharitiesError({ error, retry }: { error: Error & { dige
           </p>
           <div className="flex flex-wrap gap-3 pt-1">
             <button type="button" onClick={() => retry()} className="pressable inline-flex min-h-12 items-center rounded-[1.125rem] bg-brand px-5 font-bold text-white">Try again</button>
-            <Link href="/" className="inline-flex min-h-12 items-center rounded-[1.125rem] border-2 border-border bg-surface px-5 font-bold text-brand hover:border-brand">Go to the home page</Link>
+            <Link href="/" className="inline-flex min-h-12 items-center rounded-[1.125rem] border-2 border-outline bg-surface px-5 font-bold text-brand hover:border-brand">Go to the home page</Link>
           </div>
         </div>
       </section>

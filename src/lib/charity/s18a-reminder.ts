@@ -145,7 +145,7 @@ export function reminderOutcome(r: { sent: number; failed: number; unknown?: num
  */
 export function s18aReminderEmail(
   to: string,
-  v: { charityName: string; firstName: string | null; missing: MissingDetail[]; detailsUrl: string; stopUrl: string; replyTo: string | null; oneClickUrl?: string },
+  v: { charityName: string; firstName: string | null; missing: MissingDetail[]; detailsUrl: string; stopUrl: string; replyTo: string | null; oneClickUrl?: string; /** dd/mm/yyyy: the last day they can be added. */ deadline?: string },
 ): EmailMessage {
   const name = cleanDedicationName(v.firstName);
   const what = missingWords(v.missing, "your");
@@ -162,7 +162,7 @@ export function s18aReminderEmail(
       `Add ${v.missing.length > 1 ? "them" : "it"} here, signing in with the email address you gave when you donated:`,
       v.detailsUrl,
       "",
-      "It takes a minute. Until then your gift can't go on your s18A receipt. Receipts are sent after the tax year ends on the last day of February.",
+      `It takes a minute.${v.deadline ? ` Please add ${v.missing.length > 1 ? "them" : "it"} by ${v.deadline}: after that the form closes for this tax year.` : ""} Until then your gift can't go on your s18A receipt. Receipts are sent after the tax year ends on the last day of February.`,
       "",
       `From ${v.charityName}`,
       "",

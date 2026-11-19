@@ -50,6 +50,12 @@ describe("sign-in helpers", () => {
     expect(looksLikeEmail("sarah@")).toBe(false);
     expect(cleanCode("123 456")).toBe("123456");
     expect(cleanCode("12345")).toBeNull();
+    // Supabase sends 6 to 10 digits depending on the project's setting; the test project sent 8 (18/11/2026).
+    expect(cleanCode("12345678")).toBe("12345678");
+    expect(cleanCode("1234 5678")).toBe("12345678");
+    expect(cleanCode("1234-5678")).toBe("12345678");
+    expect(cleanCode("1234567890")).toBe("1234567890");
+    expect(cleanCode("12345678901")).toBeNull();
     expect(cleanCode("12a456")).toBeNull();
   });
 });
@@ -261,5 +267,61 @@ describe("dates follow Johannesburg time", () => {
 
   it("a saved copy from before this change is not used (it gets loaded again)", () => {
     expect(fromCache(JSON.stringify({ v: 1, gifts: [], recurring: [], receipts: [], elsewhere: [], loadedAt: new Date().toISOString() }))).toBeNull();
+  });
+});
+
+describe("a monthly donation whose donor covers the card charge (18/11/2026)", () => {
+  // Made-up rates for the test: 3% + R1, no VAT on top, on the whole payment.
+  const rates = { percentPpm: 30_000, fixedCents: 100, vatOnTopPpm: 0 };
+  const base = { id: "r1", amount_cents: 10_000, contribution_cents: 1_000, status: "active", next_charge_at: null, charities: charity };
+
+  it("shows what each month really collects, worked out as the website does", async () => {
+    const { monthlyCardCharge } = await import("../src/lib/donations/card-charge");
+    const { monthlyAmountLine, monthlyAmountParts } = await import("../apps/mobile/src/lib/live-giving");
+    const [r] = toRecurring([{ ...base, covers_card_charge: true }], { known: true, rates });
+    const charge = monthlyCardCharge(10_000, 1_000, true, rates);
+    expect(charge).toBeGreaterThan(0);
+    expect(r.cardChargeCents).toBe(charge);
+    expect(monthlyAmountLine(r)).toBe(`R${((11_000 + charge) / 100).toFixed(2)} a month`);
+    expect(monthlyAmountParts(r)).toBe(`R100 to the charity, R10 to Givezy and R${(charge / 100).toFixed(2)} card charge`);
+    // Not covered: gift + contribution, nothing added, and the rates aren't needed.
+    const [plain] = toRecurring([base]);
+    expect(monthlyAmountLine(plain)).toBe("R110 a month");
+    expect(plain.cardChargeCents).toBeUndefined();
+  });
+
+  it("each side pays its own share: the cover is on the gift only, as the monthly run works it out", async () => {
+    const { monthlyCardCharge } = await import("../src/lib/donations/card-charge");
+    const each = { ...rates, coverGiftOnly: true };
+    const [r] = toRecurring([{ ...base, covers_card_charge: true }], { known: true, rates: each });
+    expect(r.cardChargeCents).toBe(monthlyCardCharge(10_000, 1_000, true, each));
+  });
+
+  it("never guesses: no rates from the server adds nothing; rates that couldn't be fetched say so in words", async () => {
+    const { monthlyAmountLine } = await import("../apps/mobile/src/lib/live-giving");
+    const [none] = toRecurring([{ ...base, covers_card_charge: true }], { known: true, rates: null });
+    expect(monthlyAmountLine(none)).toBe("R110 a month");
+    const [offline] = toRecurring([{ ...base, covers_card_charge: true }]);
+    expect(offline).toMatchObject({ cardChargeUnknown: true });
+    expect(monthlyAmountLine(offline)).toBe("R110 a month plus the card charge");
+  });
+
+  it("keeps the card charge in the copy saved on the phone", () => {
+    const [r] = toRecurring([{ ...base, covers_card_charge: true }], { known: true, rates });
+    const [u] = toRecurring([{ ...base, id: "r2", covers_card_charge: true }]);
+    const live = { gifts: [], recurring: [r, u], receipts: [], elsewhere: [], loadedAt: new Date("2026-11-18T10:00:00Z") };
+    const back = fromCache(toCache(live))?.recurring;
+    expect(back?.map((x) => [x.id, x.cardChargeCents, x.cardChargeUnknown])).toEqual([["r1", r.cardChargeCents, undefined], ["r2", undefined, true]]);
+  });
+
+  it("asks our server for the rates, and treats no site, an older server or an odd answer as not known", async () => {
+    const { fetchCardChargeRates } = await import("../apps/mobile/src/lib/card-rates");
+    const reply = (status: number, json: unknown) => async () => ({ status, json });
+    expect(await fetchCardChargeRates("https://givezy.example", reply(200, { ok: true, cardChargeRates: rates }))).toEqual({ known: true, rates });
+    expect(await fetchCardChargeRates("https://givezy.example", reply(200, { ok: true, cardChargeRates: null }))).toEqual({ known: true, rates: null });
+    expect(await fetchCardChargeRates("https://givezy.example", reply(404, null))).toEqual({ known: false });
+    expect(await fetchCardChargeRates("https://givezy.example", reply(200, { ok: true, cardChargeRates: { percentPpm: 0.5 } }))).toEqual({ known: false });
+    expect(await fetchCardChargeRates(undefined, reply(200, { ok: true, cardChargeRates: rates }))).toEqual({ known: false });
+    expect(await fetchCardChargeRates("https://givezy.example", async () => { throw new Error("offline"); })).toEqual({ known: false });
   });
 });

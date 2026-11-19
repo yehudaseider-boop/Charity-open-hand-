@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   headTitle: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 37, letterSpacing: -0.4, color: colors.onInk, paddingRight: 30 },
   headLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft, paddingRight: 40 },
   chips: { gap: 8, paddingHorizontal: space.gutter },
-  chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface, justifyContent: "center" },
+  chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.surface, justifyContent: "center" },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   card: { gap: 12, padding: 20, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.lightPurple, backgroundColor: colors.surface },
@@ -368,3 +368,5 @@ const styles = StyleSheet.create({
   tileValue: { ...tabular, fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 30, color: colors.navy },
   split: { flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: colors.surface, marginVertical: 2 },
 });
+
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

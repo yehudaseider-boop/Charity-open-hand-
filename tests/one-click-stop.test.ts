@@ -95,7 +95,7 @@ describe("the headers", () => {
   it("are not on a test copy, confirmations, receipts or emails to charities", () => {
     expect(appealEmail("me@x.co", { charityName: "Meals", firstName: null, subject: "[Test] News", body: "Some news.", stopUrl: "(each donor gets their own stop link here)", replyTo: null }).headers).toBeUndefined();
     expect(confirmationEmail({ id: "3f9a2c71-0b1d-4e5f-9a8b-123456789abc", charityName: "Meals", amountCents: 18_000, contributionCents: 0, totalCents: 18_000, paidAt: "2026-10-08T10:00:00Z", wants18a: false })).not.toHaveProperty("headers");
-    expect(approvedEmail("c@x.co", "Meals", "c1", true, "https://g.test").headers).toBeUndefined();
+    expect(approvedEmail("c@x.co", "Meals", "c1", "ready", "https://g.test").headers).toBeUndefined();
     expect(inviteEmail("c@x.co", "Meals", "https://g.test/invite").headers).toBeUndefined();
   });
 

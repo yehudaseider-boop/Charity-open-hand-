@@ -13,20 +13,26 @@ const checkouts: Record<string, unknown>[] = [];
 const charges: Record<string, unknown>[] = [];
 let chargeResult: () => Promise<{ status: string }> = async () => ({ status: "pending" });
 let refusal = false;
+/** The refusal names the card (declined, expired). */
+let decline = false;
+/** False: a gateway that can't save a card yet (Stitch, until its test system). */
+let canSaveCards = true;
 let stored: { code: string; gateway: string } | null = { code: "AUTH_SECRET", gateway: "test" };
 const requests: { donationId: string; userId: string }[] = [];
 /** A donation already recorded under the attempt id the app sends. */
 let prior: Record<string, unknown> | null = null;
+/** Audit rows the earlier attempt left (why it failed). */
+let auditRows: { id: string }[] = [];
 
 function builder(table: string) {
   const b: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "is", "limit", "lt", "gte"]) b[m] = () => b;
+  for (const m of ["select", "eq", "is", "limit", "lt", "gte", "in"]) b[m] = () => b;
   b.insert = (row: Record<string, unknown>) => (ops.push({ table, op: "insert", row }), b);
   b.update = (row: Record<string, unknown>) => (ops.push({ table, op: "update", row }), b);
   b.upsert = (row: Record<string, unknown>) => (ops.push({ table, op: "upsert", row }), b);
   b.single = async () => ({ data: { id: "donor-1" }, error: null });
   b.maybeSingle = async () => ({ data: table === "donations" ? prior : null, error: null });
-  b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok);
+  b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === "audit_log" ? auditRows : [], error: null }).then(ok);
   return b;
 }
 
@@ -68,8 +74,10 @@ class FakeGatewayError extends Error {
 vi.mock("@/lib/gateway", () => ({
   GatewayError: FakeGatewayError,
   isGatewayRefusal: () => refusal,
+  isGatewayDecline: () => refusal && decline,
   getGateway: () => ({
     name: "test",
+    supportsSavedCards: canSaveCards ? undefined : false,
     verifyTransaction: async (reference: string) => {
       verified.push(reference);
       if (providerHas === "no") throw new FakeGatewayError("not found", { notFound: true });
@@ -95,7 +103,10 @@ beforeEach(() => {
   requests.length = 0;
   chargeResult = async () => ({ status: "pending" });
   refusal = false;
+  decline = false;
+  canSaveCards = true;
   prior = null;
+  auditRows = [];
   limitsUsedUp = false;
   providerHas = "yes";
   verified.length = 0;
@@ -141,6 +152,32 @@ describe("saved cards: switch and sign-in", () => {
     expect(both.status).toBe(409);
     expect(ops).toHaveLength(0);
     expect(charges).toHaveLength(0);
+  });
+});
+
+describe("a payment provider that can't save cards yet", () => {
+  it("says so plainly before anything is recorded, for a saved card, a new card to save, or a monthly gift", async () => {
+    canSaveCards = false;
+    for (const body of [
+      { ...gift, saveCard: true, details },
+      { ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details },
+      { ...gift, details: { ...details, monthly: true, monthly_authorised: true } },
+    ]) {
+      const res = await call(body);
+      const json = await res.json();
+      expect(json.ok).toBe(false);
+      expect(json.message).toMatch(/aren't available just yet, so nothing was charged/);
+    }
+    expect(ops).toHaveLength(0);
+    expect(charges).toHaveLength(0);
+    expect(checkouts).toHaveLength(0);
+  });
+
+  it("a once-off gift on the payment page still goes ahead", async () => {
+    canSaveCards = false;
+    const res = await call({ ...gift, details });
+    expect((await res.json()).ok).toBe(true);
+    expect(checkouts).toHaveLength(1);
   });
 });
 
@@ -204,14 +241,36 @@ describe("paying with the saved card", () => {
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
   });
 
-  it("a refusal from the provider also ends the gift as failed", async () => {
+  it("a refusal that names the card (declined, expired) ends the gift as declined", async () => {
     refusal = true;
+    decline = true;
     chargeResult = async () => {
-      throw new Error("refused");
+      throw new Error("Declined");
     };
     const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
     expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, savedCardDeclined: true });
+    expect(body.message).toMatch(/declined/);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+    expect(ops.some((o) => o.table === "audit_log")).toBe(false);
+  });
+
+  it("any other refusal charged nothing and ends the gift, but never says the card was declined, and tells a person", async () => {
+    refusal = true;
+    chargeResult = async () => {
+      throw Object.assign(new FakeGatewayError("Invalid split"), { said: "Invalid split configuration" });
+    };
+    const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, offerPaymentPage: true });
+    expect(body.savedCardDeclined).toBeUndefined();
+    expect(body.message).not.toMatch(/declined/i);
+    expect(body.message).toMatch(/nothing was charged/);
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+    const noted = ops.find((o) => o.table === "audit_log" && o.op === "insert");
+    expect(noted?.row).toMatchObject({ action: "donation.saved_card_refused", details: { said: "Invalid split configuration" } });
   });
 
   it("a timeout or outage leaves the gift pending, because the charge may have gone through", async () => {
@@ -235,7 +294,7 @@ describe("asking twice about the same saved-card gift", () => {
   });
 
   const longAgo = new Date(Date.now() - 10 * 60_000).toISOString();
-  const pendingPrior = (createdAt = longAgo) => ({ status: "pending", charity_id: "c1", total_charged_cents: 10_000, created_at: createdAt, donation_checkout_details: { email: "a@example.com" } });
+  const pendingPrior = (createdAt = longAgo) => ({ status: "pending", charity_id: "c1", total_charged_cents: 10_000, created_at: createdAt, donation_checkout_details: { email: "a@example.com", started_by_user: "u1" } });
 
   it("a retry of an attempt already recorded is never refused by the attempt limits (it may already be charged)", async () => {
     prior = pendingPrior();
@@ -353,10 +412,41 @@ describe("asking twice about the same saved-card gift", () => {
   });
 
   it("a declined first try stays declined", async () => {
-    prior = { status: "failed", charity_id: "c1", total_charged_cents: 10_000, created_at: longAgo, donation_checkout_details: { email: "a@example.com" } };
+    prior = { status: "failed", charity_id: "c1", total_charged_cents: 10_000, created_at: longAgo, donation_checkout_details: { email: "a@example.com", started_by_user: "u1" } };
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
     expect(charges).toHaveLength(0);
+  });
+
+  it("an earlier try that failed for a reason other than the card is never answered as declined (review 18/11/2026)", async () => {
+    prior = { status: "failed", charity_id: "c1", total_charged_cents: 10_000, created_at: longAgo, donation_checkout_details: { email: "a@example.com", started_by_user: "u1" } };
+    auditRows = [{ id: "a1" }];
+    const body = await (await call({ ...gift, useSavedCard: true, attemptId, details })).json();
+    expect(body).toMatchObject({ ok: false, offerPaymentPage: true });
+    expect(body.savedCardDeclined).toBeUndefined();
+    expect(body.message).toMatch(/nothing was charged/);
+    expect(charges).toHaveLength(0);
+  });
+
+  it("the 'still sending' and 'couldn't check' answers say so, so the app keeps the attempt (review 18/11/2026)", async () => {
+    prior = pendingPrior(new Date().toISOString());
+    providerHas = "no";
+    expect(await (await call({ ...gift, useSavedCard: true, attemptId, details })).json()).toMatchObject({ ok: false, stillChecking: true });
+    prior = pendingPrior();
+    providerHas = "down";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await (await call({ ...gift, useSavedCard: true, attemptId, details })).json()).toMatchObject({ ok: false, stillChecking: true });
+    expect(charges).toHaveLength(0);
+  });
+
+  it("refuses an id started by another account, even with the same email, amount and charity", async () => {
+    for (const owner of ["u2", null]) {
+      prior = { ...pendingPrior(), donation_checkout_details: { email: "a@example.com", started_by_user: owner } };
+      const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+      expect(await res.json()).toMatchObject({ ok: false, attemptMismatch: true });
+    }
+    expect(charges).toHaveLength(0);
+    expect(verified).toHaveLength(0);
   });
 
   it("refuses an id that belongs to another gift (different amount, email or charity)", async () => {
@@ -365,7 +455,7 @@ describe("asking twice about the same saved-card gift", () => {
       { total_charged_cents: 10_000, charity_id: "c2", email: "a@example.com" },
       { total_charged_cents: 10_000, charity_id: "c1", email: "b@example.com" },
     ]) {
-      prior = { status: "paid", charity_id: p.charity_id, total_charged_cents: p.total_charged_cents, donation_checkout_details: { email: p.email } };
+      prior = { status: "paid", charity_id: p.charity_id, total_charged_cents: p.total_charged_cents, donation_checkout_details: { email: p.email, started_by_user: "u1" } };
       const res = await call({ ...gift, useSavedCard: true, attemptId, details });
       expect((await res.json()).ok).toBe(false);
     }

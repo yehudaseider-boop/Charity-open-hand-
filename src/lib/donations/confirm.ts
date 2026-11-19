@@ -55,6 +55,13 @@ export type ConfirmOptions = {
   closeAbandonedBefore?: Date;
   /** The monthly job only: a monthly collection may be closed the same way (an old try the provider has no charge for). */
   includeCollections?: boolean;
+  /**
+   * The app's own check of a once-off gift (api/app/status): a payment started before this time that the provider
+   * says it has never received is closed as failed, so the app stops showing "we couldn't check" for ever (a
+   * saved-card charge whose first try never reached the provider; review 22/10/2026). Nothing was charged, and it
+   * can still become paid if the provider later says so. Never a monthly donation's payment.
+   */
+  closeNeverReceivedBefore?: Date;
   /** Told when this call closed the payment as an unpaid checkout or try (rather than the provider saying it failed). */
   onClosed?: (why: "abandoned" | "never_received") => void;
 };
@@ -96,6 +103,7 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
   } catch (e) {
     // The provider never received it: an old checkout the donor never paid is closed (daily check only).
     if (isGatewayNotFound(e) && (await closableCheckout(donation, opts))) return closeCheckout(donation, "never_received", opts);
+    if (isGatewayNotFound(e) && neverReceivedOnceOff(donation, opts)) return closeCheckout(donation, "never_received", opts);
     throw e;
   }
 
@@ -123,7 +131,8 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
     await oweDonorConfirmation(donation.id);
     const { data: updated, error } = await db
       .from("donations")
-      .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt) })
+      // payment_channel: how the provider says it was paid (null if it doesn't say), for the s18A receipt's nature of donation.
+      .update({ status: "paid", paid_at: paidAt.toISOString(), tax_year: taxYearFor(paidAt), payment_channel: tx.channel ?? null })
       .eq("id", donation.id)
       .in("status", ["pending", "failed"])
       .select("id");
@@ -237,6 +246,13 @@ type Closable = { id: string; status: string; recurring_id: string | null; creat
  * and only a checkout: a once-off gift, or the first payment of a monthly donation. Never a monthly collection or a
  * new card (their own jobs settle them).
  */
+/** A once-off payment, still pending, started before `closeNeverReceivedBefore` (see ConfirmOptions). */
+function neverReceivedOnceOff(d: Closable, opts: ConfirmOptions): boolean {
+  if (!opts.closeNeverReceivedBefore || d.status !== "pending" || d.recurring_id || !d.created_at) return false;
+  const created = new Date(d.created_at).getTime();
+  return Number.isFinite(created) && created < opts.closeNeverReceivedBefore.getTime();
+}
+
 async function closableCheckout(d: Closable, opts: ConfirmOptions): Promise<boolean> {
   if (!opts.closeAbandonedBefore || d.status !== "pending" || !d.created_at) return false;
   const created = new Date(d.created_at).getTime();
@@ -255,6 +271,13 @@ async function closableCheckout(d: Closable, opts: ConfirmOptions): Promise<bool
  */
 async function closeCheckout(d: Closable, why: "abandoned" | "never_received", opts: ConfirmOptions = {}): Promise<ConfirmOutcome> {
   const db = createAdminClient();
+  // A never-received payment is noted before it is closed: a saved-card retry reads the note so it never says
+  // "declined" (review 18/11/2026). If the note can't be written, nothing is closed and the check is tried again.
+  if (why === "never_received") {
+    await logAudit({ actorUserId: null, action: "donation.checkout_closed", entityType: "donation", entityId: d.id, details: { why } }).catch((e) => {
+      throw new PersistenceError("note the closed checkout", e);
+    });
+  }
   const { data: updated, error } = await db
     .from("donations")
     .update({ status: "failed", failed_at: new Date().toISOString() })
@@ -269,9 +292,11 @@ async function closeCheckout(d: Closable, why: "abandoned" | "never_received", o
   }
   opts.onClosed?.(why);
   if (d.recurring_id) await cancelMonthlyBeforeStart(d.id, FIRST_PAYMENT_FAILED);
-  await logAudit({ actorUserId: null, action: "donation.checkout_closed", entityType: "donation", entityId: d.id, details: { why } }).catch((e) =>
-    console.error("[confirm] could not note a closed checkout", e),
-  );
+  if (why !== "never_received") {
+    await logAudit({ actorUserId: null, action: "donation.checkout_closed", entityType: "donation", entityId: d.id, details: { why } }).catch((e) =>
+      console.error("[confirm] could not note a closed checkout", e),
+    );
+  }
   return "failed";
 }
 

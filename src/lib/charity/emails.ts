@@ -40,16 +40,21 @@ export function newApplicationEmail(to: string, charityName: string, charityId: 
   };
 }
 
-export function approvedEmail(to: string, charityName: string, charityId: string, s18a: boolean, base = site()): EmailMessage {
+/** Where receipts stand at approval: set up, waiting only for the signed mandate, or no s18A approval confirmed yet. */
+export type ReceiptsAtApproval = "ready" | "mandate" | "none";
+
+export function approvedEmail(to: string, charityName: string, charityId: string, receipts: ReceiptsAtApproval, base = site()): EmailMessage {
   return {
     to,
     subject: `${charityName} is approved on Givezy`,
     text: [
       `Good news: ${charityName} has been approved and is now listed on Givezy.`,
       "",
-      s18a
+      receipts === "ready"
         ? "Donors who ask for an s18A receipt will get one in your name, issued by Givezy under your mandate."
-        : "Donors can give to you now. You can't issue s18A receipts through Givezy yet; tell us once you have s18A approval and we'll set it up.",
+        : receipts === "mandate"
+          ? "Your s18A approval is confirmed. To issue s18A receipts we also need your signed receipting mandate, with the date it was signed: reply to this email with it (or tell us if you have sent it already) and we'll set up receipts."
+          : "You can't issue s18A receipts through Givezy yet; tell us once you have s18A approval and we'll set it up.",
       "",
       "A few things help donors find you and give:",
       "1. Add a cover photo and a few words about your work.",
@@ -83,11 +88,18 @@ export function suspendedEmail(to: string, charityName: string, charityId: strin
   };
 }
 
-export function reinstatedEmail(to: string, charityName: string, charityId: string, base = site()): EmailMessage {
+export function reinstatedEmail(to: string, charityName: string, charityId: string, connected: boolean, base = site()): EmailMessage {
   return {
     to,
     subject: `${charityName} is back on Givezy`,
-    text: [`${charityName} is listed on Givezy again, and donors can give to you.`, "", `Your dashboard: ${base}/charity-admin/${charityId}`, ...sign].join("\n"),
+    text: [
+      connected
+        ? `${charityName} is listed on Givezy again, and donors can give to you.`
+        : `${charityName} is listed on Givezy again. Online donations start once your bank account is connected to our payment provider; we will email you when that is done.`,
+      "",
+      `Your dashboard: ${base}/charity-admin/${charityId}`,
+      ...sign,
+    ].join("\n"),
   };
 }
 
@@ -98,7 +110,7 @@ export function connectedEmail(to: string, charityName: string, charityId: strin
     text: [
       `Your bank account is connected to our payment provider, so ${charityName} can take online donations on Givezy from today.`,
       "",
-      "Each donation goes straight to your bank account. The payment provider's card fee comes off each donation before it reaches you.",
+      "Each donation goes straight to your bank account. The payment provider's card fee comes off each donation before it reaches you, unless the donor chooses to cover it.",
       "",
       `Share your page, or print your QR poster: ${base}/charity-admin/${charityId}/poster`,
       ...sign,
@@ -258,6 +270,21 @@ export function memberAddedEmail(to: string, charityName: string, charityId: str
       "The first time, you'll also set up a second step on your phone, to keep donors' details safe.",
       "",
       "If you weren't expecting this, reply to this email.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
+/** The charity's bank details were changed by Givezy. If the old account was connected, giving is paused until the new one is. */
+export function bankChangedEmail(to: string, charityName: string, dateText: string, last4: string, wasConnected: boolean): EmailMessage {
+  return {
+    to,
+    subject: `The bank details for ${charityName} were changed`,
+    text: [
+      `The bank details held by Givezy for ${charityName} were changed on ${dateText}. The new account ends in ${last4}.`,
+      ...(wasConnected ? ["", "Online donations are paused until we have connected the new account to our payment provider. We will email you when that is done."] : []),
+      "",
+      "If you did not ask for this, please tell us straight away.",
       ...sign,
     ].join("\n"),
   };

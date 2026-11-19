@@ -24,7 +24,7 @@ export function TryDemo({ now }: { now?: Date }) {
   });
 
   const chip =
-    "flex min-h-12 cursor-pointer items-center justify-center rounded-full border-2 border-border bg-white px-4 text-[16px] font-bold text-navy transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-brand-contrast peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-coral";
+    "flex min-h-12 cursor-pointer items-center justify-center rounded-full border-2 border-outline bg-white px-4 text-[16px] font-bold text-navy transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-brand-contrast peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-coral";
 
   return (
     <form onSubmit={(e) => e.preventDefault()} aria-labelledby={`${id}-title`} className="flex flex-col gap-6 rounded-[1.75rem] border-[1.5px] border-border bg-white p-5 shadow-[0_24px_60px_rgba(14,27,61,0.08)] sm:p-7">
@@ -82,7 +82,7 @@ export function TryDemo({ now }: { now?: Date }) {
           {DEMO_CAUSES.map((c) => (
             <label key={c.id} className="relative">
               <input type="radio" name="cause" value={c.id} checked={cause === c.id} onChange={() => setCause(c.id)} className="peer sr-only" />
-              <span className="flex min-h-14 cursor-pointer items-center rounded-[1.125rem] border-2 border-border bg-honey-soft px-4 text-[15px] font-semibold text-navy transition-colors peer-checked:border-brand peer-checked:bg-brand-soft peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-coral">
+              <span className="flex min-h-14 cursor-pointer items-center rounded-[1.125rem] border-2 border-outline bg-honey-soft px-4 text-[15px] font-semibold text-navy transition-colors peer-checked:border-brand peer-checked:bg-brand-soft peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-coral">
                 {c.label}
               </span>
             </label>

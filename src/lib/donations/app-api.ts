@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { platformConfig } from "@/config/platform";
+import { LABEL_MAX } from "./labels";
 import { checkoutSchema, cleanPhone, type CheckoutInput } from "./validation";
 
 /**
@@ -33,7 +34,7 @@ export const appCheckoutSchema = appQuoteSchema.extend({
   attemptId: z.string().uuid().optional(),
   details: z.object({
     donor_type: z.enum(["individual", "company", "trust"]),
-    email: z.string().max(200),
+    email: z.string().max(254),
     first_name: z.string().max(80).optional(),
     last_name: z.string().max(80).optional(),
     organisation_name: z.string().max(200).optional(),
@@ -53,7 +54,7 @@ export const appCheckoutSchema = appQuoteSchema.extend({
     message: z.string().max(500).optional(),
     dedication_kind: z.string().max(10).optional(),
     dedication_name: z.string().max(200).optional(),
-    giving_label: z.string().max(80).optional(),
+    giving_label: z.string().max(LABEL_MAX).optional(),
     giving_kind: z.string().optional(),
     is_anonymous: flag,
     no_news: flag,
@@ -82,6 +83,26 @@ export function toCheckoutInput(details: AppCheckoutBody["details"]):
   const fieldErrors: Record<string, string> = {};
   for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
   return { ok: false, fieldErrors };
+}
+
+type Issue = { path: PropertyKey[]; code: string; maximum?: number | bigint; origin?: string };
+
+/**
+ * A field the app sent that failed the shape check, keyed as the app's give screen knows it, with what is wrong
+ * in plain words where we can tell (too long, not one of the choices), not just "check this detail".
+ */
+export function appFieldErrors(issues: readonly Issue[]): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+  for (const i of issues) {
+    const key = i.path[0] === "details" ? String(i.path[1] ?? "") : i.path[0] === "giftCents" ? "amount" : i.path[0] === "contributionCents" ? "extra" : "";
+    if (!key || fieldErrors[key]) continue;
+    if (key === "amount") fieldErrors[key] = "That amount is above the most we can take in the app";
+    else if (key === "extra") fieldErrors[key] = "Check your contribution";
+    else if (i.code === "too_big" && i.origin === "string" && i.maximum !== undefined) fieldErrors[key] = `Please keep this to ${Number(i.maximum)} characters or fewer`;
+    else if (i.code === "invalid_value") fieldErrors[key] = "Choose one of the options";
+    else fieldErrors[key] = "Check this detail";
+  }
+  return fieldErrors;
 }
 
 /** Off unless APP_GIVING=yes on the server: the in-app payment API stays closed in production until we choose. */

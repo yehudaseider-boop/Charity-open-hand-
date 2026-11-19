@@ -2,9 +2,10 @@
  * South African ID number check: 13 digits, a real date of birth in the
  * first six, a citizenship digit of 0 or 1, and a valid Luhn check digit. It
  * catches typing mistakes; it does not prove the number belongs to the person.
+ * Spaces and dashes are allowed ("850101 5009 08 7", "850101-5009-087"): keep saIdDigits(raw).
  */
 export function isValidSaIdNumber(raw: string): boolean {
-  const id = raw.replace(/\s/g, "");
+  const id = saIdDigits(raw);
   if (!/^\d{13}$/.test(id)) return false;
 
   const yy = Number(id.slice(0, 2));
@@ -30,4 +31,9 @@ export function isValidSaIdNumber(raw: string): boolean {
     sum += digit;
   }
   return sum % 10 === 0;
+}
+
+/** The ID number as kept: spaces and dashes taken out. Use it wherever an ID number checked above is stored. */
+export function saIdDigits(raw: string): string {
+  return raw.replace(/[\s-]/g, "");
 }

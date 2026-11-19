@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { appAccount } from "@/lib/app-auth";
+import { clientIp } from "@/lib/client-ip";
+import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { newCardPath, ownsMonthly } from "@/lib/donations/new-card";
 
 /**
@@ -16,6 +18,10 @@ const body = z.object({ id: z.uuid() });
  * on the website). The card goes in on the payment provider's page there; the app never sees it.
  */
 export async function POST(request: NextRequest) {
+  // Limited per internet address before the sign-in check (security review 18/11/2026; generous, because many phones share one address on mobile networks).
+  if (await hitRateLimit("app-new-card", ipKeys(clientIp(request.headers)), 120, 10).catch(() => false)) {
+    return NextResponse.json({ ok: false, message: "Please wait a moment, then try again." }, { status: 429 });
+  }
   const account = await appAccount(request, { forMoney: true });
   if (!account) return NextResponse.json({ ok: false, message: "Please sign in again." }, { status: 401 });
   const parsed = body.safeParse(await request.json().catch(() => null));
@@ -23,5 +29,5 @@ export async function POST(request: NextRequest) {
   const owns = await ownsMonthly(account.userId, parsed.data.id).catch(() => null);
   if (owns === null) return NextResponse.json({ ok: false, message: "We couldn't check just now. Please try again." }, { status: 503 });
   if (!owns) return NextResponse.json({ ok: false, message: "We couldn't find this monthly donation." }, { status: 404 });
-  return NextResponse.json({ ok: true, path: newCardPath(parsed.data.id, new Date()) }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, path: `${newCardPath(parsed.data.id, new Date())}&from=app` }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -127,8 +127,8 @@ describe("in the app", () => {
   });
 
   it("opens only our own new-card page, and says plainly when it can't", async () => {
-    const ok = await requestNewCardPage("https://givezy.test/", "r1", "tok", async () => ({ status: 200, json: { ok: true, path: "/monthly/new-card?m=r1&e=1&s=x" } }));
-    expect(ok).toEqual({ ok: true, url: "https://givezy.test/monthly/new-card?m=r1&e=1&s=x" });
+    const ok = await requestNewCardPage("https://givezy.test/", "r1", "tok", async () => ({ status: 200, json: { ok: true, path: "/monthly/new-card?m=r1&e=1&s=x&from=app" } }));
+    expect(ok).toEqual({ ok: true, url: "https://givezy.test/monthly/new-card?m=r1&e=1&s=x&from=app" });
     const elsewhere = await requestNewCardPage("https://givezy.test", "r1", "tok", async () => ({ status: 200, json: { ok: true, path: "https://evil.test/x" } }));
     expect(elsewhere.ok).toBe(false);
     const offline = await requestNewCardPage("https://givezy.test", "r1", "tok", async () => { throw new Error("offline"); });

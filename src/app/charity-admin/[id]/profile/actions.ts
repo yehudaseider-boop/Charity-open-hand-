@@ -10,6 +10,7 @@ import { IMAGE_MIME, MAX_UPLOAD_BYTES, profileSchema } from "@/lib/charity/valid
 import { formToObject, zodErrors, type FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
 import { isRealImage } from "@/lib/charity/file-check";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cleanImage } from "@/lib/charity/clean-image";
 import { notifyCharity, publicChangeEmail } from "@/lib/charity/emails";
@@ -145,7 +146,8 @@ export async function uploadImage(
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
   const path = `${charityId}/${kind}-${crypto.randomUUID()}.${ext}`;
   const supabase = await createClient();
-  const up = await supabase.storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
+  // Uploaded by the server, after the checks above (who, which role, a real image): a browser has no direct write to storage (18/11/2026).
+  const up = await createAdminClient().storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
   if (up.error) return failed(up.error);
 
   const column = kind === "logo" ? "logo_path" : "cover_path";

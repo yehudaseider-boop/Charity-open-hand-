@@ -86,7 +86,7 @@ export function HeaderNav({ tone = "light" }: { tone?: "light" | "dark" }) {
   const dashboards = viewer?.dashboards ?? [];
   const signedIn = Boolean(viewer?.signedIn);
   return (
-    <nav aria-label="Main" className="flex items-center gap-1 whitespace-nowrap text-[15px] sm:gap-2">
+    <nav aria-label="Main" className="flex flex-wrap items-center justify-end gap-1 text-[15px] sm:gap-2">
       {/* Phones: one Menu button holds every part of the site, so no page is a dead end (30/10/2026). */}
       <MobileMenu
         tone={tone}

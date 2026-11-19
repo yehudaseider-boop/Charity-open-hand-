@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
+import { normaliseLineBreaks } from "@/lib/text";
 
 const tooLong = (max: number) => `Please keep it to ${max.toLocaleString("en-ZA").replace(/[\s,]/g, " ")} characters or fewer`;
 const optional = (max = 200) => z.string().max(max, tooLong(max)).optional();
@@ -38,7 +40,7 @@ export const contactSchema = z.object({
   contact_email: z.email("Enter a valid email address"),
   contact_phone: z
     .string()
-    .regex(/^(\+27|0)\d{9}$/, "Use a South African number, for example 082 123 4567")
+    .regex(SA_PHONE, "Use a South African number, for example 082 123 4567")
     .optional()
     .transform((v) => v),
 });
@@ -57,11 +59,15 @@ export const bankNames = [
   "Other",
 ] as const;
 
+/** A number typed with spaces or dashes ("250 655", "250-655"), without them. */
+const digitsOnly = (v: unknown) => (typeof v === "string" ? v.replace(/[\s-]/g, "") : v);
+
 export const bankSchema = z.object({
   bank_name: z.enum(bankNames, { error: "Choose your bank" }),
   bank_account_holder: required("Account holder name"),
-  bank_account_number: required("Account number", 16).regex(/^\d{6,16}$/, "Account number is 6 to 16 digits, no spaces"),
-  bank_branch_code: required("Branch code", 6).regex(/^\d{6}$/, "Branch code is 6 digits"),
+  // Typed as on a bank letter ("1234 5678 90", "250-655"): spaces and dashes are taken out before the check.
+  bank_account_number: z.preprocess(digitsOnly, required("Account number", 16).regex(/^\d{6,16}$/, "Account number is 6 to 16 digits")),
+  bank_branch_code: z.preprocess(digitsOnly, required("Branch code", 6).regex(/^\d{6}$/, "Branch code is 6 digits")),
 });
 
 export const profileSchema = z.object({
@@ -74,7 +80,11 @@ export const profileSchema = z.object({
   website: z
     .preprocess(
       (v) => (typeof v === "string" && v.trim() && !/^[a-z]+:\/\//i.test(v.trim()) ? `https://${v.trim()}` : v),
-      z.url({ protocol: /^https?$/, error: "Enter your website address, for example example.org.za" }),
+      // A space can pass the URL rule (in the path) but not the database check: refused first, with what to change.
+      z
+        .string()
+        .regex(/^\S*$/, "Take out the spaces: a website address has none, for example example.org.za/donate")
+        .pipe(z.url({ protocol: /^https?$/, error: "Enter your website address, for example example.org.za" })),
     )
     .optional(),
 });
@@ -94,12 +104,18 @@ export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 export const DOCUMENT_MIME = ["application/pdf", "image/jpeg", "image/png"] as const;
 export const IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 
-/** Phone numbers typed with spaces: "082 123 4567" -> "0821234567". */
+/** Phone numbers as typed: "082 123 4567" -> "0821234567", "+27 (0)82 123 4567" -> "+27821234567" (src/lib/phone.ts). */
 export function normalisePhone(v: string | undefined) {
-  return v?.replace(/[\s()-]/g, "");
+  return v === undefined ? undefined : normaliseSaPhone(v);
 }
 
 /** A short update from a charity, and a photo caption. */
-export const updateSchema = z.object({ body_en: z.string({ error: (i) => (i.input === undefined ? "Write your update" : undefined) }).min(1, "Write your update").max(500, "Please keep it to 500 characters or fewer") });
+export const updateSchema = z.object({
+  // A line break counts as one character, as the text box counts it (it arrives as \r\n).
+  body_en: z.preprocess(
+    (v) => (typeof v === "string" ? normaliseLineBreaks(v) : v),
+    z.string({ error: (i) => (i.input === undefined ? "Write your update" : undefined) }).min(1, "Write your update").max(500, "Please keep it to 500 characters or fewer"),
+  ),
+});
 export const photoSchema = z.object({ caption_en: optional(120) });
 export const MAX_PHOTOS = 12;

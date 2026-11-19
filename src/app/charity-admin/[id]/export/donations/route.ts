@@ -8,7 +8,7 @@ import { giftSourceLabel } from "@/lib/donations/source";
 import { audit, authoriseExport, csvResponse, xlsxResponse } from "@/lib/charity/export";
 import { toXlsx } from "@/lib/xlsx";
 import { centsToPlain, toCsv, csvPhone } from "@/lib/csv";
-import { formatDate } from "@/lib/dates";
+import { formatDate, taxYearName } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { donationReference } from "@/lib/donations/reference";
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       formatDate(d.paid_at ?? d.created_at),
       donationReference(d.id),
       donationStatus[d.status].label,
-      d.tax_year ? String(d.tax_year) : "",
+      d.tax_year ? taxYearName(Number(d.tax_year)) : "",
       donorName(d),
       d.donor_type,
       d.registration_number,

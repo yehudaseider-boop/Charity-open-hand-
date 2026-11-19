@@ -10,6 +10,7 @@
  * uses one for a person who hasn't given (an s18A receipt takes its details from the gift itself), so the import
  * doesn't ask for or keep them (POPIA: only what is used). A column of them is listed under "Columns we didn't use".
  */
+import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
 import { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, parseCsv } from "./recorded-gifts";
 
 export { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS };
@@ -93,16 +94,14 @@ const formulaProblem = (label: string) => `${label} starts with "=", which a spr
 
 /**
  * A South African phone number without spaces, brackets, dots or dashes, as the rest of the site keeps it:
- * 0821234567 or +27821234567. A spreadsheet drops the + (27821234567), and some lists write 0027: both are the
- * same number, so they are written with +27. Null when it can't be read.
+ * 0821234567 or +27821234567. A spreadsheet drops the + (27821234567), and some lists write 0027 or +27 (0)82: all
+ * are the same number, so they are written with +27 (the shared rule in src/lib/phone.ts). Null when it can't be read.
  */
 export function cleanContactPhone(raw: string | undefined): { phone: string | null; problem?: string } {
   const typed = textCell(raw);
-  let p = typed.replace(/[\s().-]/g, "");
+  const p = normaliseSaPhone(typed);
   if (!p) return { phone: null };
-  if (/^27\d{9}$/.test(p)) p = `+${p}`;
-  else if (/^0027\d{9}$/.test(p)) p = `+${p.slice(2)}`;
-  if (/^(\+27|0)\d{9}$/.test(p)) return { phone: p };
+  if (SA_PHONE.test(p)) return { phone: p };
   const shown = typed.length > 30 ? `${typed.slice(0, 30)}…` : typed;
   // Nine digits not starting with 0: a spreadsheet read the number as a sum and dropped the 0 at the front.
   if (/^[1-9]\d{8}$/.test(p)) return { phone: null, problem: `"${shown}" is one digit short for a phone number. If a spreadsheet dropped the 0 at the front, type it as 0${p} and set the column to Text` };

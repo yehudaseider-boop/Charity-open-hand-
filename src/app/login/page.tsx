@@ -48,9 +48,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <p className="text-[15px] text-muted">
             {/* The full stop stays with the address (a long address must not leave it alone on the next line). */}
             {email ? (
-              <>We sent a link to <span dir="auto" className="font-semibold text-navy [overflow-wrap:anywhere]">{email.slice(0, -1)}<span className="whitespace-nowrap">{email.slice(-1)}<span className="font-normal text-muted">.</span></span></span> Tap it, or type the code from the email here.</>
+              <>We sent a code to <span dir="auto" className="font-semibold text-navy [overflow-wrap:anywhere]">{email.slice(0, -1)}<span className="whitespace-nowrap">{email.slice(-1)}<span className="font-normal text-muted">.</span></span></span> Type it here.</>
             ) : (
-              <>If you asked for a sign-in email, we sent it. Tap the link in it, or ask for a new email to get a code you can type here.</>
+              <>If you asked for a sign-in email, we sent it. To type the code, ask for a new email from this page.</>
             )}
           </p>
           {email ? (
@@ -78,7 +78,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       ) : (
         <form action={sendLoginLink} className="mt-4 space-y-3">
           <p className="text-[15px] text-muted">
-            No password needed. We&apos;ll email you a sign-in link. You don&apos;t need an account to give.
+            No password needed. We&apos;ll email you a sign-in code. You don&apos;t need an account to give.
           </p>
           <input type="hidden" name="next" value={next} />
           <label className="block text-sm font-medium" htmlFor="email">Email</label>
@@ -93,7 +93,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           />
           {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
           <PendingButton pendingLabel="Sending…" className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-[17px] font-bold text-navy disabled:opacity-60">
-            Email me a sign-in link
+            Email me a sign-in code
           </PendingButton>
           <p className="text-xs text-muted">
             The first time you sign in you&apos;ll be asked to agree to <TermsAndPrivacyLinks />.

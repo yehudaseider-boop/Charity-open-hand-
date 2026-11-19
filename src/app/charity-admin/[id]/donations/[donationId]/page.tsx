@@ -7,7 +7,7 @@ import { requireViewer } from "@/lib/auth";
 import { addressLine, donationStatus, donorName, shownEmail } from "@/lib/charity/dashboard";
 import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
-import { formatDate, formatDateTime } from "@/lib/dates";
+import { formatDate, formatDateTime, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { donationReference } from "@/lib/donations/reference";
 import { createClient } from "@/lib/supabase/server";
@@ -75,7 +75,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
           {d.external_ref ? <Row label="Your reference">{d.external_ref}</Row> : null}
           {d.refunded_at ? <Row label="Refunded">{formatDateTime(d.refunded_at)}</Row> : null}
           {d.charged_back_at ? <Row label="Charged back">{formatDateTime(d.charged_back_at)}</Row> : null}
-          {d.tax_year ? <Row label="Tax year">{d.tax_year}</Row> : null}
+          {d.tax_year ? <Row label="Tax year">{taxYearName(Number(d.tax_year))}</Row> : null}
           <Row label="s18A receipt requested">{d.wants_18a ? "Yes" : "No"}</Row>
           <Row label="Reference">{donationReference(d.id)}</Row>
         </dl>

@@ -41,6 +41,9 @@ export default async function YourInformationPage() {
           If you ask us to delete your account, we delete your sign-in and personal details. Records of past donations and
           receipts that tax law requires us to keep are kept for that period, no longer, and not used for anything else.
         </p>
+        <p className="mb-3 text-sm text-muted">
+          Just want to delete your account? <Link href="/account/data/delete" className="text-brand underline">Delete my account</Link>
+        </p>
         <RequestForm />
         {requests && requests.length > 0 ? (
           <ul className="mt-4 space-y-2 border-t border-border pt-3 text-sm">

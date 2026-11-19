@@ -93,7 +93,7 @@ beforeEach(() => {
 });
 
 describe("erasing a donor by their account", () => {
-  it("finds every donor record that is theirs (by account or by email, once each), erases, emails them, then deletes the account", async () => {
+  it("finds every donor record that is theirs (by account or by email, once each), erases, deletes the account, then emails them", async () => {
     const s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(rpcIds?.sort()).toEqual(["d1", "d2"]);
     expect(calls).toEqual([
@@ -105,16 +105,25 @@ describe("erasing a donor by their account", () => {
       // The database erasure comes after everything that finds them by address or donor record (13/11/2026), so an
       // erasure that stops part way can be finished by running it again.
       "rpc",
-      "email",
       ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"].map((t) => `${t}:deleted:user_id=${USER}`),
       "consents:kind=account",
       "deleteUser",
+      // The email goes once the account is gone, so someone with an account but no gifts hears too (18/11/2026).
+      "email",
       "audit",
     ]);
     expect(emails[0].to).toBe("erin@example.co.za");
     expect(emails[0].text).toContain("tax law requires");
     expect(emails[0].text).not.toMatch(/[!—]/);
     expect(s).toMatchObject({ donors: 2, checkout_details: 2, monthly_stopped: 1, accountDeleted: true });
+  });
+
+  it("emails someone who signed in but never gave, once their account is deleted (the delete page promises it)", async () => {
+    donorsByUser = [];
+    donorsByEmail = [];
+    const s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    expect(s.accountDeleted).toBe(true);
+    expect(emails.map((e) => e.to)).toEqual(["erin@example.co.za"]);
   });
 
   it("the audit entry has counts only: no name, email or address", async () => {
@@ -128,6 +137,8 @@ describe("erasing a donor by their account", () => {
     let s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(s.accountDeleted).toBe(false);
     expect(s.note).toMatch(/platform admin/);
+    // The email tells the truth: the sign-in account (and its email address) stays (reading pass, 19/11/2026).
+    expect(emails.at(-1)?.text).toMatch(/One exception: your sign-in account stays/);
     expect(calls).not.toContain("deleteUser");
 
     calls.length = 0;
@@ -149,6 +160,8 @@ describe("erasing a donor by their account", () => {
     const s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(s.accountDeleted).toBe(false);
     expect(s.note).toMatch(/could not be deleted/);
+    // Not kept on purpose: the email must not claim they run a charity or the platform (review of 19/11/2026).
+    expect(emails.at(-1)?.text ?? "").not.toMatch(/One exception/);
   });
 
   it("a failed email does not stop the erasure", async () => {
@@ -173,6 +186,8 @@ describe("erasing a donor with no account", () => {
     expect(calls).not.toContain("deleteUser");
     expect(s.accountDeleted).toBe(false);
     expect(audits[0]).toMatchObject({ entityType: "donor", entityId: null });
+    // A guest has no sign-in account: no "your account stays" line.
+    expect(emails[0].text).not.toMatch(/One exception|sign-in account/);
   });
 
   it("needs someone to erase", async () => {

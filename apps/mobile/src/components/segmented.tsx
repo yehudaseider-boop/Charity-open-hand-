@@ -42,7 +42,7 @@ export function Segmented<T extends string>({
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", borderRadius: radius.pill, padding: 4, gap: 4, backgroundColor: colors.lilacSoft },
+  track: { flexDirection: "row", borderRadius: radius.pill, padding: 4, gap: 4, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.outline },
   option: { flex: 1, minHeight: touch - 4, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   selected: { backgroundColor: colors.blue },
   off: { opacity: 0.5 },

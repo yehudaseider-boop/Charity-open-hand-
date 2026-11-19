@@ -8,6 +8,7 @@ const mails: { to: string; subject: string }[] = [];
 const deleted: string[] = [];
 const updates: Record<string, unknown>[] = [];
 let memberRow: unknown = { user_id: "u2" };
+let targetRole = "donor";
 let factors = [{ id: "f1" }];
 let charity: Record<string, unknown> = {};
 let documents: { document_type: string; signed_on?: string; storage_path: string }[] = [];
@@ -34,7 +35,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         updates.push({ table, ...row });
         return { eq: async () => ({ error: null }) };
       };
-      b.maybeSingle = async () => ({ data: table === "profiles" ? { email: "p@x.co" } : table === "charity_admins" ? memberRow : { name_en: "Meals Fund" }, error: null });
+      b.maybeSingle = async () => ({ data: table === "profiles" ? { email: "p@x.co", role: targetRole } : table === "charity_admins" ? memberRow : { name_en: "Meals Fund" }, error: null });
       return b;
     },
     auth: {
@@ -58,6 +59,7 @@ const form = (o: Record<string, string>) => {
 beforeEach(() => {
   audits.length = mails.length = deleted.length = updates.length = 0;
   memberRow = { user_id: U2 };
+  targetRole = "donor";
   factors = [{ id: "f1" }];
   charity = { status: "approved", name_en: "Meals Fund", slug: "meals", is_s18a: false, mandate_signed_at: null, s18a_reference: null };
   documents = [];
@@ -81,9 +83,10 @@ describe("remove a charity admin", () => {
 });
 
 describe("reset a lost authenticator", () => {
-  it("needs a note of how the admin checked who it was", async () => {
+  it("needs a note of how the admin checked who it was, and says how long", async () => {
     const r = await resetSecondStep(CH, U2, { ok: false }, form({ reason: "" }));
-    expect(r.fieldErrors?.reason).toBeTruthy();
+    expect(r.fieldErrors?.reason).toMatch(/at least 5 characters/);
+    expect((await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Call" }))).fieldErrors?.reason).toMatch(/at least 5 characters/);
     expect(deleted).toHaveLength(0);
   });
   it("removes their factors, records the check and emails them", async () => {
@@ -99,6 +102,12 @@ describe("reset a lost authenticator", () => {
     expect((await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Called them" }))).ok).toBe(false);
     memberRow = { user_id: ADMIN };
     expect((await resetSecondStep(CH, ADMIN, { ok: false }, form({ reason: "Called them" }))).ok).toBe(false);
+    expect(deleted).toHaveLength(0);
+  });
+  it("never for another Givezy admin, even one who is on this charity's team (security review 18/11/2026)", async () => {
+    targetRole = "platform_admin";
+    const r = await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Called them on the number we have" }));
+    expect(r).toMatchObject({ ok: false, message: expect.stringMatching(/Givezy admin/) });
     expect(deleted).toHaveLength(0);
   });
 });
@@ -118,6 +127,14 @@ describe("set up s18A after approval", () => {
     expect(r.ok).toBe(true);
     expect(updates[0]).toMatchObject({ table: "charities", s18a_reference: "930/123/45/6", is_s18a: true, mandate_signed_at: "2026-10-01T00:00:00+02:00", mandate_document_path: "c/m.pdf" });
     expect(mails[0].subject).toMatch(/s18A receipts are set up/);
+  });
+  it("refuses a reference over 40 characters (the database's limit) instead of cutting it", async () => {
+    documents = [{ document_type: "s18a_approval", storage_path: "c/s.pdf" }];
+    const r = await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "9".repeat(41), confirm_s18a: "on" }));
+    expect(r.fieldErrors?.s18a_reference).toMatch(/at most 40 characters/);
+    expect(updates).toHaveLength(0);
+    await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "9".repeat(40), confirm_s18a: "on" }));
+    expect(updates[0]).toMatchObject({ s18a_reference: "9".repeat(40) });
   });
   it("one half alone saves but doesn't promise receipts", async () => {
     documents = [{ document_type: "s18a_approval", storage_path: "c/s.pdf" }];

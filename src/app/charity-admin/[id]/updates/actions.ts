@@ -32,8 +32,8 @@ async function uploadIfAny(charityId: string, folder: "photos" | "updates", form
   }
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
   const path = `${charityId}/${folder}/${crypto.randomUUID()}.${ext}`;
-  const supabase = await createClient();
-  const up = await supabase.storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
+  // Uploaded by the server, after the checks above and in the caller (who, which role, a real image): a browser has no direct write to storage (18/11/2026).
+  const up = await createAdminClient().storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
   if (up.error) {
     console.error(up.error);
     return { error: { ok: false, message: "The upload didn't work. Please try again." } as FormState };

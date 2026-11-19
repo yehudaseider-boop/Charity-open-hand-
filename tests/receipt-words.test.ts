@@ -32,6 +32,17 @@ describe("nature of donation", () => {
     expect(donationNature("eft")).toBe("EFT (bank transfer)");
     expect(donationNature("constructor")).toBe("Other");
   });
+
+  it("an online gift says card only when the provider said card (or nothing, as before 17/11/2026)", () => {
+    expect(donationNature(null, "card")).toBe("Card (online)");
+    expect(donationNature(null, undefined)).toBe("Card (online)");
+    // Any other method is never printed as a card: wording for Apple Pay, instant EFT and the rest waits for Yosef.
+    expect(donationNature(null, "apple_pay")).toBe("Online payment");
+    expect(donationNature(null, "eft")).toBe("Online payment");
+    expect(donationNature(null, "something_new")).toBe("Online payment");
+    // A gift a charity recorded by hand says how it came in, whatever else is on the row.
+    expect(donationNature("cash", "card")).toBe("Cash");
+  });
 });
 
 describe("email button and csv safety", () => {

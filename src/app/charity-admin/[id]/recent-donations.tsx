@@ -56,7 +56,7 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
             type="button"
             aria-pressed={filter === f.key}
             onClick={() => setFilter(f.key)}
-            className={`hit min-h-9 rounded-full border-2 px-3.5 text-sm font-semibold transition ${filter === f.key ? "border-brand bg-brand text-white" : "border-border bg-surface text-muted hover:border-brand"}`}
+            className={`hit min-h-9 rounded-full border-2 px-3.5 text-sm font-semibold transition ${filter === f.key ? "border-brand bg-brand text-white" : "border-outline bg-surface text-muted hover:border-brand"}`}
           >
             {f.label}
           </button>

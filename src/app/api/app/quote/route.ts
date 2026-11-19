@@ -1,3 +1,4 @@
+import { GIVING_PAUSED_MESSAGE } from "@/lib/giving-pause";
 import { NextResponse, type NextRequest } from "next/server";
 import { clientIp } from "@/lib/client-ip";
 import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
@@ -18,6 +19,7 @@ export async function POST(request: NextRequest) {
   const body = appQuoteSchema.safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, message: "Check the amount and try again." }, { status: 400 });
   const charity = await loadDonatableCharity(body.data.slug);
+  if (charity?.givingPaused) return NextResponse.json({ ok: false, message: GIVING_PAUSED_MESSAGE }, { status: 409 });
   if (!charity?.acceptingPayments) return NextResponse.json({ ok: false, message: "This charity can't take online donations right now." }, { status: 409 });
   const result = quoteDonation(body.data.giftCents, body.data.contributionCents, body.data.coverCardCharge === true);
   return NextResponse.json(result, { status: result.ok ? 200 : 422 });

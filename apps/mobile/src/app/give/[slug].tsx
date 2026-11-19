@@ -1,3 +1,4 @@
+import { GIVING_PAUSED_MESSAGE } from "@shared/giving-pause";
 import { parseRandToCents } from "@shared/money";
 import { cardChargeToCover } from "@shared/fees";
 import { impactLine, impactSource } from "@shared/charity/impact";
@@ -6,7 +7,7 @@ import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AmountSwipe } from "@/components/amount-swipe";
 import { Button, TextLink } from "@/components/button";
@@ -43,6 +44,7 @@ import { useStoredRecord } from "@/lib/use-stored-record";
 import { tapAmounts } from "@shared/charity/suggested-amounts";
 import { charityShareText } from "@/lib/share";
 import { openGivingPage, refreshAfterGiving, SAVED_CARDS } from "@/lib/give-flow";
+import { CHECKOUT_ORIGINS } from "@shared/gateway/checkout-origins";
 import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { celebrates, stageLabel, TICK_MS, type GiveStage } from "@/lib/give-stage";
@@ -50,7 +52,7 @@ import { confirmThen, openSite, openUrl } from "@/lib/open-site";
 import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
 import { inHistory, settles, type GiftSnapshot, type PendingGift } from "@/lib/pending-gift";
-import { dropPendingGift, keepPendingGift, loadPendingGift, markDetailsLater } from "@/lib/pending-gift-store";
+import { dropPendingAttempt, dropPendingGift, keepPendingGift, loadPendingGift, markDetailsLater } from "@/lib/pending-gift-store";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -84,6 +86,18 @@ const SECTION_OF: Record<string, string> = {
  */
 /** Exactly what one tap of Give sent, kept for the thank-you and for holding an unresolved saved-card attempt. */
 type Snapshot = GiftSnapshot;
+
+/** Where a payment page may be: each payment provider's own page, and our own site (the test gateway's page). */
+function paymentPageOrigins(site: string): string[] {
+  const own = (() => {
+    try {
+      return new URL(site).origin;
+    } catch {
+      return null;
+    }
+  })();
+  return [...Object.values(CHECKOUT_ORIGINS).flat(), ...(own ? [own] : [])];
+}
 
 export default function Give() {
   const insets = useSafeAreaInsets();
@@ -135,6 +149,9 @@ export default function Give() {
   // never suggests a figure of its own, so a new donor at a charity that chose none types the amount.
   const quick = tapAmounts(pastAmounts, ready?.ok ? ready.suggestedCents : []);
   const [readyAttempt, setReadyAttempt] = useState(0);
+  // A campaign that ends while the donor is on this screen (the server says so when they give) is dropped: the gift goes
+  // to the charity. Declared up here with the other state: never after an early return (React's rule of hooks).
+  const [campaignClosed, setCampaignClosed] = useState(false);
   // Starts empty, or with the amount from "Make it monthly" after a gift (the donor's own figure, never ours).
   const [amount, setAmount] = useState(() => {
     const c = amountFromParam(amountParam);
@@ -194,6 +211,11 @@ export default function Give() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   // What happened, as a red error or a calm note while we wait; `help` adds how to reach a person.
   const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean } | null>(null);
+  // iPhone VoiceOver often doesn't speak a live region that appears on its own, so each message (what went wrong, "checking
+  // your payment", "declined") is also spoken. Android reads the live region itself.
+  useEffect(() => {
+    if (message && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message.text);
+  }, [message]);
   const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => setMessageState(text ? { text, tone, help } : null);
   // A payment we haven't heard back about: the footer offers "Check again" instead of a second gift.
   const [unsettled, setUnsettled] = useState<{ reference: string; token: string; charged: boolean; summary: Snapshot } | null>(null);
@@ -267,7 +289,7 @@ export default function Give() {
         setMonthly(false);
       }
       if (!p.reference || !p.token) {
-        setMessage(`Your gift of ${rand(p.summary.cents + p.summary.contributionCents)} from your saved card may still be going through. Tap Give: we check first, and never charge twice.`, "wait", true);
+        setMessage(`Your gift of ${rand(p.summary.cents + p.summary.contributionCents)} from your saved card may still be going through. Hold to give again: we check first, and never charge twice.`, "wait", true);
         return;
       }
       setUnsettled({ reference: p.reference, token: p.token, charged: p.charged, summary: p.summary });
@@ -280,6 +302,7 @@ export default function Give() {
       setBusy(false);
       if (settles(outcome)) {
         attemptRef.current = null;
+        setHeldAttempt(null);
         void dropPendingGift(owner, slug);
       }
       if (outcome === "paid") {
@@ -419,7 +442,11 @@ export default function Give() {
       <View style={styles.screen}>
         <TopBar title="Give" />
         <View style={{ padding: space.gutter }}>
-          <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now, so nothing was charged. Please try again later. ${helpLine()}`} action={{ label: "Back", onPress: leave }} />
+          {server.paused ? (
+            <EmptyState title="Giving is paused" body={`${GIVING_PAUSED_MESSAGE} ${helpLine()}`} action={{ label: "Back", onPress: leave }} />
+          ) : (
+            <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now, so nothing was charged. Please try again later. ${helpLine()}`} action={{ label: "Back", onPress: leave }} />
+          )}
         </View>
       </View>
     );
@@ -459,7 +486,7 @@ export default function Give() {
 
   // The campaign counts only once the server says it is still running (so a gift never quietly
   // goes to the charity in general because the app hadn't loaded it yet). The preview has no server.
-  const campaignId = campaignParam && (server ? server.campaignOpen : (charity.campaigns ?? []).some((c) => c.id === campaignParam)) ? campaignParam : undefined;
+  const campaignId = campaignParam && !campaignClosed && (server ? server.campaignOpen : (charity.campaigns ?? []).some((c) => c.id === campaignParam)) ? campaignParam : undefined;
   const campaignEnded = Boolean(campaignParam) && !campaignId;
   const campaign = campaignId ? ((charity.campaigns ?? []).find((c) => c.id === campaignId) ?? null) : null;
   const minGift = server?.minGiftCents ?? 0;
@@ -607,9 +634,9 @@ export default function Give() {
   }
 
   /** A saved-card charge with no answer yet: kept on the phone under its attempt id, so it is asked about again, never charged twice. */
-  async function keepAttempt(s: Snapshot) {
-    if (!attemptRef.current) return;
-    await keepPendingGift(owner, {
+  async function keepAttempt(s: Snapshot): Promise<boolean> {
+    if (!attemptRef.current) return false;
+    return keepPendingGift(owner, {
       slug: charity!.slug,
       charityName: charity!.nameEn,
       reference: null,
@@ -670,6 +697,17 @@ export default function Give() {
       popia_consent: agreed,
     };
     const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extraChoice === "other" ? extraAmount : "", extraChoice };
+    // A saved-card charge is kept on the phone under its attempt id *before* it is sent (review 16/11/2026): if the app
+    // is closed or the phone dies while the charge is on its way, the next visit asks about that same attempt instead of
+    // starting a new one, so the card can never be charged twice. A storage failure doesn't stop the gift (as before).
+    let keptFirst = false;
+    // A brand-new attempt id: if the server then answers plainly (not "no reply" or "still checking"), nothing can
+    // have been charged under it, so a refusal frees it (review 18/11/2026: otherwise an ordinary refusal held it for ever).
+    const freshAttempt = payWithSaved && attemptRef.current === null;
+    if (payWithSaved) {
+      attemptRef.current ??= newAttemptId();
+      keptFirst = await keepAttempt(sent);
+    }
     // Anything that goes wrong before our server answers (the sign-in token, a bad address) has charged nothing:
     // say so, and free the Give button, instead of leaving it stuck on "Opening the payment page…".
     let r: Awaited<ReturnType<typeof startPayment>>;
@@ -686,11 +724,13 @@ export default function Give() {
           useSavedId: usingSavedId || undefined,
           saveCard: (offerSave && saveCard) || undefined,
           useSavedCard: payWithSaved || undefined,
-          attemptId: payWithSaved ? (attemptRef.current ??= newAttemptId()) : undefined,
+          attemptId: payWithSaved ? (attemptRef.current ?? undefined) : undefined,
           details,
         },
         undefined,
-        usingSavedId || payWithSaved || (offerSave && saveCard) ? await account.accessToken() : null,
+        // Always sent while signed in: a gift given with the donor's own email counts as theirs, so next time we can offer
+        // "Use my ID ending 1234" (sweep of 18/11/2026). A guest has no token.
+        await account.accessToken(),
       );
     } catch {
       setBusy(false);
@@ -700,8 +740,8 @@ export default function Give() {
       }
       setMessage(
         payWithSaved
-          ? "Something went wrong before we could check your card, and we don't know yet whether it was charged. Your gift is held as it was. Tap Give again: we check first, and never charge twice."
-          : "Something went wrong before the payment page opened, so nothing was charged. Your details are still here: tap Give to try again.",
+          ? "Something went wrong before we could check your card, and we don't know yet whether it was charged. Your gift is held as it was. Hold to give again: we check first, and never charge twice."
+          : "Something went wrong before the payment page opened, so nothing was charged. Your details are still here. Hold to give when you're ready to try again.",
         payWithSaved ? "wait" : "error",
         true,
       );
@@ -711,17 +751,29 @@ export default function Give() {
     // used with other details": the first tap may have charged, so a changed amount keeps hitting
     // the same id (and the server's refusal) until this screen is closed. A saved-card charge keeps
     // its id until we know it was paid or declined (below), so "try again" can never charge twice.
-    if (!r.ok && !("noReply" in r) && !r.attemptMismatch) attemptRef.current = null;
+    // With a saved card, only an answer that says plainly nothing was charged ends the attempt (declined, or refused
+    // for another reason): any other refusal ("still sending", "couldn't check", sign in again) may come while an
+    // earlier charge under this id is still on its way, so the id is kept and the next tap asks about it again
+    // (review 18/11/2026: dropping it there could charge twice).
+    const sentAttempt = attemptRef.current;
+    const nothingCharged = !r.ok && (r.savedCardDeclined === true || r.offerPaymentPage === true || (freshAttempt && !("noReply" in r) && !r.stillChecking && !r.attemptMismatch));
+    if (!r.ok && !("noReply" in r) && !r.attemptMismatch && (!payWithSaved || nothingCharged)) attemptRef.current = null;
     if (r.ok && !r.charged) attemptRef.current = null;
-    if (attemptRef.current === null && heldAttempt) {
+    if (attemptRef.current === null && (heldAttempt || keptFirst)) {
       setHeldAttempt(null);
-      // The held saved-card attempt is over (refused, or this tap opened a payment page instead).
-      if (!r.ok) void dropPendingGift(owner, charity!.slug);
+      // The held (or just kept) saved-card attempt is over: refused with nothing charged, or a payment page instead.
+      if (!r.ok && sentAttempt) void dropPendingAttempt(owner, charity!.slug, sentAttempt);
+    }
+    // Kept after a refusal: held exactly as sent, so a changed amount can't start a second charge.
+    if (!r.ok && payWithSaved && attemptRef.current !== null && !("noReply" in r) && !r.attemptMismatch) {
+      setHeldAttempt(heldAttempt ?? sent);
+      if (!keptFirst) await keepAttempt(heldAttempt ?? sent);
     }
     if (!r.ok) {
       setBusy(false);
       // A declined saved card: offer the payment page, where another card can be used.
-      if (r.savedCardDeclined) setUseSavedCard(false);
+      // The provider turned the saved card down for another reason (nothing charged): the payment page too.
+      if (r.savedCardDeclined || r.offerPaymentPage) setUseSavedCard(false);
       if ("noReply" in r) {
         if (payWithSaved) {
           setHeldAttempt(sent);
@@ -729,8 +781,8 @@ export default function Give() {
         }
         setMessage(
           payWithSaved
-            ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your gift is held exactly as it was. Tap Give again: we check first, and never charge twice."
-            : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and tap Give again.",
+            ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your gift is held exactly as it was. Hold to give again: we check first, and never charge twice."
+            : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and hold to give again.",
           payWithSaved ? "wait" : "error",
           true,
         );
@@ -748,10 +800,15 @@ export default function Give() {
         setEmail(held.email);
         setMonthly(false);
         setMessage(
-          `We're still checking your earlier gift of ${rand(held.cents + held.contributionCents)} from your saved card, so it has been put back as it was. Tap Give again: we check first, and never charge twice.`,
+          `We're still checking your earlier gift of ${rand(held.cents + held.contributionCents)} from your saved card, so it has been put back as it was. Hold to give again: we check first, and never charge twice.`,
           "wait",
           true,
         );
+        return;
+      }
+      if (r.campaignEnded) {
+        setCampaignClosed(true);
+        setMessage("That campaign has just ended. Nothing was charged. Hold to give again and your gift goes to " + charity!.nameEn + ".", "error", true);
         return;
       }
       if (r.fieldErrors) {
@@ -761,7 +818,7 @@ export default function Give() {
         showProblems(r.fieldErrors);
         return;
       }
-      setMessage(r.message, "error", !r.quote);
+      setMessage(r.message, r.stillChecking ? "wait" : "error", !r.quote);
       if (r.quote) setAuthorisedTotal(null);
       return;
     }
@@ -791,11 +848,11 @@ export default function Give() {
     // Paid with the saved card: there is no payment page, only the check below.
     if (!r.charged) {
       try {
-        shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }));
+        shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }), paymentPageOrigins(site));
       } catch {
         setBusy(false);
         void dropPendingGift(owner, charity!.slug);
-        setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here: tap Give to try again.", "error", true);
+        setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here. Hold to give when you're ready to try again.", "error", true);
         return;
       }
     }
@@ -820,6 +877,8 @@ export default function Give() {
       attemptRef.current = null;
       setHeldAttempt(null);
     }
+    // Still unsettled: held exactly as sent, so the amount can't change and the payment page can't replace it.
+    else if (r.charged) setHeldAttempt(sent);
     if (!finished) {
       haptic.tap();
       const o = outcome === "paid" || outcome === "unknown" ? "pending" : outcome;
@@ -929,8 +988,9 @@ export default function Give() {
                 // Lets a sideways slide across the digits nudge the amount (AmountSwipe); iOS otherwise keeps the touch.
                 rejectResponderTermination={false}
                 placeholder="0"
-                placeholderTextColor={colors.lilac}
+                placeholderTextColor={colors.lilacSoft}
                 accessibilityLabel="Amount in Rand"
+                accessibilityHint={minGift ? `At least ${rand(minGift)}` : undefined}
                 style={[styles.amountInput, amount.length > 9 ? { fontSize: 34, lineHeight: 44 } : amount.length > 6 ? { fontSize: 44, lineHeight: 54 } : null]}
               />
             </View>
@@ -964,7 +1024,7 @@ export default function Give() {
             {quick.filter((c) => c !== lastGift?.cents).map((c) => {
               const on = gift === c;
               return (
-                <Pressable key={c} disabled={locked} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`Set the amount to ${rand(c)}`} accessibilityState={{ selected: on, disabled: locked }} style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}>
+                <Pressable key={c} disabled={locked} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`${rand(c)}, set as the amount`} accessibilityState={{ selected: on, disabled: locked }} style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}>
                   {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                   <Text style={[styles.chipText, on && { color: colors.onInk }]}>{rand(c)}</Text>
                 </Pressable>
@@ -1022,7 +1082,8 @@ export default function Give() {
                 {([true, false] as const).map((yes) => {
                   const on = counting === yes;
                   return (
-                    <Pressable key={String(yes)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setLabel(yes ? goalLabel : null); }} style={[styles.chip, on && styles.chipOn]}>
+                    <Pressable key={String(yes)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setLabel(yes ? goalLabel : null); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                      {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                       <Text style={[styles.chipText, on && { color: colors.onInk }]}>{yes ? "Yes, count it" : "Not this time"}</Text>
                     </Pressable>
                   );
@@ -1101,9 +1162,9 @@ export default function Give() {
           {showDetailFields ? (
             <View style={[styles.softCard, { gap: 14 }]} onLayout={at("details")}>
               <Text style={styles.sectionTitle} accessibilityRole="header">About you</Text>
-              <Field label="First name" value={first} onChangeText={setFirst} autoComplete="given-name" error={err("first_name")} />
-              <Field label="Surname" value={last} onChangeText={setLast} autoComplete="family-name" error={err("last_name")} />
-              <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={err("email")} helper="Your confirmation is sent here." />
+              <Field label="First name" value={first} onChangeText={setFirst} maxLength={80} autoComplete="given-name" textContentType="givenName" autoCapitalize="words" returnKeyType="next" error={err("first_name")} />
+              <Field label="Surname" value={last} onChangeText={setLast} maxLength={80} autoComplete="family-name" textContentType="familyName" autoCapitalize="words" returnKeyType="next" error={err("last_name")} />
+              <Field label="Email" value={email} onChangeText={setEmail} maxLength={254} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" returnKeyType="next" error={err("email")} helper="Your confirmation is sent here." />
               <SwitchRow label="Remember my details" description="So you don't type them next time." more="Your name and email are kept on this phone only, never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
             </View>
           ) : (
@@ -1113,7 +1174,7 @@ export default function Give() {
                 <Text style={styles.giverName} numberOfLines={1}>{first} {last}</Text>
                 <Text variant="label" numberOfLines={1}>{email}</Text>
               </View>
-              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" hitSlop={14} style={styles.changeTap}>
+              <Pressable onPress={() => setEditingDetails(true)} accessibilityRole="button" accessibilityLabel="Change, giver details" hitSlop={14} style={styles.changeTap}>
                 <Text style={styles.changeText}>Change</Text>
               </Pressable>
             </View>
@@ -1128,7 +1189,8 @@ export default function Give() {
                     {(["later", "now"] as const).map((when) => {
                       const on = (when === "later") === detailsLater;
                       return (
-                        <Pressable key={when} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setS18aWhen(when); }} style={[styles.chip, on && styles.chipOn]}>
+                        <Pressable key={when} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setS18aWhen(when); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                          {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                           <Text style={[styles.chipText, on && { color: colors.onInk }]}>{when === "later" ? "Add my details after paying" : "Add them now"}</Text>
                         </Pressable>
                       );
@@ -1143,7 +1205,8 @@ export default function Give() {
                     {([true, false] as const).map((saved) => {
                       const on = useSavedId === saved;
                       return (
-                        <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setUseSavedId(saved); }} style={[styles.chip, on && styles.chipOn]}>
+                        <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setUseSavedId(saved); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                          {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                           <Text style={[styles.chipText, on && { color: colors.onInk }]}>{saved ? `My ID ending ${savedLast4}` : "A different number"}</Text>
                         </Pressable>
                       );
@@ -1153,15 +1216,15 @@ export default function Give() {
                   {useSavedId && err("id_number") ? <Text variant="label" style={{ color: colors.danger }}>{err("id_number")}</Text> : null}
                 </View>
               ) : null}
-              {want18a && !detailsLater && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" maxLength={13} error={err("id_number")} helper="13 digits. Kept safely on our server for your receipt, never on this phone." /> : null}
+              {want18a && !detailsLater && !usingSavedId ? <Field label="SA ID number" value={idNumber} onChangeText={setIdNumber} keyboardType="number-pad" maxLength={17} error={err("id_number")} helper="13 digits. Kept safely on our server for your receipt, never on this phone." /> : null}
               {want18a && !detailsLater ? (
                 <View style={{ gap: 10 }}>
                   <Text variant="label">
                     Your address. SARS needs it on the receipt.{usingSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
                   </Text>
-                  <Field label="Street address" value={street} onChangeText={setStreet} autoComplete="street-address" error={err("address_line1")} />
-                  <Field label="Suburb" value={suburb} onChangeText={setSuburb} error={err("suburb")} />
-                  <Field label="City or town" value={town} onChangeText={setTown} autoComplete="postal-address-locality" error={err("city")} />
+                  <Field label="Street address" value={street} onChangeText={setStreet} maxLength={200} autoComplete="street-address" error={err("address_line1")} />
+                  <Field label="Suburb" value={suburb} onChangeText={setSuburb} maxLength={80} error={err("suburb")} />
+                  <Field label="City or town" value={town} onChangeText={setTown} maxLength={80} autoComplete="postal-address-locality" error={err("city")} />
                   <Field label="Postal code" value={postal} onChangeText={setPostal} keyboardType="number-pad" autoComplete="postal-code" maxLength={4} error={err("postal_code")} />
                 </View>
               ) : null}
@@ -1176,7 +1239,8 @@ export default function Give() {
                   {([true, false] as const).map((saved) => {
                     const on = useSavedCard === saved;
                     return (
-                      <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: heldAttempt !== null }} onPress={() => { if (heldAttempt) return; haptic.tap(); setUseSavedCard(saved); }} style={[styles.chip, on && styles.chipOn, heldAttempt && !on && { opacity: 0.4 }]}>
+                      <Pressable key={String(saved)} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: heldAttempt !== null }} onPress={() => { if (heldAttempt) return; haptic.tap(); setUseSavedCard(saved); }} style={[styles.chip, styles.chipRow, on && styles.chipOn, heldAttempt && !on && { opacity: 0.4 }]}>
+                        {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                         <Text style={[styles.chipText, on && { color: colors.onInk }]}>{saved ? cardLabel(savedCard) : "A different card"}</Text>
                       </Pressable>
                     );
@@ -1231,7 +1295,7 @@ export default function Give() {
             <SwitchRow
               label={`No news or appeals from ${charity.nameEn}`}
               description="Turn on to stop their emails."
-              more={`${charity.nameEn} can email you news and appeals through Givezy, at most 4 a month. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
+              more={`${charity.nameEn} can email you news and appeals through Givezy, at most one a week. Turn this on if you'd rather not. You'll still get your confirmation${s18aAvailable ? " and s18A receipt" : ""}.`}
               value={noNews}
               onChange={setNoNews}
             />
@@ -1265,7 +1329,8 @@ export default function Give() {
                   {(["honour", "memory"] as const).map((k) => {
                     const on = dedicate === k;
                     return (
-                      <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.chip, on && styles.chipOn]}>
+                      <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => { haptic.tap(); setDedicate(k); }} style={[styles.chip, styles.chipRow, on && styles.chipOn]}>
+                        {on ? <CheckIcon size={16} color={colors.onInk} /> : null}
                         <Text style={[styles.chipText, on && { color: colors.onInk }]}>{k === "honour" ? "In honour of" : "In memory of"}</Text>
                       </Pressable>
                     );
@@ -1363,10 +1428,10 @@ const styles = StyleSheet.create({
   safeBox: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, borderRadius: radius.card, backgroundColor: colors.peach },
   safeDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center", marginTop: 1 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  again: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lilac },
+  again: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.outline },
   againOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   againText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.blue },
-  chip: { minHeight: 46, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lilacSoft, justifyContent: "center", backgroundColor: colors.lilacSoft },
+  chip: { minHeight: 46, paddingHorizontal: 18, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.outline, justifyContent: "center", backgroundColor: colors.lilacSoft },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   chipOff: { opacity: 0.4 },
@@ -1374,12 +1439,12 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: space.gutter, paddingTop: 14, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1.5, borderTopColor: colors.hairline },
   footerLine: { textAlign: "center", fontSize: 14, lineHeight: 20 },
   amountCard: { paddingTop: 20, paddingBottom: 22, paddingHorizontal: 22, gap: 4, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
-  amountKicker: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.lilac },
+  amountKicker: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.lilacSoft },
   amountRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   amountR: { fontFamily: fonts.displayBold, fontSize: 44, lineHeight: 56, color: colors.onInk },
   amountInput: { flex: 1, fontFamily: fonts.displayBold, fontSize: 56, lineHeight: 64, color: colors.onInk, paddingVertical: 0, outlineStyle: "none" } as object,
   amountImpact: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.lilacSoft, paddingRight: 40 },
-  amountSource: { color: colors.lilac, paddingRight: 40 },
+  amountSource: { color: colors.lilacSoft, paddingRight: 40 },
   question: { fontFamily: fonts.display, fontSize: 19, lineHeight: 24, color: colors.navy },
   softCard: { gap: 6, paddingVertical: 14, paddingHorizontal: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   sectionTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: colors.navy },
@@ -1403,3 +1468,5 @@ const styles = StyleSheet.create({
   stateTitle: { fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: colors.navy },
   key: { color: colors.blue },
 });
+
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

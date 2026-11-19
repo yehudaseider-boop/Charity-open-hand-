@@ -1,6 +1,8 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import { getViewer } from "@/lib/auth";
+import { crossSiteRequest } from "@/lib/same-site";
 import { can } from "@/lib/charity/permissions";
 import { memberRole } from "@/lib/charity/team";
 import { hasSecondStep } from "@/lib/mfa";
@@ -17,6 +19,9 @@ import { loadIt3dCharity, loadIt3dReceipts } from "./it3d-store";
  * one plain message for the page to show (the page fetches the file and says what happened).
  */
 export async function authoriseIt3d(charityId: string): Promise<{ userId: string } | { status: number; message: string }> {
+  // Another site sending a signed-in person here would write false "downloaded" history and use up their downloads
+  // (security review 18/11/2026): the same same-site check as the other exports.
+  if (crossSiteRequest(await headers())) return { status: 403, message: "Please start the download from the Givezy page. Nothing was downloaded." };
   const user = await getViewer();
   if (!user || !/^[0-9a-f-]{36}$/i.test(charityId)) return { status: 401, message: "You're signed out. Sign in again, then try the download. Nothing was downloaded." };
   const supabase = await createClient();

@@ -25,7 +25,7 @@ export function PageHeader({ title, intro, actions, back }: { title: React.React
 
 const actionBase = "inline-flex min-h-11 items-center gap-2 rounded-control px-4 text-sm font-semibold transition";
 /** Classes for a secondary action (white, blue text, blue edge on hover), for a <Link>, <a> or <button>. */
-export const secondaryAction = `${actionBase} border-2 border-border bg-surface text-brand hover:border-brand focus-visible:border-brand`;
+export const secondaryAction = `${actionBase} border-2 border-outline bg-surface text-brand hover:border-brand focus-visible:border-brand`;
 /** Classes for the page's one main action: orange, ink text, a pressable edge. Use once per page at most. */
 export const primaryAction = `${actionBase} pressable bg-coral px-5 font-bold text-navy`;
 /** Classes for a blue action (forms' submit buttons and the like). */
@@ -46,7 +46,7 @@ export function Tabs({ label, items }: { label: string; items: { href: string; l
           key={t.href}
           href={t.href}
           aria-current={t.active ? "page" : undefined}
-          className={`hit inline-flex min-h-9 items-center gap-1.5 rounded-full border-2 px-3.5 text-sm font-semibold transition ${t.active ? "border-brand bg-brand text-white" : "border-border bg-surface text-muted hover:border-brand hover:text-brand"}`}
+          className={`hit inline-flex min-h-9 items-center gap-1.5 rounded-full border-2 px-3.5 text-sm font-semibold transition ${t.active ? "border-brand bg-brand text-white" : "border-outline bg-surface text-muted hover:border-brand hover:text-brand"}`}
         >
           {t.label}
           {t.count !== undefined ? <span className={`rounded-full px-1.5 text-xs tabular-nums ${t.active ? "bg-white/20" : "bg-honey-soft"}`}>{t.count}</span> : null}
@@ -57,7 +57,7 @@ export function Tabs({ label, items }: { label: string; items: { href: string; l
 }
 
 /** Classes for text boxes and menus, so every field looks the same. */
-export const field = "min-h-11 rounded-control border-2 border-border bg-surface px-3 text-sm text-navy placeholder:text-muted focus:border-brand";
+export const field = "min-h-11 rounded-control border-2 border-outline bg-surface px-3 text-sm text-navy placeholder:text-muted focus:border-brand";
 
 /** Classes for a table in a card: header, rows that light up, cells. Wrap the <table> in `table.wrap` so it scrolls on a phone. */
 export const table = {

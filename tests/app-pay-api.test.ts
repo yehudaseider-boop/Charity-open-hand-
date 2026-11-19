@@ -51,7 +51,7 @@ describe("before and after the payment page", () => {
   it("reads whether the charity can take the gift, the campaign and the minimums", async () => {
     const seen: unknown[] = [];
     const r = await checkReady("https://x.test", "a", "c1", async (url, body) => (seen.push([url, body]), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 } }));
-    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxGiftCents: null, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: null, contributionPresetsCents: [], contributionDefaultCents: 0 });
+    expect(r).toEqual({ ok: true, accepting: true, paused: false, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxGiftCents: null, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: null, contributionPresetsCents: [], contributionDefaultCents: 0 });
     expect(seen[0]).toEqual(["https://x.test/api/app/ready", { slug: "a", campaignId: "c1" }]);
   });
   it("reads the contribution buttons, keeping only sensible amounts and a default that is one of them", async () => {
@@ -173,5 +173,25 @@ describe("a stalled network", () => {
     expect(await startPayment("https://givezy.example", { slug: "meals", giftCents: 10_000, contributionCents: 0, shownTotalCents: 10_000, details: {} as never }, post)).toMatchObject({ ok: false, noReply: true });
     expect(await checkReady("https://givezy.example", "meals", undefined, post)).toMatchObject({ ok: false });
     expect(await paymentStatus("https://givezy.example", "ref", "tok", post)).toBe("unknown");
+  });
+});
+
+describe("the server's own words reach the donor (sweep of 18/11/2026)", () => {
+  it("passes a refusal's plain message through instead of 'check your connection'", async () => {
+    const r = await checkReady("https://x.test", "a", undefined, async () => ({ status: 429, json: { ok: false, message: "Too many tries from this connection. Please wait a few minutes." } }));
+    expect(r).toEqual({ ok: false, message: "Too many tries from this connection. Please wait a few minutes." });
+    const s = await fetchSavedCard("https://x.test", "t", async () => ({ status: 401, json: { ok: false, message: "Please sign in again." } }));
+    expect(s).toEqual({ ok: false, message: "Please sign in again." });
+  });
+
+  it("still says 'check your connection' for a server fault or no message", async () => {
+    const r = await checkReady("https://x.test", "a", undefined, async () => ({ status: 500, json: { ok: false, message: "boom" } }));
+    expect(r.ok).toBe(false);
+    expect((r as { message: string }).message).not.toBe("boom");
+  });
+
+  it("shows a card expiry sent as a single-digit month", () => {
+    expect(cleanSavedCard({ last4: "4242", brand: "visa", expires: "9/2028" })?.expires).toBe("09/2028");
+    expect(cleanSavedCard({ last4: "4242", brand: "visa", expires: "13/2028" })?.expires).toBeNull();
   });
 });

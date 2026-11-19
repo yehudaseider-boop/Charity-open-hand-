@@ -143,7 +143,7 @@ export function PendingGifts() {
               {checking
                 ? "Asking the payment provider whether it went through…"
                 : s.kind === "waiting" && s.outcome === "review"
-                  ? `Something about this payment needs a person to look at it. Please don't pay again. We'll email you once it's sorted.${s.at ? ` Last checked at ${hhmm(s.at)}.` : ""}`
+                  ? `Something about this payment needs a person to look at it. Please don't pay again. A person will look at it. To ask about it, contact us.${s.at ? ` Last checked at ${hhmm(s.at)}.` : ""}`
                   : `We haven't heard yet whether it went through. If you finished paying, please don't pay again.${s.kind === "waiting" && s.at ? ` Last checked at ${hhmm(s.at)}.` : ""}`}
             </Text>
             <Button label={checking ? "Checking your payment…" : "Check again"} disabled={checking} onPress={() => void ask(g)} />

@@ -8,7 +8,8 @@ import { platformConfig } from "@/config/platform";
 import { taxYearFor } from "@/lib/dates";
 import { typedDay } from "@/lib/typed-date";
 import { formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
-import { isValidSaIdNumber } from "@/lib/sa-id";
+import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
+import { isValidSaIdNumber, saIdDigits } from "@/lib/sa-id";
 import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
 
 export const RECORDED_METHODS = {
@@ -160,15 +161,15 @@ export function checkGift(f: GiftFields, opts: { today: string; fallbackMethod?:
   if (!email) e.email = "Email missing (we send the s18A receipt there)";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) e.email = `"${f.email?.trim()}" isn't an email address`;
 
-  const phoneRaw = (f.phone ?? "").replace(/[\s()-]/g, "");
-  const phone = phoneRaw || null;
-  if (phone && !/^(\+27|0)\d{9}$/.test(phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
+  // The same phone rule as the donor import and the donate form (src/lib/phone.ts).
+  const phone = normaliseSaPhone(f.phone ?? "") || null;
+  if (phone && !SA_PHONE.test(phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
 
   const s18aRaw = (f.wants_18a ?? "").trim().toLowerCase();
   const wants18a = YES.has(s18aRaw);
   if (!wants18a && !NO.has(s18aRaw)) e.wants_18a = 'Write "yes" or "no" for the s18A receipt';
 
-  const idNumber = (f.id_number ?? "").replace(/\s/g, "") || null;
+  const idNumber = saIdDigits(f.id_number ?? "") || null;
   const taxReference = (f.tax_reference ?? "").replace(/\s/g, "") || null;
   const addressLine1 = oneLine(f.address_line1, 200), city = oneLine(f.city, 80);
   const postalCode = (f.postal_code ?? "").trim() || null;

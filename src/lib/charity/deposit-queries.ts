@@ -109,5 +109,22 @@ async function giftsFor(charityId: string, ids: string[]): Promise<Map<string, G
       out.set(d.id as string, { id: d.id as string, amountCents: Number(d.amount_cents), paidAt: d.paid_at as string | null, donorName: donorName(d as Parameters<typeof donorName>[0]) });
     }
   }
+  // The card charge a donor covered goes to the charity with the gift, so the line adds up to gift + charge less
+  // the fee. The charity's view of its gifts doesn't carry it, so it is read with the service role, still only
+  // for this charity's own gifts.
+  const db = createAdminClient();
+  const found = [...out.keys()];
+  for (let i = 0; i < found.length; i += 200) {
+    const { data, error } = await db
+      .from("donations")
+      .select("id, processing_charge_cents")
+      .eq("charity_id", charityId)
+      .in("id", found.slice(i, i + 200));
+    if (error) throw error;
+    for (const d of data ?? []) {
+      const gift = out.get(d.id as string);
+      if (gift) gift.cardChargeCents = Number(d.processing_charge_cents ?? 0);
+    }
+  }
   return out;
 }

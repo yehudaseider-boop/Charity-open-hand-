@@ -7,7 +7,14 @@
 import { formatRand } from "@/lib/money";
 
 export type DepositLineIn = { kind: "payment" | "refund" | "chargeback" | "other"; donationId: string | null; grossCents: number; feeCents: number; netCents: number };
-export type GiftIn = { id: string; amountCents: number; donorName: string; paidAt: string | null };
+export type GiftIn = {
+  id: string;
+  amountCents: number;
+  /** The card charge the donor chose to cover, which goes to the charity with the gift (0 when not covered). */
+  cardChargeCents?: number;
+  donorName: string;
+  paidAt: string | null;
+};
 
 export type DepositRow = {
   kind: DepositLineIn["kind"];
@@ -43,13 +50,18 @@ export function buildDeposit(depositCents: number, lines: DepositLineIn[], gifts
     if (!gift) {
       return { kind: l.kind, donationId: null, donorName: "Not one of your Givezy gifts", giftCents: null, feeCents: l.feeCents, netCents: l.netCents, problem: "The payment provider lists this, but it doesn't match a gift on Givezy. Tell us and we'll look into it." };
     }
-    const giftCents = l.kind === "payment" ? gift.amountCents : -gift.amountCents;
-    const expected = giftCents - l.feeCents;
+    const sign = l.kind === "payment" ? 1 : -1;
+    // The gift column is the gift itself (what the s18A receipt is for). When the donor covered the card charge,
+    // the charity's share of the payment is the gift plus that charge, so that is what the line should add up to
+    // (and what a refund or chargeback takes back).
+    const giftCents = sign * gift.amountCents;
+    const cardChargeCents = gift.cardChargeCents ?? 0;
+    const expected = sign * (gift.amountCents + cardChargeCents) - l.feeCents;
     const problem =
       l.kind === "other"
         ? "The payment provider lists this line without saying what it is. Tell us and we'll look into it."
         : expected !== l.netCents
-          ? `${formatRand(Math.abs(giftCents))} ${l.kind === "payment" ? "gift" : kindWord(l.kind).toLowerCase()}${l.feeCents ? ` less a ${formatRand(l.feeCents)} fee` : ""} should be ${formatRand(expected)}, but the payment provider shows ${formatRand(l.netCents)}. Tell us and we'll look into it.`
+          ? `${formatRand(Math.abs(giftCents))} ${l.kind === "payment" ? "gift" : kindWord(l.kind).toLowerCase()}${cardChargeCents ? ` plus the ${formatRand(cardChargeCents)} card charge the donor covered` : ""}${l.feeCents ? ` less a ${formatRand(l.feeCents)} fee` : ""} should be ${formatRand(expected)}, but the payment provider shows ${formatRand(l.netCents)}. Tell us and we'll look into it.`
           : null;
     return { kind: l.kind, donationId: gift.id, donorName: gift.donorName, giftCents, feeCents: l.feeCents, netCents: l.netCents, problem };
   });

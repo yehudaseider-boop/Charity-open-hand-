@@ -58,6 +58,11 @@ export type VerifiedTransaction = {
   /** The card used, when the gateway returns one that can be charged again. */
   authorization?: CardAuthorization | null;
   /**
+   * How the gateway says the payment was made, as it says it, tidied to lower case letters, digits and underscores
+   * (for example "card"). Null when it doesn't say. Saved on the donation; see `donationNature` for what a receipt prints.
+   */
+  channel?: string | null;
+  /**
    * The gateway says the donor opened its payment page and left without paying (still "pending": they could come
    * back). Only an old payment in this state is closed as failed, by the daily check (see confirm.ts).
    */
@@ -160,6 +165,11 @@ export interface PaymentGateway {
    * confirmed for South African merchants.
    */
   readonly splitsPayments: boolean;
+  /**
+   * False when this gateway cannot yet save a card or charge one later (monthly gifts and saved cards). Said to the donor
+   * before anything is recorded. Left out, it means it can.
+   */
+  readonly supportsSavedCards?: boolean;
   /** Start a hosted checkout. Returns the page to send the donor to. */
   createCheckout(req: CheckoutRequest): Promise<{ redirectUrl: string }>;
   /**

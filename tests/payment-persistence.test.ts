@@ -79,6 +79,16 @@ describe("confirmPayment and database failures", () => {
     expect(notify).toHaveBeenCalledTimes(1);
   });
 
+  it("saves how the provider says it was paid, or nothing when it doesn't say (17/11/2026)", async () => {
+    verify.mockResolvedValue({ ...paidTx, channel: "apple_pay" });
+    expect(await confirmPayment(REF)).toBe("paid");
+    expect(row).toMatchObject({ status: "paid", payment_channel: "apple_pay" });
+    row = { id: REF, status: "pending", gateway: "test", total_charged_cents: 20_000, gateway_ref: REF };
+    verify.mockResolvedValue(paidTx);
+    expect(await confirmPayment(REF)).toBe("paid");
+    expect(row).toMatchObject({ status: "paid", payment_channel: null });
+  });
+
   it("does not claim paid when the write is refused, then succeeds on retry", async () => {
     plan.updateError = true;
     await expect(confirmPayment(REF)).rejects.toBeInstanceOf(PersistenceError);

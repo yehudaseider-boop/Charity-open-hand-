@@ -1,0 +1,80 @@
+# End-to-end checks (18/11/2026): a robot uses the real test site (test.givezy.co.za), the real TEST database and
+# the phone app's web build, the way a person would: pages load, the give form works out a total, and it signs in
+# with a real code (no email is sent: Supabase hands the robot the code). Nothing is paid.
+#
+# Runs after every successful deploy of the test site (Vercel tells GitHub), every morning, and on demand
+# (Actions, End-to-end checks, Run workflow). GitHub only offers the morning run and the button once this file is
+# also on the default branch (main); until then it runs after each test-site deploy. One secret is needed: E2E_SUPABASE_SECRET_KEY, the TEST project's
+# secret key (Settings, Secrets and variables, Actions). Without it the sign-in checks are skipped, with a note.
+# Never the live project: the robot makes its own test account there and agrees to the Terms.
+name: End-to-end checks
+
+on:
+  deployment_status:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *" # 05:17 Johannesburg
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    # After a deploy: only when the test site's deploy succeeded.
+    # (Vercel names it "Production – <project>", so match on the word; preview deploys are left out.)
+    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && startsWith(github.event.deployment.environment, 'Production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_SITE: https://test.givezy.co.za
+      # The TEST project's address and public key (public by design: the app and website ship them).
+      E2E_SUPABASE_URL: https://bodfyjskiwrwxhagtkxt.supabase.co
+      E2E_SUPABASE_PUBLISHABLE_KEY: sb_publishable_5tktt_ZO7_X3a5avySXu9A_2VcYYaFJ
+      E2E_APP_URL: http://127.0.0.1:8089
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Install website packages
+        run: npm ci --no-audit --no-fund
+
+      - name: Install phone app packages
+        working-directory: apps/mobile
+        run: npm ci --no-audit --no-fund
+
+      - name: Install the browser
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Build the phone app for the web, pointed at the TEST project
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ env.E2E_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_SITE_URL: ${{ env.E2E_SITE }}
+        run: npx expo export --platform web --output-dir dist-e2e
+
+      - name: Serve the app build
+        run: |
+          node e2e/serve-app.mjs apps/mobile/dist-e2e 8089 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8089/ >/dev/null && break; sleep 1; done
+
+      - name: Wait for the test site
+        run: |
+          for i in $(seq 1 30); do curl -sf "$E2E_SITE/api/health" >/dev/null && exit 0; sleep 10; done
+          echo "The test site's health check did not answer." && exit 1
+
+      - name: End-to-end checks
+        # The secret key only here, never during installs or the app build.
+        env:
+          E2E_SUPABASE_SECRET_KEY: ${{ secrets.E2E_SUPABASE_SECRET_KEY }}
+        run: npm run test:e2e

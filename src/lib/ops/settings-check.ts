@@ -41,7 +41,7 @@ export function settingsCheck(env: Env): SettingCheck[] {
 
   // Encryption
   const enc = env.ENCRYPTION_KEY ?? "";
-  if (!enc) add("ENCRYPTION_KEY", "fix", "Missing. Bank, ID and tax numbers can't be saved or read.");
+  if (!enc) add("ENCRYPTION_KEY", "fix", "Missing. Bank, ID and tax numbers can't be saved or read, and the limits by internet address and email (sign-in codes, forms, checkout) are switched off.");
   else if (Buffer.from(enc, "base64").length !== 32) add("ENCRYPTION_KEY", "fix", "Wrong length: it must be 32 random bytes in base64 (44 characters ending in =).");
   else add("ENCRYPTION_KEY", "ok", "Set. Keep the backup copy safe: without it, saved bank, ID and tax numbers can't be read.");
 
@@ -84,6 +84,10 @@ export function settingsCheck(env: Env): SettingCheck[] {
   add("ADMIN_NOTIFY_EMAIL", email(admin) ? "ok" : "fix", email(admin) ? "Set." : admin ? "Doesn't look like an email address." : "Missing. Chargebacks, new applications and the daily \"needs a person\" email have nowhere to go.");
 
   // Switches that stay off for launch
+  // The daily job's check-in: optional, but without it nothing tells you the daily job stopped running.
+  add("HEARTBEAT_DAILY_URL", env.HEARTBEAT_DAILY_URL?.startsWith("https://") ? "ok" : "later", env.HEARTBEAT_DAILY_URL?.startsWith("https://") ? "Set: the daily job checks in when it has run." : "Not set: nothing tells you if the daily job stops running. Add a heartbeat address from your monitoring service (docs/go-live-checklist.md).");
+  // The pause switch: if it is on, nobody can give. It must never be left on by mistake.
+  add("GIVING_PAUSED", env.GIVING_PAUSED === "yes" ? "fix" : "ok", env.GIVING_PAUSED === "yes" ? "ON: giving is paused everywhere and nobody can give. Remove it in Vercel (Settings, Environment Variables) and redeploy to open giving again." : "Off: giving is open.");
   add("APP_GIVING", env.APP_GIVING === "yes" ? "later" : "ok", env.APP_GIVING === "yes" ? "On: the app can take gifts. Keep it off until Apple and Google confirm in writing." : "Off: the app sends people to the website to give.");
   add("SAVED_CARDS", env.SAVED_CARDS === "yes" ? "later" : "ok", env.SAVED_CARDS === "yes" ? "On. Off for launch until the consent wording is agreed." : "Off.");
   const receipts = env.RECEIPTS_ENABLED === "yes" && env.RECEIPT_WORDING_CONFIRMED === "yes";

@@ -88,3 +88,5 @@ const styles = StyleSheet.create({
   promiseTick: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   promiseText: { fontFamily: fonts.bodyMedium, fontSize: 17, lineHeight: 25, color: colors.onInk, paddingRight: 24 },
 });
+
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

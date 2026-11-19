@@ -70,12 +70,16 @@ export type ReceiptDetails = {
 const lines = (...parts: (string | null | undefined)[]) => parts.map((p) => p?.trim()).filter((p): p is string => Boolean(p));
 
 /**
- * The nature of a donation as printed on a receipt: how the money came in. Online gifts are card payments
- * (the only way to pay online); gifts a charity recorded by hand say how they came in.
+ * The nature of a donation as printed on a receipt: how the money came in. Gifts a charity recorded by hand say how
+ * they came in. An online gift says "Card (online)" when the payment provider said card, or when it said nothing
+ * (every gift before 17/11/2026, which only ever offered cards); any other method the provider reports prints as
+ * "Online payment", never as a card: the exact words for Apple Pay, instant EFT and the rest wait for Yosef and for
+ * the provider's own names for them (seen in its test mode).
  */
-export function donationNature(recordedMethod: string | null | undefined): string {
-  if (!recordedMethod) return "Card (online)";
-  return Object.hasOwn(RECORDED_METHODS, recordedMethod) ? RECORDED_METHODS[recordedMethod as keyof typeof RECORDED_METHODS] : "Other";
+export function donationNature(recordedMethod: string | null | undefined, paymentChannel?: string | null): string {
+  if (recordedMethod) return Object.hasOwn(RECORDED_METHODS, recordedMethod) ? RECORDED_METHODS[recordedMethod as keyof typeof RECORDED_METHODS] : "Other";
+  if (!paymentChannel || paymentChannel === "card") return "Card (online)";
+  return "Online payment";
 }
 
 /**
@@ -93,7 +97,7 @@ export function missingForSars(d: ReceiptDetails): string[] {
 export function buildReceiptDetails(args: {
   charity: CharityRow;
   donor: DonorRow;
-  donations: { paidAt: string; amountCents: number; id?: string; recordedMethod?: string | null }[];
+  donations: { paidAt: string; amountCents: number; id?: string; recordedMethod?: string | null; paymentChannel?: string | null }[];
   taxYear: number;
   periodStart: string; // yyyy-mm-dd
   periodEnd: string; // yyyy-mm-dd
@@ -124,7 +128,7 @@ export function buildReceiptDetails(args: {
       date: formatDate(x.paidAt),
       amount_cents: x.amountCents,
       ...(x.id ? { reference: donationReference(x.id) } : {}),
-      nature: donationNature(x.recordedMethod),
+      nature: donationNature(x.recordedMethod, x.paymentChannel),
     })),
     tax_year: args.taxYear,
     period,

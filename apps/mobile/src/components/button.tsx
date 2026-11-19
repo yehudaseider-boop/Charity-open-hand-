@@ -30,8 +30,9 @@ export function Button({ label, style, variant = "primary", icon, ...rest }: Omi
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled: Boolean(rest.disabled) }}
       {...rest}
+      // Disabled always says so, and a caller's own state (busy, selected) is kept beside it.
+      accessibilityState={{ disabled: Boolean(rest.disabled), ...rest.accessibilityState }}
       onPress={(e) => {
         haptic.press();
         rest.onPress?.(e);

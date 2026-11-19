@@ -50,7 +50,7 @@ function SearchBox({ initial, category }: { initial: string; category: string })
     <form role="search" action="/charities" className="flex max-w-[44rem] gap-2">
       {category ? <input type="hidden" name="category" value={category} /> : null}
       <label htmlFor="q" className="sr-only">Search charities</label>
-      <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-[1.125rem] border-2 border-border bg-surface px-4 shadow-[0_10px_30px_rgba(23,73,181,0.08)] transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft sm:min-h-16 sm:px-5">
+      <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-[1.125rem] border-2 border-outline bg-surface px-4 shadow-[0_10px_30px_rgba(23,73,181,0.08)] transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft sm:min-h-16 sm:px-5">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeWidth="2.4" strokeLinecap="round" aria-hidden className="shrink-0 stroke-brand">
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20l-4-4" />

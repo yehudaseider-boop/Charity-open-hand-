@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { labelOf } from "@/lib/donations/labels";
 import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
+import { cameFromApp } from "@/lib/donations/return-actions";
 import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -47,7 +48,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const params = await searchParams;
   // The payment provider adds its own "reference" (the same value) to our address, so a key
   // can arrive twice: take the first.
-  const fromApp = first(params.from) === "app";
+  const fromParam = first(params.from) === "app";
   const viewer = await getViewer();
   // Came from a charity's own link: the way on stays with that charity, never "Find a charity".
   const focus = await currentFocus();
@@ -96,6 +97,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   type LabelRow = { kind: string | null; label: string | null };
   const kindRow = d?.donation_giving_kinds as unknown as LabelRow | LabelRow[] | null | undefined;
   const givingLabel = labelOf(Array.isArray(kindRow) ? kindRow[0] : kindRow);
+
+  // The gift's own saved source decides; the address mark is only an extra hint.
+  const fromApp = cameFromApp({ cameFrom: d?.came_from, fromParam });
 
   // Trying again from the phone app's sheet keeps the way back to the app and the donor's label.
   const retryParams = new URLSearchParams();
@@ -210,7 +214,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             // A first-time donor isn't signed in: show where this gift is kept, the same way the account page puts it.
             <Link href="/login?next=%2Faccount" className="inline-flex min-h-12 items-center rounded-full bg-brand px-5 font-semibold text-brand-contrast transition-colors hover:bg-navy">See this gift in your account</Link>
           )}
-          <Link href={`/c/${charity.slug}`} className="inline-flex min-h-12 max-w-full items-center rounded-full border-2 border-border px-5 font-semibold text-brand transition-colors hover:border-brand"><span className="truncate">Back to <bdi>{charity.name_en}</bdi></span></Link>
+          <Link href={`/c/${charity.slug}`} className="inline-flex min-h-12 max-w-full items-center rounded-full border-2 border-outline px-5 font-semibold text-brand transition-colors hover:border-brand"><span className="truncate">Back to <bdi>{charity.name_en}</bdi></span></Link>
         </p>
         {viewer ? null : <p className="mt-2 text-sm text-muted">Sign in with the same email address you gave with.</p>}
       </Result>
@@ -238,12 +242,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           <strong className="font-semibold text-navy">Nothing was charged{cardUpdate ? " and your monthly donation is unchanged" : ""}.</strong> This usually means the card was declined or the payment page was closed. You can try again with the same card or a different one.
         </p>
         {fromApp ? (
-          <>
-            <a href={APP_RETURN_LINK} className="pressable mt-5 block rounded-control bg-brand px-4 py-3.5 text-center font-bold text-brand-contrast">
-              Back to the Givezy app
-            </a>
-            <Link href={retryHref} className="mt-3 inline-block font-semibold text-brand underline underline-offset-4">Try again on the website</Link>
-          </>
+          <a href={APP_RETURN_LINK} className="pressable mt-5 block rounded-control bg-brand px-4 py-3.5 text-center font-bold text-brand-contrast">
+            Back to the Givezy app
+          </a>
         ) : (
           <Link href={retryHref} className="pressable mt-5 inline-block rounded-control bg-brand px-6 py-3 font-bold text-brand-contrast">
             Try again
@@ -256,7 +257,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "review") {
     return (
       <Result tone="wait" title="We're checking this payment">
-        <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. We&apos;ll email you once it&apos;s sorted.</p>
+        <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. A person will look at it. To ask about it, contact us.</p>
         <p className="mt-3 text-sm text-muted">Questions in the meantime: <HelpLine /></p>
         <p className="mt-4 flex flex-wrap gap-4 text-sm">
           <Link href={elsewhere.href} className="font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>
@@ -278,7 +279,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
     return (
       <Result tone="wait" title="We're confirming your payment">
         <p>This can take a minute. Please don&apos;t pay again.</p>
-        <KeepChecking retryHref={retryHref} />
+        <KeepChecking retryHref={retryHref} fromApp={fromApp} />
       </Result>
     );
   }

@@ -1,5 +1,6 @@
 import "server-only";
 import { paystackGateway } from "./paystack";
+import { stitchGateway } from "./stitch";
 import { testGateway } from "./test-gateway";
 import type { PaymentGateway } from "./types";
 
@@ -10,6 +11,7 @@ export { GatewayError, isGatewayDecline, isGatewayRefusal } from "./types";
 export function getGateway(): PaymentGateway {
   const name = process.env.PAYMENT_GATEWAY ?? "test";
   if (name === "paystack") return paystackGateway;
+  if (name === "stitch") return stitchGateway;
   if (name === "test") {
     // Never on the live site: its public page would let anyone mark their own gift paid. A preview
     // or test deployment may switch it on with ALLOW_TEST_GATEWAY=yes.

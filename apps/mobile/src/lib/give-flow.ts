@@ -31,8 +31,11 @@ export type OpenInAppBrowser = (url: string, returnTo: string) => Promise<Browse
  * Show the payment page. Resolves when the donor comes back (finished or closed the sheet);
  * rejects if the sheet could not open. A refusal to open a non-https address is built in.
  */
-export async function openGivingPage(url: string, open: OpenInAppBrowser): Promise<"returned" | "closed"> {
+export async function openGivingPage(url: string, open: OpenInAppBrowser, allowedOrigins: readonly string[]): Promise<"returned" | "closed"> {
   if (!url.startsWith("https://")) throw new Error("The payment page must be on a secure address");
+  // Only the payment provider's own page (or our site, for the test gateway): never an address the server was
+  // tricked into sending, shown in a sheet that looks trusted (security review 18/11/2026).
+  if (!isAllowedPaymentPage(url, allowedOrigins)) throw new Error("The payment page is not one we know");
   sheetOpen = true;
   try {
     const result = await open(url, APP_RETURN_LINK);
@@ -40,6 +43,18 @@ export async function openGivingPage(url: string, open: OpenInAppBrowser): Promi
   } finally {
     sheetOpen = false;
   }
+}
+
+/** An https address whose exact origin is on the list, with no user name, password or port. */
+export function isAllowedPaymentPage(url: string, allowedOrigins: readonly string[]): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:" || u.username || u.password || u.port) return false;
+  return allowedOrigins.includes(u.origin);
 }
 
 /** True while the payment sheet is open (set and cleared by openGivingPage). */

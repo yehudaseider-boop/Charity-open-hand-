@@ -1,6 +1,6 @@
 import { useGlobalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Animated, Modal, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Animated, Modal, Platform, StyleSheet, View } from "react-native";
 import { gifts as sampleGifts, type Gift } from "@/data/giving";
 import { useAccount } from "@/lib/account";
 import { ddmmyyyy, rand } from "@/lib/format";
@@ -36,6 +36,8 @@ export function ThankYou() {
   useEffect(() => {
     if (!visible) return;
     haptic.success();
+    // Spoken too, not only felt: VoiceOver doesn't announce a modal that opens by itself.
+    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility("Thank you. Your gift arrived.");
     scale.setValue(0.6);
     if (reduceMotion()) return scale.setValue(1);
     Animated.spring(scale, { toValue: 1, friction: 5, useNativeDriver: true }).start();

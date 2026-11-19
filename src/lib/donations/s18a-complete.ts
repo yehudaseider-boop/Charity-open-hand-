@@ -169,7 +169,7 @@ export async function completeS18aDetails(args: { donationId: string; who: Compl
   if (v.idNumber && row.id_number_encrypted) {
     let stored: string | null = null;
     try {
-      stored = decrypt(row.id_number_encrypted).replace(/\s/g, "");
+      stored = decrypt(row.id_number_encrypted).replace(/[\s-]/g, "");
     } catch (e) {
       console.error(e);
       return { ok: false, message: NOTHING_CHANGED };

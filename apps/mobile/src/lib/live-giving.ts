@@ -2,11 +2,13 @@
  * Turning the donor's own rows from the database into what the screens show.
  * Pure functions (no React Native), so the website's test suite can check them.
  */
+import { cleanSignInCode } from "@shared/sign-in-code";
 import { DECLINED_REASON } from "@shared/donations/monthly-reasons";
 import type { Gift, Receipt, Recurring } from "../data/giving";
 import { cleanLabel, labelOf } from "@shared/donations/labels";
 import { thankYouNoteToShow } from "@shared/charity/thank-you-note";
-import { jhbDay } from "./format";
+import { monthlyCardChargeAt, type CardChargeRates } from "@shared/fees";
+import { jhbDay, rand } from "./format";
 
 export type DonationRow = {
   id: string;
@@ -23,6 +25,8 @@ export type RecurringRow = {
   amount_cents: number | string;
   /** The donor's extra gift to Givezy, collected with each month. */
   contribution_cents?: number | string | null;
+  /** The donor chose to cover the card charge: each month also collects it, at that month's rates. */
+  covers_card_charge?: boolean | null;
   status: string;
   needs_gateway_sync?: boolean;
   /** Tries this month that the card declined (more to come, or it stopped after three). */
@@ -86,24 +90,64 @@ export function countsTowardsReceipts(g: Pick<Gift, "id" | "with18a">, detailsLa
   return g.with18a && !detailsLater.has(g.id);
 }
 
-export function toRecurring(rows: RecurringRow[]): Recurring[] {
+/** The provider's rates from our server: known (null means nothing is added), or not known (we couldn't ask). */
+export type RatesAnswer = { known: true; rates: CardChargeRates | null } | { known: false };
+
+/**
+ * The card charge a covered monthly donation collects each month, worked out with the website's own shared helper,
+ * or null when it can't be known now (the rates couldn't be fetched). 0 when not covered.
+ */
+function cardChargeOf(amountCents: number, contributionCents: number, covers: boolean, rates: RatesAnswer): number | null {
+  if (!covers) return 0;
+  if (!rates.known) return null;
+  try {
+    return monthlyCardChargeAt(amountCents, contributionCents, true, rates.rates);
+  } catch {
+    return null;
+  }
+}
+
+export function toRecurring(rows: RecurringRow[], rates: RatesAnswer = { known: false }): Recurring[] {
   return rows
     // Cancelled ones only show while the payment provider hasn't yet stopped them. A failed one stays so the donor sees why it stopped.
     .filter((r) => r.status === "active" || r.status === "paused" || r.status === "failed" || (r.status === "cancelled" && r.needs_gateway_sync === true))
     .map((r) => {
       const c = one(r.charities);
+      const cents = Number(r.amount_cents);
+      const contributionCents = Number(r.contribution_cents ?? 0);
+      const cardCharge = cardChargeOf(cents, contributionCents, r.covers_card_charge === true, rates);
       return {
         id: r.id,
         charitySlug: c?.slug ?? "",
         charityName: c?.name_en ?? "Charity",
-        cents: Number(r.amount_cents),
-        contributionCents: Number(r.contribution_cents ?? 0),
+        cents,
+        contributionCents,
+        ...(cardCharge === null ? { cardChargeUnknown: true } : cardCharge > 0 ? { cardChargeCents: cardCharge } : {}),
         nextDate: r.next_charge_at ? jhbDay(new Date(r.next_charge_at)) : null,
         status: r.status as "active" | "paused" | "cancelled" | "failed",
         syncing: r.needs_gateway_sync === true,
         ...((r.status === "failed" && r.ended_reason === DECLINED_REASON) || (r.status === "active" && Number(r.failed_attempts ?? 0) > 0) ? { needsCard: true } : {}),
       };
     });
+}
+
+/**
+ * What each month collects, as the website's account page says it: the gift, the contribution to Givezy and the
+ * card charge the donor covers. "R112.30 a month", or "R110 a month plus the card charge" while the rates can't be fetched.
+ */
+export function monthlyAmountLine(r: Pick<Recurring, "cents" | "contributionCents" | "cardChargeCents" | "cardChargeUnknown">): string {
+  const total = r.cents + (r.contributionCents ?? 0) + (r.cardChargeCents ?? 0);
+  return `${rand(total)} a month${r.cardChargeUnknown ? " plus the card charge" : ""}`;
+}
+
+/** The parts of that monthly amount, when there is more than the gift: "R100 to the charity, R10 to Givezy and R2.30 card charge". */
+export function monthlyAmountParts(r: Pick<Recurring, "cents" | "contributionCents" | "cardChargeCents" | "cardChargeUnknown">): string | null {
+  const parts = [`${rand(r.cents)} to the charity`];
+  if (r.contributionCents) parts.push(`${rand(r.contributionCents)} to Givezy`);
+  if (r.cardChargeCents) parts.push(`${rand(r.cardChargeCents)} card charge`);
+  else if (r.cardChargeUnknown) parts.push("the card charge at the payment provider's rates");
+  if (parts.length === 1) return null;
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 export function toReceipts(rows: ReceiptRow[]): Receipt[] {
@@ -124,11 +168,8 @@ export function looksLikeEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
-/** The 6-digit code from the sign-in email, ignoring spaces. */
-export function cleanCode(v: string): string | null {
-  const c = v.replace(/\s/g, "");
-  return /^\d{6}$/.test(c) ? c : null;
-}
+/** The code from the sign-in email, ignoring spaces and dashes: the website's own rule (src/lib/sign-in-code.ts). */
+export const cleanCode = cleanSignInCode;
 
 /**
  * Donations that arrived since the donor last looked, to thank them for.
@@ -214,6 +255,8 @@ export function fromCache(raw: string | null): Cached | null {
           charityName: str(r.charityName),
           cents: cents(r.cents),
           ...(r.contributionCents == null ? {} : { contributionCents: cents(r.contributionCents) }),
+          ...(r.cardChargeCents == null ? {} : { cardChargeCents: cents(r.cardChargeCents) }),
+          ...(r.cardChargeUnknown === true ? { cardChargeUnknown: true } : {}),
           nextDate: r.nextDate == null ? null : date(r.nextDate),
           status,
           ...(r.syncing === true ? { syncing: true } : {}),

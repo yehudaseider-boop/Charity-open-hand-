@@ -156,3 +156,5 @@ const styles = StyleSheet.create({
   tick: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },
   doneText: { flex: 1, fontFamily: fonts.bodySemibold, fontSize: 17, lineHeight: 24, color: colors.navy },
 });
+
+export { ScreenError as ErrorBoundary } from "@/components/screen-error";

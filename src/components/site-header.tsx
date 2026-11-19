@@ -15,7 +15,8 @@ export function SiteHeader() {
     <>
       {/* Stays at the top while the page scrolls, so Charities and Sign in are always one tap away. */}
       <header className="site-header chrome-full sticky top-0 z-40 border-b border-border bg-surface print:hidden">
-        <div className="mx-auto flex h-16 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-[4.5rem] sm:px-6">
+        {/* min height, not a fixed one, and wrapping: at double text size the logo, Menu and Sign in sit on two lines instead of running off the screen (18/11/2026). */}
+        <div className="mx-auto flex min-h-16 max-w-[75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1 sm:min-h-[4.5rem] sm:px-6">
           <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-9" />

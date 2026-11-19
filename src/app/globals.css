@@ -26,7 +26,8 @@
   --surface: #ffffff;
   --text: #0e1b3d; /* deep ink */
   --text-muted: #4a5878; /* slate (7.1:1 on white) */
-  --border: #ece8f6; /* light purple */
+  --border: #ece8f6; /* light purple: card borders and dividers */
+  --outline: #7a86a5; /* the outline of a control you type in or press (fields, chips): 3.6:1 on white (WCAG 1.4.11, 18/11/2026) */
 
   --success: #1f6b4a; /* darker green, for small text */
   --success-soft: #e3f2ea;
@@ -58,6 +59,7 @@
   --color-text: var(--text);
   --color-muted: var(--text-muted);
   --color-border: var(--border);
+  --color-outline: var(--outline);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -146,13 +148,35 @@ main:has(> .page-enter > .full-bleed) {
   padding: 0;
 }
 
-/* Ticks and radio buttons in Givezy blue, big enough to hit (22 px; the row around them is the real tap area). */
+/* Ticks and radio buttons in Givezy blue, big enough to hit (24 px, the WCAG 2.2 minimum; the row around them is the real tap area). */
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--brand);
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.5rem;
+  height: 1.5rem;
   flex-shrink: 0;
+}
+
+/* "Skip to main content": the first stop for a keyboard or screen-reader user, seen only when it has focus (18/11/2026). */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  padding: 0.75rem 1.25rem;
+  border-radius: 9999px;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-weight: 600;
+  transform: translateY(-300%);
+}
+.skip-link:focus {
+  transform: none;
+}
+@media print {
+  .skip-link {
+    display: none;
+  }
 }
 
 /* Keyboard focus: an orange ring, the same on every page (style guide). */

@@ -71,7 +71,7 @@ export async function PosterView({ name, slug, issues18a, sp, backHref, demoHref
           <fieldset className="flex flex-wrap gap-2">
             <legend className="mb-1 text-sm font-semibold">How often</legend>
             {([["", "Once-off"], ["1", "Every month"]] as const).map(([value, label]) => (
-              <label key={label} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-border px-4 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
+              <label key={label} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 border-outline px-4 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
                 <input type="radio" name="monthly" value={value} defaultChecked={monthly === (value === "1")} />
                 {label}
               </label>

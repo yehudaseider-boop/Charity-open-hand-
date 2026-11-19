@@ -1,3 +1,4 @@
+import { normaliseLineBreaks } from "@/lib/text";
 import { TYPED_DAY_MESSAGE, typedDay } from "@/lib/typed-date";
 import { FOCUS_MAX_DAYS, FOCUS_MESSAGE_MAX, FOCUS_TITLE_MAX, FOCUS_TITLE_MIN, focusDays, type FocusRow } from "./focus";
 
@@ -22,7 +23,8 @@ export function checkFocus(
   else if (title.length < FOCUS_TITLE_MIN) fieldErrors.title = `Give it a short title, at least ${FOCUS_TITLE_MIN} letters`;
   else if (title.length > FOCUS_TITLE_MAX) fieldErrors.title = `Please keep the title to ${FOCUS_TITLE_MAX} characters or fewer`;
 
-  const message = (raw.message ?? "").trim();
+  // A line break counts as one character, as the text box counts it.
+  const message = normaliseLineBreaks(raw.message ?? "").trim();
   if (!message) fieldErrors.message = "Write a short message for donors";
   else if (message.length > FOCUS_MESSAGE_MAX) fieldErrors.message = `Please keep the message to ${FOCUS_MESSAGE_MAX} characters or fewer (it is ${message.length} now)`;
 
