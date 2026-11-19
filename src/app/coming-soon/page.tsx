@@ -19,7 +19,8 @@ import { whatsAppChat } from "@/lib/whatsapp";
 // (Yehuda: "make it awesome and super legit"), from what the best pre-launch pages do: show the product in the first
 // screen, put both asks where the eye lands, tell one gift's story, give charities an honest reason to apply now, and
 // make it easy to ask a person. Two ways in only: "Notify me at launch" for givers (when LAUNCH_LIST=yes) and
-// "Apply to list your charity". The demo dashboard, Privacy and Terms are also open on this address. No charity list,
+// "Apply to list your charity" (CHARITY_SIGNUP=yes; WhatsApp until then). Nothing else on the site opens from here unless
+// one of those is on (lib/coming-soon.ts). No charity list,
 // no giving. Nothing about fees or invented numbers; every screen is the dashboard demo's made-up sample data.
 // DRAFT WORDING for Yehuda to approve. Never listed by search engines: robots below is set on the page itself.
 
@@ -309,8 +310,13 @@ export default function ComingSoon() {
               </a>
             ) : null}
             {email ? <a href={`mailto:${email}`} className="inline-flex min-h-11 items-center text-white/80 underline-offset-4 hover:text-white hover:underline">{email}</a> : null}
-            <Link href="/privacy" className="inline-flex min-h-11 items-center text-white/80 underline-offset-4 hover:text-white hover:underline">Privacy</Link>
-            <Link href="/terms" className="inline-flex min-h-11 items-center text-white/80 underline-offset-4 hover:text-white hover:underline">Terms</Link>
+            {/* Only while people can give their details here; otherwise this page links nowhere else on the site. */}
+            {listOpen || applyOpen ? (
+              <>
+                <Link href="/privacy" className="inline-flex min-h-11 items-center text-white/80 underline-offset-4 hover:text-white hover:underline">Privacy</Link>
+                <Link href="/terms" className="inline-flex min-h-11 items-center text-white/80 underline-offset-4 hover:text-white hover:underline">Terms</Link>
+              </>
+            ) : null}
           </nav>
         </div>
         <div className="mx-auto max-w-[80rem] px-4 sm:px-6"><p className="border-t border-white/15 py-6 text-[14px] text-white/70">© {new Date().getFullYear()} {appName}</p></div>

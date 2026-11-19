@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { comingSoonAction, comingSoonHosts, isComingSoonHost } from "@/lib/coming-soon";
 
 const on = "givezy.co.za";
-const act = (url: string, method = "GET", setting: string | undefined | null = on, deployed = true) => comingSoonAction(new URL(url), method, setting === null ? undefined : setting, deployed);
+const act = (url: string, method = "GET", setting: string | undefined | null = on, deployed = true, open = { signUp: true, policies: true }) => comingSoonAction(new URL(url), method, setting === null ? undefined : setting, deployed, open);
+const closed = (url: string, method = "GET") => comingSoonAction(new URL(url), method, on, true);
 
 describe("comingSoonHosts", () => {
   it("reads a comma-separated list as bare lower-case host names", () => {
@@ -72,6 +73,25 @@ describe("comingSoonAction", () => {
     expect(act("https://givezy.co.za/api/viewer", "POST")).toBe("not-found");
     expect(act("https://givezy.co.za/api/app/quote")).toBe("not-found");
     expect(act("https://givezy.co.za/applications")).toBe("redirect-home");
+  });
+
+  it("opens nothing but its one page while sign-up and the launch list are off", () => {
+    for (const p of ["/apply", "/login", "/auth/callback", "/charity-admin", "/demo/dashboard", "/privacy", "/terms", "/launch-list/stop", "/charities"]) {
+      expect(closed(`https://givezy.co.za${p}`), p).toBe("redirect-home");
+    }
+    expect(closed("https://givezy.co.za/api/viewer")).toBe("not-found");
+    expect(closed("https://givezy.co.za/apply", "POST")).toBe("not-found");
+    expect(closed("https://givezy.co.za/")).toBe("serve");
+    expect(closed("https://givezy.co.za/logo.png")).toBe("pass-through");
+  });
+
+  it("opens only the policies for the launch list", () => {
+    const listOnly = (p: string) => comingSoonAction(new URL(`https://givezy.co.za${p}`), "GET", on, true, { signUp: false, policies: true });
+    expect(listOnly("/privacy")).toBe("pass-through");
+    expect(listOnly("/terms")).toBe("pass-through");
+    expect(listOnly("/launch-list/stop")).toBe("pass-through");
+    expect(listOnly("/apply")).toBe("redirect-home");
+    expect(listOnly("/demo/dashboard")).toBe("redirect-home");
   });
 
   it("still serves the technical files", () => {

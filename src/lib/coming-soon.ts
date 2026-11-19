@@ -54,11 +54,19 @@ export function isComingSoonHost(hostname: string, setting: string | undefined):
  * app's and payment provider's calls) stays closed. These pages post to themselves (server actions), so they take
  * any method.
  */
-const CHARITY_SIGN_UP_PATHS = ["/apply", "/login", "/auth", "/charity-admin", "/mfa", "/agree", "/documents", "/privacy", "/terms", "/launch-list/stop", "/demo"];
+const CHARITY_SIGN_UP_PATHS = ["/apply", "/login", "/auth", "/charity-admin", "/mfa", "/agree", "/documents", "/demo"];
+/** The policies and the launch list's unsubscribe link: open while charities can apply or givers can join the list. */
+const POLICY_PATHS = ["/privacy", "/terms", "/launch-list/stop"];
 
-function isCharitySignUp(pathname: string): boolean {
-  return CHARITY_SIGN_UP_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
+const under = (list: string[], pathname: string) => list.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+/**
+ * What a coming-soon address opens besides its page (19/11/2026). Both off by default: then the address shows its one
+ * page and nothing else, so nobody ever lands on the full site from it. `signUp` follows CHARITY_SIGNUP=yes,
+ * `policies` follows CHARITY_SIGNUP=yes or LAUNCH_LIST=yes (people giving their details must be able to read them).
+ */
+export type ComingSoonOpen = { signUp: boolean; policies: boolean };
+const CLOSED: ComingSoonOpen = { signUp: false, policies: false };
 
 /** A path a coming-soon address still serves as it is. */
 function isAllowedFile(pathname: string): boolean {
@@ -76,13 +84,14 @@ function isAllowedFile(pathname: string): boolean {
  * What to do with a request. `deployed` is true only on the hosted production site (like the one-address rule in
  * canonical-host.ts), so a developer's own machine and every preview behave normally.
  */
-export function comingSoonAction(url: URL, method: string, setting: string | undefined, deployed: boolean): ComingSoonAction {
+export function comingSoonAction(url: URL, method: string, setting: string | undefined, deployed: boolean, open: ComingSoonOpen = CLOSED): ComingSoonAction {
   if (!deployed || !isComingSoonHost(url.hostname, setting)) return "pass-through";
   const pathname = url.pathname;
   // Technical files first, so robots.txt and the logo work for any method a browser or crawler uses.
   if (isAllowedFile(pathname) && (method === "GET" || method === "HEAD")) return "pass-through";
   // The charity sign-up path (see above), and the one call its header makes to know who is signed in.
-  if (isCharitySignUp(pathname) || (pathname === "/api/viewer" && (method === "GET" || method === "HEAD"))) return "pass-through";
+  if (open.signUp && (under(CHARITY_SIGN_UP_PATHS, pathname) || (pathname === "/api/viewer" && (method === "GET" || method === "HEAD")))) return "pass-through";
+  if ((open.signUp || open.policies) && under(POLICY_PATHS, pathname)) return "pass-through";
   // The app's and the payment provider's calls never come here (they use the other addresses): refuse them, don't redirect
   // them, because a redirect would be followed as if it were an answer.
   if (pathname === "/api" || pathname.startsWith("/api/")) return "not-found";
