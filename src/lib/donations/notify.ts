@@ -5,7 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { confirmationEmail } from "./confirmation-email";
 import { dedicationFrom, dedicationLine } from "./dedication";
-import { s18aDetailsMissing, type S18aDetailsRow } from "./s18a-details";
+import { lateDetailsDeadline, s18aDetailsMissing, type S18aDetailsRow } from "./s18a-details";
+import { taxYearFor } from "@/lib/dates";
 import { NOT_REUSABLE } from "./recurring";
 import { alreadyHandled, markRetryGone, markRetryUnknown, recordFailedEmail } from "@/lib/email/retry";
 import { wasCutOff } from "@/lib/email/retry-plan";
@@ -128,6 +129,8 @@ export async function deliverDonorConfirmation(
     wants18a: d.wants_18a,
     // "Add my details after paying": the email says how to add them (the thank-you page's link isn't in an email).
     s18aDetailsMissing: Boolean(d.wants_18a && row && row.donor_type && s18aDetailsMissing(row).length),
+    // The form closes on 31 May after the gift's tax year (platformConfig.taxYear.lateDetailsUntil): say so (19/11/2026).
+    s18aDetailsDeadline: lateDetailsDeadline(taxYearFor(d.paid_at)),
     accountUrl: site ? `${site.replace(/\/+$/, "")}/account` : undefined,
     dedication: (() => {
       const ded = dedicationFrom(d.dedication_kind, d.dedication_name);

@@ -139,3 +139,27 @@ describe("what the approval and related emails promise about donations (18/11/20
     }
   });
 });
+
+describe("the last day to add s18A details (19/11/2026)", () => {
+  it("the payment confirmation names it when details are missing", async () => {
+    const { confirmationEmail } = await import("@/lib/donations/confirmation-email");
+    const m = confirmationEmail({ id: "3f9a2c71-0b1d-4e5f-9a8b-123456789abc", charityName: "Meals", amountCents: 18_000, contributionCents: 0, totalCents: 18_000, paidAt: "2026-10-08T10:00:00Z", wants18a: true, s18aDetailsMissing: true, s18aDetailsDeadline: "31/05/2027", accountUrl: "https://g.test/account" } as Parameters<typeof confirmationEmail>[0]);
+    expect(m.text).toContain("by 31/05/2027");
+  });
+
+  it("the charity's reminder names it, and says the form then closes", async () => {
+    const { s18aReminderEmail } = await import("@/lib/charity/s18a-reminder");
+    const m = s18aReminderEmail("d@x.co", { charityName: "Meals", firstName: "Sam", missing: ["id_number"], detailsUrl: "https://g.test/account#s18a-details", stopUrl: "https://g.test/news/stop?t=x", replyTo: null, deadline: "31/05/2027" });
+    expect(m.text).toContain("Please add it by 31/05/2027: after that the form closes for this tax year.");
+    expect(m.text).not.toMatch(/[!—]/);
+  });
+
+  it("the deadline is 31 May after the gift's tax year, as dd/mm/yyyy", async () => {
+    const { lateDetailsDeadline } = await import("@/lib/donations/s18a-details");
+    const { taxYearFor } = await import("@/lib/dates");
+    // A gift in October 2026 is in tax year 2027 (1 March 2026 to end February 2027): its details close on 31/05/2027.
+    expect(lateDetailsDeadline(taxYearFor("2026-10-08T10:00:00Z"))).toBe("31/05/2027");
+    // A gift on 1 March 2027 starts the next tax year.
+    expect(lateDetailsDeadline(taxYearFor("2027-03-01T08:00:00+02:00"))).toBe("31/05/2028");
+  });
+});

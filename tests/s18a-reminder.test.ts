@@ -283,6 +283,8 @@ describe("sending reminders", () => {
   it("emails only donors with details missing, skipping erased, opted-out, complete and recorded-only donors and other charities' donors", async () => {
     const r = await sendS18aReminders(args(["sarah", "erased", "stop", "done", "noask", "rec", "other"]));
     expect(sent.map((m) => m.to)).toEqual(["sarah@x.co"]);
+    // The last day to add the details, from the gift's tax year (31 May after it ends).
+    expect(sent[0].text).toMatch(/by 31\/05\/\d{4}: after that the form closes/);
     expect(sent[0].text).toContain("https://g.test/account#s18a-details");
     expect(sent[0].text).toMatch(/https:\/\/g\.test\/news\/stop\?t=[A-Za-z0-9_-]{43}/);
     expect(r).toEqual({ sent: 1, failed: 0, unknown: 0, remaining: 0, skipped: { not_found: 1, erased: 1, complete: 2, recorded_only: 1, opted_out: 1, this_week: 0 }, interrupted: false, done: "act1" });
