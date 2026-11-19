@@ -2081,3 +2081,10 @@ An independent check of the dashboard (and its demo) at 390, 810, 1080 and 1440 
 - Fixed: a coming-soon address is never forwarded to SITE_URL (`src/proxy.ts`), and it opens nothing but its one page unless `CHARITY_SIGNUP=yes` (the sign-up path and policies) or `LAUNCH_LIST=yes` (the policies only). The page shows Privacy and Terms only while one of those is on.
 - Still open: test.givezy.co.za and charity-open-hand.vercel.app are public. Anyone with the address can see the full test site. Password protection waits for Yehuda's yes (the test app's calls use that address).
 - When the policies open, they show the full site's menu; its links lead back to the pre-launch page on that address. Give them the pre-launch look before turning LAUNCH_LIST on.
+
+## 19/11/2026: the phone app in a browser, at /app-preview (Yehuda: "I want it for online")
+
+- `test.givezy.co.za/app-preview` shows the real app (sample data only, no database keys in that build) in an iPhone-shaped frame on a laptop, and full screen on a phone. It follows the same app code as Expo Go.
+- It is a static copy in `public/app-preview/app`, rebuilt with `bash scripts/build-app-preview.sh` (run it after changing the app, then commit). Nothing rebuilds it by itself.
+- Its pages get their own security headers (made-up charity photos load from the web; framed by our own page only) and are never listed by search engines. Everything else on the site keeps its strict headers (`next.config.ts`).
+- On givezy.co.za it is closed, like every other page. Do not link it from there.

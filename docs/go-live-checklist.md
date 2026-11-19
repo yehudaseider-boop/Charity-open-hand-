@@ -383,3 +383,4 @@ HTML version of the confirmation email, yahrzeit giving, real charity photos fro
 - [ ] Charity sign-up on givezy.co.za: once the live database, email and address are ready, set `CHARITY_SIGNUP=yes` so the pre-launch page's charity buttons go to Apply instead of WhatsApp (19/11/2026).
 - [ ] Decide on password protection for test.givezy.co.za and charity-open-hand.vercel.app, so customers only ever see givezy.co.za. The phone app's test builds call the test address, so plan that first (19/11/2026).
 - [ ] Before `LAUNCH_LIST=yes`: give Privacy and Terms the pre-launch look on givezy.co.za (today they would show the full site's menu) (19/11/2026).
+- [ ] The app's browser preview (`/app-preview`) is a copy of the app: rebuild it with `bash scripts/build-app-preview.sh` before sharing it, and remove `public/app-preview` at launch unless it is meant to stay (19/11/2026).
