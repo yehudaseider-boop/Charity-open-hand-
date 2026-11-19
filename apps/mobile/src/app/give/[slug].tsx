@@ -23,7 +23,7 @@ import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
-import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleContribution, sampleGoals } from "@/data/giving";
+import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleContribution, sampleGiftLimits, sampleGoals } from "@/data/giving";
 import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, NO_CONTRIBUTION_NOTE_OTHER_ONLY, contributionCents, contributionLabel, startingChoice, type ContributionChoice } from "@shared/donations/contribution";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
@@ -489,13 +489,13 @@ export default function Give() {
   const campaignId = campaignParam && !campaignClosed && (server ? server.campaignOpen : (charity.campaigns ?? []).some((c) => c.id === campaignParam)) ? campaignParam : undefined;
   const campaignEnded = Boolean(campaignParam) && !campaignId;
   const campaign = campaignId ? ((charity.campaigns ?? []).find((c) => c.id === campaignId) ?? null) : null;
-  const minGift = server?.minGiftCents ?? 0;
+  const minGift = server?.minGiftCents ?? (preview ? sampleGiftLimits.minCents : 0);
   const minExtra = server?.minContributionCents ?? (preview ? sampleContribution.minCents : 0);
   // The contribution buttons come from the server (platformConfig), never from the app; the preview shows the same.
   const extraPresets = server?.contributionPresetsCents ?? (preview ? sampleContribution.presetsCents : []);
   const extraChoice = extraPick ?? startingChoice(extraPresets, server?.contributionDefaultCents ?? (preview ? sampleContribution.defaultCents : 0));
   const extraResult = contributionCents(extraChoice, extraAmount, minExtra);
-  const maxGift = server?.maxGiftCents ?? null;
+  const maxGift = server?.maxGiftCents ?? (preview ? sampleGiftLimits.maxCents : null);
   const gift = parseRandToCents(amount);
   const contribution = extraResult.ok ? extraResult.cents : null;
   // "Cover the card charge": shown only when the server sent the provider's rates (never a made-up figure).
@@ -597,8 +597,8 @@ export default function Give() {
 
   function check() {
     const e: Record<string, string> = {};
-    if (!gift) e.amount = amountProblem(amount, "180 or 180.50") ?? "Enter an amount in Rand, for example 180 or 180.50";
-    else if (gift < minGift) e.amount = `The smallest donation is ${rand(minGift)}`;
+    if (gift === null || (gift === 0 && !minGift)) e.amount = amountProblem(amount, "180 or 180.50") ?? "Enter an amount in Rand, for example 180 or 180.50";
+    else if (gift < minGift) e.amount = `The minimum donation is ${rand(minGift)}`;
     else if (maxGift !== null && gift > maxGift) e.amount = `The largest donation in the app is ${rand(maxGift)}. For a bigger gift, please contact the charity directly.`;
     if (!extraResult.ok) e.extra = extraResult.message;
     if (!first.trim()) e.first_name = "Enter your first name";

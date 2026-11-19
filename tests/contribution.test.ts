@@ -7,7 +7,7 @@ import { platformConfig } from "@/config/platform";
 import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionCents, contributionLabel, startingChoice } from "@/lib/donations/contribution";
 import { checkShownTotal, quoteDonation, quoteFromTyped } from "@/lib/donations/quote";
 import { readGiveLink } from "@/lib/donations/give-link";
-import { sampleContribution } from "../apps/mobile/src/data/giving";
+import { sampleContribution, sampleGiftLimits } from "../apps/mobile/src/data/giving";
 
 const min = platformConfig.minContributionCents;
 
@@ -23,6 +23,9 @@ describe("the config", () => {
   });
   it("the app's preview (no server) shows the same buttons as the config", () => {
     expect(sampleContribution).toEqual({ presetsCents: [...platformConfig.contributionPresetsCents], defaultCents: platformConfig.contributionDefaultCents, minCents: platformConfig.minContributionCents });
+  });
+  it("the app's preview uses the same smallest and largest gift as the config", () => {
+    expect(sampleGiftLimits).toEqual({ minCents: platformConfig.minDonationCents, maxCents: platformConfig.maxDonationCents });
   });
 });
 
