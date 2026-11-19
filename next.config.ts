@@ -62,6 +62,9 @@ const securityHeaders = [
 
 const receiptFiles = [
   "./node_modules/@sparticuz/chromium/bin/**",
+  // playwright-core reads its own files (browsers.json and more) at run time; the build doesn't see them (19/11/2026:
+  // "Cannot find module .../playwright-core/browsers.json" on the hosted site).
+  "./node_modules/playwright-core/**",
   "./src/lib/receipts/fonts/BricolageGrotesque-Bold.ttf",
   "./node_modules/@fontsource/dm-sans/files/dm-sans-latin-{400,500,600}-normal.woff2",
   "./public/logo.png",
@@ -75,6 +78,8 @@ const nextConfig: NextConfig = {
   // Chromium), which the build cannot see from the code: ship them with those pages only.
   outputFileTracingIncludes: {
     "/admin/receipts": receiptFiles,
+    // "Email me every email" attaches a sample s18A receipt PDF.
+    "/admin/settings": receiptFiles,
     "/charity-admin/\\[id\\]/receipts": receiptFiles,
     // The charity's preview of a receipt loads the receipt's fonts from here (09/11/2026).
     "/receipt-fonts/\\[file\\]": ["./src/lib/receipts/fonts/BricolageGrotesque-Bold.ttf", "./node_modules/@fontsource/dm-sans/files/dm-sans-latin-{400,500,600}-normal.woff2"],

@@ -6,7 +6,6 @@ import { getEmailTransport, maskEmail } from "@/lib/email";
 import { SAMPLE, sampleEmails, sampleReceiptDetails } from "@/lib/email/samples";
 import type { FormState } from "@/lib/form";
 import { buildReceiptHtml } from "@/lib/receipts/html";
-import { htmlToPdf, loadFontCss, loadLogoHtml } from "@/lib/receipts/pdf";
 import { platformConfig } from "@/config/platform";
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -24,6 +23,8 @@ export async function sendSampleEmails(): Promise<FormState> {
 
   // The s18A receipt sample carries its PDF, marked so it can never pass for a real receipt.
   try {
+    // Loaded only here, like the receipt runs do: the PDF maker needs a browser, and if that fails the emails still go.
+    const { htmlToPdf, loadFontCss, loadLogoHtml } = await import("@/lib/receipts/pdf");
     const pdf = await htmlToPdf(buildReceiptHtml({ details: sampleReceiptDetails(), reference: SAMPLE.receiptReference, draft: true, mark: "SAMPLE, NOT A TAX RECEIPT", fontCss: loadFontCss(), platformName: platformConfig.appName, logoHtml: loadLogoHtml() }));
     const receipt = messages.find((m) => m.subject.includes(SAMPLE.receiptReference));
     if (receipt) receipt.attachments = [{ filename: `s18A-receipt-${SAMPLE.receiptReference}.pdf`, content: pdf, contentType: "application/pdf" }];
@@ -32,6 +33,7 @@ export async function sendSampleEmails(): Promise<FormState> {
   }
 
   const transport = getEmailTransport();
+  const receiptHasPdf = messages.some((m) => m.attachments?.length);
   let sent = 0;
   let skipped = 0;
   const failed: string[] = [];
@@ -55,6 +57,7 @@ export async function sendSampleEmails(): Promise<FormState> {
   }
   const parts = [`Sent ${sent} sample emails to ${where}. They start with "[Sample]".`];
   if (skipped) parts.push(`${skipped} were skipped.`);
+  if (!receiptHasPdf) parts.push("The s18A receipt sample went without its PDF: the PDF maker didn't start on this site.");
   if (failed.length) parts.push(`${failed.length} didn't go: ${failed.slice(0, 5).join("; ")}. Press again to try once more (you'll get the others again too).`);
   return { ok: failed.length === 0, message: parts.join(" ") };
 }
