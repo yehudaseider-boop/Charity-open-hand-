@@ -337,6 +337,10 @@ body:has([data-chrome="landing"]) .chrome-full {
 .phone-screen .screen-narrow { display: block; }
 .phone-screen .screen-wide { display: none; }
 .phone-screen { scrollbar-width: thin; }
+/* The ground of the dashboard's own pages as it comes out in the phone pictures, so a picture and the phone screen
+   around it are one surface (no box inside a box). Only for those pictures. */
+.phone-ground-soft { background: #f8f6ff; }
+.phone-fade-soft { background: linear-gradient(to top, #f8f6ff, rgb(248 246 255 / 0)); }
 
 /* Placeholders while a page loads: soft lilac blocks with a gentle sheen. */
 @keyframes sheen {

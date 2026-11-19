@@ -54,6 +54,17 @@ async function receipt(c: string) {
   );
   return id as string;
 }
+/** A second receipt with one gift linked to it, for the receipt-gifts view. */
+async function receiptWithGift(c: string) {
+  const g = await gift(c, "linked@x.test");
+  const { donor_id } = await one("select donor_id from public.donations where id = $1", [g]);
+  const { id } = await one(
+    `insert into public.s18a_receipts (charity_id, receipt_number, donor_id, tax_year, amount_cents, status, details) values ($1, 2, $2, 2027, 10000, 'issued', '{"receipt_reference":"T-2","donor":{"name":"Linked"}}'::jsonb) returning id`,
+    [c, donor_id],
+  );
+  await run("insert into public.s18a_receipt_donations (receipt_id, donation_id) values ($1, $2)", [id, g]);
+  return id as string;
+}
 const as = async (id: string, aal = "aal2") => {
   await run("set local role authenticated");
   await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: id, role: "authenticated", aal, amr: [{ method: "otp" }] })]);
@@ -110,26 +121,56 @@ describe("the faster charity views keep the same rules", () => {
     });
   });
 
-  it("show s18A receipts to the charity's team and Givezy admins only", async () => {
+  it("stay fast when the contact columns are read: the team is checked once, not once per gift", async () => {
     await tx(async () => {
       const c = await charity();
       const owner = await user();
+      await run("insert into public.charity_admins (charity_id, user_id, role) values ($1, $2, 'owner')", [c, owner]);
+      const { id: donor } = await one(`insert into public.donors (email, donor_type, popia_consent_at) values ($1, 'individual', now()) returning id`, [`many${stamp()}@x.test`]);
+      await run(
+        `insert into public.donations (donor_id, charity_id, amount_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway, gateway_ref, status, paid_at, tax_year)
+         select $1, $2, 10000::bigint, 0, 0, 10000::bigint, 'test', gen_random_uuid()::text, 'paid', now() - g * interval '1 minute', 2027 from generate_series(1, 3000) g`,
+        [donor, c],
+      );
+      await as(owner);
+      const started = Date.now();
+      const { rowCount } = await run(
+        "select id, email, phone, contact_person, address_line1, address_line2, suburb, city, postal_code from public.charity_donations where charity_id = $1 order by paid_at desc nulls last, created_at desc, id limit 25",
+        [c],
+      );
+      const ms = Date.now() - started;
+      await reset();
+      expect(rowCount).toBe(25);
+      // Checked once per gift per contact column, 3 000 gifts took well over 10 seconds; checked once, a few hundredths.
+      expect(ms).toBeLessThan(3000);
+    });
+  });
+
+  it("show s18A receipts, and the gifts on them, to the charity's team and Givezy admins only", async () => {
+    await tx(async () => {
+      const c = await charity();
+      const member = await user();
       const stranger = await user();
       const admin = await user("platform_admin");
-      await run("insert into public.charity_admins (charity_id, user_id, role) values ($1, $2, 'viewer')", [c, owner]);
+      await run("insert into public.charity_admins (charity_id, user_id, role) values ($1, $2, 'viewer')", [c, member]);
       await receipt(c);
-      const count = async () => Number((await one("select count(*)::int as n from public.charity_receipts where charity_id = $1", [c])).n);
-      await as(owner);
-      expect(await count()).toBe(1);
+      const linked = await receiptWithGift(c);
+      /** [receipts seen for the charity, gifts seen on the linked receipt] */
+      const seen = async () => [
+        Number((await one("select count(*)::int as n from public.charity_receipts where charity_id = $1", [c])).n),
+        Number((await one("select count(*)::int as n from public.charity_receipt_donations where receipt_id = $1", [linked])).n),
+      ];
+      await as(member);
+      expect(await seen()).toEqual([2, 1]);
       await reset();
       await as(stranger);
-      expect(await count()).toBe(0);
+      expect(await seen()).toEqual([0, 0]);
       await reset();
       await as(admin);
-      expect(await count()).toBe(1);
+      expect(await seen()).toEqual([2, 1]);
       await reset();
-      await as(owner, "aal1");
-      expect(await count()).toBe(0);
+      await as(member, "aal1");
+      expect(await seen()).toEqual([0, 0]);
       await reset();
     });
   });

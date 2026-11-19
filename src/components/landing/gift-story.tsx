@@ -79,7 +79,7 @@ export function Receipt() {
  * (Yehuda, 17/11/2026: "it must be clear as ultra HD"). Only the open tab's picture loads.
  */
 /** Heights of the v6 phone pictures (all 1170 wide: three times the screen, for iPhone sharpness), so the page keeps its place while they load. */
-const PHONE_HEIGHTS: Record<string, number> = { overview: 2943, donations: 7056, thank: 5733, receipts: 9144 };
+const PHONE_HEIGHTS: Record<string, number> = { overview: 2943, donations: 7056, monthly: 4743, thank: 5733, receipts: 9144, campaigns: 1392 };
 
 export function Screen({ name, alt }: { name: string; alt: string }) {
   return (

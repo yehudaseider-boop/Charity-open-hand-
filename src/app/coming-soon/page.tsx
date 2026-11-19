@@ -242,6 +242,8 @@ export default function ComingSoon() {
           <Reveal className="mx-auto mt-12 max-w-[80rem] text-navy">
             <LiveWindow
               label="The charity dashboard, with sample data"
+              phoneGround="soft"
+              onBlue
               menuFrom="lg"
               tabs={[
                 { label: "Overview", screen: <Screen name="overview" alt="The overview: what needs you this week, this month's total and the tax year so far. Sample data." /> },

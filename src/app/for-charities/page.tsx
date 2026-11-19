@@ -184,7 +184,7 @@ export default function ForCharitiesPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border" aria-hidden><div className="h-2.5 w-[68%] rounded-full bg-sage" /></div>
               <p className="mt-2 flex justify-between text-[12px]"><span className="font-bold">R34 000</span><span className="text-muted">of R50 000</span></p>
             </Floating>
-            <p className="mt-3 text-right text-xs text-muted">Sample screens. Tap the menu to look around.</p>
+            <p className="mt-3 text-right text-xs text-muted">Sample screens. Tap through them to look around.</p>
           </div>
         </div>
       </section>

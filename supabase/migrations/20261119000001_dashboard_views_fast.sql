@@ -2,7 +2,7 @@
 -- donors, receipts and report pages took 9 to over 30 seconds: each of the three charity views asked "is this person on
 -- this charity's team?" (is_charity_admin, is_platform_admin, charity_can) once for every row, so reading 1 000 gifts
 -- took 2.5 seconds. The same rules are now worked out once per request, for the few charities the person may see, and
--- joined on: the same 1 000 gifts read in about 6 ms.
+-- joined on: the Donations page's own query (newest 25 of 20 000, with the contact columns) reads in about 0.4 s.
 --
 -- Nothing about who sees what changes. A row shows when its charity is one the person is on the team of (with the
 -- second step done), or for a Givezy admin (with the second step done): exactly is_charity_admin(charity) or
@@ -38,6 +38,9 @@ create or replace view public.charity_donations with (security_barrier = true) a
       union
       select ch.id from public.charities ch where (select public.is_platform_admin())
     ) v
+    -- Keeps this subquery whole: without it the planner folds it into the outer query and copies charity_can into
+    -- each of the eight contact columns, once per gift (code review 19/11/2026: Donations took 38 s at 20 000 gifts).
+    offset 0
   ) m on m.charity_id = d.charity_id
   left join public.donation_checkout_details c on c.donation_id = d.id
   where d.status in ('paid', 'refunded', 'charged_back');

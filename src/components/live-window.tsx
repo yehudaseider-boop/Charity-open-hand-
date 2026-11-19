@@ -6,18 +6,21 @@ export type LiveTab = { label: string; screen: React.ReactNode };
 
 /**
  * A product window people can click around in (09/11/2026, Yehuda: "make the website interactive"): the menu on the
- * left, or the tabs above on a phone, swap the sample screen inside. Every screen is sample content drawn on the
+ * left, or on a phone the tabs under a phone frame (19/11/2026), swap the sample screen inside. Every screen is sample content drawn on the
  * server; this only chooses which one shows. Keyboard: arrow keys move between tabs, as in any tab list.
  */
-/** `menuFrom`: from which width the menu sits on the left ("lg" keeps the tabs on top on tablets, for wide screens inside). */
-export function LiveWindow({ tabs, label, menuFrom = "sm" }: { tabs: LiveTab[]; label: string; menuFrom?: "sm" | "lg" }) {
+/**
+ * `menuFrom`: from which width the window with its menu shows ("lg" keeps the phone frame on tablets).
+ * `phoneGround`: the phone screen's background. "soft" for screens that are pictures of the dashboard (they bring
+ * their own pale ground and white cards); "white" for screens drawn in the page, whose cards are pale.
+ */
+export function LiveWindow({ tabs, label, menuFrom = "sm", phoneGround = "white", onBlue = false }: { tabs: LiveTab[]; label: string; menuFrom?: "sm" | "lg"; phoneGround?: "soft" | "white"; /** The section behind is logo blue: the phone's tabs turn the other way round (white when chosen), like the buttons in the blue header. */ onBlue?: boolean }) {
   const [active, setActive] = useState(0);
   const id = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const phoneButtons = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Arrow keys, Home and End move between tabs (and End never scrolls the page). The phone's row of tabs slides the
-  // chosen one into view.
+  // Arrow keys, Home and End move between tabs (and End never scrolls the page).
   const go = (i: number, phone = false) => {
     const next = (i + tabs.length) % tabs.length;
     setActive(next);
@@ -49,7 +52,7 @@ export function LiveWindow({ tabs, label, menuFrom = "sm" }: { tabs: LiveTab[]; 
       onClick={() => setActive(i)}
       className={
         phone
-          ? `inline-flex min-h-11 shrink-0 items-center rounded-full border-2 px-4 py-2 text-[14px] font-semibold transition-colors ${i === active ? "border-navy bg-navy text-white" : "border-border bg-white text-navy"}`
+          ? `inline-flex min-h-11 shrink-0 items-center rounded-full border-2 px-4 py-2 text-[14px] font-semibold transition-colors ${onBlue ? (i === active ? "border-white bg-white text-brand" : "border-white/40 bg-white/10 text-white") : i === active ? "border-brand bg-brand text-white" : "border-border bg-white text-navy"}`
           : `w-full rounded-lg px-3 py-2 text-left transition-colors ${i === active ? "bg-brand-soft font-semibold text-brand" : "text-muted hover:bg-honey-soft hover:text-navy"}`
       }
     >
@@ -67,11 +70,16 @@ export function LiveWindow({ tabs, label, menuFrom = "sm" }: { tabs: LiveTab[]; 
           and the tabs are below it. Before, a whole browser window was squeezed in and cut off mid-card. */}
       <div className={`mx-auto w-full max-w-[22rem] ${small}`}>
         <div className="rounded-[2.75rem] bg-navy p-2.5 shadow-[0_40px_80px_rgba(14,27,61,0.35)]">
-          <div className="relative overflow-hidden rounded-[2.25rem] bg-honey-soft">
+          <div className={`relative overflow-hidden rounded-[2.25rem] ${phoneGround === "soft" ? "phone-ground-soft" : "bg-white"}`}>
             <span aria-hidden className="absolute left-1/2 top-2 z-10 h-6 w-24 -translate-x-1/2 rounded-full bg-navy" />
-            <div id={`${id}-panel-p`} role="tabpanel" aria-labelledby={`${id}-p${active}`} tabIndex={0} className="phone-screen h-[34rem] overflow-y-auto overscroll-contain px-3 pb-4 pt-10">
+            {/* Keyed by the tab, so each screen opens at its top (not where the last one was scrolled to). No
+                overscroll-contain: at the screen's top or bottom the swipe carries on to the page, and the frame is
+                never taller than 70% of the phone, so some page always shows to scroll by. */}
+            <div key={active} id={`${id}-panel-p`} role="tabpanel" aria-labelledby={`${id}-p${active}`} tabIndex={0} className={`phone-screen h-[min(34rem,70svh)] overflow-y-auto pb-4 pt-10 ${phoneGround === "soft" ? "" : "px-4"}`}>
               {screen}
             </div>
+            {/* The screen scrolls: its last visible card fades out softly, so it reads as "more below", not as cut off. */}
+            <span aria-hidden className={`pointer-events-none absolute inset-x-0 bottom-0 h-12 ${phoneGround === "soft" ? "phone-fade-soft" : "bg-gradient-to-t from-white to-transparent"}`} />
           </div>
         </div>
         <div role="tablist" aria-label={label} onKeyDown={onPhoneKey} className="mt-5 flex flex-wrap justify-center gap-2">
