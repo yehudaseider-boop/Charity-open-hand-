@@ -50,11 +50,11 @@ export function isComingSoonHost(hostname: string, setting: string | undefined):
 
 /**
  * The charity sign-up path stays open on a coming-soon address (Yehuda, 17/11/2026): a charity can apply, sign in with
- * the emailed code, finish its application and read the policies. Everything else (donating, the charity list, the
+ * the emailed code, finish its application, read the policies and try the demo dashboard (made-up data). Everything else (donating, the charity list, the
  * app's and payment provider's calls) stays closed. These pages post to themselves (server actions), so they take
  * any method.
  */
-const CHARITY_SIGN_UP_PATHS = ["/apply", "/login", "/auth", "/charity-admin", "/mfa", "/agree", "/documents", "/privacy", "/terms", "/launch-list/stop"];
+const CHARITY_SIGN_UP_PATHS = ["/apply", "/login", "/auth", "/charity-admin", "/mfa", "/agree", "/documents", "/privacy", "/terms", "/launch-list/stop", "/demo"];
 
 function isCharitySignUp(pathname: string): boolean {
   return CHARITY_SIGN_UP_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

@@ -2030,3 +2030,12 @@ An independent check of the dashboard (and its demo) at 390, 810, 1080 and 1440 
 - The public address (givezy.co.za) keeps its coming-soon page, now with "Apply to list your charity" (charities) and "Notify me at launch" (givers, the app). Privacy and Terms are linked in its footer.
 - The charity sign-up path stays open on a coming-soon address: /apply, /login, /auth, /charity-admin, /mfa, /agree, /documents, /privacy, /terms, /launch-list/stop, plus GET /api/viewer. Everything else (giving, the charity list, the app's and payment provider's calls) stays closed (`src/lib/coming-soon.ts`, tests in `tests/coming-soon.test.ts`).
 - The giver list opens with `LAUNCH_LIST=yes` on the server (no code change). Until then the page says "The Givezy app is coming soon."
+
+## 19/11/2026: the pre-launch page, rebuilt (Yehuda: "make it awesome and super legit")
+
+- givezy.co.za's page now follows the home page's look: blue hero with one gift's story, "Two ways in" (launch list for givers, "We're picking our first charities" with Apply and the demo dashboard), the dashboard in a window, three trust facts, four questions, a close and a footer.
+- WhatsApp 078 616 0489 for questions (`legalConfig.supportWhatsApp`, links via `src/lib/whatsapp.ts`): in the header, the questions and the footer. After joining the launch list, "Tell a friend on WhatsApp" opens a ready message.
+- No LinkedIn or social links: Givezy has none yet.
+- The demo dashboard (made-up data) is now open on the coming-soon address too.
+- The fee answer says fees are published before launch, in plain Rand. Change it once the fee wording is settled.
+- The gift-story pieces moved to `src/components/landing/gift-story.tsx`, shared with the home page.

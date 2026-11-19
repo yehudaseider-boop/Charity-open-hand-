@@ -20,6 +20,9 @@ export const legalConfig = {
   /** Where donors and charities ask for help (Yehuda, 16/11/2026: hello@givezy.co.za, the one Givezy mailbox). */
   supportEmail: "hello@givezy.co.za" as string | null,
 
+  /** WhatsApp for questions (Yehuda, 19/11/2026), written as South Africans write it. Links use whatsAppLink(). */
+  supportWhatsApp: "078 616 0489" as string | null,
+
   /** Version of the Terms and Privacy Policy (set in src/lib/policy.ts, shared with the app). */
   policyVersion: POLICY_VERSION,
 

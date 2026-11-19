@@ -43,7 +43,7 @@ describe("comingSoonAction", () => {
   });
 
   it("sends every other page back to the front page", () => {
-    for (const p of ["/charities", "/for-donors", "/for-charities", "/c/some-charity", "/c/some-charity/donate", "/admin", "/demo/dashboard", "/faq", "/sitemap.xml", "/llms.txt", "/coming-soon", "/thanks/abc", "/applyx", "/login-help"]) {
+    for (const p of ["/charities", "/for-donors", "/for-charities", "/c/some-charity", "/c/some-charity/donate", "/admin", "/faq", "/demonstration", "/sitemap.xml", "/llms.txt", "/coming-soon", "/thanks/abc", "/applyx", "/login-help"]) {
       expect(act(`https://givezy.co.za${p}`), p).toBe("redirect-home");
     }
     expect(act("https://givezy.co.za/charities", "HEAD")).toBe("redirect-home");
@@ -65,7 +65,7 @@ describe("comingSoonAction", () => {
   });
 
   it("keeps the charity sign-up path open, for any method, and nothing around it", () => {
-    for (const p of ["/apply", "/apply?invite=abc", "/login", "/login/sent", "/auth/callback", "/charity-admin", "/charity-admin/abc/settings", "/mfa", "/agree", "/documents/abc", "/privacy", "/terms", "/launch-list/stop"]) {
+    for (const p of ["/apply", "/apply?invite=abc", "/login", "/login/sent", "/auth/callback", "/charity-admin", "/charity-admin/abc/settings", "/mfa", "/agree", "/documents/abc", "/privacy", "/terms", "/launch-list/stop", "/demo/dashboard", "/demo/dashboard/donations"]) {
       for (const m of ["GET", "HEAD", "POST"]) expect(act(`https://givezy.co.za${p}`, m), `${m} ${p}`).toBe("pass-through");
     }
     expect(act("https://givezy.co.za/api/viewer")).toBe("pass-through");
