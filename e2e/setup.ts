@@ -14,6 +14,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { chromium, type Browser } from "playwright-core";
+import { totpCode } from "./totp";
 
 export const SITE = (process.env.E2E_SITE ?? "https://test.givezy.co.za").replace(/\/+$/, "");
 export const SUPABASE_URL = process.env.E2E_SUPABASE_URL ?? "";
@@ -80,3 +81,44 @@ export async function openBrowser(): Promise<Browser> {
 
 /** Text that means a page failed to load what it should, on any page (our "couldn't load" and error screens). */
 export const BROKEN = /couldn.t load|something went wrong|application error|unhandled|this page could not be found/i;
+
+/** The demo charity's id on the TEST project. */
+export async function charityId(slug = CHARITY_SLUG): Promise<string> {
+  const { data, error } = await adminClient().from("charities").select("id").eq("slug", slug).maybeSingle();
+  if (error || !data) throw new Error(`No charity "${slug}" on the test project: ${error?.message ?? "not found"}`);
+  return data.id as string;
+}
+
+/**
+ * Signed in as the robot with the second step done (the charity dashboard needs it), and the website's cookies for
+ * that sign-in. The robot is a Viewer of the demo charity on TEST only (it can look, not change anything, and sees no
+ * contact details). Each run removes the robot's old authenticator and adds a fresh one, so no secret has to be kept.
+ */
+export async function charityViewerCookies(): Promise<{ cookies: SiteCookie[]; error: string | null }> {
+  const { code } = await freshSignIn();
+  let written: { name: string; value: string }[] = [];
+  const client = createServerClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+    cookies: { getAll: () => written, setAll: (list) => void (written = [...written.filter((w) => !list.some((l) => l.name === w.name)), ...list.map(({ name, value }) => ({ name, value }))]) },
+  });
+  const signIn = await client.auth.verifyOtp({ email: ROBOT_EMAIL, token: code, type: "email" });
+  if (signIn.error || !signIn.data.user) return { cookies: [], error: signIn.error?.message ?? "no user" };
+  const userId = signIn.data.user.id;
+  // Old authenticators from earlier runs: their secrets are gone, so remove them.
+  const old = await adminClient().auth.admin.mfa.listFactors({ userId });
+  for (const f of old.data?.factors ?? []) await adminClient().auth.admin.mfa.deleteFactor({ id: f.id, userId });
+  const enrolled = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: `robot-${Date.now()}` });
+  if (enrolled.error || !enrolled.data) return { cookies: [], error: `enrol: ${enrolled.error?.message}` };
+  const verified = await client.auth.mfa.challengeAndVerify({ factorId: enrolled.data.id, code: totpCode(enrolled.data.totp.secret) });
+  if (verified.error) return { cookies: [], error: `second step: ${verified.error.message}` };
+  const domain = new URL(SITE).hostname;
+  return { error: null, cookies: written.map(({ name, value }) => ({ name, value, domain, path: "/", httpOnly: false, secure: true, sameSite: "Lax" })) };
+}
+
+/** After the dashboard checks: the robot's authenticator is removed, so its plain sign-in tests stay as before. */
+export async function removeRobotAuthenticators(): Promise<void> {
+  const { data } = await adminClient().auth.admin.listUsers({ page: 1, perPage: 200 });
+  const robot = data?.users.find((u) => u.email === ROBOT_EMAIL);
+  if (!robot) return;
+  const old = await adminClient().auth.admin.mfa.listFactors({ userId: robot.id });
+  for (const f of old.data?.factors ?? []) await adminClient().auth.admin.mfa.deleteFactor({ id: f.id, userId: robot.id });
+}
