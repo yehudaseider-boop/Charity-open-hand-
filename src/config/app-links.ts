@@ -31,3 +31,12 @@ export function charityRequestsOpen(env: Record<string, string | undefined> = pr
 export function launchListOpen(env: Record<string, string | undefined> = process.env): boolean {
   return appLinks.launchListOpen || env.LAUNCH_LIST === "yes";
 }
+
+/**
+ * Whether charities can apply from the pre-launch page (19/11/2026). Off until the live site has its own database,
+ * email and address: until then "Apply" would land on the test site, in test data. Off, the page's charity buttons
+ * open a WhatsApp chat instead. CHARITY_SIGNUP=yes on the server opens it.
+ */
+export function charitySignUpOpen(env: Record<string, string | undefined> = process.env): boolean {
+  return env.CHARITY_SIGNUP === "yes";
+}

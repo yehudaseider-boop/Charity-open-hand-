@@ -10,7 +10,7 @@ import { Icon } from "@/components/marketing";
 import { Reveal } from "@/components/reveal";
 import { Splash } from "@/components/splash";
 import { DEMO_CHARITY } from "@/app/demo/dashboard/sample";
-import { appLinks, launchListOpen } from "@/config/app-links";
+import { appLinks, charitySignUpOpen, launchListOpen } from "@/config/app-links";
 import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 import { whatsAppChat } from "@/lib/whatsapp";
@@ -79,6 +79,12 @@ export default function ComingSoon() {
   const email = legalConfig.supportEmail;
   const whatsApp = whatsAppChat(legalConfig.supportWhatsApp, `Hi ${appName}, I have a question.`);
   const listOpen = launchListOpen();
+  // Until charities can apply on the live site, every charity button opens a WhatsApp chat (see charitySignUpOpen).
+  const applyOpen = charitySignUpOpen();
+  const charityChat = whatsAppChat(legalConfig.supportWhatsApp, `Hi ${appName}, I run a charity and would like to join.`);
+  const charityHref = applyOpen || !charityChat ? "/apply" : charityChat;
+  const external = !applyOpen && Boolean(charityChat);
+  const ext = external ? { target: "_blank", rel: "noopener noreferrer" } : {};
 
   return (
     <div className="full-bleed overflow-x-clip">
@@ -98,7 +104,7 @@ export default function ComingSoon() {
                 <span className="max-sm:sr-only">Chat to us</span>
               </a>
             ) : null}
-            <Link href="/apply" className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-[15px] font-bold text-brand hover:bg-honey-soft">For charities</Link>
+            <a href="#join" className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-[15px] font-bold text-brand hover:bg-honey-soft">For charities</a>
           </nav>
         </div>
       </header>
@@ -122,7 +128,7 @@ export default function ComingSoon() {
             </p>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
               <a href="#join" className={orangeBtn}>{listOpen ? "Get early access" : "I give"}</a>
-              <Link href="/apply" className={lineBtnDark}>I run a charity<ArrowRight /></Link>
+              <a href="#join" className={lineBtnDark}>I run a charity<ArrowRight /></a>
             </div>
           </div>
 
@@ -193,7 +199,11 @@ export default function ComingSoon() {
               <div className="flex flex-col gap-3 pr-8">
                 <p className="text-[14px] font-bold text-honey">I run a charity</p>
                 <h3 className="font-display text-[clamp(1.875rem,3vw,2.5rem)] font-extrabold! leading-[1.05] tracking-[-0.02em] text-balance text-white!">We&apos;re picking our first charities.</h3>
-                <p className="max-w-[30rem] text-[17px] leading-relaxed text-white/85">Apply now and a person on our team reads your application, so you&apos;re ready to take gifts from launch day.</p>
+                <p className="max-w-[30rem] text-[17px] leading-relaxed text-white/85">
+                  {external
+                    ? "Message us on WhatsApp and we'll talk you through joining, so you're ready to take gifts from launch day."
+                    : "Apply now and a person on our team reads your application, so you're ready to take gifts from launch day."}
+                </p>
               </div>
               <ul className="flex flex-col gap-3 text-[16px] font-semibold">
                 {(["s18A receipts and the IT3(d) file, done with you", "Thank-yous in your words, to every donor", "Monthly donations looked after"] as const).map((t) => (
@@ -204,8 +214,10 @@ export default function ComingSoon() {
                 ))}
               </ul>
               <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Link href="/apply" className="inline-flex min-h-13 items-center justify-center rounded-[1.125rem] bg-white whitespace-nowrap px-7 text-[17px] font-bold text-brand shadow-[0_5px_0_#0b2a73] hover:bg-honey-soft">Apply to list your charity</Link>
-                <Link href="/demo/dashboard" className={lineBtnDark}>Try the demo dashboard</Link>
+                <a href={charityHref} {...ext} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-[1.125rem] bg-white whitespace-nowrap px-7 text-[17px] font-bold text-brand shadow-[0_5px_0_#0b2a73] hover:bg-honey-soft">
+                  {external ? <><WhatsAppMark size={20} />Register on WhatsApp</> : "Apply to list your charity"}
+                </a>
+                {applyOpen ? <Link href="/demo/dashboard" className={lineBtnDark}>Try the demo dashboard</Link> : null}
               </div>
             </Reveal>
           </div>
@@ -276,7 +288,7 @@ export default function ComingSoon() {
           </h2>
           <div className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
             <a href="#join" className={orangeBtn}>{listOpen ? "Get early access" : "I give"}</a>
-            <Link href="/apply" className={lineBtnDark}>Apply to list your charity</Link>
+            <a href={charityHref} {...ext} className={lineBtnDark}>{external ? "Charities: WhatsApp us" : "Apply to list your charity"}</a>
           </div>
         </Reveal>
       </section>

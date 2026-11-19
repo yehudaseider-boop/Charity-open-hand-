@@ -379,3 +379,4 @@ HTML version of the confirmation email, yahrzeit giving, real charity photos fro
 - [ ] Supabase redirect URLs include https://givezy.co.za, and SITE_URL stays on a working address while COMING_SOON_HOSTS is set.
 - [ ] **Daily job while the coming-soon page is on (sweep of 18/11/2026, unconfirmed risk):** the coming-soon address answers "not found" to `/api/...`. If Vercel's scheduler calls givezy.co.za, the daily job (monthly gifts, checks, payouts) silently doesn't run. After setting `COMING_SOON_HOSTS`: Vercel, Settings, Cron Jobs, run `/api/jobs/daily` once and check it answers 200, not 404.
 - [ ] Someone reads each charity application before anything is listed (already the rule: every charity is looked at by a person).
+- [ ] Charity sign-up on givezy.co.za: once the live database, email and address are ready, set `CHARITY_SIGNUP=yes` so the pre-launch page's charity buttons go to Apply instead of WhatsApp (19/11/2026).

@@ -2069,3 +2069,8 @@ An independent check of the dashboard (and its demo) at 390, 810, 1080 and 1440 
 - The demo dashboard (made-up data) is now open on the coming-soon address too.
 - The fee answer says fees are published before launch, in plain Rand. Change it once the fee wording is settled.
 - The gift-story pieces moved to `src/components/landing/gift-story.tsx`, shared with the home page.
+
+## 19/11/2026: the new pre-launch page is on givezy.co.za; charity buttons go to WhatsApp for now
+
+- givezy.co.za is served by the test site's deploys, so the rebuilt page went live there with the push.
+- Found: on givezy.co.za, "Apply" and the demo dashboard were forwarded to test.givezy.co.za (SITE_URL), so a real charity would have applied on the test site, into test data. Until the live site has its own database, email and address, every charity button on the page opens a WhatsApp chat ("Hi Givezy, I run a charity and would like to join.") and the demo link is hidden. `CHARITY_SIGNUP=yes` on the server brings back Apply (`charitySignUpOpen` in `src/config/app-links.ts`).
