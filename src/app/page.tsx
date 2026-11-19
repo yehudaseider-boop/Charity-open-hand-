@@ -113,7 +113,7 @@ export default function HomePreview() {
         <div className="mx-auto flex h-16 max-w-[80rem] items-center justify-between gap-3 px-4 sm:h-[4.5rem] sm:px-6">
           <Link href="/" aria-label={`${appName} home`} className="-ml-1.5 flex items-center rounded-full bg-white px-3 py-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt={appName} width={97} height={32} className="h-7 w-auto sm:h-8" />
+            <img src="/brand/logo-400.png" alt={appName} width={97} height={32} className="h-7 w-auto sm:h-8" />
           </Link>
           <HeaderNav tone="dark" />
         </div>
@@ -341,7 +341,7 @@ export default function HomePreview() {
           <div className="flex flex-col gap-3">
             <Link href="/" aria-label={`${appName} home`} className="flex w-fit items-center rounded-full bg-white px-3 py-1.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt={appName} width={97} height={32} className="h-7 w-auto" />
+              <img src="/brand/logo-400.png" alt={appName} width={97} height={32} className="h-7 w-auto" />
             </Link>
             <p className="text-white/75">Giving, made easy.</p>
           </div>

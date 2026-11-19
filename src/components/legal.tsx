@@ -38,7 +38,7 @@ export function SiteFooter() {
         <div className="col-span-2 flex flex-col items-start gap-3 sm:col-span-3 md:col-span-1">
           <Link href="/" aria-label="Givezy home" className="rounded-xl bg-white px-3 py-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Givezy" width={97} height={32} className="h-8 w-auto" />
+            <img src="/brand/logo-400.png" alt="Givezy" width={97} height={32} className="h-8 w-auto" />
           </Link>
           <p className="max-w-[18rem] text-[15px] leading-relaxed text-white/70">Good starts here. Give to checked South African charities and keep every gift in one place.</p>
         </div>

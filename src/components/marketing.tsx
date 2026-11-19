@@ -122,7 +122,7 @@ export function AppWindow({ nav, active, children }: { nav: string[]; active: nu
       <div className="flex min-h-[20rem]">
         <ul className="hidden w-44 shrink-0 flex-col gap-1 border-r border-border p-4 text-sm sm:flex" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <li className="mb-3"><img src="/logo.png" alt="" width={97} height={32} className="h-6 w-auto" /></li>
+          <li className="mb-3"><img src="/brand/logo-400.png" alt="" width={97} height={32} className="h-6 w-auto" /></li>
           {nav.map((n, i) => (
             <li key={n} className={`rounded-lg px-3 py-2 ${i === active ? "bg-brand-soft font-semibold text-brand" : "text-muted"}`}>{n}</li>
           ))}

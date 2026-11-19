@@ -19,7 +19,7 @@ export function SiteHeader() {
         <div className="mx-auto flex min-h-16 max-w-[75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1 sm:min-h-[4.5rem] sm:px-6">
           <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-9" />
+            <img src="/brand/logo-400.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto sm:h-9" />
           </Link>
           <HeaderNav />
         </div>
@@ -30,7 +30,7 @@ export function SiteHeader() {
           {/* The one quiet way out to the rest of Givezy (30/10/2026): the logo goes home, which ends the focus. */}
           <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
+            <img src="/brand/logo-400.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
           </Link>
           <p className="flex items-center gap-1.5 text-sm text-muted">
             <svg aria-hidden viewBox="0 0 24 24" width="15" height="15" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 stroke-sage">
@@ -45,7 +45,7 @@ export function SiteHeader() {
       <header className="chrome-demo border-b border-border bg-surface print:hidden">
         <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
+          <img src="/brand/logo-400.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
           <p className="rounded-full bg-honey-soft px-3 py-1 text-sm font-semibold text-navy">Charity dashboard demo</p>
         </div>
       </header>

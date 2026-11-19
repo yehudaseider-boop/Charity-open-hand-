@@ -77,7 +77,7 @@ export function LiveWindow({ tabs, label, menuFrom = "sm" }: { tabs: LiveTab[]; 
       <div className="flex min-h-[21rem]">
         <div className={`hidden w-44 shrink-0 flex-col gap-1 border-r border-border p-4 text-sm ${menuFrom === "lg" ? "lg:flex" : "sm:flex"}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="" width={97} height={32} className="mb-3 ml-3 h-6 w-auto" />
+          <img src="/brand/logo-400.png" alt="" width={97} height={32} className="mb-3 ml-3 h-6 w-auto" />
           <div role="tablist" aria-label={label} aria-orientation="vertical" onKeyDown={onKey} className="flex flex-col gap-1">
             {tabs.map((t, i) => tab(t, i, false))}
           </div>
