@@ -14,6 +14,7 @@ import { appLinks, charitySignUpOpen, launchListOpen } from "@/config/app-links"
 import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 import { whatsAppChat } from "@/lib/whatsapp";
+import { comingSoonHosts } from "@/lib/coming-soon";
 
 // The public address's page until launch (givezy.co.za; see lib/coming-soon.ts and proxy.ts). Rebuilt 19/11/2026
 // (Yehuda: "make it awesome and super legit"), from what the best pre-launch pages do: show the product in the first
@@ -28,7 +29,11 @@ const appName = platformConfig.appName;
 const charity = DEMO_CHARITY.name_en;
 const launch = appLinks.launchMonth;
 
+/** The public address this page is shown on, so the share picture and links point at it, never at the test site. */
+const publicHost = comingSoonHosts(process.env.COMING_SOON_HOSTS)[0];
+
 export const metadata: Metadata = {
+  ...(publicHost ? { metadataBase: new URL(`https://${publicHost}`) } : {}),
   title: { absolute: `${appName}: giving, made easy` },
   description: `${appName} is a South African giving platform, launching ${launch ?? "soon"}. Give to checked charities and keep every s18A receipt in one place. For charities: s18A receipts, thank-yous and the tools to keep their donors.`,
   robots: { index: false, follow: false },
