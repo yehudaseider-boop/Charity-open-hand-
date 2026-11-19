@@ -265,7 +265,7 @@ export default function ComingSoon() {
           </div>
           <ul className="mx-auto mt-14 grid max-w-[72rem] gap-10 lg:grid-cols-3 lg:gap-10">
             {([
-              ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
+              ["One", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
               ["Every", "charity is checked by a person: its registration documents and bank details, before it can take a gift."],
               // Yehuda's pick (19/11/2026), the wording of the "Where does my money go?" answer below.
               ["Straight", "to the charity's own bank account, through our payment provider."],
