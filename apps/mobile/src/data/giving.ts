@@ -51,3 +51,5 @@ export const sampleDonor = { name: "Sarah Dube", email: "sarah@example.co.za" };
  * platformConfig. The live app always uses the server's figures; a test keeps these the same.
  */
 export const sampleContribution = { presetsCents: [1_000, 1_500, 2_000], defaultCents: 1_000, minCents: 1_000 };
+/** The smallest and largest gift in the preview (no server): the same as platformConfig (a test keeps them equal). */
+export const sampleGiftLimits = { minCents: 3_000, maxCents: 100_000_000 };
