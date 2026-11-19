@@ -152,7 +152,7 @@ export default function ComingSoon() {
                 </div>
                 <div className="hero-rise sm:ml-6" style={{ animationDelay: "620ms" }}>
                   <div className="bob-slow"><Where n={3}>You&apos;re thanked</Where>
-                    <div className={`${storyCard} overflow-hidden p-1.5`}><Image src="/home/email-v5.webp" width={1056} height={868} alt="" unoptimized priority className="block h-auto w-full rounded-[1rem]" /></div>
+                    <div className={`${storyCard} overflow-hidden p-1.5`}><Image src="/home/email-v6.webp" width={1584} height={1347} alt="" unoptimized priority className="block h-auto w-full rounded-[1rem]" /></div>
                   </div>
                 </div>
                 <div className="hero-rise sm:mr-10" style={{ animationDelay: "860ms" }}>
