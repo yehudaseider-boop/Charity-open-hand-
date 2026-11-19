@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { MonthlyRow, Period } from "./dashboard";
+import { readAllPages } from "./read-pages";
 
 /** Everything here is read as the signed-in person, so row-level security decides what comes back. */
 
@@ -100,14 +101,9 @@ export async function loadMonthlyDonations(charityId: string): Promise<MonthlyRo
 /** Rows of `charity_donations` (paid, refunded or charged back), read page by page. */
 async function allCharityDonations<T>(charityId: string, fields: string, narrow: (q: any) => any = (q) => q): Promise<T[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const supabase = await createClient();
-  const rows: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await narrow(supabase.from("charity_donations").select(fields).eq("charity_id", charityId)).order("id").range(from, from + 999);
-    if (error) throw new Error(error.message);
-    rows.push(...((data ?? []) as T[]));
-    if (!data || data.length < 1000) break;
-  }
-  return rows;
+  return readAllPages<T>((from, to, count) =>
+    narrow(supabase.from("charity_donations").select(fields, count ? { count: "exact" } : undefined).eq("charity_id", charityId)).order("id").range(from, to),
+  );
 }
 
 /** Refunds and chargebacks since a moment (by when they were refunded or charged back), for "Needs you this week". */
@@ -126,29 +122,42 @@ export function loadMonthlyGifts(charityId: string) {
 
 /** Paid gifts that asked for an s18A receipt, and which of them are on an issued receipt. */
 export async function loadReceiptGifts(charityId: string) {
-  const gifts = await allCharityDonations<{ id: string; donor_id: string; tax_year: number | null; amount_cents: number; wants_18a: boolean; status: string }>(
-    charityId,
-    "id, donor_id, tax_year, amount_cents, wants_18a, status",
-    (q) => q.eq("status", "paid").eq("wants_18a", true),
-  );
-  const supabase = await createClient();
-  const onIssued = new Set<string>();
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from("charity_receipt_donations").select("donation_id").eq("charity_id", charityId).eq("status", "issued").order("donation_id").range(from, from + 999);
-    if (error) throw new Error(error.message);
-    for (const r of data ?? []) onIssued.add(r.donation_id as string);
-    if (!data || data.length < 1000) break;
-  }
+  const [gifts, onIssued] = await Promise.all([
+    allCharityDonations<{ id: string; donor_id: string; tax_year: number | null; amount_cents: number; wants_18a: boolean; status: string }>(
+      charityId,
+      "id, donor_id, tax_year, amount_cents, wants_18a, status",
+      (q) => q.eq("status", "paid").eq("wants_18a", true),
+    ),
+    loadIssuedGiftIds(charityId),
+  ]);
   return { gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })), onIssued };
+}
+
+/** The gifts that are on an issued s18A receipt. */
+async function loadIssuedGiftIds(charityId: string): Promise<Set<string>> {
+  const supabase = await createClient();
+  const issued = await readAllPages<{ donation_id: string }>((from, to, count) =>
+    supabase
+      .from("charity_receipt_donations")
+      .select("donation_id", count ? { count: "exact" } : undefined)
+      .eq("charity_id", charityId)
+      .eq("status", "issued")
+      .order("donation_id")
+      .range(from, to),
+  );
+  return new Set(issued.map((r) => r.donation_id));
 }
 
 /** Everything the annual report needs: every paid, refunded or charged-back donation, the campaign names and issued receipts. */
 export async function loadReportData(charityId: string) {
-  const gifts = await allCharityDonations<{ id: string; donor_id: string; status: string; amount_cents: number; paid_at: string | null; tax_year: number | null; recurring_id: string | null; campaign_id: string | null; wants_18a: boolean }>(
-    charityId,
-    "id, donor_id, status, amount_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a",
-  );
-  const [campaignTitles, { onIssued }] = await Promise.all([loadCampaignTitles(charityId), loadReceiptGifts(charityId)]);
+  const [gifts, campaignTitles, onIssued] = await Promise.all([
+    allCharityDonations<{ id: string; donor_id: string; status: string; amount_cents: number; paid_at: string | null; tax_year: number | null; recurring_id: string | null; campaign_id: string | null; wants_18a: boolean }>(
+      charityId,
+      "id, donor_id, status, amount_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a",
+    ),
+    loadCampaignTitles(charityId),
+    loadIssuedGiftIds(charityId),
+  ]);
   return {
     gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })),
     campaignTitles,
