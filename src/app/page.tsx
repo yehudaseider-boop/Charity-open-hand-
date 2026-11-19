@@ -57,7 +57,7 @@ const charity = DEMO_CHARITY.name_en;
 const sizeH1 = "text-[clamp(2.75rem,5.2vw,4.75rem)] leading-[1.04]";
 const sizeH2 = "text-[clamp(2.25rem,4.2vw,3.75rem)] leading-[1.08]";
 function H({ as: Tag = "h2", size, dark = false, className = "", children }: { as?: "h1" | "h2"; size: "h1" | "h2"; dark?: boolean; className?: string; children: React.ReactNode }) {
-  return <Tag className={`font-display ${size === "h1" ? sizeH1 : sizeH2} font-medium! tracking-[-0.03em]! text-balance ${dark ? "text-white!" : "text-indigo!"} ${className}`}>{children}</Tag>;
+  return <Tag className={`font-display ${size === "h1" ? sizeH1 : sizeH2} font-bold! tracking-[-0.03em]! text-balance ${dark ? "text-white!" : "text-indigo!"} ${className}`}>{children}</Tag>;
 }
 /** The one emphasised phrase in a heading. */
 function Em({ dark = false, children }: { dark?: boolean; children: React.ReactNode }) {

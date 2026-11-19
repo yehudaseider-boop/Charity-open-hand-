@@ -44,7 +44,7 @@ const lineBtnDark = "whitespace-nowrap inline-flex min-h-13 items-center justify
 const lineBtn = "inline-flex min-h-13 items-center justify-center gap-1.5 rounded-[1.125rem] border-[1.5px] border-navy/25 px-7 text-[17px] font-bold text-navy transition-colors hover:border-navy";
 
 function H2({ dark = false, children }: { dark?: boolean; children: React.ReactNode }) {
-  return <h2 className={`font-display text-[clamp(2.25rem,4.2vw,3.75rem)] font-medium! leading-[1.08] tracking-[-0.03em]! text-balance ${dark ? "text-white!" : "text-indigo!"}`}>{children}</h2>;
+  return <h2 className={`font-display text-[clamp(2.25rem,4.2vw,3.75rem)] font-bold! leading-[1.08] tracking-[-0.03em]! text-balance ${dark ? "text-white!" : "text-indigo!"}`}>{children}</h2>;
 }
 function Em({ dark = false, children }: { dark?: boolean; children: React.ReactNode }) {
   return <em className={`font-extrabold not-italic ${dark ? "text-honey" : "text-brand"}`}>{children}</em>;
@@ -127,7 +127,7 @@ export default function ComingSoon() {
               </span>
               {launch ? `Launching in South Africa, ${launch}` : "Coming soon to South Africa"}
             </p>
-            <h1 className="font-display text-[clamp(3rem,6vw,5.25rem)] font-medium! leading-[1.02] tracking-[-0.035em]! text-balance text-white!">
+            <h1 className="font-display text-[clamp(3rem,6vw,5.25rem)] font-bold! leading-[1.02] tracking-[-0.035em]! text-balance text-white!">
               Giving, <Em dark>made easy.</Em>
             </h1>
             <p className="max-w-[32rem] text-pretty text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
@@ -293,7 +293,7 @@ export default function ComingSoon() {
       <section className="hero-glow relative overflow-hidden bg-brand text-white">
         <Reveal className="mx-auto flex max-w-[80rem] flex-col items-center gap-8 px-4 py-24 text-center sm:px-6 md:py-32">
           <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-32 md:w-32"><Splash className="w-16 md:w-20" /></span>
-          <h2 className="max-w-[56rem] font-display text-[clamp(2.75rem,5.2vw,4.75rem)] font-medium! leading-[1.04] tracking-[-0.03em]! text-balance text-white!">
+          <h2 className="max-w-[56rem] font-display text-[clamp(2.75rem,5.2vw,4.75rem)] font-bold! leading-[1.04] tracking-[-0.03em]! text-balance text-white!">
             {launch ? `${launch} is close.` : "Launch is close."} <Em dark>Be there from day one.</Em>
           </h2>
           <div className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">

@@ -13,7 +13,7 @@ const charity = DEMO_CHARITY.name_en;
 export function Where({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand-deep py-1 pl-1 pr-3 text-[12px] font-semibold text-white ring-1 ring-white/20">
-      <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-coral text-[11px] font-extrabold text-navy">{n}</span>
+      <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-coral font-display text-[11px] font-extrabold text-navy">{n}</span>
       {children}
     </p>
   );
@@ -39,7 +39,7 @@ export function GivePhone() {
           <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-md bg-sage"><Icon name="check" className="stroke-white" size={12} /></span>
           I&apos;d like an s18A receipt
         </p>
-        <div className="relative mt-5 overflow-hidden rounded-[1rem] bg-coral py-3.5 text-center text-[15px] font-extrabold text-navy shadow-[0_5px_0_#d9621c]">
+        <div className="relative mt-5 overflow-hidden rounded-[1rem] bg-coral py-3.5 text-center text-[15px] font-bold text-navy shadow-[0_5px_0_#d9621c]">
           <span className="relative">Give R250</span>
         </div>
       </div>

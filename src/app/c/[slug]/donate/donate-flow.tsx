@@ -255,7 +255,7 @@ export function DonateFlow({
         <div>
           {suggestedCents.length ? <p className="mb-1 text-sm font-semibold text-navy">Or type your own amount</p> : null}
           <div className="flex min-w-0 items-center rounded-control border-2 border-outline bg-surface px-4 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
-            <span className="font-display text-2xl text-indigo">R</span>
+            <span className="font-display text-2xl font-bold text-indigo">R</span>
             <input
               id="amount"
               ref={amountRef}
@@ -275,7 +275,7 @@ export function DonateFlow({
                 changed();
               }}
               onBlur={() => setAmountTouched(true)}
-              className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl text-navy outline-none"
+              className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl font-bold text-navy outline-none"
             />
           </div>
         </div>
