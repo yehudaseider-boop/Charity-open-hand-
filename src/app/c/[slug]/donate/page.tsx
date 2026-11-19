@@ -48,14 +48,19 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   // again after a declined card keeps the amount the donor chose (our links carry it in cents). A silly value is
   // ignored quietly and the page starts as usual.
   const link = readGiveLink(sp, platformConfig);
-  const charity = await loadCharity(slug);
+  // The charity and who is looking, at the same time (19/11/2026: one after the other made this the slowest page).
+  const [charity, viewer] = await Promise.all([loadCharity(slug), getViewer()]);
   if (!charity) notFound();
-  // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift).
-  const campaign = typeof sp.campaign === "string" ? (await loadOpenCampaigns(charity.id)).find((c) => c.id === sp.campaign) : undefined;
+  // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift), and the
+  // donor's saved ID, also at the same time.
+  const [campaigns, savedId] = await Promise.all([
+    typeof sp.campaign === "string" ? loadOpenCampaigns(charity.id) : Promise.resolve([]),
+    viewer?.email && charity.receiptsAvailable ? savedIdLast4(viewer.userId) : Promise.resolve(null),
+  ]);
+  const campaign = typeof sp.campaign === "string" ? campaigns.find((c) => c.id === sp.campaign) : undefined;
   // Otherwise one of the charity's own amounts starts selected (Givezy never suggests a figure of its own).
   const initialAmountCents = link.amountCents ?? preselectedAmount(charity.suggestedCents, platformConfig);
-  const viewer = await getViewer();
-  const account = viewer?.email ? { email: viewer.email, savedIdLast4: charity.receiptsAvailable ? await savedIdLast4(viewer.userId) : null } : undefined;
+  const account = viewer?.email ? { email: viewer.email, savedIdLast4: savedId } : undefined;
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">

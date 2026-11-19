@@ -28,11 +28,12 @@ export async function signedInWithPassword(supabase: Awaited<ReturnType<typeof c
 /** The signed-in person and their roles, or null for a visitor. Looked up once per request. */
 export const getViewer = cache(async function getViewer(): Promise<Viewer | null> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Both checks at once (19/11/2026: one after the other, they made every signed-in page wait twice).
+  const [{ data: { user } }, password] = await Promise.all([supabase.auth.getUser(), signedInWithPassword(supabase)]);
   if (!user) return null;
   // Givezy signs people in with an emailed code only: a session started with a password is refused
   // (someone could have registered another person's email with a password before they ever signed in).
-  if (await signedInWithPassword(supabase)) return null;
+  if (password) return null;
 
   const [{ data: profile }, { data: memberships }, { data: agreement }] = await Promise.all([
     supabase.from("profiles").select("role").eq("id", user.id).single(),
