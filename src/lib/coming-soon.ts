@@ -75,6 +75,9 @@ function isAllowedFile(pathname: string): boolean {
     pathname.startsWith("/_next/") ||
     pathname === "/opengraph-image" ||
     pathname.startsWith("/opengraph-image-") ||
+    // The pre-launch page's own share picture (src/app/coming-soon/opengraph-image.tsx).
+    pathname === "/coming-soon/opengraph-image" ||
+    pathname.startsWith("/coming-soon/opengraph-image-") ||
     pathname.startsWith("/brand/") ||
     STATIC_FILE.test(pathname)
   );

@@ -95,7 +95,7 @@ describe("comingSoonAction", () => {
   });
 
   it("still serves the technical files", () => {
-    for (const p of ["/robots.txt", "/_next/static/chunks/a.js", "/_next/image", "/opengraph-image", "/opengraph-image-1abc", "/logo.png", "/brand/splash.png", "/icon.png", "/apple-icon.png", "/favicon.ico", "/brand/x.svg"]) {
+    for (const p of ["/robots.txt", "/_next/static/chunks/a.js", "/_next/image", "/opengraph-image", "/opengraph-image-1abc", "/coming-soon/opengraph-image", "/coming-soon/opengraph-image-1abc", "/logo.png", "/brand/splash.png", "/icon.png", "/apple-icon.png", "/favicon.ico", "/brand/x.svg"]) {
       expect(act(`https://givezy.co.za${p}`), p).toBe("pass-through");
     }
     // But only for a plain read.
