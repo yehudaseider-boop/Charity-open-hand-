@@ -6,7 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { checkCharityBank } from "@/lib/charity/bank-check";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
-import { adminRemovedEmail, approvedEmail, connectedEmail, notifyCharity, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, sentBackEmail, suspendedEmail } from "@/lib/charity/emails";
+import { adminRemovedEmail, approvedEmail, bankChangedEmail, connectedEmail, notifyCharity, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, sentBackEmail, suspendedEmail } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { decrypt, encrypt, last4 } from "@/lib/crypto";
 import { bankSchema, DOCUMENT_MIME, documentTypes, MAX_UPLOAD_BYTES, type DocumentType } from "@/lib/charity/validation";
@@ -90,7 +90,7 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
     entityId: id,
     details: { s18a_confirmed: confirmS18a, mandate_confirmed: confirmMandate, vetting_checks: vetting.ticked, spoke_to: vetting.spokeTo },
   });
-  if (contactEmail) await notifyCharity(approvedEmail(contactEmail, charity.name_en, id, confirmS18a && confirmMandate));
+  if (contactEmail) await notifyCharity(approvedEmail(contactEmail, charity.name_en, id, confirmS18a && confirmMandate ? "ready" : confirmS18a ? "mandate" : "none"));
   refresh(id, charity.slug);
   return { ok: true, message: contactEmail ? "Approved. The charity has been emailed." : "Approved. (No contact email on file, so nobody was emailed.)" };
 }
@@ -155,7 +155,7 @@ export async function reinstateCharity(id: string, _prev: FormState): Promise<Fo
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.reinstated", entityType: "charity", entityId: id });
-  if (priv?.contact_email) await notifyCharity(reinstatedEmail(priv.contact_email, charity.name_en, id));
+  if (priv?.contact_email) await notifyCharity(reinstatedEmail(priv.contact_email, charity.name_en, id, Boolean(charity.gateway_subaccount_ref)));
   refresh(id, charity.slug);
   return { ok: true, message: "Reinstated." };
 }
@@ -321,17 +321,7 @@ export async function changeBankDetails(id: string, _prev: FormState, formData: 
 
   if (before?.contact_email) {
     try {
-      await getEmailTransport().send({
-        to: before.contact_email as string,
-        subject: `The bank details for ${charity.name_en} were changed`,
-        text: [
-          `The bank details held by Givezy for ${charity.name_en} were changed on ${formatDate(new Date())}. The new account ends in ${last4(v.bank_account_number)}.`,
-          "",
-          "If you did not ask for this, please tell us straight away.",
-          "",
-          "Givezy",
-        ].join("\n"),
-      });
+      await getEmailTransport().send(bankChangedEmail(before.contact_email as string, charity.name_en, formatDate(new Date()), last4(v.bank_account_number), wasConnected));
     } catch (e) {
       console.error("[admin] bank change email not sent", e);
     }

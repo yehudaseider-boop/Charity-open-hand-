@@ -20,7 +20,7 @@ export function monthlyFailedEmail(d: {
     : null;
   const lines = d.final
     ? [
-        `We could not collect your monthly donation of ${d.totalText} to ${d.charityName} from ${card}. We tried three times this month.`,
+        `We could not collect your monthly donation of ${d.totalText} to ${d.charityName} from ${card}. We tried three times over the last few days.`,
         "",
         "We have stopped your monthly donation, so nothing more will be charged to that card.",
         ...(newCard ? ["", newCard] : ["", "To carry on giving monthly, start a new monthly donation on the charity's page."]),

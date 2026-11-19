@@ -247,7 +247,11 @@ beforeEach(() => {
       gift("g6", "rec", { gateway: "recorded" }, { email: "rec@x.co" }),
       gift("g7", "other", { charity_id: "c2" }, { email: "other@x.co" }),
     ],
-    charity_email_opt_outs: [{ charity_id: "c1", email_hash: emailHash("stop@x.co") }],
+    charity_email_opt_outs: [
+      { charity_id: "c1", email_hash: emailHash("stop@x.co"), source: "stop_link" },
+      // The checkout tick "No news or appeals" promised news and appeals only: it must not stop this reminder (19/11/2026).
+      { charity_id: "c1", email_hash: emailHash("sarah@x.co"), source: "checkout" },
+    ],
     s18a_receipt_donations: [],
     thank_you_opt_outs: [],
   };

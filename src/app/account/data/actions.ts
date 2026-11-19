@@ -45,5 +45,5 @@ export async function sendDataRequest(_prev: FormState, formData: FormData): Pro
     }
   }
   revalidatePath("/account/data");
-  return { ok: true, message: "Thank you. We've received your request and will reply by email." };
+  return { ok: true, message: "Thank you. We've received your request. You'll see our reply on this page." };
 }

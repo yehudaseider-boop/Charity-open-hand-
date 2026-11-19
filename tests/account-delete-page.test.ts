@@ -20,9 +20,9 @@ describe("delete my account: open request check", () => {
     expect(openDeleteRequest([{ kind: "object", status: "open", created_at: "2026-11-01T10:00:00Z" }, row])).toBe(row);
   });
 
-  it("says when they asked, in dd/mm/yyyy Johannesburg time, and that we reply by email", () => {
+  it("says when they asked, in dd/mm/yyyy Johannesburg time, and where we reply", () => {
     expect(alreadyAskedSentence("2026-10-06T14:00:00Z")).toBe(
-      "You've already asked us to delete your account on 06/10/2026. We'll reply by email.",
+      "You've already asked us to delete your account on 06/10/2026. We'll reply on this page (Your information), and by email once your information is erased.",
     );
     // 23:30 UTC is already the next day in Johannesburg.
     expect(alreadyAskedSentence("2026-10-06T23:30:00Z")).toContain("07/10/2026");

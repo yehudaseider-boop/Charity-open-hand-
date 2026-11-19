@@ -137,6 +137,8 @@ describe("erasing a donor by their account", () => {
     let s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(s.accountDeleted).toBe(false);
     expect(s.note).toMatch(/platform admin/);
+    // The email tells the truth: the sign-in account (and its email address) stays (reading pass, 19/11/2026).
+    expect(emails.at(-1)?.text).toMatch(/One exception: your sign-in account stays/);
     expect(calls).not.toContain("deleteUser");
 
     calls.length = 0;

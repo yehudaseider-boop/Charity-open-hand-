@@ -48,7 +48,7 @@ async function run(request: NextRequest) {
     checks = await runDailyChecks(new Date(), started + 45_000, retries ? { retries } : {});
   } catch (e) {
     console.error("[daily] checks failed", e);
-    await alertGivezy("the daily check could not run", ["The daily safety check stopped with an error (see the job log). Nothing was charged by it. It runs again tomorrow."]);
+    await alertGivezy("the daily check could not run", ["The daily safety check stopped with an error (see the job log). The check itself never charges anyone. It runs again tomorrow."]);
     return new NextResponse("Run failed", { status: 500 });
   }
   const lines = dailyDigest(checks, {

@@ -13,10 +13,10 @@ export default async function StopThanksPage({ searchParams }: PageProps<"/thank
     <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">
       <h1 className="text-xl font-semibold">Thank-you emails</h1>
       {sp.done === "1" ? (
-        <p className="mt-3 text-sm">Done. Charities won&apos;t send you thank-you emails through Givezy any more. You still get your donation confirmations and s18A receipts.</p>
+        <p className="mt-3 text-sm">Done. Charities won&apos;t send you thank-yous, news, appeals or reminders about your s18A details through Givezy any more. You still get your donation confirmations and s18A receipts.</p>
       ) : token ? (
         <form action={confirmStop} className="mt-4 space-y-3">
-          <p className="text-sm">Stop thank-you emails from all charities on Givezy? You will still get your donation confirmations and s18A receipts.</p>
+          <p className="text-sm">Stop thank-yous, news, appeals and reminders about your s18A details from all charities on Givezy? You will still get your donation confirmations and s18A receipts.</p>
           <input type="hidden" name="t" value={token} />
           {sp.error === "1" ? <p role="alert" className="text-sm text-danger">That link didn&apos;t work. Please use the link from your most recent thank-you email.</p> : null}
           <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Stop thank-you emails</button>

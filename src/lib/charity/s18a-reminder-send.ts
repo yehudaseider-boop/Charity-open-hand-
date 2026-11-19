@@ -130,7 +130,7 @@ export async function optedOutHashes(charityId: string, hashes: string[]): Promi
     // This charity's opt-outs and "no emails from charities" overall, as appeals check (stoppedEmails).
     const chunk = hashes.slice(i, i + 200);
     const [mine, any] = await Promise.all([
-      db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("email_hash", chunk),
+      db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("source", ["stop_link", "charity"]).in("email_hash", chunk),
       db().from("thank_you_opt_outs").select("email_hash").in("email_hash", chunk),
     ]);
     if (mine.error) throw mine.error;

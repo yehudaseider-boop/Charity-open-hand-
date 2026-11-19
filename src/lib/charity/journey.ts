@@ -143,7 +143,7 @@ export const STARTER_STEPS: JourneyStep[] = [
   {
     waitDays: 21,
     subject: "A little more about our work",
-    body: "We'd love you to know more about the people behind our work and the people we serve.\n\nIf you ever have a question, or would like to visit or help in another way, reply to this email and someone from our team will get back to you.",
+    body: "We'd love you to know more about the people behind our work and the people we serve.\n\nIf you ever have a question, or would like to visit or help in another way, get in touch and someone from our team will get back to you.",
   },
   {
     waitDays: 45,
@@ -211,7 +211,7 @@ export function campaignStarterSteps(campaignTitle: string): JourneyStep[] {
     {
       waitDays: 21,
       subject: "How the campaign is going",
-      body: `We wanted to tell you how ${t} is going. Our page on Givezy has the latest news and photos.\n\nIf you have a question, reply to this email and someone from our team will get back to you.`,
+      body: `We wanted to tell you how ${t} is going. Our page on Givezy has the latest news and photos.\n\nIf you have a question, get in touch and someone from our team will get back to you.`,
     },
   ];
 }
@@ -229,7 +229,7 @@ export const WINBACK_STARTER_STEPS: JourneyStep[] = [
   {
     waitDays: 30,
     subject: "What we've been doing",
-    body: "Here's a little news from us. Our page on Givezy has our latest updates and photos.\n\nIf you ever have a question, or would like to help in another way, reply to this email and someone from our team will get back to you.",
+    body: "Here's a little news from us. Our page on Givezy has our latest updates and photos.\n\nIf you ever have a question, or would like to help in another way, get in touch and someone from our team will get back to you.",
   },
 ];
 

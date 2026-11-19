@@ -11,5 +11,5 @@ export function openDeleteRequest<T extends RequestRow>(rows: readonly T[] | nul
 
 /** What the page says when a delete request is already waiting. */
 export function alreadyAskedSentence(createdAt: string): string {
-  return `You've already asked us to delete your account on ${formatDate(createdAt)}. We'll reply by email.`;
+  return `You've already asked us to delete your account on ${formatDate(createdAt)}. We'll reply on this page (Your information), and by email once your information is erased.`;
 }
