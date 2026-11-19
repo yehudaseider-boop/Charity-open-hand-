@@ -31,8 +31,7 @@ export const REMINDER_KIND = "s18a_details_reminder";
  * Donors of this charity with at least one gift whose s18A details are still missing and can still be added (the
  * receipt run's "details missing": paid, asked for an s18A receipt, inside the completion window, not on an issued
  * receipt, not erased), with what is missing across those gifts.
- */
-/**
+ *
  * `earliestYear`, when given, is filled with each donor's earliest tax year that still needs details, so the reminder can
  * name the last day to add them (31 May after that tax year).
  */
