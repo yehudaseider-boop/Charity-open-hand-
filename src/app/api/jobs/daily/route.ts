@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { runMonthlyGiving } from "@/lib/donations/monthly-store";
 import { syncPayouts } from "@/lib/donations/payouts";
 import { alertGivezy, cronAllowed } from "@/lib/ops/alert";
+import { pingHeartbeat } from "@/lib/ops/heartbeat";
 import { collectMonthlyWithin, dailyDigest, payoutsAlertLines, runDailyChecks, runImportantEmailRetries, type RetriesDone } from "@/lib/ops/daily";
 import { runJourneys } from "@/lib/charity/journey-store";
 import { withGatewayTimeout } from "@/lib/gateway/timeout";
@@ -87,6 +88,9 @@ async function run(request: NextRequest) {
   if (payoutLines.length && Date.now() < started + 58_000) {
     await alertGivezy("the deposit report wasn't fully updated today", payoutLines).catch(() => undefined);
   }
+  // The check-in, last and only when the day's main work ran: monthly collection and the checks. If either failed, no
+  // check-in is made, so the monitoring service notices the silence (an email about it has already gone out).
+  if (monthly !== null) await pingHeartbeat().catch(() => undefined);
   // Only counts come back: no donor details.
   const counts = (a: unknown[]) => a.length;
   return NextResponse.json(

@@ -34,6 +34,15 @@ describe("the Admin settings check", () => {
   });
 });
 
+describe("the Admin settings check for the daily check-in", () => {
+  const line = (env: Record<string, string | undefined>) => settingsCheck(env).find((c) => c.name === "HEARTBEAT_DAILY_URL");
+  it("reminds you while it is not set, and is quiet once it is", () => {
+    expect(line({})?.status).toBe("later");
+    expect(line({ HEARTBEAT_DAILY_URL: "http://nope.example/x" })?.status).toBe("later");
+    expect(line({ HEARTBEAT_DAILY_URL: "https://uptime.example/hb/x" })?.status).toBe("ok");
+  });
+});
+
 describe("what the phone app is told while paused", () => {
   beforeEach(() => {
     process.env.APP_GIVING = "yes";

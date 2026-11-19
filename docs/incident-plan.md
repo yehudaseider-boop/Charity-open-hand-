@@ -49,6 +49,20 @@ Vercel, Settings, Environment Variables, set `COMING_SOON_HOSTS` to the site's a
 
 **The pause switch (built 19/11/2026, off):** a softer stop that keeps the site up. Vercel, Settings, **Environment Variables**, add `GIVING_PAUSED` with the value `yes` (all environments), then **Redeploy**. Every Give button on the website and in the app then says "Giving is paused for a short while. Nothing has been charged. Please try again later." Payment confirmations still arrive, charities and donors still sign in, and monthly collections wait (they are taken on the first day after it is off, and no donation is counted as failed). To open giving again: delete `GIVING_PAUSED` and redeploy. Admin, Settings check shows it in red while it is on, so it can't be forgotten. **Use this one first** and keep the holding page above for when nothing else will do.
 
+## Keys: what each one is, and what happens if it leaks or must be replaced
+
+A key lives in Vercel (Settings, Environment Variables) and in the service that made it. To replace one: make a new key in the service, put it in Vercel, redeploy, then delete the old key in the service. Never paste a key in a chat or an email.
+
+| Key (Vercel name) | Whose it is | If it leaks | If it is lost or replaced |
+|---|---|---|---|
+| `SUPABASE_SECRET_KEY` | Supabase | Full access to the database. Replace at once. | Replace in Supabase, then Vercel and GitHub (`E2E_SUPABASE_SECRET_KEY` for the robot). |
+| `ENCRYPTION_KEY` | Ours (no service holds a copy) | Saved bank, ID and tax numbers could be read with a copy of the database. | **Never replace casually: nothing encrypted with the old one can be read again.** Needs a planned re-encryption (Claude Code writes it) and a safe backup copy of the old key first. **Keep a backup copy somewhere safe (not in the repository).** |
+| Payment provider keys (`PAYSTACK_*` today, `STITCH_*` next) | The provider | Someone could start or refund payments. Replace in the provider's dashboard at once, then Vercel. | Replace in the provider's dashboard, then Vercel. |
+| `RESEND_API_KEY` | Resend | Someone could send email as Givezy. Replace at once. | Replace in Resend, then Vercel. |
+| `CRON_SECRET` | Ours (Vercel's scheduler uses it) | Someone could run the daily job on demand. Replace. | Change it in Vercel and redeploy; the scheduler picks the new one up. |
+| `HEARTBEAT_DAILY_URL` | The monitoring service | Someone could fake a "the daily job ran" check-in. Make a new address in the service. | Same. |
+| `E2E_SUPABASE_SECRET_KEY` (GitHub) | The test database | Test project only. Replace in Supabase, then GitHub. | Same. |
+
 ## What we say
 
 In plain words, short, no blame, no exclamation marks. The site has no notice banner yet: Claude Code can add one to the home page in minutes, or post it wherever donors follow Givezy. Draft wording, for Yehuda to adjust:
@@ -56,6 +70,14 @@ In plain words, short, no blame, no exclamation marks. The site has no notice ba
 - **Site down:** "Givezy is down for a short while. No gifts are being taken, and nothing has been charged. We'll be back as soon as we can. Questions: hello@givezy.co.za."
 - **Payments failing:** "Gifts aren't going through right now. If you tried, nothing was charged. Please try again later. Questions: hello@givezy.co.za."
 - **To a charity (payments or its page affected):** "Hi ____, a quick note: gifts to [charity] weren't going through between [time] and [time]. Nothing was charged to donors, and nothing is lost: [what happens next]. We're sorry for the trouble. Yehuda"
+
+## Quiet things that can take everything down (check now and then)
+
+- **The domain.** If `givezy.co.za` lapses at GoDaddy, the site and every email stop at once. Check that it is on auto-renew with a card that won't expire, and that the renewal reminders go to an address you read. *Yehuda: 2 minutes in GoDaddy.*
+- **The email domain's records** (SPF, DKIM, DMARC at GoDaddy for Resend): if they are changed or deleted, emails start landing in spam. Don't touch them without checking with Claude Code.
+- **Package security alerts.** GitHub can tell us when a package we use has a known security hole: GitHub, the repository, Settings, Code security, turn on **Dependabot alerts** (free). *Yehuda: 3 taps.*
+- **The daily job's check-in.** If `HEARTBEAT_DAILY_URL` is set and the monitoring service says the daily job didn't check in, nothing was collected or checked that day: open Vercel, Settings, Cron Jobs, run `/api/jobs/daily` by hand, and tell Claude Code.
+- **Backups.** Supabase's Pro plan keeps a daily backup of the database for 7 days; we still owe one practice restore on the live project before launch (restoring overwrites the database, so never on a project in use).
 
 ## Afterwards (within a week)
 
