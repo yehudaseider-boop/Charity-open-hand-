@@ -267,8 +267,8 @@ export default function ComingSoon() {
             {([
               ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
               ["Every", "charity is checked by a person: its registration documents and bank details, before it can take a gift."],
-              // True of the build (19/11/2026): no Givezy page has a card field; both payment providers take the card on their own page.
-              ["0", "card numbers kept by Givezy. You pay on the payment provider's own secure page, never in a Givezy form."],
+              // Yehuda's pick (19/11/2026), the wording of the "Where does my money go?" answer below.
+              ["Straight", "to the charity's own bank account, through our payment provider."],
             ] as [string, string][]).map(([big, text]) => (
               <li key={big} className="flex flex-col gap-4 border-t-2 border-navy/15 pt-6">
                 <span className="font-display text-[clamp(4rem,6vw,6rem)] font-bold leading-[0.9] tracking-[-0.045em] text-brand">{big}</span>
