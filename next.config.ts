@@ -36,6 +36,19 @@ const csp = [
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
+const previewCsp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' blob: data: https:",
+  "font-src 'self' data:",
+  "frame-src 'self'",
+  "connect-src 'self' https:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'self'",
+].join("; ");
+
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },
   { key: "X-Frame-Options", value: "DENY" },
@@ -72,7 +85,28 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "4.5mb" },
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      // Everything except the app's browser preview (below).
+      { source: "/((?!app-preview).*)", headers: securityHeaders },
+      // The app's browser preview (19/11/2026, public/app-preview): the app's own pages, shown in a frame on the same
+      // address, with its made-up charity photos from the web. Never listed by search engines.
+      {
+        source: "/app-preview/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: previewCsp },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          ...securityHeaders.filter((h) => !["Content-Security-Policy", "X-Frame-Options"].includes(h.key)),
+        ],
+      },
+    ];
+  },
+  async rewrites() {
+    // The preview app is a single page: any address inside it opens its index.
+    return [
+      { source: "/app-preview", destination: "/app-preview/index.html" },
+      { source: "/app-preview/app/:path*", destination: "/app-preview/app/index.html" },
+    ];
   },
 };
 
