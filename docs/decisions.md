@@ -2069,3 +2069,15 @@ An independent check of the dashboard (and its demo) at 390, 810, 1080 and 1440 
 - The demo dashboard (made-up data) is now open on the coming-soon address too.
 - The fee answer says fees are published before launch, in plain Rand. Change it once the fee wording is settled.
 - The gift-story pieces moved to `src/components/landing/gift-story.tsx`, shared with the home page.
+
+## 19/11/2026: the new pre-launch page is on givezy.co.za; charity buttons go to WhatsApp for now
+
+- givezy.co.za is served by the test site's deploys, so the rebuilt page went live there with the push.
+- Found: on givezy.co.za, "Apply" and the demo dashboard were forwarded to test.givezy.co.za (SITE_URL), so a real charity would have applied on the test site, into test data. Until the live site has its own database, email and address, every charity button on the page opens a WhatsApp chat ("Hi Givezy, I run a charity and would like to join.") and the demo link is hidden. `CHARITY_SIGNUP=yes` on the server brings back Apply (`charitySignUpOpen` in `src/config/app-links.ts`).
+
+## 19/11/2026: givezy.co.za never leads into the test site
+
+- Found by Yehuda: Privacy on givezy.co.za forwarded to test.givezy.co.za (SITE_URL), whose menu ("Charities") took him into the full test site.
+- Fixed: a coming-soon address is never forwarded to SITE_URL (`src/proxy.ts`), and it opens nothing but its one page unless `CHARITY_SIGNUP=yes` (the sign-up path and policies) or `LAUNCH_LIST=yes` (the policies only). The page shows Privacy and Terms only while one of those is on.
+- Still open: test.givezy.co.za and charity-open-hand.vercel.app are public. Anyone with the address can see the full test site. Password protection waits for Yehuda's yes (the test app's calls use that address).
+- When the policies open, they show the full site's menu; its links lead back to the pre-launch page on that address. Give them the pre-launch look before turning LAUNCH_LIST on.
