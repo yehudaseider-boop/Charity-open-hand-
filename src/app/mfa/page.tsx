@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { SupportContact } from "@/components/legal";
 import { getViewer, signedInWithPassword } from "@/lib/auth";
-import { safeNextPath } from "@/lib/mfa";
+import { passedSecondStep, safeNextPath } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 import { CodeField, Enrol } from "./enrol";
 import { verifyCode } from "./actions";
@@ -17,8 +17,7 @@ export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
   const { data: { user } } = await supabase.auth.getUser();
   // Only sessions started with an emailed code reach the second step (see auth.ts).
   if (!user || (await signedInWithPassword(supabase))) redirect(`/login?next=${encodeURIComponent(`/mfa?next=${encodeURIComponent(next)}`)}`);
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal?.currentLevel === "aal2") redirect(next);
+  if (await passedSecondStep(supabase)) redirect(next);
   // Only charity admins and Givezy staff need a second step; anyone else is sent on their way.
   const viewer = await getViewer();
   if (viewer && viewer.managedCharityIds.length === 0 && !viewer.isPlatformAdmin) redirect(next.startsWith("/charity-admin") || next.startsWith("/admin") ? "/account" : next);

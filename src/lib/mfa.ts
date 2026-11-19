@@ -10,14 +10,21 @@ import { safeNextPath } from "@/lib/safe-path";
  * in this sign-in. Sends them to set one up, or to enter their code.
  */
 export async function requireSecondStep(next: string): Promise<void> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (error || data?.currentLevel !== "aal2") redirect(`/mfa?next=${encodeURIComponent(safeNextPath(next))}`);
+  if (!(await hasSecondStep())) redirect(`/mfa?next=${encodeURIComponent(safeNextPath(next))}`);
 }
 
-/** For route handlers: true only if this sign-in has passed the second step. */
+/**
+ * True only if this sign-in has passed the second step. Read from the verified sign-in token (getClaims checks its
+ * signature), not from the cookie as stored (19/11/2026): Supabase's own assurance-level helper reads the unverified
+ * cookie, which printed a "could be insecure" warning into the site's logs on every dashboard and Admin page.
+ */
 export async function hasSecondStep(): Promise<boolean> {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  return !error && data?.currentLevel === "aal2";
+  return passedSecondStep(supabase);
+}
+
+/** The same check with a client the caller already has. */
+export async function passedSecondStep(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
+  const { data, error } = await supabase.auth.getClaims();
+  return !error && (data?.claims as { aal?: string } | undefined)?.aal === "aal2";
 }
