@@ -1,3 +1,4 @@
+import { policyVersionLabel } from "@/lib/policy";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DraftNotice, Section } from "@/components/legal";
@@ -14,7 +15,7 @@ export default function TermsPage() {
     <article className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">Terms</h1>
-        <p className="text-xs text-muted">Version {legalConfig.policyVersion}</p>
+        <p className="text-xs text-muted">Version of {policyVersionLabel(legalConfig.policyVersion)}</p>
         <DraftNotice />
       </div>
 
