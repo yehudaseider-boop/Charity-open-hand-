@@ -78,14 +78,14 @@ export function Receipt() {
  * Shot at retina size (3x phone, 2x desktop) and served as they are (`unoptimized`), so small text stays sharp
  * (Yehuda, 17/11/2026: "it must be clear as ultra HD"). Only the open tab's picture loads.
  */
-/** Heights of the v6 phone pictures (all 780 wide), so the page keeps its place while they load. */
-const PHONE_HEIGHTS: Record<string, number> = { overview: 1962, donations: 4704, thank: 3822, receipts: 6096 };
+/** Heights of the v6 phone pictures (all 1170 wide: three times the screen, for iPhone sharpness), so the page keeps its place while they load. */
+const PHONE_HEIGHTS: Record<string, number> = { overview: 2943, donations: 7056, thank: 5733, receipts: 9144 };
 
 export function Screen({ name, alt }: { name: string; alt: string }) {
   return (
     <>
       {/* Phone: whole cards from the top of that screen, shown in a phone frame that scrolls (live-window.tsx). */}
-      <Image src={`/home/screen-${name}-phone-v6.webp`} width={780} height={PHONE_HEIGHTS[name] ?? 1962} alt={alt} unoptimized className="screen-narrow block h-auto w-full sm:hidden" />
+      <Image src={`/home/screen-${name}-phone-v6.webp`} width={1170} height={PHONE_HEIGHTS[name] ?? 2943} alt={alt} unoptimized className="screen-narrow block h-auto w-full sm:hidden" />
       <Image src={`/home/screen-${name}-v5.webp`} width={2340} height={1440} alt={alt} unoptimized className="screen-wide hidden h-auto w-full rounded-[0.75rem] border border-border sm:block" />
     </>
   );
