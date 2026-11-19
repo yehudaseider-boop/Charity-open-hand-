@@ -32,6 +32,15 @@ export function parseRandToCents(input: string): number | null {
   return Number(cents);
 }
 
+/**
+ * Written like an amount (digits, an optional "R", spaces, up to two decimals) even when parseRandToCents refused it
+ * for being too large to count safely: "99999999999999" is an amount that is too big, not a typo.
+ */
+export function looksLikeAmount(input: string): boolean {
+  const cleaned = input.trim().replace(/^R/i, "").replace(/[\s ]/g, "").replace(",", ".");
+  return /^\d+(?:\.\d{1,2})?$/.test(cleaned);
+}
+
 /** The message for "1,250": SA writes thousands with a space, and the comma is the decimal mark, so it can't be read safely. */
 export const COMMA_THOUSANDS_MESSAGE = "Use a space or nothing for thousands, for example 1250 or 1 250";
 

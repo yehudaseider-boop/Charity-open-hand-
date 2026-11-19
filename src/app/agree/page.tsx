@@ -1,3 +1,4 @@
+import { policyVersionLabel } from "@/lib/policy";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DraftNotice, TermsAndPrivacyLinks } from "@/components/legal";
@@ -29,7 +30,7 @@ export default async function AgreePage({ searchParams }: PageProps<"/agree">) {
         <input type="hidden" name="next" value={next} />
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="agree" required className="mt-1" />
-          <span>I agree to <TermsAndPrivacyLinks /> (version {legalConfig.policyVersion}).</span>
+          <span>I agree to <TermsAndPrivacyLinks /> (version of {policyVersionLabel(legalConfig.policyVersion)}).</span>
         </label>
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="age" required className="mt-1" />

@@ -5,7 +5,7 @@
  */
 import { platformConfig } from "@/config/platform";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
-import { COMMA_THOUSANDS_MESSAGE, formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
+import { COMMA_THOUSANDS_MESSAGE, formatRand, looksLikeAmount, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { cardChargeRates } from "./card-charge";
 import { contributionCents, type ContributionChoice } from "./contribution";
 
@@ -64,6 +64,7 @@ export function quoteFromTyped(
   if (gift === null) {
     if (!amountText.trim()) return { ok: false, field: "amount", message: "Enter an amount in Rand, for example 180." };
     if (usesCommaThousands(amountText)) return { ok: false, field: "amount", message: `${COMMA_THOUSANDS_MESSAGE}.` };
+    if (looksLikeAmount(amountText)) return { ok: false, field: "amount", message: feeErrorMessage(new FeeError("above_maximum", "too large to count")) };
     return { ok: false, field: "amount", message: "Enter an amount in Rand, for example 180 or 180.50." };
   }
   if (gift === 0) return { ok: false, field: "amount", message: `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.` };
