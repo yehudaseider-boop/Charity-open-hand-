@@ -53,7 +53,7 @@ export function approvedEmail(to: string, charityName: string, charityId: string
       receipts === "ready"
         ? "Donors who ask for an s18A receipt will get one in your name, issued by Givezy under your mandate."
         : receipts === "mandate"
-          ? "Your s18A approval is confirmed. To issue s18A receipts we also need your signed receipting mandate: upload it on your application page and we'll set up receipts."
+          ? "Your s18A approval is confirmed. To issue s18A receipts we also need your signed receipting mandate, with the date it was signed: reply to this email with it (or tell us if you have sent it already) and we'll set up receipts."
           : "You can't issue s18A receipts through Givezy yet; tell us once you have s18A approval and we'll set it up.",
       "",
       "A few things help donors find you and give:",

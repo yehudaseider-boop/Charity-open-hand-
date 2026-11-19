@@ -257,6 +257,20 @@ beforeEach(() => {
   };
 });
 
+describe("who has turned off a charity's emails (review of 19/11/2026)", () => {
+  it("journeys and appeals count the checkout tick; only the s18A-details reminder ignores it", async () => {
+    const { optedOutHashes } = await import("@/lib/charity/s18a-reminder-send");
+    const sarah = emailHash("sarah@x.co");
+    const stop = emailHash("stop@x.co");
+    const all = await optedOutHashes("c1", [sarah, stop]);
+    expect(all.has(sarah)).toBe(true);
+    expect(all.has(stop)).toBe(true);
+    const forReminder = await optedOutHashes("c1", [sarah, stop], { forDetailsReminder: true });
+    expect(forReminder.has(sarah)).toBe(false);
+    expect(forReminder.has(stop)).toBe(true);
+  });
+});
+
 describe("finding donors with details missing", () => {
   it("lists only this charity's donors whose gifts lack what SARS needs, with what is missing", async () => {
     const m = await loadS18aMissing("c1", NOW);

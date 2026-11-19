@@ -179,6 +179,8 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     accountDeleted: false,
   };
 
+  // The sign-in account stays on purpose (they run a charity or the platform): the email says so, and only then.
+  let keptForWork = false;
   if (userId) {
     // Their own records kept against the account go in every case, also when the account itself has to stay
     // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, giving-target settings, the saved card.
@@ -188,6 +190,7 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     }
     const blocked = await accountBlocker(userId);
     if (blocked) {
+      keptForWork = true;
       summary.note = blocked;
       // The account stays for their charity or platform work, without the name they gave as a donor
       // or how they described their giving.
@@ -213,7 +216,7 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       await getEmailTransport().send({
         to: email,
         subject: "Your information has been erased",
-        text: `As you asked, we have erased the information that identifies you from Givezy.\n\n${ERASE_KEPT_TEXT}${summary.accountDeleted ? "" : "\n\nOne exception: your sign-in account stays, with your email address on it, because you manage a charity or run the platform."}\n\nGivezy`,
+        text: `As you asked, we have erased the information that identifies you from Givezy.\n\n${ERASE_KEPT_TEXT}${keptForWork ? "\n\nOne exception: your sign-in account stays, with your email address on it, because you manage a charity or run the platform." : ""}\n\nGivezy`,
       });
     } catch (e) {
       console.error("[erase] confirmation email not sent", e);

@@ -106,6 +106,9 @@ describe("what the approval and related emails promise about donations (18/11/20
     const { approvedEmail } = await import("@/lib/charity/emails");
     expect(text(approvedEmail("c@x.co", "M", "i", "ready", ""))).toMatch(/will get one in your name/);
     expect(text(approvedEmail("c@x.co", "M", "i", "mandate", ""))).toMatch(/signed receipting mandate/);
+    // The application page is locked once approved: never send them there to upload it.
+    expect(text(approvedEmail("c@x.co", "M", "i", "mandate", ""))).toMatch(/reply to this email with it/);
+    expect(text(approvedEmail("c@x.co", "M", "i", "mandate", ""))).not.toMatch(/application page/);
     expect(text(approvedEmail("c@x.co", "M", "i", "mandate", ""))).not.toMatch(/tell us once you have s18A approval/);
     expect(text(approvedEmail("c@x.co", "M", "i", "none", ""))).toMatch(/tell us once you have s18A approval/);
   });

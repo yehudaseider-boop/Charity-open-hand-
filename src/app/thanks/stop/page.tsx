@@ -3,7 +3,7 @@ import Link from "next/link";
 import { confirmStop } from "./actions";
 
 // The address carries the donor's link: never pass it on in a Referer header.
-export const metadata: Metadata = { title: "Stop thank-you emails", referrer: "no-referrer" };
+export const metadata: Metadata = { title: "Stop emails from charities", referrer: "no-referrer" };
 
 /** From the link in a charity's thank-you. Asks first, so an email scanner opening the link changes nothing. */
 export default async function StopThanksPage({ searchParams }: PageProps<"/thanks/stop">) {
@@ -11,7 +11,7 @@ export default async function StopThanksPage({ searchParams }: PageProps<"/thank
   const token = typeof sp.t === "string" ? sp.t : "";
   return (
     <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">
-      <h1 className="text-xl font-semibold">Thank-you emails</h1>
+      <h1 className="text-xl font-semibold">Emails from charities</h1>
       {sp.done === "1" ? (
         <p className="mt-3 text-sm">Done. Charities won&apos;t send you thank-yous, news, appeals or reminders about your s18A details through Givezy any more. You still get your donation confirmations and s18A receipts.</p>
       ) : token ? (
@@ -19,10 +19,10 @@ export default async function StopThanksPage({ searchParams }: PageProps<"/thank
           <p className="text-sm">Stop thank-yous, news, appeals and reminders about your s18A details from all charities on Givezy? You will still get your donation confirmations and s18A receipts.</p>
           <input type="hidden" name="t" value={token} />
           {sp.error === "1" ? <p role="alert" className="text-sm text-danger">That link didn&apos;t work. Please use the link from your most recent thank-you email.</p> : null}
-          <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Stop thank-you emails</button>
+          <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Stop emails from charities</button>
         </form>
       ) : (
-        <p className="mt-3 text-sm text-muted">Open the link from a thank-you email to stop them.</p>
+        <p className="mt-3 text-sm text-muted">Open the link at the bottom of an email from a charity to stop them.</p>
       )}
       <Link href="/" className="mt-4 inline-block text-sm text-brand underline">Givezy home</Link>
     </div>

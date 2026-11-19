@@ -160,6 +160,8 @@ describe("erasing a donor by their account", () => {
     const s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(s.accountDeleted).toBe(false);
     expect(s.note).toMatch(/could not be deleted/);
+    // Not kept on purpose: the email must not claim they run a charity or the platform (review of 19/11/2026).
+    expect(emails.at(-1)?.text ?? "").not.toMatch(/One exception/);
   });
 
   it("a failed email does not stop the erasure", async () => {
@@ -184,6 +186,8 @@ describe("erasing a donor with no account", () => {
     expect(calls).not.toContain("deleteUser");
     expect(s.accountDeleted).toBe(false);
     expect(audits[0]).toMatchObject({ entityType: "donor", entityId: null });
+    // A guest has no sign-in account: no "your account stays" line.
+    expect(emails[0].text).not.toMatch(/One exception|sign-in account/);
   });
 
   it("needs someone to erase", async () => {

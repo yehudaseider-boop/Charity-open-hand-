@@ -124,13 +124,20 @@ export async function contacts(charityId: string, donorIds: string[]): Promise<{
 }
 
 /** Addresses (as hashes) that turned off this charity's emails. */
-export async function optedOutHashes(charityId: string, hashes: string[]): Promise<Set<string>> {
+/**
+ * With `forDetailsReminder`, the checkout tick "No news or appeals" is not counted: it promised news and appeals only,
+ * and the s18A-details reminder is about the donor's own receipt (19/11/2026). Journeys and appeals count every source.
+ */
+export async function optedOutHashes(charityId: string, hashes: string[], opts: { forDetailsReminder?: boolean } = {}): Promise<Set<string>> {
   const out = new Set<string>();
   for (let i = 0; i < hashes.length; i += 200) {
     // This charity's opt-outs and "no emails from charities" overall, as appeals check (stoppedEmails).
     const chunk = hashes.slice(i, i + 200);
     const [mine, any] = await Promise.all([
-      db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("source", ["stop_link", "charity"]).in("email_hash", chunk),
+      (opts.forDetailsReminder
+        ? db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("source", ["stop_link", "charity"])
+        : db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId)
+      ).in("email_hash", chunk),
       db().from("thank_you_opt_outs").select("email_hash").in("email_hash", chunk),
     ]);
     if (mine.error) throw mine.error;
@@ -181,7 +188,7 @@ export async function sendS18aReminders(args: {
     const c = who.byDonor.get(id);
     return c ? [{ donorId: id, hash: emailHash(c.email) }] : [];
   });
-  const [stopped, recent] = await Promise.all([optedOutHashes(args.charityId, withEmail.map((d) => d.hash)), messagedThisWeek(args.charityId, withEmail, now)]);
+  const [stopped, recent] = await Promise.all([optedOutHashes(args.charityId, withEmail.map((d) => d.hash), { forDetailsReminder: true }), messagedThisWeek(args.charityId, withEmail, now)]);
   const candidates: (ReminderCandidate & { contact: Contact | null })[] = donorIds.map((id) => {
     const contact = who.byDonor.get(id) ?? null;
     return {

@@ -34,7 +34,7 @@ export default async function DeleteAccountPage() {
             tax law requires us to keep are kept for as long as that law requires, no longer, and not used for anything else.
           </p>
           <p>Any open monthly donations are stopped when we delete the account.</p>
-          <p>We check that the request is from you first. You will see our reply on this page, and we email you once your information is erased.</p>
+          <p>We check that the request is from you first. Our reply shows on your <Link href="/account/data" className="text-brand underline">Your information</Link> page, and once your information is erased we email you to confirm.</p>
         </div>
         <div className="mt-4">
           {already ? <p role="status" className="text-sm font-medium">{alreadyAskedSentence(already.created_at)}</p> : <DeleteForm />}

@@ -45,5 +45,11 @@ export async function sendDataRequest(_prev: FormState, formData: FormData): Pro
     }
   }
   revalidatePath("/account/data");
-  return { ok: true, message: "Thank you. We've received your request. You'll see our reply on this page." };
+  return {
+    ok: true,
+    message:
+      parsed.data.kind === "delete"
+        ? "Thank you. We've received your request. Our reply will show on your Your information page, and we'll email you once your information is erased."
+        : "Thank you. We've received your request. Our reply will show on this page.",
+  };
 }
