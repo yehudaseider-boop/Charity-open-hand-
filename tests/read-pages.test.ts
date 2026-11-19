@@ -57,3 +57,26 @@ describe("reading every row, page by page", () => {
     await expect(readAllPages(table(5_000, { failAt: 3 * PAGE }).page)).rejects.toThrow("timeout");
   });
 });
+
+describe("looking up batches a few at a time", () => {
+  it("keeps the batches' order and never runs more than four at once", async () => {
+    const { inTurns } = await import("@/lib/charity/read-pages");
+    let open = 0;
+    let most = 0;
+    const out = await inTurns(upTo(11), async (i) => {
+      open++;
+      most = Math.max(most, open);
+      await new Promise((r) => setTimeout(r, 11 - i));
+      open--;
+      return i * 10;
+    });
+    expect(out).toEqual(upTo(11).map((i) => i * 10));
+    expect(most).toBe(4);
+    expect(await inTurns([], async () => 1)).toEqual([]);
+  });
+
+  it("fails when one batch fails, rather than give part of the answer", async () => {
+    const { inTurns } = await import("@/lib/charity/read-pages");
+    await expect(inTurns(upTo(6), async (i) => { if (i === 4) throw new Error("timeout"); return i; })).rejects.toThrow("timeout");
+  });
+});

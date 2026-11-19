@@ -43,3 +43,18 @@ export async function readAllPages<T>(page: (from: number, to: number, count: bo
   }
   return rows;
 }
+
+/** `work` on every item, a few at a time side by side, results in the items' order (for batches of ids to look up). */
+export async function inTurns<T, R>(items: T[], work: (item: T) => Promise<R>, sideBySide = 4): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(sideBySide, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await work(items[i]);
+      }
+    }),
+  );
+  return out;
+}

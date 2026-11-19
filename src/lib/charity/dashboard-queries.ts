@@ -67,21 +67,17 @@ export type DonorRow = {
 
 export async function loadDonors(charityId: string): Promise<DonorRow[]> {
   const supabase = await createClient();
-  // The database answers at most 1 000 rows at a time, so a long list is read page by page.
-  const rows: DonorRow[] = [];
-  for (let from = 0; ; from += 1000) {
-    // The database's own order (largest total, then latest gift), with the donor id last so the order is unique and
-    // no donor repeats or goes missing between pages.
-    const { data, error } = await supabase
-      .rpc("charity_donor_list", { p_charity_id: charityId })
+  // The database answers at most 1 000 rows at a time, so a long list is read page by page, a few pages at once.
+  // The database's own order (largest total, then latest gift), with the donor id last so the order is unique and no
+  // donor repeats or goes missing between pages.
+  const rows = await readAllPages<DonorRow>((from, to, count) =>
+    supabase
+      .rpc("charity_donor_list", { p_charity_id: charityId }, count ? { count: "exact" } : undefined)
       .order("total_cents", { ascending: false })
       .order("last_paid_at", { ascending: false })
       .order("donor_id")
-      .range(from, from + 999);
-    if (error) throw new Error(error.message);
-    rows.push(...((data ?? []) as DonorRow[]));
-    if (!data || data.length < 1000) break;
-  }
+      .range(from, to) as unknown as PromiseLike<{ data: DonorRow[] | null; error: { message: string } | null; count?: number | null }>,
+  );
   return rows.map((d) => ({ ...d, donation_count: n(d.donation_count), total_cents: n(d.total_cents) }));
 }
 

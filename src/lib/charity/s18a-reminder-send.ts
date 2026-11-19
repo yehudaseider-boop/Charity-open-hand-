@@ -13,6 +13,7 @@ import { emailHash, weekStart } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
 import { recordAction } from "./charity-actions";
 import { readPages } from "./paged";
+import { inTurns, readAllPages } from "./read-pages";
 
 /**
  * The s18A filter's "details missing" and the reminder email (CRM step 2, 10/11/2026). Every call here comes after
@@ -37,28 +38,30 @@ export const REMINDER_KIND = "s18a_details_reminder";
  */
 export async function loadS18aMissing(charityId: string, now = new Date(), earliestYear?: Map<string, number>): Promise<Map<string, MissingDetail[]>> {
   const window = completionWindow(now);
-  const rows: { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; details: S18aDetailsRow | null }[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await db()
+  type Gift = { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; donation_checkout_details: unknown };
+  // Read four batches of 1 000 at a time, and check receipts four lots of 200 at a time (19/11/2026: one after
+  // another, a charity with 10 000 receipt gifts waited about 5 seconds on its overview and donors pages).
+  const gifts = await readAllPages<Gift>((from, to, count) =>
+    db()
       .from("donations")
-      .select(`id, status, wants_18a, tax_year, donor_id, donation_checkout_details(${DETAILS})`)
+      .select(`id, status, wants_18a, tax_year, donor_id, donation_checkout_details(${DETAILS})`, count ? { count: "exact" } : undefined)
       .eq("charity_id", charityId)
       .eq("status", "paid")
       .eq("wants_18a", true)
       .in("tax_year", [window.taxYear, window.taxYear - 1])
       .order("id")
-      .range(from, from + 999);
-    if (error) throw error;
-    for (const g of data ?? []) {
-      const d = g.donation_checkout_details as unknown as S18aDetailsRow | S18aDetailsRow[] | null;
-      const details = Array.isArray(d) ? (d[0] ?? null) : d;
-      // Only gifts that lack something are worth checking against issued receipts.
-      if (details && !details.erased_at && s18aDetailsMissing(details).length) rows.push({ ...(g as unknown as (typeof rows)[number]), details });
-    }
-    if (!data || data.length < 1000) break;
+      .range(from, to) as unknown as PromiseLike<{ data: Gift[] | null; error: { message: string } | null; count?: number | null }>,
+  );
+  const rows: { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; details: S18aDetailsRow | null }[] = [];
+  for (const g of gifts) {
+    const d = g.donation_checkout_details as S18aDetailsRow | S18aDetailsRow[] | null;
+    const details = Array.isArray(d) ? (d[0] ?? null) : d;
+    // Only gifts that lack something are worth checking against issued receipts.
+    if (details && !details.erased_at && s18aDetailsMissing(details).length) rows.push({ id: g.id, status: g.status, wants_18a: g.wants_18a, tax_year: g.tax_year, donor_id: g.donor_id, details });
   }
-  const issued = new Set<string>();
-  for (let i = 0; i < rows.length; i += 200) for (const id of await onIssuedReceipt(db(), rows.slice(i, i + 200).map((r) => r.id))) issued.add(id);
+  const lots: string[][] = [];
+  for (let i = 0; i < rows.length; i += 200) lots.push(rows.slice(i, i + 200).map((r) => r.id));
+  const issued = new Set<string>((await inTurns(lots, (ids) => onIssuedReceipt(db(), ids))).flatMap((s) => [...s]));
   const out = new Map<string, MissingDetail[]>();
   for (const r of rows) {
     if (!canCompleteS18a(r, r.details, { window, onIssuedReceipt: issued })) continue;
