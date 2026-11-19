@@ -1,3 +1,4 @@
+import { GIVING_PAUSED_MESSAGE } from "@shared/giving-pause";
 import { parseRandToCents } from "@shared/money";
 import { cardChargeToCover } from "@shared/fees";
 import { impactLine, impactSource } from "@shared/charity/impact";
@@ -441,7 +442,11 @@ export default function Give() {
       <View style={styles.screen}>
         <TopBar title="Give" />
         <View style={{ padding: space.gutter }}>
-          <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now, so nothing was charged. Please try again later. ${helpLine()}`} action={{ label: "Back", onPress: leave }} />
+          {server.paused ? (
+            <EmptyState title="Giving is paused" body={`${GIVING_PAUSED_MESSAGE} ${helpLine()}`} action={{ label: "Back", onPress: leave }} />
+          ) : (
+            <EmptyState title="Not taking donations yet" body={`${charity.nameEn} can't take online donations right now, so nothing was charged. Please try again later. ${helpLine()}`} action={{ label: "Back", onPress: leave }} />
+          )}
         </View>
       </View>
     );

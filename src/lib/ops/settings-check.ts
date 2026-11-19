@@ -84,6 +84,8 @@ export function settingsCheck(env: Env): SettingCheck[] {
   add("ADMIN_NOTIFY_EMAIL", email(admin) ? "ok" : "fix", email(admin) ? "Set." : admin ? "Doesn't look like an email address." : "Missing. Chargebacks, new applications and the daily \"needs a person\" email have nowhere to go.");
 
   // Switches that stay off for launch
+  // The pause switch: if it is on, nobody can give. It must never be left on by mistake.
+  add("GIVING_PAUSED", env.GIVING_PAUSED === "yes" ? "fix" : "ok", env.GIVING_PAUSED === "yes" ? "ON: giving is paused everywhere and nobody can give. Remove it in Vercel (Settings, Environment Variables) and redeploy to open giving again." : "Off: giving is open.");
   add("APP_GIVING", env.APP_GIVING === "yes" ? "later" : "ok", env.APP_GIVING === "yes" ? "On: the app can take gifts. Keep it off until Apple and Google confirm in writing." : "Off: the app sends people to the website to give.");
   add("SAVED_CARDS", env.SAVED_CARDS === "yes" ? "later" : "ok", env.SAVED_CARDS === "yes" ? "On. Off for launch until the consent wording is agreed." : "Off.");
   const receipts = env.RECEIPTS_ENABLED === "yes" && env.RECEIPT_WORDING_CONFIRMED === "yes";

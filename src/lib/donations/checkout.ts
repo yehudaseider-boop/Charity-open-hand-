@@ -1,3 +1,4 @@
+import { GIVING_PAUSED_MESSAGE } from "@/lib/giving-pause";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { legalConfig } from "@/config/legal";
@@ -81,6 +82,7 @@ export async function startDonation(args: {
   attemptId?: string;
 }): Promise<StartResult> {
   const charity = await loadDonatableCharity(args.charitySlug);
+  if (charity?.givingPaused) return { ok: false, message: GIVING_PAUSED_MESSAGE };
   if (!charity || !charity.acceptingPayments) {
     return { ok: false, message: "This charity can't take online donations right now." };
   }

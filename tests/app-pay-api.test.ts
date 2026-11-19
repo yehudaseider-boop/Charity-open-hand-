@@ -51,7 +51,7 @@ describe("before and after the payment page", () => {
   it("reads whether the charity can take the gift, the campaign and the minimums", async () => {
     const seen: unknown[] = [];
     const r = await checkReady("https://x.test", "a", "c1", async (url, body) => (seen.push([url, body]), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 } }));
-    expect(r).toEqual({ ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxGiftCents: null, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: null, contributionPresetsCents: [], contributionDefaultCents: 0 });
+    expect(r).toEqual({ ok: true, accepting: true, paused: false, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxGiftCents: null, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: null, contributionPresetsCents: [], contributionDefaultCents: 0 });
     expect(seen[0]).toEqual(["https://x.test/api/app/ready", { slug: "a", campaignId: "c1" }]);
   });
   it("reads the contribution buttons, keeping only sensible amounts and a default that is one of them", async () => {

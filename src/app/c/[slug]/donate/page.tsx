@@ -1,3 +1,4 @@
+import { GIVING_PAUSED_MESSAGE } from "@/lib/giving-pause";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -85,6 +86,8 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           cardChargeAvailable={cardChargeRates() !== null}
           singleAgreementTick={platformConfig.checkout.singleAgreementTick}
         />
+      ) : charity.givingPaused ? (
+        <Card><p role="status" className="text-sm">{GIVING_PAUSED_MESSAGE}</p></Card>
       ) : (
         <Card><p className="text-sm"><bdi>{charity.name_en}</bdi> isn&apos;t taking online donations yet.</p></Card>
       )}

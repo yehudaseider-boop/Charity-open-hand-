@@ -312,7 +312,7 @@ export function offerMessage(reason: NotOffered | "gateway"): string {
     case "busy":
       return "A payment for this monthly donation is still going through. Nothing more was charged. Please check again in an hour.";
     case "charity_closed":
-      return "This charity can't take online donations right now, so nothing can be charged. Your monthly donation is unchanged.";
+      return "Giving is paused or this charity can't take online donations right now, so nothing can be charged. Your monthly donation is unchanged.";
     case "gone":
       return "We couldn't find this monthly donation. It may have been cancelled.";
     case "start_again":

@@ -4,6 +4,7 @@ import { platformConfig } from "@/config/platform";
 import { getGateway, type PaymentGateway } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { impactUnitFrom } from "@/lib/charity/impact";
+import { givingPaused } from "@/lib/giving-pause";
 
 /** A charity as checkout needs it, or null if it isn't public. */
 export async function loadDonatableCharity(slug: string) {
@@ -36,10 +37,13 @@ export async function loadDonatableCharity(slug: string) {
      * connected: otherwise the money would land with Givezy instead of the charity.
      */
     acceptingPayments:
+      !givingPaused() &&
       gateway !== null &&
       (gateway.name === "test"
         ? !gateway.splitsPayments || connected
         : platformConfig.fees.gatewayChargePaidBy !== null && gateway.splitsPayments && connected),
+    /** The pause switch is on (GIVING_PAUSED=yes): not accepting for that reason, so pages can say so. */
+    givingPaused: givingPaused(),
     splitAccountRef: gateway?.splitsPayments && data.gateway === gateway.name ? data.gateway_subaccount_ref : null,
   };
 }

@@ -1,3 +1,4 @@
+import { GIVING_PAUSED_MESSAGE } from "@/lib/giving-pause";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -170,8 +171,8 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
                 <span className="block w-full min-w-0 truncate text-sm font-semibold">to <bdi>{charity.name_en}</bdi></span>
               </Link>
             ) : (
-              <p className="rounded-control bg-honey-soft p-4 text-center text-muted">
-                Online giving to <bdi>{charity.name_en}</bdi> opens soon.
+              <p role="status" className="rounded-control bg-honey-soft p-4 text-center text-muted">
+                {donatable?.givingPaused ? GIVING_PAUSED_MESSAGE : <>Online giving to <bdi>{charity.name_en}</bdi> opens soon.</>}
               </p>
             )}
             <ul className="space-y-2 text-sm">

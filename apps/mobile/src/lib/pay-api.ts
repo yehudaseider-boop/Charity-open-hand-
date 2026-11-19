@@ -129,7 +129,7 @@ export function startPayment(
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null; contributionPresetsCents: number[]; contributionDefaultCents: number }
+  | { ok: true; accepting: boolean; paused: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null; contributionPresetsCents: number[]; contributionDefaultCents: number }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
@@ -144,6 +144,7 @@ export async function checkReady(site: string, slug: string, campaignId: string 
       return {
         ok: true,
         accepting: j.accepting === true,
+        paused: j.paused === true,
         receiptsAvailable: j.receiptsAvailable === true,
         campaignOpen: j.campaignOpen === true,
         minGiftCents: j.minGiftCents,

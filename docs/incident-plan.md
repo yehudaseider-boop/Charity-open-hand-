@@ -26,7 +26,7 @@ One page for a bad day: the site is down, payments fail, money looks wrong, or d
 
 1. Is it every gift, or one charity? Look at Admin, **Payments**.
 2. **One charity:** Admin, the charity, **Suspend** (give a reason). It disappears from the site and can't receive gifts. Reinstate it when it's sorted.
-3. **Every gift:** check the payment provider's status page and dashboard. Donors are already told "nothing was charged" and can try again, so the site stays up.
+3. **Every gift:** check the payment provider's status page and dashboard. Donors are already told "nothing was charged" and can try again, so the site stays up. If gifts are going wrong rather than just failing, use the pause switch (section 5) so nobody is charged while you look.
 4. **Gifts started in the app only:** Vercel, Settings, Environment Variables, remove `APP_GIVING`, redeploy. The app then sends donors to give on the website.
 5. Gifts that were paid but whose confirmation never arrived are found by the daily check, which asks the provider and marks them paid. Don't mark anything paid by hand.
 
@@ -47,7 +47,7 @@ One page for a bad day: the site is down, payments fail, money looks wrong, or d
 
 Vercel, Settings, Environment Variables, set `COMING_SOON_HOSTS` to the site's address, redeploy: every page shows the holding page. **Careful:** this also stops the payment provider reaching us, so payments already made wait until it is switched back (the provider tries again for a while, and the daily check catches the rest).
 
-**Gap:** there is no switch that pauses giving with a kind message while the rest of the site stays up. It would take an hour or two to build (`GIVING_PAUSED=yes`: give buttons show "Giving is paused for a short while. Nothing has been charged."). Recommended before launch.
+**The pause switch (built 19/11/2026, off):** a softer stop that keeps the site up. Vercel, Settings, **Environment Variables**, add `GIVING_PAUSED` with the value `yes` (all environments), then **Redeploy**. Every Give button on the website and in the app then says "Giving is paused for a short while. Nothing has been charged. Please try again later." Payment confirmations still arrive, charities and donors still sign in, and monthly collections wait (they are taken on the first day after it is off, and no donation is counted as failed). To open giving again: delete `GIVING_PAUSED` and redeploy. Admin, Settings check shows it in red while it is on, so it can't be forgotten. **Use this one first** and keep the holding page above for when nothing else will do.
 
 ## What we say
 
