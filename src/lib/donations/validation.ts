@@ -2,6 +2,7 @@ import { z } from "zod";
 import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
 import { isValidSaIdNumber, saIdDigits } from "@/lib/sa-id";
 import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
+import { plainPunctuation } from "@/lib/plain-text";
 import { normaliseLineBreaks } from "@/lib/text";
 import { cleanDedicationName, parseDedication } from "./dedication";
 import { cleanLabel, LABEL_MAX } from "./labels";
@@ -11,8 +12,14 @@ const str = (max: number, what: string) => z.string().max(max, `Please keep ${wh
 /**
  * A one-line field (a name, an address line): line breaks, control and direction characters become
  * spaces. These are printed in emails and on receipts, where a typed line break could pass off extra text.
+ * Typographic quotes, dashes and odd spaces become plain ones first (20/11/2026): a phone's O’Brien would
+ * otherwise block the charity's SARS file, which holds Latin-1 only. Made plain before the length is checked.
  */
-const line = (max: number, what: string) => str(max, what).transform((v) => (v === undefined ? v : cleanDedicationName(v)));
+const line = (max: number, what: string) =>
+  z
+    .preprocess((v) => (typeof v === "string" ? plainPunctuation(v) : v), z.string().max(max, `Please keep ${what} to ${max} characters or fewer`))
+    .optional()
+    .transform((v) => (v === undefined ? v : cleanDedicationName(v)));
 /** A text box (more than one line): a line break counts as one character, as the browser's maxLength counts it. */
 const box = (max: number, what: string) =>
   z.preprocess((v) => (typeof v === "string" ? normaliseLineBreaks(v) : v), z.string().max(max, `Please keep ${what} to ${max} characters or fewer`)).optional();

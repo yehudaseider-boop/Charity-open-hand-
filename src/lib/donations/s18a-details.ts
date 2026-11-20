@@ -11,6 +11,7 @@
 import { platformConfig } from "@/config/platform";
 import { taxYearFor, zonedParts } from "@/lib/dates";
 import { isValidCompanyRegistration } from "@/lib/sars-numbers";
+import { plainPunctuation } from "@/lib/plain-text";
 import { cleanDedicationName } from "./dedication";
 import { cleanSaIdNumber } from "./monthly-id-nudge";
 
@@ -151,8 +152,9 @@ export type S18aCompletion = {
   address?: { address_line1: string; address_line2: string | null; suburb: string | null; city: string; postal_code: string };
 };
 
+/** Typographic quotes, dashes and odd spaces made plain, as at checkout, so SARS's file can hold it (20/11/2026). */
 const text = (v: unknown, max: number) => {
-  const s = typeof v === "string" ? cleanDedicationName(v).trim() : "";
+  const s = typeof v === "string" ? cleanDedicationName(plainPunctuation(v)).trim() : "";
   return s.length > max ? null : s;
 };
 

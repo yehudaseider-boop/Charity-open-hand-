@@ -12,6 +12,7 @@ import { isLegalForm, type It3dCharity, type It3dDonor, type It3dReceipt } from 
  * still paid (refunded and charged-back gifts are left out). The builder keeps those paid inside the period.
  * Names, address and contact details come from the gift's own checkout details, the same record the receipt
  * snapshot was printed from (the snapshot joins the name and address into lines, which SARS wants apart).
+ * Each receipt's certified amount comes too, so the builder can check its gifts still add up to it (20/11/2026).
  */
 
 const PAGE = 1000;
@@ -110,10 +111,10 @@ type DetailsRow = {
 
 export async function loadIt3dReceipts(charityId: string, taxYear: number): Promise<It3dReceipt[]> {
   const db = createAdminClient();
-  const receipts = await all<{ id: string; donor_id: string; donor_identity: string | null; details: { receipt_reference?: string } }>((from, to) =>
+  const receipts = await all<{ id: string; donor_id: string; donor_identity: string | null; amount_cents: number | string; details: { receipt_reference?: string } }>((from, to) =>
     db
       .from("s18a_receipts")
-      .select("id, donor_id, donor_identity, details")
+      .select("id, donor_id, donor_identity, amount_cents, details")
       .eq("charity_id", charityId)
       .eq("tax_year", taxYear)
       .eq("status", "issued")
@@ -169,6 +170,8 @@ export async function loadIt3dReceipts(charityId: string, taxYear: number): Prom
       donations: own
         .filter((g) => g.status === "paid" && g.paid_at && g.amount_cents > 0)
         .map((g) => ({ id: g.id, paidAt: g.paid_at!, amountCents: g.amount_cents, recordedMethod: g.recorded_method })),
+      // What the receipt certified: the builder checks the gifts above add up to it (20/11/2026).
+      certifiedCents: Number(r.amount_cents),
     };
   });
 }

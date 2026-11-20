@@ -287,6 +287,8 @@ function ProblemRow({ p, charityId }: { p: It3dProblem; charityId: string }) {
   const link =
     p.fix === "sars_details" ? <a href="#sars-details" className="text-brand underline">Fix it below</a>
     : p.fix === "contact" ? <Link href={`/charity-admin/${charityId}/application?step=contact`} className="text-brand underline">Change your contact details</Link>
+    // Only Givezy can correct it (a value on an issued s18A receipt, or details we hold): the way to reach us, on the row (20/11/2026).
+    : p.fix === "support" ? <span>Contact Givezy: <SupportContact /></span>
     : null;
   return (
     <li className={`rounded-control border-l-4 p-3 ${tone}`}>

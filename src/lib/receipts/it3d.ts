@@ -8,7 +8,7 @@
  * 02/11/2026). Records, in this order: GH, SE, the RE, every donor (DE), every donation (DR), the trailer (T).
  * Nothing is ever shortened or changed silently: a value SARS's file can't hold is a problem to fix.
  */
-import { centsToRandDecimal } from "@/lib/money";
+import { centsToRandDecimal, formatRand } from "@/lib/money";
 import { isoDateInJhb, taxYearRange, zonedParts } from "@/lib/dates";
 import {
   DONOR_TAX_REFERENCE_FIRST_DIGITS,
@@ -86,6 +86,12 @@ export type It3dReceipt = {
   donorKey: string;
   donor: It3dDonor;
   donations: { id: string; paidAt: string; amountCents: number; recordedMethod: string | null }[];
+  /**
+   * What the issued receipt certified (s18a_receipts.amount_cents), to check the gifts against (20/11/2026). The
+   * gifts are reported at what is left of them now; a total that no longer matches the receipt is a problem for
+   * Givezy, never sent to SARS. Left out (undefined) where it isn't known, as in older callers.
+   */
+  certifiedCents?: number | null;
 };
 
 export type It3dInput = {
@@ -222,19 +228,31 @@ export function buildIt3d(input: It3dInput): It3dResult {
   const block = (message: string, who?: Who) => add("blocking", message, who);
   const warn = (message: string, who?: Who) => add("warning", message, who);
 
-  /** Every value SARS gets: trailing spaces trimmed; a pipe, leading space, odd character or too long is a problem. */
-  const record = (fields: Field[], who: Who, sheetProblems?: string[]): string => {
+  /**
+   * Every value SARS gets: trailing spaces trimmed; a pipe, leading space, odd character or too long is a problem.
+   * `onReceipt`: the record is a donor or donation already on an issued s18A receipt. A character SARS's file
+   * can't hold there (a curly apostrophe typed before 20/11/2026, a letter outside Latin-1) is for Givezy to
+   * correct with the charity, so the problem says to contact Givezy rather than leave the charity stuck. The value
+   * itself is never changed here.
+   */
+  const record = (fields: Field[], who: Who, sheetProblems?: string[], onReceipt = false): string => {
     return fields
       .map((f) => {
         const v = clean(f.value);
-        const say = (m: string) => {
-          block(m, f.fix === undefined ? who : { ...who, fix: f.fix });
+        const say = (m: string, fixAt?: FixAt) => {
+          const fix = fixAt !== undefined ? fixAt : f.fix;
+          block(m, fix === undefined ? who : { ...who, fix });
           sheetProblems?.push(m);
         };
         if (v.includes("|")) say(`${f.label} has a "|" in it, which SARS's file can't hold. Change it to another character.`);
         if (/^\s/.test(v)) say(`${f.label} starts with a space. Remove the space.`);
         const odd = badCharacter(v);
-        if (odd) say(`${f.label} has a character SARS's file can't hold ("${odd}"). Change it to a plain letter.`);
+        if (odd) {
+          const fixAt = f.fix !== undefined ? f.fix : (who.fix ?? null);
+          if (onReceipt && fixAt === null) say(`${f.label} has a character SARS's file can't hold ("${odd}"). It is on an issued s18A receipt, so contact Givezy to correct it.`, "support");
+          else if (fixAt === "support") say(`${f.label} has a character SARS's file can't hold ("${odd}"). Ask Givezy to correct it.`);
+          else say(`${f.label} has a character SARS's file can't hold ("${odd}"). Change it to a plain letter.`);
+        }
         if ([...v].length > f.max) say(`${f.label} is ${[...v].length} characters long. SARS takes at most ${f.max}. Shorten it.`);
         return v;
       })
@@ -247,8 +265,12 @@ export function buildIt3d(input: It3dInput): It3dResult {
     const d = isoDateInJhb(new Date(paidAt));
     return d >= range.start && d <= range.end;
   };
-  const inPeriodReceipts = input.receipts
-    .map((r) => ({ ...r, donations: r.donations.filter((d) => inPeriod(d.paidAt)).sort((a, b) => a.paidAt.localeCompare(b.paidAt) || a.id.localeCompare(b.id)) }));
+  const inPeriodReceipts = input.receipts.map((r) => ({
+    ...r,
+    // Every reported gift on the receipt, in the period or not, to check against what the receipt certified.
+    reportedCents: r.donations.reduce((sum, d) => sum + d.amountCents, 0),
+    donations: r.donations.filter((d) => inPeriod(d.paidAt)).sort((a, b) => a.paidAt.localeCompare(b.paidAt) || a.id.localeCompare(b.id)),
+  }));
   const receipts = inPeriodReceipts
     .filter((r) => r.donations.length > 0)
     .sort((a, b) => (a.receiptNumber ?? "").localeCompare(b.receiptNumber ?? "", "en", { numeric: true }) || a.receiptId.localeCompare(b.receiptId));
@@ -405,6 +427,13 @@ export function buildIt3d(input: It3dInput): It3dResult {
       own.push(m);
     };
     if (!r.receiptNumber) say("blocking", "This receipt has no receipt number. Ask Givezy to check it.");
+    // The gifts must add up to what the receipt certified (20/11/2026): a refund the receipt hasn't caught up with,
+    // or a gift changed since, would send SARS a different amount from the donor's receipt.
+    if (r.certifiedCents != null && r.reportedCents !== r.certifiedCents) {
+      const m = `This receipt certified ${formatRand(r.certifiedCents)}, but its gifts now add up to ${formatRand(r.reportedCents)}. Contact Givezy to check the receipt before you send the file.`;
+      add("blocking", m, { ...who, fix: "support" });
+      own.push(m);
+    }
     for (const g of r.donations) if (g.recordedMethod === "other") say("warning", 'A gift you recorded as "Other" is reported as money (CASH). If it was goods, report it as IN SPECIE on eFiling instead.');
 
     let existing = donors.get(r.donorKey);
@@ -527,7 +556,7 @@ export function buildIt3d(input: It3dInput): It3dResult {
   const deLines = deList.map((de) => {
     de.fields.find((f) => f.no === 405)!.value = String(++row);
     const before = de.sheetProblems.length;
-    const line = record(de.fields, de.who, de.sheetProblems);
+    const line = record(de.fields, de.who, de.sheetProblems, true);
     if (de.sheetProblems.length > before) de.blocking = true;
     return line;
   });
@@ -549,7 +578,7 @@ export function buildIt3d(input: It3dInput): It3dResult {
       { no: 508, value: "CASH", max: 10, label: "" },
       { no: 509, value: datePaid, max: 10, label: "" },
       { no: 510, value, max: 18, label: "The amount" },
-    ], de.who, rowProblems);
+    ], de.who, rowProblems, true);
     sheetRows.push({
       values: [receiptNumber, "Cash", value, datePaid.split("-").reverse().join("/"), ...de.sheet],
       problems: [...new Set([...de.sheetProblems, ...rowProblems])],

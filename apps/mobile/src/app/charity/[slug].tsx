@@ -22,7 +22,7 @@ import { ShareButton } from "@/components/share-button";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
-import { ddmmyyyy, rand } from "@/lib/format";
+import { ddmmyyyy, jhbDay, rand } from "@/lib/format";
 import { causeList, useCharity } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { reduceMotion } from "@/lib/motion";
@@ -183,7 +183,8 @@ export default function CharityDetail() {
               {updates.map((u) => (
                 <View key={u.id} style={styles.note}>
                   <View style={styles.noteDot} />
-                  <Text style={styles.noteDate}>{ddmmyyyy(u.date)}</Text>
+                  {/* The Johannesburg day it was posted, as Home's news shows it, whatever the phone's time zone (20/11/2026). */}
+                  <Text style={styles.noteDate}>{ddmmyyyy(jhbDay(u.date))}</Text>
                   <Text>{u.body}</Text>
                   {u.photoUrl ? (
                     <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />

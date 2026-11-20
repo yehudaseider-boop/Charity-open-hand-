@@ -89,6 +89,7 @@ export function toPhotos(rows: PhotoRow[], base: string): CharityPhoto[] {
   });
 }
 
+/** `date` is the moment it was posted; screens show it as its Johannesburg day (jhbDay), never the phone's own (20/11/2026). */
 export function toUpdates(rows: UpdateRow[], base: string): CharityUpdate[] {
   return rows.map((r) => ({ id: r.id, date: new Date(r.created_at), body: r.body_en, photoUrl: imageUrl(base, r.photo_path) }));
 }

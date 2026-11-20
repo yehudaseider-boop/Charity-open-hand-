@@ -291,3 +291,18 @@ export function fromCache(raw: string | null): Cached | null {
     return null;
   }
 }
+
+/**
+ * Where the donor's own giving stands, for Progress and Home alike (20/11/2026): still loading, failed with no
+ * saved copy to show, or ready (fresh, or the copy saved last time). Home used to show "R0 of R12 000 · 0 gifts"
+ * while giving loaded or after it failed; both screens now read it the same way. `status` is the account status.
+ */
+export function givingLoadState(a: { status: string; hasLive: boolean; loadError: boolean }): "loading" | "error" | "ready" {
+  if (a.status === "loading") return "loading";
+  if (a.loadError && !a.hasLive) return "error";
+  if (a.status === "signed-in" && !a.hasLive) return "loading";
+  return "ready";
+}
+
+/** What Progress says when giving can't be loaded and there is no saved copy; Home says the same. */
+export const GIVING_LOAD_ERROR = "We couldn't load your giving. Check your connection and try again.";

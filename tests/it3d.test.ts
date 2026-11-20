@@ -426,6 +426,38 @@ describe("problems", () => {
     expect(long.lines[3]).toContain("y".repeat(101)); // never truncated
   });
 
+  it("a character SARS can't hold on an issued receipt points the charity to Givezy, and the file still keeps it as it is (20/11/2026)", () => {
+    const r = only({ lastName: "O\u2019Brien" });
+    const p = r.problems.find((x) => x.severity === "blocking")!;
+    expect(p.message).toBe("The donor's surname has a character SARS's file can't hold (\"\u2019\"). It is on an issued s18A receipt, so contact Givezy to correct it.");
+    expect(p.fix).toBe("support");
+    expect(r.fileReady).toBe(false);
+    expect(r.lines[3]).toContain("O\u2019Brien"); // never rewritten by the file builder
+    // The charity's own contact name, which the charity changes itself, still says so.
+    const own = buildIt3d(input({ charity: charity({ contactName: "Sarah O\u2019Neil" }) })).problems.find((x) => x.severity === "blocking")!;
+    expect(own.fix).toBe("contact");
+    expect(own.message).toMatch(/Change it to a plain letter\.$/);
+  });
+
+  it("checks each receipt's gifts against what the receipt certified (20/11/2026)", () => {
+    const ok = buildIt3d(input({ receipts: [receipt({ donations: [gift("2026-05-10T08:00:00Z", 50_000), gift("2026-10-10T08:00:00Z", 25_000)], certifiedCents: 75_000 })] }));
+    expect(ok.problems).toEqual([]);
+    expect(ok.fileReady).toBe(true);
+
+    // A part refund the receipt hasn't caught up with: R750 certified, R700 left.
+    const off = buildIt3d(input({ receipts: [receipt({ receiptNumber: "MF-2027-0099", donations: [gift("2026-05-10T08:00:00Z", 50_000), gift("2026-10-10T08:00:00Z", 20_000)], certifiedCents: 75_000 })] }));
+    const p = off.problems.find((x) => x.severity === "blocking")!;
+    expect(p.message).toBe("This receipt certified R750, but its gifts now add up to R700. Contact Givezy to check the receipt before you send the file.");
+    expect(p).toMatchObject({ fix: "support", receiptNumber: "MF-2027-0099" });
+    expect(off.fileReady).toBe(false);
+    expect(off.sheet.rows.every((row) => row.blocking)).toBe(true);
+
+    // The first six months: a gift after August is left out of the file, but the receipt's whole total still matches.
+    const half = buildIt3d(input({ period: "first_half", receipts: [receipt({ donations: [gift("2026-05-10T08:00:00Z", 50_000), gift("2026-10-10T08:00:00Z", 25_000)], certifiedCents: 75_000 })] }));
+    expect(half.problems).toEqual([]);
+    expect(half.totals.totalCents).toBe(50_000);
+  });
+
   it("trims trailing spaces", () => {
     const r = only({ lastName: "Mokoena   " });
     expect(fieldsOf(r.lines[3])[6]).toBe("Mokoena");

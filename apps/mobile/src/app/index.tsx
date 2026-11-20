@@ -6,6 +6,7 @@ import { Button, TextLink } from "@/components/button";
 import { FadeUp } from "@/components/fade-up";
 import { CheckIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
+import { isIphonePreview } from "@/components/preview-chrome";
 import { Bubbles, People } from "@/components/people";
 import { SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
@@ -14,6 +15,7 @@ import { useDirectory } from "@/lib/directory";
 import { GIVER_TYPES, saveGiverType, type GiverType } from "@/lib/giver-type";
 import { haptic } from "@/lib/haptics";
 import { markNewDonor } from "@/lib/first-run";
+import { TEST_BUILD } from "@/lib/test-build";
 import { hasBeenWelcomed, markWelcomed } from "@/lib/welcome";
 import { colors, fonts, radius, space, touch } from "@/theme/tokens";
 
@@ -24,16 +26,18 @@ const STEPS = 2;
  * First open, "small yes first": the blue welcome, then two quick questions (what kind of giver you are,
  * and which causes matter to you), each skippable, then straight to the charities, those you chose first.
  * A giving goal is asked about once, after the first gift (see GiftSent). Shown once per phone.
- * `?welcome=1&step=2` shows it again for design review (step 0 is the welcome).
+ * `?welcome=1&step=2` shows it again for design review (step 0 is the welcome). Only in test builds and the web
+ * preview (?preview=iphone), never in the store app (20/11/2026): there a link could replay it and overwrite the
+ * causes a donor picked.
  */
 export default function Welcome() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const directory = useDirectory();
   const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
-  const forced = p.welcome === "1";
+  const forced = p.welcome === "1" && (TEST_BUILD || isIphonePreview());
   const [seen, setSeen] = useState<boolean | null>(forced ? false : null);
-  const [step, setStep] = useState(() => Math.min(STEPS, Math.max(0, Number(p.step) || 0)));
+  const [step, setStep] = useState(() => (forced ? Math.min(STEPS, Math.max(0, Number(p.step) || 0)) : 0));
   const [giver, setGiver] = useState<GiverType | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
 

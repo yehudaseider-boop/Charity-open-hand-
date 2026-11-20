@@ -9,6 +9,7 @@ import { taxYearFor } from "@/lib/dates";
 import { typedDay } from "@/lib/typed-date";
 import { formatRand, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
+import { plainPunctuation } from "@/lib/plain-text";
 import { isValidSaIdNumber, saIdDigits } from "@/lib/sa-id";
 import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
 
@@ -69,7 +70,8 @@ export type GiftCheck = { ok: true; gift: CleanGift } | { ok: false; errors: Par
 /** One line of text: line breaks, control and direction characters become spaces, then trimmed. */
 function oneLine(v: string | undefined, max: number): string | null {
   if (v === undefined) return null;
-  const s = v.replace(/[\u0000-\u001f\u007f‎‏‪-‮⁦-⁩]/g, " ").replace(/\s+/g, " ").trim();
+  // Typographic quotes, dashes and odd spaces made plain, as at checkout, so SARS's file can hold them (20/11/2026).
+  const s = plainPunctuation(v).replace(/[\u0000-\u001f\u007f‎‏‪-‮⁦-⁩]/g, " ").replace(/\s+/g, " ").trim();
   return s ? s.slice(0, max) : null;
 }
 

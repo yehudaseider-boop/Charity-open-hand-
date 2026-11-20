@@ -147,7 +147,7 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
               <li key={r.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0">
                   <p className="font-semibold text-indigo [overflow-wrap:anywhere]">{r.reference}</p>
-                  <p className="truncate text-muted">{r.donor_name}</p>
+                  <p className="truncate text-muted" dir="auto">{r.donor_name}</p>
                   <p className="text-muted">{taxYearLabel(r.tax_year)}</p>
                   <p className="text-muted">Issued {formatDate(r.issued_at)}</p>
                 </div>

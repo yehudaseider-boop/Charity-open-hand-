@@ -10,6 +10,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { cleanDedicationName } from "@/lib/donations/dedication";
+import { plainPunctuation } from "@/lib/plain-text";
 import { formatRand } from "@/lib/money";
 import { taxYearName } from "@/lib/dates";
 import { buttonHtml, cardHtml, emailLayout, escHtml, paragraphHtml } from "@/lib/email/html";
@@ -101,8 +102,12 @@ export const ADDRESS_FIELDS = ["address_line1", "address_line2", "suburb", "city
 export type EditableField = (typeof NAME_FIELDS)[number] | (typeof ADDRESS_FIELDS)[number];
 export type EditableDetails = Record<EditableField, string | null>;
 
+/** Typographic quotes, dashes and odd spaces made plain before the length check, as at checkout (20/11/2026). */
 const line = (max: number, what: string) =>
-  z.string().max(max, `Please keep ${what} to ${max} characters or fewer`).optional().transform((v) => (v === undefined ? "" : cleanDedicationName(v)));
+  z
+    .preprocess((v) => (typeof v === "string" ? plainPunctuation(v) : v), z.string().max(max, `Please keep ${what} to ${max} characters or fewer`))
+    .optional()
+    .transform((v) => (v === undefined ? "" : cleanDedicationName(v)));
 
 const editSchema = z.object({
   first_name: line(80, "the first name"),

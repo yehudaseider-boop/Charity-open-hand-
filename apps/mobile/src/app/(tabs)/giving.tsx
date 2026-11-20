@@ -38,7 +38,7 @@ import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
 import { confirmThen, notify, openUrl } from "@/lib/open-site";
 import { requestNewCardPage } from "@/lib/pay-api";
-import { monthlyAmountLine, monthlyAmountParts } from "@/lib/live-giving";
+import { GIVING_LOAD_ERROR, givingLoadState, monthlyAmountLine, monthlyAmountParts } from "@/lib/live-giving";
 import { SITE_URL } from "@/lib/website";
 import { RecordProblem } from "@/components/record-problem";
 import { useStoredRecord } from "@/lib/use-stored-record";
@@ -55,15 +55,7 @@ export default function Giving() {
   const signedIn = account.status === "signed-in";
   const demoState = useScreenState();
   // Live: the screen's state comes from the account; preview keeps the design-review states.
-  const state = preview
-    ? demoState
-    : account.status === "loading"
-      ? "loading"
-      : account.loadError && !account.live
-        ? "error"
-        : signedIn && !account.live
-          ? "loading"
-          : "ready";
+  const state = preview ? demoState : givingLoadState({ status: account.status, hasLive: account.live !== null, loadError: account.loadError });
   const p = useLocalSearchParams<{ demo?: string; sheet?: string; section?: "year" | "monthly"; at?: string }>();
   // Opened from a Home row: scroll to that row's section once it is laid out. `at` makes each tap a new jump.
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -380,7 +372,7 @@ export default function Giving() {
             <SkeletonBlock height={200} />
           </View>
         ) : state === "error" ? (
-          <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => (preview ? router.replace("/giving") : account.refresh())} />
+          <ErrorState body={GIVING_LOAD_ERROR} onRetry={() => (preview ? router.replace("/giving") : account.refresh())} />
         ) : (
           <>
             {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}

@@ -1,6 +1,6 @@
 /** The app's mapping from the donor's own database rows to what the Giving and Receipts screens show. */
 import { describe, expect, it } from "vitest";
-import { cleanCode, countsTowardsReceipts, fromCache, looksLikeEmail, newArrivals, seenFrom, toCache, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
+import { cleanCode, countsTowardsReceipts, fromCache, givingLoadState, looksLikeEmail, newArrivals, seenFrom, toCache, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
 
 const charity = { slug: "meals", name_en: "Meals Fund" };
 const row = (o: Partial<DonationRow>): DonationRow => ({
@@ -346,5 +346,22 @@ describe("a monthly donation whose donor covers the card charge (18/11/2026)", (
     expect(await fetchCardChargeRates("https://givezy.example", reply(200, { ok: true, cardChargeRates: { percentPpm: 0.5 } }))).toEqual({ known: false });
     expect(await fetchCardChargeRates(undefined, reply(200, { ok: true, cardChargeRates: rates }))).toEqual({ known: false });
     expect(await fetchCardChargeRates("https://givezy.example", async () => { throw new Error("offline"); })).toEqual({ known: false });
+  });
+});
+
+describe("givingLoadState (Progress and Home, 20/11/2026)", () => {
+  const at = (status: string, hasLive: boolean, loadError = false) => givingLoadState({ status, hasLive, loadError });
+  it("loading while the account loads, or signed in with nothing loaded yet: never R0 of the goal", () => {
+    expect(at("loading", false)).toBe("loading");
+    expect(at("signed-in", false)).toBe("loading");
+  });
+  it("an error only when the load failed and there is no saved copy to show", () => {
+    expect(at("signed-in", false, true)).toBe("error");
+    expect(at("signed-in", true, true)).toBe("ready");
+  });
+  it("ready with giving loaded, signed out, or still to agree to the Terms", () => {
+    expect(at("signed-in", true)).toBe("ready");
+    expect(at("signed-out", false)).toBe("ready");
+    expect(at("agreeing", false)).toBe("ready");
   });
 });

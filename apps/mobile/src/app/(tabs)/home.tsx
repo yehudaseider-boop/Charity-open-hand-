@@ -29,6 +29,7 @@ import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
 import { loadIncome } from "@/lib/income-store";
 import { inCause, savedCharities } from "@/lib/live-charities";
+import { GIVING_LOAD_ERROR, givingLoadState, monthlyAmountLine } from "@/lib/live-giving";
 import { loadCausePrefs } from "@/lib/cause-prefs";
 import { dismissGoalCard, goalCardDismissed } from "@/lib/first-run";
 import type { IncomeEntry } from "@/lib/ledger";
@@ -68,6 +69,9 @@ export default function Home() {
   // "Your causes": the charities they saved, else ones in the causes they picked, else a few to start with.
   const causes = (saved.length ? saved : inPicked.length ? inPicked : all).slice(0, 8);
 
+  // Whether the donor's giving has loaded, read as Progress reads it (20/11/2026): until it has, the goal shows no
+  // numbers (never "R0 of R12 000 · 0 gifts"), and a failed load says so with Try again.
+  const givingState = preview ? "ready" : givingLoadState({ status: account.status, hasLive: account.live !== null, loadError: account.loadError });
   const gifts = preview ? sampleGifts : (account.live?.gifts ?? []);
   const elsewhere = preview ? sampleElsewhere : (account.live?.elsewhere ?? []);
   // "First gift" only when we know: fresh giving from the server with none in it (not while it loads or fails).
@@ -84,7 +88,7 @@ export default function Home() {
   const nextMonthly = monthlyList.filter((r) => r.status === "active" && r.nextDate).sort((a, b) => (a.nextDate as Date).getTime() - (b.nextDate as Date).getTime())[0] ?? null;
   const glance = [
     yearGifts.length ? { key: "year", Icon: GivingIcon, title: "Given through Givezy", value: rand(yearCents), sub: `${taxYearName(thisYear)} tax year · ${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving?section=year" } : null,
-    nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: rand(nextMonthly.cents), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving?section=monthly" } : null,
+    nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: monthlyAmountLine(nextMonthly), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving?section=monthly" } : null,
     receiptList.length ? { key: "receipts", Icon: ReceiptsIcon, title: "s18A receipts", value: `${receiptList.length}`, sub: "To download", to: "/receipts" } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);
   // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
@@ -94,6 +98,8 @@ export default function Home() {
     goalCardDismissed().then(setCardGone);
   }, []);
   const hideGoalCard = !preview && goals.status === "ready" && !goal && cardGone !== false;
+  // Giving failed to load: said once, in the goal card when there is a goal to show, else where the rows go.
+  const givingErrorInCard = givingState === "error" && goals.status === "ready" && goal !== null && account.status !== "agreeing";
   const progress = goal ? goalProgress(goal, [...gifts, ...elsewhere], income.value, jhbToday()) : null;
   const counted = goal && progress ? [...gifts, ...elsewhere].filter((g) => g.date >= progress.window.start && g.date <= progress.window.end && counts(goal, g.label)).length : 0;
   const pct = progress?.targetCents ? Math.floor((progress.givenCents * 100) / progress.targetCents) : 0;
@@ -159,8 +165,23 @@ export default function Home() {
                 <Text style={styles.goalSub}>Your goals could not be opened on this phone. Nothing has been changed.</Text>
                 <Button variant="white" label="Open Progress" onPress={() => router.push("/giving")} />
               </View>
+            ) : account.status === "agreeing" ? (
+              // Not agreed to the current Terms yet: goals wait for that, so say what to do, as Progress does (20/11/2026).
+              <View style={{ gap: 12 }}>
+                <Text style={styles.goalAmount} accessibilityRole="header">One more step</Text>
+                <Text style={styles.goalSub}>Agree to the Terms and Privacy Policy on the Account tab, and your giving and goals appear here.</Text>
+                <Button variant="white" label="Go to Account" onPress={() => router.push("/account")} />
+              </View>
             ) : goals.status !== "ready" && !preview ? (
               <SkeletonBlock height={120} />
+            ) : goal && givingState === "loading" ? (
+              <SkeletonBlock height={120} />
+            ) : goal && givingErrorInCard ? (
+              <View style={{ gap: 12 }} accessibilityRole="alert">
+                <Text style={styles.goalKicker} numberOfLines={1}>{goal.name}</Text>
+                <Text style={styles.goalSub}>{GIVING_LOAD_ERROR}</Text>
+                <Button variant="white" label="Try again" onPress={() => void account.refresh()} />
+              </View>
             ) : goal && progress ? (
               <Pressable
                 onPress={() => router.push("/giving")}
@@ -202,7 +223,14 @@ export default function Home() {
           </View>
         </View>}
 
-        {glance.length ? (
+        {givingState === "error" && !givingErrorInCard ? (
+          <View style={styles.gutter}>
+            <View style={[styles.glance, styles.glanceProblem]} accessibilityRole="alert">
+              <Text variant="bodyMuted">{GIVING_LOAD_ERROR}</Text>
+              <Button label="Try again" onPress={() => void account.refresh()} />
+            </View>
+          </View>
+        ) : glance.length ? (
           <View style={styles.gutter}>
             <View style={styles.glance}>
               {glance.map((t, i) => (
@@ -291,6 +319,7 @@ const styles = StyleSheet.create({
   goalAmount: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.onInk },
   glance: { borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.hairline, backgroundColor: colors.surface, overflow: "hidden" },
   glanceRow: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 72, paddingVertical: 14, paddingLeft: 14, paddingRight: 12 },
+  glanceProblem: { padding: 16, gap: 12 },
   glanceDivider: { borderTopWidth: 1, borderTopColor: colors.hairline },
   glanceIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.lilacSoft, alignItems: "center", justifyContent: "center" },
   glanceTitle: { fontFamily: fonts.bodySemibold, fontSize: 14, lineHeight: 19, color: colors.muted },
