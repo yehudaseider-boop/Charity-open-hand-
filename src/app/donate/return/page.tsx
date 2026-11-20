@@ -55,6 +55,10 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   const elsewhere = focus ? { href: `/c/${focus}`, label: "Back to the charity's page" } : { href: "/charities", label: "Find a charity" };
   const ref = first(params.reference) ?? "";
   const t = first(params.t);
+  // The donor pressed Cancel on the payment provider's page: a payment the provider calls abandoned is closed now
+  // (nothing was charged, and it can still become paid if the provider later says otherwise), so the page says
+  // "didn't go through" instead of "confirming, please don't pay again". Only with the donor's credential (below).
+  const left = first(params.left) === "1";
   // If the payment provider can't be reached, or the result can't be saved yet, say we're still
   // confirming rather than showing an error page. Nothing here says "paid" unless it is saved.
   // Each load can ask the payment provider about the payment, so one visitor gets a generous but
@@ -76,7 +80,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
           console.error(e);
           return "pending" as const;
         })
-      : await confirmPayment(ref).catch((e) => {
+      : await confirmPayment(ref, left ? { closeAbandonedBefore: new Date() } : {}).catch((e) => {
           console.error(e);
           return "pending" as const;
         });
