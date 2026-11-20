@@ -33,13 +33,22 @@ let chargeThrows = false;
 let chargeRefused = false;
 /** The gateway turned the charge down for a reason that is not the card (a field, the split, our key). */
 let chargeRejected = false;
+/** The charity stopped taking donations between the run's check and the charge itself. */
+let stopsAtCharge = false;
+/** Amounts saved on an existing attempt (the store's record of it), by donation id. */
+const savedAmounts = new Map<string, { amountCents: number; contributionCents: number; cardChargeCents: number; totalCents: number }>();
+const dropped: string[] = [];
 const audits: { action: string; id: string; details: Record<string, unknown> }[] = [];
 
 function deps(now: Date = NOW): MonthlyDeps {
   const store: MonthlyStore = {
     due: async () => ({ rows: world.due, unreadable: world.unreadable }),
     claim: async (id) => (world.claimed.has(id) ? false : (world.claimed.add(id), true)),
-    attemptStatus: async (id) => (world.attempts.has(id) ? { status: world.attempts.get(id)!, createdAt: world.born } : null),
+    attemptStatus: async (id) => (world.attempts.has(id) ? { status: world.attempts.get(id)!, createdAt: world.born, saved: savedAmounts.get(id) } : null),
+    dropUnsent: async (id) => {
+      dropped.push(id);
+      if (world.attempts.get(id) === "pending") world.attempts.delete(id);
+    },
     stillActive: async () => world.active,
     createAttempt: async (_r, id) => void world.attempts.set(id, "pending"),
     reschedule: async (id, next) => void world.rescheduled.push({ id, next: next.toISOString() }),
@@ -51,6 +60,7 @@ function deps(now: Date = NOW): MonthlyDeps {
     store,
     now,
     charge: async ({ reference, totalCents }) => {
+      if (stopsAtCharge) return "not_accepting";
       if (chargeThrows) throw new Error("network down");
       if (chargeRefused) throw new Error("refused: authorization is not active");
       if (chargeRejected) throw new Error("rejected: Invalid split configuration");
@@ -79,6 +89,9 @@ beforeEach(() => {
   chargeThrows = false;
   chargeRefused = false;
   chargeRejected = false;
+  stopsAtCharge = false;
+  savedAmounts.clear();
+  dropped.length = 0;
   audits.length = 0;
   closeAsked.length = 0;
 });
@@ -590,5 +603,44 @@ describe("an attempt marked failed here that the gateway never received", () => 
     const s = await runMonthlyCharges(deps());
     expect(s.errors).toEqual([{ id: "rec1", message: "gateway down" }]);
     expect(world.failures).toEqual([]);
+  });
+});
+
+describe("review 20/11/2026: sending again and a charity that stops mid-run", () => {
+  const ref = attemptDonationId("rec1", "2026-11", 0);
+  it("a stuck attempt is sent again with the amounts saved on it, never today's", async () => {
+    world.attempts.set(ref, "pending");
+    world.born = new Date(NOW.getTime() - 30 * 60_000);
+    // Made when the card charge cover was R5.50; today's figure would be R6.10.
+    savedAmounts.set(ref, { amountCents: 18_000, contributionCents: 2_000, cardChargeCents: 550, totalCents: 20_550 });
+    world.due = [row({ cardChargeCents: 610 })];
+    let known = false;
+    confirmWith = () => {
+      if (!known) {
+        known = true;
+        throw new Error("Transaction reference not found");
+      }
+      return "paid";
+    };
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: ref, total: 20_550 }]);
+    expect(s.paid).toBe(1);
+  });
+
+  it("a charity that stops taking donations just before the charge: nothing sent, the attempt removed, no try counted", async () => {
+    stopsAtCharge = true;
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(dropped).toEqual([ref]);
+    expect(world.attempts.has(ref)).toBe(false);
+    expect(world.failures).toEqual([]);
+    expect(failedEmails).toEqual([]);
+    expect(s.waiting).toContainEqual({ id: "rec1", reason: "the charity is not taking donations right now" });
+    // Once it takes donations again, the next run makes the attempt afresh and collects it.
+    stopsAtCharge = false;
+    world.claimed.clear();
+    const again = await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: ref, total: 20_000 }]);
+    expect(again.paid).toBe(1);
   });
 });

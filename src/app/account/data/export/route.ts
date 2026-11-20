@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { decrypt } from "@/lib/crypto";
+import { emailHash } from "@/lib/charity/thank-you";
 import { loadSavedCardInfo } from "@/lib/donations/saved-card";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { signedInWithPassword } from "@/lib/auth";
@@ -133,6 +134,26 @@ export async function GET(request: Request) {
   if (fromCharities.some((r) => r.error)) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   const [charityNotes, charityFollowUps, charityTags, charityEmails, charityImported] = fromCharities.map((r) => r.data ?? []);
 
+  // Their email choices (review 20/11/2026): thank-you emails stopped, and charities they asked to stop emailing them.
+  // Kept by a hash of the address, never the address, so found by the hashes of the account's and their donor
+  // records' addresses: only this person's own addresses, so never someone else's choices.
+  const ownAddresses = [accountEmailForCharities, ...((donors.data ?? []) as { email?: string | null }[]).map((d) => d.email ?? null)].filter((e): e is string => Boolean(e?.trim()));
+  const hashes = [...new Set(ownAddresses.map(emailHash))];
+  const choices = hashes.length
+    ? await Promise.all([
+        admin.from("thank_you_opt_outs").select("created_at").in("email_hash", hashes),
+        admin.from("charity_email_opt_outs").select("source, created_at, charities(name_en)").in("email_hash", hashes).order("created_at"),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (choices.some((r) => r.error)) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+  const emailChoices = {
+    // Since when every charity's thank-you emails are stopped for your address (empty if you never stopped them).
+    thank_you_emails_stopped: choices[0].data ?? [],
+    // Charities you asked not to email you (source: "checkout" when you ticked it while giving, "stop_link" from an
+    // email's stop link, "charity" when the charity recorded your request).
+    charities_you_stopped_emails_from: choices[1].data ?? [],
+  };
+
   // Their place on the landing page's launch list (10/11/2026), found by the account's email; nothing before that
   // migration has run.
   const accountEmail = (profile.data?.email as string | undefined)?.toLowerCase() ?? user.email?.toLowerCase();
@@ -175,6 +196,7 @@ export async function GET(request: Request) {
     charities_follow_ups_about_you: charityFollowUps,
     charities_tags_on_you: charityTags,
     charities_imported_lists_with_you: charityImported,
+    email_choices: emailChoices,
     requests: requests.data ?? [],
     saved_charities: favourites.data ?? [],
     giving_target_settings: givingTarget.data ?? [],

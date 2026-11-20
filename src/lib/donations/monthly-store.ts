@@ -111,9 +111,27 @@ export function supabaseMonthlyStore(): MonthlyStore {
     },
 
     async attemptStatus(donationId) {
-      const { data, error } = await db.from("donations").select("status, created_at").eq("id", donationId).maybeSingle();
+      const { data, error } = await db.from("donations").select("status, created_at, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents").eq("id", donationId).maybeSingle();
       if (error) throw new Error(`Could not read a collection attempt: ${error.message}`);
-      return data ? { status: data.status as string, createdAt: new Date(data.created_at as string) } : null;
+      if (!data) return null;
+      return {
+        status: data.status as string,
+        createdAt: new Date(data.created_at as string),
+        saved: {
+          amountCents: Number(data.amount_cents),
+          contributionCents: Number(data.contribution_cents ?? 0),
+          cardChargeCents: Number(data.processing_charge_cents ?? 0),
+          totalCents: Number(data.total_charged_cents),
+        },
+      };
+    },
+
+    async dropUnsent(donationId) {
+      // Only an attempt still pending, and never one the gateway saw: called only when nothing was sent.
+      await db.from("donation_giving_kinds").delete().eq("donation_id", donationId);
+      await db.from("donation_checkout_details").delete().eq("donation_id", donationId);
+      const { error } = await db.from("donations").delete().eq("id", donationId).eq("status", "pending");
+      if (error) throw new Error(`Could not remove an unsent attempt: ${error.message}`);
     },
 
     async stillActive(id) {
@@ -229,7 +247,7 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
     async charge({ reference, r, totalCents }) {
       // Checked again right before charging: the charity may have stopped taking donations since this run began.
       const charity = await loadDonatableCharity(r.charitySlug);
-      if (!charity?.acceptingPayments) throw new Error("The charity is not taking donations right now, so nothing was charged.");
+      if (!charity?.acceptingPayments) return "not_accepting";
       await gateway.chargeAuthorization({
         reference,
         authorizationCode: r.authorizationCode,

@@ -36,8 +36,11 @@ export interface MonthlyStore {
   due(now: Date, limit: number): Promise<{ rows: DueMonthly[]; unreadable: { id: string; message: string }[] }>;
   /** Take the donation for this run. False if another run has it. */
   claim(id: string, now: Date): Promise<boolean>;
-  /** A collection attempt's donation: its status and when it was created, or null if it does not exist yet. */
-  attemptStatus(donationId: string): Promise<{ status: string; createdAt: Date } | null>;
+  /**
+   * A collection attempt's donation: its status, when it was created and the amounts saved on it when it was made
+   * (sent again with those, never today's figures), or null if it does not exist yet.
+   */
+  attemptStatus(donationId: string): Promise<{ status: string; createdAt: Date; saved?: { amountCents: number; contributionCents: number; cardChargeCents: number; totalCents: number } } | null>;
   /** Is the monthly donation still active (not cancelled, paused or erased since it was read)? Checked just before a charge. */
   stillActive(id: string): Promise<boolean>;
   /** Create the (pending) donation for one attempt, copying the donor's details from their first donation. */
@@ -51,13 +54,16 @@ export interface MonthlyStore {
   failAttempt(donationId: string): Promise<void>;
   /** The donor has a new-card payment page open for this monthly donation ("Update my card"). */
   newCardPending?(id: string, now: Date): Promise<boolean>;
+  /** Remove an attempt that was never sent to the gateway (pending only), so the next run makes it afresh. */
+  dropUnsent?(donationId: string): Promise<void>;
 }
 
 export type MonthlyDeps = {
   /** Stop starting new donations after this time (epoch milliseconds): a host kills a run that goes on too long. */
   deadline?: number;
   store: MonthlyStore;
-  charge(req: { reference: string; r: DueMonthly; totalCents: number }): Promise<void>;
+  /** Charge the saved card. "not_accepting": the charity stopped taking donations just now, so nothing was sent. */
+  charge(req: { reference: string; r: DueMonthly; totalCents: number }): Promise<void | "not_accepting">;
   /**
    * Ask the gateway about a try and record the answer. With `closeUnpaidBefore`, a try made before then that the
    * gateway says was abandoned or never received is closed as failed and comes back as "closed_unpaid".
@@ -226,8 +232,12 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
 
       const attempt = r.attemptPeriod === period ? r.failedAttempts : 0;
       const donationId = attemptDonationId(r.id, period, attempt);
-      const totalCents = r.amountCents + r.contributionCents + (r.cardChargeCents ?? 0);
       const existing = await store.attemptStatus(donationId);
+      // An attempt made on an earlier run is sent (again) with the amounts saved on it, never today's: a fee change
+      // since must not charge a total that doesn't match its record (review 20/11/2026).
+      const saved = existing?.saved;
+      const chargeAs: DueMonthly = saved ? { ...r, amountCents: saved.amountCents, contributionCents: saved.contributionCents, cardChargeCents: saved.cardChargeCents } : r;
+      const totalCents = saved ? saved.totalCents : r.amountCents + r.contributionCents + (r.cardChargeCents ?? 0);
       // A try the provider has called pending for more than 48 hours holds this monthly donation: nothing more is
       // charged until the provider settles it (the old try could still go through; a missed month is the lesser
       // harm). The donor is not emailed and the card is kept. It is asked about again on every run.
@@ -258,11 +268,17 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       // donor, no try counted, the card kept. The attempt stays pending, a person is told (audit and daily email),
       // and the next run asks the gateway about it (sending it again only if the gateway never received it).
       let refused = false;
-      const send = async () => {
+      const send = async (): Promise<"sent" | "inactive" | "not_accepting"> => {
         // The donor may have cancelled, paused or been erased since this row was read.
-        if (!(await store.stillActive(r.id))) return false;
+        if (!(await store.stillActive(r.id))) return "inactive";
         try {
-          await deps.charge({ reference: donationId, r, totalCents });
+          // The charity stopped taking donations since this run began: nothing was sent, so the attempt is removed
+          // (no try counted, nothing to settle) and made afresh once it takes donations again (review 20/11/2026:
+          // it stayed pending, lit the daily alert and blocked "Update my card").
+          if ((await deps.charge({ reference: donationId, r: chargeAs, totalCents })) === "not_accepting") {
+            await store.dropUnsent?.(donationId);
+            return "not_accepting";
+          }
         } catch (e) {
           if (!deps.isDeclined(e)) {
             await audit("monthly.charge_error", r.id, { donationId, message: e instanceof Error ? e.message.slice(0, 300) : String(e).slice(0, 300) });
@@ -271,8 +287,10 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
           refused = true;
           await store.failAttempt(donationId);
         }
-        return true;
+        return "sent";
       };
+      const notSent = (how: "inactive" | "not_accepting") =>
+        summary.waiting.push({ id: r.id, reason: how === "inactive" ? "no longer active" : "the charity is not taking donations right now" });
       // A try that ended without the provider saying "declined": counted, so the month moves on, but the donor is not
       // told their card was declined and the card is kept. The last try of a month waits for next month instead of
       // stopping the monthly donation. The attempt is marked failed here; if the provider later says it was paid,
@@ -294,8 +312,9 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         await store.createAttempt(r, donationId, totalCents);
         // If this throws, the outcome is unknown: the attempt stays pending and is checked next run; it is
         // sent again only if the gateway later says it never received it.
-        if (!(await send())) {
-          summary.waiting.push({ id: r.id, reason: "no longer active" });
+        const sent = await send();
+        if (sent !== "sent") {
+          notSent(sent);
           continue;
         }
       }
@@ -328,8 +347,9 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
         const stuck =
           existing !== null && existing.status === "pending" && now.getTime() - existing.createdAt.getTime() > STUCK_AFTER_MS && deps.isNotFound(e);
         if (!stuck) throw e;
-        if (!(await send())) {
-          summary.waiting.push({ id: r.id, reason: "no longer active" });
+        const sentAgain = await send();
+        if (sentAgain !== "sent") {
+          notSent(sentAgain);
           continue;
         }
         outcome = await settle();
