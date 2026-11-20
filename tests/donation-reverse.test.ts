@@ -21,7 +21,7 @@ let recurring: { id: string; status: string; authorization_encrypted: string | n
 let voided: string[];
 let receiptLinks: { receipt_id: string; donation_id: string; s18a_receipts?: { status: string; issued_at: string } }[];
 /** When the faked refund (donation_refunds) was recorded. */
-let refundRecordedAt = "2027-03-10T08:00:00Z";
+const refundRecordedAt = "2027-03-10T08:00:00Z";
 /** The refunds record_partial_refund has counted, by source (the database's unique key). */
 let refundSources: Map<string, number>;
 const audits: { action: string; entityId?: string | null; details?: Record<string, unknown> }[] = [];
