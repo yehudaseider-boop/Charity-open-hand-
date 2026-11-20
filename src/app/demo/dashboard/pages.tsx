@@ -643,7 +643,7 @@ export function DemoDeposits({ data }: { data: DemoData }) {
       <PageHeader
         back={<Link href={`${base}/donations`} className="font-semibold text-muted hover:text-brand">← Donations</Link>}
         title="Deposits"
-        intro="The payment provider pays your gifts into your bank account in one deposit a day, with its fees taken off. Each deposit here shows the gifts it is made of, each fee, and what reached your bank, so it matches your bank statement line for line. s18A receipts are always for the full gift."
+        intro="The payment provider pays your gifts into your bank account in one deposit a day, with its fees taken off. Each deposit here shows the gifts it is made of, each fee, and what reached your bank, so it matches your bank statement line for line. s18A receipts are for the gift, not what reached the bank, less any part of it that was refunded."
         actions={<ActionLink href={`${base}/donations/deposits/csv`} download>Download all (CSV)</ActionLink>}
       />
       <Card>

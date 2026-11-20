@@ -9,6 +9,7 @@ import { DONATION_FIELDS, type DonationRow } from "@/lib/charity/dashboard-queri
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate, formatDateTime, taxYearName } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { leftCents, partRefundNote } from "@/lib/donations/what-is-left";
 import { donationReference } from "@/lib/donations/reference";
 import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
@@ -51,7 +52,7 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
     <div className="space-y-5">
       <PageHeader
         back={<BackLink href={`/charity-admin/${id}/donations`}>← Donations</BackLink>}
-        title={<span className="tabular-nums">{formatRand(d.amount_cents)}</span>}
+        title={<span className="tabular-nums">{formatRand(leftCents(d))}</span>}
         intro={
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={s.tone}>{s.label}</Badge>
@@ -73,6 +74,8 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
             </Row>
           ) : null}
           {d.external_ref ? <Row label="Your reference">{d.external_ref}</Row> : null}
+          {/* What is left shows above; the gift as given and what was refunded of it, in plain words. */}
+          {partRefundNote(d) ? <Row label="Refunded in part">{partRefundNote(d)}</Row> : null}
           {d.refunded_at ? <Row label="Refunded">{formatDateTime(d.refunded_at)}</Row> : null}
           {d.charged_back_at ? <Row label="Charged back">{formatDateTime(d.charged_back_at)}</Row> : null}
           {d.tax_year ? <Row label="Tax year">{taxYearName(Number(d.tax_year))}</Row> : null}

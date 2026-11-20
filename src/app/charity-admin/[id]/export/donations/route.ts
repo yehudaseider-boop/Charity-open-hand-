@@ -7,17 +7,21 @@ import { DONATION_FIELDS, loadCampaignTitles, type DonationRow } from "@/lib/cha
 import { giftSourceLabel } from "@/lib/donations/source";
 import { audit, authoriseExport, csvResponse, xlsxResponse } from "@/lib/charity/export";
 import { toXlsx } from "@/lib/xlsx";
-import { centsToPlain, toCsv, csvPhone } from "@/lib/csv";
+import { toCsv, csvPhone } from "@/lib/csv";
 import { formatDate, taxYearName } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { dedicationFrom, dedicationLine } from "@/lib/donations/dedication";
 import { donationReference } from "@/lib/donations/reference";
+import { donationAmountColumns } from "@/lib/charity/donation-export";
 
-const HEADER = ["Date", "Reference", "Status", "Tax year", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "s18A receipt requested", "Anonymous publicly", "Dedication", "Message", "How it came in", "Your reference", "Campaign", "Came from"];
+const HEADER = ["Date", "Reference", "Status", "Tax year", "Donor", "Donor type", "Registration number", "Email", "Phone", "Address", "Amount (R)", "Refunded (R)", "s18A receipt requested", "Anonymous publicly", "Dedication", "Message", "How it came in", "Your reference", "Campaign", "Came from"];
 
 /**
  * A charity's donations as a CSV, for their bookkeeper. Paid donations only unless asked
- * (?status=all, or one status), so adding up the Amount column gives the income received.
+ * (?status=all, or one status), so adding up the Amount column gives the income received: Amount is what is left
+ * of each gift after any part refund, and Refunded is what was refunded of it in part refunds (code review
+ * 20/11/2026). A gift refunded in full in parts shows with Amount 0.00. A refunded or charged-back gift (with "every
+ * status") keeps the gift in Amount and says so in Status.
  */
 export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admin/[id]/export/donations">) {
   const { id } = await ctx.params;
@@ -55,7 +59,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       shownEmail(d.email),
       csvPhone(d.phone),
       addressLine(d),
-      centsToPlain(d.amount_cents),
+      ...donationAmountColumns(d),
       d.wants_18a ? "Yes" : "No",
       d.is_anonymous ? "Yes" : "No",
       (() => {
@@ -69,6 +73,6 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/charity-admi
       giftSourceLabel(d.came_from),
     ]);
   const name = `donations-${status ?? "all"}${filters.fromDate ? `-${filters.fromDate}-to-${filters.toDate}` : ""}`;
-  if (xlsx) return xlsxResponse(toXlsx("Donations", HEADER, table, [HEADER.indexOf("Amount (R)")]), `${name}.xlsx`);
+  if (xlsx) return xlsxResponse(toXlsx("Donations", HEADER, table, [HEADER.indexOf("Amount (R)"), HEADER.indexOf("Refunded (R)")]), `${name}.xlsx`);
   return csvResponse(toCsv(HEADER, table), `${name}.csv`);
 }

@@ -97,7 +97,7 @@ export default async function DepositPage({ params }: PageProps<"/charity-admin/
           </table>
         </TableScroll>
       </Card>
-      <p className="text-xs text-muted">Fees are the payment provider&apos;s own, as it reports them. Each s18A receipt is for the full gift, not what reached the bank.</p>
+      <p className="text-xs text-muted">Fees are the payment provider&apos;s own, as it reports them. Each s18A receipt is for the gift, not what reached the bank, less any part of it that was refunded.</p>
     </div>
   );
 }

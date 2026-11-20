@@ -148,7 +148,8 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
 
           {r.refunded.count ? (
             <p className="text-sm text-muted">
-              Not counted above: {plural(r.refunded.count, "donation")} worth {formatRand(r.refunded.cents)} {r.refunded.count === 1 ? "was" : "were"} refunded or reversed by the donor&apos;s bank.
+              {/* The count includes gifts refunded only in part, so the sum is what was taken back, not what the gifts were worth. */}
+              Not counted above: {formatRand(r.refunded.cents)} refunded or reversed by the donor&apos;s bank, on {plural(r.refunded.count, "donation")}.
             </p>
           ) : null}
         </>

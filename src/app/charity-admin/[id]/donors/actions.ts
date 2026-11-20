@@ -17,6 +17,7 @@ import { lapsedDaysFor, listNotes, listReminders, listTags, tagsByDonor } from "
 import { donorGroup, donorGroupsFor, monthlyByDonor } from "@/lib/charity/insights";
 import { formatDate, isoDateInJhb } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { leftCents } from "@/lib/donations/what-is-left";
 import { createClient } from "@/lib/supabase/server";
 import { refusal } from "@/lib/charity/team";
 
@@ -85,7 +86,7 @@ export async function peekDonor(charityId: string, donorId: string): Promise<Don
     lapsedDaysFor(charityId),
     loadMonthlyGifts(charityId),
     loadMonthlyDonations(charityId),
-    supabase.from("charity_donations").select("status, amount_cents, paid_at, created_at").eq("charity_id", charityId).eq("donor_id", donorId).order("paid_at", { ascending: false, nullsFirst: false }).limit(5),
+    supabase.from("charity_donations").select("status, amount_cents, refunded_cents, paid_at, created_at").eq("charity_id", charityId).eq("donor_id", donorId).order("paid_at", { ascending: false, nullsFirst: false }).limit(5),
   ]);
   const { largest } = donorGiving(paid, titles);
   const tagName = new Map(tags.map((t) => [t.id, t.name]));
@@ -107,6 +108,6 @@ export async function peekDonor(charityId: string, donorId: string): Promise<Don
     tags: (byDonor.get(donorId) ?? []).map((t) => tagName.get(t)).filter((t): t is string => Boolean(t)),
     followUps: reminders.filter((r) => !r.done_at).slice(0, 3).map((r) => ({ what: r.what, due: formatDate(`${r.due_on}T12:00:00+02:00`), late: r.due_on < today })),
     latestNote: notes[0]?.body ?? null,
-    recent: (recent ?? []).map((g) => ({ date: formatDate((g.paid_at ?? g.created_at) as string), amount: formatRand(Number(g.amount_cents)), status: statusLabel(g.status as string) })),
+    recent: (recent ?? []).map((g) => ({ date: formatDate((g.paid_at ?? g.created_at) as string), amount: formatRand(leftCents(g)), status: statusLabel(g.status as string) })),
   };
 }

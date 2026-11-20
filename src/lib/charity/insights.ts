@@ -4,6 +4,7 @@
  * check by hand. Pure functions: no database, no clock (the caller passes "now").
  */
 import type { MonthlyRow } from "./dashboard";
+import { countsAsGift, leftCents } from "@/lib/donations/what-is-left";
 
 const DAY = 86_400_000;
 
@@ -186,21 +187,23 @@ export type ReceiptYear = {
 
 /**
  * s18A progress per tax year, newest first: who asked for a receipt and who has one. Only paid gifts
- * count (a refunded gift needs no receipt). `onIssuedReceipt` holds the ids of gifts on an issued receipt.
+ * count (a refunded gift needs no receipt), each for what is left after part refunds, as on the receipt; a gift
+ * refunded in full in parts needs no receipt either (code review 20/11/2026). `onIssuedReceipt` holds the ids of
+ * gifts on an issued receipt.
  */
 export function receiptProgress(
-  gifts: { id: string; donor_id: string; tax_year: number | null; amount_cents: number; wants_18a: boolean; status: string }[],
+  gifts: { id: string; donor_id: string; tax_year: number | null; amount_cents: number; refunded_cents?: number | null; wants_18a: boolean; status: string }[],
   onIssuedReceipt: Set<string>,
   currentTaxYear: number,
 ): ReceiptYear[] {
   const years = new Map<number, { donors: Set<string>; waiting: Set<string>; waitingCents: number }>();
   for (const g of gifts) {
-    if (g.status !== "paid" || !g.wants_18a || g.tax_year === null) continue;
+    if (!countsAsGift(g) || !g.wants_18a || g.tax_year === null) continue;
     const y = years.get(g.tax_year) ?? { donors: new Set<string>(), waiting: new Set<string>(), waitingCents: 0 };
     y.donors.add(g.donor_id);
     if (!onIssuedReceipt.has(g.id)) {
       y.waiting.add(g.donor_id);
-      y.waitingCents += Number(g.amount_cents);
+      y.waitingCents += leftCents(g);
     }
     years.set(g.tax_year, y);
   }

@@ -14,6 +14,7 @@ import { formatDate } from "@/lib/dates";
 import { DonePanel } from "@/components/done-panel";
 import { RECORDED_METHODS, type RecordedMethod } from "@/lib/charity/recorded-gifts";
 import { formatRand } from "@/lib/money";
+import { countsAsGift, leftCents, partRefundNote, partRefundedCents, refundedInParts } from "@/lib/donations/what-is-left";
 import { Card } from "@/components/card";
 import { ActionLink, blueAction, EmptyState, field, PageHeader, rowLink, secondaryAction, Tabs } from "@/components/dash";
 import { showDay } from "@/lib/typed-date";
@@ -153,9 +154,10 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
             {narrowed && totals.paidCount ? (
               <p className="mt-1 text-muted">From {totals.donorCount} {totals.donorCount === 1 ? "donor" : "donors"}.</p>
             ) : null}
-            {totals.reversedCount ? (
+            {totals.reversedCount || totals.reversedCents ? (
               <p className="mt-1 text-muted">
-                Not counted: {formatRand(totals.reversedCents)} refunded or charged back ({totals.reversedCount}).
+                {/* Part refunds are in the Rand figure; the number in brackets is gifts refunded or charged back in full. */}
+                Not counted: {formatRand(totals.reversedCents)} refunded or charged back{totals.reversedCount ? ` (${totals.reversedCount})` : ""}.
               </p>
             ) : null}
           </div>
@@ -198,6 +200,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
                       <p className="text-muted">{formatDate(d.paid_at ?? d.created_at)}</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         <Badge tone={s.tone}>{s.label}</Badge>
+                        {refundedInParts(d) ? <Badge tone={donationStatus.refunded.tone}>Refunded in parts</Badge> : d.status === "paid" && partRefundedCents(d) > 0 ? <Badge tone={donationStatus.refunded.tone}>Partly refunded</Badge> : null}
                         {d.wants_18a ? <Badge tone="brand">s18A requested</Badge> : null}
                         {d.is_anonymous ? <Badge>Anonymous publicly</Badge> : null}
                         {d.recorded_method ? <Badge>Recorded: {RECORDED_METHODS[d.recorded_method as RecordedMethod] ?? "by you"}</Badge> : null}
@@ -205,7 +208,11 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
                         {d.came_from && d.came_from !== "recorded" ? <Badge>{giftSourceLabel(d.came_from)}</Badge> : null}
                       </div>
                     </div>
-                    <p className="shrink-0 font-display text-lg font-bold text-indigo tabular-nums">{formatRand(d.amount_cents)}</p>
+                    {/* A partly refunded gift shows what is left, with the gift and the refund in plain words under it. */}
+                    <div className="shrink-0 text-right">
+                      <p className="font-display text-lg font-bold text-indigo tabular-nums">{formatRand(leftCents(d))}</p>
+                      {partRefundNote(d) ? <p className="text-xs text-muted tabular-nums">{partRefundNote(d)}</p> : null}
+                    </div>
                   </Link>
                 </li>
               );
@@ -227,24 +234,31 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
 
 type Totals = { paidCents: number; paidCount: number; reversedCents: number; reversedCount: number; donorCount: number };
 
-/** Totals of every donation the filters match, read in pages (whole cents, no floats). */
+/**
+ * Totals of every donation the filters match, read in pages (whole cents, no floats). A paid gift counts what is
+ * left after part refunds, and part refunds count as refunded; a gift refunded in full in parts is a refund, not a
+ * gift (code review 20/11/2026).
+ */
 async function loadTotals(supabase: Awaited<ReturnType<typeof createClient>>, charityId: string, filters: ReturnType<typeof parseDonationFilters>): Promise<Totals> {
   const t: Totals = { paidCents: 0, paidCount: 0, reversedCents: 0, reversedCount: 0, donorCount: 0 };
   const donors = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data, error } = await applyDonationFilters(
-      supabase.from("charity_donations").select("id, donor_id, status, amount_cents").eq("charity_id", charityId).order("id").range(from, from + 999),
+      supabase.from("charity_donations").select("id, donor_id, status, amount_cents, refunded_cents").eq("charity_id", charityId).order("id").range(from, from + 999),
       filters,
     );
     if (error) throw error;
     for (const r of data ?? []) {
-      const cents = Number(r.amount_cents);
-      if (r.status === "paid") {
-        t.paidCents += cents;
+      if (countsAsGift(r)) {
+        t.paidCents += leftCents(r);
         t.paidCount++;
         donors.add(r.donor_id as string);
+        if (partRefundedCents(r) > 0) t.reversedCents += partRefundedCents(r);
+      } else if (refundedInParts(r)) {
+        t.reversedCents += partRefundedCents(r);
+        t.reversedCount++;
       } else if (r.status === "refunded" || r.status === "charged_back") {
-        t.reversedCents += cents;
+        t.reversedCents += Number(r.amount_cents);
         t.reversedCount++;
       }
     }

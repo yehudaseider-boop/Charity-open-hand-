@@ -1,6 +1,6 @@
 /** The app's mapping from the donor's own database rows to what the Giving and Receipts screens show. */
 import { describe, expect, it } from "vitest";
-import { cleanCode, fromCache, looksLikeEmail, newArrivals, seenFrom, toCache, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
+import { cleanCode, countsTowardsReceipts, fromCache, looksLikeEmail, newArrivals, seenFrom, toCache, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
 
 const charity = { slug: "meals", name_en: "Meals Fund" };
 const row = (o: Partial<DonationRow>): DonationRow => ({
@@ -18,6 +18,22 @@ describe("toGifts", () => {
     expect(gifts.find((g) => g.id === "e")?.label).toBe("Work giving");
     // No label: none is made up.
     expect(gifts.find((g) => g.id === "d")).toMatchObject({ label: null, monthly: true, cents: 5_000 });
+  });
+
+  it("counts what is left after part refunds, and drops a gift refunded in full in parts (20/11/2026)", () => {
+    const gifts = toGifts(
+      [row({ id: "a", amount_cents: "100000", refunded_cents: "40000" }), row({ id: "b", amount_cents: 50_000, refunded_cents: 50_000 }), row({ id: "c", refunded_cents: null })],
+      [],
+    );
+    expect(gifts.map((g) => [g.id, g.cents]).sort()).toEqual([["a", 60_000], ["c", 18_000]]);
+  });
+
+  it("a gift held off s18A receipts (a dispute, a refund being reviewed) doesn't count towards them", () => {
+    const [held, free] = toGifts([row({ id: "h", receipt_hold: "dispute open", paid_at: "2026-10-02T08:00:00Z" }), row({ id: "f", receipt_hold: null })], []);
+    expect(held).toMatchObject({ id: "h", receiptHeld: true });
+    expect(free.receiptHeld).toBeUndefined();
+    expect(countsTowardsReceipts(held, new Set())).toBe(false);
+    expect(countsTowardsReceipts(free, new Set())).toBe(true);
   });
 
   it("puts the newest first", () => {
@@ -192,6 +208,11 @@ describe("giving saved on the phone for offline use", () => {
     loadedAt: new Date("2026-09-03T10:15:00Z"),
   };
 
+  it("keeps a gift's hold off s18A receipts", () => {
+    const held = { ...live, gifts: [{ ...live.gifts[0], receiptHeld: true }] };
+    expect(fromCache(toCache(held))?.gifts[0].receiptHeld).toBe(true);
+  });
+
   it("comes back exactly as it went in, dates included", () => {
     // Thank-you notes aren't kept in the saved copy (they're only shown for new donations).
     const gift: Partial<(typeof live.gifts)[0]> = { ...live.gifts[0] };
@@ -203,6 +224,8 @@ describe("giving saved on the phone for offline use", () => {
     expect(fromCache(null)).toBeNull();
     expect(fromCache("not json")).toBeNull();
     expect(fromCache(JSON.stringify({ ...JSON.parse(toCache(live)), v: 0 }))).toBeNull();
+    // A copy saved before part refunds counted (version 2: whole gifts) is not used (20/11/2026).
+    expect(fromCache(JSON.stringify({ ...JSON.parse(toCache(live)), v: 2 }))).toBeNull();
     const bad = JSON.parse(toCache(live));
     bad.gifts[0].cents = 180.5;
     expect(fromCache(JSON.stringify(bad))).toBeNull();

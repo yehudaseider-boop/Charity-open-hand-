@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { MonthlyRow, Period } from "./dashboard";
 import { readAllPages } from "./read-pages";
+import { leftCents } from "@/lib/donations/what-is-left";
 
 /** Everything here is read as the signed-in person, so row-level security decides what comes back. */
 
@@ -116,17 +117,20 @@ export function loadMonthlyGifts(charityId: string) {
   return allCharityDonations<{ donor_id: string; recurring_id: string | null }>(charityId, "donor_id, recurring_id", (q) => q.not("recurring_id", "is", null));
 }
 
-/** Paid gifts that asked for an s18A receipt, and which of them are on an issued receipt. */
+/**
+ * Paid gifts that asked for an s18A receipt, and which of them are on an issued receipt. Each carries what was
+ * refunded of it in part refunds, so the progress counts what is left (code review 20/11/2026).
+ */
 export async function loadReceiptGifts(charityId: string) {
   const [gifts, onIssued] = await Promise.all([
-    allCharityDonations<{ id: string; donor_id: string; tax_year: number | null; amount_cents: number; wants_18a: boolean; status: string }>(
+    allCharityDonations<{ id: string; donor_id: string; tax_year: number | null; amount_cents: number; refunded_cents: number; wants_18a: boolean; status: string }>(
       charityId,
-      "id, donor_id, tax_year, amount_cents, wants_18a, status",
+      "id, donor_id, tax_year, amount_cents, refunded_cents, wants_18a, status",
       (q) => q.eq("status", "paid").eq("wants_18a", true),
     ),
     loadIssuedGiftIds(charityId),
   ]);
-  return { gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })), onIssued };
+  return { gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents), refunded_cents: n(g.refunded_cents) })), onIssued };
 }
 
 /** The gifts that are on an issued s18A receipt. */
@@ -147,28 +151,30 @@ async function loadIssuedGiftIds(charityId: string): Promise<Set<string>> {
 /** Everything the annual report needs: every paid, refunded or charged-back donation, the campaign names and issued receipts. */
 export async function loadReportData(charityId: string) {
   const [gifts, campaignTitles, onIssued] = await Promise.all([
-    allCharityDonations<{ id: string; donor_id: string; status: string; amount_cents: number; paid_at: string | null; tax_year: number | null; recurring_id: string | null; campaign_id: string | null; wants_18a: boolean }>(
+    allCharityDonations<{ id: string; donor_id: string; status: string; amount_cents: number; refunded_cents: number; paid_at: string | null; tax_year: number | null; recurring_id: string | null; campaign_id: string | null; wants_18a: boolean }>(
       charityId,
-      "id, donor_id, status, amount_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a",
+      "id, donor_id, status, amount_cents, refunded_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a",
     ),
     loadCampaignTitles(charityId),
     loadIssuedGiftIds(charityId),
   ]);
   return {
-    gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents) })),
+    gifts: gifts.map((g) => ({ ...g, amount_cents: n(g.amount_cents), refunded_cents: n(g.refunded_cents) })),
     campaignTitles,
     onIssued,
   };
 }
 
 export const DONATION_FIELDS =
-  "id, donor_id, status, amount_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code, recorded_method, external_ref, came_from, campaign_id";
+  "id, donor_id, status, amount_cents, refunded_cents, paid_at, created_at, refunded_at, charged_back_at, tax_year, wants_18a, is_anonymous, message, dedication_kind, dedication_name, donor_type, first_name, last_name, organisation_name, registration_number, contact_person, email, phone, address_line1, address_line2, suburb, city, postal_code, recorded_method, external_ref, came_from, campaign_id";
 
 export type DonationRow = {
   id: string;
   donor_id: string;
   status: "pending" | "paid" | "failed" | "refunded" | "charged_back";
   amount_cents: number;
+  /** Cents of the gift refunded in part refunds (the gift stays paid). What is left is amount_cents - refunded_cents. */
+  refunded_cents: number;
   paid_at: string | null;
   created_at: string;
   refunded_at: string | null;
@@ -203,13 +209,16 @@ export type DonationRow = {
   campaign_id: string | null;
 };
 
-/** One donor's paid gifts to the charity, oldest first, for their largest gift and giving by campaign. */
+/**
+ * One donor's paid gifts to the charity, oldest first, for their largest gift and giving by campaign. Each counts
+ * what is left after part refunds; a gift with nothing left is not one (code review 20/11/2026).
+ */
 export function loadDonorPaidGifts(charityId: string, donorId: string) {
-  return allCharityDonations<{ id: string; amount_cents: number; paid_at: string | null; campaign_id: string | null; came_from: string | null }>(
+  return allCharityDonations<{ id: string; amount_cents: number; refunded_cents: number; paid_at: string | null; campaign_id: string | null; came_from: string | null }>(
     charityId,
-    "id, amount_cents, paid_at, campaign_id, came_from",
+    "id, amount_cents, refunded_cents, paid_at, campaign_id, came_from",
     (q) => q.eq("donor_id", donorId).eq("status", "paid"),
-  ).then((rows) => rows.map((r) => ({ ...r, amount_cents: n(r.amount_cents) })).sort((a, b) => String(a.paid_at).localeCompare(String(b.paid_at))));
+  ).then((rows) => rows.map(({ refunded_cents, ...r }) => ({ ...r, amount_cents: leftCents({ amount_cents: r.amount_cents, refunded_cents }) })).filter((r) => r.amount_cents > 0).sort((a, b) => String(a.paid_at).localeCompare(String(b.paid_at))));
 }
 
 /** The latest donations that went through (paid, refunded or charged back), newest first, for the Overview. */
@@ -226,9 +235,17 @@ export async function loadRecentDonations(charityId: string, limit = 7): Promise
   return (data ?? []) as unknown as DonationRow[];
 }
 
-/** Where the paid gifts of a period came from (website, app, shared link and so on): one row per gift. */
-export function loadGiftSources(charityId: string, period: Period) {
-  return allCharityDonations<{ came_from: string | null }>(charityId, "came_from", (q) => q.eq("status", "paid").gte("paid_at", period.from).lt("paid_at", period.to));
+/**
+ * Where the paid gifts of a period came from (website, app, shared link and so on): one row per gift. A gift refunded
+ * in full in parts is not one (code review 20/11/2026).
+ */
+export async function loadGiftSources(charityId: string, period: Period): Promise<{ came_from: string | null }[]> {
+  const rows = await allCharityDonations<{ came_from: string | null; amount_cents: number | string; refunded_cents: number | string | null }>(
+    charityId,
+    "came_from, amount_cents, refunded_cents",
+    (q) => q.eq("status", "paid").gte("paid_at", period.from).lt("paid_at", period.to),
+  );
+  return rows.filter((r) => leftCents(r) > 0).map((r) => ({ came_from: r.came_from }));
 }
 
 /** The charity's campaigns by id, for naming them on gifts and in downloads. */

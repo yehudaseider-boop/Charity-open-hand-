@@ -4,7 +4,7 @@
  */
 import type { Goal } from "../lib/goals";
 
-export type Gift = { id: string; /** The Johannesburg calendar day it was paid. */ date: Date; /** The exact moment it was paid (live donations), for "new since you last looked". */ at?: Date; charitySlug: string; charityName: string; cents: number; monthly: boolean; with18a: boolean; /** The donor's own label for it ("Work giving", "Family"), if they gave one. */ label: string | null; /** The charity's own thank-you note, if it wrote one. */ thankYou?: string };
+export type Gift = { id: string; /** The Johannesburg calendar day it was paid. */ date: Date; /** The exact moment it was paid (live donations), for "new since you last looked". */ at?: Date; charitySlug: string; charityName: string; cents: number; monthly: boolean; with18a: boolean; /** Held off s18A receipts for now (a dispute, a refund being reviewed), so it doesn't count towards them. */ receiptHeld?: boolean; /** The donor's own label for it ("Work giving", "Family"), if they gave one. */ label: string | null; /** The charity's own thank-you note, if it wrote one. */ thankYou?: string };
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 

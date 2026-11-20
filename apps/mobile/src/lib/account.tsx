@@ -106,16 +106,28 @@ async function loadLive(userId: string): Promise<Live> {
 
   const [donations, recurring, receipts] = await Promise.all([
     // Each donation carries the donor's own label, if they gave one.
-    allPages<DonationRow & { donation_giving_kinds: { kind: string | null; label: string | null } | { kind: string | null; label: string | null }[] | null }>((a, b) =>
-      db
-        .from("donations")
-        .select("id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en), donation_giving_kinds(kind, label)")
-        .in("donor_id", donorIds)
-        .eq("status", "paid")
-        .order("paid_at", { ascending: false })
-        .order("id")
-        .range(a, b),
-    ),
+    (async () => {
+      type Row = DonationRow & { donation_giving_kinds: { kind: string | null; label: string | null } | { kind: string | null; label: string | null }[] | null };
+      const read = (columns: string) =>
+        allPages<Row>((a, b) =>
+          db
+            .from("donations")
+            .select(`id, paid_at, status, amount_cents, wants_18a, recurring_id, charities(slug, name_en, thank_you_en), donation_giving_kinds(kind, label)${columns}`)
+            .in("donor_id", donorIds)
+            .eq("status", "paid")
+            .order("paid_at", { ascending: false })
+            .order("id")
+            .range(a, b),
+        );
+      // What was refunded of each gift in part refunds, and whether it is held off s18A receipts (readable since
+      // migration 20261120000001). A server without that migration yet refuses the columns: read the rest rather
+      // than lose the whole history (nothing can have been part refunded there).
+      try {
+        return await read(", refunded_cents, receipt_hold");
+      } catch {
+        return read("");
+      }
+    })(),
     (async () => {
       const columns = "id, amount_cents, contribution_cents, status, needs_gateway_sync, failed_attempts, ended_reason, next_charge_at, charities(slug, name_en)";
       // Whether the donor covers the card charge (readable since migration 20261118120001). A server without that

@@ -15,6 +15,10 @@ export type DonationRow = {
   paid_at: string | null;
   status: string;
   amount_cents: number | string;
+  /** Cents of the gift refunded in part refunds (the gift stays paid). Left out means none. */
+  refunded_cents?: number | string | null;
+  /** Why the gift is kept off s18A receipts for now ("dispute open", "refund being reviewed"); null when it isn't. */
+  receipt_hold?: string | null;
   wants_18a: boolean;
   recurring_id: string | null;
   charities: { slug: string; name_en: string; thank_you_en?: string | null } | { slug: string; name_en: string; thank_you_en?: string | null }[] | null;
@@ -51,13 +55,15 @@ const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ?
 /**
  * Paid donations only: they are what counts towards the donor's goals.
  * (Refunded or charged-back donations drop out; pending ones aren't money yet.)
+ * Each counts what is left after any part refund, as its s18A receipt does; a gift refunded in full in parts drops
+ * out like a refunded one (code review 20/11/2026).
  * Each carries the donor's own label, if they gave one. Old fixed choices are ignored: only a label the donor
  * typed themselves shows (decided 02/11/2026).
  */
 export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
   const labelFor = new Map(kinds.map((k) => [k.donation_id, labelOf(k)]));
   return donations
-    .filter((d) => d.status === "paid" && d.paid_at)
+    .filter((d) => d.status === "paid" && d.paid_at && leftOf(d) > 0)
     .map((d) => {
       const c = one(d.charities);
       // Cleaned as the website shows it: no hidden characters, and never a note with a web address in it.
@@ -68,9 +74,10 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
         at: new Date(d.paid_at!),
         charitySlug: c?.slug ?? "",
         charityName: c?.name_en ?? "Charity",
-        cents: Number(d.amount_cents),
+        cents: leftOf(d),
         monthly: d.recurring_id !== null,
         with18a: d.wants_18a,
+        ...(d.receipt_hold ? { receiptHeld: true } : {}),
         label: labelFor.get(d.id) ?? null,
         ...(thankYou ? { thankYou } : {}),
       };
@@ -78,16 +85,20 @@ export function toGifts(donations: DonationRow[], kinds: KindRow[]): Gift[] {
     .sort((a, b) => momentOf(b) - momentOf(a));
 }
 
+/** What is left of a gift after part refunds (the website's rule, src/lib/donations/what-is-left.ts). Never below 0. */
+const leftOf = (d: Pick<DonationRow, "amount_cents" | "refunded_cents">): number => Math.max(0, Number(d.amount_cents) - Number(d.refunded_cents ?? 0));
+
 /** When a gift was paid, to the moment where known (live), else its day. */
 const momentOf = (g: Gift) => (g.at ?? g.date).getTime();
 
 /**
  * Whether a gift counts towards the donor's s18A receipts, as the website says it: asked for one, and not paid with
  * "Add my details after paying" while those details are still to come (such a gift can't go on a receipt yet).
- * `detailsLater`: the gifts given on this phone that way (lib/pending-gift-store).
+ * A gift held off receipts while a person looks (a dispute, a refund being reviewed) doesn't count either, as the
+ * receipt run leaves it off (20/11/2026). `detailsLater`: the gifts given on this phone that way (lib/pending-gift-store).
  */
-export function countsTowardsReceipts(g: Pick<Gift, "id" | "with18a">, detailsLater: ReadonlySet<string>): boolean {
-  return g.with18a && !detailsLater.has(g.id);
+export function countsTowardsReceipts(g: Pick<Gift, "id" | "with18a" | "receiptHeld">, detailsLater: ReadonlySet<string>): boolean {
+  return g.with18a && !g.receiptHeld && !detailsLater.has(g.id);
 }
 
 /** The provider's rates from our server: known (null means nothing is added), or not known (we couldn't ask). */
@@ -204,15 +215,16 @@ export function toCache(live: Cached): string {
     .sort((a, b) => momentOf(b) - momentOf(a))
     .slice(0, 500)
     .map(({ thankYou: _note, ...g }) => g);
-  // Version 2: dates are Johannesburg calendar days, with the exact moment kept as `at`.
-  return JSON.stringify({ v: 2, ...live, gifts });
+  // Version 2: dates are Johannesburg calendar days, with the exact moment kept as `at`. Version 3 (20/11/2026): a
+  // gift's amount is what is left after part refunds, so a copy saved before then (the whole gift) is not used.
+  return JSON.stringify({ v: 3, ...live, gifts });
 }
 
 export function fromCache(raw: string | null): Cached | null {
   if (!raw) return null;
   try {
     const o = JSON.parse(raw) as Record<string, unknown>;
-    if (o.v !== 2) return null;
+    if (o.v !== 3) return null;
     const date = (v: unknown): Date => {
       const d = new Date(typeof v === "string" ? v : NaN);
       if (Number.isNaN(d.getTime())) throw new Error("bad date");
@@ -243,6 +255,7 @@ export function fromCache(raw: string | null): Cached | null {
         cents: cents(g.cents),
         monthly: g.monthly === true,
         with18a: g.with18a === true,
+        ...(g.receiptHeld === true ? { receiptHeld: true } : {}),
         label: label(g),
         ...(typeof g.thankYou === "string" ? { thankYou: g.thankYou } : {}),
       })),

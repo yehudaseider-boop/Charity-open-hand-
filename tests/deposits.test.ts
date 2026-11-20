@@ -52,6 +52,26 @@ describe("a deposit", () => {
     expect(wrong.problems[0]).toBe("R500 gift plus the R16 card charge the donor covered less a R15 fee should be R501, but the payment provider shows R485. Tell us and we'll look into it.");
   });
 
+  it("a refund line for a part refund takes back only that part, never the whole gift or the card charge (20/11/2026)", () => {
+    const partly = new Map<string, GiftIn>([["c", { ...gifts.get("c")!, cardChargeCents: 3_000, partRefundsCents: [40_000] }]]);
+    const d = buildDeposit(-40_000, [{ kind: "refund", donationId: "c", grossCents: -40_000, feeCents: 0, netCents: -40_000 }], partly);
+    expect(d.rows[0]).toMatchObject({ kind: "refund", giftCents: -40_000, problem: null });
+    expect(d).toMatchObject({ giftsCents: -40_000, balances: true });
+    // Two part refunds of the same gift, in two deposits: each line matches its own part.
+    const two = new Map<string, GiftIn>([["c", { ...gifts.get("c")!, partRefundsCents: [40_000, 10_000] }]]);
+    expect(buildDeposit(-10_000, [{ kind: "refund", donationId: "c", grossCents: -10_000, feeCents: 0, netCents: -10_000 }], two).balances).toBe(true);
+  });
+
+  it("refunding the rest of a gift after a part refund takes back what was left, with the card charge", () => {
+    const partly = new Map<string, GiftIn>([["c", { ...gifts.get("c")!, cardChargeCents: 3_000, partRefundsCents: [40_000] }]]);
+    const d = buildDeposit(-63_000, [{ kind: "refund", donationId: "c", grossCents: -63_000, feeCents: 0, netCents: -63_000 }], partly);
+    expect(d.rows[0]).toMatchObject({ giftCents: -60_000, problem: null });
+    // A line that matches no part and isn't the rest is said plainly.
+    const odd = buildDeposit(-25_000, [{ kind: "refund", donationId: "c", grossCents: -25_000, feeCents: 0, netCents: -25_000 }], partly);
+    expect(odd.balances).toBe(false);
+    expect(odd.rows[0].problem).toBe("R600 refund plus the R30 card charge the donor covered should be -R630, but the payment provider shows -R250. Tell us and we'll look into it.");
+  });
+
   it("says plainly when a line isn't one of the charity's gifts, or the lines don't add up to the deposit", () => {
     const d = buildDeposit(10_000, [{ kind: "payment", donationId: null, grossCents: 9_000, feeCents: 0, netCents: 9_000 }], gifts);
     expect(d.rows[0]).toMatchObject({ donorName: "Not one of your Givezy gifts", giftCents: null });

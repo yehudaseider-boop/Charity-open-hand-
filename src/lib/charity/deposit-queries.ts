@@ -126,5 +126,18 @@ async function giftsFor(charityId: string, ids: string[]): Promise<Map<string, G
       if (gift) gift.cardChargeCents = Number(d.processing_charge_cents ?? 0);
     }
   }
+  // Part refunds (20/11/2026): a refund line for one takes back only that part of the gift. donation_refunds is
+  // server-only, so it is read with the service role, only for this charity's own gifts found above.
+  for (let i = 0; i < found.length; i += 200) {
+    const { data, error } = await db
+      .from("donation_refunds")
+      .select("donation_id, amount_cents")
+      .in("donation_id", found.slice(i, i + 200));
+    if (error) throw error;
+    for (const r of data ?? []) {
+      const gift = out.get(r.donation_id as string);
+      if (gift) gift.partRefundsCents = [...(gift.partRefundsCents ?? []), Number(r.amount_cents)];
+    }
+  }
   return out;
 }

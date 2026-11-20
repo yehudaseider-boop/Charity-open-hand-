@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { monthlyByDonor, receiptProgress } from "@/lib/charity/insights";
 
-const gift = (id: string, donor: string, year: number, cents: number, extra: Partial<{ wants_18a: boolean; status: string }> = {}) => ({
+const gift = (id: string, donor: string, year: number, cents: number, extra: Partial<{ wants_18a: boolean; status: string; refunded_cents: number }> = {}) => ({
   id, donor_id: donor, tax_year: year, amount_cents: cents, wants_18a: true, status: "paid", ...extra,
 });
 
@@ -33,6 +33,18 @@ describe("s18A receipt progress", () => {
       gift("c1", "cara", 2026, 9_000, { status: "charged_back" }),
     ];
     expect(receiptProgress(gifts, new Set(), 2027)).toEqual([]);
+  });
+});
+
+describe("s18A receipt progress after part refunds (20/11/2026)", () => {
+  it("counts what is left of a partly refunded gift, as the receipt will", () => {
+    const gifts = [gift("a1", "ann", 2027, 100_000, { refunded_cents: 40_000 }), gift("b1", "ben", 2027, 10_000)];
+    expect(receiptProgress(gifts, new Set(), 2027)).toEqual([{ taxYear: 2027, current: true, donors: 2, receipted: 0, waitingCents: 70_000 }]);
+  });
+
+  it("leaves out a gift refunded in full in parts: it needs no receipt, and its donor isn't waiting", () => {
+    const gifts = [gift("a1", "ann", 2027, 100_000, { refunded_cents: 100_000 }), gift("b1", "ben", 2027, 10_000)];
+    expect(receiptProgress(gifts, new Set(["b1"]), 2027)).toEqual([{ taxYear: 2027, current: true, donors: 1, receipted: 1, waitingCents: 0 }]);
   });
 });
 

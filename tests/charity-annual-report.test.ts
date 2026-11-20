@@ -25,6 +25,28 @@ describe("annual report", () => {
     expect(r.averageCents).toBe(45_333);
     expect(r.refunded).toEqual({ count: 1, cents: 25_000 });
   });
+  it("counts what is left of a partly refunded gift, and the part refund as refunded (20/11/2026)", () => {
+    const rows = [
+      gift("ann", 100_000, "2026-04-05T10:00:00Z", { refunded_cents: 40_000, campaign_id: "c1", wants_18a: true }),
+      gift("ben", 50_000, "2026-04-06T10:00:00Z", { refunded_cents: 50_000 }), // refunded in full in parts
+      gift("cara", 20_000, "2026-04-07T10:00:00Z", { status: "refunded" }),
+    ];
+    const rep = annualReport(rows, 2027, new Map([["c1", "Winter blankets"]]), new Set(), now);
+    expect(rep.totalCents).toBe(60_000);
+    expect(rep.donationCount).toBe(1);
+    expect(rep.donors).toBe(1);
+    expect(rep.months.find((m) => m.month === "2026-04")).toMatchObject({ cents: 60_000, count: 1 });
+    expect(rep.campaigns).toEqual([{ id: "c1", title: "Winter blankets", cents: 60_000, count: 1 }]);
+    expect(rep.s18a).toEqual({ donors: 1, receipted: 0, waitingCents: 60_000 });
+    // R400 and R500 refunded in parts, and the R200 gift refunded whole: three gifts, R1 100 taken back.
+    expect(rep.refunded).toEqual({ count: 3, cents: 110_000 });
+  });
+  it("a first gift refunded in full in parts doesn't make someone a returning donor", () => {
+    const rows = [gift("x", 50_000, "2025-06-01T10:00:00Z", { refunded_cents: 50_000 }), gift("x", 20_000, "2026-04-05T10:00:00Z")];
+    const rep = annualReport(rows, 2027, new Map(), new Set(), now);
+    expect(rep.newDonors).toBe(1);
+    expect(rep.returningDonors).toBe(0);
+  });
   it("tells new donors from those who gave in an earlier year", () => {
     expect(r.donors).toBe(2);
     expect(r.newDonors).toBe(1);

@@ -1,8 +1,9 @@
 /**
  * A deposit from the payment provider, as a bookkeeper needs it (21/10/2026, Juan of the Angel Network):
  * which gifts it is made of, each gift's fee, what reached the bank, and a total that equals the bank
- * deposit. Pure: no database. The provider's figures are used as it gives them; the gift amount is ours
- * (the s18A receipt is always for the full gift). Anything that doesn't add up is said plainly, never hidden.
+ * deposit. Pure: no database. The provider's figures are used as it gives them; the gift amount is ours (what the
+ * s18A receipt is for: the gift, less any part of it refunded). Anything that doesn't add up is said plainly, never
+ * hidden.
  */
 import { formatRand } from "@/lib/money";
 
@@ -12,6 +13,11 @@ export type GiftIn = {
   amountCents: number;
   /** The card charge the donor chose to cover, which goes to the charity with the gift (0 when not covered). */
   cardChargeCents?: number;
+  /**
+   * Each part refund recorded for this gift (donation_refunds), in cents of the gift itself. A refund line for a part
+   * refund takes back only that part, never the card charge (code review 20/11/2026). Left out means none.
+   */
+  partRefundsCents?: number[];
   donorName: string;
   paidAt: string | null;
 };
@@ -44,6 +50,22 @@ export type Deposit = {
 const KIND_WORD = { payment: "Gift", refund: "Refund", chargeback: "Chargeback", other: "Other" } as const;
 export const kindWord = (k: DepositLineIn["kind"]) => KIND_WORD[k];
 
+/**
+ * What a line is about: the gift part and the card charge. A payment or chargeback is the whole gift with its card
+ * charge. A refund line for a gift with part refunds (20/11/2026) is the part refund the provider's amount matches
+ * (only that part of the gift; the card charge stays with the charity), or else the rest of the gift with the card
+ * charge, as when the whole gift is refunded after a part refund.
+ */
+function takenBy(l: DepositLineIn, gift: GiftIn): { giftPart: number; cardChargeCents: number } {
+  const cardChargeCents = gift.cardChargeCents ?? 0;
+  const parts = gift.partRefundsCents ?? [];
+  if (l.kind !== "refund" || parts.length === 0) return { giftPart: gift.amountCents, cardChargeCents };
+  const part = parts.find((p) => p === Math.abs(l.grossCents));
+  if (part !== undefined) return { giftPart: part, cardChargeCents: 0 };
+  const partsTotal = parts.reduce((t, p) => t + p, 0);
+  return { giftPart: Math.max(0, gift.amountCents - partsTotal), cardChargeCents };
+}
+
 export function buildDeposit(depositCents: number, lines: DepositLineIn[], gifts: Map<string, GiftIn>): Deposit {
   const rows: DepositRow[] = lines.map((l) => {
     const gift = l.donationId ? gifts.get(l.donationId) : undefined;
@@ -54,9 +76,9 @@ export function buildDeposit(depositCents: number, lines: DepositLineIn[], gifts
     // The gift column is the gift itself (what the s18A receipt is for). When the donor covered the card charge,
     // the charity's share of the payment is the gift plus that charge, so that is what the line should add up to
     // (and what a refund or chargeback takes back).
-    const giftCents = sign * gift.amountCents;
-    const cardChargeCents = gift.cardChargeCents ?? 0;
-    const expected = sign * (gift.amountCents + cardChargeCents) - l.feeCents;
+    const { giftPart, cardChargeCents } = takenBy(l, gift);
+    const giftCents = sign * giftPart;
+    const expected = sign * (giftPart + cardChargeCents) - l.feeCents;
     const problem =
       l.kind === "other"
         ? "The payment provider lists this line without saying what it is. Tell us and we'll look into it."

@@ -5,12 +5,15 @@
 import { platformConfig } from "@/config/platform";
 import { taxYearFor, taxYearRange } from "@/lib/dates";
 import { averageCents, saDate } from "./dashboard";
+import { countsAsGift, leftCents, partRefundedCents } from "@/lib/donations/what-is-left";
 
 export type ReportGift = {
   id: string;
   donor_id: string;
   status: string;
   amount_cents: number;
+  /** Cents of the gift refunded in part refunds (the gift stays paid). Left out means none. */
+  refunded_cents?: number | null;
   paid_at: string | null;
   tax_year: number | null;
   recurring_id: string | null;
@@ -27,7 +30,10 @@ export type AnnualReport = {
   running: boolean;
   start: string;
   end: string;
-  /** Paid donations that stayed paid (refunds and chargebacks are counted apart). */
+  /**
+   * Paid donations that stayed paid, each for what is left after part refunds; a gift refunded in full in parts is
+   * not counted (refunds and chargebacks are counted apart).
+   */
   totalCents: number;
   donationCount: number;
   donors: number;
@@ -40,6 +46,7 @@ export type AnnualReport = {
   months: MonthLine[];
   bestMonth: MonthLine | null;
   campaigns: CampaignLine[];
+  /** Gifts refunded (in full or in part) or charged back, and the cents taken back. */
   refunded: { count: number; cents: number };
   /** Donors who asked for an s18A receipt, and how many of them have one for every such gift. */
   s18a: { donors: number; receipted: number; waitingCents: number };
@@ -78,13 +85,15 @@ export function annualReport(
 ): AnnualReport {
   const { start, end } = taxYearRange(taxYear);
   const inYear = all.filter((g) => yearOf(g) === taxYear);
-  const paid = inYear.filter((g) => g.status === "paid");
+  // A paid gift counts what is left after part refunds; one with nothing left is a refund, not a gift (code review 20/11/2026).
+  const paid = inYear.filter(countsAsGift);
   const undone = inYear.filter((g) => g.status === "refunded" || g.status === "charged_back");
+  const partlyRefunded = inYear.filter((g) => g.status === "paid" && partRefundedCents(g) > 0);
 
   // A donor is new this year when their first paid donation ever is in it (the same rule as the Overview and the Donors page).
   const firstYear = new Map<string, number>();
   for (const g of all) {
-    if (g.status !== "paid") continue;
+    if (!countsAsGift(g)) continue;
     const y = yearOf(g);
     if (y === null) continue;
     const was = firstYear.get(g.donor_id);
@@ -94,7 +103,9 @@ export function annualReport(
   let newDonors = 0;
   for (const d of donors) if (firstYear.get(d) === taxYear) newDonors++;
 
-  const cents = (rows: ReportGift[]) => rows.reduce((t, g) => t + Number(g.amount_cents), 0);
+  const cents = (rows: ReportGift[]) => rows.reduce((t, g) => t + leftCents(g), 0);
+  // A refunded or charged-back gift is taken back whole (a part refund before it is already in amount_cents).
+  const takenBack = undone.reduce((t, g) => t + Number(g.amount_cents), 0) + partlyRefunded.reduce((t, g) => t + partRefundedCents(g), 0);
   const totalCents = cents(paid);
   const monthlyCents = cents(paid.filter((g) => g.recurring_id));
 
@@ -104,7 +115,7 @@ export function annualReport(
     if (!g.paid_at) continue;
     const line = byMonth.get(saDate(new Date(g.paid_at)).slice(0, 7));
     if (!line) continue;
-    line.cents += Number(g.amount_cents);
+    line.cents += leftCents(g);
     line.count++;
   }
   const bestMonth = months.reduce<MonthLine | null>((best, m) => (m.cents > 0 && (!best || m.cents > best.cents) ? m : best), null);
@@ -113,7 +124,7 @@ export function annualReport(
   for (const g of paid) {
     if (!g.campaign_id) continue;
     const line = camp.get(g.campaign_id) ?? { id: g.campaign_id, title: campaignTitles.get(g.campaign_id) ?? "A campaign", cents: 0, count: 0 };
-    line.cents += Number(g.amount_cents);
+    line.cents += leftCents(g);
     line.count++;
     camp.set(g.campaign_id, line);
   }
@@ -139,7 +150,7 @@ export function annualReport(
     months,
     bestMonth,
     campaigns: [...camp.values()].sort((a, b) => b.cents - a.cents),
-    refunded: { count: undone.length, cents: cents(undone) },
+    refunded: { count: undone.length + partlyRefunded.length, cents: takenBack },
     s18a: { donors: askedDonors.size, receipted: askedDonors.size - waitingDonors.size, waitingCents: cents(waiting) },
   };
 }

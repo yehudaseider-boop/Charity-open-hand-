@@ -15,6 +15,7 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { RECORDED_METHODS, type RecordedMethod } from "@/lib/charity/recorded-gifts";
 import { formatDate, formatDateTime, isoDateInJhb } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { leftCents, partRefundNote, partRefundedCents, refundedInParts } from "@/lib/donations/what-is-left";
 import { createClient } from "@/lib/supabase/server";
 import { addDonorNote, addDonorReminder, addDonorTag, deleteDonorNote, deleteDonorReminder, editDonorNote, markReminder, removeDonorTag } from "../care-actions";
 import { ButtonForm, NoteForm, ReminderForm, TagForm } from "../care-forms";
@@ -41,7 +42,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
   const [{ data: gifts, error }, notes, reminders, tags, byDonor, lapsedDays, paidGifts, campaignTitles] = await Promise.all([
     supabase
       .from("charity_donations")
-      .select("id, status, amount_cents, paid_at, created_at, recorded_method, wants_18a, campaign_id")
+      .select("id, status, amount_cents, refunded_cents, paid_at, created_at, recorded_method, wants_18a, campaign_id")
       .eq("charity_id", id)
       .eq("donor_id", donorId)
       .order("paid_at", { ascending: false, nullsFirst: false })
@@ -193,9 +194,9 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
                     {formatDate((g.paid_at ?? g.created_at) as string)}
                     {g.campaign_id ? <span className="text-muted"> · {campaignTitles.get(g.campaign_id as string) ?? "A campaign"}</span> : null}
                     {g.recorded_method ? <span className="text-muted"> · {RECORDED_METHODS[g.recorded_method as RecordedMethod] ?? "Recorded"}</span> : null}
-                    {g.status !== "paid" ? <span className="text-muted"> · {donationStatus[g.status as keyof typeof donationStatus]?.label}</span> : null}
+                    {g.status !== "paid" ? <span className="text-muted"> · {donationStatus[g.status as keyof typeof donationStatus]?.label}</span> : partRefundedCents(g) > 0 ? <span className="text-muted"> · {refundedInParts(g) ? "Refunded in parts" : partRefundNote(g)}</span> : null}
                   </span>
-                  <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-navy group-hover:text-brand">{formatRand(Number(g.amount_cents))}</span>
+                  <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-navy group-hover:text-brand">{formatRand(leftCents(g))}</span>
                 </Link>
               </li>
             ))}
