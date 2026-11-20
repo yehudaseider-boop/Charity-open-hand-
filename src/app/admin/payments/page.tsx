@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { ActionForm } from "@/components/forms/action-form";
 import { TextField } from "@/components/forms/fields";
-import { clearHold, markDonation, recordPartRefund, releaseHold } from "./actions";
+import { clearHold, closeRefundedEarly, markDonation, recordPartRefund, releaseHold } from "./actions";
 import { givingGuardSummary } from "@/lib/donations/giving-guard";
 import { GUARD_REASON_LABEL } from "@/lib/donations/giving-guard-rules";
 
@@ -177,6 +177,13 @@ export default async function PaymentsPage() {
                   {a.action === "donation.refund_review" && (leftById.get(donationId) ?? 0) > 0 ? (
                     <PartRefundForm donationId={donationId} leftCents={leftById.get(donationId) ?? 0} />
                   ) : null}
+                </div>
+              ) : donationId && status === "pending" && a.action === "donation.refund_review" ? (
+                <div className="flex flex-wrap gap-3 pt-1 text-xs">
+                  <span className="text-muted">Donation {donationId.slice(0, 8)} was refunded before it was confirmed</span>
+                  <form action={closeRefundedEarly.bind(null, donationId)}>
+                    <RemoveButton label="Close: nothing owed" what={`donation ${donationId.slice(0, 8)}`} confirmText="Close this payment as refunded before it was confirmed? It ends unpaid, nothing is owed, and it isn't counted as a declined card. Only do this once the gateway shows the refund." />
+                  </form>
                 </div>
               ) : donationId && status ? (
                 <p className="pt-1 text-xs text-muted">Donation {donationId.slice(0, 8)} is now {status.replace("_", " ")}.</p>

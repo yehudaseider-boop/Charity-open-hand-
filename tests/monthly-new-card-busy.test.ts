@@ -58,6 +58,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 const { loadNewCardOffer, offerMessage } = await import("@/lib/donations/new-card");
+const { attemptDonationId } = await import("@/lib/donations/schedule");
+const NOV_TRY = attemptDonationId(RID, "2026-11", 0);
 
 beforeEach(() => {
   gifts = [{ id: FIRST, recurring_id: RID, status: "paid", created_at: daysAgo(60) }];
@@ -70,12 +72,17 @@ describe("an old-card try still waiting on the payment provider", () => {
   });
 
   it("blocks a new-card payment while it is recent", async () => {
-    gifts.push({ id: "try-1", recurring_id: RID, status: "pending", created_at: daysAgo(1) });
+    gifts.push({ id: NOV_TRY, recurring_id: RID, status: "pending", created_at: daysAgo(1) });
     expect(await loadNewCardOffer(RID, NOW)).toEqual({ ok: false, reason: "busy" });
   });
 
+  it("a try from months ago left for a person to settle never blocks it (review 20/11/2026)", async () => {
+    gifts.push({ id: attemptDonationId(RID, "2026-08", 0), recurring_id: RID, status: "pending", created_at: daysAgo(90) });
+    expect(await loadNewCardOffer(RID, NOW)).toMatchObject({ ok: true });
+  });
+
   it("still blocks it after 48 hours: it may yet be paid, and the month would be paid twice", async () => {
-    gifts.push({ id: "try-1", recurring_id: RID, status: "pending", created_at: daysAgo(4) });
+    gifts.push({ id: NOV_TRY, recurring_id: RID, status: "pending", created_at: daysAgo(4) });
     expect(await loadNewCardOffer(RID, NOW)).toEqual({ ok: false, reason: "busy" });
     expect(offerMessage("busy")).toMatch(/Nothing more was charged/);
   });

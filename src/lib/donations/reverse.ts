@@ -71,11 +71,15 @@ export async function reverseDonation(donationId: string, kind: ReverseKind, act
  * it can no longer be downloaded, emailed or shown as valid; a person then issues the corrected one (the
  * donor's other gifts go back on the charity's receipts list, as after any withdrawal). Safe to repeat.
  */
-async function withdrawReceiptsFor(donationId: string, actorUserId: string | null, kind: ReverseKind | "partly_refunded", what: string): Promise<void> {
+async function withdrawReceiptsFor(donationId: string, actorUserId: string | null, kind: ReverseKind | "partly_refunded", what: string, issuedBefore?: string): Promise<void> {
   const db = createAdminClient();
-  const { data: links, error: linkError } = await db.from("s18a_receipt_donations").select("receipt_id, s18a_receipts!inner(status)").eq("donation_id", donationId).eq("s18a_receipts.status", "issued");
+  const { data: links, error: linkError } = await db.from("s18a_receipt_donations").select("receipt_id, s18a_receipts!inner(status, issued_at)").eq("donation_id", donationId).eq("s18a_receipts.status", "issued");
   if (linkError) throw linkError;
   for (const l of links ?? []) {
+    // A receipt issued after the refund was recorded already shows what is left of the gift: it stays (review
+    // 20/11/2026: a repeated refund event, or a receipt issued in between, would otherwise void a correct receipt).
+    const issuedAt = (Array.isArray(l.s18a_receipts) ? l.s18a_receipts[0] : l.s18a_receipts) as { issued_at?: string | null } | null;
+    if (issuedBefore && issuedAt?.issued_at && new Date(issuedAt.issued_at).getTime() >= new Date(issuedBefore).getTime()) continue;
     const reason = `Withdrawn automatically: ${what}. A corrected receipt follows.`;
     const { error: voidError } = await db
       .from("s18a_receipts")
@@ -105,8 +109,11 @@ export async function recordPartialRefund(donationId: string, amountCents: numbe
   if (outcome === "done") {
     await logAudit({ actorUserId, action: "donation.partly_refunded", entityType: "donation", entityId: donationId, details: { amountCents, source, how } });
   }
-  // Also on a repeat: an earlier try may have stopped before the receipt was withdrawn.
-  await withdrawReceiptsFor(donationId, actorUserId, "partly_refunded", "part of a donation on it was refunded");
+  // Also on a repeat: an earlier try may have stopped before the receipt was withdrawn. Only receipts issued before
+  // this refund was recorded are withdrawn: one issued since already counts what is left.
+  const { data: refundRow, error: refundError } = await db.from("donation_refunds").select("created_at").eq("source", source).maybeSingle();
+  if (refundError) throw refundError;
+  await withdrawReceiptsFor(donationId, actorUserId, "partly_refunded", "part of a donation on it was refunded", (refundRow?.created_at as string | undefined) ?? new Date().toISOString());
   const { data: row, error: readError } = await db.from("donations").select("status, amount_cents, refunded_cents, total_charged_cents").eq("id", donationId).maybeSingle();
   if (readError) throw readError;
   if (row && row.status === "paid" && Number(row.refunded_cents) === Number(row.amount_cents) && Number(row.total_charged_cents) === Number(row.amount_cents)) {
@@ -276,4 +283,23 @@ export async function releaseDisputeHold(donationId: string, actorUserId: string
   if (!released?.length) return Boolean(cleared?.length);
   await logAudit({ actorUserId, action: "recurring.hold_released", entityType: "recurring_donation", entityId: d.recurring_id as string, details: { donationId } });
   return true;
+}
+
+/**
+ * A payment the provider took and gave back before Givezy confirmed it (held for a person by confirmPayment, review
+ * 20/11/2026). A person checks the provider's dashboard, then closes it: the gift ends unpaid, nothing is owed, and it
+ * is never counted as a declined card (no decline is recorded). The database only lets a waiting payment end as paid
+ * or failed, so it is closed as failed, and the log says why. Only a payment still waiting is closed.
+ */
+export async function closeRefundedBeforeConfirm(donationId: string, actorUserId: string): Promise<"done" | "not_pending"> {
+  const { data, error } = await createAdminClient()
+    .from("donations")
+    .update({ status: "failed", failed_at: new Date().toISOString() })
+    .eq("id", donationId)
+    .eq("status", "pending")
+    .select("id");
+  if (error) throw error;
+  if (!data?.length) return "not_pending";
+  await logAudit({ actorUserId, action: "donation.closed_refunded_before_confirm", entityType: "donation", entityId: donationId, details: { how: "closed by a platform admin: refunded before it was confirmed, nothing owed" } });
+  return "done";
 }

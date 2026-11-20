@@ -8,8 +8,10 @@
 --    card charge) has been refunded. A receipt counts amount_cents - refunded_cents.
 --    donations.receipt_hold: null when the gift may be receipted; otherwise a short reason ('dispute open',
 --    'refund being reviewed') while a person must look. A held gift is left off every receipt.
---    Browsers still can't write donations at all (insert, update and delete were revoked from authenticated
---    in 20261006000002); the columns are revoked again here by name so a later table grant can't open them.
+--    Browsers can't write donations at all (insert, update and delete were revoked from authenticated in
+--    20261006000002), which is what keeps these columns server-only. The column revoke below only documents it:
+--    in Postgres a later table-wide grant would open these columns too, so never grant donations writes to
+--    browsers (review 20/11/2026).
 -- 2. donation_refunds: one row per partial refund recorded, keyed by where it came from (the payment
 --    provider's event, or one admin entry), so the same refund delivered twice is counted once.
 --    Server-only: no browser can read or write it.

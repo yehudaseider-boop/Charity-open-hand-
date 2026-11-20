@@ -12,7 +12,7 @@ import { loadDonatableCharity } from "./charity";
 import { issueConfirmationToken } from "./confirmation-access";
 import { createMonthlyGift } from "./monthly-store";
 import { DECLINED_REASON, NEW_CARD_NOT_REUSABLE } from "./monthly-reasons";
-import { addMonths, chargeTime, periodOf, type Period } from "./schedule";
+import { MAX_ATTEMPTS, addMonths, attemptDonationId, chargeTime, periodOf, type Period } from "./schedule";
 import { monthlyCardCharge } from "./card-charge";
 
 /**
@@ -148,14 +148,18 @@ async function busy(r: Row, now: Date): Promise<boolean> {
   const unsaved = await db.from("monthly_card_updates").select("donations!inner(status)").eq("recurring_id", r.id).is("finished_at", null).eq("donations.status", "paid").limit(1);
   if (unsaved.error) throw new Error(`Could not check the monthly donation's payments: ${unsaved.error.message}`);
   if ((unsaved.data ?? []).length > 0) return true;
-  // Any age: a try the provider is still holding after 48 hours (the monthly job reports it as waiting on the
-  // provider) may still be paid, and a new card paid meanwhile would charge the donor twice for the month. It stays
-  // in the way until it is settled (paid, failed, or closed by a person).
+  // A try of this month or last month, however old: one the provider is still holding after 48 hours (the monthly job
+  // reports it as waiting on the provider) may still be paid, and a new card paid meanwhile would charge the donor
+  // twice for that month. Tries of earlier months never block (review 20/11/2026: a try left pending for a person to
+  // settle would otherwise block Update my card for good); a new card pays this month or last month only.
+  const current = periodOf(now);
+  const recentTries = [current, addMonths(current, -1)].flatMap((p) => Array.from({ length: MAX_ATTEMPTS }, (_, n) => attemptDonationId(r.id, p, n)));
   const { data, error } = await db
     .from("donations")
     .select("id")
     .eq("recurring_id", r.id)
     .eq("status", "pending")
+    .in("id", recentTries)
     .neq("id", r.first_donation_id ?? "00000000-0000-0000-0000-000000000000");
   if (error) throw new Error(`Could not check the monthly donation's payments: ${error.message}`);
   const pending = (data ?? []).map((d) => d.id as string);

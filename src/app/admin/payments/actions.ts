@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "@/lib/auth";
-import { clearReceiptHold, recordPartialRefund, releaseDisputeHold, reverseDonation, type ReverseKind } from "@/lib/donations/reverse";
+import { clearReceiptHold, closeRefundedBeforeConfirm, recordPartialRefund, releaseDisputeHold, reverseDonation, type ReverseKind } from "@/lib/donations/reverse";
 import type { FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
 import { COMMA_THOUSANDS_MESSAGE, formatRand, looksLikeAmount, parseRandToCents, usesCommaThousands } from "@/lib/money";
@@ -21,6 +21,14 @@ export async function releaseHold(donationId: string): Promise<void> {
   const viewer = await requirePlatformAdmin();
   if (!isUuid(donationId)) return;
   await releaseDisputeHold(donationId, viewer.userId);
+  revalidatePath("/admin/payments");
+}
+
+/** A payment refunded before it was confirmed, checked in the gateway: closed unpaid, never as a declined card. Logged. */
+export async function closeRefundedEarly(donationId: string): Promise<void> {
+  const viewer = await requirePlatformAdmin();
+  if (!isUuid(donationId)) return;
+  await closeRefundedBeforeConfirm(donationId, viewer.userId);
   revalidatePath("/admin/payments");
 }
 

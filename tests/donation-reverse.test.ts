@@ -19,7 +19,9 @@ type Donation = {
 let donations: Donation[];
 let recurring: { id: string; status: string; authorization_encrypted: string | null; ended_reason?: string | null; held_reason?: string | null; paused_at?: string | null }[];
 let voided: string[];
-let receiptLinks: { receipt_id: string; donation_id: string }[];
+let receiptLinks: { receipt_id: string; donation_id: string; s18a_receipts?: { status: string; issued_at: string } }[];
+/** When the faked refund (donation_refunds) was recorded. */
+let refundRecordedAt = "2027-03-10T08:00:00Z";
 /** The refunds record_partial_refund has counted, by source (the database's unique key). */
 let refundSources: Map<string, number>;
 const audits: { action: string; entityId?: string | null; details?: Record<string, unknown> }[] = [];
@@ -52,6 +54,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         eq: (c: string, v: unknown) => ((f[c] = v), q),
         is: (c: string, v: unknown) => ((f[`${c}:is`] = v), q),
         maybeSingle: async () => {
+          if (table === "donation_refunds") return { data: { created_at: refundRecordedAt }, error: null };
           const d = donations.find((x) => (f.gateway_ref === undefined || x.gateway_ref === f.gateway_ref) && (f.id === undefined || x.id === f.id));
           return { data: d ?? null, error: null };
         },
@@ -121,7 +124,7 @@ vi.mock("@/lib/donations/confirm", () => ({
   },
 }));
 
-const { clearReceiptHold, handleDispute, handleRefund, recordPartialRefund, releaseDisputeHold, reverseDonation } = await import("@/lib/donations/reverse");
+const { clearReceiptHold, closeRefundedBeforeConfirm, handleDispute, handleRefund, recordPartialRefund, releaseDisputeHold, reverseDonation } = await import("@/lib/donations/reverse");
 
 const gift = (over: Partial<Donation> = {}): Donation => ({
   id: "d1", gateway_ref: "ref-1", status: "paid", amount_cents: 20_000, total_charged_cents: 20_000, refunded_cents: 0, receipt_hold: null, ...over,
@@ -382,5 +385,29 @@ describe("monthly donations behind a reversed payment", () => {
     expect(audits.at(-1)?.action).toBe("donation.refund_review");
     await handleRefund("ref-1", 20_000, "ev4", null);
     expect(donations[0].status).toBe("paid");
+  });
+});
+
+describe("a payment refunded before it was confirmed (review 20/11/2026)", () => {
+  it("a person closes it unpaid: logged, never a declined card, and only while it is still waiting", async () => {
+    donations = [gift({ status: "pending" })];
+    expect(await closeRefundedBeforeConfirm("d1", "admin-1")).toBe("done");
+    expect(donations[0].status).toBe("failed");
+    expect(audits.map((a) => a.action)).toEqual(["donation.closed_refunded_before_confirm"]);
+    // A paid gift is never closed this way (that is "Mark refunded").
+    donations = [gift({ status: "paid" })];
+    expect(await closeRefundedBeforeConfirm("d1", "admin-1")).toBe("not_pending");
+    expect(donations[0].status).toBe("paid");
+  });
+});
+
+describe("a part refund and receipts issued around it (review 20/11/2026)", () => {
+  it("withdraws a receipt issued before the refund, never one issued after it (which already counts what is left)", async () => {
+    receiptLinks = [
+      { receipt_id: "before", donation_id: "d1", s18a_receipts: { status: "issued", issued_at: "2027-03-01T08:00:00Z" } },
+      { receipt_id: "after", donation_id: "d1", s18a_receipts: { status: "issued", issued_at: "2027-03-11T08:00:00Z" } },
+    ];
+    await recordPartialRefund("d1", 5_000, "admin:entry-1", "admin-1", "test");
+    expect(voided).toEqual(["before"]);
   });
 });
