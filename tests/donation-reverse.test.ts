@@ -322,10 +322,23 @@ describe("disputes", () => {
     expect(audits.map((a) => [a.action, a.entityId])).toEqual([["donation.dispute_opened", "d1"], ["donation.dispute_resolved", "d1"]]);
   });
 
-  it("an open dispute never replaces a hold set for another reason", async () => {
+  it("an open dispute is added to a hold set for another reason, never replaces it, and isn't added twice", async () => {
     donations[0].receipt_hold = "refund being reviewed";
     await handleDispute("ref-1", "opened", null, "evt");
+    expect(donations[0].receipt_hold).toBe("refund being reviewed; dispute open");
+    await handleDispute("ref-1", "opened", null, "evt-again");
+    expect(donations[0].receipt_hold).toBe("refund being reviewed; dispute open");
+  });
+
+  it("releasing a won dispute keeps the gift held for a refund that came in meanwhile (review 20/11/2026)", async () => {
+    await handleDispute("ref-1", "opened", null, "evt");
+    // The provider refunded part of a gift with a contribution: this needs a person, and must outlast the dispute.
+    donations[0].total_charged_cents = 22_000;
+    await handleRefund("ref-1", 3_000, "ev-part", "ZAR");
+    expect(donations[0].receipt_hold).toBe("dispute open; refund being reviewed");
+    expect(await releaseDisputeHold("d1", "admin-1")).toBe(true);
     expect(donations[0].receipt_hold).toBe("refund being reviewed");
+    expect(audits.find((a) => a.action === "donation.receipt_hold_cleared")?.details).toMatchObject({ reason: "dispute open", stillHeldFor: ["refund being reviewed"] });
   });
 
   it("once a person releases it after a won dispute, the gift may be receipted again (no monthly donation needed)", async () => {

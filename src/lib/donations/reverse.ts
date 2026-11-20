@@ -122,10 +122,39 @@ export async function recordPartialRefund(donationId: string, amountCents: numbe
   return outcome;
 }
 
-/** Keep a gift off s18A receipts until a person has looked. An existing hold (another reason) is kept as it is. */
+/** A gift's hold reasons, as stored in receipt_hold ("dispute open; refund being reviewed"). */
+export const holdReasons = (hold: string | null | undefined): string[] =>
+  (hold ?? "").split(";").map((r) => r.trim()).filter(Boolean);
+const joinReasons = (reasons: string[]): string | null => (reasons.length ? reasons.join("; ") : null);
+
+/**
+ * Change a gift's hold reasons without losing one written at the same moment: the change is saved only if the hold
+ * is still what was read, and is read again otherwise (a few tries). Returns the reasons before and after.
+ */
+async function changeHold(donationId: string, change: (reasons: string[]) => string[]): Promise<{ before: string[]; after: string[] } | null> {
+  const db = createAdminClient();
+  for (let i = 0; i < 5; i++) {
+    const { data: row, error } = await db.from("donations").select("receipt_hold").eq("id", donationId).maybeSingle();
+    if (error) throw error;
+    if (!row) return null;
+    const current = (row.receipt_hold as string | null) ?? null;
+    const before = holdReasons(current);
+    const after = change(before);
+    if (joinReasons(after) === joinReasons(before)) return { before, after };
+    const q = db.from("donations").update({ receipt_hold: joinReasons(after) }).eq("id", donationId);
+    const { data: saved, error: saveError } = await (current === null ? q.is("receipt_hold", null) : q.eq("receipt_hold", current)).select("id");
+    if (saveError) throw saveError;
+    if (saved?.length) return { before, after };
+  }
+  throw new Error("The receipt hold kept changing; try again");
+}
+
+/**
+ * Keep a gift off s18A receipts until a person has looked. Each reason is kept on its own (review 20/11/2026: a
+ * refund to check that arrived during an open dispute was lost, so releasing the won dispute receipted the gift).
+ */
 async function holdReceipt(donationId: string, reason: string): Promise<void> {
-  const { error } = await createAdminClient().from("donations").update({ receipt_hold: reason }).eq("id", donationId).is("receipt_hold", null);
-  if (error) throw error;
+  await changeHold(donationId, (reasons) => (reasons.includes(reason) ? reasons : [...reasons, reason]));
 }
 
 /**
@@ -265,10 +294,11 @@ export async function handleDispute(reference: string | null, stage: "opened" | 
  */
 export async function releaseDisputeHold(donationId: string, actorUserId: string): Promise<boolean> {
   const db = createAdminClient();
-  const { data: cleared, error: clearError } = await db.from("donations").update({ receipt_hold: null }).eq("id", donationId).eq("receipt_hold", RECEIPT_HOLD.dispute).select("id");
-  if (clearError) throw clearError;
-  if (cleared?.length) {
-    await logAudit({ actorUserId, action: "donation.receipt_hold_cleared", entityType: "donation", entityId: donationId, details: { reason: RECEIPT_HOLD.dispute } });
+  // Only the dispute's own reason is released: a refund still to check keeps the gift off receipts.
+  const change = await changeHold(donationId, (reasons) => reasons.filter((r) => r !== RECEIPT_HOLD.dispute));
+  const cleared = change && change.before.includes(RECEIPT_HOLD.dispute) ? [{ id: donationId }] : [];
+  if (cleared.length) {
+    await logAudit({ actorUserId, action: "donation.receipt_hold_cleared", entityType: "donation", entityId: donationId, details: { reason: RECEIPT_HOLD.dispute, stillHeldFor: change?.after ?? [] } });
   }
   const { data: d, error } = await db.from("donations").select("recurring_id").eq("id", donationId).maybeSingle();
   if (error) throw error;
