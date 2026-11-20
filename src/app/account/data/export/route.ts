@@ -117,6 +117,22 @@ export async function GET(request: Request) {
     }
   };
 
+  // What charities keep about this person (review 20/11/2026: these were missing, though erasure removes them): their
+  // notes, follow-ups and tags, the emails ("appeals") they were sent, and any copy of them a charity imported from its
+  // own list (found by the account's email). Server-only tables, read with the service role for this person only.
+  const accountEmailForCharities = (profile.data?.email as string | undefined)?.toLowerCase() ?? user.email?.toLowerCase() ?? null;
+  const fromCharities = await Promise.all([
+    donorIds.length ? admin.from("charity_donor_notes").select("body, created_at, edited_at, charities(name_en)").in("donor_id", donorIds).order("created_at") : { data: [], error: null },
+    donorIds.length ? admin.from("charity_donor_reminders").select("what, due_on, created_at, done_at, charities(name_en)").in("donor_id", donorIds).order("created_at") : { data: [], error: null },
+    donorIds.length ? admin.from("charity_donor_tags").select("created_at, tag:charity_tags(name), charities(name_en)").in("donor_id", donorIds) : { data: [], error: null },
+    donorIds.length ? admin.from("charity_appeal_recipients").select("status, sent_at, appeal:charity_appeals(subject, body, created_at), charities(name_en)").in("donor_id", donorIds) : { data: [], error: null },
+    accountEmailForCharities
+      ? admin.from("charity_contacts").select("first_name, last_name, organisation_name, email, phone, address_line1, address_line2, suburb, city, postal_code, note, created_at, charities(name_en)").eq("email", accountEmailForCharities) // imports store addresses in lower case (contacts.ts); exact, so "_" or "%" in an address never matches anyone else
+      : { data: [], error: null },
+  ]);
+  if (fromCharities.some((r) => r.error)) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
+  const [charityNotes, charityFollowUps, charityTags, charityEmails, charityImported] = fromCharities.map((r) => r.data ?? []);
+
   // Their place on the landing page's launch list (10/11/2026), found by the account's email; nothing before that
   // migration has run.
   const accountEmail = (profile.data?.email as string | undefined)?.toLowerCase() ?? user.email?.toLowerCase();
@@ -154,6 +170,11 @@ export async function GET(request: Request) {
     agreements: [...(consents.data ?? []), ...checkoutAgreements],
     thank_you_notes_from_charities: thanks.data ?? [],
     donor_journeys_from_charities: journeysMissing ? [] : (journeys.data ?? []),
+    emails_from_charities: charityEmails,
+    charities_notes_about_you: charityNotes,
+    charities_follow_ups_about_you: charityFollowUps,
+    charities_tags_on_you: charityTags,
+    charities_imported_lists_with_you: charityImported,
     requests: requests.data ?? [],
     saved_charities: favourites.data ?? [],
     giving_target_settings: givingTarget.data ?? [],

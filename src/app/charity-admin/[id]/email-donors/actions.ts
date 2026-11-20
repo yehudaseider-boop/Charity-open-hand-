@@ -67,6 +67,9 @@ export async function sendAppealNow(charityId: string, _prev: FormState, formDat
   if (String(formData.get("fingerprint") ?? "") !== fingerprint(r.subject, r.body, r.audienceValue)) {
     return { ok: false, message: "You changed the email or who it goes to since you checked. Nothing was sent. Press Check who it goes to again." };
   }
+  // Email switched off here (review 20/11/2026): refuse before anything is saved, so no donor's place is used up and
+  // the email doesn't count towards this month's four.
+  if (getEmailTransport().name === "console") return { ok: false, message: "Email isn't switched on here, so nothing was sent and nothing was used up. Please contact Givezy." };
   if (await recentSameAppeal(charityId, r.subject, r.body)) {
     return { ok: false, message: "This email was already sent a few minutes ago, so it wasn't sent again. If it stopped part way, use Send the rest under Sent below." };
   }
@@ -89,6 +92,7 @@ export async function continueAppeal(charityId: string, appealId: string, _prev:
   if (notAllowed) return { ok: false, message: notAllowed };
   if (charity.status !== "approved") return { ok: false, message: "Your page isn't live just now, so the rest weren't sent. Contact Givezy if you think this is a mistake." };
   if (!/^[0-9a-f-]{36}$/i.test(appealId)) return { ok: false, message: "That email isn't there any more." };
+  if (getEmailTransport().name === "console") return { ok: false, message: "Email isn't switched on here, so nothing was sent. The rest are still waiting. Please contact Givezy." };
   const p = await sendAppeal({ charityId, appealId, charityName: charity.name_en, replyTo: priv?.contact_email ?? null, userId: viewer.userId });
   if (!p) return { ok: false, message: "That email isn't there any more." };
   revalidatePath(`/charity-admin/${charityId}/email-donors`);

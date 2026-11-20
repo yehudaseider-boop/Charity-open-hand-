@@ -137,7 +137,8 @@ export async function deliverDonorConfirmation(
       return ded ? dedicationLine(ded) : null;
     })(),
   });
-  return await getEmailTransport().send({ to: email, ...m, ...(opts.signal ? { signal: opts.signal } : {}) });
+  // Always a time limit (review 20/11/2026): a stuck send must not use up the daily job's minute and stop the rest.
+  return await getEmailTransport().send({ to: email, ...m, signal: opts.signal ?? AbortSignal.timeout(8_000) });
 }
 
 /** Tell the charity a donation came in, unless it turned these emails off. Never blocks or undoes anything. */

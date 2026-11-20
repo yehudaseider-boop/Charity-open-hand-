@@ -5,6 +5,7 @@
  */
 
 import type { CardChargeRates } from "@shared/fees";
+import { helpLine } from "./help";
 
 export type Pricing = { amountCents: number; contributionCents: number; cardChargeCents?: number; totalCents: number };
 export type CheckoutReply =
@@ -300,10 +301,10 @@ export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, sa
   const last = jhb ? ` Last checked at ${String(jhb.getUTCHours()).padStart(2, "0")}:${String(jhb.getUTCMinutes()).padStart(2, "0")}.` : "";
   // The same words as the website's return page: a "failed" payment may be a declined card or a payment page that
   // was closed (an old checkout is closed after 48 hours), so it never claims which (review 12/11/2026).
-  if (outcome === "failed") return "This payment didn't go through, so nothing was charged. This usually means the card was declined or the payment page was closed. Your details are still here: tap Give to try again, or use another card.";
+  if (outcome === "failed") return "This payment didn't go through, so nothing was charged. This usually means the card was declined or the payment page was closed. Your details are still here: hold to give to try again, or use another card.";
   if (outcome === "reversed") return "This donation was refunded, so nothing is owed on it. Your details are still here if you'd like to give again.";
-  if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: tap Give to try again.";
-  if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. A person will look at it. To ask about it, contact us.${last}`;
+  if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: hold to give to try again.";
+  if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. A person will look at it. ${helpLine()}${last}`;
   if (savedCard) return `Your bank is still confirming this payment. Please don't give again: tap Check again in a minute. We'll also email you when it's through.${last}`;
   return `We're still waiting to hear whether your payment went through. If you finished paying, please don't pay again: tap Check again in a minute, or wait for your confirmation email. If you closed the page without paying, nothing was charged.${last}`;
 }

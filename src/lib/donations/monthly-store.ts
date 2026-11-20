@@ -273,7 +273,8 @@ export async function runMonthlyGiving(now = new Date(), deadline?: number): Pro
     async notifyFailed(r, info) {
       const m = declinedNotice(r, info, now);
       try {
-        await getEmailTransport().send({ to: r.email, ...m });
+        // A time limit (review 20/11/2026), so a stuck send cannot use up the daily job's minute; cut off counts as "may have gone".
+        await getEmailTransport().send({ to: r.email, ...m, signal: AbortSignal.timeout(8_000) });
       } catch (e) {
         // A send cut off or a dropped connection may have gone (13/11/2026): never sent again by itself, flagged for a
         // person instead. A refusal (sure not to have gone) is tried again by the daily job (an hour later, then a

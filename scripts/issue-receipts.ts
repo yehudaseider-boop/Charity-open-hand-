@@ -6,16 +6,15 @@
  *   npm run receipts -- 2027                    what would be issued (nothing is written)
  *   npm run receipts -- 2027 --preview=./out    DRAFT PDFs of those receipts, to check the layout
  *   npm run receipts -- 2027 --finish           make missing PDFs for receipts already issued
- *   npm run receipts -- 2027 --finish --email   ...and email each donor any receipt not yet sent
  *
  * --finish only works when RECEIPTS_ENABLED=yes and RECEIPT_WORDING_CONFIRMED=yes are set (the
  * attorney must confirm the wording first). Making PDFs needs CHROME_PATH (see .env.example).
- * --email uses EMAIL_TRANSPORT ("console" only logs; "resend" really sends).
+ * Receipts are never emailed from here (20/11/2026): the website sends them, and it flags a send that may have gone
+ * through so it is never sent twice; this script had no such check.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { getEmailTransport } from "../src/lib/email";
 import { platformConfig } from "../src/config/platform";
 import { receiptsEnabled } from "../src/config/receipts";
 import { formatDate, taxYearFor } from "../src/lib/dates";
@@ -29,12 +28,9 @@ async function main() {
   const taxYear = Number(args.find((a) => /^\d{4}$/.test(a)));
   if (!taxYear) throw new Error("Give the tax year, for example: npm run receipts -- 2027");
   const previewDir = args.find((a) => a.startsWith("--preview="))?.slice("--preview=".length);
-  if (args.includes("--issue")) throw new Error("Receipts are issued from the website now: the charity approves its list, then Givezy signs it off in Admin, s18A receipts. Use --finish here for missing PDFs or emails.");
+  if (args.includes("--issue")) throw new Error("Receipts are issued from the website now: the charity approves its list, then Givezy signs it off in Admin, s18A receipts. Use --finish here for missing PDFs; Admin emails them.");
   const issue = args.includes("--finish");
-  const email = args.includes("--email");
-  if (email && !issue) throw new Error("--email goes with --finish.");
-  // Receipt emails link to the site and show its logo: without the address those links would be broken.
-  if (email && !process.env.SITE_URL) throw new Error("Set SITE_URL (the website's address) before emailing receipts.");
+  if (args.includes("--email")) throw new Error("Receipts are emailed from the website (Admin, s18A receipts), which never sends one twice. Nothing was done.");
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secret = process.env.SUPABASE_SECRET_KEY;
@@ -67,7 +63,7 @@ async function main() {
     today,
     now,
     mode: issue ? "finish" : "dry-run",
-    mailer: email ? { transport: getEmailTransport(), siteUrl: process.env.SITE_URL ?? "", platformName: platformConfig.appName } : undefined,
+    mailer: undefined,
     render: async ({ details, reference }) =>
       htmlToPdf(buildReceiptHtml({ details, reference, fontCss, platformName: platformConfig.appName, logoHtml })),
   });
