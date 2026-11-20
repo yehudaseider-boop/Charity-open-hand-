@@ -329,6 +329,34 @@ describe("the end of the month", () => {
     expect(world.paid[0].period).toBe("2026-11");
   });
 
+  it("back after a pause past the charge day, charges this month once, and never last month as well (review 20/11/2026)", async () => {
+    // Charge day 15; giving paused from 10/10 to 20/11, so the row still says 15/10.
+    const later = new Date("2026-11-20T06:30:00Z");
+    world.due = [row({ lastPaidPeriod: "2026-09", nextChargeAt: new Date("2026-10-15T06:00:00Z") })];
+    await runMonthlyCharges(deps(later));
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 0), total: 20_000 }]);
+    expect(world.paid[0]).toMatchObject({ period: "2026-11", next: chargeTime("2026-12", 15).toISOString() });
+    // The next day's run finds nothing due: one charge, not two.
+    world.due = [];
+    world.claimed.clear();
+    await runMonthlyCharges(deps(new Date("2026-11-21T06:30:00Z")));
+    expect(charges).toHaveLength(1);
+  });
+
+  it("back after a pause before this month's charge day: waits for the day, charges nothing now", async () => {
+    world.due = [row({ lastPaidPeriod: "2026-09", nextChargeAt: new Date("2026-10-15T06:00:00Z") })];
+    const s = await runMonthlyCharges(deps(new Date("2026-11-05T06:30:00Z")));
+    expect(charges).toEqual([]);
+    expect(world.rescheduled).toEqual([{ id: "rec1", next: chargeTime("2026-11", 15).toISOString() }]);
+    expect(s.waiting[0].reason).toMatch(/after a pause/);
+  });
+
+  it("a run a day late (after midnight on the 1st) still collects last month's charge day", async () => {
+    world.due = [row({ chargeDay: 31, lastPaidPeriod: "2026-09", nextChargeAt: new Date("2026-10-31T06:00:00Z") })];
+    await runMonthlyCharges(deps(new Date("2026-11-01T05:00:00Z")));
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-10", 0), total: 20_000 }]);
+  });
+
   it("an old retry left from months ago does not charge that old month", async () => {
     world.due = [row({ lastPaidPeriod: "2026-07", attemptPeriod: "2026-08", failedAttempts: 1, nextChargeAt: new Date("2026-08-16T06:00:00Z") })];
     await runMonthlyCharges(deps());

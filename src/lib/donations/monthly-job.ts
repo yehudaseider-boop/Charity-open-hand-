@@ -119,17 +119,32 @@ const STUCK_AFTER_MS = 20 * 60_000;
  */
 export const PENDING_TIMEOUT_MS = 48 * 3_600_000;
 
+/** How late a first try may run and still collect the month of its charge day (a job that ran a little late). */
+export const LATE_RUN_GRACE_MS = 3 * 24 * 3_600_000;
+
+/** A retry of a turned-down try this month, rather than the month's first try. */
+export function isRetry(r: Pick<DueMonthly, "attemptPeriod" | "lastPaidPeriod" | "failedAttempts">): boolean {
+  return r.attemptPeriod !== null && r.attemptPeriod !== r.lastPaidPeriod && r.failedAttempts > 0 && r.failedAttempts < MAX_ATTEMPTS;
+}
+
 /**
  * The month a due row is collecting for. A retry belongs to the month of the failed attempt, and a
  * first attempt to the month of its charge day, even when the run happens after midnight on the 1st.
- * Never more than one month back: a donation that waited longer (a long pause, the job not running)
- * is collected for the current month, so a skipped month is never charged late.
+ * Never more than one month back, and a first try only when the run is a few days late at most: a
+ * donation that waited longer (a pause, the job not running) is collected for the current month, so a
+ * skipped month is never charged late. (Code review 20/11/2026: after a pause from 10/10 to 20/11 the
+ * job charged October on 20/11 and November the next day.)
  */
 export function collectingPeriod(r: Pick<DueMonthly, "attemptPeriod" | "lastPaidPeriod" | "failedAttempts" | "nextChargeAt">, now: Date): Period {
   const current = periodOf(now);
-  const retrying = r.attemptPeriod !== null && r.attemptPeriod !== r.lastPaidPeriod && r.failedAttempts > 0 && r.failedAttempts < MAX_ATTEMPTS;
-  const candidate = retrying ? r.attemptPeriod! : periodOf(r.nextChargeAt);
-  return candidate >= addMonths(current, -1) && candidate <= current ? candidate : current;
+  if (isRetry(r)) {
+    const p = r.attemptPeriod!;
+    return p >= addMonths(current, -1) && p <= current ? p : current;
+  }
+  const candidate = periodOf(r.nextChargeAt);
+  if (candidate === current) return current;
+  const lateBy = now.getTime() - r.nextChargeAt.getTime();
+  return candidate === addMonths(current, -1) && lateBy <= LATE_RUN_GRACE_MS ? candidate : current;
 }
 
 /**
@@ -186,6 +201,13 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       if (r.lastPaidPeriod === period) {
         await store.reschedule(r.id, next);
         summary.alreadyPaid += 1;
+        continue;
+      }
+      // Back after a pause before this month's charge day: wait for the day, never charge early.
+      const due = chargeTime(period, r.chargeDay);
+      if (!isRetry(r) && due.getTime() > now.getTime()) {
+        await store.reschedule(r.id, due);
+        summary.waiting.push({ id: r.id, reason: "back after a pause: collected on this month's charge day" });
         continue;
       }
       if (!(await store.claim(r.id, now))) {
