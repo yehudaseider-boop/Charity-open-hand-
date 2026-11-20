@@ -11,6 +11,7 @@ type DonationRow = {
   charity_id: string;
   paid_at: string | null;
   amount_cents: number | string;
+  refunded_cents: number | string | null;
   wants_18a: boolean;
   recurring_id: string | null;
   dedication_kind: string | null;
@@ -40,7 +41,7 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
   for (let page = 0; ; page += 1000) {
     const { data, error } = await supabase
       .from("donations")
-      .select("id, charity_id, paid_at, amount_cents, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_giving_kinds(kind, label)")
+      .select("id, charity_id, paid_at, amount_cents, refunded_cents, wants_18a, recurring_id, dedication_kind, dedication_name, charities(name_en), donation_giving_kinds(kind, label)")
       .in("donor_id", donorIds)
       .eq("status", "paid")
       .gte("paid_at", from)
@@ -77,6 +78,7 @@ export async function loadTaxPack(userId: string, taxYear: number): Promise<TaxP
       charityId: r.charity_id,
       charityName: one(r.charities)?.name_en ?? names.get(r.charity_id) ?? "Charity",
       amountCents: r.amount_cents,
+      refundedCents: r.refunded_cents,
       wants18a: r.wants_18a,
       monthly: r.recurring_id !== null,
       label: labelOf(one(r.donation_giving_kinds)),

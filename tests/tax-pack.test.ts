@@ -66,6 +66,20 @@ describe("the annual tax pack", () => {
     expect(pack.lines.map((l) => l.dedication)).toEqual([null, "In memory of Chaim Cohen"]);
   });
 
+  it("counts what is left after a part refund, and leaves out a gift refunded in full in parts", () => {
+    const pack = buildTaxPack(2027, [
+      // R1 000 given, R400 refunded: R600, as on the s18A receipt.
+      row({ id: "a", amountCents: 100_000, refundedCents: "40000" }),
+      row({ id: "b", amountCents: 20_000, refundedCents: 20_000 }),
+      row({ id: "c", amountCents: 5_000, refundedCents: null, wants18a: false, charityName: "Glenhazel Hall Trust" }),
+    ], [], new Set(["a"]));
+    expect(pack.lines.map((l) => [l.id, l.cents])).toEqual([["a", 60_000], ["c", 5_000]]);
+    expect(pack.totalCents).toBe(65_000);
+    expect(pack.s18aCents).toBe(60_000);
+    expect(pack.receiptedCents).toBe(60_000);
+    expect(pack.byCharity.find((c) => c.name === "Northcliff Meals Fund")).toMatchObject({ cents: 60_000, count: 1, s18aCents: 60_000 });
+  });
+
   it("accepts only a sensible four-digit tax year", () => {
     expect(parseTaxYear("2027")).toBe(2027);
     for (const bad of ["27", "2027a", "1999", "9999", "", "20 27"]) expect(parseTaxYear(bad)).toBeNull();

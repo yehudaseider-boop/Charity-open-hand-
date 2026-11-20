@@ -134,3 +134,44 @@ describe("browsers", () => {
     });
   });
 });
+
+describe("a receipt and a part refund at the same moment (migration 20261120000002)", () => {
+  const withLines = (cents: number[]) => JSON.stringify({ donations: cents.map((c) => ({ date: "01/10/2026", amount_cents: c })) });
+  const issueWith = "select * from public.issue_s18a_receipt($1, $2, 2027, $3::uuid[], 'PRT', $4::jsonb)";
+
+  it("refuses a receipt whose printed lines still show the gift before a part refund", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor();
+      const g = await gift(c, d, 100_000);
+      // The run read R1 000; a R400 refund was recorded before the receipt was issued.
+      expect(await refund(g, 40_000, "gateway_event:race")).toBe("done");
+      await refused(issueWith, [c, d, [g], withLines([100_000])], /do not add up/);
+      // Read again, the line says R600 and the receipt is issued for R600.
+      const r = (await run(issueWith, [c, d, [g], withLines([60_000])])).rows[0];
+      expect(Number(r.amount_cents)).toBe(60_000);
+    });
+  });
+
+  it("refuses lines that leave a gift out", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor();
+      const a = await gift(c, d, 10_000), b = await gift(c, d, 20_000);
+      await refused(issueWith, [c, d, [a, b], withLines([30_000])], /do not add up/);
+    });
+  });
+
+  it("a part refund recorded after a receipt is timed after it, so the receipt is withdrawn, never kept", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor();
+      const g = await gift(c, d, 100_000);
+      const r = (await run(issueWith, [c, d, [g], withLines([100_000])])).rows[0];
+      expect(await refund(g, 40_000, "gateway_event:later")).toBe("done");
+      const t = await one(
+        "select (select created_at from public.donation_refunds where source = 'gateway_event:later') > (select issued_at from public.s18a_receipts where id = $1) as later",
+        [r.receipt_id],
+      );
+      // Both in one transaction here, so transaction start times would be equal; the clock keeps them in order.
+      expect(t.later).toBe(true);
+    });
+  });
+});

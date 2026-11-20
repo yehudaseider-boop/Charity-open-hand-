@@ -14,6 +14,8 @@ export type PackDonationRow = {
   charityId?: string | null;
   charityName: string;
   amountCents: number | string;
+  /** How much of the gift was refunded in part refunds (the gift stays paid). The pack counts what is left. */
+  refundedCents?: number | string | null;
   /** The donor asked for an s18A receipt (only possible with an s18A charity). */
   wants18a: boolean;
   monthly: boolean;
@@ -70,13 +72,16 @@ export function buildTaxPack(taxYear: number, donations: PackDonationRow[], rece
       paidAt: d.paidAt,
       charityId: d.charityId ?? null,
       charityName: d.charityName,
-      cents: Number(d.amountCents),
+      // What is left after part refunds, as on the s18A receipt (review 20/11/2026: R1 000 refunded R400 counted R1 000).
+      cents: Number(d.amountCents) - Number(d.refundedCents ?? 0),
       s18a: d.wants18a,
       receipted: receiptedIds.has(d.id),
       monthly: d.monthly,
       label: cleanLabel(d.label),
       dedication: d.dedication?.trim() ? d.dedication.trim() : null,
     }))
+    // A gift refunded in full in parts is no longer a gift.
+    .filter((l) => l.cents > 0)
     .sort((a, b) => (a.paidAt < b.paidAt ? -1 : a.paidAt > b.paidAt ? 1 : a.id < b.id ? -1 : 1));
 
   const totalCents = lines.reduce((t, l) => t + l.cents, 0);
