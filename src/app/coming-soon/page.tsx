@@ -131,11 +131,12 @@ export default function ComingSoon() {
               Giving, <Em dark>made easy.</Em>
             </h1>
             <p className="max-w-[32rem] text-pretty text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
-              Give to South African charities you can trust, in a few taps, and never chase an s18A receipt again. For charities: every gift, every donor and every receipt in one place.
+              Give to South African charities you can trust, in a few taps, and never chase an s18A receipt again. For charities: every gift and every donor in one place, and s18A receipts without the February rush.
             </p>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              <a href="#join" className={orangeBtn}>{listOpen ? "Get early access" : "I give"}</a>
-              <a href="#join" className={lineBtnDark}>I run a charity<ArrowRight /></a>
+              {/* Until launch the page's job is founding charities, so theirs is the orange button (20/11/2026). */}
+              <a href="#join" className={orangeBtn + " gap-1.5"}>I run a charity<ArrowRight /></a>
+              <a href="#join" className={lineBtnDark}>{listOpen ? "Get early access" : "I give"}</a>
             </div>
           </div>
 
@@ -200,9 +201,8 @@ export default function ComingSoon() {
               </div>
             </Reveal>
 
-            <Reveal className="relative isolate flex flex-col gap-7 overflow-hidden rounded-[2rem] bg-brand p-7 text-white sm:p-10">
+            <Reveal className="relative isolate flex flex-col gap-7 overflow-hidden rounded-[2rem] bg-brand p-7 text-white sm:p-10 order-first">
               <span aria-hidden className="pointer-events-none absolute -right-12 -top-12 -z-10 h-36 w-36 rounded-full border-[16px] border-white/20" />
-              <span aria-hidden className="pointer-events-none absolute -bottom-6 right-[12%] -z-10 h-12 w-12 rounded-full bg-coral" />
               <div className="flex flex-col gap-3 pr-8">
                 <p className="text-[14px] font-bold text-honey">I run a charity</p>
                 <h3 className="font-display text-[clamp(1.875rem,3vw,2.5rem)] font-extrabold! leading-[1.05] tracking-[-0.02em] text-balance text-white!">We&apos;re picking our first charities.</h3>
@@ -212,8 +212,10 @@ export default function ComingSoon() {
                     : "Apply now and a person on our team reads your application, so you're ready to take gifts from launch day."}
                 </p>
               </div>
+              {/* The founding offer, as Yehuda set it (20/11/2026): no number, no deadline. */}
+              <p className="-mb-3 text-[15px] font-bold text-honey">Our first charities get</p>
               <ul className="flex flex-col gap-3 text-[16px] font-semibold">
-                {(["s18A receipts and the IT3(d) file, done with you", "Thank-yous in your words, to every donor", "Monthly donations looked after"] as const).map((t) => (
+                {(["We set up your Givezy page with you, on a call", "A direct line to our founder, on WhatsApp", "A say in what we build before launch"] as const).map((t) => (
                   <li key={t} className="flex items-center gap-3">
                     <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white"><Icon name="check" className="stroke-brand" size={13} /></span>
                     {t}
@@ -221,7 +223,7 @@ export default function ComingSoon() {
                 ))}
               </ul>
               <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <a href={charityHref} {...ext} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-[1.125rem] bg-white whitespace-nowrap px-7 text-[17px] font-bold text-brand shadow-[0_5px_0_#0b2a73] hover:bg-honey-soft">
+                <a href={charityHref} {...ext} className={orangeBtn + " gap-2 whitespace-nowrap"}>
                   {external ? <><WhatsAppMark size={20} />Message us on WhatsApp</> : "Apply to list your charity"}
                 </a>
                 {applyOpen ? <Link href="/demo/dashboard" className={lineBtnDark}>Try the demo dashboard</Link> : null}
@@ -236,8 +238,8 @@ export default function ComingSoon() {
         <div className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <Reveal className="mx-auto flex max-w-[52rem] flex-col items-center gap-6 text-center">
             <Eyebrow dark>For charities</Eyebrow>
-            <H2 dark>Every gift, every donor, <Em dark>every receipt.</Em></H2>
-            <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-white/85">The real dashboard, with a made-up charity. Click the tabs: it&apos;s what you&apos;ll use from launch day.</p>
+            <H2 dark>Receipts without <Em dark>the February rush.</Em></H2>
+            <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-white/85">Every gift, every donor and every s18A receipt in one place. This is the real dashboard with a made-up charity: click the tabs.</p>
           </Reveal>
           <Reveal className="mx-auto mt-12 max-w-[80rem] text-navy">
             <LiveWindow
@@ -297,8 +299,8 @@ export default function ComingSoon() {
             {launch ? `${launch} is close.` : "Launch is close."} <Em dark>Be there from day one.</Em>
           </h2>
           <div className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
-            <a href="#join" className={orangeBtn}>{listOpen ? "Get early access" : "I give"}</a>
-            <a href={charityHref} {...ext} className={lineBtnDark}>{external ? "Charities: WhatsApp us" : "Apply to list your charity"}</a>
+            <a href={charityHref} {...ext} className={orangeBtn + " gap-2"}>{external ? <><WhatsAppMark size={20} />Charities: WhatsApp us</> : "Apply to list your charity"}</a>
+            <a href="#join" className={lineBtnDark}>{listOpen ? "Get early access" : "I give"}</a>
           </div>
         </Reveal>
       </section>
