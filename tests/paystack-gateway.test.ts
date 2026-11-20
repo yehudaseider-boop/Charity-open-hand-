@@ -198,9 +198,10 @@ describe("reading a payment's status", () => {
     expect(await withChannel(7)).toBeNull();
   });
 
-  it("failed and reversed are failed", async () => {
-    expect((await verify("failed")).status).toBe("failed");
-    expect((await verify("reversed")).status).toBe("failed");
+  it("failed and reversed are failed, and only reversed (taken, then refunded) is marked as given back", async () => {
+    expect(await verify("failed")).toMatchObject({ status: "failed", reversed: false });
+    expect(await verify("reversed")).toMatchObject({ status: "failed", reversed: true });
+    expect((await verify("success")).reversed).toBe(false);
   });
 
   it("abandoned (started, not paid yet) and anything else stay pending", async () => {

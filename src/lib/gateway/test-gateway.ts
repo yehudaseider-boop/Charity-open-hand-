@@ -76,7 +76,9 @@ export const testGateway: PaymentGateway = {
       | undefined;
     return {
       reference,
-      status: p?.outcome === "success" ? "success" : p?.outcome === "failed" ? "failed" : "pending",
+      // A refund is the latest word on a payment it gave back: not paid, and not a declined card either (see `reversed`).
+      status: p?.outcome === "success" ? "success" : p?.outcome === "failed" || p?.outcome === "refunded" ? "failed" : "pending",
+      reversed: p?.outcome === "refunded",
       amountCents: p?.amount ?? 0,
       currency: "ZAR",
       gatewayTransactionId: `test_${reference}`,

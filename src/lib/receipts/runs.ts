@@ -11,7 +11,7 @@ import { receiptDonorName } from "./details";
 import { runReceiptsJob, type IssuedReceipt, type JobSummary } from "./issue";
 import { markRetryUnknown, recordFailedEmail } from "@/lib/email/retry";
 import { wasCutOff } from "@/lib/email/retry-plan";
-import { planReceipts, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
+import { planReceipts, receiptableCents, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
 import { applyDecisions, certificateFingerprint, countStatuses, type CertificateStatus, type DecidedReceipt } from "./review";
 import { completionWindow, inCompletionWindow } from "@/lib/donations/s18a-details";
 import { supabaseReceiptStore } from "./store";
@@ -108,7 +108,7 @@ export async function loadPlan(charityId: string, taxYear: number, now: Date = n
     .map((id) => ({
       donorName: names.get(id)?.name || "Name missing",
       paidAt: names.get(id)?.paidAt ?? "",
-      amountCents: byId.get(id)?.amountCents ?? 0,
+      amountCents: receiptableCents(byId.get(id) ?? { amountCents: 0 }),
       missing: byId.get(id)?.detailsMissing ?? [],
       canAddOnGivezy: inCompletionWindow(byId.get(id)?.taxYear ?? taxYear, window),
     }))

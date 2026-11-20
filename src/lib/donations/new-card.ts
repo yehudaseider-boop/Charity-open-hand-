@@ -148,13 +148,15 @@ async function busy(r: Row, now: Date): Promise<boolean> {
   const unsaved = await db.from("monthly_card_updates").select("donations!inner(status)").eq("recurring_id", r.id).is("finished_at", null).eq("donations.status", "paid").limit(1);
   if (unsaved.error) throw new Error(`Could not check the monthly donation's payments: ${unsaved.error.message}`);
   if ((unsaved.data ?? []).length > 0) return true;
+  // Any age: a try the provider is still holding after 48 hours (the monthly job reports it as waiting on the
+  // provider) may still be paid, and a new card paid meanwhile would charge the donor twice for the month. It stays
+  // in the way until it is settled (paid, failed, or closed by a person).
   const { data, error } = await db
     .from("donations")
     .select("id")
     .eq("recurring_id", r.id)
     .eq("status", "pending")
-    .neq("id", r.first_donation_id ?? "00000000-0000-0000-0000-000000000000")
-    .gte("created_at", new Date(now.getTime() - PENDING_HOLD_MS).toISOString());
+    .neq("id", r.first_donation_id ?? "00000000-0000-0000-0000-000000000000");
   if (error) throw new Error(`Could not check the monthly donation's payments: ${error.message}`);
   const pending = (data ?? []).map((d) => d.id as string);
   if (pending.length === 0) return false;
@@ -310,7 +312,7 @@ export function offerMessage(reason: NotOffered | "gateway"): string {
     case "not_needed":
       return "Your monthly donation is up to date, so there is no card to update right now.";
     case "busy":
-      return "A payment for this monthly donation is still going through. Nothing more was charged. Please check again in an hour.";
+      return "A payment for this monthly donation is still going through with the payment provider, so another one can't be started yet. Nothing more was charged. Please check again in an hour. If you still see this tomorrow, contact us and a person will look at it.";
     case "charity_closed":
       return "Giving is paused or this charity can't take online donations right now, so nothing can be charged. Your monthly donation is unchanged.";
     case "gone":

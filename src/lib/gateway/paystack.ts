@@ -289,6 +289,8 @@ export const paystackGateway: PaymentGateway = {
       authorization: toAuthorization(data.authorization),
       channel: cleanChannel(data.channel),
       abandoned: data.status === "abandoned",
+      // "reversed": taken and then refunded. Still "failed" above (no money is held), but never a declined card.
+      reversed: data.status === "reversed",
     };
   },
 

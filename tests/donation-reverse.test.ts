@@ -6,16 +6,43 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-type Donation = { id: string; gateway_ref: string; status: string; total_charged_cents: number; recurring_id?: string | null };
+type Donation = {
+  id: string;
+  gateway_ref: string;
+  status: string;
+  amount_cents: number;
+  total_charged_cents: number;
+  refunded_cents: number;
+  receipt_hold: string | null;
+  recurring_id?: string | null;
+};
 let donations: Donation[];
 let recurring: { id: string; status: string; authorization_encrypted: string | null; ended_reason?: string | null; held_reason?: string | null; paused_at?: string | null }[];
 let voided: string[];
 let receiptLinks: { receipt_id: string; donation_id: string }[];
+/** The refunds record_partial_refund has counted, by source (the database's unique key). */
+let refundSources: Map<string, number>;
 const audits: { action: string; entityId?: string | null; details?: Record<string, unknown> }[] = [];
+
+/** record_partial_refund (migration 20261120000001), as the database answers it. */
+function recordPartialRefundInDb(a: { p_donation_id: string; p_amount_cents: number; p_source: string }): string {
+  const d = donations.find((x) => x.id === a.p_donation_id);
+  if (!d) return "not_found";
+  if (refundSources.has(a.p_source)) return "already";
+  if (d.status !== "paid") return "not_paid";
+  if (d.refunded_cents + a.p_amount_cents > d.amount_cents) return "too_much";
+  refundSources.set(a.p_source, a.p_amount_cents);
+  d.refunded_cents += a.p_amount_cents;
+  return "done";
+}
 
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: { action: string; entityId?: string | null; details?: Record<string, unknown> }) => void audits.push(a) }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
+    rpc: async (name: string, args: { p_donation_id: string; p_amount_cents: number; p_source: string }) => {
+      if (name !== "record_partial_refund") throw new Error(`unexpected rpc ${name}`);
+      return { data: recordPartialRefundInDb(args), error: null };
+    },
     from: (table: string) => {
       const f: Record<string, unknown> = {};
       let patch: Record<string, unknown> | null = null;
@@ -23,6 +50,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         select: () => q,
         update: (p: Record<string, unknown>) => ((patch = p), q),
         eq: (c: string, v: unknown) => ((f[c] = v), q),
+        is: (c: string, v: unknown) => ((f[`${c}:is`] = v), q),
         maybeSingle: async () => {
           const d = donations.find((x) => (f.gateway_ref === undefined || x.gateway_ref === f.gateway_ref) && (f.id === undefined || x.id === f.id));
           return { data: d ?? null, error: null };
@@ -41,9 +69,16 @@ vi.mock("@/lib/supabase/admin", () => ({
             if (patch) for (const r of hit) Object.assign(r, patch);
             return Promise.resolve({ data: hit.map((r) => ({ id: r.id })), error: null }).then(ok);
           }
-          // donations update ... eq(id).eq(status = paid).select(id)
-          const hit = donations.filter((d) => d.id === f.id && d.status === f.status);
-          if (patch) for (const d of hit) d.status = String(patch.status);
+          // donations: update ... eq(id) with any of eq(status), eq(receipt_hold), is(receipt_hold, null), not(receipt_hold, is, null)
+          const hit = donations.filter(
+            (d) =>
+              d.id === f.id &&
+              (f.status === undefined || d.status === f.status) &&
+              (f.receipt_hold === undefined || d.receipt_hold === f.receipt_hold) &&
+              (!("receipt_hold:is" in f) || d.receipt_hold === f["receipt_hold:is"]) &&
+              (!f["receipt_hold:set"] || d.receipt_hold !== null),
+          );
+          if (patch) for (const d of hit) Object.assign(d, patch);
           return Promise.resolve({ data: hit.map((d) => ({ id: d.id })), error: null }).then(ok);
         },
       };
@@ -86,10 +121,15 @@ vi.mock("@/lib/donations/confirm", () => ({
   },
 }));
 
-const { handleDispute, handleRefund, releaseDisputeHold, reverseDonation } = await import("@/lib/donations/reverse");
+const { clearReceiptHold, handleDispute, handleRefund, recordPartialRefund, releaseDisputeHold, reverseDonation } = await import("@/lib/donations/reverse");
+
+const gift = (over: Partial<Donation> = {}): Donation => ({
+  id: "d1", gateway_ref: "ref-1", status: "paid", amount_cents: 20_000, total_charged_cents: 20_000, refunded_cents: 0, receipt_hold: null, ...over,
+});
 
 beforeEach(() => {
-  donations = [{ id: "d1", gateway_ref: "ref-1", status: "paid", total_charged_cents: 20_000 }];
+  donations = [gift()];
+  refundSources = new Map();
   providerSays = "pending";
   verified.length = 0;
   recurring = [];
@@ -111,11 +151,10 @@ describe("refunds", () => {
     expect(audits.map((a) => a.action)).not.toContain("donation.refund_review");
   });
 
-  it("a partial refund or an unknown amount changes nothing and is held for a person", async () => {
-    await handleRefund("ref-1", 5_000, "evt");
+  it("an unknown amount changes nothing, is held for a person and keeps the gift off s18A receipts", async () => {
     await handleRefund("ref-1", null, "evt");
-    expect(donations[0].status).toBe("paid");
-    expect(audits.map((a) => a.action)).toEqual(["donation.refund_review", "donation.refund_review"]);
+    expect(donations[0]).toMatchObject({ status: "paid", refunded_cents: 0, receipt_hold: "refund being reviewed" });
+    expect(audits.map((a) => a.action)).toEqual(["donation.refund_review"]);
   });
 
   it("a paid donation is not checked again with the provider", async () => {
@@ -203,18 +242,101 @@ describe("refunds", () => {
   });
 });
 
+describe("partial refunds (20/11/2026)", () => {
+  it("a partial refund of a gift charged on its own comes off the gift, once per gateway event", async () => {
+    donations = [gift({ amount_cents: 100_000, total_charged_cents: 100_000 })];
+    await handleRefund("ref-1", 40_000, "evt-a");
+    expect(donations[0]).toMatchObject({ status: "paid", refunded_cents: 40_000, receipt_hold: null });
+    // The same event delivered again (it failed part-way the first time) is not counted twice.
+    await handleRefund("ref-1", 40_000, "evt-a");
+    expect(donations[0].refunded_cents).toBe(40_000);
+    expect(audits.map((a) => a.action)).toEqual(["donation.partly_refunded"]);
+    expect(audits[0].details).toMatchObject({ amountCents: 40_000, source: "gateway_event:evt-a" });
+    // A second refund of the same amount is its own event, and counts.
+    await handleRefund("ref-1", 40_000, "evt-b");
+    expect(donations[0].refunded_cents).toBe(80_000);
+  });
+
+  it("refunded in full in parts: the gift is marked refunded", async () => {
+    donations = [gift({ amount_cents: 10_000, total_charged_cents: 10_000 })];
+    await handleRefund("ref-1", 6_000, "evt-a");
+    await handleRefund("ref-1", 4_000, "evt-b");
+    expect(donations[0]).toMatchObject({ status: "refunded", refunded_cents: 10_000 });
+    expect(audits.map((a) => a.action)).toEqual(["donation.partly_refunded", "donation.partly_refunded", "donation.refunded"]);
+  });
+
+  it("a partial refund of a payment with a contribution or card charge on it is held: it can't tell how much came off the gift", async () => {
+    donations = [gift({ amount_cents: 100_000, total_charged_cents: 105_000 })];
+    await handleRefund("ref-1", 40_000, "evt-a");
+    expect(donations[0]).toMatchObject({ status: "paid", refunded_cents: 0, receipt_hold: "refund being reviewed" });
+    expect(audits.map((a) => a.action)).toEqual(["donation.refund_review"]);
+  });
+
+  it("an issued s18A receipt with the gift on it is withdrawn for re-issue, also on a repeat", async () => {
+    receiptLinks = [{ receipt_id: "rcpt-1", donation_id: "d1" }];
+    await handleRefund("ref-1", 5_000, "evt-a");
+    expect(voided).toEqual(["rcpt-1"]);
+    expect(audits.map((a) => a.action)).toEqual(["donation.partly_refunded", "receipt.voided", "receipt.needs_reissue"]);
+  });
+
+  it("an admin records part of a gift once per entry, never past what is left, and only on a paid gift", async () => {
+    expect(await recordPartialRefund("d1", 5_000, "admin:e1", "admin-1", "recorded by a platform admin")).toBe("done");
+    expect(await recordPartialRefund("d1", 5_000, "admin:e1", "admin-1", "recorded by a platform admin")).toBe("already");
+    expect(donations[0].refunded_cents).toBe(5_000);
+    expect(await recordPartialRefund("d1", 15_001, "admin:e2", "admin-1", "x")).toBe("too_much");
+    expect(donations[0].refunded_cents).toBe(5_000);
+    expect(await recordPartialRefund("zzz", 100, "admin:e3", "admin-1", "x")).toBe("not_found");
+    donations[0].status = "charged_back";
+    expect(await recordPartialRefund("d1", 100, "admin:e4", "admin-1", "x")).toBe("not_paid");
+    await expect(recordPartialRefund("d1", 0, "admin:e5", "admin-1", "x")).rejects.toThrow();
+    await expect(recordPartialRefund("d1", 1.5, "admin:e5", "admin-1", "x")).rejects.toThrow();
+  });
+
+  it("a too-big refund is held for a person, never recorded", async () => {
+    donations = [gift({ amount_cents: 10_000, total_charged_cents: 10_000, refunded_cents: 8_000 })];
+    await handleRefund("ref-1", 5_000, "evt-a");
+    expect(donations[0]).toMatchObject({ refunded_cents: 8_000, receipt_hold: "refund being reviewed" });
+    expect(audits.map((a) => a.action)).toEqual(["donation.refund_review"]);
+  });
+
+  it("an admin clears a receipt hold; clearing again changes nothing", async () => {
+    donations[0].receipt_hold = "refund being reviewed";
+    expect(await clearReceiptHold("d1", "admin-1")).toBe(true);
+    expect(donations[0].receipt_hold).toBeNull();
+    expect(await clearReceiptHold("d1", "admin-1")).toBe(false);
+    expect(audits.map((a) => a.action)).toEqual(["donation.receipt_hold_cleared"]);
+  });
+});
+
 describe("disputes", () => {
-  it("never change a donation by themselves: held for a person", async () => {
+  it("never change a donation's status by themselves: held for a person, and kept off s18A receipts while open", async () => {
     await handleDispute("ref-1", "opened", null, "evt");
+    expect(donations[0].receipt_hold).toBe("dispute open");
     await handleDispute("ref-1", "resolved", "declined", "evt");
     expect(donations[0].status).toBe("paid");
+    // Who won is for a person to read: the hold stays until they release it.
+    expect(donations[0].receipt_hold).toBe("dispute open");
     expect(audits.map((a) => [a.action, a.entityId])).toEqual([["donation.dispute_opened", "d1"], ["donation.dispute_resolved", "d1"]]);
+  });
+
+  it("an open dispute never replaces a hold set for another reason", async () => {
+    donations[0].receipt_hold = "refund being reviewed";
+    await handleDispute("ref-1", "opened", null, "evt");
+    expect(donations[0].receipt_hold).toBe("refund being reviewed");
+  });
+
+  it("once a person releases it after a won dispute, the gift may be receipted again (no monthly donation needed)", async () => {
+    await handleDispute("ref-1", "opened", null, "evt");
+    expect(await releaseDisputeHold("d1", "admin-1")).toBe(true);
+    expect(donations[0].receipt_hold).toBeNull();
+    expect(audits.at(-1)).toMatchObject({ action: "donation.receipt_hold_cleared", entityId: "d1" });
+    expect(await releaseDisputeHold("d1", "admin-1")).toBe(false);
   });
 });
 
 describe("monthly donations behind a reversed payment", () => {
   beforeEach(() => {
-    donations = [{ id: "d1", gateway_ref: "ref-1", status: "paid", total_charged_cents: 20_000, recurring_id: "rec1" }];
+    donations = [gift({ recurring_id: "rec1" })];
     recurring = [{ id: "rec1", status: "active", authorization_encrypted: "card" }];
   });
 
@@ -256,6 +378,7 @@ describe("monthly donations behind a reversed payment", () => {
   it("a refund in another currency is never matched by its number alone", async () => {
     await handleRefund("ref-1", 20_000, "ev3", "USD");
     expect(donations[0].status).toBe("paid");
+    expect(donations[0].receipt_hold).toBe("refund being reviewed");
     expect(audits.at(-1)?.action).toBe("donation.refund_review");
     await handleRefund("ref-1", 20_000, "ev4", null);
     expect(donations[0].status).toBe("paid");

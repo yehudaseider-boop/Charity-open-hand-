@@ -136,7 +136,7 @@ export async function loadIt3dReceipts(charityId: string, taxYear: number): Prom
     const { data, error } = await db
       .from("donations")
       .select(
-        "id, status, paid_at, amount_cents, recorded_method, donation_checkout_details(donor_type, first_name, last_name, organisation_name, registration_number, phone, email, id_number_encrypted, tax_reference_encrypted, address_line1, address_line2, suburb, city, postal_code, erased_at)",
+        "id, status, paid_at, amount_cents, refunded_cents, recorded_method, donation_checkout_details(donor_type, first_name, last_name, organisation_name, registration_number, phone, email, id_number_encrypted, tax_reference_encrypted, address_line1, address_line2, suburb, city, postal_code, erased_at)",
       )
       .eq("charity_id", charityId)
       .in("id", donationIds.slice(i, i + 200));
@@ -147,7 +147,8 @@ export async function loadIt3dReceipts(charityId: string, taxYear: number): Prom
         id: d.id as string,
         status: d.status as string,
         paid_at: d.paid_at as string | null,
-        amount_cents: Number(d.amount_cents),
+        // What is left of the gift after partial refunds: what its receipt certified (20/11/2026).
+        amount_cents: Number(d.amount_cents) - Number(d.refunded_cents ?? 0),
         recorded_method: (d.recorded_method as string | null) ?? null,
         details: (det as DetailsRow | undefined) ?? null,
       });
@@ -164,9 +165,9 @@ export async function loadIt3dReceipts(charityId: string, taxYear: number): Prom
       receiptNumber: r.details?.receipt_reference ?? null,
       donorKey: donorKeyOf(r.donor_identity, r.donor_id),
       donor: receiptDonor(own, open),
-      // Refunded and charged-back gifts stay linked to the receipt but are not reported.
+      // Refunded and charged-back gifts (and gifts refunded in full in parts) stay linked to the receipt but are not reported.
       donations: own
-        .filter((g) => g.status === "paid" && g.paid_at)
+        .filter((g) => g.status === "paid" && g.paid_at && g.amount_cents > 0)
         .map((g) => ({ id: g.id, paidAt: g.paid_at!, amountCents: g.amount_cents, recordedMethod: g.recorded_method })),
     };
   });

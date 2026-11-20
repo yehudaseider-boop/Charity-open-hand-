@@ -197,6 +197,10 @@ export async function startDonation(args: {
           await finishSavedCardRecords(attemptId, v);
           return chargeSavedCard({ donationId: attemptId, savedToken, v, fees, charity, token: await reissueConfirmationToken(attemptId), resumed: true });
         }
+        if (reached === "reversed") {
+          // The first try was paid and then refunded: nothing is owed on it, and it is not a declined card.
+          return { ok: false, message: "This gift was refunded, so nothing is owed on it. If you'd like to give, please start a new gift." };
+        }
         if (reached === "failed") {
           // The first try's charge did reach the provider and was declined: say so, as the first try would have.
           await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", attemptId).eq("status", "pending");
@@ -433,9 +437,11 @@ const RESUME_AFTER_MS = 2 * 60_000;
  * What the provider holds under this reference: its status when it has the payment, "no" only when it says so
  * plainly that it has never seen it, "unknown" when it can't be asked.
  */
-async function providerKnows(reference: string): Promise<"success" | "failed" | "pending" | "no" | "unknown"> {
+async function providerKnows(reference: string): Promise<"success" | "failed" | "reversed" | "pending" | "no" | "unknown"> {
   try {
-    return (await getGateway().verifyTransaction(reference)).status;
+    const t = await getGateway().verifyTransaction(reference);
+    // Taken and then given back (a refund): not a declined card (review 20/11/2026).
+    return t.reversed ? "reversed" : t.status;
   } catch (e) {
     if (e instanceof GatewayError && e.notFound) return "no";
     console.error(e);

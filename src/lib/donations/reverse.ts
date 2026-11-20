@@ -14,17 +14,27 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ReverseKind = "refunded" | "charged_back";
 export type ReverseOutcome = "done" | "already" | "not_paid" | "not_found";
+/** What recording a partial refund did: see record_partial_refund (migration 20261120000001). */
+export type PartialRefundOutcome = "done" | "already" | "not_paid" | "not_found" | "too_much";
 
-type Found = { id: string; status: string; total_charged_cents: number; gateway: string };
+/**
+ * Why a gift is kept off s18A receipts until a person has looked (donations.receipt_hold, 20/11/2026). The
+ * receipt run and issue_s18a_receipt both skip a held gift.
+ */
+export const RECEIPT_HOLD = { dispute: "dispute open", refundReview: "refund being reviewed" } as const;
+
+type Found = { id: string; status: string; amount_cents: number; total_charged_cents: number; gateway: string };
 
 async function findByReference(reference: string): Promise<Found | null> {
   const { data, error } = await createAdminClient()
     .from("donations")
-    .select("id, status, total_charged_cents, gateway")
+    .select("id, status, amount_cents, total_charged_cents, gateway")
     .eq("gateway_ref", reference)
     .maybeSingle();
   if (error) throw error;
-  return data ? { id: data.id as string, status: data.status as string, total_charged_cents: Number(data.total_charged_cents), gateway: String(data.gateway) } : null;
+  return data
+    ? { id: data.id as string, status: data.status as string, amount_cents: Number(data.amount_cents), total_charged_cents: Number(data.total_charged_cents), gateway: String(data.gateway) }
+    : null;
 }
 
 /** Move one paid donation to refunded or charged back. Safe to repeat. */
@@ -52,13 +62,21 @@ export async function reverseDonation(donationId: string, kind: ReverseKind, act
   // A chargeback disputes the authority to charge the card, so a monthly donation paid with it stops
   // and the card is dropped: every further collection would be another chargeback.
   if (kind === "charged_back") await stopMonthlyFor(donationId, actorUserId, "the payment was charged back");
-  // An s18A receipt already issued with this donation on it is now wrong. It is withdrawn straight away, so
-  // it can no longer be downloaded, emailed or shown as valid; a person then issues the corrected one (the
-  // donor's other gifts go back on the charity's receipts list, as after any withdrawal).
+  await withdrawReceiptsFor(donationId, actorUserId, kind, `a donation on it was ${kind === "refunded" ? "refunded" : "charged back"}`);
+  return outcome;
+}
+
+/**
+ * An s18A receipt already issued with this donation on it is now wrong. It is withdrawn straight away, so
+ * it can no longer be downloaded, emailed or shown as valid; a person then issues the corrected one (the
+ * donor's other gifts go back on the charity's receipts list, as after any withdrawal). Safe to repeat.
+ */
+async function withdrawReceiptsFor(donationId: string, actorUserId: string | null, kind: ReverseKind | "partly_refunded", what: string): Promise<void> {
+  const db = createAdminClient();
   const { data: links, error: linkError } = await db.from("s18a_receipt_donations").select("receipt_id, s18a_receipts!inner(status)").eq("donation_id", donationId).eq("s18a_receipts.status", "issued");
   if (linkError) throw linkError;
   for (const l of links ?? []) {
-    const reason = `Withdrawn automatically: a donation on it was ${kind === "refunded" ? "refunded" : "charged back"}. A corrected receipt follows.`;
+    const reason = `Withdrawn automatically: ${what}. A corrected receipt follows.`;
     const { error: voidError } = await db
       .from("s18a_receipts")
       .update({ status: "void", voided_at: new Date().toISOString(), void_reason: reason })
@@ -68,7 +86,51 @@ export async function reverseDonation(donationId: string, kind: ReverseKind, act
     await logAudit({ actorUserId, action: "receipt.voided", entityType: "s18a_receipt", entityId: l.receipt_id as string, details: { reason, donationId, kind } });
     await logAudit({ actorUserId, action: "receipt.needs_reissue", entityType: "s18a_receipt", entityId: l.receipt_id as string, details: { donationId, kind } });
   }
+}
+
+/**
+ * Part of a paid gift was refunded: `amountCents` of the gift itself (never Givezy's contribution or the card
+ * charge) stops counting on s18A receipts. Recorded once per `source` (the payment provider's event, or one admin
+ * entry), so a repeat delivery never counts it twice, and never past what is left of the gift. An issued receipt
+ * with the gift on it is withdrawn for re-issue. A gift refunded in full this way (and with nothing else charged)
+ * is marked refunded. Safe to repeat.
+ */
+export async function recordPartialRefund(donationId: string, amountCents: number, source: string, actorUserId: string | null, how: string): Promise<PartialRefundOutcome> {
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error("A refund must be a whole number of cents above 0");
+  const db = createAdminClient();
+  const { data, error } = await db.rpc("record_partial_refund", { p_donation_id: donationId, p_amount_cents: amountCents, p_source: source, p_actor: actorUserId });
+  if (error) throw error;
+  const outcome = data as PartialRefundOutcome;
+  if (outcome !== "done" && outcome !== "already") return outcome;
+  if (outcome === "done") {
+    await logAudit({ actorUserId, action: "donation.partly_refunded", entityType: "donation", entityId: donationId, details: { amountCents, source, how } });
+  }
+  // Also on a repeat: an earlier try may have stopped before the receipt was withdrawn.
+  await withdrawReceiptsFor(donationId, actorUserId, "partly_refunded", "part of a donation on it was refunded");
+  const { data: row, error: readError } = await db.from("donations").select("status, amount_cents, refunded_cents, total_charged_cents").eq("id", donationId).maybeSingle();
+  if (readError) throw readError;
+  if (row && row.status === "paid" && Number(row.refunded_cents) === Number(row.amount_cents) && Number(row.total_charged_cents) === Number(row.amount_cents)) {
+    await reverseDonation(donationId, "refunded", actorUserId, "the whole gift was refunded in parts");
+  }
   return outcome;
+}
+
+/** Keep a gift off s18A receipts until a person has looked. An existing hold (another reason) is kept as it is. */
+async function holdReceipt(donationId: string, reason: string): Promise<void> {
+  const { error } = await createAdminClient().from("donations").update({ receipt_hold: reason }).eq("id", donationId).is("receipt_hold", null);
+  if (error) throw error;
+}
+
+/**
+ * A platform admin has checked a held gift: it may go on an s18A receipt again. Returns false when it was not
+ * held. Logged.
+ */
+export async function clearReceiptHold(donationId: string, actorUserId: string): Promise<boolean> {
+  const { data, error } = await createAdminClient().from("donations").update({ receipt_hold: null }).eq("id", donationId).not("receipt_hold", "is", null).select("id");
+  if (error) throw error;
+  if (!data?.length) return false;
+  await logAudit({ actorUserId, action: "donation.receipt_hold_cleared", entityType: "donation", entityId: donationId, details: {} });
+  return true;
 }
 
 /** End the monthly donation a reversed payment belongs to (if any), keeping its history. Safe to repeat. */
@@ -118,7 +180,10 @@ async function pauseMonthlyFor(donationId: string): Promise<void> {
 
 /**
  * A refund from the gateway. Only a refund in rand can be matched to what the donor paid. A refund of the whole amount the donor paid marks the donation refunded.
- * A partial refund, an unknown amount or an unknown payment is held for a person. A refund for a payment not yet
+ * A partial refund of a gift that was charged on its own (no contribution or card charge on top, so the refund can
+ * only have come off the gift) is recorded against the gift, once per gateway event (20/11/2026). Anything else (a
+ * partial refund of a payment with more than the gift on it, an unknown amount or currency, too much) is held for
+ * a person, and the gift is kept off s18A receipts until they have looked. A refund for a payment not yet
  * recorded as paid is first checked with the provider (confirmPayment); one the provider doesn't confirm is held too.
  */
 export async function handleRefund(reference: string | null, amountCents: number | null, eventRowId: string, currency: string | null = "ZAR"): Promise<void> {
@@ -150,13 +215,27 @@ export async function handleRefund(reference: string | null, amountCents: number
     const outcome = await reverseDonation(d.id, "refunded", null, "the payment provider refunded the full amount");
     if (outcome === "done" || outcome === "already") return;
   }
+  // The gateway event row is the refund's own: the adapter keys each refund event by the refund itself, so two
+  // partial refunds are two rows and a repeat delivery of one finds the same row.
+  if (currency === "ZAR" && amountCents !== null && amountCents > 0 && amountCents < d.total_charged_cents && d.total_charged_cents === d.amount_cents) {
+    const outcome = await recordPartialRefund(d.id, amountCents, `gateway_event:${eventRowId}`, null, "the payment provider refunded part of the payment");
+    if (outcome === "done" || outcome === "already") return;
+  }
+  await holdReceipt(d.id, RECEIPT_HOLD.refundReview);
   await logAudit({ actorUserId: null, action: "donation.refund_review", entityType: "donation", entityId: d.id, details: { amountCents, currency, paidCents: d.total_charged_cents, status: d.status } });
 }
 
-/** A dispute (chargeback) opened or resolved: never changes a donation by itself, held for a person. */
+/**
+ * A dispute (chargeback) opened or resolved: never changes a donation's status by itself, held for a person. An
+ * opened dispute keeps the gift off s18A receipts until a person marks it charged back or releases the hold after
+ * the dispute was won (each payment provider words the outcome its own way, so a person reads it).
+ */
 export async function handleDispute(reference: string | null, stage: "opened" | "resolved", detail: string | null, eventRowId: string): Promise<void> {
   const d = reference ? await findByReference(reference) : null;
-  if (d && stage === "opened") await pauseMonthlyFor(d.id);
+  if (d && stage === "opened") {
+    await holdReceipt(d.id, RECEIPT_HOLD.dispute);
+    await pauseMonthlyFor(d.id);
+  }
   await logAudit({
     actorUserId: null,
     action: stage === "opened" ? "donation.dispute_opened" : "donation.dispute_resolved",
@@ -174,14 +253,19 @@ export async function handleDispute(reference: string | null, stage: "opened" | 
 }
 
 /**
- * A platform admin, after the dispute was won: the monthly donation stays paused, and the donor may resume
- * it again. Returns false when there was no hold to release. Logged.
+ * A platform admin, after the dispute was won: the gift may go on an s18A receipt again, and the monthly donation
+ * stays paused while the donor may resume it again. Returns false when there was no hold to release. Logged.
  */
 export async function releaseDisputeHold(donationId: string, actorUserId: string): Promise<boolean> {
   const db = createAdminClient();
+  const { data: cleared, error: clearError } = await db.from("donations").update({ receipt_hold: null }).eq("id", donationId).eq("receipt_hold", RECEIPT_HOLD.dispute).select("id");
+  if (clearError) throw clearError;
+  if (cleared?.length) {
+    await logAudit({ actorUserId, action: "donation.receipt_hold_cleared", entityType: "donation", entityId: donationId, details: { reason: RECEIPT_HOLD.dispute } });
+  }
   const { data: d, error } = await db.from("donations").select("recurring_id").eq("id", donationId).maybeSingle();
   if (error) throw error;
-  if (!d?.recurring_id) return false;
+  if (!d?.recurring_id) return Boolean(cleared?.length);
   const { data: released, error: releaseError } = await db
     .from("recurring_donations")
     .update({ held_reason: null })
@@ -189,7 +273,7 @@ export async function releaseDisputeHold(donationId: string, actorUserId: string
     .not("held_reason", "is", null)
     .select("id");
   if (releaseError) throw releaseError;
-  if (!released?.length) return false;
+  if (!released?.length) return Boolean(cleared?.length);
   await logAudit({ actorUserId, action: "recurring.hold_released", entityType: "recurring_donation", entityId: d.recurring_id as string, details: { donationId } });
   return true;
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { randomUUID } from "node:crypto";
 import { heldLabel } from "@/lib/ops/held";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { monthlyHealth, staleEvents, stalePending, totalsByCharity, MONTHLY_OVERDUE_HOURS, type PaidRow } from "@/lib/admin/payments-overview";
@@ -6,7 +7,9 @@ import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RemoveButton } from "@/components/forms/remove-button";
-import { markDonation, releaseHold } from "./actions";
+import { ActionForm } from "@/components/forms/action-form";
+import { TextField } from "@/components/forms/fields";
+import { clearHold, markDonation, recordPartRefund, releaseHold } from "./actions";
 import { givingGuardSummary } from "@/lib/donations/giving-guard";
 import { GUARD_REASON_LABEL } from "@/lib/donations/giving-guard-rules";
 
@@ -39,22 +42,36 @@ export default async function PaymentsPage() {
   const now = new Date();
   const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
 
-  const [pending, events, review, paid, monthly] = await Promise.all([
+  const [pending, events, review, paid, monthly, holds] = await Promise.all([
     db.from("donations").select("id, created_at, total_charged_cents, charities(name_en)").eq("status", "pending").order("created_at").limit(500),
     db.from("gateway_events").select("id, gateway, event_type, received_at, payload").is("processed_at", null).order("received_at").limit(200),
     db.from("audit_log").select("id, action, created_at, entity_type, entity_id, details").in("action", HELD).gte("created_at", since).order("created_at", { ascending: false }).limit(50),
     allRows((a, b) => db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").neq("gateway", "recorded").gte("paid_at", since).order("id").range(a, b)),
     allRows((a, b) => db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).order("id").range(a, b)),
+    // Paid gifts kept off s18A receipts until a person has looked (an open dispute, a refund to check).
+    db.from("donations").select("id, amount_cents, refunded_cents, receipt_hold, paid_at, charities(name_en)").eq("status", "paid").not("receipt_hold", "is", null).order("paid_at").limit(200),
   ]);
-  for (const r of [pending, events, review, paid, monthly]) if (r.error) throw r.error;
+  for (const r of [pending, events, review, paid, monthly, holds]) if (r.error) throw r.error;
   // The current state of each donation a held item is about, so a handled one says so.
   const heldDonationIds = (review.data ?? []).filter((a) => a.entity_type === "donation" && a.entity_id).map((a) => a.entity_id as string);
   const statusById = new Map<string, string>();
+  const leftById = new Map<string, number>();
   if (heldDonationIds.length) {
-    const { data: rows, error: statusError } = await db.from("donations").select("id, status").in("id", heldDonationIds);
+    const { data: rows, error: statusError } = await db.from("donations").select("id, status, amount_cents, refunded_cents").in("id", heldDonationIds);
     if (statusError) throw statusError;
-    for (const r of rows ?? []) statusById.set(r.id as string, r.status as string);
+    for (const r of rows ?? []) {
+      statusById.set(r.id as string, r.status as string);
+      leftById.set(r.id as string, Number(r.amount_cents) - Number(r.refunded_cents ?? 0));
+    }
   }
+  const held = (holds.data ?? []).filter((r) => r.receipt_hold).map((r) => ({
+    id: r.id as string,
+    reason: String(r.receipt_hold),
+    charity: nameOf(r.charities),
+    paidAt: r.paid_at as string | null,
+    amountCents: Number(r.amount_cents),
+    leftCents: Number(r.amount_cents) - Number(r.refunded_cents ?? 0),
+  }));
 
   const stuckPayments = stalePending(
     (pending.data ?? []).map((r) => ({ id: r.id as string, created_at: r.created_at as string, total_charged_cents: r.total_charged_cents as number, charity: nameOf(r.charities) })),
@@ -87,7 +104,7 @@ export default async function PaymentsPage() {
   }
   const blockedTotal = (guard?.blocked ?? []).reduce((sum, b) => sum + b.count, 0);
 
-  const needsAttention = stuckPayments.length + stuckEvents.length + (review.data?.length ?? 0) + health.failed.length + health.overdue;
+  const needsAttention = stuckPayments.length + stuckEvents.length + (review.data?.length ?? 0) + held.length + health.failed.length + health.overdue;
 
   return (
     <div className="space-y-4">
@@ -131,8 +148,9 @@ export default async function PaymentsPage() {
       <Section title="Held for a person (last 30 days)" empty="None." count={review.data?.length ?? 0}>
         <p className="mb-2 text-xs text-muted">
           Payments, refunds and disputes the system would not decide on its own. Check each in the gateway&apos;s dashboard. A full refund is marked
-          automatically; for anything else, mark the donation here once you have checked it. Refunded and charged-back donations stop counting
-          in the charity&apos;s totals, campaigns and s18A receipts.
+          automatically, and so is part of a gift refunded when nothing else was charged with it; for anything else, mark the donation here once
+          you have checked it. Refunded and charged-back donations stop counting in the charity&apos;s totals, campaigns and s18A receipts; a part
+          refunded comes off the s18A receipt.
         </p>
         {(review.data ?? []).map((a) => {
           const donationId = a.entity_type === "donation" ? (a.entity_id as string | null) : null;
@@ -153,8 +171,11 @@ export default async function PaymentsPage() {
                   </form>
                   {a.action === "donation.dispute_opened" || a.action === "donation.dispute_resolved" ? (
                     <form action={releaseHold.bind(null, donationId)}>
-                      <RemoveButton label="Dispute won: let the donor resume" what={`the hold on donation ${donationId.slice(0, 8)}`} confirmText="Let the donor resume the monthly donation this dispute paused? Only do this once the gateway shows the dispute was won." />
+                      <RemoveButton label="Dispute won: release the hold" what={`the hold on donation ${donationId.slice(0, 8)}`} confirmText="Release the hold this dispute put on the donation? It goes back on the charity's s18A receipts, and the donor may resume a monthly donation it paused. Only do this once the gateway shows the dispute was won." />
                     </form>
+                  ) : null}
+                  {a.action === "donation.refund_review" && (leftById.get(donationId) ?? 0) > 0 ? (
+                    <PartRefundForm donationId={donationId} leftCents={leftById.get(donationId) ?? 0} />
                   ) : null}
                 </div>
               ) : donationId && status ? (
@@ -165,6 +186,29 @@ export default async function PaymentsPage() {
             </div>
           );
         })}
+      </Section>
+
+      <Section title="Kept off s18A receipts" empty="None. Every paid gift can go on its s18A receipt." count={held.length}>
+        <p className="mb-2 text-xs text-muted">
+          Paid gifts the yearly s18A receipts leave out until a person has looked: an open dispute, or a refund to check. Check each in the
+          gateway&apos;s dashboard. Record any part of the gift that was refunded, then release the hold so what is left is receipted. A gift
+          whose dispute was lost: mark it charged back above.
+        </p>
+        {held.map((h) => (
+          <div key={h.id} className="border-t border-border py-1.5 first:border-t-0">
+            <Row left={`${h.reason.charAt(0).toUpperCase()}${h.reason.slice(1)} · ${h.charity}`} right={h.paidAt ? formatDate(h.paidAt) : ""} />
+            <p className="pt-1 text-xs text-muted">
+              Donation {h.id.slice(0, 8)} · gift {formatRand(h.amountCents)}
+              {h.leftCents !== h.amountCents ? ` · ${formatRand(h.leftCents)} left after refunds` : ""}
+            </p>
+            <div className="flex flex-wrap items-start gap-3 pt-1 text-xs">
+              <form action={clearHold.bind(null, h.id)}>
+                <RemoveButton label="Release the hold" what={`the s18A receipt hold on donation ${h.id.slice(0, 8)}`} confirmText={`Release the hold? ${formatRand(h.leftCents)} of this gift goes back on the charity's s18A receipts. Only do this once the gateway shows nothing more is owed back.`} />
+              </form>
+              {h.leftCents > 0 ? <PartRefundForm donationId={h.id} leftCents={h.leftCents} /> : null}
+            </div>
+          </div>
+        ))}
       </Section>
 
       <Section title="Monthly donations" empty="" count={health.failed.length + health.overdue}>
@@ -200,6 +244,30 @@ export default async function PaymentsPage() {
         {paid.capped ? <p className="text-xs text-warning">Showing the first 50 000 payments only.</p> : null}
       </section>
     </div>
+  );
+}
+
+/**
+ * Record the part of a paid gift that was refunded. A fresh entry id each time the page is shown, so pressing the
+ * button twice records it once. Asks first: it can't be taken back here.
+ */
+function PartRefundForm({ donationId, leftCents }: { donationId: string; leftCents: number }) {
+  return (
+    <ActionForm
+      action={recordPartRefund.bind(null, donationId, randomUUID())}
+      submitLabel="Record part refunded"
+      pendingLabel="Saving…"
+      confirm="Record this part of the gift as refunded? It comes off the s18A receipt and can't be taken back here. Only do this once the gateway shows the refund."
+      className="w-full max-w-sm"
+    >
+      <TextField
+        name="amount"
+        label="Part of the gift refunded, in Rand"
+        hint={`Only the gift's share, not the contribution or card charge. At most ${formatRand(leftCents)}.`}
+        inputMode="decimal"
+        required
+      />
+    </ActionForm>
   );
 }
 

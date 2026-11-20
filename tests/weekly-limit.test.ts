@@ -67,6 +67,7 @@ beforeEach(() => {
     charity_appeal_recipients: [],
     charity_thank_yous: [],
     charity_thank_you_recipients: [],
+    donors: [],
   };
 });
 
@@ -97,6 +98,53 @@ describe("who had a message this week", () => {
     tables.charity_thank_yous = [{ id: "t1", charity_id: "c1", sent_at: THIS_WEEK }];
     tables.charity_thank_you_recipients = [{ thank_you_id: "t1", email_hash: emailHash("sarah@x.co"), status: "sending", claimed_at: THIS_WEEK }];
     expect((await messagedThisWeek("c1", pairs(["sarah"]), NOW, { thankYouId: "t1" })).size).toBe(0);
+  });
+});
+
+describe("one inbox, two donor records (20/11/2026)", () => {
+  // Sarah gave as herself and as her company: two donor records, one address.
+  const sameInbox = () => {
+    tables.donors = [
+      { id: "sarah", email: "sarah@x.co" },
+      { id: "sarah-co", email: "sarah@x.co" },
+      { id: "david", email: "david@x.co" },
+    ];
+  };
+
+  it("a thank-you or reminder to either record counts for both, and for nobody else", async () => {
+    sameInbox();
+    tables.charity_donor_thanks = [{ charity_id: "c1", donor_id: "sarah-co", week_start: "2026-11-09" }];
+    expect([...(await messagedThisWeek("c1", pairs(["sarah", "david"]), NOW))]).toEqual(["sarah"]);
+    // Asked about both records at once: both are counted, by their own ids.
+    expect([...(await messagedThisWeek("c1", [...pairs(["sarah"]), { donorId: "sarah-co", hash: emailHash("sarah@x.co") }], NOW))].sort()).toEqual(["sarah", "sarah-co"]);
+  });
+
+  it("a news email or appeal to the other record counts, this week and this charity only", async () => {
+    sameInbox();
+    tables.charity_appeal_recipients = [{ charity_id: "c1", appeal_id: "a1", donor_id: "sarah-co", status: "sent", claimed_at: THIS_WEEK }];
+    expect((await messagedThisWeek("c1", pairs(["sarah"]), NOW)).has("sarah")).toBe(true);
+    tables.charity_appeal_recipients = [
+      { charity_id: "c1", appeal_id: "a1", donor_id: "sarah-co", status: "sent", claimed_at: LAST_WEEK },
+      { charity_id: "c2", appeal_id: "a2", donor_id: "sarah-co", status: "sent", claimed_at: THIS_WEEK },
+      { charity_id: "c1", appeal_id: "a3", donor_id: "sarah-co", status: "failed", claimed_at: THIS_WEEK },
+    ];
+    tables.charity_donor_thanks = [{ charity_id: "c2", donor_id: "sarah-co", week_start: "2026-11-09" }];
+    expect((await messagedThisWeek("c1", pairs(["sarah"]), NOW)).size).toBe(0);
+  });
+
+  it("the appeal that is asking never counts against itself, also through the other record", async () => {
+    sameInbox();
+    tables.charity_appeal_recipients = [{ charity_id: "c1", appeal_id: "a1", donor_id: "sarah-co", status: "sending", claimed_at: THIS_WEEK }];
+    expect((await messagedThisWeek("c1", pairs(["sarah"]), NOW, { appealId: "a1" })).size).toBe(0);
+  });
+
+  it("a donor record with no address, or an erased one, only ever counts for itself", async () => {
+    tables.donors = [
+      { id: "sarah", email: "erased+sarah@erased.invalid" },
+      { id: "thandi", email: null },
+    ];
+    tables.charity_donor_thanks = [{ charity_id: "c1", donor_id: "thandi", week_start: "2026-11-09" }];
+    expect([...(await messagedThisWeek("c1", pairs(["sarah", "thandi"]), NOW))]).toEqual(["thandi"]);
   });
 });
 

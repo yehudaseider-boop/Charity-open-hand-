@@ -4,7 +4,9 @@
  * One receipt per person (donor record plus the s18A identity typed at
  * checkout, so people sharing an email are never merged), per charity, per SARS tax year, covering every paid
  * donation that asked for an s18A receipt. The amount is the donations' gift
- * amounts only, never a contribution to Givezy.
+ * amounts only, never a contribution to Givezy, less any part of a gift that was refunded (20/11/2026). A gift
+ * held for a person (an open dispute, a refund being reviewed) or refunded in full is left out, as
+ * issue_s18a_receipt does.
  */
 
 export type PlanDonation = {
@@ -14,7 +16,12 @@ export type PlanDonation = {
   /** Fingerprint of the s18A identity typed with this donation ("" if none). */
   donorIdentity: string;
   taxYear: number;
+  /** The gift as given. What a receipt counts is receiptableCents (less any part refunded). */
   amountCents: number;
+  /** How much of the gift was refunded (partial refunds). Left out means none. */
+  refundedCents?: number;
+  /** Why a person must look before this gift is receipted ("dispute open", "refund being reviewed"); null or left out when it may be. */
+  receiptHold?: string | null;
   status: string;
   wants18a: boolean;
   paidAt: string | null;
@@ -51,7 +58,16 @@ export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_request
   /** The charity declined this certificate (09/11/2026): left out of the run. */
   | "declined"
   /** The charity hasn't approved this certificate (or it changed since it did): left out of the run. */
-  | "not_approved" };
+  | "not_approved"
+  /** Held for a person (an open dispute, a refund being reviewed, 20/11/2026): left out until they release it. */
+  | "on_hold"
+  /** Every cent of the gift was refunded in parts: nothing left to receipt. */
+  | "fully_refunded" };
+
+/** What a receipt counts for one gift: the gift less any part of it that was refunded. Never below 0. */
+export function receiptableCents(d: Pick<PlanDonation, "amountCents" | "refundedCents">): number {
+  return Math.max(0, d.amountCents - (d.refundedCents ?? 0));
+}
 
 /** Can this charity issue s18A receipts: approval confirmed and a signed mandate. */
 export function charityCanIssue(c: PlanCharity): boolean {
@@ -86,6 +102,8 @@ export function planReceipts(args: {
     if (d.status !== "paid" || !d.paidAt) { skip("not_paid"); continue; }
     if (!d.wants18a) { skip("no_18a_requested"); continue; }
     if (args.alreadyReceipted.has(d.id)) { skip("already_receipted"); continue; }
+    if (d.receiptHold) { skip("on_hold"); continue; }
+    if (receiptableCents(d) <= 0) { skip("fully_refunded"); continue; }
     const charity = charityById.get(d.charityId);
     if (!charity || !charityCanIssue(charity)) { skip("charity_cannot_issue"); continue; }
     if (new Date(charity.mandateSignedAt!).getTime() > new Date(d.paidAt).getTime()) { skip("mandate_after_payment"); continue; }
@@ -96,7 +114,7 @@ export function planReceipts(args: {
     const key = groupKey(d);
     const g = groups.get(key) ?? { charityId: d.charityId, donorId: d.donorId, donorIdentity: d.donorIdentity, taxYear: args.taxYear, donationIds: [], totalCents: 0 };
     g.donationIds.push(d.id);
-    g.totalCents += d.amountCents;
+    g.totalCents += receiptableCents(d);
     groups.set(key, g);
   }
   const perDonor = new Map<string, SeveralIdentities>();

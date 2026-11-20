@@ -1,5 +1,6 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
+import { alertGivezy } from "@/lib/ops/alert";
 import { taxYearFor } from "@/lib/dates";
 import { gatewayByName, getGateway } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -105,6 +106,24 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
     if (isGatewayNotFound(e) && (await closableCheckout(donation, opts))) return closeCheckout(donation, "never_received", opts);
     if (isGatewayNotFound(e) && neverReceivedOnceOff(donation, opts)) return closeCheckout(donation, "never_received", opts);
     throw e;
+  }
+
+  // The provider took this payment and then gave the money back (refunded or reversed) before we recorded it as paid.
+  // Not a declined card: never marked failed, never counted against the donor, and a monthly donation is never closed
+  // as "the first payment failed" over it. Held for a person once (Admin, Payments and the daily email), the same way
+  // as a refund that arrives before the payment is confirmed (reverse.ts); once they mark it refunded, every later
+  // check answers "reversed".
+  if (tx.reversed) {
+    if (!(await alreadyNoted("donation.refund_review", donation.id))) {
+      await logAudit({
+        actorUserId: null,
+        action: "donation.refund_review",
+        entityType: "donation",
+        entityId: donation.id,
+        details: { reversedBeforeConfirmed: true, status: donation.status, paidCents: donation.total_charged_cents },
+      });
+    }
+    return "review";
   }
 
   if (tx.status === "success") {
@@ -316,25 +335,46 @@ export function collectionPeriodOf(donationId: string, recurringId: string, crea
 }
 
 /**
- * A monthly collection just became paid while another try for the same month was paid too (a late answer from the
- * provider): the donor paid twice for one month. Written once for a person (Admin, Payments and the daily email), who
- * refunds one of the two. Never refunds by itself, and never stops the payment being recorded.
+ * A monthly collection just became paid while the same month was already paid (a late answer from the provider):
+ * another try of the old card, or the donor's new card ("Update my card", paid while this try was still waiting on
+ * the provider). The donor paid twice for one month. Written once for a person (Admin, Payments and the daily email)
+ * and sent to the Givezy team at once, as finishNewCard does when the new card is the later one; a person refunds one
+ * of the two. Never refunds by itself, and never stops the payment being recorded.
  */
 async function flagMonthPaidTwice(donationId: string, recurringId: string, createdAt: string | null | undefined): Promise<void> {
   try {
     const period = collectionPeriodOf(donationId, recurringId, createdAt);
     if (!period) return;
+    const db = createAdminClient();
     const others = Array.from({ length: MAX_ATTEMPTS }, (_, n) => attemptDonationId(recurringId, period, n)).filter((id) => id !== donationId);
-    const { data, error } = await createAdminClient().from("donations").select("id").in("id", others).eq("status", "paid");
-    if (error || !(data ?? []).length) return;
+    const tries = await db.from("donations").select("id").in("id", others).eq("status", "paid");
+    if (tries.error) throw tries.error;
+    // A new card paid for the same monthly donation and month (monthly_card_updates records the month it paid for).
+    const newCards = await db
+      .from("monthly_card_updates")
+      .select("donation_id, donations!inner(status)")
+      .eq("recurring_id", recurringId)
+      .eq("period", period)
+      .eq("donations.status", "paid");
+    if (newCards.error) throw newCards.error;
+    const alsoPaid = (tries.data ?? []).map((d) => d.id as string);
+    const newCardPaid = (newCards.data ?? []).map((u) => u.donation_id as string).filter((id) => id !== donationId);
+    if (!alsoPaid.length && !newCardPaid.length) return;
     if (await alreadyNoted("monthly.paid_twice", donationId)) return;
     await logAudit({
       actorUserId: null,
       action: "monthly.paid_twice",
       entityType: "donation",
       entityId: donationId,
-      details: { recurring: recurringId, period, alsoPaid: (data ?? []).map((d) => d.id) },
+      details: { recurring: recurringId, period, alsoPaid: [...alsoPaid, ...newCardPaid], ...(newCardPaid.length ? { newCard: newCardPaid } : {}) },
     });
+    const [y, m] = period.split("-");
+    await alertGivezy("a monthly donation was paid twice", [
+      newCardPaid.length
+        ? `A monthly donation was paid twice for ${m}/${y}: once with the new card ("Update my card") and once with the old card, whose payment the payment provider confirmed later.`
+        : `A monthly donation was paid twice for ${m}/${y}: two tries of the same card both went through.`,
+      "Refund one of the two payments in the payment provider's dashboard, then mark it refunded in Admin, Payments.",
+    ]);
   } catch (e) {
     console.error("[confirm] could not check for a month paid twice", e);
   }

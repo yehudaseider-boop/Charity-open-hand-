@@ -67,6 +67,13 @@ export type VerifiedTransaction = {
    * back). Only an old payment in this state is closed as failed, by the daily check (see confirm.ts).
    */
   abandoned?: boolean;
+  /**
+   * The gateway took this payment and then gave the money back (a refund or reversal). That is never a declined card:
+   * `status` is "failed" (no money is held), so a caller that only asks "was it paid?" reads it as not paid, but
+   * anything that records a payment's outcome must check this first. confirm.ts holds such a payment for a person and
+   * never marks it failed, counts it as a decline or closes a monthly donation over it.
+   */
+  reversed?: boolean;
 };
 
 export type ChargeRequest = {

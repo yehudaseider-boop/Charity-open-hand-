@@ -10,6 +10,8 @@ const USER = "11111111-1111-1111-1111-111111111111";
 const calls: string[] = [];
 let donorsByUser: string[];
 let donorsByEmail: string[];
+/** The address on each donor record linked to their account, when it differs from the account's. */
+let donorEmails: Record<string, string>;
 let profile: { email?: string; role?: string } | null;
 let charityAdminCount: number;
 let rpcError: { message: string } | null;
@@ -54,7 +56,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         update: (patch: Record<string, unknown>) => ({ eq: async () => (calls.push(`${table}:update:${JSON.stringify(patch)}`), { error: null }) }),
         then: (resolve: (v: { data: unknown[]; error: null }) => void) => {
           const ids = table === "donors" ? (f.user_id ? donorsByUser : donorsByEmail) : [];
-          resolve({ data: ids.map((id) => ({ id })), error: null });
+          resolve({ data: ids.map((id) => ({ id, ...(donorEmails[id] ? { email: donorEmails[id] } : {}) })), error: null });
         },
       };
       return q;
@@ -83,6 +85,7 @@ beforeEach(() => {
   emails.length = 0;
   donorsByUser = ["d1"];
   donorsByEmail = ["d1", "d2"];
+  donorEmails = {};
   profile = { email: "Erin@Example.co.za", role: "user" };
   charityAdminCount = 0;
   rpcError = null;
@@ -102,6 +105,8 @@ describe("erasing a donor by their account", () => {
       // Their "Request a charity" asks, by account and by the email left to hear back (15/11/2026).
       "charity_requests:deleted:requested_by=11111111-1111-1111-1111-111111111111",
       "charity_requests:deleted:notify_email=erin@example.co.za",
+      // A charity's imported copy of them (its contact list) goes too, with its tags (20/11/2026).
+      "charity_contacts:deleted:email=erin@example.co.za",
       // The database erasure comes after everything that finds them by address or donor record (13/11/2026), so an
       // erasure that stops part way can be finished by running it again.
       "rpc",
@@ -175,6 +180,33 @@ describe("erasing a donor by their account", () => {
     await expect(eraseDonor({ userId: USER, actorUserId: "admin1" })).rejects.toThrow(/Could not erase/);
     expect(calls).not.toContain("deleteUser");
     expect(audits).toHaveLength(0);
+  });
+});
+
+describe("a charity's imported copy of them (20/11/2026)", () => {
+  it("is deleted by the whole address, never a pattern: a _ or % in it matches only itself", async () => {
+    await eraseDonor({ email: "A_B%c@Example.co.za", actorUserId: "admin1" });
+    expect(calls).toContain("charity_contacts:deleted:email=a_b%c@example.co.za");
+    expect(calls.filter((c) => c.startsWith("charity_contacts:"))).toHaveLength(1);
+  });
+
+  it("also goes by the address on any donor record linked to their account, once each, before the database erasure", async () => {
+    donorEmails = { d1: "Erin.Work@Example.co.za" };
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    const contacts = calls.filter((c) => c.startsWith("charity_contacts:"));
+    expect(contacts.sort()).toEqual(["charity_contacts:deleted:email=erin.work@example.co.za", "charity_contacts:deleted:email=erin@example.co.za"]);
+    expect(calls.indexOf(contacts[0])).toBeLessThan(calls.indexOf("rpc"));
+  });
+
+  it("running it again skips addresses already erased", async () => {
+    donorEmails = { d1: "erased+d1@erased.invalid" };
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    expect(calls.filter((c) => c.startsWith("charity_contacts:"))).toEqual(["charity_contacts:deleted:email=erin@example.co.za"]);
+  });
+
+  it("the email says so", async () => {
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    expect(emails[0].text).toMatch(/any copy of your details a charity imported into its own contact list/);
   });
 });
 

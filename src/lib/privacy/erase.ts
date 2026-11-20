@@ -20,7 +20,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 
 /** What stays after an erasure, in words a person can read. */
 export const ERASE_KEPT_TEXT =
-  "We keep each donation's amount, date, charity and tax year, and any s18A receipt already issued. For a donation on an issued s18A receipt we also keep the name, ID or income tax number, registration number and address the charity must report to SARS, because tax law requires us to keep those records. Your email address, phone number and everything else are erased.";
+  "We keep each donation's amount, date, charity and tax year, and any s18A receipt already issued. For a donation on an issued s18A receipt we also keep the name, ID or income tax number, registration number and address the charity must report to SARS, because tax law requires us to keep those records. Your email address, phone number and everything else are erased, including any copy of your details a charity imported into its own contact list on Givezy.";
 
 /**
  * Erase everything that identifies a person, keeping only the records tax law requires
@@ -29,7 +29,7 @@ export const ERASE_KEPT_TEXT =
  * donor who never had one, by the email address they gave with.
  *
  * Order matters: everything that finds the person by their donor records or address (charities' notes, tags,
- * follow-ups, journeys, thank-yous, activity rows) is cleared first, and the database erasure, which removes that
+ * follow-ups, journeys, thank-yous, activity rows, imported contact lists) is cleared first, and the database erasure, which removes that
  * address and the link to their account, comes after (13/11/2026: done the other way round, an erasure that stopped
  * part way could never be finished, since pressing again found nobody). The confirmation email follows (to the
  * address read beforehand), and the sign-in account is deleted last (deleting it also removes their open privacy
@@ -47,14 +47,20 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     email = (data?.email as string | undefined)?.toLowerCase();
   }
 
-  // Every donor record that is theirs: linked to their account, or given with their address.
+  // Every donor record that is theirs: linked to their account, or given with their address. The addresses on the
+  // records linked to their account are theirs too (a charity may have imported them under any of them).
   const ids = new Set<string>();
+  const theirEmails = new Set<string>();
   if (userId) {
-    const { data, error } = await db.from("donors").select("id").eq("user_id", userId);
+    const { data, error } = await db.from("donors").select("id, email").eq("user_id", userId);
     if (error) throw error;
-    for (const d of data ?? []) ids.add(d.id as string);
+    for (const d of data ?? []) {
+      ids.add(d.id as string);
+      if (typeof d.email === "string") theirEmails.add(d.email.trim().toLowerCase());
+    }
   }
   if (email) {
+    theirEmails.add(email);
     const { data, error } = await db.from("donors").select("id").eq("email", email);
     if (error) throw error;
     for (const d of data ?? []) ids.add(d.id as string);
@@ -150,6 +156,15 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       const { error: e } = await db.from("charity_requests").delete().eq("notify_email", email);
       if (e && !gone(e.code)) throw new Error(`Could not erase: ${e.message}`);
     }
+  }
+  // A charity's own imported copy of them (its contact list, 02/11/2026), and that contact's tags, which go with it
+  // (the tags' foreign key cascades). Matched on the whole address only: an exact match, never a pattern, so a "_" or
+  // "%" in an address can never reach anyone else's. Imported addresses are kept lower-case. Before the database
+  // erasure, which blanks the addresses on their donor records (decided 20/11/2026, Yehuda).
+  for (const address of theirEmails) {
+    if (address.endsWith("@erased.invalid")) continue;
+    const { error: e } = await db.from("charity_contacts").delete().eq("email", address);
+    if (e) throw new Error(`Could not erase: ${e.message}`);
   }
   if (email) {
     const exact = email.replace(/[\\%_]/g, (ch) => `\\${ch}`);

@@ -16,7 +16,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "in", "is", "gte", "order", "limit", "range"]) q[m] = () => q;
+      for (const m of ["select", "eq", "in", "is", "not", "gte", "order", "limit", "range"]) q[m] = () => q;
       q.neq = (col: string, val: string) => (excluded.push(`${table}.${col}<>${val}`), q);
       q.then = (resolve: (v: { data: unknown[]; error: null }) => void) => resolve({ data: tables[table] ?? [], error: null });
       return q;
@@ -69,6 +69,21 @@ describe("the Payments page", () => {
     expect(html).toContain("Meals Fund · 1 payment");
     expect(html).toContain("R180 + R20");
     expect(html).toMatch(/things need a look/);
+  });
+
+  it("lists paid gifts kept off s18A receipts, with what is left after refunds, a way to record part refunded and to release the hold", async () => {
+    tables = {
+      donations: [
+        { id: "3f9a2c71-0b1d-4e5f-9a8b-123456789abc", status: "paid", amount_cents: 100000, refunded_cents: 40000, receipt_hold: "dispute open", paid_at: ago(600), created_at: ago(600), total_charged_cents: 100000, charity_id: "a", contribution_cents: 0, charities: { name_en: "Meals Fund" } },
+      ],
+    };
+    const html = await page();
+    expect(html).toContain("Kept off s18A receipts");
+    expect(html).toContain("Dispute open · Meals Fund");
+    expect(html).toContain("gift R1 000 · R600 left after refunds");
+    expect(html).toContain("Release the hold");
+    expect(html).toContain("Part of the gift refunded, in Rand");
+    expect(html).toContain("At most R600.");
   });
 
   it("never prints the customer details held in a gateway record", async () => {

@@ -62,7 +62,7 @@ vi.mock("@/lib/donations/charity", () => ({
   loadDonatableCharity: async () => ({ id: "c1", name_en: "Meals", acceptingPayments: true, receiptsAvailable: true, splitAccountRef: "ACCT_1" }),
 }));
 /** What the provider says when asked about a reference: it has it, has never seen it, or can't be reached. */
-let providerHas: "yes" | "no" | "down" | "failed" = "yes";
+let providerHas: "yes" | "no" | "down" | "failed" | "reversed" = "yes";
 const verified: string[] = [];
 class FakeGatewayError extends Error {
   notFound: boolean;
@@ -82,6 +82,7 @@ vi.mock("@/lib/gateway", () => ({
       verified.push(reference);
       if (providerHas === "no") throw new FakeGatewayError("not found", { notFound: true });
       if (providerHas === "down") throw new FakeGatewayError("unreachable");
+      if (providerHas === "reversed") return { reference, status: "failed", reversed: true, amountCents: 10_000, currency: "ZAR", gatewayTransactionId: "1" };
       return { reference, status: providerHas === "failed" ? "failed" : "pending", amountCents: 10_000, currency: "ZAR", gatewayTransactionId: "1" };
     },
     createCheckout: async (req: Record<string, unknown>) => (checkouts.push(req), { redirectUrl: "https://pay.test/x" }),
@@ -381,6 +382,18 @@ describe("asking twice about the same saved-card gift", () => {
     expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
     expect(charges).toHaveLength(0);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+  });
+
+  it("a first try that was paid and then refunded is never answered as a declined card (review 20/11/2026)", async () => {
+    prior = pendingPrior();
+    providerHas = "reversed";
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false });
+    expect(body.savedCardDeclined).toBeUndefined();
+    expect(body.message).toMatch(/refunded, so nothing is owed/);
+    expect(charges).toHaveLength(0);
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);
   });
 
   it("a retried charge turned down while the provider can't be asked is neither claimed nor marked failed", async () => {

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isErasedAddress } from "@/lib/email";
 import type { CharityRow, DonorRow, ReceiptDetails } from "./details";
 import type { IssuedReceipt, ReceiptStore } from "./issue";
-import type { PlanCharity, PlanDonation, PlannedReceipt } from "./plan";
+import { receiptableCents, type PlanCharity, type PlanDonation, type PlannedReceipt } from "./plan";
 import type { StoredDecision } from "./review";
 import { s18aDetailsMissing, type S18aDetailsRow } from "@/lib/donations/s18a-details";
 
@@ -56,7 +56,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         const q = db
           .from("donations")
           // A donor whose information was erased can no longer be given a receipt (their details are gone), so they are left out.
-          .select("id, charity_id, donor_id, tax_year, amount_cents, status, wants_18a, paid_at, donation_checkout_details!inner(receipt_identity, erased_at, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
+          .select("id, charity_id, donor_id, tax_year, amount_cents, refunded_cents, receipt_hold, status, wants_18a, paid_at, donation_checkout_details!inner(receipt_identity, erased_at, donor_type, id_number_encrypted, tax_reference_encrypted, registration_number, address_line1)")
           .is("donation_checkout_details.erased_at", null)
           .eq("tax_year", taxYear)
           .eq("status", "paid")
@@ -71,6 +71,9 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
           donorIdentity: identityOf(r.donation_checkout_details),
           taxYear: r.tax_year as number,
           amountCents: Number(r.amount_cents),
+          // Planning leaves out a held gift and counts what is left of each one, as issue_s18a_receipt does.
+          refundedCents: Number(r.refunded_cents ?? 0),
+          receiptHold: (r.receipt_hold as string | null) ?? null,
           status: r.status as string,
           wants18a: r.wants_18a as boolean,
           paidAt: r.paid_at as string | null,
@@ -122,14 +125,15 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         const { data, error } = await db
           .from("donations")
           .select(
-            "id, paid_at, amount_cents, recorded_method, payment_channel, donation_checkout_details(donor_type, first_name, last_name, organisation_name, registration_number, address_line1, address_line2, suburb, city, postal_code, id_number_last4, tax_reference_last4)",
+            "id, paid_at, amount_cents, refunded_cents, recorded_method, payment_channel, donation_checkout_details(donor_type, first_name, last_name, organisation_name, registration_number, address_line1, address_line2, suburb, city, postal_code, id_number_last4, tax_reference_last4)",
           )
           .in("id", chunk);
         if (error) throw new Error(error.message);
         for (const d of data ?? []) {
           const details = (Array.isArray(d.donation_checkout_details) ? d.donation_checkout_details[0] : d.donation_checkout_details) as DonorRow | undefined;
           if (!details) throw new Error(`Donation ${d.id} has no donor details`);
-          out.push({ id: d.id as string, paidAt: d.paid_at as string, amountCents: Number(d.amount_cents), recordedMethod: (d.recorded_method as string | null) ?? null, paymentChannel: (d.payment_channel as string | null) ?? null, donor: details });
+          // Each line shows what is left of the gift after partial refunds, so the lines add up to the receipt's total.
+          out.push({ id: d.id as string, paidAt: d.paid_at as string, amountCents: receiptableCents({ amountCents: Number(d.amount_cents), refundedCents: Number(d.refunded_cents ?? 0) }), recordedMethod: (d.recorded_method as string | null) ?? null, paymentChannel: (d.payment_channel as string | null) ?? null, donor: details });
         }
       }
       return out;
