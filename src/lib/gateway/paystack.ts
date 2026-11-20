@@ -257,6 +257,10 @@ export const paystackGateway: PaymentGateway = {
           description: req.description,
           charity_cents: req.lines.charityCents,
           contribution_cents: req.lines.contributionCents,
+          // Paystack's "Cancel Payment" (after a declined card, say) goes back to our return page, which says plainly
+          // that nothing was charged and offers to try again. Without it the donor landed on an empty give form with
+          // no word about what happened (test gift with a declined card, 20/11/2026).
+          cancel_action: req.returnUrl,
         },
       }),
     });

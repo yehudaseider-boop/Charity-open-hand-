@@ -71,6 +71,11 @@ describe("starting a checkout", () => {
     });
   });
 
+  it("Cancel Payment on the provider's page brings the donor back to our return page, not an empty give form", async () => {
+    await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "charity" });
+    expect((calls[0].body as { metadata: { cancel_action: string } }).metadata.cancel_action).toBe(base.returnUrl);
+  });
+
   it("each side paying its own share sends an inline flat split, the charity's line to its subaccount, fee in proportion", async () => {
     await paystackGateway.createCheckout({ ...base, charityAccountRef: "ACCT_charity1", feeBearer: "each" });
     expect(calls[0].body).toMatchObject({
