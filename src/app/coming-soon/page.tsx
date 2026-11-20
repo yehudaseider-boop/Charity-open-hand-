@@ -212,6 +212,23 @@ export default function ComingSoon() {
                     : "Apply now and a person on our team reads your application, so you're ready to take gifts from launch day."}
                 </p>
               </div>
+              {/* The 56-second charity explainer (Yehuda's 1080p export, 20/11/2026). Nothing downloads until play is
+                  tapped (preload none); the still is its own opening frame. Plays inline on iPhones. */}
+              <figure className="flex flex-col gap-2">
+                <video
+                  controls
+                  playsInline
+                  preload="none"
+                  poster="/home/charity-explainer-poster.webp"
+                  width={1920}
+                  height={1080}
+                  aria-label="Givezy for charities, a 56-second video"
+                  className="block aspect-video h-auto w-full rounded-[1.25rem] bg-brand-deep shadow-[0_18px_40px_rgba(6,22,70,0.35)] ring-1 ring-white/15"
+                >
+                  <source src="/home/charity-explainer-1080.mp4" type="video/mp4" />
+                </video>
+                <figcaption className="text-[13px] text-white/75">56 seconds, with sound. Sample charity shown.</figcaption>
+              </figure>
               {/* The founding offer, as Yehuda set it (20/11/2026): no number, no deadline. */}
               <p className="-mb-3 text-[15px] font-bold text-honey">Our first charities get</p>
               <ul className="flex flex-col gap-3 text-[16px] font-semibold">
