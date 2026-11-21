@@ -443,6 +443,16 @@ export async function setUpReceipts(id: string, _prev: FormState, formData: Form
   if (reference.length > 40) return { ok: false, fieldErrors: { s18a_reference: "The s18A reference number is at most 40 characters. Check it against the SARS letter" } };
   const confirmS18a = formData.get("confirm_s18a") === "on";
   const confirmMandate = formData.get("confirm_mandate") === "on";
+  // Already set up, but the reference number is missing (or wrong): the s18A receipts box on this page shows again
+  // for it, with nothing to tick (21/11/2026 review), so the reference alone is saved and nobody is emailed again.
+  const alreadySetUp = charity.is_s18a && Boolean(charity.mandate_signed_at);
+  if (alreadySetUp) {
+    const { error } = await createAdminClient().from("charities").update({ s18a_reference: reference }).eq("id", id);
+    if (error) return failed(error);
+    await logAudit({ actorUserId: admin.userId, action: "charity.receipts_set_up", entityType: "charity", entityId: id, details: { s18a_reference: reference, reference_only: true } });
+    refresh(id, charity.slug);
+    return { ok: true, message: "Saved the s18A reference number. Receipts were already set up, so the charity wasn't emailed." };
+  }
   if (!confirmS18a && !confirmMandate) return { ok: false, message: "Tick what you have confirmed." };
 
   const now = new Date().toISOString();

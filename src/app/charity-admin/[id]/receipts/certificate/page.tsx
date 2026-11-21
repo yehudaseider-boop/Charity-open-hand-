@@ -11,7 +11,9 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { viewerCan } from "@/lib/charity/team";
 import { formatDate } from "@/lib/dates";
 import { firstParam } from "@/lib/form";
+import { missingForCharity } from "@/lib/receipts/details";
 import { buildReceiptHtml, previewFontCss } from "@/lib/receipts/html";
+import { shownFingerprint } from "@/lib/receipts/review";
 import { loadCertificate } from "@/lib/receipts/review-store";
 import { closedTaxYears } from "@/lib/receipts/runs";
 import { approveCertificateAction, declineCertificateAction, editCertificateAction, reopenCertificateAction } from "../actions";
@@ -71,6 +73,7 @@ export default async function CertificatePage({ params, searchParams }: PageProp
       totalCents={r.totalCents}
       status={r.status}
       changedSince={r.changedSince}
+      shown={shownFingerprint(cert)}
       decidedOn={r.decision ? formatDate(r.decision.decidedAt) : null}
       declineEmailedOn={r.decision?.declineEmailedAt ? formatDate(r.decision.declineEmailedAt) : null}
       run={cert.run ? { sentOn: formatDate(cert.run.charity_approved_at), issuing: cert.run.status === "issuing" } : null}
@@ -89,6 +92,7 @@ export default async function CertificatePage({ params, searchParams }: PageProp
         logoHtml: `<img src="/logo.png" alt="${platformConfig.appName}">`,
       })}
       actions={{ approve: act(approveCertificateAction), decline: act(declineCertificateAction), reopen: act(reopenCertificateAction), edit: act(editCertificateAction) }}
+      charityMissing={missingForCharity(charity)}
       next={cert.next ? { href: `${base}/certificate?year=${taxYear}&c=${cert.next.key}`, donorName: cert.next.donorName } : null}
     />
   );

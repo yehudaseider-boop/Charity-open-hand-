@@ -14,6 +14,7 @@ import {
   checkJourneySteps,
   chosenDonors,
   existingOutcome,
+  journeyStepsMoved,
   middleStepWords,
   parseRefKey,
   partWay,
@@ -69,13 +70,6 @@ export async function saveJourney(charityId: string, key: string, _prev: FormSta
   if (notAllowed) return { ok: false, message: notAllowed };
   const which = await journeyFor(charityId, key);
   if (!which) return UNKNOWN;
-  // An email removed from the middle moves the ones after it to new numbers, and each donor's place goes by number:
-  // refused while anyone is part way through (the page offers only the last email's Remove then).
-  if (formData.get("shifted") === "yes") {
-    const row = await findJourney(charityId, which.ref);
-    const onIt = row ? partWay(await enrolmentStates(charityId, row)) : 0;
-    if (onIt) return { ok: false, message: `${middleStepWords(onIt)} Nothing was saved.` };
-  }
   const count = Math.min(JOURNEY_MAX_STEPS + 1, Math.max(0, Number(formData.get("steps") ?? 0) || 0));
   const raw = Array.from({ length: count }, (_, i) => ({ subject: formData.get(`subject_${i + 1}`), body: formData.get(`body_${i + 1}`), waitDays: formData.get(`wait_${i + 1}`) }));
   const checked = checkJourneySteps(raw);
@@ -90,6 +84,15 @@ export async function saveJourney(charityId: string, key: string, _prev: FormSta
   }
   const before = await readJourneyState(charityId, which.ref);
   if (same(before.steps, checked.steps)) return { ok: true, message: "These are the emails already saved. Nothing changed." };
+  // An email removed from the middle moves the ones after it to new numbers, and each donor's place goes by number:
+  // refused while anyone is part way through (the page offers only the last email's Remove then). Worked out here from
+  // the saved emails and the new ones (review 21/11/2026); the page's own "shifted" note can only add a refusal (it
+  // knows which saved email each box came from, which the words alone can't always tell), never take one away.
+  if (journeyStepsMoved(before.steps, checked.steps) || formData.get("shifted") === "yes") {
+    const row = await findJourney(charityId, which.ref);
+    const onIt = row ? partWay(await enrolmentStates(charityId, row)) : 0;
+    if (onIt) return { ok: false, message: `${middleStepWords(onIt)} Nothing was saved.` };
+  }
   try {
     await writeJourney(charityId, viewer.userId, { ...before, steps: checked.steps }, which.ref);
   } catch (e) {

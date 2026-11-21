@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buildReceiptDetails, receiptDonorName, type ReceiptDetails } from "./details";
 import { decidedPlan, openRun, type ReceiptRun } from "./runs";
 import {
-  buildDeclineEmail, certificateFingerprint, changedParts, checkCertificateEdit, editRows, fieldsFor,
+  buildDeclineEmail, certificateFingerprint, changedParts, checkCertificateEdit, editRows, fieldsFor, shownFingerprint,
   type DecidedReceipt, type EditableDetails, type EditableField,
 } from "./review";
 import { supabaseReceiptStore } from "./store";
@@ -100,7 +100,7 @@ export async function loadCertificate(charityId: string, taxYear: number, key: s
   };
 }
 
-export type ReviewFailure = "gone" | "run_open" | "already" | "no_contact" | "issued" | "changed" | "invalid";
+export type ReviewFailure = "gone" | "run_open" | "already" | "no_contact" | "issued" | "changed" | "invalid" | "stale";
 type Row = { id: string; decided_at: string };
 
 /** Write (or replace) the charity's decision on one certificate. */
@@ -142,11 +142,16 @@ async function find(a: Args): Promise<{ ok: true; cert: Certificate } | { ok: fa
 
 export type DecisionDone = { ok: true; decisionId: string; decidedAt: string; previous: Record<string, unknown> | null; cert: Certificate };
 
-/** Approve one certificate: it is issued with the list once Givezy signs it off. */
-export async function approveCertificate(a: Args): Promise<DecisionDone | { ok: false; why: ReviewFailure }> {
+/**
+ * Approve one certificate: it is issued with the list once Givezy signs it off. `shown` is shownFingerprint() of the
+ * certificate as the page showed it: anything different now (a part refund, a late gift, someone else's decision) and
+ * nothing is approved.
+ */
+export async function approveCertificate(a: Args & { shown: string }): Promise<DecisionDone | { ok: false; why: ReviewFailure }> {
   const f = await find(a);
   if (!f.ok) return f;
   if (f.cert.receipt.status === "approved" || f.cert.receipt.status === "edited") return { ok: false, why: "already" };
+  if (shownFingerprint(f.cert) !== a.shown) return { ok: false, why: "stale" };
   const saved = await saveDecision(a.charityId, f.cert.receipt, "approved", a.userId);
   await logAudit({ actorUserId: a.userId, action: "receipts.certificate_approved", entityType: "charity", entityId: a.charityId, details: { taxYear: a.taxYear, certificate: a.key, gifts: f.cert.receipt.donationIds.length } });
   return { ok: true, decisionId: saved.id, decidedAt: saved.decided_at, previous: saved.previous, cert: f.cert };
@@ -233,9 +238,11 @@ export type EditResult =
  * issued receipt. Never an amount, a date, an ID or tax number, a registration number or the s18A identity:
  * only the columns in fieldsFor() reach the database function, which refuses any other.
  */
-export async function editCertificate(a: Args & { input: Record<string, string | undefined> }): Promise<EditResult> {
+export async function editCertificate(a: Args & { input: Record<string, string | undefined>; shown: string }): Promise<EditResult> {
   const f = await find(a);
   if (!f.ok) return f;
+  // Saving approves it: only the certificate the page showed (see approveCertificate).
+  if (shownFingerprint(f.cert) !== a.shown) return { ok: false, why: "stale" };
   const check = checkCertificateEdit(a.input, f.cert.donorType);
   if (!check.ok) return { ok: false, why: "invalid", fieldErrors: check.fieldErrors };
   const fields: EditableField[] = fieldsFor(f.cert.donorType);
@@ -278,5 +285,6 @@ export function reviewFailureText(why: ReviewFailure): string {
     case "issued": return "A gift on this receipt is already on an issued s18A receipt, so its details can't be changed here. Nothing was changed. Tell us if something is wrong: only we can withdraw and re-issue a receipt.";
     case "changed": return "Someone changed this receipt's details a moment ago. Nothing was changed. The page now shows the latest: check it and try again.";
     case "invalid": return "Please fix the highlighted fields. Nothing was saved yet.";
+    case "stale": return "This receipt changed since you opened the page: check it again. A gift on it may have been refunded or paid, the donor's name or address corrected, or someone at your charity decided on it. Nothing was approved or changed. The page now shows the latest.";
   }
 }

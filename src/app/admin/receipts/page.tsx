@@ -8,6 +8,7 @@ import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { receiptsEnabled } from "@/config/receipts";
 import { leftOutText } from "@/lib/receipts/issue";
+import { adminCharityMissingWords } from "@/lib/receipts/details";
 import { getRun, listUnfinishedRuns, listWaitingRuns, loadPlan, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
 import { finishReceipts, markReceiptsStopped, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
 import { FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
@@ -94,6 +95,12 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
                 Details missing: {detailsMissing[i]} {detailsMissing[i] === 1 ? "gift" : "gifts"} held back, because the donor asked for an s18A receipt but hasn&apos;t added the ID or registration number and address yet. They are not on this list and get no receipt until they do.
               </p>
             ) : detailsMissing[i] === null ? <p className="text-muted">We couldn&apos;t check for gifts with missing s18A details just now. Refresh to try again.</p> : null}
+            {plans[i]?.charityMissing.length ? (
+              <p className="font-medium text-warning">
+                Every receipt on this list would be refused, so signing off issues nothing yet. {adminCharityMissingWords(plans[i]!.charityMissing)}{" "}
+                <Link href={`/admin/charities/${w.charity_id}`} className="text-brand underline">Open the charity&apos;s page</Link>.
+              </p>
+            ) : null}
             {w.status === "issuing" ? (
               <div className="space-y-2">
                 <p className="text-muted">Being issued since {w.signed_off_at ? formatDateTime(w.signed_off_at) : "just now"}.</p>

@@ -74,6 +74,8 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
   // any case, so "930 012 345" and "930012345" count as the same number.
   const sameNumber = new Map<string, { name: string; status: string }>();
   const mine = [charity.npo_number, charity.pbo_number].map(registrationKey).filter(Boolean);
+  // SARS needs one of these on every s18A receipt (missingForCharity): the s18A receipts box shows again without it.
+  const noReferenceNumber = !charity.s18a_reference?.trim() && !charity.pbo_number?.trim();
   if (mine.length) {
     // Page by page: the database hands out at most 1 000 rows at a time.
     const others: { id: string; name_en: string; status: string; npo_number: string | null; pbo_number: string | null }[] = [];
@@ -248,12 +250,18 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
         ) : null}
       </Card>
 
-      {(charity.status === "approved" || charity.status === "suspended") && !canIssue18a(charity) ? (
+      {(charity.status === "approved" || charity.status === "suspended") && (!canIssue18a(charity) || noReferenceNumber) ? (
         <Card title="s18A receipts">
-          <p className="mb-3 text-sm text-muted">
-            Not set up yet{charity.is_s18a ? ": s18A is confirmed, the mandate isn't" : charity.mandate_signed_at ? ": the mandate is confirmed, s18A isn't" : ""}.
-            When the charity sends its SARS letter and signed mandate, add them under Documents, then confirm here.
-          </p>
+          {canIssue18a(charity) ? (
+            <p className="mb-3 text-sm text-warning">
+              Set up, but the charity&apos;s SARS reference number is missing, so every s18A receipt would be refused. Enter the s18A reference number from the SARS letter and press Save.
+            </p>
+          ) : (
+            <p className="mb-3 text-sm text-muted">
+              Not set up yet{charity.is_s18a ? ": s18A is confirmed, the mandate isn't" : charity.mandate_signed_at ? ": the mandate is confirmed, s18A isn't" : ""}.
+              When the charity sends its SARS letter and signed mandate, add them under Documents, then confirm here.
+            </p>
+          )}
           <ReceiptsForm
             action={setUpReceipts.bind(null, id)}
             reference={charity.s18a_reference}

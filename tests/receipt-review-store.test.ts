@@ -21,17 +21,21 @@ let decisions: StoredDecision[] = [];
 let email = "thandi@example.co.za";
 
 const planned: PlannedReceipt = { charityId: "c1", donorId: "u1", donorIdentity: "idfp", taxYear: 2027, donationIds: ["g1", "g2"], totalCents: 75_000 };
-const donor: DonorRow = {
+/** The certificate as the server works it out now (a part refund changes it). */
+let planNow: PlannedReceipt = planned;
+const donorStart: DonorRow = {
   donor_type: "individual", first_name: "Thandi", last_name: "Mokoena", organisation_name: null, registration_number: null,
   address_line1: "5 Old Road", address_line2: null, suburb: null, city: "Johannesburg", postal_code: "2192", id_number_last4: "9085", tax_reference_last4: null,
 };
+/** The donor's details as Givezy holds them now (an admin correction or an erasure changes them). */
+let donor: DonorRow = donorStart;
 const gift = (id: string, paidAt: string) => ({
   id, paid_at: paidAt,
   donation_checkout_details: { donor_type: "individual", email, first_name: "Thandi", last_name: "Mokoena", organisation_name: null, address_line1: "5 Old Road", address_line2: null, suburb: null, city: "Johannesburg", postal_code: "2192" },
 });
 
 vi.mock("@/lib/receipts/runs", () => ({
-  decidedPlan: async () => ({ receipts: applyDecisions([planned], decisions), skipped: [], donations: [] }),
+  decidedPlan: async () => ({ receipts: applyDecisions([planNow], decisions), skipped: [], donations: [], charities: [] }),
   openRun: async () => run,
 }));
 vi.mock("@/lib/receipts/store", () => ({
@@ -86,7 +90,9 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 const { approveCertificate, declineCertificate, editCertificate, loadCertificate, reopenCertificate, reviewFailureText } = await import("@/lib/receipts/review-store");
-const { certificateKey, certificateFingerprint } = await import("@/lib/receipts/review");
+const { certificateKey, certificateFingerprint, shownFingerprint } = await import("@/lib/receipts/review");
+/** What the certificate page shows right now (sent back with Approve and Save and approve). */
+const shown = async () => shownFingerprint((await loadCertificate("c1", 2027, key))!);
 const key = certificateKey("c1", 2027, "u1", "idfp");
 const args = { charityId: "c1", taxYear: 2027, key, userId: "admin1" };
 const contact = { phone: "011 555 0101", email: "office@meals.org.za" };
@@ -96,6 +102,8 @@ beforeEach(() => {
   rpcError = null;
   run = null;
   decisions = [];
+  planNow = planned;
+  donor = donorStart;
   email = "thandi@example.co.za";
   process.env.SITE_URL = "https://givezy.test";
 });
@@ -114,7 +122,7 @@ describe("correcting the name and address", () => {
   const typed = { first_name: "Thandi", last_name: "Mokoena-Dlamini", address_line1: "12 New Street", suburb: "Melville", city: "Johannesburg", postal_code: "2092" };
 
   it("writes only name and address columns to each gift, never an amount or an ID number, then marks it edited", async () => {
-    const r = await editCertificate({ ...args, input: { ...typed, id_number: "8001015009087", amount_cents: "1", registration_number: "x", email: "x@y.co" } });
+    const r = await editCertificate({ ...args, shown: await shown(), input: { ...typed, id_number: "8001015009087", amount_cents: "1", registration_number: "x", email: "x@y.co" } });
     expect(r.ok).toBe(true);
     expect(rpcs).toHaveLength(1);
     expect(rpcs[0].fn).toBe("correct_receipt_donor_details");
@@ -136,7 +144,7 @@ describe("correcting the name and address", () => {
 
   it("is refused once a gift is on an issued receipt, and nothing is marked", async () => {
     rpcError = "receipt_details_issued";
-    const r = await editCertificate({ ...args, input: typed });
+    const r = await editCertificate({ ...args, shown: await shown(), input: typed });
     expect(r).toEqual({ ok: false, why: "issued" });
     expect(writes.filter((w) => w.table === "receipt_plan_decisions")).toEqual([]);
     expect(audits).toEqual([]);
@@ -144,13 +152,13 @@ describe("correcting the name and address", () => {
   });
 
   it("refuses an incomplete address with the fields to fix, and writes nothing", async () => {
-    const r = await editCertificate({ ...args, input: { ...typed, address_line1: "" } });
+    const r = await editCertificate({ ...args, shown: await shown(), input: { ...typed, address_line1: "" } });
     expect(r).toMatchObject({ ok: false, why: "invalid", fieldErrors: { address_line1: expect.any(String) } });
     expect(rpcs).toEqual([]);
   });
 
   it("with nothing different, approves it without touching the gifts", async () => {
-    const r = await editCertificate({ ...args, input: { first_name: "Thandi", last_name: "Mokoena", address_line1: "5 Old Road", city: "Johannesburg", postal_code: "2192" } });
+    const r = await editCertificate({ ...args, shown: await shown(), input: { first_name: "Thandi", last_name: "Mokoena", address_line1: "5 Old Road", city: "Johannesburg", postal_code: "2192" } });
     expect(r).toMatchObject({ ok: true, changed: [] });
     expect(rpcs).toEqual([]);
     expect(writes.find((w) => w.op === "upsert")?.payload).toMatchObject({ decision: "approved" });
@@ -161,9 +169,9 @@ describe("while the list is with Givezy", () => {
   it("nothing can be approved, declined, corrected or reopened", async () => {
     run = { id: "run1", status: "charity_approved", charity_approved_at: "2027-03-02T08:00:00Z" };
     decisions = [{ id: "dec1", charityId: "c1", taxYear: 2027, donorId: "u1", donorIdentity: "idfp", decision: "approved", certificateFingerprint: certificateFingerprint(planned), decidedAt: "x" }];
-    expect(await approveCertificate(args)).toEqual({ ok: false, why: "run_open" });
+    expect(await approveCertificate({ ...args, shown: await shown() })).toEqual({ ok: false, why: "run_open" });
     expect(await declineCertificate({ ...args, contact })).toEqual({ ok: false, why: "run_open" });
-    expect(await editCertificate({ ...args, input: {} })).toEqual({ ok: false, why: "run_open" });
+    expect(await editCertificate({ ...args, shown: await shown(), input: {} })).toEqual({ ok: false, why: "run_open" });
     expect(await reopenCertificate(args)).toEqual({ ok: false, why: "run_open" });
     expect(writes).toEqual([]);
     expect(mails).toEqual([]);
@@ -238,5 +246,63 @@ describe("reopening", () => {
   });
   it("has nothing to do for a receipt still to check", async () => {
     expect(await reopenCertificate(args)).toEqual({ ok: false, why: "already" });
+  });
+});
+
+describe("approving one receipt approves only what the page showed (review 21/11/2026)", () => {
+  it("approves it when nothing changed since the page was opened", async () => {
+    const r = await approveCertificate({ ...args, shown: await shown() });
+    expect(r).toMatchObject({ ok: true });
+    expect(writes.find((w) => w.op === "upsert")?.payload).toMatchObject({ decision: "approved", certificate_fingerprint: certificateFingerprint(planned) });
+  });
+
+  it("refuses, and writes nothing, when a part refund landed between opening the page and pressing Approve", async () => {
+    const seen = await shown();
+    planNow = { ...planned, totalCents: 70_000 };
+    expect(await approveCertificate({ ...args, shown: seen })).toEqual({ ok: false, why: "stale" });
+    expect(writes).toEqual([]);
+    expect(audits).toEqual([]);
+    expect(reviewFailureText("stale")).toMatch(/^This receipt changed since you opened the page: check it again\..*Nothing was approved or changed/);
+    expect(reviewFailureText("stale")).not.toMatch(/[!—]/);
+  });
+
+  it("refuses when a late gift joined it, or someone at the charity declined it in between", async () => {
+    const seen = await shown();
+    planNow = { ...planned, donationIds: ["g1", "g2", "g3"], totalCents: 85_000 };
+    expect(await approveCertificate({ ...args, shown: seen })).toEqual({ ok: false, why: "stale" });
+    planNow = planned;
+    decisions = [{ id: "dec1", charityId: "c1", taxYear: 2027, donorId: "u1", donorIdentity: "idfp", decision: "declined", certificateFingerprint: certificateFingerprint(planned), decidedAt: "2027-03-02T08:00:00Z" }];
+    expect(await approveCertificate({ ...args, shown: seen })).toEqual({ ok: false, why: "stale" });
+    expect(writes).toEqual([]);
+  });
+
+  it("refuses a press that carries nothing (a page opened before this check)", async () => {
+    expect(await approveCertificate({ ...args, shown: "" })).toEqual({ ok: false, why: "stale" });
+    expect(writes).toEqual([]);
+  });
+
+  it("refuses when Givezy corrected or erased the donor's name or address in between", async () => {
+    const seen = await shown();
+    donor = { ...donorStart, address_line1: "7 Other Road" };
+    expect(await approveCertificate({ ...args, shown: seen })).toEqual({ ok: false, why: "stale" });
+    donor = { ...donorStart, first_name: null, last_name: null, address_line1: null, city: null, postal_code: null };
+    expect(await approveCertificate({ ...args, shown: seen })).toEqual({ ok: false, why: "stale" });
+    expect(writes).toEqual([]);
+  });
+
+  it("the page and the server work it out the same way, whenever each loads the certificate", async () => {
+    const page = await loadCertificate("c1", 2027, key, new Date("2027-03-01T08:00:00Z"));
+    const server = await loadCertificate("c1", 2027, key, new Date("2027-03-02T17:30:00Z"));
+    expect(shownFingerprint(page!)).toBe(shownFingerprint(server!));
+    expect(await approveCertificate({ ...args, shown: shownFingerprint(page!) })).toMatchObject({ ok: true });
+  });
+
+  it("Save and approve refuses too, before any gift's details are changed", async () => {
+    const seen = await shown();
+    planNow = { ...planned, totalCents: 70_000 };
+    const r = await editCertificate({ ...args, shown: seen, input: { first_name: "Thandi", last_name: "Dlamini", address_line1: "5 Old Road", city: "Johannesburg", postal_code: "2192" } });
+    expect(r).toEqual({ ok: false, why: "stale" });
+    expect(rpcs).toEqual([]);
+    expect(writes).toEqual([]);
   });
 });

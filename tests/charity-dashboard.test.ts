@@ -98,6 +98,20 @@ describe("names and search", () => {
     const { containsPattern } = await import("@/lib/charity/dashboard");
     expect(containsPattern("levin),email.neq.x")).toBe('"%levin),email.neq.x%"');
   });
+  it("makes LIKE's wildcards plain, escaped twice: once for Postgres LIKE, once for PostgREST's quoted value (review 21/11/2026)", async () => {
+    const { containsPattern, likeLiteral } = await import("@/lib/charity/dashboard");
+    // "_" matched any one character: PostgREST reads \\_ as \_, which LIKE reads as a plain "_".
+    expect(containsPattern("sarah_levin@x.co.za")).toBe('"%sarah\\\\_levin@x.co.za%"');
+    expect(containsPattern("a_b_c")).toBe('"%a\\\\_b\\\\_c%"');
+    // Even without safeSearch first, nothing can end the quoted value or act as a wildcard.
+    expect(likeLiteral("50%")).toBe("50\\\\%");
+    expect(likeLiteral("a\\b")).toBe("a\\\\\\\\b");
+    expect(likeLiteral('say "hi"')).toBe('say \\"hi\\"');
+    // Commas, dots, colons and brackets stay inside the quotes: one value, never a second filter.
+    const p = containsPattern('x"),email.ilike.*,(id.eq.1');
+    expect(p).toBe('"%x ),email.ilike. ,(id.eq.1%"');
+    expect(p.slice(1, -1)).not.toContain('"');
+  });
 });
 
 describe("monthly donations for charities", () => {

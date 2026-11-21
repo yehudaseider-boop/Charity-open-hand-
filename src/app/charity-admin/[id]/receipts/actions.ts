@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewer } from "@/lib/auth";
 import { recordAction } from "@/lib/charity/charity-actions";
@@ -9,8 +9,9 @@ import { canIssue18a } from "@/lib/charities";
 import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
 import { approveRun, cancelRun, closedTaxYears } from "@/lib/receipts/runs";
-import { approveCertificate, declineCertificate, editCertificate, reopenCertificate, reviewFailureText, type Certificate } from "@/lib/receipts/review-store";
+import { approveCertificate, declineCertificate, editCertificate, reopenCertificate, reviewFailureText, type Certificate, type ReviewFailure } from "@/lib/receipts/review-store";
 import { formToObject } from "@/lib/form";
+import { charityMissingRefusal, missingForCharity } from "@/lib/receipts/details";
 import { refusal } from "@/lib/charity/team";
 
 /** The charity approves the list of s18A receipts it was shown for a closed tax year. */
@@ -27,6 +28,7 @@ export async function approveReceipts(charityId: string, taxYear: number, finger
   if (!r.ok) {
     if (r.why === "changed") return { ok: false, message: "The list changed while you were looking at it (a gift was paid or refunded, or someone at your charity decided on a receipt). Nothing was approved. The page now shows the new list: check it and approve again." };
     if (r.why === "open") return { ok: false, message: "Someone at your charity has just approved this list. Nothing more to do: it's waiting for Givezy to sign it off." };
+    if (r.why === "charity_details") return { ok: false, message: charityMissingRefusal(r.missing) };
     return { ok: false, message: "There are no receipts left to approve for that tax year (any left are declined). Nothing was changed." };
   }
   const done = await recordAction(charityId, viewer.userId, "receipts_approved", { taxYear, receipts: r.run.receipts_planned, total: formatRand(r.run.total_cents) }, { type: "cancel_receipt_run", id: r.run.id, decisionIds: r.approvedNow });
@@ -58,19 +60,39 @@ async function reviewer(charityId: string, taxYear: number) {
   if (refused) return { error: refused } as const;
   if (!canIssue18a(charity)) return { error: "Your charity can't issue s18A receipts yet: it needs confirmed s18A approval and a signed receipting mandate." } as const;
   if (!closedTaxYears(new Date()).includes(taxYear)) return { error: "Receipts for that tax year can't be checked here. Nothing was changed." } as const;
-  return { viewer, priv } as const;
+  return { viewer, priv, charity } as const;
+}
+
+/**
+ * Approving one receipt (or correcting it and approving it) is refused, as "Approve all" is, while the charity's own
+ * record lacks what SARS needs on every receipt (review 21/11/2026). Declining and reopening still work.
+ */
+function cantApprove(charity: Parameters<typeof missingForCharity>[0]): FormState | null {
+  const missing = missingForCharity(charity);
+  return missing.length ? { ok: false, message: charityMissingRefusal(missing) } : null;
 }
 
 /** What the "what just happened" panel needs about the next receipt to check. */
 const nextOf = (cert: Certificate) => (cert.next ? { nextKey: cert.next.key, nextName: cert.next.donorName } : {});
 const back = (charityId: string, taxYear: number, done: string) => `/charity-admin/${charityId}/receipts?done=${done}#year-${taxYear}`;
 
-export async function approveCertificateAction(charityId: string, taxYear: number, key: string, _prev: FormState, _formData: FormData): Promise<FormState> {
+/** What the page showed when it was opened (shownFingerprint), sent back with Approve and Save and approve. */
+const shownOf = (formData: FormData) => String(formData.get("shown") ?? "");
+
+/** Refused because the receipt changed since the page was opened: the page shows the latest, to check again. */
+function failed(why: ReviewFailure): FormState {
+  if (why === "stale") refresh();
+  return { ok: false, message: reviewFailureText(why) };
+}
+
+export async function approveCertificateAction(charityId: string, taxYear: number, key: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const who = await reviewer(charityId, taxYear);
   if ("error" in who) return { ok: false, message: who.error };
-  const r = await approveCertificate({ charityId, taxYear, key, userId: who.viewer.userId });
+  const blocked = cantApprove(who.charity);
+  if (blocked) return blocked;
+  const r = await approveCertificate({ charityId, taxYear, key, userId: who.viewer.userId, shown: shownOf(formData) });
   revalidatePath(`/charity-admin/${charityId}/receipts`);
-  if (!r.ok) return { ok: false, message: reviewFailureText(r.why) };
+  if (!r.ok) return failed(r.why);
   const done = await recordAction(
     charityId, who.viewer.userId, "certificate_approved",
     { taxYear, key, name: r.cert.donorName, total: formatRand(r.cert.receipt.totalCents), ...nextOf(r.cert) },
@@ -112,9 +134,11 @@ export async function reopenCertificateAction(charityId: string, taxYear: number
 export async function editCertificateAction(charityId: string, taxYear: number, key: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const who = await reviewer(charityId, taxYear);
   if ("error" in who) return { ok: false, message: who.error };
-  const r = await editCertificate({ charityId, taxYear, key, userId: who.viewer.userId, input: formToObject(formData) });
+  const blocked = cantApprove(who.charity);
+  if (blocked) return blocked;
+  const r = await editCertificate({ charityId, taxYear, key, userId: who.viewer.userId, input: formToObject(formData), shown: shownOf(formData) });
   revalidatePath(`/charity-admin/${charityId}/receipts`);
-  if (!r.ok) return { ok: false, message: reviewFailureText(r.why), fieldErrors: r.fieldErrors };
+  if (!r.ok) return r.why === "stale" ? failed(r.why) : { ok: false, message: reviewFailureText(r.why), fieldErrors: r.fieldErrors };
   const changed = r.changed.length === 2 ? "name and address" : r.changed[0] ?? "details";
   const done = await recordAction(
     charityId, who.viewer.userId, r.changed.length ? "certificate_edited" : "certificate_approved",

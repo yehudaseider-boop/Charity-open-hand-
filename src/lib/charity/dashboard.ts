@@ -69,9 +69,21 @@ export function safeSearch(q: string): string {
   return q.replace(/[\\"*%\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
 }
 
-/** A "contains" pattern for a PostgREST or() filter: quoted, so commas, dots and brackets are plain text. */
+/**
+ * A "contains" pattern for a PostgREST ilike in an or() filter: quoted, so commas, dots, colons and brackets are plain
+ * text, and with LIKE's own wildcards made plain (review 21/11/2026: "_" matched any one character). Two layers of
+ * escaping: Postgres LIKE reads a backslash as "the next character is plain", and PostgREST, inside double quotes,
+ * reads a backslash the same way, so each backslash meant for LIKE is written twice. "a_b" becomes "%a\\_b%" in the
+ * URL, "%a\_b%" in Postgres. safeSearch has already removed `"` (it would end the quoted value), `*` (PostgREST turns
+ * it into %) and `%` and `\`; they are escaped here as well, so this stays safe on its own.
+ */
 export function containsPattern(q: string): string {
-  return `"%${safeSearch(q)}%"`;
+  return `"%${likeLiteral(safeSearch(q))}%"`;
+}
+
+/** Text that LIKE and a quoted PostgREST value both read as plain characters (see containsPattern). */
+export function likeLiteral(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => (c === "\\" ? "\\\\\\\\" : `\\\\${c}`)).replace(/"/g, '\\"');
 }
 
 export const donationStatus = {

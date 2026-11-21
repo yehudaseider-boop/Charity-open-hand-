@@ -283,18 +283,35 @@ const HEADINGS: Record<GiftField, string[]> = {
 /** The headings of the template file, in order. */
 export const TEMPLATE_HEADINGS = ["Date", "Amount", "Method", "Donor type", "First name", "Surname", "Organisation", "Registration number", "Email", "Phone", "s18A", "ID number", "Tax number", "Address", "Address line 2", "Suburb", "City", "Postal code", "Campaign", "Reference"];
 
-/** Which column holds which field. Unknown columns are listed so the person sees what was left out. */
-export function mapHeadings(header: string[]): { columns: Partial<Record<GiftField, number>>; unknown: string[]; missing: GiftField[] } {
+/**
+ * Fields where using the wrong one of two columns would put a wrong fact on a gift or an s18A receipt (review
+ * 21/11/2026): the date, the amount, who it is from, and the details SARS reads.
+ */
+const ONE_COLUMN_ONLY: GiftField[] = ["date", "amount", "email", "id_number", "tax_reference", "wants_18a"];
+
+/**
+ * Which column holds which field. Unknown columns are listed so the person sees what was left out. Two columns for
+ * one of ONE_COLUMN_ONLY ("Date" and "Transaction date", or two "Amount" columns) can't be told apart, so they are
+ * reported in `twice` and the file is refused (review 21/11/2026): taking the first one silently could record the
+ * wrong date or amount. For any other field (ordinary exports have "Phone" and "Mobile", or "Name" and "First name")
+ * the first column is used and the others are listed with the unknown ones, under "Columns we didn't use".
+ */
+export function mapHeadings(header: string[]): { columns: Partial<Record<GiftField, number>>; unknown: string[]; missing: GiftField[]; twice: string[][] } {
   const columns: Partial<Record<GiftField, number>> = {};
+  const seen: Partial<Record<GiftField, string[]>> = {};
   const unknown: string[] = [];
   header.forEach((raw, i) => {
     const h = raw.trim().toLowerCase().replace(/\s+/g, " ");
     const field = (Object.keys(HEADINGS) as GiftField[]).find((f) => HEADINGS[f].includes(h));
-    if (field && columns[field] === undefined) columns[field] = i;
+    if (field && columns[field] === undefined) {
+      columns[field] = i;
+      seen[field] = [raw.trim()];
+    } else if (field && ONE_COLUMN_ONLY.includes(field)) seen[field]!.push(raw.trim());
     else if (h) unknown.push(raw.trim());
   });
   const missing = (["date", "amount", "email"] as GiftField[]).filter((f) => columns[f] === undefined);
-  return { columns, unknown, missing };
+  const twice = Object.values(seen).filter((names): names is string[] => Boolean(names && names.length > 1));
+  return { columns, unknown, missing, twice };
 }
 
 export type RowResult = { line: number; fields: GiftFields; check: GiftCheck; duplicateOf?: string; duplicateOfErased?: boolean };
@@ -307,7 +324,10 @@ export function checkFile(text: string, opts: { today: string; fallbackMethod: R
   if (text.length > MAX_IMPORT_BYTES) return { ok: false, message: "This file is over 1 MB. Split it into smaller files and import them one at a time." };
   const all = parseCsv(text);
   if (all.length < 2) return { ok: false, message: "This file has no gifts in it: we need a heading row and at least one gift." };
-  const { columns, unknown, missing } = mapHeadings(all[0]);
+  const { columns, unknown, missing, twice } = mapHeadings(all[0]);
+  if (twice.length) {
+    return { ok: false, message: `Two columns mean the same thing (${twice.map((t) => t.map((n) => `"${n}"`).join(" and ")).join("; ")}), so we can't tell which one to use. Keep one of them and check the file again. Nothing was recorded.` };
+  }
   if (missing.length) {
     const names: Record<string, string> = { date: "Date", amount: "Amount", email: "Email" };
     return { ok: false, message: `We couldn't find the ${missing.map((m) => names[m]).join(", ")} column. Use the headings in our template (download it below).` };

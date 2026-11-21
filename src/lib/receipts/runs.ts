@@ -7,13 +7,15 @@ import { formatDate, taxYearFor, taxYearRange } from "@/lib/dates";
 import { getEmailTransport } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildReceiptHtml } from "./html";
-import { receiptDonorName } from "./details";
+import { adminCharityMissingWords, missingForCharity, receiptDonorName } from "./details";
 import { runReceiptsJob, type IssuedReceipt, type JobSummary } from "./issue";
 import { markRetryUnknown, recordFailedEmail } from "@/lib/email/retry";
 import { wasCutOff } from "@/lib/email/retry-plan";
-import { planReceipts, receiptableCents, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
+import { groupLeftOut, type LeftOutReason } from "./left-out";
+import { planReceipts, receiptableCents, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped } from "./plan";
 import { applyDecisions, certificateFingerprint, countStatuses, type CertificateStatus, type DecidedReceipt } from "./review";
 import { completionWindow, inCompletionWindow } from "@/lib/donations/s18a-details";
+import type { CharityRow } from "./details";
 import { supabaseReceiptStore } from "./store";
 
 /**
@@ -59,6 +61,12 @@ export type DetailsMissingLine = {
   canAddOnGivezy: boolean;
 };
 /**
+ * Paid s18A gifts left off this year's list for now for another reason than missing details (21/11/2026): on hold,
+ * paid after the donor's receipt was issued, or paid before the mandate was signed. Grouped by reason, with each
+ * gift's donor name (as the receipt prints it), date and amount: never an email, phone number or address.
+ */
+export type LeftOutGroupLines = { reason: LeftOutReason; amountCents: number; lines: { donorName: string; paidAt: string; amountCents: number }[] };
+/**
  * `totalCents` and `toIssue` count what would be issued: every certificate except the declined ones (those still
  * to check are approved by "Approve all"). `fingerprint` covers every certificate and its decision.
  */
@@ -70,6 +78,12 @@ export type Plan = {
   counts: Record<CertificateStatus, number>;
   fingerprint: string;
   detailsMissing: DetailsMissingLine[];
+  leftOut: LeftOutGroupLines[];
+  /**
+   * What SARS needs on every receipt that the charity's own record lacks (its address, its SARS reference number).
+   * While anything is listed, the list can't be approved or signed off: every receipt on it would be refused.
+   */
+  charityMissing: string[];
 };
 
 /**
@@ -99,11 +113,20 @@ const store = () => supabaseReceiptStore(createAdminClient());
  * in all, however many donors, because the charity opens this page often.
  */
 export async function loadPlan(charityId: string, taxYear: number, now: Date = new Date()): Promise<Plan> {
-  const { receipts, skipped, donations } = await decidedPlan(charityId, taxYear);
+  const { receipts, skipped, donations, charities } = await decidedPlan(charityId, taxYear);
   const held = skipped.filter((k) => k.reason === "details_missing").map((k) => k.donationId);
   const window = completionWindow(now);
-  const names = await namesByDonation([...receipts.flatMap((r) => r.donationIds), ...held]);
+  const left = groupLeftOut(skipped, donations);
+  const names = await namesByDonation([...receipts.flatMap((r) => r.donationIds), ...held, ...left.flatMap((g) => g.donationIds)]);
   const byId = new Map(donations.map((d) => [d.id, d]));
+  const charity = charities.find((c) => c.id === charityId);
+  const leftOut: LeftOutGroupLines[] = left.map((g) => ({
+    reason: g.reason,
+    amountCents: g.amountCents,
+    lines: g.donationIds
+      .map((id) => ({ donorName: names.get(id)?.name || "Name missing", paidAt: names.get(id)?.paidAt ?? "", amountCents: receiptableCents(byId.get(id) ?? { amountCents: 0 }) }))
+      .sort((a, b) => a.donorName.localeCompare(b.donorName, "en-ZA") || a.paidAt.localeCompare(b.paidAt)),
+  }));
   const detailsMissing = held
     .map((id) => ({
       donorName: names.get(id)?.name || "Name missing",
@@ -128,6 +151,9 @@ export async function loadPlan(charityId: string, taxYear: number, now: Date = n
     counts: countStatuses(lines),
     fingerprint: fingerprintPlan(receipts),
     detailsMissing,
+    leftOut,
+    // Only when there is something to receipt: a charity with no s18A gifts that year is never asked for anything.
+    charityMissing: receipts.length && charity ? missingForCharity(charity) : [],
   };
 }
 
@@ -135,13 +161,13 @@ export async function loadPlan(charityId: string, taxYear: number, now: Date = n
  * The planned certificates of one charity's tax year with the charity's decision on each: the same planning and
  * the same decisions the issuing job uses, so the fingerprint shown is the one a sign-off checks.
  */
-export async function decidedPlan(charityId: string, taxYear: number): Promise<{ receipts: DecidedReceipt[]; skipped: Skipped[]; donations: PlanDonation[] }> {
+export async function decidedPlan(charityId: string, taxYear: number): Promise<{ receipts: DecidedReceipt[]; skipped: Skipped[]; donations: PlanDonation[]; charities: (PlanCharity & CharityRow)[] }> {
   const s = store();
   const donations = await s.listDonations(taxYear, charityId);
   const charities = await s.listCharities([...new Set(donations.map((d) => d.charityId))]);
   const [receipted, decisions] = await Promise.all([s.receiptedDonationIds(taxYear), s.listDecisions(taxYear, charityId)]);
   const { receipts, skipped } = planReceipts({ taxYear, donations, charities, alreadyReceipted: receipted });
-  return { receipts: applyDecisions(receipts, decisions), skipped, donations };
+  return { receipts: applyDecisions(receipts, decisions), skipped, donations, charities };
 }
 
 /** The donor name typed with each donation, and when it was paid. */
@@ -230,7 +256,7 @@ export function runNeedsFinishing(summary: JobSummary | null): boolean {
   return summary.failed.length > 0 || summary.emailFailed > 0 || summary.pdfsMade < summary.issued || summary.emailed < summary.issued;
 }
 
-export type ApproveResult = { ok: true; run: ReceiptRun; approvedNow: string[] } | { ok: false; why: "nothing" | "changed" | "open" };
+export type ApproveResult = { ok: true; run: ReceiptRun; approvedNow: string[] } | { ok: false; why: "nothing" | "changed" | "open" } | { ok: false; why: "charity_details"; missing: string[] };
 
 /**
  * "Approve all": the charity approves every certificate still to check and sends the list to Givezy. Refused
@@ -242,6 +268,10 @@ export async function approveRun(args: { charityId: string; taxYear: number; fin
   const before = await decidedPlan(args.charityId, args.taxYear);
   if (fingerprintPlan(before.receipts) !== args.fingerprint) return { ok: false, why: "changed" };
   if (!before.receipts.some((r) => r.status !== "declined")) return { ok: false, why: "nothing" };
+  // Every receipt would be refused at sign-off without the charity's address or SARS reference number: say so now.
+  const charity = before.charities.find((c) => c.id === args.charityId);
+  const missing = charity ? missingForCharity(charity) : [];
+  if (missing.length) return { ok: false, why: "charity_details", missing };
   const open = await openRun(args.charityId, args.taxYear);
   if (open) return { ok: false, why: "open" };
   const toCheck = before.receipts.filter((r) => r.status === "to_check");
@@ -346,7 +376,7 @@ export async function pendingAtYearEnd(charityId: string, taxYear: number): Prom
 
 export type SignOffResult =
   | { ok: true; summary: JobSummary; emailed: boolean }
-  | { ok: false; why: "switched_off" | "gone" | "changed" | "error"; message?: string };
+  | { ok: false; why: "switched_off" | "gone" | "changed" | "error" | "charity_details"; message?: string };
 
 function job(runId: string) {
   const siteUrl = process.env.SITE_URL ?? "";
@@ -382,6 +412,9 @@ export async function signOffRun(args: { runId: string; userId: string; now?: Da
     await cancelRun({ runId: run.id, userId: args.userId, reason: CHANGED_REASON });
     return { ok: false, why: "changed" };
   }
+  // Every receipt would fail on the charity's own missing details: nothing is claimed, so it can be signed off once
+  // they are added (adminCharityMissingWords says where, or that there's no form for it yet).
+  if (plan.charityMissing.length) return { ok: false, why: "charity_details", message: `Nothing was issued. ${adminCharityMissingWords(plan.charityMissing)} Once that's done, sign off again.` };
   // Claim it, so two people signing off at once can't run it twice.
   const { data: claimed, error: claimError } = await db
     .from("receipt_runs")

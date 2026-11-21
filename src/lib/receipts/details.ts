@@ -89,11 +89,74 @@ export function donationNature(recordedMethod: string | null | undefined, paymen
  */
 export function missingForSars(d: ReceiptDetails): string[] {
   const out: string[] = [];
-  if (!d.charity.s18a_reference?.trim() && !d.charity.pbo_number?.trim()) out.push("the charity's SARS reference number");
+  if (noSarsReference(d.charity)) out.push(CHARITY_REFERENCE);
   if (!d.donor.name) out.push("the donor's name");
   if (!d.donor.address.length) out.push("the donor's address");
-  if (!d.charity.address.length) out.push("the charity's address");
+  if (!d.charity.address.length) out.push(CHARITY_ADDRESS);
   return out;
+}
+
+const CHARITY_REFERENCE = "the charity's SARS reference number";
+const CHARITY_ADDRESS = "the charity's address";
+const noSarsReference = (c: { s18a_reference: string | null; pbo_number: string | null }) => !c.s18a_reference?.trim() && !c.pbo_number?.trim();
+
+/**
+ * What missingForSars would refuse every one of a charity's receipts for: its SARS reference number (s18A reference
+ * or PBO number) and its address (21/11/2026). Checked before the charity's list is shown as ready to approve, so a
+ * list is never approved and signed off only for every receipt on it to fail.
+ */
+export function missingForCharity(c: Pick<CharityRow, "s18a_reference" | "pbo_number" | "address_line1" | "address_line2" | "suburb" | "city" | "postal_code">): string[] {
+  const out: string[] = [];
+  if (noSarsReference(c)) out.push(CHARITY_REFERENCE);
+  if (!lines(c.address_line1, c.address_line2, c.suburb, c.city, c.postal_code).length) out.push(CHARITY_ADDRESS);
+  return out;
+}
+
+/** "a, b and c". */
+export function andList(items: string[]): string {
+  return items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/**
+ * The charity's own words for what missingForCharity found: what is missing, why it blocks the list, and that nothing
+ * was approved. "Your charity's address and SARS reference number aren't on your Givezy record yet ..."
+ */
+export function charityMissingWords(missing: string[]): string {
+  const what = andList(missing.map((m) => m.replace(/^the charity's /, "")));
+  const one = missing.length === 1;
+  return `Your charity's ${what} ${one ? "isn't" : "aren't"} on your Givezy record yet, and SARS needs ${one ? "it" : "both"} on every s18A receipt, so none can be approved or issued. Nothing was approved or sent.`;
+}
+
+/**
+ * Said when an approval is refused because of what missingForCharity found: "Approve all" and approving one receipt
+ * (or correcting it and approving it) say the same thing.
+ */
+export function charityMissingRefusal(missing: string[]): string {
+  const it = missing.length === 1 ? "it" : "them";
+  return `${charityMissingWords(missing)} Send ${it} to us and we'll add ${it}, then approve again.`;
+}
+
+/**
+ * Givezy's own words (admin pages only) for what missingForCharity found, and how to put it right (review
+ * 21/11/2026): the SARS reference number is saved in the s18A receipts box on the charity's admin page; the address
+ * has no admin form yet (docs/go-live-checklist.md, section B).
+ * "The charity's SARS reference number and address are missing from its record, and SARS needs both ..."
+ */
+export function adminCharityMissingWords(missing: string[]): string {
+  if (!missing.length) return "";
+  const one = missing.length === 1;
+  const said = `The charity's ${andList(missing.map((m) => m.replace(/^the charity's /, "")))} ${one ? "is" : "are"} missing from its record, and SARS needs ${one ? "it" : missing.length === 2 ? "both" : "them all"} on every s18A receipt.`;
+  const fixes: string[] = [];
+  if (missing.includes(CHARITY_REFERENCE)) fixes.push(`Add the s18A reference number from the SARS letter in the s18A receipts box on the charity's page (Charities), then press Save.`);
+  const rest = missing.filter((m) => m !== CHARITY_REFERENCE);
+  if (rest.length) {
+    fixes.push(
+      fixes.length
+        ? `There's no form for the ${andList(rest.map((m) => m.replace(/^the charity's /, "")))} yet: ask the developer to correct it in the database.`
+        : "There's no form for this yet: ask the developer to correct it in the database.",
+    );
+  }
+  return [said, ...fixes].join(" ");
 }
 
 export function buildReceiptDetails(args: {

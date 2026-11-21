@@ -12,7 +12,7 @@ import { runReceiptsJob, type IssuedReceipt, type ReceiptStore } from "@/lib/rec
 import { planReceipts, type PlanCharity, type PlanDonation, type PlannedReceipt } from "@/lib/receipts/plan";
 import {
   applyDecisions, buildDeclineEmail, certificateFingerprint, certificateKey, changedParts, checkCertificateEdit, countStatuses, editRows, fieldsFor,
-  willIssue, type StoredDecision,
+  shownDonorHash, shownFingerprint, willIssue, type StoredDecision,
 } from "@/lib/receipts/review";
 import { fingerprintPlan } from "@/lib/receipts/runs";
 import { ASK_FIRST, describeDone, describeUndone, isActionKind, pageOf } from "@/lib/charity/done";
@@ -288,5 +288,24 @@ describe("the dashboard's words for a decision on one receipt", () => {
       expect(describeDone(k, d, ctx).what).not.toMatch(/[!—]/);
       expect(describeUndone(k, d)).not.toMatch(/[!—]/);
     }
+  });
+});
+
+describe("what the page showed includes the donor's name and address (review 21/11/2026)", () => {
+  const receipt = { donorId: "u1", donorIdentity: "idfp", donationIds: ["g2", "g1"], totalCents: 75_000, status: "to_check" as const, decidedAt: null };
+  const shownWith = (name: string, address: string[]) => shownFingerprint({ receipt, details: { donor: { name, address } } });
+
+  it("is the same for the same words, however the spaces fall", () => {
+    const a = shownWith("Thandi Mokoena", ["5 Old Road", "Johannesburg", "2192"]);
+    expect(shownWith("  Thandi   Mokoena ", ["5 Old Road ", "", "Johannesburg", "2192"])).toBe(a);
+    expect(shownDonorHash({ name: "Thandi\u00a0Mokoena", address: ["5 Old Road"] })).toBe(shownDonorHash({ name: "Thandi Mokoena", address: ["5 Old Road"] }));
+  });
+
+  it("changes when the name or any address line changes, or when they are erased", () => {
+    const a = shownWith("Thandi Mokoena", ["5 Old Road", "Johannesburg", "2192"]);
+    expect(shownWith("Thandi Dlamini", ["5 Old Road", "Johannesburg", "2192"])).not.toBe(a);
+    expect(shownWith("Thandi Mokoena", ["7 Old Road", "Johannesburg", "2192"])).not.toBe(a);
+    expect(shownWith("Thandi Mokoena", ["5 Old Road", "Johannesburg 2192"])).not.toBe(a);
+    expect(shownWith("", [])).not.toBe(a);
   });
 });

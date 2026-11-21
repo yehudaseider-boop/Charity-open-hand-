@@ -32,9 +32,16 @@ export function WithdrawReceiptsForm({ action }: { action: Action }) {
   return <ActionForm action={action} submitLabel="Take back my approval" pendingLabel="Taking it back…" />;
 }
 
-/** Approve one receipt. It can be taken back for 30 minutes (Undo), or reopened until the list goes to Givezy. */
-export function ApproveCertificateForm({ action }: { action: Action }) {
-  return <ActionForm action={action} submitLabel="Approve this receipt" pendingLabel="Approving…" />;
+/**
+ * Approve one receipt. It can be taken back for 30 minutes (Undo), or reopened until the list goes to Givezy. `shown`
+ * is what the page showed (shownFingerprint): if the receipt changed since, the server refuses and the page refreshes.
+ */
+export function ApproveCertificateForm({ action, shown }: { action: Action; shown: string }) {
+  return (
+    <ActionForm action={action} submitLabel="Approve this receipt" pendingLabel="Approving…">
+      <input type="hidden" name="shown" value={shown} />
+    </ActionForm>
+  );
 }
 
 /**
@@ -78,9 +85,10 @@ type Details = Record<"first_name" | "last_name" | "organisation_name" | "addres
  * Correct the donor's name and street address on this receipt, then approve it. Only these fields: amounts,
  * dates, the gifts, ID and tax numbers are never on this form, and the server writes only these columns.
  */
-export function EditCertificateForm({ action, person, current }: { action: Action; person: boolean; current: Details }) {
+export function EditCertificateForm({ action, person, current, shown }: { action: Action; person: boolean; current: Details; shown: string }) {
   return (
     <ActionForm action={action} submitLabel="Save and approve" pendingLabel="Saving…">
+      <input type="hidden" name="shown" value={shown} />
       {person ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <TextField name="first_name" label="First name" required autoDirection autoComplete="off" maxLength={80} defaultValue={current.first_name} />

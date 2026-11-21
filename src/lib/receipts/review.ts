@@ -68,6 +68,38 @@ export function certificateFingerprint(r: Pick<PlannedReceipt, "donorId" | "dono
   return createHash("sha256").update(`${r.donorId}|${r.donorIdentity}|${[...r.donationIds].sort().join(",")}|${r.totalCents}`).digest("hex");
 }
 
+/** One line of the donor's name or address as the preview prints it: plain spaces, trimmed, one Unicode form. */
+const shownLine = (v: string | null | undefined) => (v ?? "").normalize("NFC").replace(/\s+/g, " ").trim();
+
+/**
+ * A stable hash of the donor's name and address on the preview (details.donor), so a correction or an erasure by
+ * Givezy between opening the page and pressing Approve is caught too. Empty address lines are left out, as the
+ * preview leaves them out.
+ */
+export function shownDonorHash(donor: { name: string; address: string[] }): string {
+  const lines = [shownLine(donor.name), ...donor.address.map(shownLine).filter(Boolean)];
+  return createHash("sha256").update(`donor|${JSON.stringify(lines)}`).digest("hex");
+}
+
+/** The certificate as the page shows it: what shownFingerprint reads (review-store's Certificate has both). */
+export type ShownCertificate = {
+  receipt: Pick<DecidedReceipt, "donorId" | "donorIdentity" | "donationIds" | "totalCents" | "status" | "decidedAt">;
+  details: { donor: { name: string; address: string[] } };
+};
+
+/**
+ * What the charity's page showed for one certificate: its gifts and total, where its check stood, and the donor's
+ * name and address on the preview. The page sends it back with Approve (and with Save and approve), and the server
+ * works it out again from the certificate as it is now, with this same function, and refuses when it differs. So a
+ * part refund or a late gift landing between opening the page and pressing the button is never approved unseen
+ * (review 21/11/2026), the same check "Approve all" makes on the whole list, and neither is a name or address that
+ * Givezy corrected or erased meanwhile.
+ */
+export function shownFingerprint(c: ShownCertificate): string {
+  const r = c.receipt;
+  return createHash("sha256").update(`${certificateFingerprint(r)}|${r.status}|${r.decidedAt ?? ""}|${shownDonorHash(c.details.donor)}`).digest("hex");
+}
+
 /**
  * Where each planned certificate stands. A decline holds whatever changes (only the charity reopens it). An
  * approval or an edit counts only for the certificate the charity saw: changed since, it is to check again.

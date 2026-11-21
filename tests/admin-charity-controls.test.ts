@@ -136,6 +136,15 @@ describe("set up s18A after approval", () => {
     await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "9".repeat(40), confirm_s18a: "on" }));
     expect(updates[0]).toMatchObject({ s18a_reference: "9".repeat(40) });
   });
+  it("already set up but the reference number is missing: saves the number alone, with nothing to tick, and emails nobody (review 21/11/2026)", async () => {
+    charity = { ...charity, is_s18a: true, mandate_signed_at: "2026-10-01T00:00:00+02:00" };
+    const r = await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "930/123/45/6" }));
+    expect(r).toEqual({ ok: true, message: "Saved the s18A reference number. Receipts were already set up, so the charity wasn't emailed." });
+    expect(updates).toEqual([{ table: "charities", s18a_reference: "930/123/45/6" }]);
+    expect(mails).toHaveLength(0);
+    expect(audits.at(-1)).toMatchObject({ action: "charity.receipts_set_up", details: { reference_only: true } });
+    expect((await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "" }))).fieldErrors?.s18a_reference).toBeTruthy();
+  });
   it("one half alone saves but doesn't promise receipts", async () => {
     documents = [{ document_type: "s18a_approval", storage_path: "c/s.pdf" }];
     const r = await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "930/123/45/6", confirm_s18a: "on" }));

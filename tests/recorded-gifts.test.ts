@@ -111,6 +111,32 @@ describe("files", () => {
     expect(m.unknown).toEqual(["Favourite colour"]);
     expect(m.missing).toEqual([]);
     expect(mapHeadings(["Name", "Amount"]).missing).toEqual(["date", "email"]);
+    expect(mapHeadings(["Date", "Amount", "Email"]).twice).toEqual([]);
+  });
+  it("refuses a file with two columns for the same field, naming them, instead of silently using the first (review 21/11/2026)", () => {
+    expect(mapHeadings(["Date", "Transaction date", "Amount", "Email"]).twice).toEqual([["Date", "Transaction date"]]);
+    const dates = checkFile("Date,Transaction date,Amount,Email\n05/03/2026,04/03/2026,500,sarah@x.co.za", { today, fallbackMethod: "eft" });
+    expect(dates).toEqual({ ok: false, message: 'Two columns mean the same thing ("Date" and "Transaction date"), so we can\'t tell which one to use. Keep one of them and check the file again. Nothing was recorded.' });
+    const amounts = checkFile("Date,Amount,Email,Amount,Value\n05/03/2026,500,sarah@x.co.za,50,5", { today, fallbackMethod: "eft" });
+    expect(amounts.ok).toBe(false);
+    if (amounts.ok) return;
+    expect(amounts.message).toContain('("Amount" and "Amount" and "Value")');
+    expect(amounts.message).not.toMatch(/[!—]/);
+    expect(mapHeadings(["Date", "Amount", "Email", "E-mail"]).twice).toEqual([["Email", "E-mail"]]);
+    for (const pair of [["ID number", "ID"], ["Tax number", "Tax reference"], ["s18A", "Section 18A"]]) {
+      expect(mapHeadings(["Date", "Amount", "Email", ...pair]).twice).toEqual([pair]);
+    }
+  });
+  it("uses the first of two columns for an everyday field and lists the other under columns we didn't use", () => {
+    const m = mapHeadings(["Date", "Amount", "Email", "Phone", "Mobile", "Name", "First name", "Type", "Donor type", "Code", "Postal code"]);
+    expect(m.twice).toEqual([]);
+    expect(m.columns).toMatchObject({ phone: 3, first_name: 5, donor_type: 7, postal_code: 9 });
+    expect(m.unknown).toEqual(["Mobile", "First name", "Donor type", "Postal code"]);
+    const file = checkFile("Date,Amount,Email,Phone,Mobile\n05/03/2026,500,sarah@x.co.za,0821234567,0731234567", { today, fallbackMethod: "eft" });
+    expect(file.ok).toBe(true);
+    if (!file.ok) return;
+    expect(file.unknownColumns).toEqual(["Mobile"]);
+    expect(file.rows[0].fields.phone).toBe("0821234567");
   });
   it("checks every row, leaves out problems and repeats, and adds up only what will be recorded", () => {
     const text = [

@@ -14,6 +14,7 @@ import { buildReceiptEmail } from "./email";
 import { buildReceiptDetails, missingForSars, type CharityRow, type DonorRow, type ReceiptDetails } from "./details";
 import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation, type PlannedReceipt, type Skipped, type SeveralIdentities } from "./plan";
 import { applyDecisions, willIssue, type DecidedReceipt, type StoredDecision } from "./review";
+import { ADMIN_LEFT_OUT_WORDS, LEFT_OUT_REASONS } from "./left-out";
 
 export type IssuedReceipt = { id: string; reference: string; charityId: string; details: ReceiptDetails; pdfPath: string | null };
 
@@ -82,12 +83,8 @@ export type JobSummary = {
 export function leftOutText(s: Pick<JobSummary, "skippedByReason" | "checkIdentities">): string {
   const by = s.skippedByReason ?? {};
   const gifts = (n: number) => `${n} ${n === 1 ? "gift" : "gifts"}`;
-  const parts = [
-    by.on_hold ? `${gifts(by.on_hold)} on hold (a dispute or a refund to check)` : "",
-    by.late_after_receipt ? `${gifts(by.late_after_receipt)} paid after the donor's receipt was issued (withdraw that receipt and issue it again)` : "",
-    by.mandate_after_payment ? `${gifts(by.mandate_after_payment)} paid before the charity signed its receipting mandate` : "",
-    by.charity_cannot_issue ? `${gifts(by.charity_cannot_issue)} the charity can't receipt (no s18A approval or mandate)` : "",
-  ].filter(Boolean);
+  // The same reasons, in the same order, as the charity's receipts page (left-out.ts).
+  const parts = LEFT_OUT_REASONS.filter((r) => by[r]).map((r) => `${gifts(by[r])} ${ADMIN_LEFT_OUT_WORDS[r]}`);
   const several = s.checkIdentities?.length ?? 0;
   const out: string[] = [];
   if (parts.length) out.push(`Left out for you to look at: ${parts.join("; ")}.`);

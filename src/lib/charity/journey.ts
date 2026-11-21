@@ -398,6 +398,43 @@ export function partWay(rows: { status: string }[]): number {
   return rows.filter((r) => r.status === "active").length;
 }
 
+/**
+ * Would saving `next` over `saved` move an email to another number? Worked out on the server from the emails
+ * themselves (review 21/11/2026), so the safety check never rests on what the browser says. Changing an email's
+ * words where it is, adding emails at the end and removing them from the end move nothing. What the server catches:
+ * - a saved email, word for word (subject and body), now at another number while its own number holds something
+ *   else (one removed from the middle or the start, one put in before others, or the order changed). This holds even
+ *   when every email has the same subject;
+ * - fewer emails, and a kept one that isn't the email saved at its number reads like a LATER saved email: the same
+ *   body, or a subject, that no email up to its number had (a later email moved up after one in the middle was removed,
+ *   with small changes to it). A new email written over the last kept place is not a move.
+ * The gap: an email moved up whose body was also changed, when its subject is shared with the email that was at that
+ * number (or it is new too), can't be told from a rewrite by its words. The page's own note (shifted=yes, sent from
+ * which saved email each box came from) covers that when the page's script ran; it can only add a refusal.
+ * Waits are left out: changing a wait moves nothing.
+ */
+export function journeyStepsMoved(saved: Pick<JourneyStep, "subject" | "body">[], next: Pick<JourneyStep, "subject" | "body">[]): boolean {
+  const same = (a: Pick<JourneyStep, "subject" | "body"> | undefined, b: Pick<JourneyStep, "subject" | "body"> | undefined) =>
+    Boolean(a && b && a.subject === b.subject && a.body === b.body);
+  for (let i = 0; i < next.length; i++) {
+    if (same(next[i], saved[i])) continue;
+    // A saved email at a new number, and not still at its own one (a copy of an email kept in place moves nothing).
+    if (saved.some((s, j) => j !== i && same(next[i], s) && !same(next[j], s))) return true;
+  }
+  if (next.length < saved.length) {
+    for (let i = 0; i < next.length; i++) {
+      const n = next[i], here = saved[i];
+      if (same(n, here)) continue;
+      const upTo = saved.slice(0, i + 1);
+      const later = saved.slice(i + 1);
+      const sameBody = !upTo.some((s) => s.body === n.body) && later.some((s) => s.body === n.body);
+      const sameSubject = !upTo.some((s) => s.subject === n.subject) && later.some((s) => s.subject === n.subject);
+      if (sameBody || sameSubject) return true;
+    }
+  }
+  return false;
+}
+
 /** May email `i` (0-based) of `count` be removed, with `onIt` people part way through? */
 export function canRemoveStep(i: number, count: number, onIt: number): boolean {
   return onIt === 0 || i === count - 1;

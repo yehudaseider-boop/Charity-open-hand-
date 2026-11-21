@@ -9,6 +9,7 @@ import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
 import { STATUS_WORDS, type CertificateStatus } from "@/lib/receipts/review";
 import { ApproveCertificateForm, DeclineCertificateForm, EditCertificateForm, ReopenCertificateForm } from "../forms";
+import { CharityMissingNotice } from "../year-run";
 
 type Action = (s: FormState, f: FormData) => Promise<FormState>;
 type Status = CertificateStatus;
@@ -35,7 +36,11 @@ export type CertificateViewProps = {
   phone: string;
   email: string;
   previewHtml: string;
+  /** What this page shows of the receipt (shownFingerprint), sent back with Approve and Save and approve. */
+  shown: string;
   actions: { approve: Action; decline: Action; reopen: Action; edit: Action };
+  /** What the charity's own record lacks that SARS needs on every receipt (missingForCharity): approving is off. */
+  charityMissing: string[];
   next: { href: string; donorName: string } | null;
 };
 
@@ -85,27 +90,29 @@ export function CertificateView(p: CertificateViewProps) {
       ) : (
         <Card title="Your decision">
           <div className="space-y-5 text-sm">
-            {p.status === "to_check" || p.status === "declined" ? (
+            {p.charityMissing.length ? (
+              <CharityMissingNotice missing={p.charityMissing} />
+            ) : p.status === "to_check" || p.status === "declined" ? (
               <div className="space-y-2">
                 <p>The name, address and donations look right? Approve it.</p>
-                <ApproveCertificateForm action={p.actions.approve} />
+                <ApproveCertificateForm action={p.actions.approve} shown={p.shown} />
               </div>
             ) : null}
 
-            <details className="rounded-card border border-border p-3">
+            {p.charityMissing.length ? null : <details className="rounded-card border border-border p-3">
               <summary className="cursor-pointer font-semibold text-brand">Correct the name or address, then approve</summary>
               <div className="mt-3 space-y-3">
                 <p className="text-muted">
                   Fix a spelling or an address SARS needs on the receipt. The change is made on the donor&apos;s recorded details for these donations,
                   so the receipt and your SARS file (IT3(d)) show the same thing.
                 </p>
-                <EditCertificateForm action={p.actions.edit} person={p.person} current={p.current} />
+                <EditCertificateForm action={p.actions.edit} person={p.person} current={p.current} shown={p.shown} />
                 <p className="text-xs text-muted">
                   ID or tax number wrong? That can&apos;t be changed here, because it decides who the receipt is for. Ask the donor to ask for a
                   correction from their Givezy account (Account, Your data).
                 </p>
               </div>
-            </details>
+            </details>}
 
             {p.status === "declined" ? (
               <div className="space-y-2">
