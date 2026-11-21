@@ -105,7 +105,14 @@ vi.mock("@/lib/audit", () => ({
     (tables.audit_log ??= []).push({ actor_user_id: e.actorUserId, action: e.action, entity_type: e.entityType, entity_id: e.entityId ?? null, details: e.details ?? {}, created_at: new Date(Date.now() + ++seq * 1000).toISOString() });
   },
 }));
-vi.mock("@/lib/charity/dashboard-queries", () => ({ loadDonors: async () => donorList }));
+/** The dashboard's donor list needs a signed-in team member: the daily job has none, and the database refuses it. */
+let signedIn = true;
+vi.mock("@/lib/charity/dashboard-queries", () => ({
+  loadDonors: async () => {
+    if (!signedIn) throw new Error("permission denied for function charity_donor_list");
+    return donorList;
+  },
+}));
 vi.mock("@/lib/charity/donor-care", () => ({ lapsedDaysFor: async () => 365, listSegments: async () => [], listTags: async () => [], tagsByDonor: async () => new Map() }));
 vi.mock("@/lib/auth", () => ({ getViewer: async () => null }));
 vi.mock("@/lib/email", () => {
@@ -201,9 +208,12 @@ describe("the daily job carries on unfinished emails to donors", () => {
     expect(await job()).toMatchObject({ unfinished: 0, sent: 0 });
   });
 
-  it("finishes a news email that stopped part way", async () => {
+  it("finishes a news email that stopped part way, with no signed-in person (review 21/11/2026)", async () => {
     unfinishedAppeal();
-    const r = await job();
+    // As on the hosted site: the job has no session, so the dashboard's donor list refuses it. Before the fix, the
+    // job claimed donors, failed to read them, and left them "sending" for good.
+    signedIn = false;
+    const r = await job().finally(() => (signedIn = true));
     expect(to()).toEqual(["ben@x.co", "cat@x.co"]);
     expect(r).toMatchObject({ unfinished: 1, continued: 1, sent: 2, finished: 1 });
     expect(tables.charity_appeal_recipients.map((x) => x.status)).toEqual(["sent", "sent", "sent"]);

@@ -180,6 +180,53 @@ export type SendProgress = { sent: number; failed: number; skipped: number; wait
 /** One run's result: the email's progress, what this run sent, and whether the email service said "not now". */
 export type AppealRun = SendProgress & { sentThisRun: number; refused?: true };
 
+type Recipient = { donor_type: string; display_name: string; email: string | null };
+
+/**
+ * The address and name of everyone still waiting for this email, for the daily job (no signed-in person, so the
+ * server's own client). Each donor's details are those typed with their latest paid gift, as on the dashboard's donor
+ * list; an erased donor has no address and is skipped by the sender.
+ */
+async function recipientsForJob(charityId: string, appealId: string): Promise<Map<string, Recipient>> {
+  const ids: string[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db().from("charity_appeal_recipients").select("donor_id").eq("appeal_id", appealId).eq("status", "waiting").order("donor_id").range(from, from + 999);
+    if (error) throw error;
+    ids.push(...(data ?? []).map((r) => r.donor_id as string));
+    if (!data || data.length < 1000) break;
+  }
+  const out = new Map<string, Recipient>();
+  for (let i = 0; i < ids.length; i += 200) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db()
+        .from("donations")
+        .select("donor_id, donation_checkout_details(donor_type, first_name, last_name, organisation_name, email, erased_at)")
+        .eq("charity_id", charityId)
+        .eq("status", "paid")
+        .in("donor_id", ids.slice(i, i + 200))
+        .order("paid_at", { ascending: false })
+        .order("id")
+        .range(from, from + 999);
+      if (error) throw error;
+      for (const g of data ?? []) {
+        const id = g.donor_id as string;
+        if (out.has(id)) continue;
+        const raw = g.donation_checkout_details as unknown;
+        const d = (Array.isArray(raw) ? raw[0] : raw) as { donor_type: string | null; first_name: string | null; last_name: string | null; organisation_name: string | null; email: string | null; erased_at: string | null } | null;
+        if (!d) continue;
+        const type = d.donor_type ?? "individual";
+        out.set(id, {
+          donor_type: type,
+          display_name: type === "individual" ? `${d.first_name ?? ""} ${d.last_name ?? ""}`.trim() : (d.organisation_name ?? ""),
+          email: d.erased_at ? null : d.email,
+        });
+      }
+      if (!data || data.length < 1000) break;
+    }
+  }
+  return out;
+}
+
 /**
  * Send what is still waiting, until the time runs out (a web request can't run for ever). Each donor is
  * claimed in the database first, so pressing again, or two people pressing, never emails anyone twice.
@@ -196,7 +243,12 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
   // Before claiming anyone: a sending set-up problem must not use up a donor's place.
   const transport = getEmailTransport();
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
-  let donorsById: Map<string, DonorRow> | null = null;
+  // Everyone's address and name, read before anyone is claimed (review 21/11/2026): the daily job has no signed-in
+  // person, so the dashboard's donor list refused it after 25 donors were already claimed, and they were left as
+  // "may have gone" and never emailed. The job reads with the server's own client; a person's press reads as them.
+  const donorsById: Map<string, Recipient> = args.auto
+    ? await recipientsForJob(args.charityId, appeal.id as string)
+    : new Map((await loadDonors(args.charityId)).map((d) => [d.donor_id, d]));
   // Addresses this run has emailed (or tried to): a second donor with the same address is skipped, never emailed twice.
   const inbox = new Set<string>();
   // The email service said "not now", or the time ran out: stop, and leave everyone not yet sent waiting for
@@ -210,14 +262,13 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
     if (claimError) throw claimError;
     const ids = ((claimed ?? []) as { donor_id: string }[]).map((r) => r.donor_id);
     if (!ids.length) break;
-    donorsById ??= new Map((await loadDonors(args.charityId)).map((d) => [d.donor_id, d]));
-    const stopped = await stoppedEmails(args.charityId, ids.map((id) => donorsById!.get(id)?.email ?? "").filter(Boolean));
+    const stopped = await stoppedEmails(args.charityId, ids.map((id) => donorsById.get(id)?.email ?? "").filter(Boolean));
     // Checked again as each one goes ("Send the rest" can be days later): a donor who had another message from the
     // charity this week (a thank-you, a reminder, another email) is left out of this one. This email's own claims don't count.
     const recent = await messagedThisWeek(
       args.charityId,
       ids.flatMap((id) => {
-        const e = donorsById!.get(id)?.email;
+        const e = donorsById.get(id)?.email;
         return e ? [{ donorId: id, hash: emailHash(e) }] : [];
       }),
       new Date(),
