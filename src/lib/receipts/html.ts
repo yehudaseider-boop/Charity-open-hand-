@@ -86,19 +86,20 @@ body { font-family: "DM Sans", Arial, sans-serif; font-size: 10.5pt; line-height
 .no strong { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 12pt; }
 h1 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 24pt; line-height: 1.1; color: ${colours.ink}; margin: 0 0 2mm; }
 h1 .accent { color: ${colours.blue}; }
+.charity, .meta span, td, .no strong, .foot { overflow-wrap: anywhere; }
 .charity { border-bottom: 1px solid ${colours.hairline}; padding-bottom: 5mm; margin-bottom: 5mm; }
 .charity strong { font-size: 11.5pt; }
 .muted { color: ${colours.muted}; }
 dl { margin: 0; }
 .f { display: grid; grid-template-columns: 52mm 1fr; gap: 4mm; padding: 2.4mm 0; border-bottom: 1px solid ${colours.hairlineSoft}; }
 .f dt { color: ${colours.blue}; font-weight: 600; }
-.f dd { margin: 0; }
+.f dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .amount { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 700; font-size: 15pt; }
 .words { color: ${colours.muted}; font-size: 9.5pt; }
 .statement { margin-top: 6mm; background: ${colours.lilacSoft}; border-radius: 14px; padding: 4mm 5mm; }
 h2 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-size: 18pt; font-weight: 700; color: ${colours.ink}; margin: 0 0 1.5mm; }
 .sub { color: ${colours.muted}; margin: 0 0 5mm; }
-.meta { display: grid; grid-template-columns: auto 1fr; gap: 1mm 5mm; margin-bottom: 5mm; }
+.meta { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1mm 5mm; margin-bottom: 5mm; }
 .meta b { font-weight: 600; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 2.2mm 2.5mm; border-bottom: 1px solid ${colours.hairlineSoft}; text-align: left; }
@@ -119,11 +120,11 @@ ${args.draft ? `<div class="draft">${esc(args.mark ?? "DRAFT, NOT A TAX RECEIPT"
     ${d.charity.address.length ? `<div class="muted">${d.charity.address.map(esc).join(", ")}</div>` : ""}
   </div>
   <dl>
-    ${field(`Donor (${kind})`, `<strong>${esc(d.donor.name)}</strong>`)}
+    ${field(`Donor (${kind})`, `<strong dir="auto">${esc(d.donor.name)}</strong>`)}
     ${field("Registration number", d.donor.registration_number ? esc(d.donor.registration_number) : "")}
     ${field("South African ID number", masked(d.donor.id_number_last4, args.hideIdNumbers))}
     ${field("Income tax number", masked(d.donor.tax_reference_last4, args.hideIdNumbers))}
-    ${field("Donor address", d.donor.address.map(esc).join(", "))}
+    ${field("Donor address", d.donor.address.length ? `<span dir="auto">${d.donor.address.map(esc).join(", ")}</span>` : "")}
     ${field(count === 1 ? "Date of donation" : "Dates of donations", esc(dates))}
     ${field("Nature of donation", esc(natures.join(", ")))}
     ${field("Number of donations", count > 1 ? `${count}, listed on the next page` : "")}
@@ -139,7 +140,7 @@ ${args.draft ? `<div class="draft">${esc(args.mark ?? "DRAFT, NOT A TAX RECEIPT"
   <h2>Donation summary</h2>
   <p class="sub">Every donation on ${esc(d.wording.title.charAt(0).toLowerCase() + d.wording.title.slice(1))} ${esc(reference)}.</p>
   <div class="meta">
-    <b>Donor</b><span>${esc(d.donor.name)}</span>
+    <b>Donor</b><span dir="auto">${esc(d.donor.name)}</span>
     <b>Charity</b><span>${esc(d.charity.legal_name_en)}</span>
     <b>Tax year</b><span>${esc(taxYearName(Number(d.tax_year)))} (${esc(d.period)})</span>
   </div>

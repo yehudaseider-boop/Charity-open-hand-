@@ -74,6 +74,27 @@ export type JobSummary = {
   failed: { what: string; message: string }[];
 };
 
+/**
+ * Gifts the run left out for a person to look at, and donor records given more than one receipt (different ID or
+ * tax numbers typed). Without this line they were counted in the run's record but never shown, so a donor could be
+ * left without a receipt with nobody knowing (review 21/11/2026).
+ */
+export function leftOutText(s: Pick<JobSummary, "skippedByReason" | "checkIdentities">): string {
+  const by = s.skippedByReason ?? {};
+  const gifts = (n: number) => `${n} ${n === 1 ? "gift" : "gifts"}`;
+  const parts = [
+    by.on_hold ? `${gifts(by.on_hold)} on hold (a dispute or a refund to check)` : "",
+    by.late_after_receipt ? `${gifts(by.late_after_receipt)} paid after the donor's receipt was issued (withdraw that receipt and issue it again)` : "",
+    by.mandate_after_payment ? `${gifts(by.mandate_after_payment)} paid before the charity signed its receipting mandate` : "",
+    by.charity_cannot_issue ? `${gifts(by.charity_cannot_issue)} the charity can't receipt (no s18A approval or mandate)` : "",
+  ].filter(Boolean);
+  const several = s.checkIdentities?.length ?? 0;
+  const out: string[] = [];
+  if (parts.length) out.push(`Left out for you to look at: ${parts.join("; ")}.`);
+  if (several) out.push(`${several} ${several === 1 ? "donor record was" : "donor records were"} given more than one receipt because different ID or tax numbers were typed: check whether it is one person, and if so withdraw them and issue one.`);
+  return out.join(" ");
+}
+
 export async function runReceiptsJob(args: {
   store: ReceiptStore;
   render: Renderer;

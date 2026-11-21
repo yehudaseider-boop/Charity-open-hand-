@@ -7,6 +7,7 @@ import { formatDate, formatDateTime, taxYearLabel, taxYearName } from "@/lib/dat
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { receiptsEnabled } from "@/config/receipts";
+import { leftOutText } from "@/lib/receipts/issue";
 import { getRun, listUnfinishedRuns, listWaitingRuns, loadPlan, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
 import { finishReceipts, markReceiptsStopped, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
 import { FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
@@ -219,6 +220,7 @@ function RunDone({ run }: { run: NonNullable<Awaited<ReturnType<typeof getRun>>>
       {s.skippedByReason?.details_missing ? (
         <p>Details missing: {s.skippedByReason.details_missing} {s.skippedByReason.details_missing === 1 ? "gift was" : "gifts were"} held back, because the donor hasn&apos;t added the s18A details yet. No receipt was issued for {s.skippedByReason.details_missing === 1 ? "it" : "them"}.</p>
       ) : null}
+      {leftOutText(s) ? <p>{leftOutText(s)}</p> : null}
       {unfinished ? (
         <p>
           Not everything is done yet{s.emailed < s.issued && s.failed.length === 0 && s.emailFailed === 0 ? ": receipts are not emailed while email is not switched on (EMAIL_TRANSPORT) or SITE_URL is missing" : ""}.

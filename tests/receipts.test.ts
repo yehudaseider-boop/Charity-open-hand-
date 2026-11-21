@@ -430,3 +430,41 @@ describe("one donor record with more than one identity at a charity", () => {
     expect(severalIdentities).toEqual([{ charityId: "c1", donorId: "donor1", taxYear: 2027, receipts: 2 }]);
   });
 });
+
+describe("receipt review fixes (21/11/2026)", () => {
+  const base = buildReceiptDetails({
+    charity, donor,
+    donations: [{ paidAt: "2026-10-01T10:00:00Z", amountCents: 3_457, id: "3f9a2c71-0000-4000-8000-000000000001" }],
+    taxYear: 2027, periodStart: "2026-03-01", periodEnd: "2027-02-28", issuedAt: new Date("2027-03-02T08:00:00Z"),
+  });
+
+  it("refuses a receipt without the charity's SARS reference number (s18A reference or PBO number)", () => {
+    const blank = { ...base, charity: { ...base.charity, s18a_reference: " ", pbo_number: null } };
+    expect(missingForSars(blank)).toEqual(["the charity's SARS reference number"]);
+    expect(missingForSars({ ...base, charity: { ...base.charity, s18a_reference: null } })).toEqual([]);
+  });
+
+  it("wraps a very long unbroken name or address instead of running off the page, and lets names set their own direction", () => {
+    const long = "A".repeat(120);
+    const html = buildReceiptHtml({ details: { ...base, donor: { ...base.donor, name: long, address: [long] } }, reference: "LTC-2027-0001", platformName: "Givezy" });
+    expect(html).toMatch(/\.f dd \{[^}]*overflow-wrap: anywhere/);
+    expect(html).toMatch(/\.f dd \{[^}]*min-width: 0/);
+    expect(html).toContain(`<strong dir="auto">${long}</strong>`);
+    expect(html).toContain(`<span dir="auto">${long}</span>`);
+    expect(html).toContain("R34.57");
+    expect(html).toContain("Thirty-four rand and fifty-seven cents");
+  });
+});
+
+describe("what a sign-off left out, for Givezy to see", () => {
+  it("names held, late and pre-mandate gifts and several identities; says nothing when there are none", async () => {
+    const { leftOutText } = await import("@/lib/receipts/issue");
+    expect(leftOutText({ skippedByReason: { details_missing: 2, already_receipted: 3 }, checkIdentities: [] })).toBe("");
+    const t = leftOutText({ skippedByReason: { on_hold: 1, late_after_receipt: 2, mandate_after_payment: 1 }, checkIdentities: [{ charityId: "c1", donorId: "u1", taxYear: 2027, receipts: 2 }] });
+    expect(t).toContain("1 gift on hold");
+    expect(t).toContain("2 gifts paid after the donor's receipt was issued");
+    expect(t).toContain("1 gift paid before the charity signed its receipting mandate");
+    expect(t).toContain("1 donor record was given more than one receipt");
+    expect(t).not.toContain("!");
+  });
+});

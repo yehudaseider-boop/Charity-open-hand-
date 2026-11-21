@@ -83,11 +83,13 @@ export function donationNature(recordedMethod: string | null | undefined, paymen
 }
 
 /**
- * What SARS needs on an s18A receipt that this one lacks (section 18A(2)): the donor's and the
- * charity's names and addresses. Empty when nothing is missing.
+ * What SARS needs on an s18A receipt that this one lacks (section 18A(2)): the charity's reference number from
+ * SARS (its s18A reference or PBO number), the donor's and the charity's names and addresses. Empty when nothing
+ * is missing.
  */
 export function missingForSars(d: ReceiptDetails): string[] {
   const out: string[] = [];
+  if (!d.charity.s18a_reference?.trim() && !d.charity.pbo_number?.trim()) out.push("the charity's SARS reference number");
   if (!d.donor.name) out.push("the donor's name");
   if (!d.donor.address.length) out.push("the donor's address");
   if (!d.charity.address.length) out.push("the charity's address");
