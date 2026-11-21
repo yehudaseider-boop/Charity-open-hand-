@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { assistantDemoOn } from "@/config/assistant";
 import { OverviewView } from "@/app/charity-admin/[id]/overview-view";
 import { demoData } from "../data";
 import { DEMO_BASE, DEMO_CHARITY, demoOverview } from "../sample";
@@ -52,7 +53,7 @@ export default async function DemoDashboard({ params, searchParams }: PageProps<
   else body = <DemoAbout path={first === "donations" ? `donations/${second}` : path} />;
 
   return (
-    <DashboardShell id="demo" charity={DEMO_CHARITY} asGivezy={false} base={DEMO_BASE} publicHref={null} hiddenTabs={DEMO_HIDDEN_TABS}>
+    <DashboardShell id="demo" charity={DEMO_CHARITY} asGivezy={false} base={DEMO_BASE} publicHref={null} hiddenTabs={DEMO_HIDDEN_TABS} help={assistantDemoOn() ? { demo: true } : null}>
       <p role="note" className="rounded-card border-2 border-honey bg-honey-soft p-4 text-sm text-navy">
         This is a demonstration with made-up donors and figures. Nothing here is real, and nothing you do is sent: what you add stays in your own browser. <DemoReset />
       </p>

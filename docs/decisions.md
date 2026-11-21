@@ -2097,3 +2097,14 @@ An independent check of the dashboard (and its demo) at 390, 810, 1080 and 1440 
 - It is a static copy in `public/app-preview/app`, rebuilt with `bash scripts/build-app-preview.sh` (run it after changing the app, then commit). Nothing rebuilds it by itself.
 - Its pages get their own security headers (made-up charity photos load from the web; framed by our own page only) and are never listed by search engines. Everything else on the site keeps its strict headers (`next.config.ts`).
 - On givezy.co.za it is closed, like every other page. Do not link it from there.
+
+## 21/11/2026: "Need help?" for charities (the dashboard help assistant)
+
+Yehuda: "I want it to help charities use the dashboard." Version one answers "how do I" questions only.
+- **What it is:** a "Need help?" button on every charity dashboard page opens the Givezy helper. It answers from our own dashboard guide (`src/lib/assistant/guide.ts`, written from the code) and links to the right page. It explains only: it can't see the charity's data and can't change, send or approve anything, and it says so.
+- **How:** the panel (`src/components/help-assistant.tsx`) sends the question to `/api/assistant`, which checks the person is a signed-in member of that charity (or the demo, when its switch is on), applies limits, and asks Claude (`src/config/assistant.ts`: model, effort, limits). The rules and the guide are cached, so most of each question's input is paid at the cached rate. Only token counts are logged, never questions or answers.
+- **Safe answers:** links in answers only go to pages inside that charity's dashboard; anything else shows as plain words, and nothing is ever treated as HTML (`src/lib/assistant/answer.ts`).
+- **Privacy:** no charity or donor data is sent. The question itself goes to Anthropic, so the panel asks people not to type donors' details, and the assistant is told not to repeat them. Yosef to confirm whether the Privacy Policy needs a line on this before charities use it.
+- **Switches, both off:** `ASSISTANT=yes` with `ANTHROPIC_API_KEY` (real dashboard); `ASSISTANT_DEMO=yes` as well for the public demo.
+- **Limits:** 30 questions per person per hour, 200 per charity per day; the demo 10 per visitor per hour and 300 a day for everyone together.
+- **Model:** Claude Opus 5.5 at low effort, the default until Yehuda chooses after seeing real costs on the test site.
