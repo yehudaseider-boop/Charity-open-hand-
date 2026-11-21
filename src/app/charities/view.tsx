@@ -6,6 +6,7 @@ import { Illustration } from "@/components/illustration";
 import { Bubbles, Key } from "@/components/marketing";
 import { Splash } from "@/components/splash";
 import { causeHref, coverTone, emptyState, requestHref, resultsLine } from "@/lib/charity/browse";
+import { searchWords } from "@/lib/charity/search-text";
 import { charityRequestsOpen } from "@/config/app-links";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
@@ -27,13 +28,13 @@ export function cleanQuery(q: unknown): string {
 }
 
 /**
- * The pattern searched for: the words with "anything" between them, so a name written with a hyphen, an "&" or
- * other signs between its words is still found ("Save a Life" finds "Save-a-Life", "Boys Girls" finds
- * "Boys & Girls"). Only what cleanQuery kept goes in. (An accent typed or left out still matters: "Cafe" does not
- * find "Café"; that needs the database's unaccent, a go-live decision.)
+ * The pattern searched for: the words, in lower case without accents, with "anything" between them, so a name written
+ * with a hyphen, an "&" or other signs between its words is still found ("Save a Life" finds "Save-a-Life", "Boys
+ * Girls" finds "Boys & Girls"), and an accent typed or left out doesn't matter ("Cafe" finds "Café", 21/11/2026). It is
+ * matched against charities.search_text, which the database folds the same way. Only what cleanQuery kept goes in.
  */
 export function searchPattern(search: string): string {
-  return `%${search.split(" ").filter(Boolean).join("%")}%`;
+  return `%${searchWords(search).join("%")}%`;
 }
 
 type Row = {
@@ -61,7 +62,8 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
   const supabase = createPublicClient();
   const categories = await loadCategories();
   const category = categories.find((c) => c.slug === categorySlug);
-  const search = cleanQuery(q);
+  // Typed signs only ("%%%") leave no words: nothing is searched for, and nothing is found.
+  const search = searchWords(cleanQuery(q)).length ? cleanQuery(q) : "";
 
   // Row-level security only returns approved charities to the public.
   let query = supabase
@@ -70,9 +72,9 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
     .eq("status", "approved")
     .order("name_en");
   if (search) {
-    // Quoted so spaces are safe; cleanQuery has already removed quotes, commas, % and _.
-    const like = `"${searchPattern(search)}"`;
-    query = query.or(`name_en.ilike.${like},legal_name_en.ilike.${like},description_en.ilike.${like},suburb.ilike.${like},city.ilike.${like}`);
+    // search_text is the name, legal name, description, suburb and city in lower case without accents (migration
+    // 20261121000001). cleanQuery has already removed quotes, commas, % and _, so the only wildcards are ours.
+    query = query.like("search_text", searchPattern(search));
   }
   if (category) {
     const { data: links } = await supabase.from("charity_categories").select("charity_id").eq("category_id", category.id);

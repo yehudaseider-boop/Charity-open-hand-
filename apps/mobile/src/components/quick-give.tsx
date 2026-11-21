@@ -4,6 +4,7 @@ import { gifts as sampleGifts } from "@/data/giving";
 import type { Charity } from "@/data/sample";
 import { useAccount } from "@/lib/account";
 import { SEARCH_MAX_LENGTH, useDirectory } from "@/lib/directory";
+import { matchesSearch } from "@shared/charity/search-text";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { givenBefore, savedCharities } from "@/lib/live-charities";
@@ -42,8 +43,9 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
     );
   }
 
-  const q = query.trim().toLowerCase();
-  const matches = q ? all.filter((c) => c.nameEn.toLowerCase().includes(q) || c.cause.toLowerCase().includes(q) || c.area.toLowerCase().includes(q)) : [];
+  const q = query.trim();
+  // The same search as Discover and the website: capitals, accents and signs between words don't matter.
+  const matches = q ? all.filter((c) => matchesSearch(q, [c.nameEn, c.cause, c.area])) : [];
   const pick = (c: Charity) => {
     haptic.tap();
     if (GIVE_IN_APP) {

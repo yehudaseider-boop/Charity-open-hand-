@@ -18,6 +18,7 @@ import { SearchIcon, StarIcon } from "@/components/icons";
 import { EmptyState, ErrorState, LoadingList, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { SEARCH_MAX_LENGTH, useDirectory } from "@/lib/directory";
+import { matchesSearch } from "@shared/charity/search-text";
 import { haptic } from "@/lib/haptics";
 import { loadCausePrefs } from "@/lib/cause-prefs";
 import { causesFirst, inCause } from "@/lib/live-charities";
@@ -62,12 +63,9 @@ export default function Discover() {
   };
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const found = charities.filter(
-      (c) =>
-        inCause(c, cause) &&
-        (!q || c.nameEn.toLowerCase().includes(q) || c.cause.toLowerCase().includes(q) || c.area.toLowerCase().includes(q)),
-    );
+    const q = query.trim();
+    // Capitals, accents and signs between words don't matter, as on the website ("cafe" finds "Café").
+    const found = charities.filter((c) => inCause(c, cause) && (!q || matchesSearch(q, [c.nameEn, c.cause, c.area])));
     return !q && cause === "all" ? causesFirst(found, picked) : found;
   }, [query, cause, charities, picked]);
 
