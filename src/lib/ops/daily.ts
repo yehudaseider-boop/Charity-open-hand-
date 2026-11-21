@@ -8,7 +8,7 @@ import { deliverDonorConfirmation } from "@/lib/donations/notify";
 import { retryDeclinedNotice } from "@/lib/donations/monthly-declined-retry";
 import { retryReceiptEmail } from "@/lib/receipts/email-retry";
 import { auditRetry, recordFailedConfirmations, runEmailRetries, supabaseRetryStore, type RetryHandler, type RetrySummary } from "@/lib/email/retry";
-import { emailIsOn, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
+import { emailIsOn, RETRY_DELAYS_HOURS, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
 import { heldLabel } from "./held";
 import { formatRand } from "@/lib/money";
 import { formatDate } from "@/lib/dates";
@@ -346,6 +346,12 @@ export type JobProblems = {
   monthlyWaitingOnProvider?: { totalCents: number; charityName: string }[];
   payoutsFailed: boolean;
   monthlyFailed: boolean;
+  /**
+   * Charities' unfinished emails to donors (thank-yous and news emails) carried on by the job (21/11/2026): how many
+   * were left for a person today because the email service kept refusing them, and whether the step itself failed.
+   */
+  sendsLeftForPerson?: number;
+  sendsFailed?: boolean;
 };
 
 /**
@@ -380,6 +386,14 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   }
   if (jobs.monthlyStopped) lines.push(`${n(jobs.monthlyStopped, "monthly donation", "monthly donations")} stopped after three declined tries. The donors were emailed a link to put in a new card.`);
   if (jobs.payoutsFailed) lines.push("The deposit report could not be updated today. It tries again tomorrow.");
+  if (jobs.sendsFailed) lines.push("Charities' unfinished emails to donors could not carry on today (see the job log). Nobody was emailed twice. It tries again tomorrow.");
+  if (jobs.sendsLeftForPerson) {
+    const k = jobs.sendsLeftForPerson;
+    // The same rule as src/lib/charity/carry-on-sends (GIVE_UP_AFTER, LEFT_FOR_PERSON), kept here without its imports.
+    lines.push(
+      `${n(k, "email", "emails")} from a charity to its donors (a thank-you or a news email) stopped carrying on by ${k === 1 ? "itself" : "themselves"}: the email service refused ${k === 1 ? "it" : "them"} ${RETRY_DELAYS_HOURS.length} days in a row. Nobody was emailed twice. Each is in the audit log as charity.send_left_for_person; once email works, press Send the rest on the charity's page or ask the charity to.`,
+    );
+  }
   if (c.stuckPending) lines.push(`${n(c.stuckPending, "payment has", "payments have")} been pending for more than 3 days.`);
   if (c.privacyRequests?.open) {
     const since = c.privacyRequests.oldestAt ? ` (the oldest from ${formatDate(c.privacyRequests.oldestAt)})` : "";

@@ -177,13 +177,17 @@ export async function createAppeal(args: { charityId: string; userId: string; su
 
 export type SendProgress = { sent: number; failed: number; skipped: number; waiting: number };
 
+/** One run's result: the email's progress, what this run sent, and whether the email service said "not now". */
+export type AppealRun = SendProgress & { sentThisRun: number; refused?: true };
+
 /**
  * Send what is still waiting, until the time runs out (a web request can't run for ever). Each donor is
  * claimed in the database first, so pressing again, or two people pressing, never emails anyone twice.
  * Each email is looked up fresh: someone who said no in the meantime, or had another message from the charity this
- * week, is skipped.
+ * week, is skipped. Also what the daily job calls to carry an unfinished email on by itself (`userId` null, `auto`
+ * true; see ./carry-on-sends). The time is checked before each donor, so a run ends close to its budget.
  */
-export async function sendAppeal(args: { charityId: string; appealId: string; charityName: string; replyTo: string | null; userId: string; budgetMs?: number }): Promise<SendProgress | null> {
+export async function sendAppeal(args: { charityId: string; appealId: string; charityName: string; replyTo: string | null; userId: string | null; budgetMs?: number; auto?: boolean }): Promise<AppealRun | null> {
   const started = Date.now();
   const budget = args.budgetMs ?? 40_000;
   const { data: appeal, error } = await db().from("charity_appeals").select("id, subject, body").eq("id", args.appealId).eq("charity_id", args.charityId).maybeSingle();
@@ -195,9 +199,13 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
   let donorsById: Map<string, DonorRow> | null = null;
   // Addresses this run has emailed (or tried to): a second donor with the same address is skipped, never emailed twice.
   const inbox = new Set<string>();
-  // The email service said "not now": stop, and leave everyone not yet sent waiting for "Send the rest".
+  // The email service said "not now", or the time ran out: stop, and leave everyone not yet sent waiting for
+  // "Send the rest" (or the daily job).
   let paused = false;
-  while (!paused && Date.now() - started < budget) {
+  let refused = false;
+  let sentThisRun = 0;
+  const late = () => Date.now() - started >= budget;
+  while (!paused && !late()) {
     const { data: claimed, error: claimError } = await db().rpc("claim_appeal_recipients", { p_appeal_id: appeal.id, p_limit: 25 });
     if (claimError) throw claimError;
     const ids = ((claimed ?? []) as { donor_id: string }[]).map((r) => r.donor_id);
@@ -219,6 +227,7 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
       const d = donorsById.get(id);
       const mark = (status: "sent" | "failed" | "skipped" | "waiting") =>
         db().from("charity_appeal_recipients").update({ status, ...(status === "sent" ? { sent_at: new Date().toISOString() } : {}) }).eq("appeal_id", appeal.id).eq("donor_id", id);
+      if (!paused && late()) paused = true;
       if (paused) {
         // Claimed in this batch but not tried: back in the queue.
         await mark("waiting");
@@ -241,6 +250,7 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
         );
         // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
         await mark(outcome === "sent" ? "sent" : "skipped");
+        if (outcome === "sent") sentThisRun++;
       } catch (e) {
         console.error("[appeal] not sent", e instanceof Error ? e.message : e);
         if (isTemporaryRefusal(e)) {
@@ -248,6 +258,7 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
           inbox.delete(inboxKey(d.email));
           await mark("waiting");
           paused = true;
+          refused = true;
           continue;
         }
         // Cut off or a dropped connection: it may have gone, so the row stays "sending" (counted as not sent, still this
@@ -257,8 +268,14 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
     }
   }
   const progress = await appealProgress(appeal.id as string);
-  await logAudit({ actorUserId: args.userId, action: "charity.appeal_sent", entityType: "charity", entityId: args.charityId, details: { appealId: appeal.id, ...progress } });
-  return progress;
+  await logAudit({
+    actorUserId: args.userId,
+    action: "charity.appeal_sent",
+    entityType: "charity",
+    entityId: args.charityId,
+    details: { appealId: appeal.id, ...progress, sentThisRun, ...(refused ? { refused: true } : {}), ...(args.auto ? { auto: true } : {}) },
+  });
+  return { ...progress, sentThisRun, ...(refused ? { refused: true as const } : {}) };
 }
 
 export async function appealProgress(appealId: string): Promise<SendProgress> {

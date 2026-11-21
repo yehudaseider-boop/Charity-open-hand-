@@ -111,6 +111,6 @@ describe("after sending", () => {
     expect(describeDone("appeal_sent", { subject: "News", sent: 0, waiting: 0, skipped: 2 }, ctx).what).toBe(
       "\"News\" is saved, but nobody was emailed: 2 donors left out (they asked not to get emails, already had a message from you this week, already had 4 from you this month, or email isn't switched on here).",
     );
-    expect(describeDone("appeal_sent", { subject: "News", sent: 120, waiting: 30 }, ctx).what).toBe("\"News\" went to 120 donors. 30 emails still to send: press \"Send the rest\" below.");
+    expect(describeDone("appeal_sent", { subject: "News", sent: 120, waiting: 30 }, ctx).what).toBe("\"News\" went to 120 donors. 30 emails still to send: they go out by themselves over the next day or two, or press \"Send the rest\" below.");
   });
 });

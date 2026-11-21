@@ -5,6 +5,7 @@ import { DonePanel } from "@/components/done-panel";
 import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { appealsThisMonth, listAppeals } from "@/lib/charity/appeals";
+import { carriesOnByItself, GOES_BY_ITSELF } from "@/lib/charity/carry-on-sends";
 import { audienceValue, parseAudience } from "@/lib/charity/appeals-rules";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { lapsedDaysFor, listSegments, listTags } from "@/lib/charity/donor-care";
@@ -17,7 +18,7 @@ import { formatDate } from "@/lib/dates";
 import { checkAppealAudience, continueAppeal, sendAppealNow, sendTestAppeal } from "./actions";
 import { AppealForm, ContinueForm } from "./forms";
 
-// Sending runs until about 40 seconds, then offers "Send the rest".
+// Sending runs until about 40 seconds, then offers "Send the rest"; the daily job also carries the rest on by itself.
 export const maxDuration = 60;
 
 export const metadata: Metadata = { title: "Email donors" };
@@ -110,6 +111,7 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
                   {a.progress.failed ? `, ${a.progress.failed} not sent` : ""}
                   {a.progress.waiting ? `, ${a.progress.waiting} still to send` : ""}
                 </p>
+                {a.progress.waiting && carriesOnByItself(a.created_at) ? <p className="text-xs text-muted">{owner ? GOES_BY_ITSELF : "The rest go out by themselves over the next day or two."}</p> : null}
                 {a.progress.waiting && owner ? <ContinueForm action={continueAppeal.bind(null, id, a.id)} waiting={a.progress.waiting} /> : null}
               </li>
             ))}

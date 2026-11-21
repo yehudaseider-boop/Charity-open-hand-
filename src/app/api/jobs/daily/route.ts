@@ -5,14 +5,24 @@ import { alertGivezy, cronAllowed } from "@/lib/ops/alert";
 import { pingHeartbeat } from "@/lib/ops/heartbeat";
 import { collectMonthlyWithin, dailyDigest, payoutsAlertLines, runDailyChecks, runImportantEmailRetries, type RetriesDone } from "@/lib/ops/daily";
 import { runJourneys } from "@/lib/charity/journey-store";
+import { runCarryOnSends, type CarryOnSummary } from "@/lib/charity/carry-on-sends";
 import { withGatewayTimeout } from "@/lib/gateway/timeout";
 
 /** Each call to the payment provider inside this job waits at most this long, so one slow call can't push the job past its minute. */
 export const DAILY_GATEWAY_TIMEOUT_MS = 10_000;
 
 /**
+ * Charities' unfinished emails to donors (thank-yous and news emails), carried on after the checks: started only in
+ * the first 40 seconds, for at most 12 seconds, and never past 44, so the day's email, the deposit report and the
+ * journeys keep their time. What isn't reached carries on tomorrow.
+ */
+export const CARRY_ON_START_BY_MS = 40_000;
+export const CARRY_ON_MAX_MS = 12_000;
+export const CARRY_ON_END_BY_MS = 44_000;
+
+/**
  * Everything that runs once a day, in order: collect the monthly donations that are due, the safety net (pending
- * payments, failed confirmation emails, held items) and the Givezy team's email when something needs a person, then,
+ * payments, failed confirmation emails, held items), charities' unfinished emails to donors carried on, and the Givezy team's email when something needs a person, then,
  * in the time left, the payment provider's payouts for the Deposits page and the donors' journey emails. The checks
  * and the email come before the payouts, so a slow payment provider can never stop them. Called by the scheduler
  * (vercel.json) with `Authorization: Bearer <CRON_SECRET>`; safe to call again. Without CRON_SECRET it is off.
@@ -32,7 +42,8 @@ async function run(request: NextRequest) {
   // The function is allowed 60 seconds. First the important emails that failed (owed confirmations, receipts,
   // declined-card notices), started only in the first 10 seconds so a collection day never starves them. Then up to
   // 30 seconds of monthly collection (it goes run after run while donations are due, and stops starting new ones at
-  // its deadline); the checks stop at 45, then the day's email. The payouts start nothing new after 48 and the journeys after
+  // its deadline); the checks stop at 45; charities' unfinished emails to donors carry on for up to 12 seconds (not
+  // started after 40, ended by 44), then the day's email. The payouts start nothing new after 48 and the journeys after
   // 46. Every call to the payment provider waits at most 10 seconds (DAILY_GATEWAY_TIMEOUT_MS).
   const started = Date.now();
   // Each email try needs its send plus reads and writes (a 12-second margin), so a deadline at 22 lets them start until 10.
@@ -52,6 +63,15 @@ async function run(request: NextRequest) {
     await alertGivezy("the daily check could not run", ["The daily safety check stopped with an error (see the job log). The check itself never charges anyone. It runs again tomorrow."]);
     return new NextResponse("Run failed", { status: 500 });
   }
+  // Charities' unfinished emails to donors carry on by themselves, before the day's email so it can count any left for
+  // a person. The same send functions as "Send the rest": nobody is emailed twice and the one-a-week rule holds.
+  const carryOnStarted = Date.now() < started + CARRY_ON_START_BY_MS;
+  const sends: CarryOnSummary | null | undefined = carryOnStarted
+    ? await runCarryOnSends(Math.min(Date.now() + CARRY_ON_MAX_MS, started + CARRY_ON_END_BY_MS)).catch((e) => {
+        console.error("[daily] carrying on charities' emails failed", e instanceof Error ? e.message : e);
+        return null;
+      })
+    : undefined;
   const lines = dailyDigest(checks, {
     monthlyFailed: monthly === null,
     monthlyCutOff: monthly?.cutOff === true,
@@ -61,6 +81,8 @@ async function run(request: NextRequest) {
     monthlyWaitingOnProvider: monthly?.waitingOnProvider ?? [],
     // Read after this email (below), with its own short email when it has a problem.
     payoutsFailed: false,
+    sendsFailed: sends === null,
+    sendsLeftForPerson: sends?.leftForPerson ?? 0,
   });
   // The day's alert to Givezy goes first, so nothing after it can hold it up.
   if (lines.length) await alertGivezy(`${lines.length} ${lines.length === 1 ? "thing needs" : "things need"} a person today`, lines);
@@ -98,6 +120,8 @@ async function run(request: NextRequest) {
       monthly: monthly && { ...monthly, waiting: counts(monthly.waiting), review: counts(monthly.review), unconfirmed: counts(monthly.unconfirmed ?? []), waitingOnProvider: counts(monthly.waitingOnProvider ?? []), errors: counts(monthly.errors) },
       payouts: payouts && { ...payouts, failed: counts(payouts.failed) },
       checks,
+      // Counts only. Undefined: no time left to start it today (it carries on tomorrow).
+      sends: sends === undefined ? { notStarted: true } : sends,
       journeys,
       attention: lines.length,
     },

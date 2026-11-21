@@ -96,5 +96,5 @@ export async function continueAppeal(charityId: string, appealId: string, _prev:
   const p = await sendAppeal({ charityId, appealId, charityName: charity.name_en, replyTo: priv?.contact_email ?? null, userId: viewer.userId });
   if (!p) return { ok: false, message: "That email isn't there any more." };
   revalidatePath(`/charity-admin/${charityId}/email-donors`);
-  return { ok: true, message: p.waiting ? `${p.sent} sent so far, ${p.waiting} still to send. Press Send the rest again.` : `All sent: ${p.sent} delivered to the email service.` };
+  return { ok: true, message: p.waiting ? `${p.sent} sent so far, ${p.waiting} still to send. They go out by themselves over the next day or two, or press Send the rest again.` : `All sent: ${p.sent} delivered to the email service.` };
 }

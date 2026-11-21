@@ -167,6 +167,6 @@ describe("news emails and appeals", () => {
     const p = await sendAppeal({ charityId: "c1", appealId: "a1", charityName: "Meals Fund", replyTo: null, userId: "u1" });
     vi.useRealTimers();
     expect(sent.map((m) => m.to).sort()).toEqual(["sarah@x.co", "thandi@x.co"]);
-    expect(p).toEqual({ sent: 2, failed: 0, skipped: 1, waiting: 0 });
+    expect(p).toEqual({ sent: 2, failed: 0, skipped: 1, waiting: 0, sentThisRun: 2 });
   });
 });

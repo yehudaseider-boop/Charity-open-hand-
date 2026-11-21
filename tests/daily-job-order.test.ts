@@ -19,6 +19,16 @@ vi.mock("@/lib/donations/payouts", () => ({
   },
 }));
 vi.mock("@/lib/charity/journey-store", () => ({ runJourneys: async () => (steps.push("journeys"), { sent: 0 }) }));
+let carryOnDeadline: number | undefined;
+let carryOnResult: unknown = { unfinished: 0, continued: 0, sent: 0, finished: 0, notAllowed: 0, leftForPerson: 0, waitingForPerson: 0, notReached: 0, errors: 0 };
+vi.mock("@/lib/charity/carry-on-sends", () => ({
+  runCarryOnSends: async (deadline: number) => {
+    steps.push("sends carried on");
+    carryOnDeadline = deadline;
+    if (carryOnResult instanceof Error) throw carryOnResult;
+    return carryOnResult;
+  },
+}));
 vi.mock("@/lib/ops/alert", () => ({
   cronAllowed: () => true,
   alertGivezy: async (subject: string) => (steps.push(`alert: ${subject}`), "sent"),
@@ -50,7 +60,9 @@ describe("the daily job's order", () => {
     const before = Date.now();
     await call();
     // The important emails first, so a long collection day never leaves them for tomorrow; the checks don't run them again.
-    expect(steps.slice(0, 5)).toEqual(["email retries", "monthly", "checks (retries done)", "alert: 1 thing needs a person today", "payouts"]);
+    expect(steps.slice(0, 6)).toEqual(["email retries", "monthly", "checks (retries done)", "sends carried on", "alert: 1 thing needs a person today", "payouts"]);
+    // Charities' unfinished emails get at most 12 seconds, and never past 44, so the rest of the job keeps its time.
+    expect(carryOnDeadline! - before).toBeLessThanOrEqual(12_000 + 1_000);
     expect(payoutsOpts?.deadline).toBeGreaterThan(before);
     expect(payoutsOpts!.deadline! - before).toBeLessThanOrEqual(48_000 + 1_000);
     expect(steps.some((s) => s.startsWith("alert: the deposit report"))).toBe(false);
@@ -67,6 +79,32 @@ describe("the daily job's order", () => {
     expect(res.status).toBe(200);
     expect(steps.indexOf("alert: 1 thing needs a person today")).toBeLessThan(steps.indexOf("payouts"));
     expect(steps.at(-1)).toBe("alert: the deposit report wasn't fully updated today");
+  });
+});
+
+describe("charities' unfinished emails in the daily job (21/11/2026)", () => {
+  it("a send left for a person, or the step failing, is a line in the day's email; nothing else stops", async () => {
+    carryOnResult = { unfinished: 2, continued: 1, sent: 0, finished: 0, notAllowed: 0, leftForPerson: 1, waitingForPerson: 0, notReached: 0, errors: 0 };
+    const res = await call();
+    expect(steps).toContain("alert: 2 things need a person today");
+    expect(((await res.json()) as { sends: { leftForPerson: number } }).sends.leftForPerson).toBe(1);
+    steps.length = 0;
+    carryOnResult = new Error("database down");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await call()).status).toBe(200);
+    expect(steps).toContain("payouts");
+    expect(steps).toContain("alert: 2 things need a person today");
+    carryOnResult = { unfinished: 0, continued: 0, sent: 0, finished: 0, notAllowed: 0, leftForPerson: 0, waitingForPerson: 0, notReached: 0, errors: 0 };
+  });
+
+  it("the lines are plain and say nobody was emailed twice", () => {
+    const quiet = { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+    const fine = { monthlyErrors: 0, monthlyReview: 0, monthlyStopped: 0, payoutsFailed: false, monthlyFailed: false };
+    expect(dailyDigest(quiet, { ...fine, sendsLeftForPerson: 1 })).toEqual([
+      "1 email from a charity to its donors (a thank-you or a news email) stopped carrying on by itself: the email service refused it 3 days in a row. Nobody was emailed twice. Each is in the audit log as charity.send_left_for_person; once email works, press Send the rest on the charity's page or ask the charity to.",
+    ]);
+    expect(dailyDigest(quiet, { ...fine, sendsFailed: true })[0]).toMatch(/could not carry on today .* Nobody was emailed twice/);
+    expect(dailyDigest(quiet, fine)).toEqual([]);
   });
 });
 

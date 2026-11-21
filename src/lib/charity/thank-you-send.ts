@@ -73,6 +73,8 @@ export type SendResult =
       thisWeek?: number;
       /** When "Send the rest" can reach those left out (the next Monday, dd/mm/yyyy), when any were. */
       from?: string;
+      /** The email service said "not now" and this run stopped there (the rest wait; nothing was lost). */
+      refused?: true;
     }
   | { ok: false; message: string };
 
@@ -110,8 +112,11 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
   return r;
 }
 
-/** "Send the rest": carry on with a month's thank-you that stopped part way, with the same words. */
-export async function continueThankYou(args: { charityId: string; charityName: string; month: string; userId: string; replyTo?: string | null; budgetMs?: number }): Promise<SendResult> {
+/**
+ * "Send the rest": carry on with a month's thank-you that stopped part way, with the same words. Also what the daily
+ * job calls to carry it on by itself (`userId` null, `auto` true; see ./carry-on-sends).
+ */
+export async function continueThankYou(args: { charityId: string; charityName: string; month: string; userId: string | null; replyTo?: string | null; budgetMs?: number; auto?: boolean }): Promise<SendResult> {
   const { data, error } = await createAdminClient()
     .from("charity_thank_yous")
     .select("id, body, finished_at")
@@ -124,7 +129,7 @@ export async function continueThankYou(args: { charityId: string; charityName: s
   return runThankYou({ ...args, body: data.body as string, thankYouId: data.id as string });
 }
 
-async function runThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string; replyTo?: string | null; budgetMs?: number; thankYouId: string }): Promise<SendResult> {
+async function runThankYou(args: { charityId: string; charityName: string; month: string; body: string; userId: string | null; replyTo?: string | null; budgetMs?: number; thankYouId: string; auto?: boolean }): Promise<SendResult> {
   const started = Date.now();
   const budget = args.budgetMs ?? 40_000;
   const db = createAdminClient();
@@ -138,6 +143,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
   const leftOut = new Set(waiting.filter((r) => r.donorIds.some((id) => recent.has(id))).map((r) => emailHash(r.email)));
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   let stoppedEarly = false;
+  let refused = false;
   let sentThisRun = 0;
   for (const r of recipients) {
     const hash = emailHash(r.email);
@@ -174,6 +180,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
         if (releaseError) console.error("[thank-you] claim not released", releaseError.message);
         else claimed.delete(hash);
         stoppedEarly = true;
+        refused = true;
         break;
       }
       // Cut off or a dropped connection: it may have gone, so it stays "sending" (counted as not sent, but still this
@@ -190,8 +197,8 @@ async function runThankYou(args: { charityId: string; charityName: string; month
     .from("charity_thank_yous")
     .update({ recipient_count: counts.sent, ...(finished ? { finished_at: new Date().toISOString() } : {}) })
     .eq("id", args.thankYouId);
-  await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining, thisWeek: leftOut.size } });
-  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun, thisWeek: leftOut.size, ...(leftOut.size ? { from: formatDate(nextWeekStart(new Date())) } : {}) };
+  await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining, thisWeek: leftOut.size, sentThisRun, ...(refused ? { refused: true } : {}), ...(args.auto ? { auto: true } : {}) } });
+  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun, thisWeek: leftOut.size, ...(leftOut.size ? { from: formatDate(nextWeekStart(new Date())) } : {}), ...(refused ? { refused: true as const } : {}) };
 }
 
 /** Addresses (as hashes) already claimed for this thank-you, in pages. */
