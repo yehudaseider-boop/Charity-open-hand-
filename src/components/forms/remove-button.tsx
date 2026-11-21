@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { useSafeFormPending } from "./safe-form";
 
 /**
  * A "Remove" button inside a server-action form, saying what it removes. `label` for another verb ("End").
@@ -8,7 +9,9 @@ import { useFormStatus } from "react-dom";
  * Shows "Removing…" while it works, and is big enough to tap.
  */
 export function RemoveButton({ what, confirmText, label = "Remove", ask = true }: { what: string; confirmText?: string; label?: string; ask?: boolean }) {
-  const { pending } = useFormStatus();
+  const { pending: sending } = useFormStatus();
+  const safePending = useSafeFormPending();
+  const pending = sending || safePending;
   const working = label === "Remove" ? "Removing…" : label === "End" ? "Ending…" : "Working…";
   return (
     <button

@@ -9,6 +9,8 @@ import { reviewWithin } from "@/lib/charity/review-time";
 import { sendLoginLink } from "@/app/login/actions";
 import { StartForm } from "./start-form";
 import { signInMessage } from "@/lib/sign-in";
+import { SafeForm } from "@/components/forms/safe-form";
+import { PendingButton } from "@/components/forms/pending-button";
 
 export const metadata: Metadata = { title: "List your charity" };
 
@@ -84,7 +86,7 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
                 <p className="text-sm text-muted">Signed in as {viewer.email}. Everything saves as you go.</p>
               </div>
             ) : (
-              <form action={sendLoginLink} className="space-y-4">
+              <SafeForm action={sendLoginLink} className="space-y-4">
                 <h2 className="font-display text-2xl font-bold">Start your application</h2>
                 <p className="text-sm text-muted">We&apos;ll email you a code, so you can come back to your application from any device. No password needed.</p>
                 {/* No surprises: the two short stops before the first step (agreement, then the second step that keeps donors' details safe). */}
@@ -103,9 +105,9 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
                 </div>
                 {signInError ? <p id="apply-error" role="alert" className="text-sm text-danger">{signInError}</p> : null}
                 <input type="hidden" name="next" value={back(startName)} />
-                <button className="pressable w-full rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Email me a code</button>
+                <PendingButton pendingLabel="Sending…" className="pressable w-full rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Email me a code</PendingButton>
                 <p className="text-sm text-muted">Already applied? <Link href={`/login?next=${encodeURIComponent("/charity-admin")}`} className="font-semibold text-brand underline">Sign in to carry on</Link>.</p>
-              </form>
+              </SafeForm>
             )}
           </div>
         </div>

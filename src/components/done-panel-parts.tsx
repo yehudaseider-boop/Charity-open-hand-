@@ -2,10 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
+import { useSafeFormPending } from "./forms/safe-form";
 
-/** The Undo button: "Taking it back…" while it works, and only one tap. */
+/** The Undo button: "Taking it back…" while it works, and only one tap (in a SafeForm too). */
 export function UndoButton() {
-  const { pending } = useFormStatus();
+  const { pending: sending } = useFormStatus();
+  const safePending = useSafeFormPending();
+  const pending = sending || safePending;
   return (
     <button disabled={pending} className="min-h-11 rounded-control border border-brand px-4 py-2 font-medium text-brand disabled:opacity-60">
       {pending ? "Taking it back…" : "Undo"}

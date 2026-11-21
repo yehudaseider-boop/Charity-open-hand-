@@ -16,6 +16,7 @@ import { ShareLinks } from "../share-links";
 import { viewerCan } from "@/lib/charity/team";
 import { refusedFor } from "@/lib/charity/permissions";
 import { journeysV2 } from "@/lib/charity/journey-write";
+import { SafeForm } from "@/components/forms/safe-form";
 
 export const metadata: Metadata = { title: "Campaigns" };
 
@@ -69,9 +70,9 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
               <li key={c.id} className="space-y-3 py-4 first:pt-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3">
                   <p className="min-w-0 font-semibold text-indigo [overflow-wrap:anywhere]">{c.title}</p>
-                  <form action={endCampaign.bind(null, id, c.id)}>
+                  <SafeForm nothingTyped action={endCampaign.bind(null, id, c.id)}>
                     <RemoveButton label="End" what={c.title} ask={false} />
-                  </form>
+                  </SafeForm>
                 </div>
                 <CampaignBar raised={c.raisedCents} target={c.targetCents} gifts={c.giftCount} endsAt={c.endsAt} />
                 {c.giftCount || journeys ? (

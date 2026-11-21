@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { loadNewCardOffer, newCardLinkValid, offerMessage, ownsMonthly, type NotOffered } from "@/lib/donations/new-card";
 import { payWithNewCard } from "./actions";
+import { SafeForm } from "@/components/forms/safe-form";
 
 /**
  * The longest this may run (13/11/2026). The payment provider is given 20 seconds; this leaves room for our own
@@ -102,7 +103,7 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
         <div className="flex justify-between gap-3"><dt className="min-w-0">Then monthly, next on</dt><dd className="whitespace-nowrap">{formatDate(offer.nextChargeAt)}</dd></div>
       </dl>
       {problem ? <p role="alert" className="mt-4 rounded-control bg-danger-soft p-3 text-sm text-danger">{problem}</p> : null}
-      <form action={payWithNewCard} className="mt-5">
+      <SafeForm action={payWithNewCard} className="mt-5">
         <input type="hidden" name="m" value={m} />
         <input type="hidden" name="e" value={e} />
         <input type="hidden" name="s" value={s} />
@@ -110,7 +111,7 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
         <PendingButton pendingLabel="Opening the payment page…" className="pressable w-full rounded-control bg-coral px-4 py-3.5 font-bold text-navy">
           Pay {formatRand(offer.totalCents)} with a new card
         </PendingButton>
-      </form>
+      </SafeForm>
       <p className="mt-3 text-sm text-muted">
         You enter the card on the payment provider&apos;s secure page; we never see it. By paying, you agree that the new card is used for this
         monthly donation, the same amount each month, until you pause or cancel it in your account or the Givezy app.

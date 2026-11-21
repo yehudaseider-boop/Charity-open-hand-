@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { CodeField, Enrol } from "./enrol";
 import { verifyCode } from "./actions";
 import Link from "next/link";
+import { SafeForm } from "@/components/forms/safe-form";
+import { PendingButton } from "@/components/forms/pending-button";
 
 export const metadata: Metadata = { title: "Second step", robots: { index: false, follow: false } };
 
@@ -35,13 +37,13 @@ export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
       <div className="mt-4">
         {error ? <p role="alert" className="mb-3 text-sm text-danger">{error}</p> : null}
         {verified ? (
-          <form action={verifyCode} className="space-y-3">
+          <SafeForm action={verifyCode} className="space-y-3">
             <p className="text-sm text-muted">Open your authenticator app and enter the 6-digit code for Givezy.</p>
             <input type="hidden" name="factorId" value={verified.id} />
             <input type="hidden" name="next" value={next} />
             <CodeField />
-            <button className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Continue</button>
-          </form>
+            <PendingButton pendingLabel="Checking…" className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Continue</PendingButton>
+          </SafeForm>
         ) : (
           <Enrol next={next} />
         )}

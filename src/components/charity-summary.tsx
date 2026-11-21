@@ -2,6 +2,7 @@ import { documentTypes, type DocumentType } from "@/lib/charity/validation";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { masked } from "@/lib/mask";
+import { SafeForm } from "@/components/forms/safe-form";
 
 type Row = [label: string, value: React.ReactNode];
 
@@ -94,9 +95,9 @@ export function DocumentList({ docs, hrefFor, removeAction }: {
               </p>
             </div>
             {removeAction ? (
-              <form action={removeAction(d.id)}>
+              <SafeForm nothingTyped action={removeAction(d.id)}>
                 <RemoveButton what={d.file_name} ask={false} />
-              </form>
+              </SafeForm>
             ) : null}
           </li>
         );

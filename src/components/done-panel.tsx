@@ -5,6 +5,7 @@ import { canUndo, describeDone, describeUndone, minutesLeft, pageOf, PANEL_HOURS
 import { formatDate } from "@/lib/dates";
 import { FocusOnArrive, UndoButton } from "./done-panel-parts";
 import { firstParam } from "@/lib/form";
+import { SafeForm } from "./forms/safe-form";
 
 /**
  * A key for the page's forms: a new one after each action and after each Undo, so the form shows the
@@ -71,10 +72,10 @@ export async function DonePanel({ charity, sp, here }: Props) {
           </Link>
         ) : null}
         {undoable && !failed ? (
-          <form action={undoCharityAction.bind(null, charity.id, row.id, here)} className="flex flex-wrap items-center gap-2">
+          <SafeForm nothingTyped action={undoCharityAction.bind(null, charity.id, row.id, here)} className="flex flex-wrap items-center gap-2">
             <UndoButton />
             <span className="text-xs text-muted">You can take this back for {minutesLeft(row.created_at, now)} more {minutesLeft(row.created_at, now) === 1 ? "minute" : "minutes"}.</span>
-          </form>
+          </SafeForm>
         ) : null}
       </div>
     </FocusOnArrive>

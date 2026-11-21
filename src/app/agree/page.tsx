@@ -7,6 +7,8 @@ import { platformConfig } from "@/config/platform";
 import { getViewer } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-path";
 import { agreeToPolicy } from "./actions";
+import { SafeForm } from "@/components/forms/safe-form";
+import { PendingButton } from "@/components/forms/pending-button";
 
 export const metadata: Metadata = { title: "Before you continue", robots: { index: false, follow: false } };
 
@@ -26,7 +28,7 @@ export default async function AgreePage({ searchParams }: PageProps<"/agree">) {
         {platformConfig.appName} keeps your email address and your giving records so you can see them here and in the app.
         Only you see your giving goal and the labels you give your donations. Givezy never sells your information or sends you its own marketing.
       </p>
-      <form action={agreeToPolicy} className="space-y-3">
+      <SafeForm action={agreeToPolicy} className="space-y-3">
         <input type="hidden" name="next" value={next} />
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="agree" required className="mt-1" />
@@ -37,8 +39,8 @@ export default async function AgreePage({ searchParams }: PageProps<"/agree">) {
           <span>I am 18 or older.</span>
         </label>
         {sp.error ? <p role="alert" className="text-sm text-danger">Please tick both boxes to continue.</p> : null}
-        <button className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">Continue</button>
-      </form>
+        <PendingButton pendingLabel="Saving…" className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">Continue</PendingButton>
+      </SafeForm>
       {/* Not a trap: the public pages work without an account, and signing out is right here. */}
       <form action="/auth/signout" method="post" className="text-center">
         <button className="text-sm text-muted underline">Not now, sign me out</button>

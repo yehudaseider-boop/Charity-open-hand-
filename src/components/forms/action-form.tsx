@@ -131,13 +131,15 @@ export function ActionForm({
  * What a form says when its action never reached Givezy (offline, or the server failed): what happened, that what was
  * typed is kept, and what to do now. Next's own redirects and not-founds are passed on, never swallowed.
  */
-export function connectionTroubleMessage(e: unknown): string {
+export function connectionTroubleMessage(e: unknown, opts: { nothingTyped?: boolean } = {}): string {
   const digest = (e as { digest?: unknown } | null)?.digest;
   if (typeof digest === "string" && digest.startsWith("NEXT_")) throw e;
   const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  // A button with nothing to type (Undo, Remove, Stop emails) says nothing about typing (21/11/2026).
+  const kept = opts.nothingTyped ? "" : " What you typed is still here.";
   return offline
-    ? "You're offline, so this wasn't sent. What you typed is still here. Check your connection and try again."
-    : "We couldn't reach Givezy, so this may not have gone through. What you typed is still here. Please try again in a moment.";
+    ? `You're offline, so this wasn't sent.${kept} Check your connection and try again.`
+    : `We couldn't reach Givezy, so this may not have gone through.${kept} Please try again in a moment.`;
 }
 
 /** For forms that manage their own action state but reuse the field components. */

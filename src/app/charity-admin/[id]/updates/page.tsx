@@ -14,6 +14,7 @@ import { addPhoto, postUpdate, removePhoto, removeUpdate } from "./actions";
 import { PhotoForm, UpdateForm } from "./forms";
 import { ProfileVideo } from "@/components/profile-video";
 import { refusedFor } from "@/lib/charity/permissions";
+import { SafeForm } from "@/components/forms/safe-form";
 
 export const metadata: Metadata = { title: "Photos and updates" };
 
@@ -68,9 +69,9 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     {canEmail ? <Link href={`/charity-admin/${id}/email-donors?update=${u.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline hover:text-indigo">Email this to your donors</Link> : null}
                     {canEdit ? (
-                      <form action={removeUpdate.bind(null, id, u.id)}>
+                      <SafeForm nothingTyped action={removeUpdate.bind(null, id, u.id)}>
                         <RemoveButton what={`the update from ${formatDate(u.created_at)}`} ask={false} />
-                      </form>
+                      </SafeForm>
                     ) : null}
                   </div>
                 </li>
@@ -89,9 +90,9 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
                 <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} className="aspect-square w-full rounded-card border-2 border-border object-cover" />
                 {p.caption_en ? <p className="text-xs text-muted [overflow-wrap:anywhere]">{p.caption_en}</p> : null}
                 {canEdit ? (
-                  <form action={removePhoto.bind(null, id, p.id)}>
+                  <SafeForm nothingTyped action={removePhoto.bind(null, id, p.id)}>
                     <RemoveButton what={p.caption_en ? `the photo "${p.caption_en}"` : "this photo"} ask={false} />
-                  </form>
+                  </SafeForm>
                 ) : null}
               </li>
             ))}

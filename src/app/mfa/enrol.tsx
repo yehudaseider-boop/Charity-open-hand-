@@ -1,10 +1,20 @@
 "use client";
 
 import { useActionState } from "react";
+import { connectionTroubleMessage } from "@/components/forms/action-form";
+import { PendingButton } from "@/components/forms/pending-button";
+import { SafeForm } from "@/components/forms/safe-form";
 import { startEnrol, verifyCode, type EnrolState } from "./actions";
 
 export function Enrol({ next }: { next: string }) {
-  const [state, start, pending] = useActionState<EnrolState, FormData>(() => startEnrol(), {});
+  // A dropped connection says so here and leaves Set up to press again, rather than throwing the page away (21/11/2026).
+  const [state, start, pending] = useActionState<EnrolState, FormData>(async () => {
+    try {
+      return await startEnrol();
+    } catch (e) {
+      return { error: connectionTroubleMessage(e) };
+    }
+  }, {});
   if (!state.factorId) {
     return (
       <form action={start} className="space-y-3">
@@ -19,7 +29,7 @@ export function Enrol({ next }: { next: string }) {
     );
   }
   return (
-    <form action={verifyCode} className="space-y-3">
+    <SafeForm action={verifyCode} className="space-y-3">
       <p className="text-sm">1. Scan this code with your authenticator app.</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={state.qr} alt="QR code for your authenticator app" width={192} height={192} className="mx-auto rounded-control border-2 border-border bg-surface p-2" />
@@ -28,8 +38,8 @@ export function Enrol({ next }: { next: string }) {
       <input type="hidden" name="factorId" value={state.factorId} />
       <input type="hidden" name="next" value={next} />
       <CodeField />
-      <button className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">Confirm and continue</button>
-    </form>
+      <PendingButton pendingLabel="Checking…" className="pressable w-full rounded-control bg-coral px-4 py-3 font-bold text-navy">Confirm and continue</PendingButton>
+    </SafeForm>
   );
 }
 
