@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { CharityNav } from "@/components/charity-nav";
+import { HelpAssistant } from "@/components/help-assistant";
+import { legalConfig } from "@/config/legal";
+import { whatsAppChat } from "@/lib/whatsapp";
 import { initials } from "@/lib/charity/initials";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 
@@ -23,6 +26,7 @@ export function DashboardShell({
   base: baseOverride,
   publicHref,
   hiddenTabs,
+  help,
   children,
 }: {
   id: string;
@@ -34,6 +38,8 @@ export function DashboardShell({
   publicHref?: string | null;
   /** Menu pages this person's role can't use (team roles, 10/11/2026); the pages refuse them anyway. */
   hiddenTabs?: string[];
+  /** The "Need help?" assistant (21/11/2026): left out when its switch is off (src/config/assistant.ts). */
+  help?: { demo?: boolean } | null;
   children: React.ReactNode;
 }) {
   const base = baseOverride ?? `/charity-admin/${id}`;
@@ -97,6 +103,15 @@ export function DashboardShell({
           {children}
         </div>
       </div>
+      {help ? (
+        <HelpAssistant
+          charityId={help.demo ? undefined : id}
+          demo={Boolean(help.demo)}
+          base={base}
+          whatsApp={whatsAppChat(legalConfig.supportWhatsApp, "Hi Givezy, I need help with my charity dashboard.")}
+          email={legalConfig.supportEmail}
+        />
+      ) : null}
     </div>
   );
 }
