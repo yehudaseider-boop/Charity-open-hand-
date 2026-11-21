@@ -367,6 +367,8 @@ Paystack support (13/11/2026): Google Pay is available to South African business
 
 ## D. Later ideas (not for go-live)
 
+- [ ] **"Need help?" assistant in the charity dashboard (decided 21/11/2026: after launch).** Built, off. Before switching on: the seven review fixes, an Anthropic account with a spending cap and a Rand price, cost per question measured on the test site, Yosef's Privacy Policy line. Details in `docs/decisions.md`.
+
 - **"Donate with Givezy" button for charities' own websites (21/10/2026, Yehuda: later).** A copy-paste styled link (charity or campaign), colour choice and preview, carrying a "came from website" source tag. Not an embedded form: the site refuses to be framed on purpose. About half a day.
 
 HTML version of the confirmation email, yahrzeit giving, real charity photos from the charities. (Tax pack and dedications were built on 15/10/2026.)
