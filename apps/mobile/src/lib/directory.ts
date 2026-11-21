@@ -307,3 +307,6 @@ export function useCharityNews(slugs: string[]) {
   return { live, news: !key ? new Map<string, CharityUpdate[]>() : loaded?.key === key ? loaded.news : null };
 }
 
+
+/** The longest charity search, as on the website's Find a charity (60 characters). */
+export const SEARCH_MAX_LENGTH = 60;

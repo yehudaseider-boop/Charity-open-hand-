@@ -41,15 +41,7 @@ export function ActionForm({
     try {
       return await action(prev, formData);
     } catch (e) {
-      const digest = (e as { digest?: unknown } | null)?.digest;
-      if (typeof digest === "string" && digest.startsWith("NEXT_")) throw e;
-      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
-      return {
-        ok: false,
-        message: offline
-          ? "You're offline, so this wasn't sent. What you typed is still here. Check your connection and try again."
-          : "We couldn't reach Givezy, so this may not have gone through. What you typed is still here. Please try again in a moment.",
-      };
+      return { ok: false, message: connectionTroubleMessage(e) };
     }
   };
   const [state, dispatch, pending] = useActionState(safeAction, initialFormState);
@@ -133,6 +125,19 @@ export function ActionForm({
       </form>
     </FormStateContext>
   );
+}
+
+/**
+ * What a form says when its action never reached Givezy (offline, or the server failed): what happened, that what was
+ * typed is kept, and what to do now. Next's own redirects and not-founds are passed on, never swallowed.
+ */
+export function connectionTroubleMessage(e: unknown): string {
+  const digest = (e as { digest?: unknown } | null)?.digest;
+  if (typeof digest === "string" && digest.startsWith("NEXT_")) throw e;
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  return offline
+    ? "You're offline, so this wasn't sent. What you typed is still here. Check your connection and try again."
+    : "We couldn't reach Givezy, so this may not have gone through. What you typed is still here. Please try again in a moment.";
 }
 
 /** For forms that manage their own action state but reuse the field components. */

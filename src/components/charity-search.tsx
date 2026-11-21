@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 
 /**
  * The charities search: results update as you type (after a short pause), with a small spinner while they load.
@@ -27,12 +27,16 @@ function SearchBox({ initial, category }: { initial: string; category: string })
   }
   const [pending, startTransition] = useTransition();
   const first = useRef(true);
+  // Offline, a search would throw the person out to the browser's own "No internet" page and lose the list
+  // (21/11/2026): the box keeps what was typed, says why the list isn't changing, and searches once back online.
+  const offline = useSyncExternalStore(subscribeOnline, () => !navigator.onLine, () => false);
 
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
+    if (offline) return;
     const t = setTimeout(() => {
       const p = new URLSearchParams();
       const q = value.trim();
@@ -44,10 +48,18 @@ function SearchBox({ initial, category }: { initial: string; category: string })
       startTransition(() => router.replace(qs ? `/charities?${qs}` : "/charities", { scroll: false }));
     }, 300);
     return () => clearTimeout(t);
-  }, [value, category, initial, router]);
+  }, [value, category, initial, router, offline]);
 
   return (
-    <form role="search" action="/charities" className="flex max-w-[44rem] gap-2">
+    <>
+    <form
+      role="search"
+      action="/charities"
+      className="flex max-w-[44rem] gap-2"
+      onSubmit={(e) => {
+        if (!navigator.onLine) e.preventDefault();
+      }}
+    >
       {category ? <input type="hidden" name="category" value={category} /> : null}
       <label htmlFor="q" className="sr-only">Search charities</label>
       <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-[1.125rem] border-2 border-outline bg-surface px-4 shadow-[0_10px_30px_rgba(23,73,181,0.08)] transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft sm:min-h-16 sm:px-5">
@@ -75,5 +87,20 @@ function SearchBox({ initial, category }: { initial: string; category: string })
       </div>
       <button className="pressable min-h-14 shrink-0 rounded-[1.125rem] bg-brand px-4 font-bold text-brand-contrast sm:min-h-16 sm:px-6">Search</button>
     </form>
+    {offline ? (
+      <p role="status" className="mt-2 max-w-[44rem] text-sm font-semibold text-navy">
+        You&apos;re offline, so the list can&apos;t update. What you typed is still here, and the list updates when you&apos;re back online.
+      </p>
+    ) : null}
+    </>
   );
+}
+
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
 }

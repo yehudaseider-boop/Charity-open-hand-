@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native
 import { gifts as sampleGifts } from "@/data/giving";
 import type { Charity } from "@/data/sample";
 import { useAccount } from "@/lib/account";
-import { useDirectory } from "@/lib/directory";
+import { SEARCH_MAX_LENGTH, useDirectory } from "@/lib/directory";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { givenBefore, savedCharities } from "@/lib/live-charities";
@@ -62,14 +62,14 @@ export function QuickGive({ onDone }: { onDone: () => void }) {
       </Text>
       <View style={styles.search}>
         <SearchIcon />
-        <TextInput value={query} onChangeText={setQuery} placeholder="Search charities" placeholderTextColor={colors.muted} accessibilityLabel="Search charities" style={styles.searchInput} returnKeyType="search" />
+        <TextInput value={query} onChangeText={setQuery} placeholder="Search charities" placeholderTextColor={colors.muted} accessibilityLabel="Search charities" maxLength={SEARCH_MAX_LENGTH} style={styles.searchInput} returnKeyType="search" />
       </View>
 
       {q ? (
         matches.length ? (
           <View>{matches.slice(0, 8).map((c, i) => <Row key={c.slug} charity={c} live={directory.live} last={i === Math.min(matches.length, 8) - 1} onPress={() => pick(c)} />)}</View>
         ) : (
-          <EmptyState title="No charities found" body={`Nothing matches "${query.trim()}". Try another name or a different cause.`} action={{ label: "Clear search", onPress: () => setQuery("") }} />
+          <EmptyState title="No charities found" body={`Nothing matches “${query.trim()}”. Try another name or a different cause.`} action={{ label: "Clear search", onPress: () => setQuery("") }} />
         )
       ) : (
         <>

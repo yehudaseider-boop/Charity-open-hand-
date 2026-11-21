@@ -4,6 +4,7 @@ import { TermsAndPrivacyLinks } from "@/components/legal";
 import { getViewer } from "@/lib/auth";
 import { sendLoginLink, verifyLoginCode } from "./actions";
 import { PendingButton } from "@/components/forms/pending-button";
+import { SafeForm } from "@/components/forms/safe-form";
 import { safeNextPath } from "@/lib/safe-path";
 import { Splash } from "@/components/splash";
 import { Illustration } from "@/components/illustration";
@@ -54,7 +55,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             )}
           </p>
           {email ? (
-            <form action={verifyLoginCode} className="space-y-3">
+            <SafeForm action={verifyLoginCode} className="space-y-3">
               <input type="hidden" name="email" value={email} />
               <input type="hidden" name="s" value={typeof params.s === "string" ? params.s : ""} />
               <input type="hidden" name="next" value={next} />
@@ -69,14 +70,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
               />
               {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
               <PendingButton pendingLabel="Signing in…" className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-[17px] font-bold text-navy disabled:opacity-60">Sign in</PendingButton>
-            </form>
+            </SafeForm>
           ) : null}
           <p className="text-xs text-muted">
             Nothing arrived? Check spam, or <Link href={`/login?next=${encodeURIComponent(next)}`} className="-my-3.5 inline-block py-3.5 text-brand underline">ask for a new email</Link>.
           </p>
         </div>
       ) : (
-        <form action={sendLoginLink} className="mt-4 space-y-3">
+        <SafeForm action={sendLoginLink} className="mt-4 space-y-3">
           <p className="text-[15px] text-muted">
             No password needed. We&apos;ll email you a sign-in code. You don&apos;t need an account to give.
           </p>
@@ -98,7 +99,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <p className="text-xs text-muted">
             The first time you sign in you&apos;ll be asked to agree to <TermsAndPrivacyLinks />.
           </p>
-        </form>
+        </SafeForm>
       )}
     </div>
     </div>

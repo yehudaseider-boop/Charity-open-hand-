@@ -17,7 +17,7 @@ import { PressableScale } from "@/components/pressable-scale";
 import { SearchIcon, StarIcon } from "@/components/icons";
 import { EmptyState, ErrorState, LoadingList, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
-import { useDirectory } from "@/lib/directory";
+import { SEARCH_MAX_LENGTH, useDirectory } from "@/lib/directory";
 import { haptic } from "@/lib/haptics";
 import { loadCausePrefs } from "@/lib/cause-prefs";
 import { causesFirst, inCause } from "@/lib/live-charities";
@@ -112,6 +112,8 @@ export default function Discover() {
               <TextInput
                 value={query}
                 onChangeText={setQuery}
+                // As on the website: a search is a few words, and a pasted page of text would push "Ask us to add it" off the screen.
+                maxLength={SEARCH_MAX_LENGTH}
                 placeholder="Name, cause or area"
                 placeholderTextColor={colors.muted}
                 accessibilityLabel="Search charities"
@@ -148,7 +150,7 @@ export default function Discover() {
             <EmptyState
               art="checklist"
               title="No charities found"
-              body={query.trim() ? `Nothing matches "${query.trim()}". Try another name or a different cause.` : "No charities in this cause yet. Try another one."}
+              body={query.trim() ? `Nothing matches “${query.trim()}”. Try another name or a different cause.` : "No charities in this cause yet. Try another one."}
               action={requestsOpen && query.trim() ? { label: "Ask us to add it", onPress: askToAdd } : { label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } }}
               away={requestsOpen && query.trim() ? { label: "Clear search", onPress: () => { setQuery(""); setCause("all"); } } : requestsOpen ? { label: "Ask us to add a charity", onPress: askToAdd } : undefined}
             />

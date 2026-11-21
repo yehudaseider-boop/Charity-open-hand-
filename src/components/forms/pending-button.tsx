@@ -1,13 +1,16 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { useSafeFormPending } from "./safe-form";
 
 /**
  * A submit button for a plain server-action form: while the form is working it says so ("Sending…") and
- * can't be pressed again, so a slow connection never sends twice. ActionForm does this for its own forms.
+ * can't be pressed again, so a slow connection never sends twice. ActionForm does this for its own forms; inside a SafeForm it follows that form.
  */
 export function PendingButton({ children, pendingLabel, className, name, value }: { children: React.ReactNode; pendingLabel: string; className?: string; name?: string; value?: string }) {
-  const { pending } = useFormStatus();
+  const { pending: sending } = useFormStatus();
+  const safePending = useSafeFormPending();
+  const pending = sending || safePending;
   return (
     <button type="submit" name={name} value={value} disabled={pending} aria-disabled={pending} className={`${className ?? ""} disabled:opacity-60`}>
       {pending ? pendingLabel : children}

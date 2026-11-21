@@ -65,6 +65,23 @@ function TickMark() {
 const centsToInput = (c: number) => (c % 100 ? `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}` : String(c / 100));
 
 /**
+ * The amount goes in the address as it is chosen, so refreshing the page part-way keeps it (21/11/2026: a refresh
+ * kept every other box, through the form's draft, but emptied the amount). Only an amount the page would take back
+ * (see readGiveLink); anything else takes the old one out, so a refresh never brings back a figure the donor changed.
+ */
+function keepAmountInAddress(cents: number | null) {
+  try {
+    const url = new URL(window.location.href);
+    if (cents !== null && cents >= platformConfig.minDonationCents && cents <= platformConfig.maxDonationCents) url.searchParams.set("cents", String(cents));
+    else url.searchParams.delete("cents");
+    url.searchParams.delete("amount");
+    window.history.replaceState(window.history.state, "", url);
+  } catch {
+    // Only a convenience.
+  }
+}
+
+/**
  * A dropped connection or a server error at Give stays on this page, with everything typed kept, and says plainly
  * that nothing was charged (the card is only ever entered on the payment page, so nothing can be charged before it
  * opens). Next's own errors (a redirect, a not-found) still go through.
@@ -240,6 +257,7 @@ export function DonateFlow({
                 type="button"
                 onClick={() => {
                   setAmountText(centsToInput(c));
+                  keepAmountInAddress(c);
                   setPicked(c);
                   setAmountTouched(true);
                   changed();
@@ -271,6 +289,7 @@ export function DonateFlow({
               onChange={(e) => {
                 setAmountText(e.target.value);
                 const c = parseRandToCents(e.target.value);
+                keepAmountInAddress(c);
                 setPicked(c !== null && suggestedCents.includes(c) ? c : null);
                 changed();
               }}
