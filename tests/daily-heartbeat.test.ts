@@ -1,4 +1,7 @@
-/** The daily job checks in once, last, and only when its main work ran (19/11/2026). */
+/**
+ * The daily job checks in once, only when its main work ran (19/11/2026), straight after the day's email and before
+ * anything slower (21/11/2026: carrying on charities' emails, the payouts and the journeys can never use up its time).
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -13,7 +16,10 @@ vi.mock("@/lib/donations/monthly-store", () => ({
 }));
 vi.mock("@/lib/donations/payouts", () => ({ syncPayouts: async () => (steps.push("payouts"), { charities: 0, payouts: 0, lines: 0, unmatched: 0, failed: [] }) }));
 vi.mock("@/lib/charity/journey-store", () => ({ runJourneys: async () => (steps.push("journeys"), { sent: 0 }) }));
-vi.mock("@/lib/ops/alert", () => ({ cronAllowed: () => true, alertGivezy: async () => "sent" }));
+vi.mock("@/lib/ops/alert", () => ({ cronAllowed: () => true, alertGivezy: async (subject: string) => (steps.push(`alert: ${subject}`), "sent") }));
+vi.mock("@/lib/charity/carry-on-sends", () => ({
+  runCarryOnSends: async () => (steps.push("sends carried on"), { unfinished: 0, continued: 0, sent: 0, finished: 0, notAllowed: 0, leftForPerson: 0, waitingForPerson: 0, notReached: 0, errors: 0 }),
+}));
 vi.mock("@/lib/ops/heartbeat", () => ({ pingHeartbeat: async () => (steps.push("heartbeat"), "sent") }));
 vi.mock("@/lib/ops/daily", async (orig) => {
   const real = await orig<typeof import("@/lib/ops/daily")>();
@@ -22,7 +28,7 @@ vi.mock("@/lib/ops/daily", async (orig) => {
     runImportantEmailRetries: async () => ({ incomplete: false, confirmations: { resent: 0, failedAgain: 0 } }),
     runDailyChecks: async () => {
       if (checksFail) throw new Error("checks down");
-      return { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 0, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
+      return { incomplete: false, cardUpdatesFinished: 0, pending: { checked: 0, paid: 0, failed: 0, still: 0, errors: 0 }, stuckPending: 1, confirmations: { resent: 0, failedAgain: 0 }, unhandledEvents: 0, held: {} };
     },
   };
 });
@@ -38,13 +44,11 @@ beforeEach(() => {
 });
 
 describe("the daily job's check-in", () => {
-  it("checks in once, after the payouts and the journeys, when the day's work ran", async () => {
+  it("checks in once, after the day's email and before carrying on charities' emails, the payouts and the journeys", async () => {
     const res = await call();
     expect(res.status).toBe(200);
     expect(steps.filter((s) => s === "heartbeat")).toHaveLength(1);
-    expect(steps.at(-1)).toBe("heartbeat");
-    expect(steps.indexOf("heartbeat")).toBeGreaterThan(steps.indexOf("payouts"));
-    expect(steps.indexOf("heartbeat")).toBeGreaterThan(steps.indexOf("journeys"));
+    expect(steps).toEqual(["alert: 1 thing needs a person today", "heartbeat", "sends carried on", "payouts", "journeys"]);
   });
 
   it("does not check in when the monthly collection failed: the monitoring service notices the silence", async () => {

@@ -10,6 +10,13 @@ import { EmailMaybeSent } from "./index";
 export const RETRY_KINDS = ["donation_confirmation", "s18a_receipt", "monthly_declined"] as const;
 export type RetryKind = (typeof RETRY_KINDS)[number];
 
+/**
+ * The most one email may take when the daily job sends it (charities' sends it carries on; the same 8 seconds as the
+ * journeys and the tries again), so a slow email service can't hold the job past its minute. One cut off by it may
+ * have gone, so it is treated as "may have gone": never sent again by itself.
+ */
+export const JOB_SEND_TIMEOUT_MS = 8_000;
+
 /** Hours to wait before each try again, counted from the try that failed. */
 export const RETRY_DELAYS_HOURS = [1, 24, 72] as const;
 /** The first send plus three tries again. */

@@ -7,10 +7,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
 import { emailHash, monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
 import { WEEKLY_LIMIT, messagedThisWeek } from "./weekly-limit";
-import { mayHaveSent } from "@/lib/email/retry-plan";
+import { JOB_SEND_TIMEOUT_MS, mayHaveSent } from "@/lib/email/retry-plan";
 import { isolate } from "@/lib/text";
 import { formatDate } from "@/lib/dates";
 import { nextWeekStart } from "./journey";
+import { nothingLeft } from "@/lib/donations/what-is-left";
 
 /** One address that gave in the month, with the donors it belongs to (for the one-message-a-week rule). */
 export type Recipient = { email: string; firstName: string | null; donorIds: string[] };
@@ -29,7 +30,7 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   for (let start = 0; ; start += 1000) {
     const { data, error } = await db
       .from("donations")
-      .select("id, donor_id, donation_checkout_details(email, first_name, erased_at)")
+      .select("id, donor_id, amount_cents, refunded_cents, donation_checkout_details(email, first_name, erased_at)")
       .eq("charity_id", charityId)
       .eq("status", "paid")
       // Only people who gave on Givezy: a gift the charity recorded itself carries an email Givezy never checked.
@@ -40,6 +41,8 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
       .range(start, start + 999);
     if (error) throw error;
     for (const row of data ?? []) {
+      // A gift refunded in full in part refunds is a refund, not a gift: nothing to thank them for (21/11/2026).
+      if (nothingLeft(row)) continue;
       const raw = row.donation_checkout_details as unknown;
       const d = (Array.isArray(raw) ? raw[0] : raw) as { email: string | null; first_name: string | null; erased_at: string | null } | null;
       if (!d?.email || d.erased_at || isErasedEmail(d.email)) continue;
@@ -168,7 +171,12 @@ async function runThankYou(args: { charityId: string; charityName: string; month
       continue;
     }
     try {
-      const outcome = await transport.send(thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, oneClickUrl: oneClickStopUrl(site, "thanks", token), replyTo: args.replyTo }));
+      const outcome = await transport.send({
+        ...thankYouEmail(r.email, { charityName: args.charityName, firstName: r.firstName, month: args.month, body: args.body, stopUrl: `${site}/thanks/stop?t=${token}`, oneClickUrl: oneClickStopUrl(site, "thanks", token), replyTo: args.replyTo }),
+        // From the daily job, each email has a time limit, so a slow email service can't hold up the rest of the job.
+        // One cut off may have gone: it is handled below as any dropped connection (never sent again).
+        ...(args.auto ? { signal: AbortSignal.timeout(JOB_SEND_TIMEOUT_MS) } : {}),
+      });
       // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
       if (outcome === "sent") sentThisRun++;
       await mark(outcome === "sent" ? "sent" : "failed");
@@ -246,19 +254,25 @@ export async function sendDonorThankYou(args: {
   replyTo: string | null;
 }): Promise<DonorThankResult> {
   const db = createAdminClient();
-  const { data: gift, error } = await db
-    .from("donations")
-    .select("id, donation_checkout_details(email, first_name, last_name, donor_type, organisation_name, contact_person, erased_at)")
-    .eq("charity_id", args.charityId)
-    .eq("donor_id", args.donorId)
-    .eq("status", "paid")
-    // Only to someone who gave on Givezy (as for appeals): a recorded gift's email was never checked by us.
-    .neq("gateway", "recorded")
-    .order("paid_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!gift) return { ok: false, message: "This donor has only gifts you recorded yourself, so Givezy can't email them. Thank them directly." };
+  // Their latest paid gift on Givezy with something left: one refunded in full in part refunds is a refund, not a gift.
+  let gift: { id: string; donation_checkout_details: unknown } | null = null;
+  for (let from = 0; !gift; from += 100) {
+    const { data, error } = await db
+      .from("donations")
+      .select("id, amount_cents, refunded_cents, donation_checkout_details(email, first_name, last_name, donor_type, organisation_name, contact_person, erased_at)")
+      .eq("charity_id", args.charityId)
+      .eq("donor_id", args.donorId)
+      .eq("status", "paid")
+      // Only to someone who gave on Givezy (as for appeals): a recorded gift's email was never checked by us.
+      .neq("gateway", "recorded")
+      .order("paid_at", { ascending: false })
+      .order("id")
+      .range(from, from + 99);
+    if (error) throw error;
+    gift = (data ?? []).find((g) => !nothingLeft(g)) ?? null;
+    if (!data || data.length < 100) break;
+  }
+  if (!gift) return { ok: false, message: "This donor has only gifts you recorded yourself or gifts that were refunded, so Givezy can't email them. Thank them directly." };
   const raw = gift?.donation_checkout_details as unknown;
   const d = (Array.isArray(raw) ? raw[0] : raw) as {
     email: string | null; first_name: string | null; last_name: string | null; donor_type: string; organisation_name: string | null; contact_person: string | null; erased_at: string | null;

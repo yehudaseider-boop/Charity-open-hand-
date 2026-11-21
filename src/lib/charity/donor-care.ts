@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { nothingLeft } from "@/lib/donations/what-is-left";
 import { LAPSED_DAYS } from "./insights";
 import type { SegmentFilters } from "./donor-care-rules";
 
@@ -91,14 +92,17 @@ export async function dueReminders(charityId: string, onOrBefore: string): Promi
   if (ids.length) {
     const { data: gifts, error: gErr } = await db()
       .from("donations")
-      .select("donor_id, paid_at, donation_checkout_details(donor_type, first_name, last_name, organisation_name)")
+      .select("donor_id, paid_at, amount_cents, refunded_cents, donation_checkout_details(donor_type, first_name, last_name, organisation_name)")
       .eq("charity_id", charityId)
       .eq("status", "paid")
       .in("donor_id", ids)
       .order("paid_at", { ascending: false })
       .limit(1000);
     if (gErr) throw gErr;
-    for (const g of gifts ?? []) {
+    // Gifts with something left first (a gift refunded in full in part refunds is a refund, not a gift); one refunded
+    // in full still names a donor who has nothing else, rather than "A donor".
+    const all = gifts ?? [];
+    for (const g of [...all.filter((x) => !nothingLeft(x)), ...all.filter((x) => nothingLeft(x))]) {
       if (names.has(g.donor_id as string)) continue;
       const raw = g.donation_checkout_details as unknown;
       const c = (Array.isArray(raw) ? raw[0] : raw) as { donor_type: string; first_name: string | null; last_name: string | null; organisation_name: string | null } | null;

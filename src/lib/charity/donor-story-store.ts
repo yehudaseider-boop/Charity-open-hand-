@@ -26,7 +26,7 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
   const [donations, monthly, thanksWithKind, appeals, receipts, declinedRead, enrolment, donorRow] = await Promise.all([
     db
       .from("donations")
-      .select("id, status, amount_cents, paid_at, created_at, recorded_method, recurring_id, donation_checkout_details(email, erased_at)")
+      .select("id, status, amount_cents, refunded_cents, paid_at, created_at, recorded_method, recurring_id, donation_checkout_details(email, erased_at)")
       .eq("charity_id", charityId)
       .eq("donor_id", donorId)
       .order("created_at", { ascending: false })
@@ -67,7 +67,7 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
     thanks = plain.error ? [] : ((plain.data ?? []) as { sent_at: string }[]);
   }
 
-  type DonationRow = { id: string; status: string; amount_cents: number | string; paid_at: string | null; created_at: string; recorded_method: string | null; recurring_id: string | null; donation_checkout_details: unknown };
+  type DonationRow = { id: string; status: string; amount_cents: number | string; refunded_cents?: number | string | null; paid_at: string | null; created_at: string; recorded_method: string | null; recurring_id: string | null; donation_checkout_details: unknown };
   const rows = (donations.data ?? []) as DonationRow[];
 
   // When each monthly donation first went through: the dashboard counts a monthly donation only once it has.
@@ -153,7 +153,7 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
   }
 
   return {
-    gifts: rows.map((d) => ({ id: d.id, status: d.status, amount_cents: Number(d.amount_cents), paid_at: d.paid_at, created_at: d.created_at, recorded_method: d.recorded_method })),
+    gifts: rows.map((d) => ({ id: d.id, status: d.status, amount_cents: Number(d.amount_cents), refunded_cents: Number(d.refunded_cents ?? 0), paid_at: d.paid_at, created_at: d.created_at, recorded_method: d.recorded_method })),
     monthly: (monthly.data ?? []).map((m) => ({
       id: m.id as string,
       status: m.status as string,

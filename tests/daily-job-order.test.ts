@@ -60,7 +60,8 @@ describe("the daily job's order", () => {
     const before = Date.now();
     await call();
     // The important emails first, so a long collection day never leaves them for tomorrow; the checks don't run them again.
-    expect(steps.slice(0, 6)).toEqual(["email retries", "monthly", "checks (retries done)", "sends carried on", "alert: 1 thing needs a person today", "payouts"]);
+    // The day's email before charities' unfinished emails carry on (review 21/11/2026): a slow email service can't hold it up.
+    expect(steps.slice(0, 6)).toEqual(["email retries", "monthly", "checks (retries done)", "alert: 1 thing needs a person today", "sends carried on", "payouts"]);
     // Charities' unfinished emails get at most 12 seconds, and never past 44, so the rest of the job keeps its time.
     expect(carryOnDeadline! - before).toBeLessThanOrEqual(12_000 + 1_000);
     expect(payoutsOpts?.deadline).toBeGreaterThan(before);
@@ -83,17 +84,19 @@ describe("the daily job's order", () => {
 });
 
 describe("charities' unfinished emails in the daily job (21/11/2026)", () => {
-  it("a send left for a person, or the step failing, is a line in the day's email; nothing else stops", async () => {
+  it("a send left for a person, or the step failing, gets its own short email straight after; nothing else stops", async () => {
     carryOnResult = { unfinished: 2, continued: 1, sent: 0, finished: 0, notAllowed: 0, leftForPerson: 1, waitingForPerson: 0, notReached: 0, errors: 0 };
     const res = await call();
-    expect(steps).toContain("alert: 2 things need a person today");
+    // The day's email has gone already, unchanged; the carried-on sends' email follows them, before the payouts.
+    expect(steps.slice(3, 7)).toEqual(["alert: 1 thing needs a person today", "sends carried on", "alert: charities' emails to donors need a person", "payouts"]);
     expect(((await res.json()) as { sends: { leftForPerson: number } }).sends.leftForPerson).toBe(1);
     steps.length = 0;
     carryOnResult = new Error("database down");
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect((await call()).status).toBe(200);
     expect(steps).toContain("payouts");
-    expect(steps).toContain("alert: 2 things need a person today");
+    expect(steps).toContain("alert: 1 thing needs a person today");
+    expect(steps).toContain("alert: charities' emails to donors need a person");
     carryOnResult = { unfinished: 0, continued: 0, sent: 0, finished: 0, notAllowed: 0, leftForPerson: 0, waitingForPerson: 0, notReached: 0, errors: 0 };
   });
 

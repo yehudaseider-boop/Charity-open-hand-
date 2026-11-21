@@ -10,6 +10,21 @@ import { thankYouNoteToShow } from "@shared/charity/thank-you-note";
 import { monthlyCardChargeAt, type CardChargeRates } from "@shared/fees";
 import { jhbDay, rand } from "./format";
 
+/**
+ * Did the server refuse a read because it doesn't have these columns yet (a migration not run there)? Postgres says
+ * 42703 ("column donations.refunded_cents does not exist"); PostgREST's schema cache says PGRST204. Anything else (a
+ * dropped connection, a time-out, a server error) is not this, and must show as a load error, never be hidden by a
+ * read without the columns (which would show full amounts with no sign of a refund).
+ */
+export function isMissingColumn(e: unknown, columns: string[]): boolean {
+  if (!e || typeof e !== "object") return false;
+  const { code, message } = e as { code?: unknown; message?: unknown };
+  if (code === "42703" || code === "PGRST204") return true;
+  // Some versions answer without the code: only a message that names one of the columns as missing counts.
+  const text = typeof message === "string" ? message : "";
+  return /does not exist|could not find|schema cache/i.test(text) && columns.some((c) => text.includes(c));
+}
+
 export type DonationRow = {
   id: string;
   paid_at: string | null;

@@ -3,7 +3,7 @@
  * everywhere, as on its s18A receipt, and a gift refunded in full in parts counts as a refund, not a gift.
  */
 import { describe, expect, it } from "vitest";
-import { countsAsGift, leftCents, partRefundNote, refundedInParts } from "@/lib/donations/what-is-left";
+import { countsAsGift, leftCents, nothingLeft, partRefundNote, refundedInParts } from "@/lib/donations/what-is-left";
 import { donationAmountColumns } from "@/lib/charity/donation-export";
 
 describe("what is left of a gift", () => {
@@ -38,5 +38,16 @@ describe("the donations download", () => {
     expect(donationAmountColumns({ amount_cents: 50_000, refunded_cents: 50_000 })).toEqual(["0.00", "500.00"]);
     // Huge amounts stay exact (no floats).
     expect(donationAmountColumns({ amount_cents: 9_007_199_254_740_991, refunded_cents: 1 })).toEqual(["90071992547409.90", "0.01"]);
+  });
+});
+
+describe("nothingLeft: who to email and who gave read paid gifts only (21/11/2026)", () => {
+  it("only part refunds that took the whole gift; a normal gift, or a read without the column, is never nothing left", () => {
+    expect(nothingLeft({ amount_cents: 10_000, refunded_cents: 10_000 })).toBe(true);
+    expect(nothingLeft({ amount_cents: "10000", refunded_cents: "12000" })).toBe(true);
+    expect(nothingLeft({ amount_cents: 10_000, refunded_cents: 4_000 })).toBe(false);
+    expect(nothingLeft({ amount_cents: 10_000, refunded_cents: 0 })).toBe(false);
+    expect(nothingLeft({ amount_cents: 10_000, refunded_cents: null })).toBe(false);
+    expect(nothingLeft({ amount_cents: 10_000 })).toBe(false);
   });
 });

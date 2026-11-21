@@ -92,7 +92,7 @@ async function rpc(_name: string, args: { p_appeal_id: string; p_limit: number }
   return { data: rows.map((r) => ({ donor_id: r.donor_id })), error: null };
 }
 
-const sent: { to: string; subject: string }[] = [];
+const sent: { to: string; subject: string; signal?: AbortSignal }[] = [];
 /** The email service says "too many, slow down" (429) to every email: nothing goes. */
 let refuseAll = false;
 const donorList = ["ann", "ben", "cat"].map((id) => ({ donor_id: id, donor_type: "individual", display_name: id, email: `${id}@x.co` }));
@@ -128,9 +128,9 @@ vi.mock("@/lib/email", () => {
     isTemporaryRefusal: (e: unknown) => e instanceof EmailError && (e.status === 429 || (e.status ?? 0) >= 500),
     getEmailTransport: () => ({
       name: "resend",
-      send: async (m: { to: string; subject: string }) => {
+      send: async (m: { to: string; subject: string; signal?: AbortSignal }) => {
         if (refuseAll) throw new EmailError("Resend refused the email (429).", 429);
-        sent.push({ to: m.to, subject: m.subject });
+        sent.push({ to: m.to, subject: m.subject, signal: m.signal });
         return "sent";
       },
     }),
@@ -217,6 +217,22 @@ describe("the daily job carries on unfinished emails to donors", () => {
     expect(to()).toEqual(["ben@x.co", "cat@x.co"]);
     expect(r).toMatchObject({ unfinished: 1, continued: 1, sent: 2, finished: 1 });
     expect(tables.charity_appeal_recipients.map((x) => x.status)).toEqual(["sent", "sent", "sent"]);
+  });
+
+  it("each email the job sends has its 8-second limit, so a slow email service can't hold up the day's job (review 21/11/2026)", async () => {
+    unfinishedThankYou();
+    unfinishedAppeal();
+    await job();
+    expect(sent.length).toBeGreaterThan(0);
+    for (const m of sent) expect(m.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("a donor whose gift was refunded in full in part refunds gets no news email from the job: a refund, not a gift (21/11/2026)", async () => {
+    unfinishedAppeal();
+    tables.donations = tables.donations.map((g) => (g.donor_id === "cat" ? { ...g, amount_cents: 10_000, refunded_cents: 10_000 } : { ...g, amount_cents: 10_000, refunded_cents: 0 }));
+    await job();
+    expect(to()).toEqual(["ben@x.co"]);
+    expect(Object.fromEntries(tables.charity_appeal_recipients.map((x) => [x.donor_id, x.status]))).toMatchObject({ ben: "sent", cat: "skipped" });
   });
 
   it("never emails a claimed address again, even one whose send may have gone", async () => {
@@ -365,5 +381,45 @@ describe("reading a send's history", () => {
     expect(readHistory([refused, { by: "job", refusedWithNothingSent: false }, refused])).toEqual({ refusedRuns: 1, left: false });
     expect(readHistory([{ by: "left" }, refused])).toEqual({ refusedRuns: 0, left: true });
     expect(readHistory([{ by: "person" }, { by: "left" }])).toEqual({ refusedRuns: 0, left: false });
+  });
+});
+
+describe("what the charity's page says about the rest (review 21/11/2026)", () => {
+  it("only says they go out by themselves when the job really carries them on, and never promises a time", async () => {
+    const { carryOnStateFrom, carryOnLine, CARRY_ON_DAYS } = await import("@/lib/charity/carry-on-sends");
+    const base = { startedAt: "2026-11-10T10:00:00+02:00", emailOn: true, pageLive: true, senderAllowed: true, history: [], now: NOW };
+    expect(carryOnStateFrom(base)).toBe("goes");
+    expect(carryOnLine("goes", { owner: true })).toBe("The rest keep going out by themselves each day. You can also press Send the rest now.");
+    expect(carryOnStateFrom({ ...base, emailOn: false })).toBe("email_off");
+    expect(carryOnStateFrom({ ...base, startedAt: new Date(NOW.getTime() - (CARRY_ON_DAYS + 1) * 86_400_000).toISOString() })).toBe("too_old");
+    expect(carryOnStateFrom({ ...base, pageLive: false })).toBe("page_not_live");
+    expect(carryOnStateFrom({ ...base, senderAllowed: false })).toBe("sender_left");
+    expect(carryOnStateFrom({ ...base, history: [{ by: "left" }] })).toBe("left_for_person");
+    // Refused the most times in a row: the job leaves it for a person on its next run.
+    expect(carryOnStateFrom({ ...base, history: Array.from({ length: GIVE_UP_AFTER }, () => ({ by: "job" as const, refusedWithNothingSent: true })) })).toBe("left_for_person");
+    // A person pressing Send the rest since lifts it again.
+    expect(carryOnStateFrom({ ...base, history: [{ by: "person" }, { by: "left" }] })).toBe("goes");
+    for (const s of ["too_old", "sender_left", "left_for_person"] as const) {
+      expect(carryOnLine(s, { owner: true })).toMatch(/Press Send the rest/);
+      expect(carryOnLine(s, { owner: false })).toMatch(/can press Send the rest/);
+    }
+    expect(carryOnLine("left_for_person", { owner: true })).toMatch(/email service refused/);
+    expect(carryOnLine("too_old", { owner: true })).toMatch(/more than 14 days ago/);
+    for (const s of ["goes", "email_off", "too_old", "page_not_live", "sender_left", "left_for_person"] as const) {
+      const line = carryOnLine(s, { owner: true });
+      expect(line).not.toMatch(/day or two|!|—/);
+    }
+  });
+
+  it("reads the sender and the history as the job does", async () => {
+    const { carryOnState } = await import("@/lib/charity/carry-on-sends");
+    unfinishedThankYou();
+    const send = { kind: "thank_you" as const, id: "t1", charityId: C, startedBy: OWNER, startedAt: "2026-11-11T10:00:00+02:00", month: MONTH };
+    expect(await carryOnState(send, { pageLive: true, emailOn: on, now: NOW })).toBe("goes");
+    // Whoever pressed Send has left the team: the job skips it, so the page says so.
+    tables.charity_admins = [];
+    expect(await carryOnState(send, { pageLive: true, emailOn: on, now: NOW })).toBe("sender_left");
+    expect(await carryOnState({ ...send, startedBy: null }, { pageLive: true, emailOn: on, now: NOW })).toBe("sender_left");
+    expect(await carryOnState(send, { pageLive: true, emailOn: () => false, now: NOW })).toBe("email_off");
   });
 });

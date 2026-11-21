@@ -74,8 +74,14 @@ vi.mock("@/lib/supabase/admin", () => ({
       // Lists (the one-a-week check): an appeal this week when asked for, nothing else.
       b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === "charity_appeal_recipients" && appealThisWeek ? [{ donor_id: "d1" }] : [], error: null }).then(ok);
       // Gifts the charity recorded itself are left out: "recordedOnly" means this donor has no other.
-      b.neq = (col: string, val: string) => (table === "donations" && col === "gateway" && val === "recorded" && recordedOnly ? ((b.maybeSingle = async () => ({ data: null, error: null })), b) : b);
-      b.maybeSingle = async () => (table === "donations" ? { data: gift, error: null } : { data: stopped ? { email_hash: "h" } : null, error: null });
+      let noGivezyGift = false;
+      b.neq = (col: string, val: string) => {
+        if (table === "donations" && col === "gateway" && val === "recorded" && recordedOnly) noGivezyGift = true;
+        return b;
+      };
+      // The donor's paid gifts on Givezy, newest first.
+      b.range = async () => ({ data: table === "donations" && !noGivezyGift ? (Array.isArray(gift) ? gift : gift ? [gift] : []) : [], error: null });
+      b.maybeSingle = async () => ({ data: stopped ? { email_hash: "h" } : null, error: null });
       b.delete = () => ({ eq: async () => ((released++), { error: null }) });
       b.insert = () => {
         if (table === "email_stop_tokens") return Promise.resolve({ error: null });
@@ -87,7 +93,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 const { sendDonorThankYou } = await import("@/lib/charity/thank-you-send");
 const args = { charityId: "c1", charityName: "Meals Fund", donorId: "d1", body: "Thank you, truly.", userId: "u1", replyTo: "office@meals.org" };
-const details = (over: Record<string, unknown> = {}) => ({ id: "g1", donation_checkout_details: { email: "sarah@x.co", first_name: "Sarah", last_name: "Cohen", donor_type: "individual", organisation_name: null, contact_person: null, erased_at: null, ...over } });
+const details = (over: Record<string, unknown> = {}, money: { amount_cents?: number; refunded_cents?: number } = {}) => ({ id: "g1", amount_cents: 10_000, refunded_cents: 0, ...money, donation_checkout_details: { email: "sarah@x.co", first_name: "Sarah", last_name: "Cohen", donor_type: "individual", organisation_name: null, contact_person: null, erased_at: null, ...over } });
 
 beforeEach(() => {
   sent.length = 0;
@@ -116,6 +122,20 @@ describe("sending one donor a thank-you", () => {
     const r = await sendDonorThankYou(args);
     expect(r.ok === false && r.message).toMatch(/only gifts you recorded yourself/);
     expect(sent).toHaveLength(0);
+  });
+  it("never for a gift refunded in full in part refunds: a refund, not a gift (21/11/2026)", async () => {
+    gift = details({}, { amount_cents: 10_000, refunded_cents: 10_000 });
+    const r = await sendDonorThankYou(args);
+    expect(r.ok === false && r.message).toMatch(/gifts that were refunded/);
+    expect(sent).toHaveLength(0);
+  });
+  it("a part refund with something left still counts, and so does an earlier gift when the latest was refunded in full", async () => {
+    gift = details({}, { amount_cents: 10_000, refunded_cents: 4_000 });
+    expect((await sendDonorThankYou(args)).ok).toBe(true);
+    claimed = false;
+    gift = [{ ...details({ email: "new@x.co" }, { refunded_cents: 10_000 }), id: "g2" }, details()];
+    expect(await sendDonorThankYou(args)).toEqual({ ok: true, name: "Sarah Cohen" });
+    expect(sent.map((m) => m.to)).toEqual(["sarah@x.co", "sarah@x.co"]);
   });
   it("only once a week per donor", async () => {
     await sendDonorThankYou(args);

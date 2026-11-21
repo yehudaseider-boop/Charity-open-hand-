@@ -372,6 +372,24 @@ export function payoutsAlertLines(p: PayoutSyncSummary | null, opts: { started: 
   return lines;
 }
 
+/**
+ * Charities' unfinished emails to donors carried on by the job: their own short email, sent after the day's main email
+ * and the check-in (21/11/2026: carrying them on runs after both, so it can never hold them up). None when all is well.
+ */
+export function sendsAlertLines(jobs: Pick<JobProblems, "sendsFailed" | "sendsLeftForPerson">): string[] {
+  const lines: string[] = [];
+  if (jobs.sendsFailed) lines.push("Charities' unfinished emails to donors could not carry on today (see the job log). Nobody was emailed twice. It tries again tomorrow.");
+  if (jobs.sendsLeftForPerson) {
+    const k = jobs.sendsLeftForPerson;
+    const n = (x: number, one: string, many: string) => `${x} ${x === 1 ? one : many}`;
+    // The same rule as src/lib/charity/carry-on-sends (GIVE_UP_AFTER, LEFT_FOR_PERSON), kept here without its imports.
+    lines.push(
+      `${n(k, "email", "emails")} from a charity to its donors (a thank-you or a news email) stopped carrying on by ${k === 1 ? "itself" : "themselves"}: the email service refused ${k === 1 ? "it" : "them"} ${RETRY_DELAYS_HOURS.length} days in a row. Nobody was emailed twice. Each is in the audit log as charity.send_left_for_person; once email works, press Send the rest on the charity's page or ask the charity to.`,
+    );
+  }
+  return lines;
+}
+
 /** The lines of the daily email, or none when nothing needs a person. Plain words, one thing per line. */
 export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   const lines: string[] = [];
@@ -386,14 +404,7 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   }
   if (jobs.monthlyStopped) lines.push(`${n(jobs.monthlyStopped, "monthly donation", "monthly donations")} stopped after three declined tries. The donors were emailed a link to put in a new card.`);
   if (jobs.payoutsFailed) lines.push("The deposit report could not be updated today. It tries again tomorrow.");
-  if (jobs.sendsFailed) lines.push("Charities' unfinished emails to donors could not carry on today (see the job log). Nobody was emailed twice. It tries again tomorrow.");
-  if (jobs.sendsLeftForPerson) {
-    const k = jobs.sendsLeftForPerson;
-    // The same rule as src/lib/charity/carry-on-sends (GIVE_UP_AFTER, LEFT_FOR_PERSON), kept here without its imports.
-    lines.push(
-      `${n(k, "email", "emails")} from a charity to its donors (a thank-you or a news email) stopped carrying on by ${k === 1 ? "itself" : "themselves"}: the email service refused ${k === 1 ? "it" : "them"} ${RETRY_DELAYS_HOURS.length} days in a row. Nobody was emailed twice. Each is in the audit log as charity.send_left_for_person; once email works, press Send the rest on the charity's page or ask the charity to.`,
-    );
-  }
+  lines.push(...sendsAlertLines(jobs));
   if (c.stuckPending) lines.push(`${n(c.stuckPending, "payment has", "payments have")} been pending for more than 3 days.`);
   if (c.privacyRequests?.open) {
     const since = c.privacyRequests.oldestAt ? ` (the oldest from ${formatDate(c.privacyRequests.oldestAt)})` : "";

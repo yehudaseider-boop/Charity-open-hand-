@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   for (let page = 0; donorIds.length; page += 1000) {
     const { data, error } = await supabase
       .from("donations")
-      .select("id, created_at, paid_at, status, amount_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, dedication_kind, dedication_name, tax_year, popia_consent_at, age_confirmed_at, charities(name_en)")
+      .select("id, created_at, paid_at, status, amount_cents, refunded_cents, contribution_cents, total_charged_cents, wants_18a, is_anonymous, message, dedication_kind, dedication_name, tax_year, popia_consent_at, age_confirmed_at, charities(name_en)")
       .in("donor_id", donorIds)
       .order("created_at")
       .order("id")
@@ -176,7 +176,7 @@ export async function GET(request: Request) {
   const savedCard = await loadSavedCardInfo(user.id).catch(() => null);
 
   const body = {
-    about: "Everything Givezy holds about you, as at the time of download. Amounts are in cents (R1 = 100). Times are in UTC, the standard for data files: South African time is 2 hours ahead (a time of 08:00 UTC is 10:00 in South Africa).",
+    about: "Everything Givezy holds about you, as at the time of download. Amounts are in cents (R1 = 100). A donation's refunded_cents is the part of it refunded to you: what the charity kept is amount_cents less refunded_cents. Times are in UTC, the standard for data files: South African time is 2 hours ahead (a time of 08:00 UTC is 10:00 in South Africa).",
     downloaded_at: new Date().toISOString(),
     account: profile.data,
     // ID and tax numbers as their last 4 digits only: a donor record can be shared by everyone who gave with one email.

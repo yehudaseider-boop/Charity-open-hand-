@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
 import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
-import { mayHaveSent } from "@/lib/email/retry-plan";
+import { JOB_SEND_TIMEOUT_MS, mayHaveSent } from "@/lib/email/retry-plan";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { appealEmail, audienceValue, greetingName, type Audience } from "./appeals-rules";
 import { donorMatches, isErasedEmail } from "./dashboard";
@@ -13,6 +13,7 @@ import { donorGroup, donorGroupsFor } from "./insights";
 import { emailHash } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
 import { inboxKey, onePerAddress } from "./one-per-address";
+import { nothingLeft } from "@/lib/donations/what-is-left";
 
 /**
  * Emails from a charity to its donors. Every call here comes after loadCharityForManager and the owner
@@ -84,9 +85,10 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
       if (!campaign) return null;
       const gave = new Set<string>();
       for (let from = 0; ; from += 1000) {
-        const { data, error: e } = await db().from("donations").select("donor_id").eq("charity_id", charityId).eq("campaign_id", campaign.id).eq("status", "paid").order("id").range(from, from + 999);
+        const { data, error: e } = await db().from("donations").select("donor_id, amount_cents, refunded_cents").eq("charity_id", charityId).eq("campaign_id", campaign.id).eq("status", "paid").order("id").range(from, from + 999);
         if (e) throw e;
-        for (const r of data ?? []) gave.add(r.donor_id as string);
+        // A gift refunded in full in part refunds is a refund, not a gift (21/11/2026).
+        for (const r of data ?? []) if (!nothingLeft(r)) gave.add(r.donor_id as string);
         if (!data || data.length < 1000) break;
       }
       donors = all.filter((d) => gave.has(d.donor_id));
@@ -104,13 +106,13 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
   return { donors: kept, stopped: reachable.length - allowed.length, thisWeek: allowed.length - kept.length, recordedOnly: donors.length - reachable.length, label };
 }
 
-/** Donors with at least one paid gift made on Givezy itself (not recorded by the charity). */
+/** Donors with at least one paid gift made on Givezy itself (not recorded by the charity), with something left after part refunds. */
 async function donorsWhoGaveOnGivezy(charityId: string): Promise<Set<string>> {
   const out = new Set<string>();
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db().from("donations").select("donor_id").eq("charity_id", charityId).eq("status", "paid").neq("gateway", "recorded").order("id").range(from, from + 999);
+    const { data, error } = await db().from("donations").select("donor_id, amount_cents, refunded_cents").eq("charity_id", charityId).eq("status", "paid").neq("gateway", "recorded").order("id").range(from, from + 999);
     if (error) throw error;
-    for (const r of data ?? []) out.add(r.donor_id as string);
+    for (const r of data ?? []) if (!nothingLeft(r)) out.add(r.donor_id as string);
     if (!data || data.length < 1000) break;
   }
   return out;
@@ -200,7 +202,7 @@ async function recipientsForJob(charityId: string, appealId: string): Promise<Ma
     for (let from = 0; ; from += 1000) {
       const { data, error } = await db()
         .from("donations")
-        .select("donor_id, donation_checkout_details(donor_type, first_name, last_name, organisation_name, email, erased_at)")
+        .select("donor_id, amount_cents, refunded_cents, donation_checkout_details(donor_type, first_name, last_name, organisation_name, email, erased_at)")
         .eq("charity_id", charityId)
         .eq("status", "paid")
         .in("donor_id", ids.slice(i, i + 200))
@@ -210,7 +212,8 @@ async function recipientsForJob(charityId: string, appealId: string): Promise<Ma
       if (error) throw error;
       for (const g of data ?? []) {
         const id = g.donor_id as string;
-        if (out.has(id)) continue;
+        // A gift refunded in full in part refunds is a refund, not a gift: a donor with only those has no address here and is skipped.
+        if (out.has(id) || nothingLeft(g)) continue;
         const raw = g.donation_checkout_details as unknown;
         const d = (Array.isArray(raw) ? raw[0] : raw) as { donor_type: string | null; first_name: string | null; last_name: string | null; organisation_name: string | null; email: string | null; erased_at: string | null } | null;
         if (!d) continue;
@@ -296,9 +299,12 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
         continue;
       }
       try {
-        const outcome = await transport.send(
-          appealEmail(d.email.trim(), { charityName: args.charityName, firstName: greetingName(d), subject: appeal.subject as string, body: appeal.body as string, stopUrl: `${site}/news/stop?t=${token}`, oneClickUrl: oneClickStopUrl(site, "news", token), replyTo: args.replyTo }),
-        );
+        const outcome = await transport.send({
+          ...appealEmail(d.email.trim(), { charityName: args.charityName, firstName: greetingName(d), subject: appeal.subject as string, body: appeal.body as string, stopUrl: `${site}/news/stop?t=${token}`, oneClickUrl: oneClickStopUrl(site, "news", token), replyTo: args.replyTo }),
+          // From the daily job, each email has a time limit, so a slow email service can't hold up the rest of the job.
+          // One cut off may have gone: it is handled below as any dropped connection (never sent again).
+          ...(args.auto ? { signal: AbortSignal.timeout(JOB_SEND_TIMEOUT_MS) } : {}),
+        });
         // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
         await mark(outcome === "sent" ? "sent" : "skipped");
         if (outcome === "sent") sentThisRun++;
@@ -347,11 +353,12 @@ export async function appealProgress(appealId: string): Promise<SendProgress> {
   return p;
 }
 
-export type AppealRow = { id: string; subject: string; audience_label: string; created_at: string; progress: SendProgress };
+/** created_by: who pressed Send (null once their sign-in was removed), for whether the rest carry on by themselves. */
+export type AppealRow = { id: string; subject: string; audience_label: string; created_at: string; created_by: string | null; progress: SendProgress };
 
 /** The charity's emails, newest first, with how far each got. */
 export async function listAppeals(charityId: string, limit = 20): Promise<AppealRow[]> {
-  const { data, error } = await db().from("charity_appeals").select("id, subject, audience_label, created_at").eq("charity_id", charityId).order("created_at", { ascending: false }).limit(limit);
+  const { data, error } = await db().from("charity_appeals").select("id, subject, audience_label, created_at, created_by").eq("charity_id", charityId).order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return Promise.all((data ?? []).map(async (a) => ({ ...(a as Omit<AppealRow, "progress">), progress: await appealProgress(a.id as string) })));
 }

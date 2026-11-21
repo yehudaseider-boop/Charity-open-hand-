@@ -27,8 +27,59 @@ export function carriesOnByItself(startedAt: string, now = new Date()): boolean 
   return now.getTime() - new Date(startedAt).getTime() <= CARRY_ON_DAYS * 86_400_000;
 }
 
-/** The charity's page, under an unfinished send that carries on by itself. */
-export const GOES_BY_ITSELF = "The rest go out by themselves over the next day or two. You can also press Send the rest now.";
+/**
+ * Will the daily job carry this unfinished send on by itself, and if not, why not (review 21/11/2026: the page said
+ * "over the next day or two" for every send under 14 days old, but the job may never reach some). The same rules the
+ * job applies: email on, started in the last CARRY_ON_DAYS, the charity's page live, whoever pressed Send still allowed
+ * to email donors, and not left for a person after the email service kept refusing it. It never promises a time: the
+ * job shares a few seconds a day among every charity's sends.
+ */
+export type CarryOnState = "goes" | "email_off" | "too_old" | "page_not_live" | "sender_left" | "left_for_person";
+
+/** The rules, without the database. */
+export function carryOnStateFrom(input: { startedAt: string; emailOn: boolean; pageLive: boolean; senderAllowed: boolean; history: HistoryEntry[]; now?: Date }): CarryOnState {
+  if (!input.emailOn) return "email_off";
+  if (!carriesOnByItself(input.startedAt, input.now)) return "too_old";
+  if (!input.pageLive) return "page_not_live";
+  if (!input.senderAllowed) return "sender_left";
+  const h = readHistory(input.history);
+  // Left for a person already, or the job will leave it on its next run (refused GIVE_UP_AFTER runs in a row).
+  if (h.left || h.refusedRuns >= GIVE_UP_AFTER) return "left_for_person";
+  return "goes";
+}
+
+/** For the charity's page: the state of one unfinished send, read as the job would (service role: check access first). */
+export async function carryOnState(s: UnfinishedSend, opts: { pageLive: boolean; store?: Pick<CarryOnStore, "sender" | "history">; emailOn?: () => boolean; now?: Date }): Promise<CarryOnState> {
+  const emailOn = (opts.emailOn ?? emailIsOn)();
+  const now = opts.now ?? new Date();
+  // Nothing more to read when the answer is already plain.
+  if (!emailOn || !carriesOnByItself(s.startedAt, now) || !opts.pageLive) return carryOnStateFrom({ startedAt: s.startedAt, emailOn, pageLive: opts.pageLive, senderAllowed: true, history: [], now });
+  const store = opts.store ?? supabaseCarryOnStore();
+  const [sender, history] = await Promise.all([store.sender(s), store.history(s)]);
+  return carryOnStateFrom({ startedAt: s.startedAt, emailOn, pageLive: true, senderAllowed: sender !== null, history, now });
+}
+
+/**
+ * The charity's page, under an unfinished send: whether the rest go out by themselves, and if not, why, with Send the
+ * rest as the way on. `owner`: the person looking may press Send the rest.
+ */
+export function carryOnLine(state: CarryOnState, opts: { owner: boolean }): string {
+  const press = opts.owner ? "Press Send the rest" : "Someone on your team who can email donors can press Send the rest";
+  switch (state) {
+    case "goes":
+      return opts.owner ? "The rest keep going out by themselves each day. You can also press Send the rest now." : "The rest keep going out by themselves each day.";
+    case "email_off":
+      return "Email isn't switched on here just now, so the rest don't go out by themselves and Send the rest can't send them yet. They're kept, and nobody gets it twice. Please contact Givezy.";
+    case "too_old":
+      return `This was started more than ${CARRY_ON_DAYS} days ago, so the rest no longer go out by themselves. ${press} to send them. Nobody gets it twice.`;
+    case "page_not_live":
+      return "Your page isn't live just now, so the rest don't go out by themselves. They're kept until it is.";
+    case "sender_left":
+      return `The person who started this can no longer email donors, so the rest don't go out by themselves. ${press} to send them. Nobody gets it twice.`;
+    case "left_for_person":
+      return `The email service refused the rest several days in a row, so they stopped going out by themselves. Nothing was lost and nobody was emailed twice. ${press} to try again.`;
+  }
+}
 
 /** Job runs in a row the email service refused (nothing sent) before a send is left for a person: the important emails' three tries again. */
 export const GIVE_UP_AFTER = RETRY_DELAYS_HOURS.length;
@@ -266,6 +317,23 @@ export function supabaseCarryOnStore(): CarryOnStore {
       });
     },
   };
+}
+
+/**
+ * The state of one charity's unfinished thank-you or news email, for the page after a press (service role: call only
+ * after checking the person manages this charity). Null when it isn't there.
+ */
+export async function carryOnStateOf(s: { kind: "thank_you"; charityId: string; month: string } | { kind: "appeal"; charityId: string; appealId: string }, opts: { pageLive: boolean }): Promise<CarryOnState | null> {
+  if (s.kind === "thank_you") {
+    const { data, error } = await db().from("charity_thank_yous").select("id, sent_by, sent_at").eq("charity_id", s.charityId).eq("period_month", s.month).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return carryOnState({ kind: "thank_you", id: data.id as string, charityId: s.charityId, startedBy: (data.sent_by as string | null) ?? null, startedAt: data.sent_at as string, month: s.month }, opts);
+  }
+  const { data, error } = await db().from("charity_appeals").select("id, created_by, created_at").eq("charity_id", s.charityId).eq("id", s.appealId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return carryOnState({ kind: "appeal", id: data.id as string, charityId: s.charityId, startedBy: (data.created_by as string | null) ?? null, startedAt: data.created_at as string }, opts);
 }
 
 /** The daily job's step: every unfinished send, carried on until `deadline`. */

@@ -15,6 +15,11 @@ export function useSafeFormPending(): boolean {
  * `<form action={…}>` on its own throws a failed send to the page's error screen: the person lost what they typed and
  * read "this page couldn't open" about a page that had opened. Here the form stays as it was, says plainly what
  * happened, and Send can be pressed again. The browser's own checks (required, email) still run first.
+ *
+ * The server action stays the form's own `action` (review 21/11/2026): before the page's script has loaded (exactly
+ * the slow connection this is for) the form is still an ordinary server-action post, so signing in works and nothing
+ * typed (an email, a sign-in code) ever lands in the address bar, history or server logs as a GET would put it. Once
+ * the script is running, onSubmit takes over: React then runs only our transition, never the action a second time.
  */
 export function SafeForm({ action, className, children }: { action: (formData: FormData) => Promise<void>; className?: string; children: React.ReactNode }) {
   const [pending, startTransition] = useTransition();
@@ -23,10 +28,12 @@ export function SafeForm({ action, className, children }: { action: (formData: F
     <SafeFormPending value={pending}>
       <form
         className={className}
+        action={action}
         onSubmit={(e) => {
           e.preventDefault();
           if (pending) return;
-          const formData = new FormData(e.currentTarget);
+          // With the button that was pressed, so a named submit button's value goes too, as a plain post would send it.
+          const formData = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
           setTrouble(null);
           startTransition(async () => {
             try {

@@ -8,7 +8,7 @@ import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { thankYouRecipients } from "@/lib/charity/thank-you-send";
-import { carriesOnByItself, GOES_BY_ITSELF } from "@/lib/charity/carry-on-sends";
+import { carryOnLine, carryOnState } from "@/lib/charity/carry-on-sends";
 import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import { formatDate } from "@/lib/dates";
 import { nextWeekStart } from "@/lib/charity/journey";
@@ -20,7 +20,7 @@ import { WordingEditor } from "./wording-editor";
 
 export const metadata: Metadata = { title: "Thank donors" };
 
-// Sending runs until about 40 seconds, then offers "Send the rest"; the daily job also carries the rest on by itself.
+// Sending runs until about 40 seconds, then offers "Send the rest"; the daily job may also carry the rest on by itself.
 export const maxDuration = 60;
 
 /**
@@ -39,7 +39,7 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
   const supabase = await createClient();
   const { data: sentRows } = await supabase
     .from("charity_thank_yous")
-    .select("id, period_month, body, sent_at, recipient_count, finished_at")
+    .select("id, period_month, body, sent_at, sent_by, recipient_count, finished_at")
     .eq("charity_id", id)
     .order("period_month", { ascending: false })
     .limit(24);
@@ -47,7 +47,18 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
   const months = recentMonths(new Date());
   // A thank-you that stopped part way (it ran out of time) and how many donors it hasn't reached yet.
   const unfinished = owner && charity.status === "approved"
-    ? await Promise.all((sentRows ?? []).filter((r) => !r.finished_at).map(async (r) => ({ month: r.period_month as string, sent: Number(r.recipient_count ?? 0), total: (await thankYouRecipients(id, r.period_month as string)).length, byItself: carriesOnByItself(r.sent_at as string) })))
+    ? await Promise.all(
+        (sentRows ?? []).filter((r) => !r.finished_at).map(async (r) => ({
+          month: r.period_month as string,
+          sent: Number(r.recipient_count ?? 0),
+          total: (await thankYouRecipients(id, r.period_month as string)).length,
+          // Whether the daily job really carries the rest on, by its own rules, and if not why (review 21/11/2026).
+          carryOn: await carryOnState(
+            { kind: "thank_you", id: r.id as string, charityId: id, startedBy: (r.sent_by as string | null) ?? null, startedAt: r.sent_at as string, month: String(r.period_month).slice(0, 10) },
+            { pageLive: charity.status === "approved" },
+          ),
+        })),
+      )
     : [];
   const open = owner && charity.status === "approved"
     ? await Promise.all(months.filter((m) => !sent.has(m)).map(async (m) => ({ month: m, count: (await thankYouRecipients(id, m)).length })))
@@ -94,14 +105,14 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
         <Notice>Your role doesn&apos;t include sending thank-yous. You can see what was sent below.</Notice>
       ) : null}
 
-      {unfinished.map(({ month, sent: done, total, byItself }) => (
+      {unfinished.map(({ month, sent: done, total, carryOn }) => (
         <Card key={`rest-${month}`} title={`${monthLabel(month)}: not finished`}>
           <div id="unfinished" className="space-y-3 text-sm">
             <p>
               Your thank-you has gone to {done} {done === 1 ? "donor" : "donors"} so far. About {Math.max(0, total - done)} haven&apos;t had it yet: the send stopped part way, or they
               already had a message from you this week. Anyone who had one this week can get it from Monday {formatDate(nextWeekStart(new Date()))}. Nobody gets it twice.
             </p>
-            {byItself ? <p className="text-muted">{GOES_BY_ITSELF}</p> : null}
+            <p className="text-muted">{carryOnLine(carryOn, { owner })}</p>
             <SendRestForm action={sendRestOfThankYou.bind(null, id, month)} confirm={`Send the same thank-you to the donors in ${monthLabel(month)} who haven't had it yet?`} />
           </div>
         </Card>

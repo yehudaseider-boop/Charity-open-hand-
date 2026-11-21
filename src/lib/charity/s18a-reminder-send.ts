@@ -14,6 +14,7 @@ import { messagedThisWeek } from "./weekly-limit";
 import { recordAction } from "./charity-actions";
 import { readPages } from "./paged";
 import { inTurns, readAllPages } from "./read-pages";
+import { nothingLeft } from "@/lib/donations/what-is-left";
 
 /**
  * The s18A filter's "details missing" and the reminder email (CRM step 2, 10/11/2026). Every call here comes after
@@ -38,13 +39,13 @@ export const REMINDER_KIND = "s18a_details_reminder";
  */
 export async function loadS18aMissing(charityId: string, now = new Date(), earliestYear?: Map<string, number>): Promise<Map<string, MissingDetail[]>> {
   const window = completionWindow(now);
-  type Gift = { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; donation_checkout_details: unknown };
+  type Gift = { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; amount_cents: number; refunded_cents: number | null; donation_checkout_details: unknown };
   // Read four batches of 1 000 at a time, and check receipts four lots of 200 at a time (19/11/2026: one after
   // another, a charity with 10 000 receipt gifts waited about 5 seconds on its overview and donors pages).
   const gifts = await readAllPages<Gift>((from, to, count) =>
     db()
       .from("donations")
-      .select(`id, status, wants_18a, tax_year, donor_id, donation_checkout_details(${DETAILS})`, count ? { count: "exact" } : undefined)
+      .select(`id, status, wants_18a, tax_year, donor_id, amount_cents, refunded_cents, donation_checkout_details(${DETAILS})`, count ? { count: "exact" } : undefined)
       .eq("charity_id", charityId)
       .eq("status", "paid")
       .eq("wants_18a", true)
@@ -54,6 +55,8 @@ export async function loadS18aMissing(charityId: string, now = new Date(), earli
   );
   const rows: { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; details: S18aDetailsRow | null }[] = [];
   for (const g of gifts) {
+    // A gift refunded in full in part refunds is a refund, not a gift: no s18A receipt, so no details to ask for.
+    if (nothingLeft(g)) continue;
     const d = g.donation_checkout_details as S18aDetailsRow | S18aDetailsRow[] | null;
     const details = Array.isArray(d) ? (d[0] ?? null) : d;
     // Only gifts that lack something are worth checking against issued receipts.
@@ -101,10 +104,10 @@ export async function contacts(charityId: string, donorIds: string[]): Promise<{
   for (let i = 0; i < donorIds.length; i += 200) {
     // Page by page: 200 long-standing donors can hold far more than the 1 000 rows one read returns, and a donor whose
     // gifts fell off the end would look like someone with no paid gift (and be stopped, or enrolled as new).
-    const data = await readPages<{ donor_id: string; gateway: string; paid_at: string; donation_checkout_details: unknown }>((from, to) =>
+    const data = await readPages<{ donor_id: string; gateway: string; paid_at: string; amount_cents: number; refunded_cents: number | null; donation_checkout_details: unknown }>((from, to) =>
       db()
         .from("donations")
-        .select("donor_id, gateway, paid_at, donation_checkout_details(email, first_name, donor_type, contact_person, erased_at)")
+        .select("donor_id, gateway, paid_at, amount_cents, refunded_cents, donation_checkout_details(email, first_name, donor_type, contact_person, erased_at)")
         .eq("charity_id", charityId)
         .eq("status", "paid")
         .in("donor_id", donorIds.slice(i, i + 200))
@@ -114,13 +117,17 @@ export async function contacts(charityId: string, donorIds: string[]): Promise<{
     );
     for (const g of data) {
       const id = g.donor_id as string;
-      found.add(id);
+      // A gift refunded in full in part refunds is a refund, not a gift (21/11/2026): it neither makes someone a donor
+      // here nor gives an address. Erasure still counts from every gift.
+      const left = !nothingLeft(g);
+      if (left) found.add(id);
       const raw = g.donation_checkout_details as unknown;
       const d = (Array.isArray(raw) ? raw[0] : raw) as { email: string | null; first_name: string | null; donor_type: string; contact_person: string | null; erased_at: string | null } | null;
       if (!d || d.erased_at || isErasedEmail(d.email)) {
         erased.add(id);
         continue;
       }
+      if (!left) continue;
       if (g.gateway === "recorded" || !d.email || byDonor.has(id)) continue;
       byDonor.set(id, { email: d.email.trim(), greeting: d.donor_type === "individual" ? d.first_name : (d.contact_person?.split(/\s+/)[0] ?? null) });
     }

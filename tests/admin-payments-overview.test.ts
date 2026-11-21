@@ -40,6 +40,16 @@ describe("payments overview", () => {
     expect(t).toMatchObject({ count: 3, donationCents: 123_000, contributionCents: 3_000 });
   });
 
+  it("paid per charity counts what is left after part refunds; a gift refunded in full in parts is not a payment (21/11/2026)", () => {
+    const t = totalsByCharity([
+      { charity_id: "a", charity: "Meals", amount_cents: 100_000, refunded_cents: 40_000, contribution_cents: 2_000 },
+      { charity_id: "a", charity: "Meals", amount_cents: "5000", refunded_cents: "5000", contribution_cents: 500 },
+      { charity_id: "a", charity: "Meals", amount_cents: 3_000, refunded_cents: null, contribution_cents: 0 },
+    ]);
+    // R1 000 less R400 refunded, plus R30; the contribution is never part-refunded, so it counts in full.
+    expect(t).toMatchObject({ count: 2, donationCents: 63_000, contributionCents: 2_500 });
+  });
+
   it("monthly donations: counts, the failed ones, and ones overdue by a day or more", () => {
     const h = monthlyHealth(
       [

@@ -1,6 +1,6 @@
 /** The app's mapping from the donor's own database rows to what the Giving and Receipts screens show. */
 import { describe, expect, it } from "vitest";
-import { cleanCode, countsTowardsReceipts, fromCache, givingLoadState, looksLikeEmail, newArrivals, seenFrom, toCache, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
+import { cleanCode, countsTowardsReceipts, fromCache, givingLoadState, isMissingColumn, looksLikeEmail, newArrivals, seenFrom, toCache, toGifts, toReceipts, toRecurring, type DonationRow } from "../apps/mobile/src/lib/live-giving";
 
 const charity = { slug: "meals", name_en: "Meals Fund" };
 const row = (o: Partial<DonationRow>): DonationRow => ({
@@ -363,5 +363,22 @@ describe("givingLoadState (Progress and Home, 20/11/2026)", () => {
     expect(at("signed-in", true)).toBe("ready");
     expect(at("signed-out", false)).toBe("ready");
     expect(at("agreeing", false)).toBe("ready");
+  });
+});
+
+describe("isMissingColumn: reading without the part-refund columns only when the server lacks them (21/11/2026)", () => {
+  const cols = ["refunded_cents", "receipt_hold"];
+  it("a server without the migration: Postgres's unknown column, or PostgREST's schema cache", () => {
+    expect(isMissingColumn({ code: "42703", message: "column donations.refunded_cents does not exist" }, cols)).toBe(true);
+    expect(isMissingColumn({ code: "PGRST204", message: "Could not find the 'receipt_hold' column of 'donations' in the schema cache" }, cols)).toBe(true);
+    expect(isMissingColumn({ message: "column donations.refunded_cents does not exist" }, cols)).toBe(true);
+  });
+  it("anything else is a load error, never a quiet read showing full amounts", () => {
+    expect(isMissingColumn(new TypeError("Network request failed"), cols)).toBe(false);
+    expect(isMissingColumn({ code: "57014", message: "canceling statement due to statement timeout" }, cols)).toBe(false);
+    expect(isMissingColumn({ code: "42501", message: "permission denied for table donations" }, cols)).toBe(false);
+    expect(isMissingColumn({ message: "column donations.other does not exist" }, cols)).toBe(false);
+    expect(isMissingColumn(null, cols)).toBe(false);
+    expect(isMissingColumn("offline", cols)).toBe(false);
   });
 });

@@ -10,7 +10,7 @@ import { forgetDetails } from "./donor-details";
 import { cacheKey, forgetGivingCache, writeGivingCache } from "./giving-cache";
 import { syncGiverType } from "./giver-type";
 import { secureStorage } from "./secure-storage";
-import { fromCache, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
+import { fromCache, isMissingColumn, newArrivals, seenFrom, toCache, type Seen, toGifts, toReceipts, toRecurring, type DonationRow, type KindRow, type ReceiptRow, type RecurringRow } from "./live-giving";
 import { supabase } from "./supabase";
 import { TEST_BUILD } from "./test-build";
 import { setDirectoryDemo } from "./directory";
@@ -122,9 +122,12 @@ async function loadLive(userId: string): Promise<Live> {
       // What was refunded of each gift in part refunds, and whether it is held off s18A receipts (readable since
       // migration 20261120000001). A server without that migration yet refuses the columns: read the rest rather
       // than lose the whole history (nothing can have been part refunded there).
+      // Only that refusal: a dropped connection or any other error shows as a load error, never full amounts with
+      // no sign of a refund.
       try {
         return await read(", refunded_cents, receipt_hold");
-      } catch {
+      } catch (e) {
+        if (!isMissingColumn(e, ["refunded_cents", "receipt_hold"])) throw e;
         return read("");
       }
     })(),

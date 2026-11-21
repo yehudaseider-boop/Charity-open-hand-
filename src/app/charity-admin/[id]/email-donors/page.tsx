@@ -5,7 +5,7 @@ import { DonePanel } from "@/components/done-panel";
 import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { appealsThisMonth, listAppeals } from "@/lib/charity/appeals";
-import { carriesOnByItself, GOES_BY_ITSELF } from "@/lib/charity/carry-on-sends";
+import { carryOnLine, carryOnState, type CarryOnState } from "@/lib/charity/carry-on-sends";
 import { audienceValue, parseAudience } from "@/lib/charity/appeals-rules";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { lapsedDaysFor, listSegments, listTags } from "@/lib/charity/donor-care";
@@ -18,7 +18,7 @@ import { formatDate } from "@/lib/dates";
 import { checkAppealAudience, continueAppeal, sendAppealNow, sendTestAppeal } from "./actions";
 import { AppealForm, ContinueForm } from "./forms";
 
-// Sending runs until about 40 seconds, then offers "Send the rest"; the daily job also carries the rest on by itself.
+// Sending runs until about 40 seconds, then offers "Send the rest"; the daily job may also carry the rest on by itself.
 export const maxDuration = 60;
 
 export const metadata: Metadata = { title: "Email donors" };
@@ -38,6 +38,14 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
   ]);
   // Emailing donors is part of the "message" role permission (team roles, 10/11/2026).
   const owner = can(role, "message");
+  // For each email still waiting: whether the daily job really carries the rest on, by its own rules (review 21/11/2026).
+  const carryOn = new Map<string, CarryOnState>(
+    await Promise.all(
+      appeals
+        .filter((a) => a.progress.waiting)
+        .map(async (a) => [a.id, await carryOnState({ kind: "appeal", id: a.id, charityId: id, startedBy: a.created_by, startedAt: a.created_at }, { pageLive: charity.status === "approved" })] as const),
+    ),
+  );
   // "Email these donors" from a list, a tag or a campaign arrives with it chosen.
   const asked = parseAudience(sp.to);
   const audiences = [
@@ -111,7 +119,7 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
                   {a.progress.failed ? `, ${a.progress.failed} not sent` : ""}
                   {a.progress.waiting ? `, ${a.progress.waiting} still to send` : ""}
                 </p>
-                {a.progress.waiting && carriesOnByItself(a.created_at) ? <p className="text-xs text-muted">{owner ? GOES_BY_ITSELF : "The rest go out by themselves over the next day or two."}</p> : null}
+                {a.progress.waiting && carryOn.has(a.id) ? <p className="text-xs text-muted">{carryOnLine(carryOn.get(a.id)!, { owner })}</p> : null}
                 {a.progress.waiting && owner ? <ContinueForm action={continueAppeal.bind(null, id, a.id)} waiting={a.progress.waiting} /> : null}
               </li>
             ))}

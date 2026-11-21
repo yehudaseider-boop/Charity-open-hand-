@@ -45,6 +45,24 @@ describe("the donor's story", () => {
     expect(story.some((e) => e.what.includes("R50"))).toBe(false);
   });
 
+  it("a part refund shows what is left and the refund in plain words; refunded in full in parts shows as refunded (21/11/2026)", () => {
+    const story = buildDonorStory(
+      rows({
+        gifts: [
+          { id: "d1", status: "paid", amount_cents: 100_000, refunded_cents: 40_000, paid_at: "2026-03-02T08:00:00Z", created_at: "2026-03-02T08:00:00Z", recorded_method: null },
+          { id: "d2", status: "paid", amount_cents: 5_000, refunded_cents: 5_000, paid_at: "2026-02-02T08:00:00Z", created_at: "2026-02-02T08:00:00Z", recorded_method: null },
+          { id: "d3", status: "paid", amount_cents: 2_000, refunded_cents: 0, paid_at: "2026-01-02T08:00:00Z", created_at: "2026-01-02T08:00:00Z", recorded_method: null },
+        ],
+      }),
+      { base, erased: false },
+    );
+    expect(story.map((e) => [e.what, e.status, e.tone])).toEqual([
+      ["Gift of R600 (R1 000, R400 refunded)", null, "good"],
+      ["Gift of R50", "Refunded", "warning"],
+      ["Gift of R20", null, "good"],
+    ]);
+  });
+
   it("tells a monthly donation's start, stop and why, in the stopped list's words", () => {
     const story = buildDonorStory(
       rows({

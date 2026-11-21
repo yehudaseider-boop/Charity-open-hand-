@@ -8,12 +8,24 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { refusal } from "@/lib/charity/team";
 import { checkThankYou, monthLabel, recentMonths } from "@/lib/charity/thank-you";
 import { continueThankYou, sendThankYou } from "@/lib/charity/thank-you-send";
+import { carryOnStateOf } from "@/lib/charity/carry-on-sends";
 import type { FormState } from "@/lib/form";
 import { logAudit } from "@/lib/audit";
 import { checkThankYouNote } from "@/lib/charity/thank-you-note";
 import { createClient } from "@/lib/supabase/server";
 
 /** Only the owner sends thank-yous (Yehuda, 02/11/2026), as for Email donors. */
+
+/**
+ * Whether the rest of a stopped thank-you really go out by themselves (the daily job's own rules), so the panel after
+ * the press never promises it when they don't (review 21/11/2026). False when it can't be told: the panel then points
+ * to Send the rest.
+ */
+async function goesByItself(charityId: string, month: string, remaining: number): Promise<boolean> {
+  if (!remaining) return false;
+  const state = await carryOnStateOf({ kind: "thank_you", charityId, month }, { pageLive: true }).catch(() => null);
+  return state === "goes";
+}
 
 export async function sendThankDonors(charityId: string, month: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
@@ -29,7 +41,7 @@ export async function sendThankDonors(charityId: string, month: string, _prev: F
   revalidatePath(`/charity-admin/${charityId}/thank-donors`);
   if (!r.ok) return { ok: false, message: r.message };
   // Sent emails can't be called back, so there is no undo: the page asked first.
-  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null }, null);
+  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null, byItself: await goesByItself(charityId, month, r.remaining) }, null);
   redirect(`/charity-admin/${charityId}/thank-donors?done=${done}`);
 }
 
@@ -43,7 +55,7 @@ export async function sendRestOfThankYou(charityId: string, month: string, _prev
   const r = await continueThankYou({ charityId, charityName: charity.name_en, month, userId: viewer.userId, replyTo: priv?.contact_email ?? null });
   revalidatePath(`/charity-admin/${charityId}/thank-donors`);
   if (!r.ok) return { ok: false, message: r.message };
-  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null }, null);
+  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null, byItself: await goesByItself(charityId, month, r.remaining) }, null);
   redirect(`/charity-admin/${charityId}/thank-donors?done=${done}`);
 }
 

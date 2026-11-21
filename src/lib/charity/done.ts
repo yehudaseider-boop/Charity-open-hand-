@@ -175,7 +175,8 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         : "";
       if (remaining) {
         return {
-          what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: the rest go out by themselves over the next day or two, and nobody gets it twice.${leftOut}`,
+          // Only when the daily job really carries them on (`byItself`, worked out at the press, 21/11/2026); never a time.
+          what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: ${d.byItself === true ? "the rest keep going out by themselves each day, or press Send the rest" : "press Send the rest to send them"}, and nobody gets it twice.${leftOut}`,
           next: { label: "Send the rest", href: `${c.base}/thank-donors#unfinished` },
         };
       }
@@ -313,7 +314,7 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
         };
       }
       return {
-        what: `${quote(d.subject)} went to ${plural(sent, "donor")}.${waiting ? ` ${plural(waiting, "email")} still to send: they go out by themselves over the next day or two, or press "Send the rest" below.` : ""}${Number(d.failed ?? 0) ? ` ${plural(Number(d.failed), "email")} could not be sent.` : ""}`,
+        what: `${quote(d.subject)} went to ${plural(sent, "donor")}.${waiting ? ` ${plural(waiting, "email")} still to send: ${d.byItself === true ? "they keep going out by themselves each day, or press \"Send the rest\" below" : "press \"Send the rest\" below to send them"}.` : ""}${Number(d.failed ?? 0) ? ` ${plural(Number(d.failed), "email")} could not be sent.` : ""}`,
         next: { label: "See your donors", href: `${c.base}/donors` },
       };
     }

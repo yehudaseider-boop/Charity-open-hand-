@@ -46,7 +46,7 @@ export default async function PaymentsPage() {
     db.from("donations").select("id, created_at, total_charged_cents, charities(name_en)").eq("status", "pending").order("created_at").limit(500),
     db.from("gateway_events").select("id, gateway, event_type, received_at, payload").is("processed_at", null).order("received_at").limit(200),
     db.from("audit_log").select("id, action, created_at, entity_type, entity_id, details").in("action", HELD).gte("created_at", since).order("created_at", { ascending: false }).limit(50),
-    allRows((a, b) => db.from("donations").select("charity_id, amount_cents, contribution_cents, charities(name_en)").eq("status", "paid").neq("gateway", "recorded").gte("paid_at", since).order("id").range(a, b)),
+    allRows((a, b) => db.from("donations").select("charity_id, amount_cents, refunded_cents, contribution_cents, charities(name_en)").eq("status", "paid").neq("gateway", "recorded").gte("paid_at", since).order("id").range(a, b)),
     allRows((a, b) => db.from("recurring_donations").select("id, status, next_charge_at, last_attempt_at, amount_cents, contribution_cents, charities(name_en)").in("status", ["active", "paused", "failed"]).order("id").range(a, b)),
     // Paid gifts kept off s18A receipts until a person has looked (an open dispute, a refund to check).
     db.from("donations").select("id, amount_cents, refunded_cents, receipt_hold, paid_at, charities(name_en)").eq("status", "paid").not("receipt_hold", "is", null).order("paid_at").limit(200),
@@ -85,7 +85,7 @@ export default async function PaymentsPage() {
     now,
   );
   const totals = totalsByCharity(
-    (paid.data ?? []).map((r): PaidRow => ({ charity_id: r.charity_id as string, charity: nameOf(r.charities), amount_cents: r.amount_cents as number, contribution_cents: r.contribution_cents as number })),
+    (paid.data ?? []).map((r): PaidRow => ({ charity_id: r.charity_id as string, charity: nameOf(r.charities), amount_cents: r.amount_cents as number, refunded_cents: r.refunded_cents as number | null, contribution_cents: r.contribution_cents as number })),
   );
   const health = monthlyHealth(
     (monthly.data ?? []).map((r) => ({
@@ -237,7 +237,7 @@ export default async function PaymentsPage() {
 
       <section className="space-y-2 rounded-card border border-border bg-surface p-4 text-sm">
         <h2 className="font-semibold">Last 30 days, by charity</h2>
-        <p className="text-xs text-muted">From our own records of confirmed payments. Compare with the gateway&apos;s settlement report. The donation goes to the charity; the contribution is Givezy&apos;s.</p>
+        <p className="text-xs text-muted">From our own records of confirmed payments. Compare with the gateway&apos;s settlement report. The donation goes to the charity; the contribution is Givezy&apos;s. Donations count what is left after part refunds, so they can be less than the gateway&apos;s report shows.</p>
         {totals.list.length === 0 ? <p className="text-muted">No confirmed payments in the last 30 days.</p> : null}
         {totals.list.map((t) => (
           <Row key={t.charity} left={`${t.charity} · ${t.count} ${t.count === 1 ? "payment" : "payments"}`} right={`${formatRand(t.donationCents)}${t.contributionCents ? ` + ${formatRand(t.contributionCents)}` : ""}`} />

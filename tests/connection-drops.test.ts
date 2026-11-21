@@ -104,6 +104,56 @@ describe("SafeForm (Sign in)", () => {
   });
 });
 
+describe("SafeForm before the page's script has loaded (review 21/11/2026)", () => {
+  // What the browser does with the server's HTML before hydration: a form with no action and no method is a GET to the
+  // same page, which put the email, or a sign-in code, into the address bar, history and server logs.
+  const noGetFallback = (html: string) => {
+    const form = html.match(/<form[^>]*>/)?.[0] ?? "";
+    expect(form).not.toBe("");
+    expect(form).not.toMatch(/method="get"/i);
+    // Either a real post (a server action) or React's guard that refuses to submit at all: never a plain GET.
+    expect(/method="post"/i.test(form) || /action="javascript:/.test(form)).toBe(true);
+  };
+
+  it("a server action posts, with its id, as an ordinary form post", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    // As Next hands a server action to a client component: it knows how to post itself without the page's script.
+    const serverAction = Object.assign(async () => {}, {
+      $$FORM_ACTION: () => ({ name: "$ACTION_ID_abc123", action: "", encType: "multipart/form-data", method: "POST", data: null }),
+    });
+    const html = renderToStaticMarkup(
+      createElement(SafeForm as unknown as React.FC<{ action: typeof serverAction }>, { action: serverAction }, createElement("input", { name: "code", defaultValue: "" })),
+    );
+    noGetFallback(html);
+    expect(html).toMatch(/<form[^>]*method="POST"/);
+    expect(html).toContain("$ACTION_ID_abc123");
+  });
+
+  it("any other action never submits as a GET either", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    noGetFallback(renderToStaticMarkup(createElement(SafeForm as unknown as React.FC<{ action: () => Promise<void> }>, { action: async () => {} }, createElement("input", { name: "email" }))));
+  });
+
+  it("once running, the action runs once per press, with a named submit button's value", async () => {
+    const got: FormData[] = [];
+    const action = async (f: FormData) => void got.push(f);
+    await act(async () => {
+      root.render(
+        createElement(
+          SafeForm as unknown as React.FC<{ action: typeof action }>,
+          { action },
+          createElement("input", { name: "email", defaultValue: "thandi@example.co.za" }),
+          createElement(PendingButton as unknown as React.FC<{ pendingLabel: string; name: string; value: string }>, { pendingLabel: "Sending…", name: "intent", value: "resend" }, "Send"),
+        ),
+      );
+    });
+    await act(async () => host.querySelector("form")!.requestSubmit(host.querySelector("button")!));
+    expect(got).toHaveLength(1);
+    expect(got[0].get("email")).toBe("thandi@example.co.za");
+    expect(got[0].get("intent")).toBe("resend");
+  });
+});
+
 describe("CharitySearch offline", () => {
   it("doesn't search while offline, says so, and searches once back online", async () => {
     vi.useFakeTimers();

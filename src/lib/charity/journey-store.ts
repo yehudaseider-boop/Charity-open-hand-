@@ -36,6 +36,7 @@ import { contacts, optedOutHashes } from "./s18a-reminder-send";
 import { emailHash, weekStart } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
 import { readPages } from "./paged";
+import { nothingLeft } from "@/lib/donations/what-is-left";
 import { inboxKey } from "./one-per-address";
 
 /**
@@ -154,10 +155,10 @@ export async function journeyPeople(charityId: string, j: Pick<Journey, "id">, l
 async function donorNames(charityId: string, donorIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (let i = 0; i < donorIds.length; i += 200) {
-    const data = await readPages<{ donor_id: string; paid_at: string; donation_checkout_details: unknown }>((from, to) =>
+    const data = await readPages<{ donor_id: string; paid_at: string; amount_cents: number; refunded_cents: number | null; donation_checkout_details: unknown }>((from, to) =>
       db()
         .from("donations")
-        .select("donor_id, paid_at, donation_checkout_details(donor_type, first_name, last_name, organisation_name, erased_at)")
+        .select("donor_id, paid_at, amount_cents, refunded_cents, donation_checkout_details(donor_type, first_name, last_name, organisation_name, erased_at)")
         .eq("charity_id", charityId)
         .eq("status", "paid")
         .in("donor_id", donorIds.slice(i, i + 200))
@@ -165,7 +166,9 @@ async function donorNames(charityId: string, donorIds: string[]): Promise<Map<st
         .order("id")
         .range(from, to),
     );
-    for (const g of data) {
+    // Gifts with something left first (a gift refunded in full in part refunds is a refund, not a gift); one refunded
+    // in full still names a donor who has nothing else, rather than "A donor".
+    for (const g of [...data.filter((x) => !nothingLeft(x)), ...data.filter((x) => nothingLeft(x))]) {
       const id = g.donor_id as string;
       if (out.has(id)) continue;
       const raw = g.donation_checkout_details as unknown;
@@ -188,11 +191,12 @@ async function donorNames(charityId: string, donorIds: string[]): Promise<Map<st
 async function allDonorIds(charityId: string, before?: string): Promise<string[]> {
   const ids = new Set<string>();
   for (let from = 0; ; from += 1000) {
-    let q = db().from("donations").select("donor_id").eq("charity_id", charityId).eq("status", "paid").not("donor_id", "is", null);
+    let q = db().from("donations").select("donor_id, amount_cents, refunded_cents").eq("charity_id", charityId).eq("status", "paid").not("donor_id", "is", null);
     if (before) q = q.lt("paid_at", before);
     const { data, error } = await q.order("id").range(from, from + 999);
     if (error) throw error;
-    for (const r of data ?? []) ids.add(r.donor_id as string);
+    // A gift refunded in full in part refunds is a refund, not a gift (21/11/2026).
+    for (const r of data ?? []) if (!nothingLeft(r)) ids.add(r.donor_id as string);
     if (!data || data.length < 1000) break;
   }
   return [...ids];
@@ -418,11 +422,12 @@ async function gaveAgainRows(charityId: string, rows: { id: string; donor_id: st
   for (let i = 0; i < withDate.length; i += 200) {
     const chunk = withDate.slice(i, i + 200);
     const earliest = new Date(Math.min(...chunk.map((r) => Date.parse(r.enrolled_at!)))).toISOString();
-    const data = await readPages<{ donor_id: string; paid_at: string }>((from, to) =>
-      db().from("donations").select("donor_id, paid_at").eq("charity_id", charityId).eq("status", "paid").in("donor_id", chunk.map((r) => r.donor_id)).gt("paid_at", earliest).order("id").range(from, to),
+    const data = await readPages<{ donor_id: string; paid_at: string; amount_cents: number; refunded_cents: number | null }>((from, to) =>
+      db().from("donations").select("donor_id, paid_at, amount_cents, refunded_cents").eq("charity_id", charityId).eq("status", "paid").in("donor_id", chunk.map((r) => r.donor_id)).gt("paid_at", earliest).order("id").range(from, to),
     );
     const last = new Map<string, Date>();
-    for (const g of data) {
+    // A gift refunded in full in part refunds is not giving again.
+    for (const g of data.filter((x) => !nothingLeft(x))) {
       const at = new Date(g.paid_at as string);
       const had = last.get(g.donor_id as string);
       if (!had || at > had) last.set(g.donor_id as string, at);
@@ -458,10 +463,11 @@ async function stopGaveAgain(winbacks: Live[], now: Date, deadline: number): Pro
     const last = new Map<string, Date>();
     for (let i = 0; i < ids.length; i += 200) {
       const earliest = new Date(Math.min(...ids.slice(i, i + 200).map((id) => enrolled.get(id)!.at.getTime()))).toISOString();
-      const data = await readPages<{ donor_id: string; paid_at: string }>((from, to) =>
-        db().from("donations").select("donor_id, paid_at").eq("charity_id", j.charityId).eq("status", "paid").in("donor_id", ids.slice(i, i + 200)).gt("paid_at", earliest).order("id").range(from, to),
+      const data = await readPages<{ donor_id: string; paid_at: string; amount_cents: number; refunded_cents: number | null }>((from, to) =>
+        db().from("donations").select("donor_id, paid_at, amount_cents, refunded_cents").eq("charity_id", j.charityId).eq("status", "paid").in("donor_id", ids.slice(i, i + 200)).gt("paid_at", earliest).order("id").range(from, to),
       );
-      for (const g of data) {
+      // A gift refunded in full in part refunds is not giving again.
+      for (const g of data.filter((x) => !nothingLeft(x))) {
         const at = new Date(g.paid_at as string);
         const had = last.get(g.donor_id as string);
         if (!had || at > had) last.set(g.donor_id as string, at);
@@ -488,7 +494,7 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
     for (let from = 0; from < 5000; from += 1000) {
       let q = db()
         .from("donations")
-        .select("donor_id, paid_at")
+        .select("donor_id, paid_at, amount_cents, refunded_cents")
         .eq("charity_id", j.charityId)
         .eq("status", "paid")
         .neq("gateway", "recorded")
@@ -498,7 +504,8 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
       if (j.kind === "campaign" && j.campaignId) q = q.eq("campaign_id", j.campaignId);
       const { data, error: e } = await q.order("paid_at").order("id").range(from, from + 999);
       if (e) throw e;
-      for (const r of data ?? []) if (!first.has(r.donor_id as string)) first.set(r.donor_id as string, new Date(r.paid_at as string));
+      // A gift refunded in full in part refunds is a refund, not a gift: it doesn't make a new donor.
+      for (const r of data ?? []) if (!nothingLeft(r) && !first.has(r.donor_id as string)) first.set(r.donor_id as string, new Date(r.paid_at as string));
       if (!data || data.length < 1000) break;
     }
     if (!first.size) continue;

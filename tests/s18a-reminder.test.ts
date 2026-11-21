@@ -365,6 +365,19 @@ describe("sending reminders", () => {
     expect(who.byDonor.get("sarah")).toEqual({ email: "sarah.new@x.co", greeting: "Sal" });
   });
 
+  it("a gift refunded in full in part refunds is no gift: no address from it, no reminder about it; a part refund still counts (21/11/2026)", async () => {
+    tables.donations.push(gift("g0", "sarah", { paid_at: "2026-11-05T10:00:00+02:00", amount_cents: 10_000, refunded_cents: 10_000 }, { email: "sarah.new@x.co", first_name: "Sal" }));
+    tables.donations.push(gift("ga", "gone", { amount_cents: 10_000, refunded_cents: 10_000 }, { email: "gone@x.co", first_name: "Gone" }));
+    tables.donations.push(gift("gb", "part", { amount_cents: 10_000, refunded_cents: 4_000 }, { email: "part@x.co", first_name: "Part" }));
+    const who = await contacts("c1", ["sarah", "gone", "part"]);
+    expect(who.byDonor.get("sarah")).toEqual({ email: "sarah@x.co", greeting: "Sarah" });
+    expect(who.found.has("gone")).toBe(false);
+    expect(who.byDonor.has("gone")).toBe(false);
+    expect(who.byDonor.get("part")).toEqual({ email: "part@x.co", greeting: "Part" });
+    await sendS18aReminders(args(["gone", "part"]));
+    expect(sent.map((m) => m.to)).toEqual(["part@x.co"]);
+  });
+
   it("stopped part way by a database problem: what was sent is still recorded, and the rest are still to send", async () => {
     tables.donations.push(gift("g8", "anna", {}, { email: "anna@x.co", first_name: "Anna" }), gift("g9", "ben", {}, { email: "ben@x.co", first_name: "Ben" }));
     claimsBeforeOutage = 1;

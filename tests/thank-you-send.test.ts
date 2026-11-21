@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emailHash } from "@/lib/charity/thank-you";
 
 vi.mock("server-only", () => ({}));
-const sent: { to: string; text: string; headers?: Record<string, string> }[] = [];
+const sent: { to: string; text: string; headers?: Record<string, string>; signal?: AbortSignal }[] = [];
 let donations: unknown[] = [];
 let optedOut: string[] = [];
 // The month's claim row, and the addresses claimed for it (hash -> status).
@@ -104,7 +104,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 const { continueThankYou, sendThankYou } = await import("@/lib/charity/thank-you-send");
-const gift = (email: string, first: string | null, erased = false) => ({ id: email, donor_id: `d-${email.toLowerCase()}`, donation_checkout_details: { email, first_name: first, erased_at: erased ? "2026-10-01" : null } });
+const gift = (email: string, first: string | null, erased = false, refunded_cents = 0) => ({ id: email, donor_id: `d-${email.toLowerCase()}`, amount_cents: 10_000, refunded_cents, donation_checkout_details: { email, first_name: first, erased_at: erased ? "2026-10-01" : null } });
 const args = { charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", body: "Thank you, truly.", userId: "u1" };
 
 beforeEach(() => {
@@ -144,6 +144,39 @@ describe("sending a thank-you", () => {
     await continueThankYou(args);
     expect(sent.map((m) => m.to)).toEqual(["ann@x.co", "ben@x.co", "cat@x.co"]);
     expect(month?.finished_at).not.toBeNull();
+  });
+
+  it("a gift refunded in full in part refunds is a refund, not a gift: no thank-you for it; a part refund still gets one (21/11/2026)", async () => {
+    donations = [gift("all@x.co", "All", false, 10_000), gift("part@x.co", "Part", false, 4_000)];
+    const r = await sendThankYou(args);
+    expect(r).toMatchObject({ ok: true, sent: 1, remaining: 0 });
+    expect(sent.map((m) => m.to)).toEqual(["part@x.co"]);
+  });
+
+  it("carried on by the daily job, each email has an 8-second limit; a person's press has none (review 21/11/2026)", async () => {
+    donations = [gift("ann@x.co", "Ann")];
+    await sendThankYou(args);
+    expect(sent[0].signal).toBeUndefined();
+    donations = [gift("ann@x.co", "Ann"), gift("ben@x.co", "Ben")];
+    month!.finished_at = null;
+    await continueThankYou({ ...args, userId: null, auto: true });
+    expect(sent[1].to).toBe("ben@x.co");
+    expect(sent[1].signal).toBeInstanceOf(AbortSignal);
+    expect(sent[1].signal?.aborted).toBe(false);
+  });
+
+  it("a job send cut off by its time limit may have gone: it stays 'sending', never sent again", async () => {
+    donations = [gift("a@x.co", "A"), gift("b@x.co", "B")];
+    month = { id: "t1", body: "Thank you, truly.", finished_at: null };
+    dropFor = new Set(["a@x.co"]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await continueThankYou({ ...args, userId: null, auto: true });
+    err.mockRestore();
+    expect(recipients.get(emailHash("a@x.co"))).toBe("sending");
+    expect(r).toMatchObject({ ok: true, sent: 1 });
+    dropFor = new Set();
+    await continueThankYou({ ...args, userId: null, auto: true });
+    expect(sent.map((m) => m.to)).toEqual(["b@x.co"]);
   });
 
   it("emails each address once, skipping erased and opted-out donors", async () => {

@@ -10,6 +10,7 @@ import { formatRand } from "@/lib/money";
 import { RECORDED_METHODS, type RecordedMethod } from "./recorded-gifts";
 import { lapsedReasonLabel, type LapsedReason } from "./lapsed-monthly";
 import { monthLabel } from "./thank-you";
+import { leftCents, nothingLeft, partRefundNote } from "@/lib/donations/what-is-left";
 
 /** How many entries the page shows before "Show older", and the most it ever shows. */
 export const STORY_FIRST = 100;
@@ -33,7 +34,8 @@ export type StoryKind =
 
 /** The rows the store reads, already limited to this charity and this donor. */
 export type StoryRows = {
-  gifts: { id: string; status: string; amount_cents: number; paid_at: string | null; created_at: string; recorded_method: string | null }[];
+  /** refunded_cents: cents of the gift refunded in part refunds (the gift stays paid). */
+  gifts: { id: string; status: string; amount_cents: number; refunded_cents?: number | null; paid_at: string | null; created_at: string; recorded_method: string | null }[];
   monthly: { id: string; status: string; amount_cents: number; first_paid_at: string | null; ended_at: string | null; paused_at: string | null; ended_reason: string | null }[];
   thanks: { kind: string; sent_at: string }[];
   appeals: { subject: string | null; status: string; at: string | null }[];
@@ -92,12 +94,18 @@ export function buildDonorStory(rows: StoryRows, opts: { base: string; erased: b
   for (const g of rows.gifts) {
     if (!["paid", "refunded", "charged_back"].includes(g.status)) continue;
     const how = g.recorded_method ? (RECORDED_METHODS[g.recorded_method as RecordedMethod] ?? "Recorded") : null;
+    // Part refunds (20/11/2026): a paid gift shows what is left, with the part refund in plain words; one refunded in
+    // full in parts shows as refunded, like a refunded gift.
+    const allRefunded = g.status === "refunded" || (g.status === "paid" && nothingLeft(g));
+    const partNote = g.status === "paid" && !allRefunded ? partRefundNote(g) : null;
+    const shown = g.status === "paid" && !allRefunded ? leftCents(g) : g.amount_cents;
+    const extra = [how, partNote].filter(Boolean).join("; ");
     out.push({
       at: g.paid_at ?? g.created_at,
       kind: "gift",
-      what: `${how ? "Recorded gift" : "Gift"} of ${formatRand(g.amount_cents)}${how ? ` (${how})` : ""}`,
-      status: g.status === "paid" ? null : g.status === "refunded" ? "Refunded" : "Charged back",
-      tone: g.status === "paid" ? "good" : "warning",
+      what: `${how ? "Recorded gift" : "Gift"} of ${formatRand(shown)}${extra ? ` (${extra})` : ""}`,
+      status: allRefunded ? "Refunded" : g.status === "paid" ? null : "Charged back",
+      tone: allRefunded || g.status !== "paid" ? "warning" : "good",
       href: `${opts.base}/donations/${g.id}`,
     });
   }

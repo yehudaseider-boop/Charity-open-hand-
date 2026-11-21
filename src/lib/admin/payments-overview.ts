@@ -2,10 +2,11 @@
  * What the Payments page shows, worked out from rows read from the database. Pure.
  */
 import { donationReference } from "@/lib/donations/reference";
+import { leftCents, nothingLeft } from "@/lib/donations/what-is-left";
 
 export type PendingRow = { id: string; created_at: string; total_charged_cents: number | string; charity: string };
 export type EventRow = { id: string; gateway: string; event_type: string; received_at: string; reference: string | null };
-export type PaidRow = { charity_id: string; charity: string; amount_cents: number | string; contribution_cents: number | string };
+export type PaidRow = { charity_id: string; charity: string; amount_cents: number | string; contribution_cents: number | string; refunded_cents?: number | string | null };
 export type MonthlyRow = { id: string; status: string; next_charge_at: string | null; last_attempt_at: string | null; charity: string; amount_cents: number | string; contribution_cents: number | string };
 
 const MINUTE = 60_000;
@@ -31,13 +32,17 @@ export function staleEvents(rows: EventRow[], now: Date) {
     .sort((a, b) => a.receivedAt.localeCompare(b.receivedAt));
 }
 
-/** Money per charity: what went to the charity and what Givezy received as contributions. */
+/**
+ * Money per charity: what went to the charity and what Givezy received as contributions. A gift counts what is left
+ * after part refunds, and one with nothing left is a refund, not a payment (21/11/2026). Part refunds never touch the
+ * contribution, so it is counted in full.
+ */
 export function totalsByCharity(rows: PaidRow[]) {
   const by = new Map<string, { charity: string; count: number; donationCents: number; contributionCents: number }>();
   for (const r of rows) {
     const t = by.get(r.charity_id) ?? { charity: r.charity, count: 0, donationCents: 0, contributionCents: 0 };
-    t.count += 1;
-    t.donationCents += Number(r.amount_cents);
+    if (!nothingLeft(r)) t.count += 1;
+    t.donationCents += leftCents(r);
     t.contributionCents += Number(r.contribution_cents);
     by.set(r.charity_id, t);
   }

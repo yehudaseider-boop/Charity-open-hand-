@@ -6,6 +6,7 @@ import { requireViewer } from "@/lib/auth";
 import { createAppeal, pickAudience, recentSameAppeal, sendAppeal } from "@/lib/charity/appeals";
 import { appealEmail, checkAppeal, parseAudience } from "@/lib/charity/appeals-rules";
 import { recordAction } from "@/lib/charity/charity-actions";
+import { carryOnLine, carryOnStateOf } from "@/lib/charity/carry-on-sends";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { refusal } from "@/lib/charity/team";
 import { getEmailTransport } from "@/lib/email";
@@ -80,7 +81,9 @@ export async function sendAppealNow(charityId: string, _prev: FormState, formDat
   const appealId = await createAppeal({ charityId, userId: viewer.userId, subject: r.subject, body: r.body, audience: r.audience, pick });
   const p = await sendAppeal({ charityId, appealId, charityName: r.charity.name_en, replyTo: r.priv?.contact_email ?? null, userId: viewer.userId });
   revalidatePath(`/charity-admin/${charityId}/email-donors`);
-  const done = await recordAction(charityId, viewer.userId, "appeal_sent", { subject: r.subject, sent: p?.sent ?? 0, waiting: p?.waiting ?? 0, failed: p?.failed ?? 0, skipped: p?.skipped ?? 0 }, null);
+  // Whether the rest really go out by themselves (the daily job's own rules), so the panel never promises it when they don't.
+  const byItself = p?.waiting ? (await carryOnStateOf({ kind: "appeal", charityId, appealId }, { pageLive: true }).catch(() => null)) === "goes" : false;
+  const done = await recordAction(charityId, viewer.userId, "appeal_sent", { subject: r.subject, sent: p?.sent ?? 0, waiting: p?.waiting ?? 0, failed: p?.failed ?? 0, skipped: p?.skipped ?? 0, byItself }, null);
   redirect(`/charity-admin/${charityId}/email-donors?done=${done}`);
 }
 
@@ -96,5 +99,8 @@ export async function continueAppeal(charityId: string, appealId: string, _prev:
   const p = await sendAppeal({ charityId, appealId, charityName: charity.name_en, replyTo: priv?.contact_email ?? null, userId: viewer.userId });
   if (!p) return { ok: false, message: "That email isn't there any more." };
   revalidatePath(`/charity-admin/${charityId}/email-donors`);
-  return { ok: true, message: p.waiting ? `${p.sent} sent so far, ${p.waiting} still to send. They go out by themselves over the next day or two, or press Send the rest again.` : `All sent: ${p.sent} delivered to the email service.` };
+  if (!p.waiting) return { ok: true, message: `All sent: ${p.sent} delivered to the email service.` };
+  // Only say the rest go out by themselves when the daily job really carries them on (review 21/11/2026).
+  const state = await carryOnStateOf({ kind: "appeal", charityId, appealId }, { pageLive: true }).catch(() => null);
+  return { ok: true, message: `${p.sent} sent so far, ${p.waiting} still to send. ${state ? carryOnLine(state, { owner: true }) : "Press Send the rest again to carry on. Nobody gets it twice."}` };
 }
