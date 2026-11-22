@@ -42,6 +42,13 @@ jobs:
       - name: Install website packages
         run: npm ci --no-audit --no-fund
 
+      # The database takes about a minute to wake up and needs nothing below, so it starts now and wakes up while
+      # the typecheck and lint run (22/11/2026: saves about a minute a push). "Wait for the test database" below
+      # fails the job if it didn't start.
+      - name: Start the test database in the background
+        run: |
+          setsid bash -c 'npm run db:start > db-start.log 2>&1; echo $? > db-start.exit' > /dev/null 2>&1 < /dev/null &
+
       - name: Install phone app packages
         working-directory: apps/mobile
         run: npm ci --no-audit --no-fund
@@ -60,8 +67,12 @@ jobs:
         working-directory: apps/mobile
         run: npx eslint src
 
-      - name: Start the test database
-        run: npm run db:start
+      - name: Wait for the test database
+        timeout-minutes: 8
+        run: |
+          until [ -f db-start.exit ]; do sleep 2; done
+          cat db-start.log
+          exit "$(cat db-start.exit)"
 
       - name: Write local settings for the seed and tests
         run: |
