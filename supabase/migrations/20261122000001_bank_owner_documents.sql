@@ -9,7 +9,7 @@
 -- 3. A charity is never left without an owner: remove_charity_member refuses to remove the last owner, with the team
 --    held so two removals at once can't both pass. make_charity_owner hands ownership to someone already on the team
 --    (the old owner stays on as an admin), so Givezy can replace an owner who left.
--- 4. A browser can no longer add or change a document record: the server writes it, after checking the file is real
+-- 4. (In 20261122000002_document_records_server_only.sql, applied separately.) A browser can no longer add or change a document record: the server writes it, after checking the file is real
 --    and the mandate's signing date. (A record pointing at no file, or a backdated mandate, could be written
 --    directly before.) Removing a document while the application is open is unchanged.
 -- All three functions are for the server only (service role).
@@ -96,8 +96,3 @@ begin
 end $$;
 revoke execute on function public.make_charity_owner(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.make_charity_owner(uuid, uuid) to service_role;
-
--- 4 --------------------------------------------------------------------------------------------------------------
-drop policy if exists charity_documents_insert on public.charity_documents;
-drop policy if exists charity_documents_update on public.charity_documents;
-revoke insert, update on public.charity_documents from authenticated, anon;
