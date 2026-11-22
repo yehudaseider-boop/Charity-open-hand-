@@ -15,12 +15,21 @@
  *   Policy wording and Yehuda has signed it off (go-live list). Never contact, ID or bank details either way.
  */
 export const assistantConfig = {
-  /** Claude model. Change only with Yehuda's yes (cost). */
-  model: "claude-opus-5-5",
+  /**
+   * Claude model. Haiku 5.5 (Yehuda, 22/11/2026: "isn't it an easy task?"): lookups and short answers, at a fraction of
+   * Opus's cost. If answers on the test site aren't good enough, Sonnet 5.5 ("claude-sonnet-5-5") is the next step up.
+   * Change only with Yehuda's yes (cost).
+   */
+  model: "claude-haiku-5-5",
+  /**
+   * Whether the API passes a declined question to another model by itself. Haiku 5.5 has no such fallback, so a declined
+   * question gets Givy's plain "can't help" message. Sonnet 5.5 and Opus 5.5 have it: set true with either.
+   */
+  serverFallback: false,
   /** How hard it thinks: "low" keeps answers quick and cheap; help answers come from the guide, not reasoning. */
   effort: "low" as const,
   /**
-   * Most tokens per reply, thinking included (thinking is always on for this model). The words themselves are kept
+   * Most tokens per reply, thinking included (Haiku 5.5 thinks by default, as the Opus model did). The words themselves are kept
    * short by the instructions; this only stops a reply being cut off mid-thought (review 21/11/2026).
    */
   maxAnswerTokens: 4000,

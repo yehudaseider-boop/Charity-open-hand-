@@ -125,8 +125,7 @@ export async function POST(req: Request) {
           const stream = anthropic().beta.messages.stream({
             model: assistantConfig.model,
             max_tokens: assistantConfig.maxAnswerTokens,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
+            ...(assistantConfig.serverFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
             output_config: { effort: assistantConfig.effort },
             system,
             tools,
