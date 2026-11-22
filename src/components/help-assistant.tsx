@@ -21,7 +21,7 @@ const SUGGESTED = [
   "How much came in this month?",
   "What's left to set up?",
   "How are my monthly donations doing?",
-  "How do s18A receipts work here?",
+  "How do s18A receipts work?",
   "How do I add someone to my team?",
 ];
 
@@ -129,6 +129,11 @@ export function HelpAssistant({
   useEffect(() => {
     if (turns.length > 0) scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
   }, [turns, open]);
+  // Room at the very end of the page (the footer included), so the last line always scrolls clear of the round button.
+  useEffect(() => {
+    document.body.classList.add("has-givy");
+    return () => document.body.classList.remove("has-givy");
+  }, []);
   // Drawn straight into the page body, so the dashboard's own layout can never trap or clip it.
   const mounted = useSyncExternalStore(noSubscribe, () => true, () => false);
 
@@ -208,7 +213,7 @@ export function HelpAssistant({
         const offline = typeof navigator !== "undefined" && navigator.onLine === false;
         setTurns([
           ...asked,
-          { role: "assistant", content: offline ? "The connection dropped before the answer arrived. Nothing was changed." : "We couldn't reach the helper. Nothing was changed.", failed: true },
+          { role: "assistant", content: offline ? "The connection dropped before the answer arrived. Nothing was changed." : "We couldn't reach Givy. Nothing was changed.", failed: true },
         ]);
         setAnnounce("The answer didn't arrive");
       }
@@ -235,8 +240,8 @@ export function HelpAssistant({
           type="button"
           onClick={openPanel}
           aria-haspopup="dialog"
-          aria-label="Ask the Givezy helper"
-          title="Ask the Givezy helper"
+          aria-label="Ask Givy, your Givezy helper"
+          title="Ask Givy"
           className="group fixed bottom-4 right-4 z-40 grid h-16 w-16 place-items-center rounded-full border-2 border-border bg-white shadow-[0_5px_0_var(--border),0_16px_34px_rgba(14,27,61,0.22)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_7px_0_var(--border),0_20px_40px_rgba(14,27,61,0.26)] active:translate-y-1 active:shadow-[0_1px_0_var(--border),0_8px_18px_rgba(14,27,61,0.2)] focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-coral motion-reduce:transition-none sm:bottom-6 sm:right-6"
         >
           {/* The splash from the logo, cut from the logo file (never redrawn). A soft ring breathes once on arrival. */}
@@ -259,16 +264,16 @@ export function HelpAssistant({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/brand/splash.png" alt="" width={640} height={451} className="w-6" />
                 </span>
-                Givezy helper
+                Givy
               </h2>
-              <p className="mt-1 text-[13px] text-white/85">Your giving, what&apos;s left to set up, and how to do things.</p>
+              <p className="mt-1 text-[13px] text-white/85">Your donations, what&apos;s left to set up, and how to do things.</p>
             </div>
             {turns.length > 0 && !busy ? (
               <button type="button" onClick={() => { setTurns([]); setNotice(null); }} className="min-h-10 rounded-full px-3 text-[13px] font-semibold text-white/90 hover:bg-white/10">
                 New chat
               </button>
             ) : null}
-            <button type="button" onClick={close} aria-label="Close the helper" className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-white/10">
+            <button type="button" onClick={close} aria-label="Close Givy" className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-white/10">
               <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
           </header>
@@ -277,8 +282,8 @@ export function HelpAssistant({
             {turns.length === 0 ? (
               <div className="space-y-4">
                 <div className="rounded-[1.25rem] bg-surface p-4 shadow-sm">
-                  <p className="font-semibold">Hi. Ask me about your charity&apos;s giving, what&apos;s left to set up, or how to do something.</p>
-                  <p className="mt-1.5 text-[14px] text-muted">I look things up in your dashboard, the same as you can see it, and link you to the right page. I can&apos;t change, send or approve anything.</p>
+                  <p className="font-semibold">Hi, I&apos;m Givy. Ask me about your charity&apos;s donations, what&apos;s left to set up, or how to do something in your dashboard.</p>
+                  <p className="mt-1.5 text-[14px] text-muted">I see what you see on your dashboard, and I&apos;ll link you to the right page. I can&apos;t change, send or approve anything.</p>
                 </div>
                 <div>
                   <p className="mb-2 text-[13px] font-semibold text-muted">Try asking</p>
@@ -347,7 +352,7 @@ export function HelpAssistant({
                   }
                 }}
                 rows={1}
-                placeholder="Ask about your giving or setup"
+                placeholder="Ask about donations or setup"
                 aria-invalid={tooLong || undefined}
                 className="max-h-32 min-h-12 flex-1 resize-none rounded-control border-2 border-outline bg-surface px-3.5 py-3 text-[15px] text-navy outline-none [field-sizing:content] focus:border-brand"
                 dir="auto"
@@ -364,7 +369,7 @@ export function HelpAssistant({
             </form>
             {tooLong ? <p className="mt-1.5 text-[13px] text-danger">Please keep it under 800 characters ({draft.length} now).</p> : null}
             <p className="mt-2.5 text-[12px] leading-snug text-muted">
-              Answers can be wrong, so check the page before you act. Please don&apos;t type donors&apos; contact or ID details here.
+              Givy can get things wrong, so check the page before you act. Please don&apos;t type donors&apos; contact or ID details here.
               {whatsApp || email ? <> Need a person? </> : null}
               {whatsApp ? <a href={whatsApp} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand underline">WhatsApp us</a> : null}
               {whatsApp && email ? " or " : null}

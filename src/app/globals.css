@@ -210,7 +210,17 @@ input[type="radio"] {
   }
 }
 
-/* The Givezy helper's round button: a soft ring grows and fades once when it first shows (22/11/2026). */
+/* Givy's round button floats bottom right: the page ends with room for it, so nothing is left under it. */
+body.has-givy {
+  padding-bottom: 6.5rem;
+}
+@media print {
+  body.has-givy {
+    padding-bottom: 0;
+  }
+}
+
+/* Givy's round button: a soft ring grows and fades once when it first shows (22/11/2026). */
 @keyframes helper-hello {
   0% { transform: scale(0.85); opacity: 0.9; }
   100% { transform: scale(1.35); opacity: 0; }

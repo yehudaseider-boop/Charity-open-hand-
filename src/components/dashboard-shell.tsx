@@ -38,7 +38,7 @@ export function DashboardShell({
   publicHref?: string | null;
   /** Menu pages this person's role can't use (team roles, 10/11/2026); the pages refuse them anyway. */
   hiddenTabs?: string[];
-  /** The "Need help?" assistant (21/11/2026): left out when its switch is off (src/config/assistant.ts). */
+  /** Givy, the dashboard helper (21/11/2026, named 22/11/2026): left out when its switch is off (src/config/assistant.ts). */
   help?: { demo?: boolean; who?: string } | null;
   children: React.ReactNode;
 }) {

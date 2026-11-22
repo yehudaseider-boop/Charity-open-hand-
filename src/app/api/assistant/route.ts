@@ -34,7 +34,7 @@ let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic({ timeout: assistantConfig.roundTimeoutMs, maxRetries: 1 }));
 
 export async function POST(req: Request) {
-  if (!assistantOn()) return plain(404, "The help assistant isn't switched on.");
+  if (!assistantOn()) return plain(404, "Givy isn't switched on.");
   if (!fromThisSite(req.headers)) return plain(403, "This can only be asked from the Givezy dashboard.");
 
   let body: AssistantRequest;
@@ -52,10 +52,10 @@ export async function POST(req: Request) {
   let keys: { bucket: string; keys: string[]; limit: number; minutes: number }[];
   let source: HelperSource;
   if (demo) {
-    if (!assistantDemoOn()) return plain(404, "The help assistant isn't switched on for the demo.");
+    if (!assistantDemoOn()) return plain(404, "Givy isn't switched on for the demo.");
     const visitor = ipKeys(clientIp(req.headers));
     // No address to count by: refused, so the demo's shared daily allowance can't be used up anonymously.
-    if (visitor.length === 0) return plain(429, "The demo helper can't answer just now. Please try again later.");
+    if (visitor.length === 0) return plain(429, "Givy can't answer on the demo just now. Please try again later.");
     role = "demo";
     keys = [
       { bucket: "assistant-demo", keys: visitor, limit: assistantConfig.demoPerVisitorPerHour, minutes: 60 },
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     const viewer = await getViewer();
     if (!viewer) return plain(401, "Please sign in again to ask a question.");
     role = charityId ? await viewerRole(charityId) : null;
-    if (!role) return plain(403, "You're not part of this charity's team, so the helper isn't available here.");
+    if (!role) return plain(403, "You're not part of this charity's team, so Givy isn't available here.");
     // The dashboard itself needs the second step; so does its helper (review 21/11/2026).
     if (!(await hasSecondStep())) return plain(401, "Please finish signing in with your authenticator app, then ask again.");
     keys = [
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     }
   } catch (e) {
     console.error("[assistant] limit check failed", e);
-    return plain(503, "The helper is busy just now. Nothing was changed. Please try again in a moment.");
+    return plain(503, "Givy is busy just now. Nothing was changed. Please try again in a moment.");
   }
 
   // The demo is made up, so its donors' names may always be shown there.
