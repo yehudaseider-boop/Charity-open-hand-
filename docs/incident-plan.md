@@ -19,8 +19,9 @@ One page for a bad day: the site is down, payments fail, money looks wrong, or d
 ## 1. The site is down or showing errors
 
 1. Open `/api/health` on the site. `{"ok":true}` means the site and database are up; anything else means they're not.
-2. If it broke after an update: Vercel, the project, **Deployments**, the last one that worked, **Instant Rollback**. The site is back on the old version in about a minute. Then tell Claude Code what broke.
-3. If Vercel or Supabase itself is down, check their status pages (vercel-status.com, status.supabase.com). There is nothing to fix on our side; wait, and post the notice below.
+2. A new version only goes live once GitHub's Checks pass (Vercel, Settings, Deployment Checks, "Vercel - charity-open-hand: checks"; set up 22/11/2026). A red check means the site stays on the last good version: nothing to roll back, tell Claude Code what failed.
+3. If it broke after an update anyway: Vercel, the project, **Deployments**, the last one that worked, **Instant Rollback**. The site is back on the old version in about a minute. Then tell Claude Code what broke.
+4. If Vercel or Supabase itself is down, check their status pages (vercel-status.com, status.supabase.com). There is nothing to fix on our side; wait, and post the notice below.
 
 ## 2. Payments are failing
 

@@ -15,7 +15,20 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # statuses: write lets the step below tell Vercel pass or fail; actions: read lets it see how the steps went.
+    permissions:
+      contents: read
+      statuses: write
+      actions: read
     steps:
+      # Tells Vercel this commit's checks are running (pending), and when the job ends whether every step passed.
+      # Vercel's Deployment Checks wait for this before a new version goes live (decided 22/11/2026).
+      # The name must match the check name typed into Vercel, Settings, Deployment Checks.
+      - name: Tell Vercel the checks are running
+        uses: vercel/repository-dispatch/actions/status@30f760c6640485cd92f8c785ef361382555fb712 # v1
+        with:
+          name: 'Vercel - charity-open-hand: checks'
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
