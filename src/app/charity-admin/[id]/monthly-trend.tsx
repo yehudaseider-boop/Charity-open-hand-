@@ -46,9 +46,16 @@ export function MonthlyTrend({ rows, now, seeAllHref }: { rows: MonthlyRow[]; no
                 />
               ))}
             </div>
+            {/* A month's name never breaks in two ("De / c" on a phone, 22/11/2026): on a phone with more than 6 months,
+                every other one is shown, counting back from this month, as on the donations chart. */}
             <div className="mt-1 flex gap-1.5">
               {points.map((p, i) => (
-                <span key={p.month} className={`min-w-0 flex-1 text-center text-[11px] ${i === points.length - 1 ? "font-semibold text-indigo" : "text-muted"}`}>{shortMonth(p.month)}</span>
+                <span
+                  key={p.month}
+                  className={`min-w-0 flex-1 whitespace-nowrap text-center text-[11px] ${points.length > 6 && (points.length - 1 - i) % 2 ? "max-sm:invisible" : ""} ${i === points.length - 1 ? "font-semibold text-indigo" : "text-muted"}`}
+                >
+                  {shortMonth(p.month)}
+                </span>
               ))}
             </div>
           </div>

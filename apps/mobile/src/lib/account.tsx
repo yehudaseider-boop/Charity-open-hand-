@@ -16,6 +16,7 @@ import { TEST_BUILD } from "./test-build";
 import { setDirectoryDemo } from "./directory";
 import { SITE_URL, siteUrl } from "./website";
 import { fetchCardChargeRates } from "./card-rates";
+import { reviewerSignIn } from "./pay-api";
 
 /**
  * Who is using the app, and their real giving.
@@ -427,6 +428,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
         if (!error) return { ok: true };
         if (isNetworkError(error)) return { ok: false, message: `${NO_CONNECTION} Your code still works for a short while, so try again once you're connected.` };
+        // The app reviewer's fixed code (22/11/2026): our server answers only for the reviewer's email, while switched on.
+        const tokenHash = await reviewerSignIn(SITE_URL, email, code);
+        if (tokenHash) {
+          const reviewer = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+          if (!reviewer.error) return { ok: true };
+        }
         return { ok: false, message: "That code didn't work or has expired. Check it, or tap Send a new code." };
       },
       async signInWith(provider) {

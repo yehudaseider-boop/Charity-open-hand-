@@ -195,3 +195,16 @@ describe("the server's own words reach the donor (sweep of 18/11/2026)", () => {
     expect(cleanSavedCard({ last4: "4242", brand: "visa", expires: "13/2028" })?.expires).toBeNull();
   });
 });
+
+import { reviewerSignIn } from "../apps/mobile/src/lib/pay-api";
+
+describe("the app reviewer's fixed code (22/11/2026)", () => {
+  it("returns the server's one-time token only on a clear yes", async () => {
+    const yes = async () => ({ status: 200, json: { ok: true, tokenHash: "hashed-token-1234567890" } });
+    expect(await reviewerSignIn("https://test.givezy.co.za", "review@givezy.co.za", "48213907", yes)).toBe("hashed-token-1234567890");
+    expect(await reviewerSignIn("https://test.givezy.co.za", "a@b.co", "1", async () => ({ status: 401, json: { ok: false } }))).toBeNull();
+    expect(await reviewerSignIn("https://test.givezy.co.za", "a@b.co", "1", async () => ({ status: 200, json: { ok: true } }))).toBeNull();
+    expect(await reviewerSignIn("https://test.givezy.co.za", "a@b.co", "1", async () => Promise.reject(new Error("offline")))).toBeNull();
+    expect(await reviewerSignIn("", "review@givezy.co.za", "48213907", yes)).toBeNull();
+  });
+});

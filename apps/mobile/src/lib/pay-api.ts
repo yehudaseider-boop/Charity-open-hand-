@@ -374,3 +374,19 @@ function defaultRandom(n: number): Uint8Array {
   for (let i = 0; i < n; i++) out[i] = Math.floor(Math.random() * 256);
   return out;
 }
+
+/**
+ * The app reviewer's fixed code (22/11/2026, see the website's src/lib/review-sign-in.ts): asked only after Supabase
+ * turned a typed code down. Returns a one-time sign-in token for Supabase, or null (not the reviewer, switched off,
+ * or no answer), in which case the person sees the usual "that code didn't work".
+ */
+export async function reviewerSignIn(site: string, email: string, code: string, post: Post = fetchPost): Promise<string | null> {
+  if (!site) return null;
+  try {
+    const { status, json } = await post(api(site, "review-sign-in"), { email: email.trim(), code: code.trim() }, null);
+    const tokenHash = (json as { tokenHash?: unknown } | null)?.tokenHash;
+    return status === 200 && typeof tokenHash === "string" && tokenHash.length > 10 ? tokenHash : null;
+  } catch {
+    return null;
+  }
+}
