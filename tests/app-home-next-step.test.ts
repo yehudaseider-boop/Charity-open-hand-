@@ -14,4 +14,10 @@ describe("Home's next step", () => {
   it("while giving hasn't loaded, makes no claim either way", () => {
     expect(homeNextStep([g("a", "Alpha", 10_000, 1)], false)).toEqual({ kind: "browse" });
   });
+  it("passes over a charity that is no longer listed, for the latest one that still is (review 22/11/2026)", () => {
+    expect(homeNextStep([g("a", "Alpha", 10_000, 1), g("", "Charity", 36_000, 20)])).toMatchObject({ kind: "again", slug: "a", charityName: "Alpha" });
+  });
+  it("when every charity given to is gone, points to a cause without calling it a first gift", () => {
+    expect(homeNextStep([g("", "Charity", 36_000, 20)])).toEqual({ kind: "browse" });
+  });
 });

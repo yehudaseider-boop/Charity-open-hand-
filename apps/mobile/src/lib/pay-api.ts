@@ -375,18 +375,51 @@ function defaultRandom(n: number): Uint8Array {
   return out;
 }
 
+/** What our server said about the reviewer's fixed code: a one-time token (and its kind), or a reason worth showing. */
+export type ReviewerAnswer = { tokenHash: string; type: "signup" | "magiclink" } | { message: string } | null;
+
+/** The reviewer's check gets a short wait of its own: it runs after every mistyped code, so it must never hang. */
+export const REVIEWER_TIMEOUT_MS = 8_000;
+const reviewerPost: Post = (url, body) => fetchWithTimeout(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, REVIEWER_TIMEOUT_MS);
+
 /**
  * The app reviewer's fixed code (22/11/2026, see the website's src/lib/review-sign-in.ts): asked only after Supabase
- * turned a typed code down. Returns a one-time sign-in token for Supabase, or null (not the reviewer, switched off,
- * or no answer), in which case the person sees the usual "that code didn't work".
+ * turned a typed code down. Returns a one-time sign-in token for Supabase; or the server's own words when it is busy
+ * or the reviewer must wait or tap Send code first (review 22/11/2026); or null (not the reviewer, switched off, or
+ * no answer), in which case the person sees the usual "that code didn't work".
  */
-export async function reviewerSignIn(site: string, email: string, code: string, post: Post = fetchPost): Promise<string | null> {
+export async function reviewerSignIn(site: string, email: string, code: string, post: Post = reviewerPost): Promise<ReviewerAnswer> {
   if (!site) return null;
   try {
     const { status, json } = await post(api(site, "review-sign-in"), { email: email.trim(), code: code.trim() }, null);
-    const tokenHash = (json as { tokenHash?: unknown } | null)?.tokenHash;
-    return status === 200 && typeof tokenHash === "string" && tokenHash.length > 10 ? tokenHash : null;
+    const j = (json ?? {}) as { tokenHash?: unknown; type?: unknown; message?: unknown };
+    if (status === 200 && typeof j.tokenHash === "string" && j.tokenHash.length > 10) return { tokenHash: j.tokenHash, type: j.type === "signup" ? "signup" : "magiclink" };
+    if ((status === 409 || status === 429 || status === 503) && typeof j.message === "string" && j.message.trim()) return { message: j.message.trim().slice(0, 200) };
+    return null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Signing in with a typed code (pure, so it can be tested): Supabase first; only a plain "wrong code" (not a lost
+ * connection) asks the reviewer check, and its token is exchanged with Supabase. Anything else is the usual message.
+ */
+export async function signInWithCode(steps: {
+  verifyCode: () => Promise<{ error: { name?: string; status?: number } | null }>;
+  isNetworkError: (e: { name?: string; status?: number }) => boolean;
+  reviewer: () => Promise<ReviewerAnswer>;
+  verifyToken: (tokenHash: string, type: "signup" | "magiclink") => Promise<{ error: unknown }>;
+  offline: string;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { error } = await steps.verifyCode();
+  if (!error) return { ok: true };
+  if (steps.isNetworkError(error)) return { ok: false, message: steps.offline };
+  const answer = await steps.reviewer();
+  if (answer && "message" in answer) return { ok: false, message: answer.message };
+  if (answer) {
+    const reviewer = await steps.verifyToken(answer.tokenHash, answer.type);
+    if (!reviewer.error) return { ok: true };
+  }
+  return { ok: false, message: "That code didn't work or has expired. Check it, or tap Send a new code." };
 }

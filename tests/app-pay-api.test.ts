@@ -196,15 +196,65 @@ describe("the server's own words reach the donor (sweep of 18/11/2026)", () => {
   });
 });
 
-import { reviewerSignIn } from "../apps/mobile/src/lib/pay-api";
+import { reviewerSignIn, signInWithCode, type ReviewerAnswer } from "../apps/mobile/src/lib/pay-api";
 
 describe("the app reviewer's fixed code (22/11/2026)", () => {
-  it("returns the server's one-time token only on a clear yes", async () => {
-    const yes = async () => ({ status: 200, json: { ok: true, tokenHash: "hashed-token-1234567890" } });
-    expect(await reviewerSignIn("https://test.givezy.co.za", "review@givezy.co.za", "48213907", yes)).toBe("hashed-token-1234567890");
-    expect(await reviewerSignIn("https://test.givezy.co.za", "a@b.co", "1", async () => ({ status: 401, json: { ok: false } }))).toBeNull();
-    expect(await reviewerSignIn("https://test.givezy.co.za", "a@b.co", "1", async () => ({ status: 200, json: { ok: true } }))).toBeNull();
-    expect(await reviewerSignIn("https://test.givezy.co.za", "a@b.co", "1", async () => Promise.reject(new Error("offline")))).toBeNull();
+  const site = "https://test.givezy.co.za";
+  it("returns the server's one-time token and its kind only on a clear yes", async () => {
+    const yes = async () => ({ status: 200, json: { ok: true, tokenHash: "hashed-token-1234567890", type: "signup" } });
+    expect(await reviewerSignIn(site, "review@givezy.co.za", "48213907", yes)).toEqual({ tokenHash: "hashed-token-1234567890", type: "signup" });
+    expect(await reviewerSignIn(site, "review@givezy.co.za", "48213907", async () => ({ status: 200, json: { ok: true, tokenHash: "hashed-token-1234567890" } }))).toEqual({ tokenHash: "hashed-token-1234567890", type: "magiclink" });
+    expect(await reviewerSignIn(site, "a@b.co", "1", async () => ({ status: 401, json: { ok: false, message: "That code didn't work" } }))).toBeNull();
+    expect(await reviewerSignIn(site, "a@b.co", "1", async () => ({ status: 200, json: { ok: true } }))).toBeNull();
+    expect(await reviewerSignIn(site, "a@b.co", "1", async () => Promise.reject(new Error("offline")))).toBeNull();
     expect(await reviewerSignIn("", "review@givezy.co.za", "48213907", yes)).toBeNull();
+  });
+  it("passes on the server's reason when it must wait, is busy, or needs Send code first (review 22/11/2026)", async () => {
+    for (const status of [409, 429, 503]) {
+      expect(await reviewerSignIn(site, "review@givezy.co.za", "48213907", async () => ({ status, json: { ok: false, message: "Too many tries. Please wait an hour and try again." } }))).toEqual({ message: "Too many tries. Please wait an hour and try again." });
+    }
+    expect(await reviewerSignIn(site, "review@givezy.co.za", "48213907", async () => ({ status: 429, json: null }))).toBeNull();
+  });
+});
+
+describe("signing in with a typed code", () => {
+  const wrong = { error: { name: "AuthApiError", status: 403 } };
+  const steps = (over: Partial<Parameters<typeof signInWithCode>[0]> = {}) => {
+    const calls: string[] = [];
+    return {
+      calls,
+      run: () =>
+        signInWithCode({
+          verifyCode: async () => (calls.push("code"), wrong),
+          isNetworkError: (e) => e.name === "AuthRetryableFetchError",
+          offline: "We couldn't reach Givezy.",
+          reviewer: async (): Promise<ReviewerAnswer> => (calls.push("reviewer"), null),
+          verifyToken: async (_t, type) => (calls.push(`token:${type}`), { error: null }),
+          ...over,
+        }),
+    };
+  };
+  it("a right code signs in without asking our server", async () => {
+    const s = steps({ verifyCode: async () => ({ error: null }) });
+    expect(await s.run()).toEqual({ ok: true });
+    expect(s.calls).toEqual([]);
+  });
+  it("a lost connection says so, and never asks the reviewer check", async () => {
+    const s = steps({ verifyCode: async () => ({ error: { name: "AuthRetryableFetchError" } }) });
+    expect(await s.run()).toEqual({ ok: false, message: "We couldn't reach Givezy." });
+    expect(s.calls).toEqual([]);
+  });
+  it("a wrong code that isn't the reviewer's gets the usual message", async () => {
+    const s = steps();
+    expect(await s.run()).toEqual({ ok: false, message: "That code didn't work or has expired. Check it, or tap Send a new code." });
+  });
+  it("the reviewer's code is exchanged with Supabase as the kind of token it is", async () => {
+    const s = steps({ reviewer: async () => ({ tokenHash: "hashed-token-1234567890", type: "signup" }) });
+    expect(await s.run()).toEqual({ ok: true });
+    expect(s.calls).toEqual(["code", "token:signup"]);
+  });
+  it("a token Supabase turns down gets the usual message, and the server's reason is shown as it is", async () => {
+    expect(await steps({ reviewer: async () => ({ tokenHash: "hashed-token-1234567890", type: "magiclink" }), verifyToken: async () => ({ error: new Error("expired") }) }).run()).toMatchObject({ ok: false, message: expect.stringMatching(/didn't work/) });
+    expect(await steps({ reviewer: async () => ({ message: "Tap Send code first, then type the code." }) }).run()).toEqual({ ok: false, message: "Tap Send code first, then type the code." });
   });
 });

@@ -164,7 +164,7 @@ export default function Home() {
                 <Text style={styles.heroLine}>
                   {next.kind !== "again"
                     ? "Find a checked charity you care about and give in a few taps."
-                    : `Your last gift was ${rand(next.cents)} to ${next.charityName} on ${ddmmyyyy(next.date)}.`}
+                    : `You gave ${rand(next.cents)} to ${next.charityName} on ${ddmmyyyy(next.date)}.`}
                 </Text>
               </View>
               <People name="workingTogether" width={Math.min(120, Math.round(width * 0.3))} float={false} style={styles.heroArt} />

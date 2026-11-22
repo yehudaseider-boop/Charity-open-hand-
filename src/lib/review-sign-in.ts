@@ -27,3 +27,12 @@ export function isReviewSignIn(setting: ReviewSignIn, email: unknown, code: unkn
   const b = Buffer.from(setting.code);
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+/**
+ * The kind of one-time token Supabase made, as the app passes it back: "signup" for an account not yet confirmed (the
+ * reviewer typed the fixed code before ever finishing a sign-in), otherwise "magiclink" (review 22/11/2026).
+ */
+export type ReviewTokenType = "signup" | "magiclink";
+export function reviewTokenType(verificationType: unknown): ReviewTokenType {
+  return verificationType === "signup" ? "signup" : "magiclink";
+}
