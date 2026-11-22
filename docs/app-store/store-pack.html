@@ -1,0 +1,236 @@
+<title>Givezy store pack</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+<style>
+/* Layout: one column of cards, store by store; screenshots in a sideways strip. Givezy v2.1 colours and fonts. */
+:root {
+  --page: #FFFFFF; --ink: #0E1B3D; --slate: #4A5878; --blue: #1749B5; --blue-edge: #0F3486;
+  --orange: #FF8A3D; --lilac: #C9B4FA; --line: #ECE8F6; --soft: #F4F1FF; --peach: #FFEBDD;
+  --sage: #2E8B5E; --warn-bg: #FFF4E5; --warn-ink: #7A3E00; --on-blue: #FFFFFF; --code: #F4F1FF;
+  --display: "Bricolage Grotesque", "DM Sans", system-ui, sans-serif;
+  --body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0B1430; --ink: #EEF0FA; --slate: #A9B3CF; --blue: #5B86F0; --blue-edge: #2F5BC9;
+  --line: #24305A; --soft: #131F44; --peach: #3A2A20; --sage: #6CC79A; --warn-bg: #3A2A12; --warn-ink: #FFD7A8; --code: #131F44; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0B1430; --ink: #EEF0FA; --slate: #A9B3CF; --blue: #5B86F0; --blue-edge: #2F5BC9;
+  --line: #24305A; --soft: #131F44; --peach: #3A2A20; --sage: #6CC79A; --warn-bg: #3A2A12; --warn-ink: #FFD7A8; --code: #131F44; color-scheme: dark }
+body { background: var(--page); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 880px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 64px; display: grid; gap: 28px; }
+.hero { background: var(--blue); color: var(--on-blue); border-radius: 24px; padding: 28px 24px; position: relative; overflow: hidden; }
+.hero::after { content: ""; position: absolute; width: 140px; height: 140px; border-radius: 50%; background: var(--orange); right: -40px; top: -40px; }
+.hero::before { content: ""; position: absolute; width: 90px; height: 90px; border-radius: 50%; border: 14px solid var(--lilac); left: -30px; bottom: -40px; }
+.hero h1 { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 6vw, 40px); line-height: 1.05; margin: 0 0 10px; position: relative; text-wrap: balance; }
+.hero p { margin: 0; max-width: 60ch; position: relative; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 24px; margin: 0 0 4px; text-wrap: balance; }
+h3 { font-size: 16px; font-weight: 700; margin: 18px 0 6px; }
+.lead { color: var(--slate); margin: 0 0 14px; }
+section { display: grid; gap: 4px; }
+.card { border: 1px solid var(--line); border-radius: 18px; padding: 16px; background: var(--page); min-width: 0; }
+.soft { background: var(--soft); border-color: transparent; }
+.field { display: grid; gap: 6px; padding: 14px 0; border-top: 1px solid var(--line); }
+.field:first-child { border-top: 0; padding-top: 0; }
+.fhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.label { font-weight: 700; }
+.limit { color: var(--slate); font-size: 13px; font-variant-numeric: tabular-nums; }
+.text { white-space: pre-wrap; background: var(--code); border-radius: 12px; padding: 12px 14px; margin: 0; font-family: var(--body); font-size: 15px; overflow-wrap: anywhere; }
+button.copy { font: 600 14px var(--body); color: var(--blue); background: transparent; border: 1.5px solid var(--blue); border-radius: 12px; padding: 6px 12px; cursor: pointer; }
+button.copy:focus-visible, a:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+.strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+.strip figure { margin: 0; flex: 0 0 auto; width: 168px; scroll-snap-align: start; }
+.strip img { width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--line); display: block; }
+.strip figcaption { font-size: 13px; color: var(--slate); margin-top: 6px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+th { font-weight: 700; color: var(--slate); font-size: 13px; }
+.no { color: var(--slate); }
+.flag { background: var(--warn-bg); color: var(--warn-ink); border-radius: 18px; padding: 16px; }
+.flag h3 { margin-top: 0; }
+ol, ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 8px; }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--peach); color: var(--ink); }
+a { color: var(--blue); }
+.small { font-size: 13px; color: var(--slate); }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <h1>Givezy store pack</h1>
+    <p>Everything Apple and Google ask for when the app goes in: the store text, screenshots, the privacy answers and a note for Apple's reviewer. A draft for you to check, written for the first version, where donors give on the website.</p>
+  </header>
+
+  <section>
+    <h2>Before we submit</h2>
+    <p class="lead">Things these answers depend on, or that a reviewer would trip over. None is hard; each needs a decision or a few minutes.</p>
+    <div class="flag">
+      <h3>To sort first</h3>
+      <ol>
+        <li><strong>Screenshots use the made-up sample charities.</strong> Apple wants screenshots to show the real app. Better to retake them with your first real charities, with their permission, once they're listed. These are the layout to follow.</li>
+        <li><strong>The live site must be open.</strong> Privacy Policy, Terms, Delete my account and every Give button go to givezy.co.za, which shows the coming-soon page today. Already on the go-live list.</li>
+        <li><strong>Privacy Policy and Terms must be final.</strong> The app still asks people to agree to the draft version. Yosef's sign-off.</li>
+        <li><strong>A sign-in for Apple's reviewer.</strong> Sign-in is by emailed code, so the reviewer needs an email address whose codes we can pass on, or a mailbox they can open.</li>
+        <li><strong>A Face ID line nobody asked for.</strong> One of the app's building blocks adds "Allow Givezy to access your Face ID" to the app's settings, though the app never uses Face ID. Apple may ask why. It's a one-line fix; say the word and I'll make it.</li>
+        <li><strong>Charities post their own updates and videos.</strong> Apple's rule on content from others asks for a way to report something and to block it. Only checked charities can post and Givezy can suspend one, and "Get help" emails us. A "Report this" link on updates would close it off.</li>
+        <li><strong>Small Android phones.</strong> On a 360-wide screen, the goal amount on Home ("R2 940") breaks onto two lines. Worth fixing before the screenshots are retaken.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2>Store text</h2>
+    <p class="lead">The same words for both stores where the limits allow. Copy each box straight into App Store Connect or the Play Console.</p>
+    <div class="card">
+      <div class="field"><div class="fhead"><span class="label">App name (both stores)</span><span class="limit">6 of 30</span><button class="copy" data-for="t-name">Copy</button></div><p class="text" id="t-name">Givezy</p></div>
+      <div class="field"><div class="fhead"><span class="label">Subtitle (Apple)</span><span class="limit">28 of 30</span><button class="copy" data-for="t-sub">Copy</button></div><p class="text" id="t-sub">Give to checked SA charities</p></div>
+      <div class="field"><div class="fhead"><span class="label">Short description (Google)</span><span class="limit">70 of 80</span><button class="copy" data-for="t-short">Copy</button></div><p class="text" id="t-short">Give to checked SA charities and keep every s18A receipt in one place.</p></div>
+      <div class="field"><div class="fhead"><span class="label">Promotional text (Apple)</span><span class="limit">114 of 170</span><button class="copy" data-for="t-promo">Copy</button></div><p class="text" id="t-promo">Find a checked South African charity, give once or every month, and keep every gift and s18A receipt in one place.</p></div>
+      <div class="field"><div class="fhead"><span class="label">Keywords (Apple, not shown to people)</span><span class="limit">91 of 100</span><button class="copy" data-for="t-keys">Copy</button></div><p class="text" id="t-keys">donate,charity,donation,s18A,tax receipt,NPO,PBO,South Africa,giving,nonprofit,monthly,SARS</p></div>
+      <div class="field"><div class="fhead"><span class="label">Description (both stores)</span><span class="limit" id="desc-count"></span><button class="copy" data-for="t-desc">Copy</button></div>
+<p class="text" id="t-desc">Givezy keeps your giving in one place.
+
+Find a checked South African charity, give once or every month, and keep every gift and s18A receipt in one Givezy account.
+
+Find a cause
+Search by name, cause or area. Before a charity can take a gift on Givezy, a person looks at its registration documents and bank details. Every charity's page shows that it's verified, and whether it issues s18A receipts.
+
+Give on a secure page
+Tap Give and you finish on Givezy's website, where you pay on the payment provider's secure page. Givezy never sees your card. Your gift then shows in the app.
+
+Once or every month
+A once-off gift when something moves you, or the same amount every month for a cause you stand behind. Pause, resume or stop a monthly donation from the app, whenever you like.
+
+Your s18A receipts
+One receipt per charity, per tax year, ready for your tax return. Download it from the app any time after the tax year ends.
+
+See your giving
+Your gifts, monthly donations and receipts together. Set a giving goal for the tax year, and note giving you did elsewhere so your total is complete.
+
+Hear from the charities you support
+Charities thank you in their own words and post updates, some with a video.
+
+Private by design
+Charities see only what they need to thank you and record your gift. You can give anonymously. See and download everything we hold about you, and ask us to correct or delete it.
+
+Sign in with your email
+No password: we email you a code.
+
+Givezy is for people aged 18 and over.</p></div>
+    </div>
+    <h3>Other boxes</h3>
+    <div class="tablewrap"><table>
+      <tr><th>Box</th><th>Answer</th><th>Note</th></tr>
+      <tr><td>Category</td><td>Lifestyle (Apple), Lifestyle (Google)</td><td>Finance is the alternative; Lifestyle fits giving better and draws less scrutiny.</td></tr>
+      <tr><td>Price</td><td>Free, no in-app purchases</td><td>Apple requires donation apps to be free.</td></tr>
+      <tr><td>Privacy Policy URL</td><td>https://givezy.co.za/privacy</td><td>Live site must be open.</td></tr>
+      <tr><td>Support URL / email</td><td>https://givezy.co.za and hello@givezy.co.za</td><td>The app's Get help uses the same address.</td></tr>
+      <tr><td>Account deletion URL (Google)</td><td>https://givezy.co.za/account/data/delete</td><td>Google asks for a web link; the app opens the same page.</td></tr>
+      <tr><td>Countries</td><td>South Africa only</td><td>s18A receipts and Rand only make sense here.</td></tr>
+      <tr><td>Age rating</td><td>Apple 4+ questionnaire answers: no to every content question; Google: target audience 18+</td><td>The app's own sign-up asks people to confirm they're 18 or older.</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Screenshots</h2>
+    <p class="lead">iPhone: 1290 × 2796 (the size Apple asks for). Android phone: 1080 × 1920. Six each, in this order. Drafts with sample charities; see the first point above.</p>
+    <h3>iPhone</h3>
+    <div class="strip">
+      <figure><img src="screens/ios/1-welcome.png" alt="Welcome screen: Give in a few taps"><figcaption>1 · Welcome</figcaption></figure>
+      <figure><img src="screens/ios/2-discover.png" alt="Discover: find a cause"><figcaption>2 · Find a cause</figcaption></figure>
+      <figure><img src="screens/ios/3-charity.png" alt="A charity's page"><figcaption>3 · A charity's page</figcaption></figure>
+      <figure><img src="screens/ios/4-home.png" alt="Home with giving goal"><figcaption>4 · Home</figcaption></figure>
+      <figure><img src="screens/ios/5-progress.png" alt="Progress through the tax year"><figcaption>5 · Progress</figcaption></figure>
+      <figure><img src="screens/ios/6-receipts.png" alt="s18A receipts"><figcaption>6 · s18A receipts</figcaption></figure>
+    </div>
+    <h3>Android</h3>
+    <div class="strip">
+      <figure><img src="screens/android/1-welcome.png" alt="Welcome screen"><figcaption>1 · Welcome</figcaption></figure>
+      <figure><img src="screens/android/2-discover.png" alt="Discover"><figcaption>2 · Find a cause</figcaption></figure>
+      <figure><img src="screens/android/3-charity.png" alt="A charity's page"><figcaption>3 · A charity's page</figcaption></figure>
+      <figure><img src="screens/android/4-home.png" alt="Home"><figcaption>4 · Home</figcaption></figure>
+      <figure><img src="screens/android/5-progress.png" alt="Progress"><figcaption>5 · Progress</figcaption></figure>
+      <figure><img src="screens/android/6-receipts.png" alt="s18A receipts"><figcaption>6 · s18A receipts</figcaption></figure>
+    </div>
+    <p class="small">The sample "fresh bread" photo was swapped for a fruit basket in these, in line with the no-religious-imagery rule.</p>
+  </section>
+
+  <section>
+    <h2>Apple: App Privacy</h2>
+    <p class="lead">From reading the app's code (22/11/2026), with in-app giving, saved cards and Google/Apple sign-in all off. Apple counts data as collected when it leaves the phone.</p>
+    <div class="card soft"><strong>Tracking: No.</strong> No advertising, no analytics, no crash-reporting service, no advertising identifier.</div>
+    <div class="tablewrap"><table>
+      <tr><th>Apple's data type</th><th>What it is in Givezy</th><th>Used for</th><th>Linked to the person</th></tr>
+      <tr><td>Contact Info: Email Address</td><td>Sign-in email; the email on "Ask us to add a charity"</td><td>App Functionality</td><td>Yes</td></tr>
+      <tr><td>Purchases: Purchase History</td><td>Gifts and monthly donations made on the website, shown in the app</td><td>App Functionality</td><td>Yes</td></tr>
+      <tr><td>Financial Info: Other Financial Info</td><td>Giving the person notes they did elsewhere (amount, date, to whom)</td><td>App Functionality</td><td>Yes</td></tr>
+      <tr><td>User Content: Other User Content</td><td>Charity suggestions (name, town, note)</td><td>App Functionality</td><td>Yes</td></tr>
+      <tr><td>Identifiers: User ID</td><td>The account's id</td><td>App Functionality</td><td>Yes</td></tr>
+      <tr><td>Other Data</td><td>Saved charities, and which kind of giver they said they are</td><td>App Functionality</td><td>Yes</td></tr>
+    </table></div>
+    <h3>Not collected</h3>
+    <p class="no">Location, contacts, photos, health, browsing history, diagnostics, phone number, ID number, card details. Goals, the income log and causes chosen stay on the phone and are never sent.</p>
+    <h3>One to confirm</h3>
+    <p class="no">App updates come through Expo, which sends a random install id with each update check. Expo's own privacy notice says it collects no data and does no tracking, so it's left out above. Worth a second look before submitting.</p>
+  </section>
+
+  <section>
+    <h2>Google: Data safety</h2>
+    <div class="tablewrap"><table>
+      <tr><th>Question</th><th>Answer</th></tr>
+      <tr><td>Does the app collect or share any of the required data types?</td><td>Yes, it collects. It shares nothing (our database and hosting providers work for us, which Google doesn't count as sharing).</td></tr>
+      <tr><td>Is all data encrypted in transit?</td><td>Yes. The app only makes https connections.</td></tr>
+      <tr><td>Can people ask for their data to be deleted?</td><td>Yes: in the app (Account, Your information, Delete my account) and at https://givezy.co.za/account/data/delete</td></tr>
+      <tr><td>Personal info: Email address</td><td>Collected, required. Account management, App functionality.</td></tr>
+      <tr><td>Financial info: Purchase history</td><td>Collected, required for an account. App functionality.</td></tr>
+      <tr><td>Financial info: Other financial info</td><td>Collected, optional (giving noted from elsewhere). App functionality.</td></tr>
+      <tr><td>App activity: Other user-generated content</td><td>Collected, optional (charity suggestions). App functionality.</td></tr>
+      <tr><td>App activity: Other actions</td><td>Collected, optional (saved charities, kind of giver). App functionality, Personalisation.</td></tr>
+      <tr><td>Location, contacts, photos, health, messages, device ids, app performance</td><td>Not collected.</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Note for Apple's reviewer</h2>
+    <p class="lead">Goes in App Review Information, Notes. The reviewer's email still needs filling in.</p>
+    <div class="card">
+      <div class="field"><div class="fhead"><span class="label">Review notes</span><button class="copy" data-for="t-review">Copy</button></div>
+<p class="text" id="t-review">Givezy is a South African app for donors. It lists registered South African charities (NPOs and PBOs) that Givezy has checked, and keeps a donor's gifts, monthly donations and s18A tax receipts in one account. (An s18A receipt is the receipt South African charities issue under section 18A of the Income Tax Act, so the donor can claim the gift against tax.)
+
+The app does not take donations. When a donor taps Give, the charity's donation page opens in Safari on givezy.co.za, where the payment is made on the payment provider's page, in line with guideline 3.2.2(iv). The app is free and has no in-app purchases.
+
+Sign-in is by a code sent to the email address; there is no password. Review account: [email to fill in]. [How the reviewer gets the code: to fill in.]
+
+Account deletion: Account, Your information, Delete my account. This opens the deletion page on givezy.co.za for the signed-in account.
+
+Charity updates and videos are posted only by charities Givezy has checked; Givezy can suspend any charity. Questions or reports go to hello@givezy.co.za.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>When in-app giving is switched on later</h2>
+    <p class="lead">Apple's rules (3.2.1(vi) and 3.2.2(iv)) allow donations inside a third-party app only for charities Apple has approved as nonprofits, with Apple Pay offered. Forum answers from Apple are mixed on whether a for-profit platform like Givezy qualifies, so it needs Apple's answer in writing first. Then these change:</p>
+    <ul>
+      <li>Apple privacy adds Name, Physical Address, Other Financial Info (amounts given in the app) and Other Data (SA ID number for s18A receipts). Google adds Name, Address and Government ID.</li>
+      <li>The reviewer note changes to describe in-app giving and Apple Pay.</li>
+      <li>Card details still never touch the app: they're typed on the payment provider's page.</li>
+    </ul>
+    <p class="small">Sources: <a href="https://developer.apple.com/app-store/review/guidelines/">App Review Guidelines</a>, <a href="https://developer.apple.com/forums/thread/688607">Apple forum: donations for multiple nonprofits</a>, <a href="https://developer.apple.com/forums/thread/130952">Apple forum: charity app rejected under 3.2.2</a>.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var d = document.getElementById("t-desc");
+  var c = document.getElementById("desc-count");
+  if (d && c) c.textContent = d.textContent.length + " of 4000";
+  document.querySelectorAll("button.copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var el = document.getElementById(b.getAttribute("data-for"));
+      var text = el ? el.textContent : "";
+      var done = function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600); };
+      var select = function () { var r = document.createRange(); r.selectNodeContents(el); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selected: press copy"; };
+      try { navigator.clipboard.writeText(text).then(done, select); } catch (e) { select(); }
+    });
+  });
+})();
+</script>
