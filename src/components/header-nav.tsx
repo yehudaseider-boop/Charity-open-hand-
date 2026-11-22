@@ -109,7 +109,7 @@ export function HeaderNav({ tone = "light" }: { tone?: "light" | "dark" }) {
       {signedIn ? (
         <NavLink tone={tone} href="/account" className="max-sm:hidden">Account</NavLink>
       ) : (
-        <Link href="/login" className={`ml-1 inline-flex min-h-11 items-center rounded-full px-4 font-semibold transition-colors ${tone === "dark" ? "bg-white text-brand hover:bg-honey-soft" : "bg-brand text-brand-contrast hover:bg-navy"}`}>
+        <Link href="/login" className={`ml-1 inline-flex min-h-11 items-center rounded-full px-4 font-semibold max-[359px]:ml-0 max-[359px]:px-3 transition-colors ${tone === "dark" ? "bg-white text-brand hover:bg-honey-soft" : "bg-brand text-brand-contrast hover:bg-navy"}`}>
           Sign in
         </Link>
       )}

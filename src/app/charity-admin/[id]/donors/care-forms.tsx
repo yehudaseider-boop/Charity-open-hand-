@@ -17,7 +17,7 @@ export function NoteForm({ action, defaultBody, label = "Add a note", submit = "
 export function ReminderForm({ action, today }: { action: Action; today: string }) {
   return (
     <ActionForm action={action} submitLabel="Add follow-up" pendingLabel="Saving…" resetOnSuccess>
-      <TextField name="what" label="What to do" required maxLength={300} />
+      <TextField name="what" label="What to do" required autoDirection maxLength={300} />
       <DateField name="due_on" label="When" required defaultValue={today} />
     </ActionForm>
   );
@@ -26,7 +26,7 @@ export function ReminderForm({ action, today }: { action: Action; today: string 
 export function TagForm({ action, existing }: { action: Action; existing: string[] }) {
   return (
     <ActionForm action={action} submitLabel="Add tag" pendingLabel="Adding…" resetOnSuccess>
-      <TextField name="name" label="Tag" required maxLength={40} hint={existing.length ? `Type a new tag, or one you use already: ${existing.slice(0, 8).join(", ")}${existing.length > 8 ? "…" : ""}` : "For example Board member, Volunteer, Heroes with Halos"} />
+      <TextField name="name" label="Tag" required autoDirection maxLength={40} hint={existing.length ? `Type a new tag, or one you use already: ${existing.slice(0, 8).join(", ")}${existing.length > 8 ? "…" : ""}` : "For example Board member, Volunteer, Heroes with Halos"} />
     </ActionForm>
   );
 }
@@ -39,7 +39,7 @@ export function ButtonForm({ action, label, pending, confirm, confirmLabel }: { 
 export function SaveListForm({ action }: { action: Action }) {
   return (
     <ActionForm action={action} submitLabel="Save this list" pendingLabel="Saving…" resetOnSuccess>
-      <TextField name="name" label="Name for this list" required maxLength={60} hint="Saves the group, tag and search you have chosen, so you can open the same list again." />
+      <TextField name="name" label="Name for this list" required autoDirection maxLength={60} hint="Saves the group, tag and search you have chosen, so you can open the same list again." />
     </ActionForm>
   );
 }

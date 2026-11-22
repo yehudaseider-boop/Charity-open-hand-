@@ -56,6 +56,12 @@ export const platformConfig = {
   minContributionCents: 1_000,
 
   /**
+   * Most a donor can add for Givezy on one gift: R5 000 (Yehuda, 22/11/2026). With a monthly gift it is per month.
+   * Kept apart from the gift's maximum: a contribution this big is far more likely a typo than a choice.
+   */
+  maxContributionCents: 500_000,
+
+  /**
    * The contribution to Givezy on the give form (Yehuda, 09/11/2026): these amount buttons, then "Other" and
    * "No thanks" (R0). Rand amounts, not a percentage. The default is preselected and must be one of the presets
    * (anything else starts on "No thanks"). With a monthly gift the contribution repeats each month.

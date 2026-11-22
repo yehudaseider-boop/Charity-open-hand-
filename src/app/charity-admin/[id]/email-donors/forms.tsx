@@ -78,12 +78,12 @@ export function AppealForm({
           </div>
           <div className="space-y-1">
             <label htmlFor="subject" className="block text-sm font-semibold text-navy">Subject</label>
-            <input id="subject" value={subject} onChange={(e) => setSubject(e.currentTarget.value)} maxLength={APPEAL_SUBJECT_MAX} aria-invalid={errors.subject ? true : undefined} className={`${field} w-full aria-invalid:border-danger`} />
+            <input id="subject" dir="auto" value={subject} onChange={(e) => setSubject(e.currentTarget.value)} maxLength={APPEAL_SUBJECT_MAX} aria-invalid={errors.subject ? true : undefined} className={`${field} w-full aria-invalid:border-danger`} />
             {errors.subject ? <p role="alert" className="text-xs text-danger">{errors.subject}</p> : <p className="text-xs text-muted">What donors see in their inbox. For example: Winter parcels, how you helped.</p>}
           </div>
           <div className="space-y-1">
             <label htmlFor="body" className="block text-sm font-semibold text-navy">Your message</label>
-            <textarea id="body" rows={10} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={APPEAL_BODY_MAX} aria-invalid={errors.body ? true : undefined} className={`${field} w-full py-2.5 aria-invalid:border-danger`} />
+            <textarea id="body" dir="auto" rows={10} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={APPEAL_BODY_MAX} aria-invalid={errors.body ? true : undefined} className={`${field} w-full py-2.5 aria-invalid:border-danger`} />
             {errors.body ? (
               <p role="alert" className="text-xs text-danger">{errors.body}</p>
             ) : (

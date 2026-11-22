@@ -10,6 +10,7 @@ import { Splash } from "@/components/splash";
 import { Illustration } from "@/components/illustration";
 import { Bubbles } from "@/components/marketing";
 import { sentProofMatches, signInMessage } from "@/lib/sign-in";
+import { ErrorMark } from "@/components/forms/fields";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -77,7 +78,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </p>
         </div>
       ) : (
-        <SafeForm action={sendLoginLink} className="mt-4 space-y-3">
+        // The site's own message for an empty or mistyped email, not the browser's popup (22/11/2026): the server
+        // checks it and sends the person back here with what they typed still in the box.
+        <SafeForm action={sendLoginLink} noValidate className="mt-4 space-y-3">
           <p className="text-[15px] text-muted">
             No password needed. We&apos;ll email you a sign-in code. You don&apos;t need an account to give.
           </p>
@@ -90,9 +93,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             required
             autoComplete="email"
             defaultValue={email}
-            className="w-full rounded-control border-2 border-border bg-surface px-4 py-3 text-[17px] outline-none focus:border-brand focus:ring-4 focus:ring-brand-soft"
+            aria-invalid={params.error === "email" ? true : undefined}
+            aria-describedby={error ? "email-error" : undefined}
+            className="w-full rounded-control border-2 border-border bg-surface px-4 py-3 text-[17px] outline-none focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger"
           />
-          {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+          {error ? <p id="email-error" role="alert" className="flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{error}</span></p> : null}
           <PendingButton pendingLabel="Sending…" className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-[17px] font-bold text-navy disabled:opacity-60">
             Email me a sign-in code
           </PendingButton>

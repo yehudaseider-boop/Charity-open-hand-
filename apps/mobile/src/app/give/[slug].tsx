@@ -2,7 +2,8 @@ import { GIVING_PAUSED_MESSAGE } from "@shared/giving-pause";
 import { parseRandToCents } from "@shared/money";
 import { cardChargeToCover } from "@shared/fees";
 import { impactLine, impactSource } from "@shared/charity/impact";
-import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
+import { AMOUNT_MAX_LENGTH } from "@/lib/amount-input";
+import { footerAmountLine, GIVE_STILL_CONNECTING_MS, giftAmountError, givableTotal, waitingGiftLine } from "@/lib/give-checks";
 import { isValidSaIdNumber } from "@shared/sa-id";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -19,12 +20,12 @@ import { GiftSent, type GoalInvite, type SentGift } from "@/components/gift-sent
 import { CheckIcon, ChevronIcon } from "@/components/icons";
 import { Segmented } from "@/components/segmented";
 import { Bubbles, People } from "@/components/people";
-import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, LoadingNote, SkeletonBlock } from "@/components/states";
 import { CheckRow, SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
-import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleContribution, sampleGiftLimits, sampleGoals } from "@/data/giving";
-import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, NO_CONTRIBUTION_NOTE_OTHER_ONLY, contributionCents, contributionLabel, startingChoice, type ContributionChoice } from "@shared/donations/contribution";
+import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, sampleContribution, sampleContributionMaxCents, sampleGiftLimits, sampleGoals } from "@/data/giving";
+import { CONTRIBUTION_EXPLAINER, contributionAboveMaximumMessage, NO_CONTRIBUTION_NOTE, NO_CONTRIBUTION_NOTE_OTHER_ONLY, contributionCents, contributionLabel, startingChoice, type ContributionChoice } from "@shared/donations/contribution";
 import { LabelPicker } from "@/components/label-picker";
 import { useLabelSuggestions } from "@/lib/use-labels";
 import { cleanLabel } from "@shared/donations/labels";
@@ -209,6 +210,16 @@ export default function Give() {
   // The monthly authorisation names an exact total: it counts only for the total that was ticked.
   const [authorisedTotal, setAuthorisedTotal] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // A changed amount is checked afresh (below, as it is typed): an earlier "fix the amount" doesn't hang on.
+  // Reset while rendering, the way React asks for state that follows another value.
+  const [errorsAmount, setErrorsAmount] = useState(amount);
+  if (errorsAmount !== amount) {
+    setErrorsAmount(amount);
+    if (errors.amount) {
+      const { amount: _gone, ...rest } = errors;
+      setErrors(rest);
+    }
+  }
   // What happened, as a red error or a calm note while we wait; `help` adds how to reach a person.
   const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean } | null>(null);
   // iPhone VoiceOver often doesn't speak a live region that appears on its own, so each message (what went wrong, "checking
@@ -216,9 +227,21 @@ export default function Give() {
   useEffect(() => {
     if (message && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message.text);
   }, [message]);
-  const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => setMessageState(text ? { text, tone, help } : null);
+  const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => {
+    setMessageState(text ? { text, tone, help } : null);
+    setMessageAtEnd(false);
+  };
+  // Whether the pinned message has more below what shows, so it can say "Scroll for more".
+  const [messageBox, setMessageBox] = useState(0);
+  const [messageContent, setMessageContent] = useState(0);
+  const [messageAtEnd, setMessageAtEnd] = useState(false);
+  // A small phone (iPhone SE, 568 tall): with a message showing, the footer keeps only the card line.
+  const smallScreen = windowHeight < 700;
+  const messageMax = Math.round(windowHeight * (keyboardUp ? 0.14 : 0.26));
   // A payment we haven't heard back about: the footer offers "Check again" instead of a second gift.
-  const [unsettled, setUnsettled] = useState<{ reference: string; token: string; charged: boolean; summary: Snapshot } | null>(null);
+  const [unsettled, setUnsettled] = useState<{ reference: string; token: string; charged: boolean; summary: Snapshot; charityName: string; sentAt: string } | null>(null);
+  // "I didn't pay: start again" asks first, on the screen (22/11/2026): the gift may still arrive if they did pay.
+  const [askingStartAgain, setAskingStartAgain] = useState(false);
   // A saved-card charge we haven't heard back about: the form is held to exactly what was sent (same amount,
   // card, email) until the server says paid or declined, so no second donation can be started around it.
   const [heldAttempt, setHeldAttempt] = useState<Snapshot | null>(null);
@@ -278,22 +301,25 @@ export default function Give() {
       restoredFor.current = who;
       // A gift started on this screen in the meantime is the one that counts.
       if (!p || busyRef.current) return;
+      // The form shows the gift that was sent (amount, contribution, email, once-off or monthly), never "Your gift R0"
+      // under a message about a gift it doesn't name (try-to-break-it pass, 22/11/2026).
+      setAmount(p.summary.amountText ?? centsToInput(p.summary.cents));
+      if (p.summary.extraChoice !== undefined) setExtraPick(p.summary.extraChoice);
+      setExtraAmount(p.summary.extraText ?? "");
+      setEmail(p.summary.email);
+      if (p.summary.label) setLabel(p.summary.label);
       if (p.attemptId) {
         // A saved-card charge: held exactly as it was sent, under the same attempt id, so it is never charged twice.
         attemptRef.current = p.attemptId;
         setHeldAttempt(p.summary);
-        setAmount(p.summary.amountText ?? centsToInput(p.summary.cents));
-        if (p.summary.extraChoice !== undefined) setExtraPick(p.summary.extraChoice);
-        setExtraAmount(p.summary.extraText ?? "");
-        setEmail(p.summary.email);
         setMonthly(false);
-      }
+      } else setMonthly(p.summary.monthly);
       if (!p.reference || !p.token) {
-        setMessage(`Your gift of ${rand(p.summary.cents + p.summary.contributionCents)} from your saved card may still be going through. Hold to give again: we check first, and never charge twice.`, "wait", true);
+        setMessage(`Your gift of ${waitingGiftLine(p)} It was from your saved card and may still be going through. Hold to give again: we check first, and never charge twice.`, "wait", true);
         return;
       }
-      setUnsettled({ reference: p.reference, token: p.token, charged: p.charged, summary: p.summary });
-      setMessage(`Checking your gift of ${rand(p.summary.cents + p.summary.contributionCents)}…`, "info");
+      setUnsettled({ reference: p.reference, token: p.token, charged: p.charged, summary: p.summary, charityName: p.charityName, sentAt: p.sentAt });
+      setMessage(`Checking your gift of ${waitingGiftLine(p)}`, "info");
       busyRef.current = true;
       setBusy("checking");
       const outcome = await paymentStatus(site, p.reference, p.token);
@@ -427,6 +453,8 @@ export default function Give() {
             <EmptyState title="Charity not found" body="It may have been removed from the directory." action={{ label: "Back to Discover", onPress: leave }} />
           ) : (
             <>
+              {/* Words with the blocks (22/11/2026): what it's doing at once, then that it's slow, until the 35s "Try again". */}
+              <LoadingNote first="Getting giving ready…" slowAfterMs={GIVE_STILL_CONNECTING_MS} />
               <SkeletonBlock height={64} />
               <SkeletonBlock height={220} />
             </>
@@ -494,7 +522,8 @@ export default function Give() {
   // The contribution buttons come from the server (platformConfig), never from the app; the preview shows the same.
   const extraPresets = server?.contributionPresetsCents ?? (preview ? sampleContribution.presetsCents : []);
   const extraChoice = extraPick ?? startingChoice(extraPresets, server?.contributionDefaultCents ?? (preview ? sampleContribution.defaultCents : 0));
-  const extraResult = contributionCents(extraChoice, extraAmount, minExtra);
+  const maxExtra = server?.maxContributionCents ?? (preview ? sampleContributionMaxCents : null);
+  const extraResult = contributionCents(extraChoice, extraAmount, minExtra, maxExtra ?? undefined);
   const maxGift = server?.maxGiftCents ?? (preview ? sampleGiftLimits.maxCents : null);
   const gift = parseRandToCents(amount);
   const contribution = extraResult.ok ? extraResult.cents : null;
@@ -509,7 +538,10 @@ export default function Give() {
       return 0;
     }
   })();
-  const total = gift !== null && contribution !== null ? gift + contribution + cardCharge : null;
+  // The amount's problem, as the Give check words it (null when it can be given). The button names a total only when
+  // the gift and the contribution can both be given (22/11/2026: amount 0 read "Hold to give R10").
+  const amountError = giftAmountError(amount, gift, minGift, maxGift);
+  const total = givableTotal(gift, amountError, contribution, cardCharge);
   // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
   const isMonthly = monthly && !campaignId && !heldAttempt;
   // What the typed amount pays for, by the charity's own figure (none when it set no figure).
@@ -591,15 +623,13 @@ export default function Give() {
       setDone(sentSummary(g.summary, false, g.reference));
     } else {
       const o = outcome === "failed" || outcome === "not_found" || outcome === "reversed" || outcome === "review" ? outcome : "pending";
-      setMessage(afterPaymentMessage(o, g.charged, checkedAt), afterPaymentTone(o), true);
+      setMessage(`Your gift of ${waitingGiftLine(g)} ${afterPaymentMessage(o, g.charged, checkedAt)}`, afterPaymentTone(o), true);
     }
   }
 
   function check() {
     const e: Record<string, string> = {};
-    if (gift === null || (gift === 0 && !minGift)) e.amount = amountProblem(amount, "180 or 180.50") ?? "Enter an amount in Rand, for example 180 or 180.50";
-    else if (gift < minGift) e.amount = `The minimum donation is ${rand(minGift)}`;
-    else if (maxGift !== null && gift > maxGift) e.amount = `The largest donation in the app is ${rand(maxGift)}. For a bigger gift, please contact the charity directly.`;
+    if (amountError) e.amount = amountError;
     if (!extraResult.ok) e.extra = extraResult.message;
     if (!first.trim()) e.first_name = "Enter your first name";
     if (!last.trim()) e.last_name = "Enter your surname";
@@ -812,6 +842,11 @@ export default function Give() {
         return;
       }
       if (r.fieldErrors) {
+        // The server's shape check only says "Check your contribution": the shared validator's own words say what to change.
+        if (r.fieldErrors.extra) {
+          const said = extraResult.ok ? null : extraResult.message;
+          r.fieldErrors.extra = said ?? (maxExtra !== null && (contribution ?? 0) > maxExtra ? contributionAboveMaximumMessage(maxExtra) : "We couldn't take that contribution. Choose one of the amounts, type a smaller one, or choose No thanks.");
+        }
         setErrors(r.fieldErrors);
         // A problem with a detail folded away under "Giving as" opens it, so it can be seen and fixed.
         if (remembered && ["first_name", "last_name", "email", "phone"].some((k) => r.fieldErrors?.[k])) setEditingDetails(true);
@@ -826,6 +861,7 @@ export default function Give() {
     if (!r.charged) setBusy("opening");
     // Kept on the phone before the payment page opens, so a phone that closes the app meanwhile still asks about it
     // when the donor comes back (Progress, and this screen when it opens again).
+    const sentAtNow = new Date().toISOString();
     await keepPendingGift(owner, {
       slug: charity!.slug,
       charityName: charity!.nameEn,
@@ -835,7 +871,7 @@ export default function Give() {
       attemptId: r.charged ? attemptRef.current : null,
       detailsLater,
       summary: sent,
-      sentAt: new Date().toISOString(),
+      sentAt: sentAtNow,
     });
     // "Add my details after paying": Receipts doesn't count this gift towards an s18A receipt until they are added.
     if (detailsLater) void markDetailsLater(owner, r.reference);
@@ -883,7 +919,7 @@ export default function Give() {
       haptic.tap();
       const o = outcome === "paid" || outcome === "unknown" ? "pending" : outcome;
       const waiting = o === "pending" || o === "review";
-      setUnsettled(waiting ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent } : null);
+      setUnsettled(waiting ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent, charityName: charity!.nameEn, sentAt: sentAtNow } : null);
       // Declined or not found: nothing to wait for. Still waiting: kept on the phone (above) until we hear.
       if (!waiting) void dropPendingGift(owner, charity!.slug);
       setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date()), afterPaymentTone(o), true);
@@ -931,7 +967,7 @@ export default function Give() {
         return;
       }
       const o = outcome === "unknown" ? "pending" : outcome;
-      setMessage(afterPaymentMessage(o, unsettled.charged, new Date()), afterPaymentTone(o), true);
+      setMessage(`Your gift of ${waitingGiftLine(unsettled)} ${afterPaymentMessage(o, unsettled.charged, new Date())}`, afterPaymentTone(o), true);
     } finally {
       busyRef.current = false;
     }
@@ -991,7 +1027,7 @@ export default function Give() {
                 placeholderTextColor={colors.lilacSoft}
                 accessibilityLabel="Amount in Rand"
                 accessibilityHint={minGift ? `At least ${rand(minGift)}` : undefined}
-                style={[styles.amountInput, amount.length > 9 ? { fontSize: 34, lineHeight: 44 } : amount.length > 6 ? { fontSize: 44, lineHeight: 54 } : null]}
+                style={[styles.amountInput, amount.length > (width < 340 ? 7 : 9) ? { fontSize: 34, lineHeight: 44 } : amount.length > (width < 340 ? 5 : 6) ? { fontSize: 44, lineHeight: 54 } : null]}
               />
             </View>
             </AmountSwipe>
@@ -1003,7 +1039,8 @@ export default function Give() {
               </>
             ) : charity.impact ? <Text style={styles.amountImpact}>{charity.impact}</Text> : null}
           </View>
-          {err("amount") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert">{err("amount")}</Text> : minGift ? <Text variant="label">At least {rand(minGift)}.</Text> : null}
+          {/* A typed amount that can't be given says why at once (22/11/2026), without holding the button first. */}
+          {(amount.trim() ? amountError : null) ?? err("amount") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert" accessibilityLiveRegion="polite">{(amount.trim() ? amountError : null) ?? err("amount")}</Text> : minGift ? <Text variant="label">At least {rand(minGift)}.</Text> : null}
           {lastGift ? (
             <Pressable
               disabled={locked}
@@ -1156,6 +1193,7 @@ export default function Give() {
                 <Text style={extraChoice === "none" ? styles.noThanksOn : styles.link}>No thanks</Text>
               </Pressable>
             </View>
+            {extraChoice !== "other" && err("extra") ? <Text variant="label" style={{ color: colors.danger }} accessibilityRole="alert">{err("extra")}</Text> : null}
             {extraChoice === "none" ? <Text variant="label" accessibilityLiveRegion="polite">{extraPresets.length ? NO_CONTRIBUTION_NOTE : NO_CONTRIBUTION_NOTE_OTHER_ONLY}</Text> : null}
           </View>
 
@@ -1392,27 +1430,58 @@ export default function Give() {
         <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
           {message ? (
             <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={message.tone === "error" ? styles.errorNote : styles.waitNote}>
-              {/* Never taller than a slice of the screen: a long message scrolls inside, the form stays usable. */}
-              <ScrollView style={{ maxHeight: Math.round(windowHeight * (keyboardUp ? 0.14 : 0.26)) }} nestedScrollEnabled>
+              {/* Never taller than a slice of the screen: a long message scrolls inside, the form stays usable. On a small
+                  phone it may take a bit more room, and when it doesn't all fit it says so ("Scroll for more"), with the
+                  scroll bar always showing (22/11/2026: at 320 by 568 the help line was cut off with no sign). */}
+              <ScrollView
+                style={{ maxHeight: messageMax }}
+                nestedScrollEnabled
+                persistentScrollbar
+                scrollEventThrottle={100}
+                onLayout={(e) => setMessageBox(e.nativeEvent.layout.height)}
+                onContentSizeChange={(_w, h) => setMessageContent(h)}
+                onScroll={(e) => {
+                  const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+                  setMessageAtEnd(contentOffset.y + layoutMeasurement.height >= contentSize.height - 4);
+                }}
+              >
                 <Text style={{ fontSize: 16, lineHeight: 23, color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
                 {message.help && !keyboardUp ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
               </ScrollView>
+              {messageContent > messageBox + 4 && !messageAtEnd ? (
+                <Text variant="label" style={styles.scrollMore} accessibilityElementsHidden importantForAccessibility="no">Scroll for more ↓</Text>
+              ) : null}
             </View>
           ) : null}
           <View style={{ gap: 8 }}>
-            {unsettled ? (
+            {unsettled && askingStartAgain ? (
+              // Asked on the screen, not in a pop-up, so the gift it is about stays in view above (22/11/2026).
+              <View style={styles.askBox} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                <Text style={styles.askTitle}>Start again without this gift?</Text>
+                <Text variant="label">Only if you closed the payment page without paying. If you did pay, the gift still arrives and you&apos;ll get an email.</Text>
+                <Button variant="cta" label="Keep checking" onPress={() => setAskingStartAgain(false)} />
+                <TextLink
+                  label="Start again"
+                  onPress={() => {
+                    setAskingStartAgain(false);
+                    setUnsettled(null);
+                    setMessage(null);
+                    void dropPendingGift(owner, charity.slug);
+                  }}
+                />
+              </View>
+            ) : unsettled ? (
               <>
                 <Button variant="cta" label={busy === "checking" ? "Checking your payment…" : "Check again"} disabled={busy !== false} onPress={checkAgain} />
-                {unsettled.charged ? null : (
-                  <TextLink label="I didn't pay: start again" onPress={() => { setUnsettled(null); setMessage(null); void dropPendingGift(owner, charity.slug); }} />
-                )}
+                {unsettled.charged ? null : <TextLink label="I didn't pay: start again" disabled={busy !== false} onPress={() => setAskingStartAgain(true)} />}
               </>
             ) : (
               <HoldToGive label={total ? `Hold to give ${rand(total)}${isMonthly ? " every month" : ""}` : "Hold to give"} busyLabel={busy ? buttonLabel : "Giving…"} busy={busy !== false} confirmed={confirmed} onConfirm={give} />
             )}
-            {keyboardUp ? null : (
-            <Text variant="label" style={styles.footerLine}>
-              {total !== null ? `${rand(gift ?? 0)} to ${charity.nameEn}${cardCharge ? `, plus ${rand(cardCharge)} card charge` : ""}. Contribution to Givezy: ${contributionLabel(contribution ?? 0, isMonthly)}. ` : ""}
+            {keyboardUp || (unsettled && askingStartAgain) ? null : (
+            <Text variant="label" style={styles.footerLine} numberOfLines={3}>
+              {/* On a small phone with a message showing, the button already names the total: the amount line gives way. */}
+              {total !== null && !unsettled && !(smallScreen && message) ? `${footerAmountLine(gift ?? 0, charity.nameEn, cardCharge, contributionLabel(contribution ?? 0, isMonthly))} ` : ""}
               {payWithSaved && savedCard ? `Charged to your ${cardLabel(savedCard)}. Nothing is typed in the app.` : "You enter your card on a secure payment page, never in the app."}
             </Text>
             )}
@@ -1438,6 +1507,9 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.navy },
   footer: { paddingHorizontal: space.gutter, paddingTop: 14, gap: 10, backgroundColor: colors.cream, borderTopWidth: 1.5, borderTopColor: colors.hairline },
   footerLine: { textAlign: "center", fontSize: 14, lineHeight: 20 },
+  scrollMore: { textAlign: "right", marginTop: 4, color: colors.blue },
+  askBox: { gap: 8 },
+  askTitle: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 22, color: colors.navy },
   amountCard: { paddingTop: 20, paddingBottom: 22, paddingHorizontal: 22, gap: 4, borderRadius: radius.card, backgroundColor: colors.blue, overflow: "hidden" },
   amountKicker: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.lilacSoft },
   amountRow: { flexDirection: "row", alignItems: "center", gap: 4 },

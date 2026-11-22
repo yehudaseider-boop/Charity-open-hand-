@@ -9,5 +9,6 @@ export async function confirmStopNews(formData: FormData) {
     console.error(e);
     return null;
   });
-  redirect(r ? "/news/stop?done=1" : `/news/stop?t=${encodeURIComponent(token)}&error=1`);
+  // "Done" keeps the link's token, and the page checks it really is stopped before saying so (22/11/2026).
+  redirect(r ? `/news/stop?t=${encodeURIComponent(token)}&done=1` : `/news/stop?t=${encodeURIComponent(token)}&error=1`);
 }

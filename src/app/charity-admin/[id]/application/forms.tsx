@@ -16,7 +16,7 @@ export function OrganisationForm({ action, charity }: {
 }) {
   return (
     <ActionForm action={action} submitLabel="Save">
-      <TextField name="name_en" label="Name donors will see" required defaultValue={charity.name_en} />
+      <TextField name="name_en" label="Name donors will see" required autoDirection defaultValue={charity.name_en} />
       <TextField name="legal_name_en" label="Registered legal name" required defaultValue={charity.legal_name_en}
         hint="Exactly as on your NPO or PBO documents. This appears on s18A receipts." />
       <TextField name="npo_number" label="NPO number" defaultValue={charity.npo_number} hint="For example 123-456 NPO" />
@@ -49,7 +49,7 @@ export function ContactForm({ action, priv }: {
 }) {
   return (
     <ActionForm action={action} submitLabel="Save">
-      <TextField name="contact_name" label="Full name" required defaultValue={priv?.contact_name} autoComplete="name" />
+      <TextField name="contact_name" label="Full name" required autoDirection defaultValue={priv?.contact_name} autoComplete="name" />
       <TextField name="contact_email" label="Email" type="email" required defaultValue={priv?.contact_email} autoComplete="email" />
       <TextField name="contact_phone" label="Phone" type="tel" defaultValue={priv?.contact_phone} autoComplete="tel" />
     </ActionForm>

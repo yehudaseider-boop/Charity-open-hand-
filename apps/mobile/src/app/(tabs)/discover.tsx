@@ -15,7 +15,7 @@ import type { Charity } from "@/data/sample";
 import { FadeUp } from "@/components/fade-up";
 import { PressableScale } from "@/components/pressable-scale";
 import { SearchIcon, StarIcon } from "@/components/icons";
-import { EmptyState, ErrorState, LoadingList, OfflineNote, SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, LoadingList, LoadingNote, OfflineNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { SEARCH_MAX_LENGTH, useDirectory } from "@/lib/directory";
 import { matchesSearch } from "@shared/charity/search-text";
@@ -137,6 +137,7 @@ export default function Discover() {
         <View style={styles.gutter}>
           {state === "loading" ? (
             <View style={{ gap: space.block }}>
+              <LoadingNote />
               <SkeletonBlock height={258} />
               <LoadingList count={2} imageHeight={99} />
             </View>

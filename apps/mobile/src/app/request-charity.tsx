@@ -12,7 +12,7 @@ import { SwitchRow } from "@/components/switch-row";
 import { Text } from "@/components/text";
 import { TopBar } from "@/components/top-bar";
 import { useAccount } from "@/lib/account";
-import { sendCharityRequest, type RequestReply } from "@/lib/charity-request";
+import { fieldErrorsForTheSwitch, forTheSwitch, sendCharityRequest, type RequestReply } from "@/lib/charity-request";
 import { haptic } from "@/lib/haptics";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 
@@ -46,8 +46,8 @@ export default function RequestCharity() {
     const checked = checkCharityRequest({ name, town, link, note, emailMe, email });
     if (!checked.ok) {
       haptic.soft();
-      setErrors(checked.fieldErrors);
-      setProblem(checked.message);
+      setErrors(fieldErrorsForTheSwitch(checked.fieldErrors));
+      setProblem(forTheSwitch(checked.message));
       scroll.current?.scrollTo({ y: 0, animated: true });
       return;
     }
@@ -69,8 +69,8 @@ export default function RequestCharity() {
       return;
     }
     haptic.soft();
-    setErrors((reply.fieldErrors ?? {}) as Errors);
-    setProblem(reply.message);
+    setErrors(fieldErrorsForTheSwitch(reply.fieldErrors ?? {}) as Errors);
+    setProblem(forTheSwitch(reply.message));
   };
 
   const again = () => {

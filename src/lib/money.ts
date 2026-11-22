@@ -20,14 +20,15 @@ export function formatRand(cents: number | bigint): string {
 
 /**
  * Parse a Rand amount typed by a person into cents, without floating point.
- * Accepts "1250", "1 250", "1250.5", "R1 250,50" (comma or dot decimal).
+ * Accepts "1250", "1 250", "1250.5", "R1 250,50" (comma or dot decimal), "100." and ".50".
  * Returns null if it is not a valid amount with at most 2 decimals.
  */
 export function parseRandToCents(input: string): number | null {
   const cleaned = input.trim().replace(/^R/i, "").replace(/[\s ]/g, "").replace(",", ".");
-  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(cleaned);
+  // "100." and ".50" are read as 100 and 0.50 (a dot typed and left, or a leading zero left out).
+  const match = /^(?:(\d+)(?:\.(\d{0,2}))?|\.(\d{1,2}))$/.exec(cleaned);
   if (!match) return null;
-  const cents = BigInt(match[1]) * 100n + BigInt((match[2] ?? "").padEnd(2, "0"));
+  const cents = BigInt(match[1] ?? "0") * 100n + BigInt((match[2] ?? match[3] ?? "").padEnd(2, "0"));
   if (cents > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   return Number(cents);
 }
@@ -38,7 +39,7 @@ export function parseRandToCents(input: string): number | null {
  */
 export function looksLikeAmount(input: string): boolean {
   const cleaned = input.trim().replace(/^R/i, "").replace(/[\s ]/g, "").replace(",", ".");
-  return /^\d+(?:\.\d{1,2})?$/.test(cleaned);
+  return /^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(cleaned);
 }
 
 /** The message for "1,250": SA writes thousands with a space, and the comma is the decimal mark, so it can't be read safely. */

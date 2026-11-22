@@ -98,6 +98,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
           <div className="flex min-w-0 gap-2">
             <input
               name="q"
+              dir="auto"
               defaultValue={q}
               placeholder="Search name or email"
               aria-label="Search by donor name or email"

@@ -208,6 +208,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
           {s18a ? <input type="hidden" name="s18a" value={s18a} /> : null}
           <input
             name="q"
+            dir="auto"
             defaultValue={q}
             placeholder="Search name or email"
             aria-label="Search by donor name or email"

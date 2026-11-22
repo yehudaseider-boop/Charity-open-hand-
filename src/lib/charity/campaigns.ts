@@ -61,3 +61,19 @@ export function progressPercent(raisedCents: number, targetCents: number | null)
 export function isRunning(c: { status: string; endsAt: string | null }, now: Date = new Date()): boolean {
   return c.status === "active" && (!c.endsAt || new Date(c.endsAt).getTime() >= now.getTime());
 }
+
+/**
+ * A give link with ?campaign=: the campaign to give to when it is taking gifts, or why not (22/11/2026). "ended" only
+ * for a campaign the charity really ran; an id we can't find (a typo, a draft, another charity's) is "unknown", so
+ * the page never says a campaign ended that never was.
+ */
+export function campaignFromLink<C extends { id: string; status: string; endsAt: string | null }>(
+  id: string | undefined,
+  campaigns: readonly C[],
+  now: Date = new Date(),
+): { campaign: C } | { problem: "ended" | "unknown" } | null {
+  if (id === undefined) return null;
+  const found = campaigns.find((c) => c.id === id);
+  if (!found) return { problem: "unknown" };
+  return isRunning(found, now) ? { campaign: found } : { problem: "ended" };
+}

@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { platformConfig } from "@/config/platform";
 import { FeeError, priceDonation } from "@/lib/fees";
 
-const mins = { minDonationCents: platformConfig.minDonationCents, minContributionCents: platformConfig.minContributionCents, maxDonationCents: platformConfig.maxDonationCents };
+const mins = {
+  minDonationCents: platformConfig.minDonationCents,
+  minContributionCents: platformConfig.minContributionCents,
+  maxDonationCents: platformConfig.maxDonationCents,
+  maxContributionCents: platformConfig.maxContributionCents,
+};
 
 function code(fn: () => unknown) {
   try {
@@ -35,11 +40,20 @@ describe("priceDonation", () => {
   it("refuses a gift above R1 000 000 (a typo, not a gift), and takes exactly R1 000 000", () => {
     expect(platformConfig.maxDonationCents).toBe(100_000_000);
     expect(code(() => priceDonation(100_000_001, 0, mins))).toBe("above_maximum");
-    // A typo in the contribution (R50 000 instead of R50) is caught the same way.
-    expect(code(() => priceDonation(3_000, 100_000_001, mins))).toBe("above_maximum");
     expect(code(() => priceDonation(100_000_000, 0, mins))).toBeNull();
     // Callers without a ceiling (older tests) keep working.
     expect(code(() => priceDonation(100_000_001, 0, { minDonationCents: 3_000, minContributionCents: 1_000 }))).toBeNull();
+  });
+
+  it("caps the contribution to Givezy at R5 000 a gift (Yehuda, 22/11/2026), with its own code", () => {
+    expect(platformConfig.maxContributionCents).toBe(500_000);
+    expect(code(() => priceDonation(3_000, 500_000, mins))).toBeNull();
+    expect(code(() => priceDonation(3_000, 500_001, mins))).toBe("contribution_above_maximum");
+    // A typo in the contribution (R50 000 instead of R50) is the contribution's problem, never the gift's.
+    expect(code(() => priceDonation(3_000, 5_000_000, mins))).toBe("contribution_above_maximum");
+    expect(code(() => priceDonation(3_000, 100_000_001, mins))).toBe("contribution_above_maximum");
+    // The gift's own maximum is not the contribution's: a R1 000 000 gift still takes a R5 000 contribution.
+    expect(code(() => priceDonation(100_000_000, 500_000, mins))).toBeNull();
   });
 
   it("refuses broken amounts", () => {

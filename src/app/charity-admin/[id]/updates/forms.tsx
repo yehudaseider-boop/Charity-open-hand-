@@ -22,7 +22,7 @@ export function PhotoForm({ action }: { action: Action }) {
   return (
     <ActionForm action={action} submitLabel="Add photo" pendingLabel="Uploading…" resetOnSuccess>
       <FileField name="file" label="Photo" required accept="image/jpeg,image/png,image/webp" hint="JPG, PNG or WebP, up to 4 MB." />
-      <TextField name="caption_en" label="Caption (optional)" hint="Up to 120 characters, for example: Packing parcels on a Thursday night." />
+      <TextField name="caption_en" label="Caption (optional)" autoDirection hint="Up to 120 characters, for example: Packing parcels on a Thursday night." />
     </ActionForm>
   );
 }

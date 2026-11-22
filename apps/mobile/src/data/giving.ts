@@ -8,6 +8,15 @@ export type Gift = { id: string; /** The Johannesburg calendar day it was paid. 
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 
+/**
+ * The 1st of next month in Johannesburg (UTC+2 all year), as a local-midnight date: the sample monthly donation's
+ * next date, so the preview never shows a "next" date in the past (22/11/2026: it read 01/11/2026 on 22/11/2026).
+ */
+export function nextFirstOfMonth(now: Date = new Date()): Date {
+  const t = new Date(now.getTime() + 2 * 3_600_000);
+  return new Date(t.getUTCFullYear(), t.getUTCMonth() + 1, 1);
+}
+
 export const gifts: Gift[] = [
   { id: "g8", date: d(2026, 10, 2), charitySlug: "northcliff-meals-fund", charityName: "Northcliff Meals Fund", cents: 36_000, monthly: false, with18a: true, label: "Family" },
   { id: "g7", date: d(2026, 10, 1), charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 50_000, monthly: true, with18a: true, label: "Work giving" },
@@ -32,7 +41,7 @@ export const sampleGoals: Goal[] = [
 export type Recurring = { id: string; charitySlug: string; charityName: string; /** The gift to the charity each month. */ cents: number; /** The contribution to Givezy paid with it, if any. */ contributionCents?: number; /** The card charge the donor covers each month, at today's rates (worked out as the website does). */ cardChargeCents?: number; /** The donor covers the card charge, but today's rates couldn't be fetched (offline): the amount is shown as "plus the card charge". */ cardChargeUnknown?: boolean; nextDate: Date | null; status: "active" | "paused" | "cancelled" | "failed"; /** A change is saved and waiting for the payment provider to apply it. */ syncing?: boolean; /** The card was declined: the donor can put in a new one. */ needsCard?: boolean };
 
 export const recurring: Recurring[] = [
-  { id: "r1", charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 50_000, nextDate: d(2026, 11, 1), status: "active" },
+  { id: "r1", charitySlug: "linksfield-learning-centre", charityName: "Linksfield Evening Learning Centre", cents: 50_000, nextDate: nextFirstOfMonth(), status: "active" },
   { id: "r2", charitySlug: "sandton-patient-care", charityName: "Sandton Patient Care Volunteers", cents: 18_000, nextDate: d(2026, 10, 15), status: "paused" },
 ];
 
@@ -53,3 +62,5 @@ export const sampleDonor = { name: "Sarah Dube", email: "sarah@example.co.za" };
 export const sampleContribution = { presetsCents: [1_000, 1_500, 2_000], defaultCents: 1_000, minCents: 1_000 };
 /** The smallest and largest gift in the preview (no server): the same as platformConfig (a test keeps them equal). */
 export const sampleGiftLimits = { minCents: 3_000, maxCents: 100_000_000 };
+/** The most a donor can add for Givezy in the preview: platformConfig.maxContributionCents (a test keeps them equal). */
+export const sampleContributionMaxCents = 500_000;

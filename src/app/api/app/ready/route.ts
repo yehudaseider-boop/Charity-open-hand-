@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
     campaignOpen,
     minGiftCents: platformConfig.minDonationCents,
     minContributionCents: platformConfig.minContributionCents,
+    // The most a donor can add for Givezy (22/11/2026), so the app can say so before the server refuses it.
+    maxContributionCents: platformConfig.maxContributionCents,
     // The contribution buttons and the preselected one (decided 09/11/2026), so the app shows the same as the website.
     contributionPresetsCents: platformConfig.contributionPresetsCents,
     contributionDefaultCents: platformConfig.contributionDefaultCents,

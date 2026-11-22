@@ -398,6 +398,20 @@ export async function stoppedThisCharity(charityId: string, hashes: string[]): P
 }
 
 /** The "stop these emails" link. True when the link was ours (the opt-out is then saved). */
+/**
+ * Has this stop link's email already stopped thank-yous? Read only. The stop page says "Done" only when this is true
+ * (22/11/2026), so a bare "?done=1" opened by hand never claims something was stopped.
+ */
+export async function thankYousStopped(token: string): Promise<boolean> {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
+  const db = createAdminClient();
+  const { data } = await db.from("email_stop_tokens").select("email_hash").eq("token_hash", sha(token)).maybeSingle();
+  if (!data) return false;
+  const { data: out, error } = await db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", data.email_hash).maybeSingle();
+  if (error) throw error;
+  return Boolean(out);
+}
+
 export async function stopThankYous(token: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
   const db = createAdminClient();

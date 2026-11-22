@@ -15,7 +15,7 @@ import { GoalRing } from "@/components/goal-ring";
 import { CalendarIcon, ChevronIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { useStatusCover } from "@/components/status-cover";
 import { Logo } from "@/components/logo";
-import { EmptyState, ErrorState, OfflineNote, SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, LoadingNote, OfflineNote, SkeletonBlock } from "@/components/states";
 import { useScreenState } from "@/lib/screen-state";
 import { Text } from "@/components/text";
 import { gifts as sampleGifts, givenElsewhere as sampleElsewhere, receipts as sampleReceipts, recurring as sampleRecurring, sampleGoals } from "@/data/giving";
@@ -30,7 +30,7 @@ import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
 import { loadIncome } from "@/lib/income-store";
 import { inCause, savedCharities } from "@/lib/live-charities";
-import { GIVING_LOAD_ERROR, givingLoadState, monthlyAmountLine } from "@/lib/live-giving";
+import { GIVING_LOAD_ERROR, givingLoadState, monthlyAmountLine, nextChargeText } from "@/lib/live-giving";
 import { loadCausePrefs } from "@/lib/cause-prefs";
 import { dismissGoalCard, goalCardDismissed } from "@/lib/first-run";
 import type { IncomeEntry } from "@/lib/ledger";
@@ -89,7 +89,7 @@ export default function Home() {
   const nextMonthly = monthlyList.filter((r) => r.status === "active" && r.nextDate).sort((a, b) => (a.nextDate as Date).getTime() - (b.nextDate as Date).getTime())[0] ?? null;
   const glance = [
     yearGifts.length ? { key: "year", Icon: GivingIcon, title: "Given through Givezy", value: rand(yearCents), sub: `${taxYearName(thisYear)} tax year · ${yearGifts.length} ${yearGifts.length === 1 ? "gift" : "gifts"}`, to: "/giving?section=year" } : null,
-    nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: monthlyAmountLine(nextMonthly), sub: `${ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving?section=monthly" } : null,
+    nextMonthly ? { key: "next", Icon: CalendarIcon, title: "Next monthly donation", value: monthlyAmountLine(nextMonthly), sub: `${(nextMonthly.nextDate as Date).getTime() < jhbToday().getTime() ? nextChargeText(nextMonthly.nextDate as Date, jhbToday()) : ddmmyyyy(nextMonthly.nextDate as Date)} · ${nextMonthly.charityName}`, to: "/giving?section=monthly" } : null,
     receiptList.length ? { key: "receipts", Icon: ReceiptsIcon, title: "s18A receipts", value: `${receiptList.length}`, sub: "To download", to: "/receipts" } : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null);
   // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
@@ -296,7 +296,7 @@ export default function Home() {
               <ErrorState body="We can't load charities right now. Check your connection, then try again." onRetry={directory.retry} />
             </View>
           ) : (preview && demoState === "loading") || (!directory.data && !directory.failed) ? (
-            <View style={styles.gutter}><SkeletonBlock height={260} /></View>
+            <View style={[styles.gutter, { gap: 10 }]}><LoadingNote /><SkeletonBlock height={260} /></View>
           ) : !causes.length ? (
             <View style={styles.gutter}>
               <EmptyState title="No charities here yet" body="Charities are joining Givezy. Have a look again soon." action={{ label: "Go to Discover", onPress: () => router.push("/discover") }} />

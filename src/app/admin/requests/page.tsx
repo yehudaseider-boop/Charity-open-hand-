@@ -64,7 +64,7 @@ export default async function PrivacyRequestsPage({ searchParams }: PageProps<"/
                 </form>
               ) : null}
               <form action={closeRequest.bind(null, r.id)} className="space-y-2">
-                <textarea name="response" rows={2} maxLength={2000} aria-label="Reply to the person" placeholder="Reply to the person" className="w-full rounded-control border border-outline bg-surface px-3 py-2" />
+                <textarea name="response" dir="auto" rows={2} maxLength={2000} aria-label="Reply to the person" placeholder="Reply to the person" className="w-full rounded-control border border-outline bg-surface px-3 py-2" />
                 <div className="flex gap-2">
                   <PendingButton name="status" value="done" pendingLabel="Saving…" className="rounded-control bg-brand px-3 py-2 text-brand-contrast">Mark done</PendingButton>
                   <PendingButton name="status" value="declined" pendingLabel="Saving…" className="rounded-control border border-outline px-3 py-2">Decline</PendingButton>

@@ -79,10 +79,13 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
 
   if (v.donor_type === "individual") {
     if (!v.first_name) e.first_name = "Enter your first name";
+    else if (!hasLetter(v.first_name)) e.first_name = "Enter your first name in letters";
     if (!v.last_name) e.last_name = "Enter your surname";
+    else if (!hasLetter(v.last_name)) e.last_name = "Enter your surname in letters";
   } else {
     if (!v.organisation_name) e.organisation_name = "Enter the registered name";
     if (!v.contact_person) e.contact_person = "Enter a contact person";
+    else if (!hasLetter(v.contact_person)) e.contact_person = "Enter the contact person's name in letters";
     // SARS reports a company by its CIPC number (Appendix K) and a trust by its Master's number (decided 03/11/2026).
     if (detailsNow && !v.registration_number?.trim()) e.registration_number = "Needed for an s18A receipt";
     else if (want18a && v.registration_number?.trim() && v.donor_type === "company" && !isValidCompanyRegistration(v.registration_number, new Date())) {
@@ -116,6 +119,14 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";
   if (v.popia_consent !== "on") e.popia_consent = "Please agree so we can record your donation";
   return e;
+}
+
+/**
+ * A person's name has at least one letter, in any script (22/11/2026): "---", "1234" or emoji alone are not a name,
+ * and would end up on the charity's records and the s18A receipt.
+ */
+export function hasLetter(name: string): boolean {
+  return /\p{L}/u.test(name);
 }
 
 /** The donor asked for an s18A receipt and chose to add the details after paying. */

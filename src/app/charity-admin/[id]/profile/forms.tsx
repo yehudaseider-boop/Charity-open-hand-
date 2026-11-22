@@ -19,7 +19,7 @@ export function ProfileForm({ action, charity, categories, selected }: {
 }) {
   return (
     <ActionForm action={action} submitLabel="Save profile">
-      <TextField name="name_en" label="Name" required defaultValue={charity.name_en} />
+      <TextField name="name_en" label="Name" required defaultValue={charity.name_en} autoDirection />
       <TextArea name="description_en" label="What you do" defaultValue={charity.description_en}
         hint="A few sentences donors read first. Who you help and how." />
       <TextArea name="funds_use_en" label="How donations are used" defaultValue={charity.funds_use_en}

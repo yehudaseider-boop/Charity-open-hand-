@@ -7,7 +7,7 @@ import { platformConfig } from "@/config/platform";
 import { FeeError, priceDonation, type Pricing } from "@/lib/fees";
 import { COMMA_THOUSANDS_MESSAGE, formatRand, looksLikeAmount, parseRandToCents, usesCommaThousands } from "@/lib/money";
 import { cardChargeRates } from "./card-charge";
-import { contributionCents, type ContributionChoice } from "./contribution";
+import { contributionAboveMaximumMessage, contributionCents, type ContributionChoice } from "./contribution";
 
 export type Quote = Pricing;
 
@@ -20,6 +20,7 @@ const minimums = {
   minDonationCents: platformConfig.minDonationCents,
   minContributionCents: platformConfig.minContributionCents,
   maxDonationCents: platformConfig.maxDonationCents,
+  maxContributionCents: platformConfig.maxContributionCents,
 };
 
 function feeErrorMessage(e: FeeError): string {
@@ -30,6 +31,8 @@ function feeErrorMessage(e: FeeError): string {
   if (e.code === "contribution_below_minimum") {
     return `The minimum contribution to ${platformConfig.appName} is ${formatRand(platformConfig.minContributionCents)}.`;
   }
+  // The contribution is to Givezy, not the charity: its own words, never "contact the charity".
+  if (e.code === "contribution_above_maximum") return contributionAboveMaximumMessage(platformConfig.maxContributionCents);
   return e.message;
 }
 
@@ -68,13 +71,11 @@ export function quoteFromTyped(
     return { ok: false, field: "amount", message: "Enter an amount in Rand, for example 180 or 180.50." };
   }
   if (gift === 0) return { ok: false, field: "amount", message: `The minimum donation is ${formatRand(platformConfig.minDonationCents)}.` };
-  const chosen = contributionCents(contribution, otherText, platformConfig.minContributionCents);
+  const chosen = contributionCents(contribution, otherText, platformConfig.minContributionCents, platformConfig.maxContributionCents);
   if (!chosen.ok) return { ok: false, field: "contribution", message: chosen.message };
   const result = quoteDonation(gift, chosen.cents, cover);
   if (result.ok) return { ok: true, quote: result.quote };
-  // priceDonation checks each line against the maximum on its own, so an above-maximum result is the
-  // contribution's only when the gift itself fits.
-  const contributionProblem = result.code === "contribution_below_minimum" || (result.code === "above_maximum" && gift <= platformConfig.maxDonationCents);
+  const contributionProblem = result.code === "contribution_below_minimum" || result.code === "contribution_above_maximum";
   return { ok: false, field: contributionProblem ? "contribution" : "amount", message: result.message };
 }
 

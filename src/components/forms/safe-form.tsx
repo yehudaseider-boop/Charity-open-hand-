@@ -41,6 +41,7 @@ export function SafeForm({
   confirmText,
   children,
   nothingTyped,
+  noValidate,
 }: {
   action: (formData: FormData) => Promise<void>;
   className?: string;
@@ -49,6 +50,8 @@ export function SafeForm({
   children: React.ReactNode;
   /** A button with nothing to type (Undo, Remove, Stop emails): the message doesn't mention typing. */
   nothingTyped?: boolean;
+  /** Skip the browser's own popups: the server checks what was typed and the page shows its message in the site's style. */
+  noValidate?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [trouble, setTrouble] = useState<string | null>(null);
@@ -61,6 +64,7 @@ export function SafeForm({
       <SafeFormWaiting value={waiting}>
         <form
           className={className}
+          noValidate={noValidate}
           action={confirmText ? (running ? action : undefined) : action}
           onSubmit={(e) => {
             e.preventDefault();

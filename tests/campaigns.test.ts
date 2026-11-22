@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campaignSlug, checkCampaign, progressPercent } from "@/lib/charity/campaigns";
+import { campaignFromLink, campaignSlug, checkCampaign, progressPercent } from "@/lib/charity/campaigns";
 
 describe("a charity's new campaign", () => {
   const today = "2026-10-16";
@@ -69,5 +69,27 @@ describe("guided application", () => {
     expect(currentStep(steps, "bank").key).toBe("bank");
     expect(currentStep(steps, "nonsense").key).toBe("contact");
     expect(currentStep(applicationSteps(items.map((i) => ({ ...i, done: true }))), undefined).key).toBe("submit");
+  });
+});
+
+describe("a give link to a campaign (22/11/2026)", () => {
+  const now = new Date("2026-11-22T10:00:00+02:00");
+  const running = { id: "c-open", status: "active", endsAt: null };
+  const past = { id: "c-past", status: "active", endsAt: "2026-11-01T23:59:59+02:00" };
+  const closed = { id: "c-closed", status: "ended", endsAt: null };
+  const all = [running, past, closed];
+  it("gives to a campaign that is running", () => {
+    expect(campaignFromLink("c-open", all, now)).toEqual({ campaign: running });
+  });
+  it("says ended only for a campaign the charity really ran", () => {
+    expect(campaignFromLink("c-past", all, now)).toEqual({ problem: "ended" });
+    expect(campaignFromLink("c-closed", all, now)).toEqual({ problem: "ended" });
+  });
+  it("says not found for an id it doesn't know (a typo, a draft, another charity's)", () => {
+    expect(campaignFromLink("nope", all, now)).toEqual({ problem: "unknown" });
+    expect(campaignFromLink("c-open", [], now)).toEqual({ problem: "unknown" });
+  });
+  it("is nothing without a campaign in the link", () => {
+    expect(campaignFromLink(undefined, all, now)).toBeNull();
   });
 });

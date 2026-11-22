@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, AppState, Easing, Pressable, StyleSheet, View, type GestureResponderEvent, type LayoutChangeEvent } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { haptic } from "@/lib/haptics";
+import { buttonTextFit } from "@/lib/give-checks";
 import { labelWait } from "@/lib/give-stage";
 import { reduceMotion } from "@/lib/motion";
 import { colors, radius, type } from "@/theme/tokens";
@@ -272,7 +273,9 @@ export function HoldToGive({ label, busyLabel, busy, disabled, confirmed, onConf
               <AnimatedCircle cx={15} cy={15} r={RING} stroke={colors.navy} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={progress.interpolate({ inputRange: [0, 1], outputRange: [CIRC, 0] })} />
             </Svg>
           )}
-          <Text style={[type.button, { color: face.text }]} accessibilityLiveRegion="polite">{text}</Text>
+          {/* One line, always: a long total ("Hold to give R1 034 511.79") shrinks to fit instead of breaking mid-number
+              (22/11/2026, 320 wide). The phone apps shrink it themselves; the web build is given a smaller size. */}
+          <Text style={[type.button, { color: face.text, flexShrink: 1 }, buttonTextFit(text, width, type.button.fontSize)]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} accessibilityLiveRegion="polite">{text}</Text>
         </View>
       </Pressable>
       {/* The drops rise from the button's top edge, clear of its words. */}
@@ -294,6 +297,6 @@ export function HoldToGive({ label, busyLabel, busy, disabled, confirmed, onConf
 const styles = StyleSheet.create({
   base: { minHeight: 58, borderRadius: radius.control, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, overflow: "hidden" },
   fill: { position: "absolute", left: 0, top: 0, bottom: 0, right: 0, backgroundColor: colors.orangeEdge, transformOrigin: "left center" } as object,
-  inner: { flexDirection: "row", alignItems: "center", gap: 10 },
+  inner: { flexDirection: "row", alignItems: "center", gap: 10, maxWidth: "100%" },
   hint: { textAlign: "center" },
 });

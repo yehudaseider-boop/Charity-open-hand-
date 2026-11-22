@@ -54,7 +54,7 @@ export function MobileMenu({ items, tone = "light" }: { items: MenuItem[]; tone?
         aria-expanded={open}
         aria-controls="phone-menu"
         onClick={() => setOpenOn(open ? null : path)}
-        className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 font-semibold text-navy transition-colors ${tone === "dark" ? "bg-white hover:bg-honey-soft" : "hover:bg-honey-soft"}`}
+        className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 font-semibold text-navy max-[359px]:px-2.5 transition-colors ${tone === "dark" ? "bg-white hover:bg-honey-soft" : "hover:bg-honey-soft"}`}
       >
         <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}

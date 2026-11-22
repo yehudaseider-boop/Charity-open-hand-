@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Animated, Easing, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, View } from "react-native";
+import { loadingLine, STILL_CONNECTING_MS } from "@/lib/give-checks";
 import { reduceMotion } from "@/lib/motion";
 import { colors, radius, space } from "@/theme/tokens";
 import { Button, TextLink } from "./button";
@@ -23,6 +24,30 @@ export function SkeletonBlock({ height, width = "100%", style }: { height: numbe
     return () => loop.stop();
   }, [v]);
   return <Animated.View style={[{ height, width, borderRadius: radius.card, backgroundColor: colors.lightPurple, opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.75] }) }, style]} />;
+}
+
+/**
+ * Words with the grey blocks while something loads (22/11/2026): `first` at once (or nothing), then "Still
+ * connecting… this is taking longer than usual." once it has taken `slowAfterMs`, so a slow or dead connection is
+ * never only grey blocks. The web build can tell when the device is offline and says so at once.
+ */
+export function LoadingNote({ first = null, slowAfterMs = STILL_CONNECTING_MS }: { first?: string | null; slowAfterMs?: number }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setSlow(true), slowAfterMs);
+    return () => clearTimeout(id);
+  }, [slowAfterMs]);
+  const onLine = (globalThis as { navigator?: { onLine?: unknown } }).navigator?.onLine;
+  const line = loadingLine(slow ? slowAfterMs : 0, slowAfterMs, first, onLine === false ? true : undefined);
+  useEffect(() => {
+    if (line && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(line);
+  }, [line]);
+  if (!line) return null;
+  return (
+    <Text variant="bodyMuted" accessibilityLiveRegion="polite">
+      {line}
+    </Text>
+  );
 }
 
 export function LoadingList({ count = 3, imageHeight = 120 }: { count?: number; imageHeight?: number }) {

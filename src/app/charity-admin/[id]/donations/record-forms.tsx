@@ -48,12 +48,12 @@ export function RecordGiftForm({
         </div>
         {donorType === "individual" ? (
           <>
-            <TextField name="first_name" label="First name" required maxLength={80} />
-            <TextField name="last_name" label="Surname" required maxLength={80} />
+            <TextField name="first_name" label="First name" required maxLength={80} autoDirection />
+            <TextField name="last_name" label="Surname" required maxLength={80} autoDirection />
           </>
         ) : (
           <>
-            <TextField name="organisation_name" label="Registered name" required maxLength={200} />
+            <TextField name="organisation_name" label="Registered name" required maxLength={200} autoDirection />
             <TextField name="registration_number" label="Registration number" required={wants} maxLength={40}
               hint={donorType === "trust" ? "The trust number, for example IT1234/2015." : "The CIPC number, for example 2015/123456/07."} />
           </>

@@ -378,6 +378,16 @@ export async function optOutAtCheckout(charityId: string, email: string): Promis
 }
 
 /** The stop link in an email. The charity's name when the link was ours (the opt-out is then saved). */
+/** Has this stop link's email already stopped this charity's emails? Read only, for the stop page's "Done" (22/11/2026). */
+export async function appealsStopped(token: string): Promise<boolean> {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
+  const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash").eq("token_hash", sha(token)).maybeSingle();
+  if (!data) return false;
+  const { data: out, error } = await db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", data.charity_id).eq("email_hash", data.email_hash).maybeSingle();
+  if (error) throw error;
+  return Boolean(out);
+}
+
 export async function stopAppeals(token: string): Promise<{ charityName: string } | null> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, charities(name_en)").eq("token_hash", sha(token)).maybeSingle();

@@ -31,6 +31,9 @@ const ctl = vi.hoisted(() => {
 });
 vi.mock("@/app/news/stop/actions", () => ({ confirmStopNews: ctl.make("confirmStopNews") }));
 vi.mock("@/app/thanks/stop/actions", () => ({ confirmStop: ctl.make("confirmStop") }));
+// The pages check a real stop before saying "Done" (server-only lookups, not reached without ?done=1).
+vi.mock("@/lib/charity/thank-you-send", () => ({ thankYousStopped: async () => false }));
+vi.mock("@/lib/charity/appeals", () => ({ appealsStopped: async () => false }));
 vi.mock("@/app/account/monthly/actions", () => ({ changeMonthly: ctl.make("changeMonthly") }));
 vi.mock("@/app/mfa/actions", () => ({
   verifyCode: ctl.make("verifyCode"),

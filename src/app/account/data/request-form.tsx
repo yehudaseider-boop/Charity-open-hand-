@@ -21,7 +21,7 @@ export function RequestForm() {
       </fieldset>
       <label className="block space-y-1 text-sm">
         <span className="font-medium">Details (optional)</span>
-        <textarea name="details" rows={3} maxLength={2000} className="w-full rounded-control border border-outline bg-surface px-3 py-2.5" />
+        <textarea name="details" dir="auto" rows={3} maxLength={2000} className="w-full rounded-control border border-outline bg-surface px-3 py-2.5" />
       </label>
     </ActionForm>
   );

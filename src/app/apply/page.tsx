@@ -97,7 +97,7 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
                 </ol>
                 <div className="space-y-1.5">
                   <label htmlFor="apply-name" className="block text-sm font-semibold">Organisation name</label>
-                  <input id="apply-name" name="apply_name" required minLength={2} maxLength={120} pattern=".*\S.*\S.*" title="Type your organisation's name" defaultValue={startName} autoComplete="organization" className="min-h-12 w-full rounded-control border-2 border-outline bg-surface px-3 focus:border-brand" />
+                  <input id="apply-name" name="apply_name" dir="auto" required minLength={2} maxLength={120} pattern=".*\S.*\S.*" title="Type your organisation's name" defaultValue={startName} autoComplete="organization" className="min-h-12 w-full rounded-control border-2 border-outline bg-surface px-3 focus:border-brand" />
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="apply-email" className="block text-sm font-semibold">Your email</label>

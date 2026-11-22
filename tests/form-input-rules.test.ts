@@ -168,3 +168,23 @@ describe("the same limits in the box, the app and the server", () => {
     expect(appFieldErrors(big.error!.issues)).toEqual({ amount: "That amount is above the most we can take in the app" });
   });
 });
+
+describe("a donor's name has a letter in it (22/11/2026)", () => {
+  const details = (names: Record<string, string>) =>
+    checkDonorDetails(checkoutSchema.parse({ email: "a@b.co", age_confirmed: "on", popia_consent: "on", ...names }), false);
+  it("refuses a name of only dashes, digits or emoji, in plain words", () => {
+    for (const bad of ["---", "1234", "😀😀", "..."]) {
+      const e = details({ donor_type: "individual", first_name: bad, last_name: bad });
+      expect(e.first_name, bad).toBe("Enter your first name in letters");
+      expect(e.last_name, bad).toBe("Enter your surname in letters");
+      expect(details({ donor_type: "company", organisation_name: "Acme", contact_person: bad }).contact_person, bad).toBe("Enter the contact person's name in letters");
+    }
+  });
+  it("takes a name in any script, and with digits or marks alongside letters", () => {
+    for (const good of ["Thandi", "O'Brien", "Zoë", "Νίκος", "李", "محمد", "Jean-Luc 2nd", "Ana 😀"]) {
+      const e = details({ donor_type: "individual", first_name: good, last_name: good });
+      expect(e.first_name, good).toBeUndefined();
+      expect(e.last_name, good).toBeUndefined();
+    }
+  });
+});

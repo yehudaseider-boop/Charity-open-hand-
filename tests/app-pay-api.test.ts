@@ -51,7 +51,7 @@ describe("before and after the payment page", () => {
   it("reads whether the charity can take the gift, the campaign and the minimums", async () => {
     const seen: unknown[] = [];
     const r = await checkReady("https://x.test", "a", "c1", async (url, body) => (seen.push([url, body]), { status: 200, json: { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000 } }));
-    expect(r).toEqual({ ok: true, accepting: true, paused: false, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxGiftCents: null, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: null, contributionPresetsCents: [], contributionDefaultCents: 0 });
+    expect(r).toEqual({ ok: true, accepting: true, paused: false, receiptsAvailable: false, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxContributionCents: null, maxGiftCents: null, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: null, contributionPresetsCents: [], contributionDefaultCents: 0 });
     expect(seen[0]).toEqual(["https://x.test/api/app/ready", { slug: "a", campaignId: "c1" }]);
   });
   it("reads the contribution buttons, keeping only sensible amounts and a default that is one of them", async () => {
@@ -60,6 +60,13 @@ describe("before and after the payment page", () => {
     expect(r).toMatchObject({ contributionPresetsCents: [1_000, 2_000, 3_000], contributionDefaultCents: 2_000 });
     const odd = await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: { ...base, contributionPresetsCents: [500, 2_000, "30", 1.5], contributionDefaultCents: 3_000 } }));
     expect(odd).toMatchObject({ contributionPresetsCents: [2_000], contributionDefaultCents: 0 });
+  });
+  it("reads the most a donor can add for Givezy, and null when an older server doesn't say or sends nonsense", async () => {
+    const base = { ok: true, accepting: true, receiptsAvailable: false, campaignOpen: false, minGiftCents: 3_000, minContributionCents: 1_000 };
+    expect(await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: { ...base, maxContributionCents: 500_000 } }))).toMatchObject({ maxContributionCents: 500_000 });
+    expect(await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: base }))).toMatchObject({ maxContributionCents: null });
+    expect(await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: { ...base, maxContributionCents: "5000" } }))).toMatchObject({ maxContributionCents: null });
+    expect(await checkReady("https://x.test", "a", undefined, async () => ({ status: 200, json: { ...base, maxContributionCents: -1 } }))).toMatchObject({ maxContributionCents: null });
   });
   it("offline is a plain message, not the website hand-off", async () => {
     const r = await checkReady("https://x.test", "a", undefined, async () => { throw new Error("offline"); });

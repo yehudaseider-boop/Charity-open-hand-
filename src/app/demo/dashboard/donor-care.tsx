@@ -180,7 +180,7 @@ function NoteForm({ label, submit, defaultBody = "", onSave }: { label: string; 
       }}
     >
       <label htmlFor={id} className="block font-semibold text-navy">{label}</label>
-      <textarea id={id} rows={3} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} className={`${field} w-full py-2`} aria-describedby={`${id}-hint`} aria-invalid={error ? true : undefined} />
+      <textarea id={id} dir="auto" rows={3} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} className={`${field} w-full py-2`} aria-describedby={`${id}-hint`} aria-invalid={error ? true : undefined} />
       <p id={`${id}-hint`} className="text-xs text-muted">Only people who manage your charity on Givezy see notes. Donors can ask what&apos;s held about them, so write what you&apos;d be happy for them to read.</p>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       <button type="submit" className={blueAction}>{submit}</button>
@@ -207,7 +207,7 @@ function FollowUpForm({ today, onAdd }: { today: string; onAdd: (what: string, d
       }}
     >
       <label htmlFor={`${id}-what`} className="block font-semibold text-navy">What to do</label>
-      <input id={`${id}-what`} value={what} maxLength={300} onChange={(e) => setWhat(e.target.value)} className={`${field} w-full`} placeholder="For example: call to say thank you" />
+      <input id={`${id}-what`} dir="auto" value={what} maxLength={300} onChange={(e) => setWhat(e.target.value)} className={`${field} w-full`} placeholder="For example: call to say thank you" />
       <label htmlFor={`${id}-due`} className="block font-semibold text-navy">When</label>
       <input id={`${id}-due`} type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
       {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -233,7 +233,7 @@ function TagForm({ suggestions, onAdd }: { suggestions: string[]; onAdd: (name: 
       }}
     >
       <label htmlFor={id} className="block font-semibold text-navy">Tag</label>
-      <input id={id} value={name} maxLength={40} list={`${id}-list`} onChange={(e) => setName(e.target.value)} className={`${field} w-full`} aria-describedby={`${id}-hint`} />
+      <input id={id} dir="auto" value={name} maxLength={40} list={`${id}-list`} onChange={(e) => setName(e.target.value)} className={`${field} w-full`} aria-describedby={`${id}-hint`} />
       <datalist id={`${id}-list`}>{suggestions.map((s) => <option key={s} value={s} />)}</datalist>
       <p id={`${id}-hint`} className="text-xs text-muted">{suggestions.length ? `Type a new tag, or one you use already: ${suggestions.slice(0, 6).join(", ")}` : "For example Board member, Volunteer, Open day 2026"}</p>
       {error ? <p className="text-sm text-danger">{error}</p> : null}

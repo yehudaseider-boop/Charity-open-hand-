@@ -60,8 +60,13 @@ export function TextField({
 }) {
   const error = useFieldError(base.name);
   const id = useFieldId(base.name);
+  // A typed name (a free-text box) that reaches its limit says so, rather than stop taking letters with no word why
+  // (22/11/2026). Not for boxes of a fixed size (a postal code is full at 4 digits).
+  const [full, setFull] = useState(false);
+  const watchLimit = Boolean(autoDirection && maxLength);
+  const hint = watchLimit && full ? `That's the most this box takes: ${maxLength} characters.` : base.hint;
   return (
-    <Wrapper {...base} id={id}>
+    <Wrapper {...base} hint={hint} id={id}>
       <input
         id={id}
         name={base.name}
@@ -69,10 +74,11 @@ export function TextField({
         defaultValue={defaultValue ?? ""}
         required={base.required}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : base.hint ? `${id}-hint` : undefined}
+        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         inputMode={inputMode}
         autoComplete={autoComplete}
         maxLength={maxLength}
+        {...(watchLimit ? { onInput: (e: React.FormEvent<HTMLInputElement>) => setFull(e.currentTarget.value.length >= (maxLength ?? 0)) } : {})}
         {...(autoDirection ? { dir: "auto" } : {})}
         className={inputClass}
       />
@@ -115,6 +121,8 @@ export function TextArea({
         maxLength={maxLength}
         defaultValue={defaultValue ?? ""}
         required={base.required}
+        // Free text: follows the direction of what is typed (left to right or right to left).
+        dir="auto"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : base.hint ? `${id}-hint` : undefined}
         className={inputClass}

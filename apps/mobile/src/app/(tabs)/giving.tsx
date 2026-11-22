@@ -38,7 +38,7 @@ import { useSaved } from "@/lib/saved";
 import { SavedRow } from "@/components/saved-row";
 import { confirmThen, notify, openUrl } from "@/lib/open-site";
 import { requestNewCardPage } from "@/lib/pay-api";
-import { GIVING_LOAD_ERROR, givingLoadState, monthlyAmountLine, monthlyAmountParts } from "@/lib/live-giving";
+import { GIVING_LOAD_ERROR, givingLoadState, monthlyAmountLine, monthlyAmountParts, nextChargeText } from "@/lib/live-giving";
 import { SITE_URL } from "@/lib/website";
 import { RecordProblem } from "@/components/record-problem";
 import { useStoredRecord } from "@/lib/use-stored-record";
@@ -676,7 +676,7 @@ export default function Giving() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 17, fontFamily: fonts.bodySemibold }}>{r.charityName}</Text>
                         <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                          {monthlyAmountLine(r)} · {r.status === "failed" ? (r.needsCard ? "Stopped: the card was declined" : "Stopped: start a new monthly donation") : r.needsCard && r.status === "active" ? "Card declined: tap to update" : r.status === "cancelled" ? "Cancelled" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? `Next on ${ddmmyyyy(r.nextDate)}` : "Active"}
+                          {monthlyAmountLine(r)} · {r.status === "failed" ? (r.needsCard ? "Stopped: the card was declined" : "Stopped: start a new monthly donation") : r.needsCard && r.status === "active" ? "Card declined: tap to update" : r.status === "cancelled" ? "Cancelled" : r.status === "paused" ? (r.syncing ? "Pause requested" : "Paused") : r.nextDate ? nextChargeText(r.nextDate, jhbToday()) : "Active"}
                         </Text>
                       </View>
                       <ChevronIcon />
@@ -732,7 +732,7 @@ export default function Giving() {
             <View style={{ gap: 4 }}>
               <Text variant="label">Monthly donation</Text>
               <Text variant="h2">{open.charityName}</Text>
-              <Text variant="bodyMuted">{monthlyAmountLine(open)} · {open.status === "failed" ? "stopped" : open.status === "cancelled" ? "cancelled" : open.status === "paused" ? "paused" : open.nextDate ? `next on ${ddmmyyyy(open.nextDate)}` : "active"}</Text>
+              <Text variant="bodyMuted">{monthlyAmountLine(open)} · {open.status === "failed" ? "stopped" : open.status === "cancelled" ? "cancelled" : open.status === "paused" ? "paused" : open.nextDate ? nextChargeText(open.nextDate, jhbToday(), true) : "active"}</Text>
               {monthlyAmountParts(open) ? <Text variant="label">Each month: {monthlyAmountParts(open)}.</Text> : null}
             </View>
             {!preview ? (

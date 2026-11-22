@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import { CampaignProgress } from "@/components/campaign-progress";
 import { cache } from "react";
 import { Card } from "@/components/card";
-import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
+import { loadCampaigns, loadOpenCampaigns } from "@/lib/charity/campaign-queries";
+import { campaignFromLink } from "@/lib/charity/campaigns";
 import { platformConfig } from "@/config/platform";
 import { loadDonatableCharity } from "@/lib/donations/charity";
 import { cleanLabel } from "@/lib/donations/labels";
@@ -51,13 +52,15 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   // The charity and who is looking, at the same time (19/11/2026: one after the other made this the slowest page).
   const [charity, viewer] = await Promise.all([loadCharity(slug), getViewer()]);
   if (!charity) notFound();
-  // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift), and the
-  // donor's saved ID, also at the same time.
+  // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift, and says
+  // which), and the donor's saved ID, also at the same time.
   const [campaigns, savedId] = await Promise.all([
-    typeof sp.campaign === "string" ? loadOpenCampaigns(charity.id) : Promise.resolve([]),
+    typeof sp.campaign === "string" ? loadCampaigns(charity.id) : Promise.resolve([]),
     viewer?.email && charity.receiptsAvailable ? savedIdLast4(viewer.userId) : Promise.resolve(null),
   ]);
-  const campaign = typeof sp.campaign === "string" ? campaigns.find((c) => c.id === sp.campaign) : undefined;
+  const fromLink = campaignFromLink(typeof sp.campaign === "string" ? sp.campaign : undefined, campaigns);
+  const campaign = fromLink && "campaign" in fromLink ? fromLink.campaign : undefined;
+  const campaignProblem = fromLink && "problem" in fromLink ? fromLink.problem : null;
   // Otherwise one of the charity's own amounts starts selected (Givezy never suggests a figure of its own).
   const initialAmountCents = link.amountCents ?? preselectedAmount(charity.suggestedCents, platformConfig);
   const account = viewer?.email ? { email: viewer.email, savedIdLast4: savedId } : undefined;
@@ -69,8 +72,12 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
         <h1 className="text-[clamp(2rem,5vw,2.75rem)] leading-[1.05] text-balance">Give to <bdi>{charity.name_en}</bdi></h1>
       </div>
       {campaign && charity.acceptingPayments ? <CampaignProgress campaign={campaign} compact /> : null}
-      {typeof sp.campaign === "string" && !campaign ? (
-        <Card><p className="text-sm">That campaign has ended. You can still give to <bdi>{charity.name_en}</bdi> below.</p></Card>
+      {campaignProblem ? (
+        <Card>
+          <p className="text-sm">
+            {campaignProblem === "ended" ? "That campaign has ended." : "We couldn't find that campaign."} You can still give to <bdi>{charity.name_en}</bdi>{charity.acceptingPayments ? " below" : ""}.
+          </p>
+        </Card>
       ) : null}
       {charity.acceptingPayments ? (
         <DonateFlow

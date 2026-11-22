@@ -8,7 +8,7 @@ import type { Gift, Receipt, Recurring } from "../data/giving";
 import { cleanLabel, labelOf } from "@shared/donations/labels";
 import { thankYouNoteToShow } from "@shared/charity/thank-you-note";
 import { monthlyCardChargeAt, type CardChargeRates } from "@shared/fees";
-import { jhbDay, rand } from "./format";
+import { ddmmyyyy, jhbDay, rand } from "./format";
 
 /**
  * Did the server refuse a read because it doesn't have these columns yet (a migration not run there)? Postgres says
@@ -155,6 +155,17 @@ export function toRecurring(rows: RecurringRow[], rates: RatesAnswer = { known: 
         ...((r.status === "failed" && r.ended_reason === DECLINED_REASON) || (r.status === "active" && Number(r.failed_attempts ?? 0) > 0) ? { needsCard: true } : {}),
       };
     });
+}
+
+/**
+ * When a monthly donation is next collected, in words. A next date that has already passed (the payment provider is
+ * still collecting it, or trying again) is never shown as "Next on" a past day (22/11/2026): it reads "Due now".
+ * `lower`: for the middle of a sentence ("next on 01/12/2026", "due now: being collected").
+ */
+export function nextChargeText(nextDate: Date, today: Date, lower = false): string {
+  const due = nextDate.getTime() < today.getTime();
+  const text = due ? "Due now: being collected" : `Next on ${ddmmyyyy(nextDate)}`;
+  return lower ? text.charAt(0).toLowerCase() + text.slice(1) : text;
 }
 
 /**

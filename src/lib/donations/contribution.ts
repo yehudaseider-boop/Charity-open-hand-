@@ -30,21 +30,32 @@ export function contributionLabel(cents: number, monthly: boolean): string {
 }
 
 /**
- * The contribution in cents for a choice, or what to fix in plain words. Zero is always allowed ("No thanks",
- * or 0 typed under Other); anything else under the minimum is refused, as the server refuses it.
+ * The contribution in cents for a choice, or what to fix in plain words. "No thanks" is R0; an amount typed under
+ * Other must be from the minimum to the maximum (0 typed there is under the minimum: "No thanks" is the way to give
+ * nothing, so the summary never shows "Contribution to Givezy R0"), as the server refuses it.
+ * `maxCents`: the most a donor can add (platform config, 22/11/2026), checked on presets too; absent, no cap here.
  */
 export function contributionCents(
   choice: ContributionChoice,
   otherText: string,
   minCents: number,
+  maxCents?: number,
 ): { ok: true; cents: number } | { ok: false; message: string } {
+  const tooBig = (cents: number) => maxCents !== undefined && cents > maxCents;
+  const tooBigMessage = () => contributionAboveMaximumMessage(maxCents ?? 0);
   if (choice === "none") return { ok: true, cents: 0 };
-  if (typeof choice === "number") return { ok: true, cents: choice };
+  if (typeof choice === "number") return tooBig(choice) ? { ok: false, message: tooBigMessage() } : { ok: true, cents: choice };
   const typed = otherText.trim();
   if (!typed) return { ok: false, message: "Enter your contribution in Rand, for example 15, or choose No thanks." };
   if (usesCommaThousands(typed)) return { ok: false, message: `${COMMA_THOUSANDS_MESSAGE}.` };
   const cents = parseRandToCents(typed);
   if (cents === null) return { ok: false, message: "Enter your contribution in Rand, for example 15 or 15.50, or choose No thanks." };
-  if (cents > 0 && cents < minCents) return { ok: false, message: `The minimum contribution to Givezy is ${formatRand(minCents)}. Choose a bigger amount, or No thanks.` };
+  if (cents < minCents) return { ok: false, message: `The minimum contribution to Givezy is ${formatRand(minCents)}. Choose a bigger amount, or No thanks.` };
+  if (tooBig(cents)) return { ok: false, message: tooBigMessage() };
   return { ok: true, cents };
+}
+
+/** The words for a contribution over the maximum, the same on the give form, in the app and from the server. */
+export function contributionAboveMaximumMessage(maxCents: number): string {
+  return `The most you can add for Givezy is ${formatRand(maxCents)}. Choose a smaller amount, or No thanks.`;
 }

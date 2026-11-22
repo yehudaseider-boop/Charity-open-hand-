@@ -21,7 +21,7 @@ import { openUrl } from "@/lib/open-site";
 import { campaignShareText, charityShareText } from "@/lib/share";
 import { ShareButton } from "@/components/share-button";
 import { donateUrl, SITE_URL } from "@/lib/website";
-import { EmptyState, ErrorState, SkeletonBlock } from "@/components/states";
+import { EmptyState, ErrorState, LoadingNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
 import { ddmmyyyy, jhbDay, rand } from "@/lib/format";
 import { causeList, useCharity } from "@/lib/directory";
@@ -65,6 +65,7 @@ export default function CharityDetail() {
         ) : (
           <>
             <SkeletonBlock height={220} />
+            <LoadingNote />
             <SkeletonBlock height={120} />
             {/* A way back while it loads, not only once it has. */}
             <View style={[styles.topBar, { top: insets.top + 10 }]} pointerEvents="box-none">

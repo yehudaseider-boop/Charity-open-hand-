@@ -92,6 +92,7 @@ export default async function MonthlyPage({ params, searchParams }: PageProps<"/
         {show ? <input type="hidden" name="show" value={show} /> : null}
         <input
           name="q"
+          dir="auto"
           defaultValue={q}
           placeholder="Search name or email"
           aria-label="Search by donor name or email"

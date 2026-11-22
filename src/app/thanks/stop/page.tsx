@@ -3,6 +3,7 @@ import Link from "next/link";
 import { confirmStop } from "./actions";
 import { SafeForm } from "@/components/forms/safe-form";
 import { PendingButton } from "@/components/forms/pending-button";
+import { thankYousStopped } from "@/lib/charity/thank-you-send";
 
 // The address carries the donor's link: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Stop emails from charities", referrer: "no-referrer" };
@@ -11,10 +12,16 @@ export const metadata: Metadata = { title: "Stop emails from charities", referre
 export default async function StopThanksPage({ searchParams }: PageProps<"/thanks/stop">) {
   const sp = await searchParams;
   const token = typeof sp.t === "string" ? sp.t : "";
+  // "Done" only after a real stop: the link's email is on the stop list. "?done=1" alone, or with a link that hasn't
+  // stopped anything (or a lookup that failed), shows the question again instead.
+  const done = sp.done === "1" && token ? await thankYousStopped(token).catch((e) => {
+    console.error(e);
+    return false;
+  }) : false;
   return (
     <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">
       <h1 className="text-xl font-semibold">Emails from charities</h1>
-      {sp.done === "1" ? (
+      {done ? (
         <p className="mt-3 text-sm">Done. Charities won&apos;t send you thank-yous, news, appeals or reminders about your s18A details through Givezy any more. You still get your donation confirmations and s18A receipts.</p>
       ) : token ? (
         <SafeForm nothingTyped action={confirmStop} className="mt-4 space-y-3">

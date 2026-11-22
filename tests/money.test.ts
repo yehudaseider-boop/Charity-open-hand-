@@ -24,11 +24,16 @@ describe("parseRandToCents", () => {
     ["R1 250.50", 125_050],
     ["1250,5", 125_050],
     ["0.07", 7],
+    // A dot typed and left, or the leading zero left out (22/11/2026).
+    ["100.", 10_000],
+    ["R100.", 10_000],
+    [".50", 50],
+    [",5", 50],
   ])("%s -> %i", (input, expected) => {
     expect(parseRandToCents(input)).toBe(expected);
   });
 
-  it.each(["", "abc", "12.345", "-5", "1.2.3"])("rejects %s", (input) => {
+  it.each(["", "abc", "12.345", "-5", "1.2.3", ".", "R.", "1e3", "-50", "34.567", "1,250.50", "..5", "5..", ".567"])("rejects %s", (input) => {
     expect(parseRandToCents(input)).toBeNull();
   });
 });

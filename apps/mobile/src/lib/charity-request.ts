@@ -57,3 +57,16 @@ export async function sendCharityRequest(body: RequestBody, token: string | null
   }
   return { ok: false, message: CHARITY_REQUEST_MESSAGES.unreachable, fieldErrors: null };
 }
+
+/**
+ * The shared check is worded for the website's tick box ("untick the box"); in the app the same choice is a switch,
+ * so the words say "switch off" (22/11/2026). Only that phrase changes; every other message is the shared one.
+ */
+export function forTheSwitch(text: string): string {
+  return text.replace(/untick the box/g, 'switch off "Email me when it joins"');
+}
+
+/** The same, for each field's message. */
+export function fieldErrorsForTheSwitch(errors: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(errors).map(([k, v]) => [k, forTheSwitch(v)]));
+}

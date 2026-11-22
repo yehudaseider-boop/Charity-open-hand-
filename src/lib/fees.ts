@@ -19,6 +19,8 @@ export type Minimums = {
   minContributionCents: number;
   /** Optional: the largest gift accepted. */
   maxDonationCents?: number;
+  /** Optional: the most a donor can add for Givezy on one gift (per month for a monthly gift). */
+  maxContributionCents?: number;
 };
 
 export type Pricing = {
@@ -84,7 +86,7 @@ export function monthlyCardChargeAt(amountCents: number, contributionCents: numb
 
 export class FeeError extends Error {
   constructor(
-    public code: "invalid_amount" | "below_minimum" | "above_maximum" | "contribution_below_minimum",
+    public code: "invalid_amount" | "below_minimum" | "above_maximum" | "contribution_below_minimum" | "contribution_above_maximum",
     message: string,
   ) {
     super(message);
@@ -109,8 +111,8 @@ export function priceDonation(amountCents: number, contributionCents: number, m:
   if (m.maxDonationCents !== undefined && amountCents > m.maxDonationCents) {
     throw new FeeError("above_maximum", "That amount is above the most we can take online. Please give a smaller amount or contact us.");
   }
-  if (m.maxDonationCents !== undefined && contributionCents > m.maxDonationCents) {
-    throw new FeeError("above_maximum", "That contribution is above the most we can take online. Please check the amount.");
+  if (m.maxContributionCents !== undefined && contributionCents > m.maxContributionCents) {
+    throw new FeeError("contribution_above_maximum", "That contribution is above the most you can add. Please check the amount.");
   }
   if (contributionCents > 0 && contributionCents < m.minContributionCents) {
     throw new FeeError("contribution_below_minimum", "The contribution is below the minimum.");

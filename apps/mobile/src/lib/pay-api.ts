@@ -130,7 +130,7 @@ export function startPayment(
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; paused: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null; contributionPresetsCents: number[]; contributionDefaultCents: number }
+  | { ok: true; accepting: boolean; paused: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; /** The most a donor can add for Givezy (platform config); null from an older server that doesn't say. */ maxContributionCents: number | null; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null; contributionPresetsCents: number[]; contributionDefaultCents: number }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
@@ -150,6 +150,7 @@ export async function checkReady(site: string, slug: string, campaignId: string 
         campaignOpen: j.campaignOpen === true,
         minGiftCents: j.minGiftCents,
         minContributionCents: j.minContributionCents,
+        maxContributionCents: Number.isSafeInteger(j.maxContributionCents) && (j.maxContributionCents as number) > 0 ? (j.maxContributionCents as number) : null,
         maxGiftCents: Number.isSafeInteger(j.maxGiftCents) && (j.maxGiftCents as number) > 0 ? (j.maxGiftCents as number) : null,
         savedIdLast4: last4,
         suggestedCents: Array.isArray(j.suggestedCents) ? j.suggestedCents.filter((c): c is number => Number.isSafeInteger(c) && c > 0).slice(0, 3) : [],

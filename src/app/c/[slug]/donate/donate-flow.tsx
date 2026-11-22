@@ -109,7 +109,8 @@ export function DonateFlow({
   const [contribChoice, setContribChoice] = useState<ContributionChoice>(() => startingChoice(contributionPresets, platformConfig.contributionDefaultCents));
   const [contributionText, setContributionText] = useState("");
   const [coverCharge, setCoverCharge] = useState(false);
-  // An amount's problem shows once the donor leaves the box or presses Give, not while they are still typing "3" of "300".
+  // An amount's problem shows once the donor leaves the box with something typed in it, or presses Give: not while
+  // they are still typing "3" of "300", and not for tabbing past an empty box (22/11/2026).
   const [amountTouched, setAmountTouched] = useState(false);
   const [contributionTouched, setContributionTouched] = useState(false);
   const live = quoteFromTyped(amountText, contribChoice, contributionText, coverCharge);
@@ -293,7 +294,10 @@ export function DonateFlow({
                 setPicked(c !== null && suggestedCents.includes(c) ? c : null);
                 changed();
               }}
-              onBlur={() => setAmountTouched(true)}
+              // Leaving the box empty is not a mistake yet: the message waits for something typed, or for Give.
+              onBlur={(e) => {
+                if (e.currentTarget.value.trim()) setAmountTouched(true);
+              }}
               className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl font-bold text-navy outline-none"
             />
           </div>
@@ -387,14 +391,16 @@ export function DonateFlow({
                     setContributionText(e.target.value);
                     changed();
                   }}
-                  onBlur={() => setContributionTouched(true)}
+                  onBlur={(e) => {
+                    if (e.currentTarget.value.trim()) setContributionTouched(true);
+                  }}
                   className="min-w-0 flex-1 bg-transparent px-2 py-2.5 outline-none"
                 />
               </div>
               {contributionError ? (
                 <p id="contribution-error" role="alert" className="mt-1 flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{contributionError}</span></p>
               ) : (
-                <p id="contribution-hint" className="mt-1 text-xs text-muted">Any amount from {contributionMinimumLabel}.</p>
+                <p id="contribution-hint" className="mt-1 text-xs text-muted">Any amount from {contributionMinimumLabel} to {formatRand(platformConfig.maxContributionCents)}.</p>
               )}
             </div>
           ) : null}

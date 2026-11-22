@@ -87,7 +87,11 @@ export async function submitDonation(
     return { ...rest, failedToStart: providerDown };
   }
   // The website never charges a saved card (only the app does), so there is always a payment page.
-  if (!isWebAddress(result.redirectUrl)) return { ok: false, message: "We couldn't start the payment. Please try again." };
+  // The provider gave no page to pay on: nothing was charged, and the form (with what was typed) stays as it is. The
+  // page adds how to reach a person, as for the other gifts that never started.
+  if (!isWebAddress(result.redirectUrl)) {
+    return { ok: false, message: "We couldn't open the payment page, so nothing was charged. What you typed is still here. Please press Give again in a minute.", failedToStart: true };
+  }
   return { ok: true, redirectUrl: result.redirectUrl };
 }
 

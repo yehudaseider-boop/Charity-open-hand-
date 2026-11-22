@@ -3,6 +3,7 @@ import Link from "next/link";
 import { confirmStopNews } from "./actions";
 import { SafeForm } from "@/components/forms/safe-form";
 import { PendingButton } from "@/components/forms/pending-button";
+import { appealsStopped } from "@/lib/charity/appeals";
 
 // The address carries the donor's link: never pass it on in a Referer header.
 export const metadata: Metadata = { title: "Stop emails from a charity", referrer: "no-referrer", robots: { index: false, follow: false } };
@@ -11,10 +12,15 @@ export const metadata: Metadata = { title: "Stop emails from a charity", referre
 export default async function StopNewsPage({ searchParams }: PageProps<"/news/stop">) {
   const sp = await searchParams;
   const token = typeof sp.t === "string" ? sp.t : "";
+  // "Done" only after a real stop (the link's email is on this charity's stop list), never for "?done=1" alone.
+  const done = sp.done === "1" && token ? await appealsStopped(token).catch((e) => {
+    console.error(e);
+    return false;
+  }) : false;
   return (
     <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">
       <h1 className="text-xl font-semibold">Emails from this charity</h1>
-      {sp.done === "1" ? (
+      {done ? (
         <p className="mt-3 text-sm">Done. That charity won&apos;t email you through Givezy any more: no news, appeals or thank-yous. You still get your donation confirmations and s18A receipts.</p>
       ) : token ? (
         <SafeForm nothingTyped action={confirmStopNews} className="mt-4 space-y-3">
