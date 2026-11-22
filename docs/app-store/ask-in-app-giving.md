@@ -1,6 +1,6 @@
 # Asking Apple and Google about giving inside the app (draft, 22/11/2026)
 
-Draft for Yehuda to check and send. Not sent. Two points to settle first are marked [CONFIRM].
+Draft for Yehuda to check and send. Not sent.
 
 ## To Apple (App Review, guideline question)
 
@@ -14,7 +14,7 @@ Our first version will send donors to our website in Safari to give, in line wit
 
 - The donor chooses a charity and an amount in the app and pays on our payment provider's page (Stitch, a South African payment provider). The app never sees card details.
 - The payment settles directly to the charity's own bank account. Givezy does not hold the money at any point.
-- [CONFIRM] Givezy takes no share of the gift. Givezy is paid by the charities through a separate monthly fee.
+- Givezy takes no share of the gift. Charities pay Givezy a separate flat fee.
 - We would offer Apple Pay on the payment page.
 - Each charity issues the donor a tax receipt (an s18A receipt, under section 18A of the South African Income Tax Act), and every charity page says how the charity uses the money.
 
@@ -39,7 +39,7 @@ We would like to let donors give inside the app, set up as follows:
 
 - The donor pays on our payment provider's page (Stitch, a South African payment provider). The app never sees card details.
 - The payment settles directly to the charity's own bank account; Givezy does not hold the money.
-- [CONFIRM] Givezy takes no share of the gift.
+- Givezy takes no share of the gift. Charities pay Givezy a separate flat fee.
 - Each charity issues the donor a tax receipt (an s18A receipt, under section 18A of the South African Income Tax Act).
 
 Our questions:
@@ -52,6 +52,6 @@ Givezy
 
 ## Before sending
 
-1. **[CONFIRM] Does Givezy keep a part of each gift?** On 13/11/2026 you decided a monthly fee from each charity and no cut of a gift. On 18/11/2026, with the move to Stitch, this came up again and is still open on the go-live list. The letters say "no share of the gift": change them if that has changed.
+1. **No share of the gift (confirmed by Yehuda, 22/11/2026).** Givezy charges charities a flat fee for now. When a fee per gift starts later, tell Apple and Google before switching it on: their answer may depend on it.
 2. **The optional contribution to Givezy on the give screen.** In the app today a donor can add a contribution to Givezy on top of the gift. That money goes to Givezy, a company, not to a charity, so Apple and Google may treat it as a payment for Givezy rather than a donation. If in-app giving goes ahead, expect to take the contribution out of the app (keep it on the website), unless they say otherwise. Not mentioned in the letters, to keep the question simple; worth raising if they ask.
 3. **Where to send them (from memory, check on the day):** Apple: developer.apple.com, Contact Us, App Review, a question about the guidelines. Google: Play Console, Help, Contact support, Policy.
