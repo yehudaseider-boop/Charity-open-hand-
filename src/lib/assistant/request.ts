@@ -2,7 +2,7 @@ import { assistantConfig } from "@/config/assistant";
 
 /**
  * What the help panel sends, and the checks on it before anything goes to the model (21/11/2026). Pure.
- * Only the conversation's words travel: never charity data. Earlier turns are trimmed to the last few.
+ * Only the conversation's words travel from the browser. Earlier turns are trimmed to the last few, and capped in size.
  */
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
@@ -27,7 +27,7 @@ export function checkQuestion(body: AssistantRequest, limits = assistantConfig):
     if ((role !== "user" && role !== "assistant") || typeof content !== "string") return { ok: false, message: "We couldn't read that question. Please try again." };
     const text = content.trim();
     if (!text) continue;
-    turns.push({ role, content: text.slice(0, role === "user" ? limits.maxQuestionChars : 4000) });
+    turns.push({ role, content: text.slice(0, role === "user" ? limits.maxQuestionChars : limits.maxAnswerChars) });
   }
   const last = turns[turns.length - 1];
   if (!last || last.role !== "user") return { ok: false, message: "Type a question first." };
@@ -43,6 +43,12 @@ export function checkQuestion(body: AssistantRequest, limits = assistantConfig):
     const prev = merged[merged.length - 1];
     if (prev && prev.role === t.role) prev.content = `${prev.content}\n\n${t.content}`;
     else merged.push({ ...t });
+  }
+  // The whole history is capped too (review 21/11/2026): the oldest turns go first, the question always stays.
+  let total = merged.reduce((t, m) => t + m.content.length, 0);
+  while (merged.length > 1 && total > limits.maxHistoryChars) {
+    total -= merged.shift()!.content.length;
+    if (merged[0]?.role === "assistant") total -= merged.shift()!.content.length;
   }
   return { ok: true, charityId, demo, page: typeof body.page === "string" ? body.page.slice(0, 200) : null, messages: merged };
 }

@@ -39,7 +39,7 @@ export function DashboardShell({
   /** Menu pages this person's role can't use (team roles, 10/11/2026); the pages refuse them anyway. */
   hiddenTabs?: string[];
   /** The "Need help?" assistant (21/11/2026): left out when its switch is off (src/config/assistant.ts). */
-  help?: { demo?: boolean } | null;
+  help?: { demo?: boolean; who?: string } | null;
   children: React.ReactNode;
 }) {
   const base = baseOverride ?? `/charity-admin/${id}`;
@@ -106,6 +106,7 @@ export function DashboardShell({
       {help ? (
         <HelpAssistant
           charityId={help.demo ? undefined : id}
+          who={help.who}
           demo={Boolean(help.demo)}
           base={base}
           whatsApp={whatsAppChat(legalConfig.supportWhatsApp, "Hi Givezy, I need help with my charity dashboard.")}

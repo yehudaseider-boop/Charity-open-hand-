@@ -19,7 +19,7 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
   const role = await viewerRole(id);
   const hiddenTabs = Object.entries(PAGE_PERMISSION).filter(([, p]) => !can(role, p)).map(([href]) => href);
   return (
-    <DashboardShell id={id} charity={charity} asGivezy={asGivezy} hiddenTabs={hiddenTabs} help={assistantOn() ? {} : null}>
+    <DashboardShell id={id} charity={charity} asGivezy={asGivezy} hiddenTabs={hiddenTabs} help={assistantOn() ? { who: viewer?.userId } : null}>
       {children}
     </DashboardShell>
   );

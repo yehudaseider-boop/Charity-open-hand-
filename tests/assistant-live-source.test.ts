@@ -1,0 +1,97 @@
+/**
+ * The helper's lookups for a real charity (review 22/11/2026): a donor erased at their request is never named (their
+ * name is kept only for SARS), anonymous donors stay anonymous and can't be searched for, the setup steps count the
+ * bank letter a role can't see, and the donor list is read once per question. The dashboard's queries are stand-ins.
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+let donorReads = 0;
+const recent = [
+  { status: "paid", amount_cents: 50_000, refunded_cents: 0, paid_at: "2026-11-20T10:00:00Z", created_at: "2026-11-20T10:00:00Z", is_anonymous: false, recurring_id: null, donor_type: "individual", first_name: "Kept", last_name: "ForSars", organisation_name: null, email: "erased+abc@erased.invalid" },
+  { status: "paid", amount_cents: 30_000, refunded_cents: 10_000, paid_at: "2026-11-19T10:00:00Z", created_at: "2026-11-19T10:00:00Z", is_anonymous: false, recurring_id: "r1", donor_type: "individual", first_name: "Thandi", last_name: "Mokoena", organisation_name: null, email: null },
+];
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({
+    from: () => {
+      const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: recent, error: null }) };
+      return q;
+    },
+  }),
+}));
+vi.mock("@/lib/charity/dashboard-queries", () => ({
+  loadDonors: async () => {
+    donorReads++;
+    return [
+      { donor_id: "d1", display_name: "Kept ForSars", email: "erased+abc@erased.invalid", donation_count: 2, total_cents: 90_000, first_paid_at: "2026-03-02T10:00:00Z", last_paid_at: "2026-11-20T10:00:00Z", is_anonymous: false },
+      { donor_id: "d2", display_name: "Quiet Giver", email: null, donation_count: 1, total_cents: 60_000, first_paid_at: "2026-05-02T10:00:00Z", last_paid_at: "2026-05-02T10:00:00Z", is_anonymous: true },
+      { donor_id: "d3", display_name: "Thandi Mokoena", email: null, donation_count: 4, total_cents: 40_000, first_paid_at: "2026-04-02T10:00:00Z", last_paid_at: "2026-11-19T10:00:00Z", is_anonymous: false },
+    ];
+  },
+  loadMonthlyGifts: async () => [{ donor_id: "d3", recurring_id: "r1" }],
+  loadOverview: async () => ({}),
+  loadMonthlyTotals: async () => [],
+  loadMonthlyDonations: async () => [],
+  loadReceiptGifts: async () => ({ gifts: [], onIssued: new Set() }),
+}));
+vi.mock("@/lib/charity/queries", () => ({
+  loadCharityForManager: async () => ({
+    charity: { status: "draft", name_en: "Meals", legal_name_en: "Meals NPC", npo_number: "1", pbo_number: null, s18a_reference: null, address_line1: "1 Main", city: "Joburg", postal_code: "2000" },
+    priv: { contact_name: "Jo", contact_email: "jo@x.co", bank_account_last4: null, bank_branch_code: null, bank_set: true },
+    // The admin's own read can't see the bank letter; documentTypes counts it.
+    documents: [{ document_type: "npo_certificate" }],
+    documentTypes: ["npo_certificate", "bank_confirmation"],
+  }),
+  loadStories: async () => ({ updates: [] }),
+}));
+vi.mock("@/lib/charity/start-facts", () => ({ loadStartFacts: async () => ({ charity: {}, bank: null, s18a: { issues: false, sarsDetails: null }, journeyOn: null, updates: 0, teamSize: null }) }));
+vi.mock("@/lib/charity/team", () => ({ viewerRole: async () => "admin" }));
+
+const { liveSource } = await import("@/lib/assistant/live-source");
+const { checkToolCall, runTool } = await import("@/lib/assistant/tools");
+const ask = async (name: string, input: unknown) => {
+  const call = checkToolCall(name, input, true);
+  if (!call.ok) throw new Error(call.error);
+  return JSON.stringify(JSON.parse(await runTool(call, src, true)));
+};
+let src = liveSource("11111111-2222-3333-4444-555555555555");
+beforeEach(() => {
+  donorReads = 0;
+  src = liveSource("11111111-2222-3333-4444-555555555555");
+});
+
+describe("donors the helper may never name", () => {
+  it("an erased donor is never named, in recent gifts or the donor list", async () => {
+    const gifts = await ask("recent_gifts", { limit: 5 });
+    expect(gifts).not.toContain("Kept");
+    expect(gifts).toContain("Erased at the donor's request");
+    expect(gifts).toContain("Thandi Mokoena");
+    expect(gifts).not.toContain("erased.invalid");
+    const top = await ask("top_donors", { limit: 5 });
+    expect(top).not.toMatch(/Kept|ForSars|Quiet Giver/);
+  });
+
+  it("can't be found by searching, and nor can an anonymous donor", async () => {
+    expect(await ask("find_donor", { name: "Kept" })).toContain('"found":0');
+    expect(await ask("find_donor", { name: "Quiet" })).toContain('"found":0');
+    expect(await ask("find_donor", { name: "anon" })).toContain('"found":0');
+    expect(await ask("find_donor", { name: "thandi" })).toContain("Thandi Mokoena");
+  });
+
+  it("a part refund shows what is left of the gift", async () => {
+    expect(await ask("recent_gifts", { limit: 5 })).toContain('"amount":"R200"');
+  });
+
+  it("reads the donor list once per question, however many lookups use it", async () => {
+    await ask("top_donors", { limit: 3 });
+    await ask("find_donor", { name: "thandi" });
+    expect(donorReads).toBe(1);
+  });
+});
+
+describe("setup", () => {
+  it("counts the bank letter an admin can't see, so it isn't asked for again", async () => {
+    const s = await ask("setup_progress", {});
+    expect(s).not.toContain("Bank confirmation letter");
+  });
+});

@@ -7,27 +7,30 @@ import { createPortal } from "react-dom";
 import { parseAnswer, type Block, type Inline } from "@/lib/assistant/answer";
 
 /**
- * "Need help?" on every charity dashboard page (21/11/2026): a panel where staff ask how to do something and get a
- * short answer from our dashboard guide, with links straight to the right page. It explains only: it can't see the
- * charity's data or change anything, and it says so. The conversation stays while they move between pages, and for
- * this browser tab only. Every state is designed: waiting, answering, stopped, offline, refused, too many questions.
+ * The Givezy helper on every charity dashboard page (21/11/2026; looks things up since 22/11/2026): a round white
+ * button with the Givezy splash opens a panel where staff ask about their charity's giving, what's left to set up, or
+ * how to do something, and get a short answer with links straight to the right page. It reads only, as the person
+ * asking, and can't change anything, and says so. The conversation stays while they move between pages, for this
+ * browser tab and this person only. Every state is designed: waiting, looking up, answering, stopped, offline,
+ * refused, too many questions.
  */
 
 type Turn = { role: "user" | "assistant"; content: string; failed?: boolean };
 
 const SUGGESTED = [
-  "How do I add someone to my team?",
+  "How much came in this month?",
+  "What's left to set up?",
+  "How are my monthly donations doing?",
   "How do s18A receipts work here?",
-  "How do I start a campaign?",
-  "How do I thank my donors?",
-  "How do I record a gift paid in cash?",
+  "How do I add someone to my team?",
 ];
 
 const ERROR_MARK = "[[error]]";
 const noSubscribe = () => () => {};
 
-function storageKey(charityId: string | undefined, demo: boolean) {
-  return `givezy.helper.${demo ? "demo" : charityId}`;
+/** One saved chat per person and charity, so someone signing in next on the same tab never sees it (review 21/11/2026). */
+function storageKey(charityId: string | undefined, demo: boolean, who: string | undefined) {
+  return `givezy.helper.${demo ? "demo" : `${charityId}.${who ?? "anon"}`}`;
 }
 
 function Parts({ parts, onLink }: { parts: Inline[]; onLink: () => void }) {
@@ -66,12 +69,15 @@ function Answer({ blocks, onLink }: { blocks: Block[]; onLink: () => void }) {
 
 export function HelpAssistant({
   charityId,
+  who,
   demo = false,
   base,
   whatsApp,
   email,
 }: {
   charityId?: string;
+  /** The signed-in person's id: the saved chat is theirs only. */
+  who?: string;
   demo?: boolean;
   /** This dashboard's address ("/charity-admin/<id>" or "/demo/dashboard"), for the answer's links. */
   base: string;
@@ -91,7 +97,7 @@ export function HelpAssistant({
   const input = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  const key = storageKey(charityId, demo);
+  const key = storageKey(charityId, demo, who);
 
   // The conversation survives moving between pages and a reload, in this tab only: read back when the panel opens.
   const loaded = useRef(false);
@@ -228,11 +234,15 @@ export function HelpAssistant({
           ref={launcher}
           type="button"
           onClick={openPanel}
-          className="fixed bottom-4 right-4 z-40 inline-flex min-h-12 items-center gap-2 rounded-full bg-brand px-5 text-[15px] font-bold text-white shadow-[0_5px_0_#0b2a73,0_14px_30px_rgba(6,22,70,0.25)] transition-transform active:translate-y-0.5 sm:bottom-6 sm:right-6"
           aria-haspopup="dialog"
+          aria-label="Ask the Givezy helper"
+          title="Ask the Givezy helper"
+          className="group fixed bottom-4 right-4 z-40 grid h-16 w-16 place-items-center rounded-full border-2 border-border bg-white shadow-[0_5px_0_var(--border),0_16px_34px_rgba(14,27,61,0.22)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_7px_0_var(--border),0_20px_40px_rgba(14,27,61,0.26)] active:translate-y-1 active:shadow-[0_1px_0_var(--border),0_8px_18px_rgba(14,27,61,0.2)] focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-coral motion-reduce:transition-none sm:bottom-6 sm:right-6"
         >
-          <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.5M12 16.5h.01" /></svg>
-          Need help?
+          {/* The splash from the logo, cut from the logo file (never redrawn). A soft ring breathes once on arrival. */}
+          <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-honey/50 animate-[helper-hello_1.6s_ease-out_1] motion-reduce:animate-none" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/splash.png" alt="" aria-hidden width={640} height={451} className="w-10 select-none transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-6 motion-reduce:transition-none" />
         </button>
       ) : null}
 
@@ -244,8 +254,14 @@ export function HelpAssistant({
         >
           <header className="flex items-start gap-3 bg-brand px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-white">
             <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="font-display text-[1.25rem] font-bold leading-tight text-white!">Givezy helper</h2>
-              <p className="mt-0.5 text-[13px] text-white/85">How to do things in your dashboard, with links to the right page.</p>
+              <h2 id={titleId} className="flex items-center gap-2.5 font-display text-[1.25rem] font-bold leading-tight text-white!">
+                <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/splash.png" alt="" width={640} height={451} className="w-6" />
+                </span>
+                Givezy helper
+              </h2>
+              <p className="mt-1 text-[13px] text-white/85">Your giving, what&apos;s left to set up, and how to do things.</p>
             </div>
             {turns.length > 0 && !busy ? (
               <button type="button" onClick={() => { setTurns([]); setNotice(null); }} className="min-h-10 rounded-full px-3 text-[13px] font-semibold text-white/90 hover:bg-white/10">
@@ -261,8 +277,8 @@ export function HelpAssistant({
             {turns.length === 0 ? (
               <div className="space-y-4">
                 <div className="rounded-[1.25rem] bg-surface p-4 shadow-sm">
-                  <p className="font-semibold">Hi. Ask me how to do anything in your Givezy dashboard.</p>
-                  <p className="mt-1.5 text-[14px] text-muted">I explain and point you to the right page. I can&apos;t see your charity&apos;s donations or change anything for you.</p>
+                  <p className="font-semibold">Hi. Ask me about your charity&apos;s giving, what&apos;s left to set up, or how to do something.</p>
+                  <p className="mt-1.5 text-[14px] text-muted">I look things up in your dashboard, the same as you can see it, and link you to the right page. I can&apos;t change, send or approve anything.</p>
                 </div>
                 <div>
                   <p className="mb-2 text-[13px] font-semibold text-muted">Try asking</p>
@@ -331,7 +347,7 @@ export function HelpAssistant({
                   }
                 }}
                 rows={1}
-                placeholder="Ask how to do something"
+                placeholder="Ask about your giving or setup"
                 aria-invalid={tooLong || undefined}
                 className="max-h-32 min-h-12 flex-1 resize-none rounded-control border-2 border-outline bg-surface px-3.5 py-3 text-[15px] text-navy outline-none [field-sizing:content] focus:border-brand"
                 dir="auto"
@@ -348,7 +364,7 @@ export function HelpAssistant({
             </form>
             {tooLong ? <p className="mt-1.5 text-[13px] text-danger">Please keep it under 800 characters ({draft.length} now).</p> : null}
             <p className="mt-2.5 text-[12px] leading-snug text-muted">
-              Answers come from our dashboard guide and can be wrong, so check before you act. Please don&apos;t type donors&apos; details here.
+              Answers can be wrong, so check the page before you act. Please don&apos;t type donors&apos; contact or ID details here.
               {whatsApp || email ? <> Need a person? </> : null}
               {whatsApp ? <a href={whatsApp} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand underline">WhatsApp us</a> : null}
               {whatsApp && email ? " or " : null}

@@ -59,12 +59,18 @@ export function ipKeys(ip: string): string[] {
  * Counts recent attempts per key and refuses once the limit is reached.
  * Used on checkout to slow down card testing (bots trying stolen cards).
  */
-export async function hitRateLimit(bucket: string, keys: string[], limit: number, windowMinutes: number) {
+export async function hitRateLimit(
+  bucket: string,
+  keys: string[],
+  limit: number,
+  windowMinutes: number,
+  options: { forgetRefused?: boolean; recorded?: string[] } = {},
+) {
   if (keys.length === 0) return false;
   const db = createAdminClient();
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
   // Record this attempt first, then count: parallel requests can't all slip under the limit.
-  const { error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key })));
+  const { data: recorded, error } = await db.from("rate_limit_events").insert(keys.map((key) => ({ bucket, key }))).select("id");
   if (error) throw error;
   // Each key is counted, and rows older than a day cleared, side by side rather than in turn (12/11/2026: speed).
   const [counts] = await Promise.all([
@@ -82,7 +88,16 @@ export async function hitRateLimit(bucket: string, keys: string[], limit: number
     ),
     clearOldAttempts(),
   ]);
-  return counts.some((count) => count > limit);
+  const refused = counts.some((count) => count > limit);
+  // The caller keeps the ids, to take this attempt back if a later limit refuses the same request.
+  if (!refused && options.recorded && recorded?.length) options.recorded.push(...recorded.map((r) => String(r.id)));
+  // forgetRefused: a refused attempt doesn't count towards the next window, so someone (or a script) who keeps
+  // trying while refused can't keep the limit closed for everyone sharing the key (review 21/11/2026).
+  if (refused && options.forgetRefused && recorded?.length) {
+    const { error: forgetError } = await db.from("rate_limit_events").delete().in("id", recorded.map((r) => r.id));
+    if (forgetError) console.error(`[rate-limit] could not forget a refused attempt: ${forgetError.message}`);
+  }
+  return refused;
 }
 
 /** Emails and address stand-ins in the limits table are kept for about a day (Privacy Policy). Never throws. */
