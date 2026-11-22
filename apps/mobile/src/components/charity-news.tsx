@@ -4,6 +4,7 @@ import { initials } from "@shared/charity/initials";
 import { openGiveScreen } from "@/lib/give-entry";
 import type { NewsItem } from "@/lib/charity-news";
 import { colors, fonts, radius } from "@/theme/tokens";
+import { ReportLink } from "./report-link";
 import { Text } from "./text";
 
 /**
@@ -34,6 +35,9 @@ export function NewsCard({ item }: { item: NewsItem }) {
           <Text style={styles.actionText}>Give again</Text>
         </Pressable>
       </View>
+      <View style={styles.report}>
+        <ReportLink charityName={item.charityName} slug={item.slug} updateId={item.id} />
+      </View>
     </View>
   );
 }
@@ -49,5 +53,6 @@ const styles = StyleSheet.create({
   body: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.ink, paddingHorizontal: 16, paddingTop: 10 },
   actions: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 6 },
   action: { minHeight: 44, justifyContent: "center" },
+  report: { paddingHorizontal: 16, paddingBottom: 4, marginTop: -6 },
   actionText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue },
 });

@@ -41,7 +41,12 @@
         }
       ],
       "expo-asset",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-web-browser"
     ],
     "scheme": "nedivlev",

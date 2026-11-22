@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
-import { bigAmountSize } from "@/lib/amount-size";
+import { bigAmountSize, NARROW_SCREEN } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStatusCover } from "@/components/status-cover";
 import { Button, TextLink } from "@/components/button";
@@ -300,11 +300,11 @@ export default function Giving() {
           {main && mainProgress && state === "ready" && goalsLoaded && !goalsProblem ? (
             <View style={{ gap: 18, marginTop: 8 }}>
               <View style={styles.ringRow}>
-                <GoalRing percent={mainPct} size={width < 360 ? 112 : 140} onBlue stroke={14} />
+                <GoalRing percent={mainPct} size={width < NARROW_SCREEN ? 112 : 140} onBlue stroke={14} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.headKicker} numberOfLines={1}>{main.name}</Text>
                   <Text style={styles.headWindow} numberOfLines={2}>{mainProgress.window.label}</Text>
-                  <Text style={[styles.headAmount, bigAmountSize(rand(mainProgress.givenCents), width, 34)]}>{rand(mainProgress.givenCents)}</Text>
+                  <Text style={[styles.headAmount, bigAmountSize(rand(mainProgress.givenCents), width, 34)]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{rand(mainProgress.givenCents)}</Text>
                   <Text style={styles.headLine}>
                     {mainProgress.targetCents === null ? "Log your income to see the goal" : `of ${rand(mainProgress.targetCents)}`}
                   </Text>

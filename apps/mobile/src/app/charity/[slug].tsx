@@ -14,6 +14,7 @@ import { CampaignCard } from "@/components/campaign-card";
 import { FocusCard } from "@/components/focus-card";
 import { focusGive } from "@/lib/charity-extras";
 import { ProfileVideo } from "@/components/profile-video";
+import { ReportLink } from "@/components/report-link";
 import { GiveSheet } from "@/components/give-sheet";
 import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { openUrl } from "@/lib/open-site";
@@ -190,6 +191,7 @@ export default function CharityDetail() {
                     <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />
                   ) : null}
                   {u.video ? <ProfileVideo video={u.video} charityName={charity.nameEn} /> : null}
+                  <ReportLink charityName={charity.nameEn} slug={charity.slug} updateId={u.id} />
                 </View>
               ))}
             </View>
@@ -216,6 +218,9 @@ export default function CharityDetail() {
                 ? `Ask for an s18A receipt when you give, and your donations count towards one receipt a year, issued on ${charity.nameEn}'s behalf after the tax year closes.`
                 : `${charity.nameEn} is not s18A-approved, so donations don't get a tax receipt. You can still give.`}
             </Text>
+          </View>
+          <View style={{ marginTop: 10, alignItems: "center" }}>
+            <ReportLink charityName={charity.nameEn} slug={charity.slug} label="Report something on this page" />
           </View>
           {live ? null : <Text variant="label" style={{ marginTop: 14, textAlign: "center" }}>Sample charity (demo data)</Text>}
         </View>

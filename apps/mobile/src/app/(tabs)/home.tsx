@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "re
 import { RaisingNowRow } from "@/components/raising-now";
 import { pullToRefresh, RefreshDrops } from "@/components/refresh-drops";
 import { yourCampaigns } from "@/lib/campaign-feed";
-import { bigAmountSize } from "@/lib/amount-size";
+import { bigAmountSize, NARROW_SCREEN } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Blob } from "@/components/blob";
 import { Bubbles, People } from "@/components/people";
@@ -189,11 +189,11 @@ export default function Home() {
                 accessibilityLabel={`${goal.name}: ${rand(progress.givenCents)}${progress.targetCents !== null ? ` of ${rand(progress.targetCents)}` : ""}. Open your goals`}
                 style={({ pressed }) => [styles.goalRow, pressed && { opacity: 0.85 }]}
               >
-                <GoalRing percent={pct} onBlue size={width < 360 ? 96 : 118} />
+                <GoalRing percent={pct} onBlue size={width < NARROW_SCREEN ? 96 : 118} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.goalKicker} numberOfLines={1}>{goal.name}</Text>
                   <Text style={styles.goalWindow} numberOfLines={2}>{progress.window.label}</Text>
-                  <Text style={[styles.goalAmount, bigAmountSize(rand(progress.givenCents), width, 34)]}>{rand(progress.givenCents)}</Text>
+                  <Text style={[styles.goalAmount, bigAmountSize(rand(progress.givenCents), width, 34)]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{rand(progress.givenCents)}</Text>
                   <Text style={styles.goalSub}>{progress.targetCents !== null ? `of ${rand(progress.targetCents)}` : "Log income to see the target"}</Text>
                   <Text style={styles.goalSub}>{counted} {counted === 1 ? "gift" : "gifts"}</Text>
                 </View>
