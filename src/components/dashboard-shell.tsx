@@ -108,6 +108,7 @@ export function DashboardShell({
           charityId={help.demo ? undefined : id}
           who={help.who}
           demo={Boolean(help.demo)}
+          live={charity.status === "approved"}
           base={base}
           whatsApp={whatsAppChat(legalConfig.supportWhatsApp, "Hi Givezy, I need help with my charity dashboard.")}
           email={legalConfig.supportEmail}

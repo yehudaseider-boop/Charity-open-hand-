@@ -113,7 +113,7 @@ describe("the help assistant's server", () => {
   it("answers a member, streaming the words, with the guide cached and the person's role and page after it", async () => {
     const res = await ask(question);
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("Open [Team](dash:/team).");
+    expect(await res.text()).toBe("Open [Team](dash:/team).\n[[next:]]");
     const p = state.lastParams!;
     const system = p.system as { text: string; cache_control?: unknown }[];
     expect(system[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
@@ -176,7 +176,8 @@ describe("the help assistant's server", () => {
     state.toolRounds = [[{ id: "t1", name: "giving_totals", input: { period: "this_month" } }]];
     state.streamText = ["R1 250 came in this month."];
     const res = await ask({ ...question, messages: [{ role: "user", content: "How much came in this month?" }] });
-    expect(await res.text()).toBe("R1 250 came in this month.");
+    // Last, which lookups ran, for the panel's follow-up questions (22/11/2026).
+    expect(await res.text()).toBe("R1 250 came in this month.\n[[next:giving_totals]]");
     expect(state.looked).toEqual(["totals"]);
     expect(state.allParams).toHaveLength(2);
     const second = state.allParams[1].messages as { role: string; content: unknown }[];
@@ -189,7 +190,7 @@ describe("the help assistant's server", () => {
   it("without the donor switch, offers no donor tools and refuses a donor lookup", async () => {
     state.toolRounds = [[{ id: "t1", name: "top_donors", input: { limit: 3 } }]];
     state.streamText = ["Have a look on the Donors page."];
-    expect(await (await ask(question)).text()).toBe("Have a look on the Donors page.");
+    expect(await (await ask(question)).text()).toBe("Have a look on the Donors page.\n[[next:]]");
     const names = (state.allParams[0].tools as { name: string }[]).map((t) => t.name);
     expect(names).not.toContain("top_donors");
     expect(names).not.toContain("find_donor");
@@ -207,7 +208,7 @@ describe("the help assistant's server", () => {
   it("stops looking things up after the last allowed round, and answers with what it has", async () => {
     state.toolRounds = Array.from({ length: 4 }, (_, i) => [{ id: `t${i}`, name: "giving_by_month", input: {} }]);
     state.streamText = ["Here is what I found."];
-    expect(await (await ask(question)).text()).toBe("Here is what I found.");
+    expect(await (await ask(question)).text()).toBe("Here is what I found.\n[[next:giving_by_month]]");
     expect(state.allParams).toHaveLength(5);
     expect(state.allParams[4].tool_choice).toEqual({ type: "none" });
     expect(state.allParams[0].tool_choice).toEqual({ type: "auto" });

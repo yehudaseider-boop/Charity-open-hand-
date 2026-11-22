@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { parseAnswer, type Block, type Inline } from "@/lib/assistant/answer";
+import { followUps, splitNext, startingSuggestions } from "@/lib/assistant/suggestions";
 
 /**
  * The Givezy helper on every charity dashboard page (21/11/2026; looks things up since 22/11/2026): a round white
@@ -15,15 +16,8 @@ import { parseAnswer, type Block, type Inline } from "@/lib/assistant/answer";
  * refused, too many questions.
  */
 
-type Turn = { role: "user" | "assistant"; content: string; failed?: boolean };
-
-const SUGGESTED = [
-  "How much came in this month?",
-  "What's left to set up?",
-  "How are my monthly donations doing?",
-  "How do s18A receipts work?",
-  "How do I add someone to my team?",
-];
+/** `next`: the lookups an answer used, for its follow-up questions (22/11/2026). */
+type Turn = { role: "user" | "assistant"; content: string; failed?: boolean; next?: string[] };
 
 const ERROR_MARK = "[[error]]";
 const noSubscribe = () => () => {};
@@ -71,6 +65,7 @@ export function HelpAssistant({
   charityId,
   who,
   demo = false,
+  live = false,
   base,
   whatsApp,
   email,
@@ -79,6 +74,8 @@ export function HelpAssistant({
   /** The signed-in person's id: the saved chat is theirs only. */
   who?: string;
   demo?: boolean;
+  /** The charity takes donations (approved): its starting questions lead with donations, not setting up. */
+  live?: boolean;
   /** This dashboard's address ("/charity-admin/<id>" or "/demo/dashboard"), for the answer's links. */
   base: string;
   /** A WhatsApp chat link to the Givezy team, and the team's email. */
@@ -193,19 +190,20 @@ export function HelpAssistant({
         const { done, value } = await reader.read();
         if (done) break;
         text += decoder.decode(value, { stream: true });
-        const shown = text.replace(ERROR_MARK, "");
-        setTurns([...asked, { role: "assistant", content: shown }]);
+        setTurns([...asked, { role: "assistant", content: splitNext(text.replace(ERROR_MARK, "")).text }]);
       }
       if (text.includes(ERROR_MARK)) {
         const partial = text.replace(ERROR_MARK, "").trim();
         setTurns([...asked, { role: "assistant", content: partial || "We couldn't finish that answer. Nothing was changed.", failed: true }]);
         setAnnounce("The answer didn't finish");
       } else {
+        const { text: answer, tools } = splitNext(text);
+        setTurns([...asked, { role: "assistant", content: answer, ...(tools ? { next: tools } : {}) }]);
         setAnnounce("Answer ready");
       }
     } catch (e) {
       const stopped = e instanceof DOMException && e.name === "AbortError";
-      const partial = text.replace(ERROR_MARK, "").trim();
+      const partial = splitNext(text.replace(ERROR_MARK, "")).text.trim();
       if (stopped) {
         setTurns([...asked, { role: "assistant", content: partial ? `${partial}\n\n(Stopped.)` : "(Stopped before an answer.)" }]);
         setAnnounce("Stopped");
@@ -224,6 +222,7 @@ export function HelpAssistant({
   }
 
   const lastQuestion = [...turns].reverse().find((t) => t.role === "user")?.content ?? "";
+  const askedSoFar = turns.filter((t) => t.role === "user").map((t) => t.content);
   const lastFailed = turns.length > 0 && turns[turns.length - 1].failed;
   const onLink = () => {
     // On a phone the panel covers the page: close it so the page that was linked to shows.
@@ -288,7 +287,7 @@ export function HelpAssistant({
                 <div>
                   <p className="mb-2 text-[13px] font-semibold text-muted">Try asking</p>
                   <ul className="flex flex-wrap gap-2">
-                    {SUGGESTED.map((s) => (
+                    {startingSuggestions(live).map((s) => (
                       <li key={s}>
                         <button type="button" onClick={() => ask(s, turns)} className="min-h-10 rounded-full border-2 border-border bg-surface px-3.5 py-1.5 text-left text-[14px] font-semibold text-brand hover:border-brand">
                           {s}
@@ -318,6 +317,18 @@ export function HelpAssistant({
                         Looking that up
                       </p>
                     )}
+                    {/* What to ask next, fitting what was just looked up: under the newest answer only. */}
+                    {!busy && !t.failed && t.next && i === turns.length - 1 ? (
+                      <ul aria-label="Ask next" className="mt-3 flex flex-wrap gap-2 border-t-2 border-border pt-3">
+                        {followUps(t.next, askedSoFar, live).map((s) => (
+                          <li key={s}>
+                            <button type="button" onClick={() => ask(s, turns)} className="min-h-10 rounded-full border-2 border-border bg-surface px-3 py-1 text-left text-[13px] font-semibold text-brand hover:border-brand">
+                              {s}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {t.failed && i === turns.length - 1 ? (
                       <button type="button" onClick={() => ask(lastQuestion, turns.slice(0, -2))} className="mt-3 inline-flex min-h-10 items-center rounded-control border-2 border-brand px-4 text-[14px] font-bold text-brand hover:bg-brand-soft">
                         Try again

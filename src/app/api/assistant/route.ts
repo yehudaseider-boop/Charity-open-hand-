@@ -5,6 +5,7 @@ import { demoSource } from "@/lib/assistant/demo-source";
 import { liveSource } from "@/lib/assistant/live-source";
 import { askerContext, stableInstructions } from "@/lib/assistant/prompt";
 import { checkQuestion, pagePath, type AssistantRequest } from "@/lib/assistant/request";
+import { nextMark } from "@/lib/assistant/suggestions";
 import { checkToolCall, runTool, toolDefinitions, type HelperSource } from "@/lib/assistant/tools";
 import { getViewer } from "@/lib/auth";
 import { viewerRole } from "@/lib/charity/team";
@@ -116,6 +117,8 @@ export async function POST(req: Request) {
       let sent = false;
       let anySent = false;
       let lookups = 0;
+      // Which lookups ran, so the panel can offer fitting follow-up questions (22/11/2026).
+      const used: string[] = [];
       try {
         for (let round = 0; round <= assistantConfig.maxToolRounds && !stopped; round++) {
           // The last round has no tools: by then it must answer with what it found. Short of time, it answers now.
@@ -162,6 +165,7 @@ export async function POST(req: Request) {
               }
               try {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: await runTool(call, source, donorData) });
+                used.push(block.name);
               } catch (e) {
                 console.error("[assistant] lookup failed", block.name, e instanceof Error ? e.message : e);
                 results.push({ type: "tool_result", tool_use_id: block.id, content: "That couldn't be looked up just now.", is_error: true });
@@ -183,6 +187,8 @@ export async function POST(req: Request) {
         }
         // Never an empty answer shown as finished.
         if (!anySent && !stopped) send("I couldn't put an answer together just now. Please try again, or contact the Givezy team.");
+        // Last of all, after the answer: which lookups ran (names only, from our own list). The panel hides it.
+        if (!stopped) send(nextMark(used));
         console.info(`[assistant] lookups: ${lookups}`);
       } catch (e) {
         if (!stopped) {
