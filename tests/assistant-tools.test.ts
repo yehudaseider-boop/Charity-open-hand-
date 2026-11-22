@@ -41,7 +41,7 @@ describe("the tools offered", () => {
     expect(toolDefinitions(true).map((t) => t.name)).toEqual([...without, "top_donors", "find_donor"]);
     for (const t of toolDefinitions(true)) {
       expect(t.strict).toBe(true);
-      expect((t.input_schema as { additionalProperties: boolean }).additionalProperties).toBe(false);
+      expect((t.input_schema as unknown as { additionalProperties: boolean }).additionalProperties).toBe(false);
       expect(t.description).not.toMatch(/email address|phone number|ID number/i);
     }
   });
