@@ -1,6 +1,6 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
-import { decrypt, last4 } from "@/lib/crypto";
+import { bankAccountKey, decrypt, last4 } from "@/lib/crypto";
 import { getGateway, isGatewayRefusal } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -12,6 +12,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 export type BankCheckRow = {
   account_last4: string;
+  /** Which exact account the answer is about (bankAccountKey); null for answers kept before 22/11/2026. */
+  account_key: string | null;
   checked_at: string;
   outcome: "checked" | "not_checked";
   verified: boolean | null;
@@ -27,14 +29,24 @@ const WAIT_MS = 8_000;
 /** From the charity's side, the provider is asked at most this often (each check costs money in live mode). */
 const CHARITY_CHECK_GAP_MS = 24 * 60 * 60_000;
 
-const CHECK_COLUMNS = "account_last4, checked_at, outcome, verified, account_open, accepts_credits, holder_matches, open_three_months, message";
+const CHECK_COLUMNS = "account_last4, account_key, checked_at, outcome, verified, account_open, accepts_credits, holder_matches, open_three_months, message";
 
 /**
- * The charity saving its own bank details: `previous` is what was saved before. The provider is not asked again when
- * the bank and the account's last four digits are unchanged and a check for that account already exists, nor more
- * than once a day for the charity. The admin's "Check again" passes nothing and always asks.
+ * The charity saving its own bank details: `previousKey` is the account saved before (bankAccountKey, or null). The
+ * provider is not asked again when the account is unchanged and a check for that exact account already exists, nor
+ * more than once a day for the charity. The admin's "Check again" passes nothing and always asks.
  */
-export type BankCheckOptions = { charitySave?: { previousBankName: string | null; previousLast4: string | null } };
+export type BankCheckOptions = { charitySave?: { previousKey: string | null } };
+
+/** The fingerprint of an encrypted account saved earlier, or null when there was none or it can't be read. */
+export function savedAccountKey(bankName: unknown, encrypted: unknown): string | null {
+  if (typeof bankName !== "string" || typeof encrypted !== "string" || !bankName || !encrypted) return null;
+  try {
+    return bankAccountKey(bankName, decrypt(encrypted));
+  } catch {
+    return null;
+  }
+}
 
 type Answer = { verified: boolean; accountOpen: boolean; acceptsCredits: boolean; holderMatches: boolean; openMoreThanThreeMonths: boolean; message: string | null };
 
@@ -49,14 +61,13 @@ export async function checkCharityBank(charityId: string, actorUserId: string | 
       .maybeSingle();
     if (error || !priv?.bank_account_number_encrypted || !priv.bank_name || !priv.bank_account_holder) return null;
     const accountNumber = decrypt(priv.bank_account_number_encrypted as string);
-    const row: BankCheckRow = { account_last4: last4(accountNumber), checked_at: new Date().toISOString(), outcome: "not_checked", verified: null, account_open: null, accepts_credits: null, holder_matches: null, open_three_months: null, message: null };
+    const row: BankCheckRow = { account_last4: last4(accountNumber), account_key: bankAccountKey(priv.bank_name as string, accountNumber), checked_at: new Date().toISOString(), outcome: "not_checked", verified: null, account_open: null, accepts_credits: null, holder_matches: null, open_three_months: null, message: null };
     const { data: earlierData } = await db.from("charity_bank_checks").select(CHECK_COLUMNS).eq("charity_id", charityId).maybeSingle();
     const earlier = (earlierData as BankCheckRow | null) ?? null;
 
     if (options.charitySave && earlier) {
-      const { previousBankName, previousLast4 } = options.charitySave;
-      const sameAccount = previousBankName === priv.bank_name && previousLast4 === row.account_last4;
-      if (sameAccount && earlier.account_last4 === row.account_last4) return earlier;
+      const sameAccount = options.charitySave.previousKey === row.account_key;
+      if (sameAccount && earlier.account_key === row.account_key) return earlier;
       if (Date.now() - new Date(earlier.checked_at).getTime() < CHARITY_CHECK_GAP_MS) return earlier;
     }
 
@@ -101,7 +112,7 @@ export async function checkCharityBank(charityId: string, actorUserId: string | 
       }
     }
     // Couldn't ask this time: an earlier answer about this same account stays, rather than being wiped.
-    if (earlier?.outcome === "checked" && earlier.account_last4 === row.account_last4) return row;
+    if (earlier?.outcome === "checked" && earlier.account_key === row.account_key) return row;
     return (await save(row)) ? row : null;
   } catch (e) {
     console.error("[bank-check] failed", e instanceof Error ? e.message : e);
@@ -110,17 +121,16 @@ export async function checkCharityBank(charityId: string, actorUserId: string | 
 }
 
 /** The latest check for this charity's current account, or null ("not checked yet"). Never throws. */
-export async function loadBankCheck(charityId: string, currentLast4: string | null): Promise<BankCheckRow | null> {
-  if (!currentLast4) return null;
+export async function loadBankCheck(charityId: string): Promise<BankCheckRow | null> {
   try {
-    const { data, error } = await createAdminClient()
-      .from("charity_bank_checks")
-      .select("account_last4, checked_at, outcome, verified, account_open, accepts_credits, holder_matches, open_three_months, message")
-      .eq("charity_id", charityId)
-      .maybeSingle();
+    const db = createAdminClient();
+    const { data: priv } = await db.from("charity_private").select("bank_name, bank_account_number_encrypted").eq("charity_id", charityId).maybeSingle();
+    const current = savedAccountKey(priv?.bank_name, priv?.bank_account_number_encrypted);
+    if (!current) return null;
+    const { data, error } = await db.from("charity_bank_checks").select(CHECK_COLUMNS).eq("charity_id", charityId).maybeSingle();
     if (error || !data) return null;
-    // An answer about an earlier account (the details changed since) is not shown.
-    return data.account_last4 === currentLast4 ? (data as BankCheckRow) : null;
+    // Only an answer about this exact account is shown: not an earlier account, nor another ending in the same digits.
+    return (data as BankCheckRow).account_key === current ? (data as BankCheckRow) : null;
   } catch {
     return null;
   }

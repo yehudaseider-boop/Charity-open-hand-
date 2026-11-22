@@ -8,6 +8,10 @@ const mails: { to: string; subject: string }[] = [];
 const deleted: string[] = [];
 const updates: Record<string, unknown>[] = [];
 let memberRow: unknown = { user_id: "u2" };
+/** What the database's own owner rule answers (remove_charity_member, make_charity_owner, 22/11/2026). */
+let removeOutcome: string | null = null;
+let ownerOutcome = "done";
+const rpcs: { name: string; args: Record<string, unknown> }[] = [];
 let targetRole = "donor";
 let factors = [{ id: "f1" }];
 let charity: Record<string, unknown> = {};
@@ -15,6 +19,7 @@ let documents: { document_type: string; signed_on?: string; storage_path: string
 const ADMIN = "11111111-1111-4111-8111-111111111111";
 const CH = "22222222-2222-4222-8222-222222222222";
 const U2 = "33333333-3333-4333-8333-333333333333";
+const OLD_OWNER = "44444444-4444-4444-8444-444444444444";
 
 vi.mock("@/lib/auth", () => ({ requirePlatformAdmin: async () => ({ userId: ADMIN }) }));
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: { action: string; details?: Record<string, unknown> }) => void audits.push(a) }));
@@ -24,6 +29,16 @@ vi.mock("@/lib/charity/queries", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      rpcs.push({ name, args });
+      if (name === "remove_charity_member") {
+        const outcome = removeOutcome ?? (memberRow ? "done" : "gone");
+        if (outcome === "done") deleted.push("charity_admins");
+        return { data: outcome, error: null };
+      }
+      if (name === "make_charity_owner") return { data: ownerOutcome, error: null };
+      throw new Error(`unexpected ${name}`);
+    },
     from: (table: string) => {
       const b: Record<string, unknown> = {};
       for (const m of ["select", "eq", "in"]) b[m] = () => b;
@@ -35,6 +50,12 @@ vi.mock("@/lib/supabase/admin", () => ({
         updates.push({ table, ...row });
         return { eq: async () => ({ error: null }) };
       };
+      // A list read (the team, the people's emails) when awaited without .maybeSingle().
+      b.then = (ok: (v: unknown) => unknown) =>
+        Promise.resolve({
+          data: table === "profiles" ? [{ id: U2, email: "p@x.co" }, { id: OLD_OWNER, email: "old@x.co" }] : table === "charity_admins" ? [{ user_id: U2, role: "admin" }, { user_id: OLD_OWNER, role: "owner" }] : [],
+          error: null,
+        }).then(ok);
       b.maybeSingle = async () => ({ data: table === "profiles" ? { email: "p@x.co", role: targetRole } : table === "charity_admins" ? memberRow : { name_en: "Meals Fund" }, error: null });
       return b;
     },
@@ -49,7 +70,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-const { removeCharityAdmin, resetSecondStep, setUpReceipts } = await import("@/app/admin/charities/[id]/actions");
+const { makeCharityOwner, removeCharityAdmin, resetSecondStep, setUpReceipts } = await import("@/app/admin/charities/[id]/actions");
 const form = (o: Record<string, string>) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(o)) f.set(k, v);
@@ -57,7 +78,9 @@ const form = (o: Record<string, string>) => {
 };
 
 beforeEach(() => {
-  audits.length = mails.length = deleted.length = updates.length = 0;
+  audits.length = mails.length = deleted.length = updates.length = rpcs.length = 0;
+  removeOutcome = null;
+  ownerOutcome = "done";
   memberRow = { user_id: U2 };
   targetRole = "donor";
   factors = [{ id: "f1" }];
@@ -79,6 +102,42 @@ describe("remove a charity admin", () => {
     memberRow = null;
     expect((await removeCharityAdmin(CH, U2, { ok: false })).ok).toBe(false);
     expect(audits).toHaveLength(0);
+  });
+  it("never removes the charity's only owner, and says what to do instead (22/11/2026)", async () => {
+    removeOutcome = "last_owner";
+    const r = await removeCharityAdmin(CH, U2, { ok: false });
+    expect(r.ok).toBe(false);
+    expect(r.message).toMatch(/only owner/);
+    expect(r.message).toMatch(/Make someone else on the team the owner first/);
+    expect(deleted).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+    expect(mails).toHaveLength(0);
+  });
+});
+
+describe("hand a charity's ownership to someone on its team (22/11/2026)", () => {
+  it("hands it over in the database, records who from and to, and emails the new owner", async () => {
+    const r = await makeCharityOwner(CH, U2, { ok: false });
+    expect(r.ok).toBe(true);
+    expect(rpcs).toEqual([{ name: "make_charity_owner", args: { p_charity_id: CH, p_user_id: U2 } }]);
+    expect(audits[0]).toEqual(expect.objectContaining({ action: "charity.owner_changed", details: expect.objectContaining({ to: U2 }) }));
+    expect(JSON.stringify(audits)).not.toContain("@");
+    expect(audits[0].details).toEqual({ to: U2, from: [OLD_OWNER] });
+    expect(mails.map((m) => m.to).sort()).toEqual(["old@x.co", "p@x.co"]);
+    expect(mails.find((m) => m.to === "p@x.co")?.subject).toMatch(/now the owner/);
+    expect(mails.find((m) => m.to === "old@x.co")?.subject).toMatch(/has a new owner/);
+  });
+  it("someone no longer on the team: nothing changes, and it says so", async () => {
+    ownerOutcome = "gone";
+    const r = await makeCharityOwner(CH, U2, { ok: false });
+    expect(r).toMatchObject({ ok: false });
+    expect(r.message).toMatch(/Nothing was changed/);
+    expect(audits).toHaveLength(0);
+    expect(mails).toHaveLength(0);
+  });
+  it("refuses an id that isn't one", async () => {
+    expect((await makeCharityOwner(CH, "nope", { ok: false })).ok).toBe(false);
+    expect(rpcs).toHaveLength(0);
   });
 });
 

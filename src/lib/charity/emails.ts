@@ -144,6 +144,22 @@ export function adminRemovedEmail(to: string, charityName: string): EmailMessage
   };
 }
 
+/** Givezy handed a charity's ownership to someone on its team: the new owner, and the one it moved from, are told. */
+export function ownerChangedEmail(to: string, charityName: string, isNewOwner: boolean): EmailMessage {
+  return {
+    to,
+    subject: isNewOwner ? `You are now the owner of ${charityName} on Givezy` : `${charityName} on Givezy has a new owner`,
+    text: [
+      isNewOwner
+        ? `Givezy has made you the owner of ${charityName}. As owner you decide the charity's bank account and who is on its team.`
+        : `Givezy has handed the ownership of ${charityName} to someone else on its team. You still manage the charity, as an admin.`,
+      "",
+      "If you did not expect this, reply to this email straight away.",
+      ...sign,
+    ].join("\n"),
+  };
+}
+
 export function contactChangedEmail(to: string, charityName: string, newEmail: string): EmailMessage {
   return {
     to,

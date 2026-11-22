@@ -9,6 +9,16 @@ vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/lib/auth", () => ({ getViewer: async () => null }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
+    // remove_charity_member, as the database does it: the last owner is refused.
+    async rpc(name: string, args: { p_charity_id: string; p_user_id: string }) {
+      if (name !== "remove_charity_member") throw new Error(`unexpected ${name}`);
+      const target = rows.find((r) => r.charity_id === args.p_charity_id && r.user_id === args.p_user_id);
+      if (!target) return { data: "gone", error: null };
+      if (target.role === "owner" && !rows.some((r) => r.charity_id === args.p_charity_id && r.role === "owner" && r !== target)) return { data: "last_owner", error: null };
+      rows = rows.filter((r) => r !== target);
+      deleted.push(target.user_id);
+      return { data: "done", error: null };
+    },
     from(table: string) {
       const filters: Record<string, string> = {};
       let del = false;

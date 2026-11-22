@@ -1,12 +1,13 @@
 "use server";
 
-import { readVetting } from "@/lib/charity/vetting";
+import { readSameNumberNote, readVetting } from "@/lib/charity/vetting";
+import { charitiesWithSameNumber } from "@/lib/charity/same-number";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { checkCharityBank } from "@/lib/charity/bank-check";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
-import { adminRemovedEmail, approvedEmail, bankChangedEmail, connectedEmail, notifyCharity, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, sentBackEmail, suspendedEmail } from "@/lib/charity/emails";
+import { adminRemovedEmail, approvedEmail, ownerChangedEmail, bankChangedEmail, connectedEmail, notifyCharity, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, sentBackEmail, suspendedEmail } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { decrypt, encrypt, last4 } from "@/lib/crypto";
 import { bankSchema, DOCUMENT_MIME, documentTypes, MAX_UPLOAD_BYTES, type DocumentType } from "@/lib/charity/validation";
@@ -50,6 +51,10 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
   // Every check ticked, and who was spoken to (18/11/2026): one blanket tick was too easy to give without looking.
   const vetting = readVetting(formData);
   if (!vetting.ok) return { ok: false, message: vetting.message };
+  // Another charity with the same NPO or PBO number: approving needs a written reason (22/11/2026).
+  const sameNumber = await charitiesWithSameNumber(charity);
+  const shared = readSameNumberNote(formData, sameNumber.map((o) => o.name));
+  if (!shared.ok) return { ok: false, message: shared.message };
 
   const now = new Date().toISOString();
   const update: Record<string, unknown> = {
@@ -88,7 +93,13 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
     action: "charity.approved",
     entityType: "charity",
     entityId: id,
-    details: { s18a_confirmed: confirmS18a, mandate_confirmed: confirmMandate, vetting_checks: vetting.ticked, spoke_to: vetting.spokeTo },
+    details: {
+      s18a_confirmed: confirmS18a,
+      mandate_confirmed: confirmMandate,
+      vetting_checks: vetting.ticked,
+      spoke_to: vetting.spokeTo,
+      ...(shared.note ? { same_number_as: sameNumber.map((o) => o.id), same_number_note: shared.note } : {}),
+    },
   });
   if (contactEmail) await notifyCharity(approvedEmail(contactEmail, charity.name_en, id, confirmS18a && confirmMandate ? "ready" : confirmS18a ? "mandate" : "none"));
   refresh(id, charity.slug);
@@ -284,30 +295,27 @@ export async function changeBankDetails(id: string, _prev: FormState, formData: 
   const v = parsed.data;
 
   const db = createAdminClient();
-  const { data: charity, error: charityError } = await db.from("charities").select("id, slug, name_en, gateway, gateway_subaccount_ref").eq("id", id).maybeSingle();
+  const { data: charity, error: charityError } = await db.from("charities").select("id, slug, name_en").eq("id", id).maybeSingle();
   if (charityError || !charity) return { ok: false, message: "Unknown charity." };
-  const { data: before } = await db.from("charity_private").select("bank_name, bank_account_last4, contact_email").eq("charity_id", id).maybeSingle();
 
-  const { error } = await db
-    .from("charity_private")
-    .update({
-      bank_name: v.bank_name,
-      bank_account_holder: v.bank_account_holder,
-      bank_account_number_encrypted: encrypt(v.bank_account_number),
-      bank_account_last4: last4(v.bank_account_number),
-      bank_branch_code: v.bank_branch_code,
-      // The admin has checked the letter for this account.
-      bank_verified_at: new Date().toISOString(),
-    })
-    .eq("charity_id", id);
-  if (error) return failed(error);
-
-  // The old account is still registered with the gateway: stop payments until it is connected again.
-  const wasConnected = Boolean(charity.gateway_subaccount_ref);
-  if (wasConnected) {
-    const { error: unlink } = await db.from("charities").update({ gateway: null, gateway_subaccount_ref: null }).eq("id", id);
-    if (unlink) return failed(unlink);
+  // One step (22/11/2026): the new account, "checked", and taking the charity off the payment provider (where the old
+  // account is still registered) happen together or not at all, so a dropped connection can't leave payments going
+  // to the old account under the new details.
+  const { data: changed, error } = await db.rpc("change_charity_bank", {
+    p_charity_id: id,
+    p_bank_name: v.bank_name,
+    p_account_holder: v.bank_account_holder,
+    p_account_number_encrypted: encrypt(v.bank_account_number),
+    p_account_last4: last4(v.bank_account_number),
+    p_branch_code: v.bank_branch_code,
+  });
+  if (error) {
+    console.error(error);
+    return { ok: false, message: "That didn't save, so nothing was changed: the charity still has its old bank details. Please try again." };
   }
+  const result = (Array.isArray(changed) ? changed[0] : changed) as { was_connected: boolean; before_bank_name: string | null; before_last4: string | null; contact_email: string | null } | undefined;
+  const wasConnected = Boolean(result?.was_connected);
+  const before = { bank_name: result?.before_bank_name ?? null, bank_account_last4: result?.before_last4 ?? null, contact_email: result?.contact_email ?? null };
 
   await logAudit({
     actorUserId: admin.userId,
@@ -345,13 +353,46 @@ export async function removeCharityAdmin(id: string, userId: string, _prev: Form
   const db = createAdminClient();
   const { data: charity } = await db.from("charities").select("name_en").eq("id", id).maybeSingle();
   const { data: profile } = await db.from("profiles").select("email").eq("id", userId).maybeSingle();
-  const { data, error } = await db.from("charity_admins").delete().eq("charity_id", id).eq("user_id", userId).select("user_id");
+  // The database refuses to remove the last owner (22/11/2026), so a charity is never left with nobody in charge.
+  const { data: outcome, error } = await db.rpc("remove_charity_member", { p_charity_id: id, p_user_id: userId });
   if (error) return failed(error);
-  if (!data?.length) return { ok: false, message: "That person no longer manages this charity." };
+  if (outcome === "gone") return { ok: false, message: "That person no longer manages this charity." };
+  if (outcome === "last_owner") {
+    return { ok: false, message: `${profile?.email ?? "This person"} is the charity's only owner, so they weren't removed. Make someone else on the team the owner first, then remove them.` };
+  }
   await logAudit({ actorUserId: admin.userId, action: "charity.admin_removed", entityType: "charity", entityId: id, details: { user_id: userId, by: "platform" } });
   if (profile?.email && charity) await notifyCharity(adminRemovedEmail(profile.email as string, charity.name_en));
   refresh(id);
   return { ok: true, message: `${profile?.email ?? "That person"} can no longer manage this charity.` };
+}
+
+/**
+ * Hand a charity's ownership to someone already on its team (an owner who left, or asked to hand over). The owner
+ * decides the bank account and the team, so only Givezy does this, after checking with the charity. The old owner
+ * stays on as an admin (remove them separately if needed); both are emailed, so a handover nobody asked for is noticed.
+ */
+export async function makeCharityOwner(id: string, userId: string, _prev: FormState): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isUuid(id) || !isUuid(userId)) return { ok: false, message: "Unknown admin." };
+  const db = createAdminClient();
+  const { data: charity } = await db.from("charities").select("name_en").eq("id", id).maybeSingle();
+  const { data: team } = await db.from("charity_admins").select("user_id, role").eq("charity_id", id);
+  const oldOwners = (team ?? []).filter((m) => m.role === "owner" && m.user_id !== userId).map((m) => m.user_id as string);
+  const { data: people } = await db.from("profiles").select("id, email").in("id", [userId, ...oldOwners]);
+  const emailOf = new Map((people ?? []).map((p) => [p.id as string, p.email as string]));
+  const { data: outcome, error } = await db.rpc("make_charity_owner", { p_charity_id: id, p_user_id: userId });
+  if (error) return failed(error);
+  if (outcome === "gone") return { ok: false, message: "That person no longer manages this charity. Nothing was changed." };
+  if (outcome === "already") return { ok: true, message: `${emailOf.get(userId) ?? "They"} already own this charity. Nothing was changed.` };
+  await logAudit({ actorUserId: admin.userId, action: "charity.owner_changed", entityType: "charity", entityId: id, details: { to: userId, from: oldOwners } });
+  if (charity) {
+    for (const person of [userId, ...oldOwners]) {
+      const email = emailOf.get(person);
+      if (email) await notifyCharity(ownerChangedEmail(email, charity.name_en, person === userId));
+    }
+  }
+  refresh(id);
+  return { ok: true, message: `${emailOf.get(userId) ?? "They"} now own this charity.${oldOwners.length ? " The previous owner stays on the team as an admin." : ""} Both have been emailed.` };
 }
 
 /**

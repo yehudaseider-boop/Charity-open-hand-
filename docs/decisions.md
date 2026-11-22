@@ -2109,3 +2109,12 @@ Yehuda: "I want it to help charities use the dashboard." Version one answers "ho
 - **Switches, both off:** `ASSISTANT=yes` with `ANTHROPIC_API_KEY` (real dashboard); `ASSISTANT_DEMO=yes` as well for the public demo.
 - **Limits:** 30 questions per person per hour, 200 per charity per day; the demo 10 per visitor per hour and 300 a day for everyone together.
 - **Model:** Claude Opus 5.5 at low effort, the default until Yehuda chooses after seeing real costs on the test site.
+
+## 22/11/2026: bank details, owners, documents and shared NPO numbers (last fixes from the code review of 20/11/2026)
+
+Yehuda: "Yes" (22/11/2026), including the change to the test database. Migration `20261122000001_bank_owner_documents.sql`.
+- **A bank check belongs to one exact account.** It was matched on the last four digits, so two accounts ending the same way shared an answer. Each answer now keeps a keyed fingerprint of the bank and the whole account number (`bankAccountKey` in `src/lib/crypto.ts`; never the number). Answers kept before this have none and show "Not checked yet" until Check again.
+- **Givezy changing a charity's bank details is one step** (`change_charity_bank`): the new account, marked checked, and taking the charity off the payment provider all save together or not at all. If it fails, the admin is told nothing changed and the old details stand.
+- **A charity always has an owner.** `remove_charity_member` refuses to remove the last owner (Admin and the charity's Team page both use it, so two removals at once can't both pass). Admin has a new **Make owner** button for anyone on the team: the old owner stays on as an admin, both are emailed, and the audit log records who from and to. Only do it after checking with the charity: the owner decides the bank account and the team.
+- **Document records are written by the server only.** A browser could add a record pointing at no real file, or a mandate with any signing date. Now only the upload step (which checks the file and the date) writes them. Removing a document while applying is unchanged.
+- **A shared NPO or PBO number needs a written reason to approve.** The warning stays; approving now also asks "Why is it fine that another charity has the same number?" (at least 10 characters), kept in the audit trail with the other charity's id.

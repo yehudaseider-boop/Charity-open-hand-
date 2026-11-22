@@ -47,6 +47,16 @@ export function last4(value: string): string {
 }
 
 /**
+ * A keyed fingerprint of one bank account (the bank and the whole account number, never the number itself), so a bank
+ * check's answer is only ever shown for the exact account it was about (22/11/2026: the last four digits alone let two
+ * accounts share an answer).
+ */
+export function bankAccountKey(bankName: string, accountNumber: string): string {
+  const digits = accountNumber.replace(/[\s-]/g, "");
+  return createHmac("sha256", key()).update(`bank-account|${bankName.trim().toLowerCase()}|${digits}`).digest("base64url");
+}
+
+/**
  * A keyed fingerprint of the s18A identity a donor typed (never the number
  * itself), so receipts can tell two people apart who share an email address.
  * Same person, same number: same fingerprint.

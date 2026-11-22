@@ -55,3 +55,26 @@ export function readVetting(formData: FormData): VettingResult {
 export function registrationKey(value: unknown): string {
   return typeof value === "string" ? value.replace(/[^0-9a-z]/gi, "").toUpperCase() : "";
 }
+
+/**
+ * When another charity has the same NPO or PBO number, approving needs a written reason (22/11/2026: it was only a
+ * warning, easy to scroll past). Kept in the audit trail.
+ */
+export const SAME_NUMBER_FIELD = "vet_same_number";
+export const SAME_NUMBER_MIN = 10;
+export const SAME_NUMBER_MAX = 500;
+
+export type SameNumberResult = { ok: true; note: string | null } | { ok: false; message: string };
+
+/** Reads the reason for approving despite a shared number; nothing is needed when no other charity shares it. */
+export function readSameNumberNote(formData: FormData, sharedWith: string[]): SameNumberResult {
+  if (!sharedWith.length) return { ok: true, note: null };
+  const note = String(formData.get(SAME_NUMBER_FIELD) ?? "").replace(/\s+/g, " ").trim();
+  if (note.length < SAME_NUMBER_MIN) {
+    return {
+      ok: false,
+      message: `Another charity here has the same NPO or PBO number (${sharedWith.join(", ")}). Write why it's fine to approve this one (at least ${SAME_NUMBER_MIN} characters), then approve again. Nothing was changed.`,
+    };
+  }
+  return { ok: true, note: note.slice(0, SAME_NUMBER_MAX) };
+}

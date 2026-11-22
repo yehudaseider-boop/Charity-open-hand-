@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
-vi.mock("@/lib/crypto", () => ({ decrypt: (s: string) => s.replace("enc:", ""), last4: (s: string) => s.slice(-4) }));
+vi.mock("@/lib/crypto", () => ({
+  decrypt: (s: string) => s.replace("enc:", ""),
+  last4: (s: string) => s.slice(-4),
+  bankAccountKey: (bank: string, n: string) => `key:${bank}:${n}:padding-to-twenty`,
+}));
+const KEY = "key:FNB:62000001234:padding-to-twenty";
 
 let priv: Record<string, string> | null = null;
 let saved: Record<string, unknown> | null = null;
@@ -42,7 +47,7 @@ describe("checking a charity's bank account", () => {
     check = async (req) => ((asked = req), { verified: true, accountOpen: true, acceptsCredits: true, holderMatches: true, openMoreThanThreeMonths: false, message: "OK" });
     const r = await checkCharityBank("c1", "u1");
     expect(asked).toEqual({ bankName: "FNB", accountNumber: "62000001234", accountHolder: "Meals Fund NPC" });
-    expect(r).toMatchObject({ outcome: "checked", verified: true, open_three_months: false, account_last4: "1234" });
+    expect(r).toMatchObject({ outcome: "checked", verified: true, open_three_months: false, account_last4: "1234", account_key: KEY });
     expect(saved).toMatchObject({ charity_id: "c1", outcome: "checked", verified: true });
   });
 
@@ -64,16 +69,21 @@ describe("checking a charity's bank account", () => {
   });
 
   it("couldn't ask this time: an earlier answer about the same account is kept, not wiped", async () => {
-    stored = { account_last4: "1234", outcome: "checked" };
+    stored = { account_last4: "1234", account_key: KEY, outcome: "checked" };
     check = async () => {
       throw new Error("could not be reached");
     };
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     await checkCharityBank("c1", "u1");
     expect(saved).toBeNull();
-    stored = { account_last4: "9999", outcome: "checked" };
+    stored = { account_last4: "9999", account_key: "key:FNB:62000009999:padding-to-twenty", outcome: "checked" };
     await checkCharityBank("c1", "u1");
-    expect(saved).toMatchObject({ outcome: "not_checked", account_last4: "1234" });
+    expect(saved).toMatchObject({ outcome: "not_checked", account_last4: "1234", account_key: KEY });
+    // Another account ending in the same digits is not "the same account" either.
+    saved = null;
+    stored = { account_last4: "1234", account_key: "key:FNB:99990001234:padding-to-twenty", outcome: "checked" };
+    await checkCharityBank("c1", "u1");
+    expect(saved).toMatchObject({ outcome: "not_checked", account_key: KEY });
     err.mockRestore();
   });
 
@@ -95,9 +105,9 @@ describe("checking a charity's bank account", () => {
   });
 
   describe("the charity saving its own details (each check costs money)", () => {
-    const recent = () => ({ account_last4: "1234", checked_at: new Date(Date.now() - 60_000).toISOString(), outcome: "checked", verified: true });
-    const sameAccount = { charitySave: { previousBankName: "FNB", previousLast4: "1234" } };
-    const newAccount = { charitySave: { previousBankName: "FNB", previousLast4: "9999" } };
+    const recent = () => ({ account_last4: "1234", account_key: KEY, checked_at: new Date(Date.now() - 60_000).toISOString(), outcome: "checked", verified: true });
+    const sameAccount = { charitySave: { previousKey: KEY } };
+    const newAccount = { charitySave: { previousKey: "key:FNB:62000009999:padding-to-twenty" } };
     let asked = 0;
     beforeEach(() => {
       asked = 0;
@@ -125,6 +135,12 @@ describe("checking a charity's bank account", () => {
       expect(saved).toMatchObject({ outcome: "checked", account_last4: "1234" });
     });
 
+    it("an answer about a different account ending in the same four digits is not reused (22/11/2026)", async () => {
+      stored = { ...recent(), account_key: "key:FNB:99990001234:padding-to-twenty", checked_at: new Date(Date.now() - 25 * 60 * 60_000).toISOString() };
+      expect(await checkCharityBank("c1", "u1", sameAccount)).toMatchObject({ outcome: "checked", account_key: KEY });
+      expect(asked).toBe(1);
+    });
+
     it("never checked before: asked", async () => {
       stored = null;
       await checkCharityBank("c1", "u1", sameAccount);
@@ -150,13 +166,26 @@ describe("checking a charity's bank account", () => {
 });
 
 describe("showing it to the Givezy admin", () => {
-  const row = { account_last4: "1234", checked_at: "2026-10-26T10:00:00Z", outcome: "checked", verified: false, account_open: true, accepts_credits: true, holder_matches: false, open_three_months: true, message: null };
+  const row = { account_last4: "1234", account_key: KEY, checked_at: "2026-10-26T10:00:00Z", outcome: "checked", verified: false, account_open: true, accepts_credits: true, holder_matches: false, open_three_months: true, message: null };
 
   it("an answer about an earlier account is not shown", async () => {
     stored = row;
-    expect(await loadBankCheck("c1", "1234")).toMatchObject({ verified: false });
-    expect(await loadBankCheck("c1", "9999")).toBeNull();
-    expect(await loadBankCheck("c1", null)).toBeNull();
+    expect(await loadBankCheck("c1")).toMatchObject({ verified: false });
+    priv = { ...priv!, bank_account_number_encrypted: "enc:62000009999" };
+    expect(await loadBankCheck("c1")).toBeNull();
+    priv = null;
+    expect(await loadBankCheck("c1")).toBeNull();
+  });
+
+  it("an answer about another account ending in the same four digits is not shown (22/11/2026)", async () => {
+    stored = row;
+    priv = { ...priv!, bank_account_number_encrypted: "enc:99990001234" };
+    expect(await loadBankCheck("c1")).toBeNull();
+  });
+
+  it("an answer kept before 22/11/2026, with no account fingerprint, shows as not checked yet", async () => {
+    stored = { ...row, account_key: null };
+    expect(await loadBankCheck("c1")).toBeNull();
   });
 
   it("says plainly what the bank did and didn't confirm, and never more", () => {

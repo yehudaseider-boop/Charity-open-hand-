@@ -3,7 +3,7 @@
 import { ActionForm } from "@/components/forms/action-form";
 import { SelectField, TextArea, TextField } from "@/components/forms/fields";
 import { bankNames } from "@/lib/charity/validation";
-import { SPOKE_TO_FIELD, SPOKE_TO_MAX, vettingChecks, vettingField } from "@/lib/charity/vetting";
+import { SAME_NUMBER_FIELD, SAME_NUMBER_MAX, SAME_NUMBER_MIN, SPOKE_TO_FIELD, SPOKE_TO_MAX, vettingChecks, vettingField } from "@/lib/charity/vetting";
 import type { FormState } from "@/lib/form";
 
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
@@ -17,7 +17,7 @@ function Check({ name, children }: { name: string; children: React.ReactNode }) 
   );
 }
 
-export function ApproveForm({ action, hasS18a, hasMandate }: { action: Action; hasS18a: boolean; hasMandate: boolean }) {
+export function ApproveForm({ action, hasS18a, hasMandate, sameNumber = false }: { action: Action; hasS18a: boolean; hasMandate: boolean; sameNumber?: boolean }) {
   return (
     <ActionForm action={action} submitLabel="Approve" confirm="Approve this charity and make it public?">
       <fieldset className="space-y-2">
@@ -33,6 +33,17 @@ export function ApproveForm({ action, hasS18a, hasMandate }: { action: Action; h
         maxLength={SPOKE_TO_MAX}
         hint="At least 5 characters. For example: Jo Smith, treasurer, by phone on 19/11/2026. Kept in the audit trail."
       />
+      {sameNumber ? (
+        <TextArea
+          name={SAME_NUMBER_FIELD}
+          label="Why is it fine that another charity has the same number?"
+          required
+          rows={2}
+          minLength={SAME_NUMBER_MIN}
+          maxLength={SAME_NUMBER_MAX}
+          hint="At least 10 characters. For example: the other listing is their old, closed one; checked on the NPO register on 22/11/2026. Kept in the audit trail."
+        />
+      ) : null}
       {hasS18a ? (
         <Check name="confirm_s18a">I have confirmed the s18A approval with SARS documents.</Check>
       ) : null}

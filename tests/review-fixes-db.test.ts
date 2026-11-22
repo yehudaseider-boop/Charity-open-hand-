@@ -96,21 +96,21 @@ describe("review fixes in the database", () => {
     });
   });
 
-  it("documents can't be added once an application is submitted, and the uploader is the person signed in", async () => {
+  it("a browser can't add a document record at all (the server writes them, 22/11/2026), submitted or not", async () => {
     await tx(async () => {
       await as(ids.mealsAdmin);
       await refused(
         "insert into public.charity_documents (charity_id, document_type, storage_path, file_name, uploaded_by) values ($1, 'npo_certificate', $2, 'a.pdf', $3)",
         [ids.meals, `${ids.meals}/a.pdf`, ids.mealsAdmin],
-        /submitted/,
+        /permission denied/,
       );
       await run("reset role");
       await run("update public.charities set status = 'draft' where id = $1", [ids.meals]);
       await as(ids.mealsAdmin);
       await refused(
         "insert into public.charity_documents (charity_id, document_type, storage_path, file_name, uploaded_by) values ($1, 'npo_certificate', $2, 'a.pdf', $3)",
-        [ids.meals, `${ids.meals}/a.pdf`, ids.hallAdmin],
-        /signed in/,
+        [ids.meals, `${ids.meals}/a.pdf`, ids.mealsAdmin],
+        /permission denied/,
       );
     });
   });

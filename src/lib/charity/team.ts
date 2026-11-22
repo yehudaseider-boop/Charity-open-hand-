@@ -104,9 +104,12 @@ export async function removeMember(charityId: string, actorId: string, userId: s
     if (userId !== actorId) return { ok: false, message: "Another owner can only be removed by Givezy. Reply to any email from us to ask." };
     if (owners < 2) return { ok: false, message: "You're the only owner, so you can't remove yourself. Ask Givezy to make someone else the owner first." };
   }
-  const { data, error } = await db.from("charity_admins").delete().eq("charity_id", charityId).eq("user_id", userId).select("user_id");
+  // The database holds the team while it removes, and refuses the last owner (22/11/2026): two owners removing
+  // themselves at the same moment can't leave the charity with nobody in charge.
+  const { data: outcome, error } = await db.rpc("remove_charity_member", { p_charity_id: charityId, p_user_id: userId });
   if (error) throw error;
-  if (!data?.length) return { ok: false, message: "That person no longer has access." };
+  if (outcome === "gone") return { ok: false, message: "That person no longer has access." };
+  if (outcome === "last_owner") return { ok: false, message: "You're the only owner, so you can't remove yourself. Ask Givezy to make someone else the owner first." };
   await logAudit({ actorUserId: actorId, action: "charity.admin_removed", entityType: "charity", entityId: charityId, details: { user_id: userId, by: "owner" } });
   return { ok: true, email: target.email };
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { checkCharityBank } from "@/lib/charity/bank-check";
+import { checkCharityBank, savedAccountKey } from "@/lib/charity/bank-check";
 import { redirect } from "next/navigation";
 import { TYPED_DAY_MESSAGE, typedDay } from "@/lib/typed-date";
 import { recordAction } from "@/lib/charity/charity-actions";
@@ -184,8 +184,8 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
   });
   // Ask the payment provider about the account, for Givezy's review. Information only; never holds anything up.
   // Each check costs money: not asked again for the same account, nor more than once a day from this side.
-  const previous = pick(was, ["bank_name", "bank_account_last4"]);
-  await checkCharityBank(charityId, viewer.userId, { charitySave: { previousBankName: previous.bank_name as string | null, previousLast4: previous.bank_account_last4 as string | null } });
+  const previous = pick(was, ["bank_name", "bank_account_number_encrypted"]);
+  await checkCharityBank(charityId, viewer.userId, { charitySave: { previousKey: savedAccountKey(previous.bank_name, previous.bank_account_number_encrypted) } });
   // Taking it back puts the previous details back; they are checked again before going live either way.
   const done = await recordAction(charityId, viewer.userId, "bank_saved", { last4: last4(v.bank_account_number) }, {
     type: "restore", table: "charity_private", before: pick(was, Object.keys(after)), after,
@@ -222,7 +222,6 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
 
   const ext = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" }[file.type];
   const path = `${charityId}/${type}-${crypto.randomUUID()}.${ext}`;
-  const supabase = await createClient();
   // Uploaded by the server, after who, role, open application and a real file have been checked above: a browser has no
   // direct write to storage (18/11/2026).
   const upload = await createAdminClient().storage
@@ -233,7 +232,9 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
     return { ok: false, message: "The upload didn't work. Please try again." };
   }
 
-  const { data: made, error } = await supabase.from("charity_documents").insert({
+  // Written by the server too (22/11/2026): a browser can no longer add a document record, so every record points at
+  // a file checked above, with a signing date checked above.
+  const { data: made, error } = await createAdminClient().from("charity_documents").insert({
     charity_id: charityId,
     document_type: type,
     storage_path: path,

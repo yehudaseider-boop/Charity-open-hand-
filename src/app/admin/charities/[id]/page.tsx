@@ -5,9 +5,9 @@ import { Card, Notice } from "@/components/card";
 import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/charity-summary";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { bankCheckLines, loadBankCheck } from "@/lib/charity/bank-check";
+import { charitiesWithSameNumber } from "@/lib/charity/same-number";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { charityBadges } from "@/lib/charities";
-import { registrationKey } from "@/lib/charity/vetting";
 import { loadCharityForManager, publicImageUrl } from "@/lib/charity/queries";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 import { formatDate } from "@/lib/dates";
@@ -17,6 +17,7 @@ import {
   addCharityAdmin,
   adminUploadDocument,
   approveCharity,
+  makeCharityOwner,
   removeCharityAdmin,
   resetSecondStep,
   setUpReceipts,
@@ -43,7 +44,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
   await requirePlatformAdmin();
   const { id } = await params;
   const { charity, priv, documents } = await loadCharityForManager(id);
-  const bankCheck = bankCheckLines(await loadBankCheck(id, priv?.bank_account_last4 ?? null));
+  const bankCheck = bankCheckLines(await loadBankCheck(id));
   const supabase = await createClient();
   const [{ data: memberships }, { data: history }, { data: updates }, { data: campaignRows }, { data: contactChanges }] = await Promise.all([
     supabase.from("charity_admins").select("user_id, role").eq("charity_id", id),
@@ -69,26 +70,11 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
   ]);
   const contactChangedAt = (contactChanges?.[0]?.created_at as string | undefined) ?? null;
 
-  // Another charity already listed under the same registration number: a copy, a typo, or someone borrowing a real
-  // charity's number. A person looks before approving (18/11/2026). Compared without spaces, dashes or slashes and in
-  // any case, so "930 012 345" and "930012345" count as the same number.
-  const sameNumber = new Map<string, { name: string; status: string }>();
-  const mine = [charity.npo_number, charity.pbo_number].map(registrationKey).filter(Boolean);
+  // Another charity already listed under the same registration number: a person looks before approving, and
+  // approving then needs a written reason.
+  const sameNumber = await charitiesWithSameNumber(charity);
   // SARS needs one of these on every s18A receipt (missingForCharity): the s18A receipts box shows again without it.
   const noReferenceNumber = !charity.s18a_reference?.trim() && !charity.pbo_number?.trim();
-  if (mine.length) {
-    // Page by page: the database hands out at most 1 000 rows at a time.
-    const others: { id: string; name_en: string; status: string; npo_number: string | null; pbo_number: string | null }[] = [];
-    for (let from = 0; from < 20_000; from += 1000) {
-      const { data } = await supabase.from("charities").select("id, name_en, status, npo_number, pbo_number").neq("id", id).order("id").range(from, from + 999);
-      others.push(...((data ?? []) as typeof others));
-      if (!data || data.length < 1000) break;
-    }
-    for (const o of others) {
-      const theirs = [o.npo_number, o.pbo_number].map(registrationKey).filter(Boolean);
-      if (theirs.some((n) => mine.includes(n))) sameNumber.set(o.id as string, { name: o.name_en as string, status: o.status as string });
-    }
-  }
 
   // charity_admins links to auth users, so look up their emails separately.
   const { data: profiles } = await supabase
@@ -137,15 +123,15 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
       {charity.status === "pending_review" ? (
         <Card title="Decision">
           {isComplete(checklist) ? null : <Notice tone="warning">The application is incomplete.</Notice>}
-          {sameNumber.size ? (
+          {sameNumber.length ? (
             <Notice tone="danger">
               <p className="font-medium">Another charity here has the same NPO or PBO number.</p>
               <ul className="mt-1 list-disc pl-5">
-                {[...sameNumber].map(([otherId, o]) => (
-                  <li key={otherId}><Link href={`/admin/charities/${otherId}`} className="underline"><bdi>{o.name}</bdi></Link> ({o.status.replace("_", " ")})</li>
+                {sameNumber.map((o) => (
+                  <li key={o.id}><Link href={`/admin/charities/${o.id}`} className="underline"><bdi>{o.name}</bdi></Link> ({o.status.replace("_", " ")})</li>
                 ))}
               </ul>
-              <p className="mt-1">Find out why before approving.</p>
+              <p className="mt-1">Find out why before approving. Approving asks you to write down why it&apos;s fine.</p>
             </Notice>
           ) : null}
           <div className="space-y-5">
@@ -153,6 +139,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
               action={approveCharity.bind(null, id)}
               hasS18a={Boolean(charity.s18a_reference)}
               hasMandate={hasMandateDoc}
+              sameNumber={sameNumber.length > 0}
             />
             <div className="border-t border-border pt-4">
               <ReasonForm action={rejectCharity.bind(null, id)} label="What needs fixing? The charity sees this."
@@ -279,11 +266,22 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
                 <span className="break-all font-medium">{a.email}</span>
                 <span className="text-muted">{a.role}</span>
               </div>
-              <SimpleForm
-                action={removeCharityAdmin.bind(null, id, a.userId)}
-                submitLabel="Remove access"
-                confirm={`Remove ${a.email}? They will no longer see this charity's donors, donations or exports.${admins.length === 1 ? " Nobody else manages this charity." : ""}`}
-              />
+              {a.role === "owner" && admins.filter((m) => m.role === "owner").length < 2 ? (
+                <p className="text-xs text-muted">The only owner. To remove them, first make someone else on the team the owner.</p>
+              ) : (
+                <SimpleForm
+                  action={removeCharityAdmin.bind(null, id, a.userId)}
+                  submitLabel="Remove access"
+                  confirm={`Remove ${a.email}? They will no longer see this charity's donors, donations or exports.`}
+                />
+              )}
+              {a.role !== "owner" ? (
+                <SimpleForm
+                  action={makeCharityOwner.bind(null, id, a.userId)}
+                  submitLabel="Make owner"
+                  confirm={`Make ${a.email} the owner? They will decide the bank account and the team. The current owner stays on as an admin. Only do this after checking with the charity. Both will be emailed.`}
+                />
+              ) : null}
               <details>
                 <summary className="cursor-pointer text-muted">Lost their phone? Reset their second step</summary>
                 <p className="my-2 text-xs text-muted">

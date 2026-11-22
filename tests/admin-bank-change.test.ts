@@ -15,6 +15,7 @@ let charityUpdate: Record<string, unknown> | null;
 const audits: Record<string, unknown>[] = [];
 const emails: { to: string; subject: string; text: string }[] = [];
 let mailFails = false;
+let rpcFails = false;
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/auth", () => ({ requirePlatformAdmin: async () => ({ userId: "admin1" }) }));
@@ -24,6 +25,15 @@ vi.mock("@/lib/charity/queries", () => ({ loadCharityForManager: async () => ({}
 vi.mock("@/lib/gateway", () => ({ getGateway: () => ({ name: "test" }), GatewayError: class extends Error {} }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
+    // change_charity_bank, as the database does it: one step, or nothing at all (22/11/2026).
+    rpc: async (name: string, a: Record<string, string>) => {
+      if (name !== "change_charity_bank") throw new Error(`unexpected ${name}`);
+      if (rpcFails) return { data: null, error: { message: "connection lost" } };
+      privUpdate = { bank_name: a.p_bank_name, bank_account_holder: a.p_account_holder, bank_account_number_encrypted: a.p_account_number_encrypted, bank_account_last4: a.p_account_last4, bank_branch_code: a.p_branch_code, bank_verified_at: new Date().toISOString() };
+      const wasConnected = Boolean(charity?.gateway_subaccount_ref);
+      if (wasConnected) charityUpdate = { gateway: null, gateway_subaccount_ref: null };
+      return { data: [{ was_connected: wasConnected, before_bank_name: priv.bank_name, before_last4: priv.bank_account_last4, contact_email: priv.contact_email }], error: null };
+    },
     from: (table: string) => {
       const q = {
         select: () => q,
@@ -55,6 +65,7 @@ beforeEach(() => {
   audits.length = 0;
   emails.length = 0;
   mailFails = false;
+  rpcFails = false;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -123,5 +134,17 @@ describe("changing a charity's bank details", () => {
     const r = await changeBankDetails(CHARITY, { ok: false }, form());
     expect(r.ok).toBe(true);
     expect(privUpdate).not.toBeNull();
+  });
+
+  it("when the save fails, nothing changed, and nobody is told otherwise", async () => {
+    rpcFails = true;
+    const r = await changeBankDetails(CHARITY, { ok: false }, form());
+    expect(r).toMatchObject({ ok: false });
+    expect(r.message).toMatch(/nothing was changed/);
+    expect(r.message).toMatch(/old bank details/);
+    expect(privUpdate).toBeNull();
+    expect(charityUpdate).toBeNull();
+    expect(audits).toHaveLength(0);
+    expect(emails).toHaveLength(0);
   });
 });

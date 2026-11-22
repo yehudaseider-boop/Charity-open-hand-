@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readVetting, registrationKey, vettingChecks, vettingField, SPOKE_TO_FIELD } from "../src/lib/charity/vetting";
+import { readSameNumberNote, readVetting, registrationKey, vettingChecks, vettingField, SAME_NUMBER_FIELD, SPOKE_TO_FIELD } from "../src/lib/charity/vetting";
 
 function form(entries: Record<string, string>) {
   const f = new FormData();
@@ -53,5 +53,26 @@ describe("comparing registration numbers for the same-number warning", () => {
     expect(registrationKey("")).toBe("");
     expect(registrationKey(null)).toBe("");
     expect(registrationKey("  - ")).toBe("");
+  });
+});
+
+describe("approving a charity that shares its NPO or PBO number needs a written reason (22/11/2026)", () => {
+  it("nothing extra is asked when no other charity has the number", () => {
+    expect(readSameNumberNote(form({}), [])).toEqual({ ok: true, note: null });
+  });
+  it("refuses without a reason, naming the other charity, and says nothing was changed", () => {
+    const r = readSameNumberNote(form({ [SAME_NUMBER_FIELD]: "fine" }), ["Hope Meals NPC"]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.message).toContain("Hope Meals NPC");
+      expect(r.message).toContain("Nothing was changed");
+    }
+    expect(readSameNumberNote(form({ [SAME_NUMBER_FIELD]: "          " }), ["Hope Meals NPC"]).ok).toBe(false);
+  });
+  it("keeps the reason, tidied and capped, for the audit trail", () => {
+    const r = readSameNumberNote(form({ [SAME_NUMBER_FIELD]: "  Old listing   closed; checked the register  " }), ["Hope Meals NPC"]);
+    expect(r).toEqual({ ok: true, note: "Old listing closed; checked the register" });
+    const long = readSameNumberNote(form({ [SAME_NUMBER_FIELD]: "x".repeat(900) }), ["A"]);
+    expect(long.ok && long.note?.length).toBe(500);
   });
 });
