@@ -63,7 +63,9 @@ export type CharityUpdate = { id: string; date: Date; body: string; photoUrl: st
  */
 const photo = (file: string) => `https://d8j0ntlcm91z4.cloudfront.net/user_3JMbY89afWySU23FksuSQhKkNXQ/${file}.png`;
 const dummy = {
-  meals: [photo("hf_20261011_002939_f36bd191-cf6e-4347-a046-ffb5def7c7af"), photo("hf_20261011_002939_9ce51b70-d481-40a2-9fce-7e0cdef4d455"), photo("hf_20261011_002939_dd537826-017f-4a64-9d4a-e60b81154878")],
+  // The two "fresh bread" pictures were dropped (22/11/2026): the braided loaf read as challah, and the app has no
+  // religious imagery. The fruit basket is shared with the care sample.
+  meals: [photo("hf_20261011_002939_dd537826-017f-4a64-9d4a-e60b81154878"), photo("hf_20261011_003002_378081f3-914c-4b04-96e8-d2314e88ea3e")],
   care: [photo("hf_20261011_003001_241ed450-eab3-4f98-ab62-cd5dc930bf49"), photo("hf_20261011_003002_378081f3-914c-4b04-96e8-d2314e88ea3e"), photo("hf_20261011_003001_5ec0d37f-d2e5-4240-b819-a3efd8cb76b1")],
 };
 const gallery = (urls: string[], captions: string[]) => urls.slice(1).map((url, i) => ({ id: `p${i}`, url, caption: captions[i] }));
@@ -81,13 +83,13 @@ export const charities: Charity[] = [
     issues18a: true,
     featured: true,
     coverUrl: dummy.meals[0],
-    photos: gallery(dummy.meals, ["Fresh bread in every parcel", "Sorting fruit and vegetables on a Thursday night"]),
+    photos: gallery(dummy.meals, ["Fresh fruit in every parcel"]),
     // Sample figures for the design preview only.
     campaigns: [
       { id: "c-winter", title: "Winter food parcels", description: "A full winter parcel, with blankets, for every family on our list.", targetCents: 5_000_000, raisedCents: 3_140_000, giftCount: 86, endsAt: new Date(2027, 6, 31) },
     ],
     updates: [
-      { id: "u1", date: new Date(2026, 9, 2), body: "Thursday night packing went late this week. Thank you to everyone who came to help.", photoUrl: dummy.meals[2] },
+      { id: "u1", date: new Date(2026, 9, 2), body: "Thursday night packing went late this week. Thank you to everyone who came to help.", photoUrl: dummy.meals[0] },
       { id: "u2", date: new Date(2026, 8, 18), body: "Month-end parcels went out on Friday. Every family on our list received one.", photoUrl: null },
     ],
     about: [
