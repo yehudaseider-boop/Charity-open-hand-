@@ -5,19 +5,17 @@ import type { MonthlyRow } from "@/lib/charity/dashboard";
 import { monthlyTrend } from "@/lib/charity/insights";
 import { formatRand } from "@/lib/money";
 import { plural } from "@/lib/text";
+import { MonthlyTrendChart } from "./monthly-trend-chart";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-/** "Nov" for yyyy-mm-01. */
-const shortMonth = (month: string) => MONTHS[Number(month.slice(5, 7)) - 1];
 /** "Nov 2026" for yyyy-mm-01. */
-const monthLabel = (month: string) => `${shortMonth(month)} ${month.slice(0, 4)}`;
+const monthLabel = (month: string) => `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
 
 /** Monthly giving over the last 12 months: how many donors give monthly, what they bring in, who joined and who left. */
 export function MonthlyTrend({ rows, now, seeAllHref }: { rows: MonthlyRow[]; now: Date; seeAllHref?: string }) {
   const points = monthlyTrend(rows, saDate(now), now, 12);
   const current = points[points.length - 1];
   const before = points[points.length - 2];
-  const max = Math.max(1, ...points.map((p) => p.runningCents));
   const anything = points.some((p) => p.running > 0 || p.started > 0 || p.stopped > 0 || p.paused > 0);
 
   return (
@@ -32,33 +30,9 @@ export function MonthlyTrend({ rows, now, seeAllHref }: { rows: MonthlyRow[]; no
               <span className="text-muted"> {current.running > before.running ? `Up ${current.running - before.running}` : `Down ${before.running - current.running}`} on the end of last month.</span>
             ) : null}
           </p>
-          {/* Bars for the eye, each as tall as its month's monthly amount against the biggest month (17/11/2026: the
-              labels used to share the bars' column, so every bar above about 85% was squashed to the same height).
-              The list underneath is what screen readers read. Both run oldest to newest, this month last. */}
-          <div aria-hidden className="mt-4">
-            <div className="flex h-32 items-end gap-1.5">
-              {points.map((p, i) => (
-                <div
-                  key={p.month}
-                  title={`${monthLabel(p.month)}: ${plural(p.running, "monthly donor")}, ${formatRand(p.runningCents)} a month`}
-                  className={`min-w-0 flex-1 rounded-t-lg ${p.runningCents ? "bg-brand" : "bg-border"} ${i === points.length - 1 ? "ring-2 ring-coral ring-offset-1" : ""}`}
-                  style={{ height: p.runningCents ? `${Math.max(4, Math.round((p.runningCents / max) * 100))}%` : "2px" }}
-                />
-              ))}
-            </div>
-            {/* A month's name never breaks in two ("De / c" on a phone, 22/11/2026): on a phone with more than 6 months,
-                every other one is shown, counting back from this month, as on the donations chart. */}
-            <div className="mt-1 flex gap-1.5">
-              {points.map((p, i) => (
-                <span
-                  key={p.month}
-                  className={`min-w-0 flex-1 whitespace-nowrap text-center text-[11px] ${points.length > 6 && (points.length - 1 - i) % 2 ? "max-sm:invisible" : ""} ${i === points.length - 1 ? "font-semibold text-indigo" : "text-muted"}`}
-                >
-                  {shortMonth(p.month)}
-                </span>
-              ))}
-            </div>
-          </div>
+          {/* The bars, to touch: the orange outline slides to the month chosen, with its figures above (22/11/2026). The
+              list underneath has every month in words. Both run oldest to newest, this month last. */}
+          <MonthlyTrendChart points={points} />
           <ul className="mt-4 space-y-1 text-sm">
             {points.filter((p) => p.running > 0 || p.started > 0 || p.stopped > 0 || p.paused > 0).map((p, i, shown) => {
               const moves = [p.started ? `${p.started} new` : "", p.stopped ? `${p.stopped} stopped` : "", p.paused ? `${p.paused} paused` : ""].filter(Boolean).join(", ");
