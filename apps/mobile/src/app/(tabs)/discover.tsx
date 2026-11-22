@@ -95,7 +95,7 @@ export default function Discover() {
               items={[
                 { size: 170, color: colors.peach, at: { right: -60, top: -70 } },
                 { size: 14, color: colors.orange, float: true, at: { right: 30, top: 24 } },
-                { size: 26, color: colors.blue, ring: true, float: true, at: { left: width < 360 ? 150 : 170, top: 70 } },
+                { size: 22, color: colors.blue, ring: true, float: true, at: { left: width < 360 ? 120 : 150, top: 18 } },
                 { size: 9, color: colors.blue, float: true, at: { right: 118, top: 44 } },
               ]}
             />

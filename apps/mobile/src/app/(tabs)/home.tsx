@@ -25,6 +25,7 @@ import { charitiesGivenTo, newsFeed } from "@/lib/charity-news";
 import { ddmmyyyy, rand, jhbToday } from "@/lib/format";
 import { taxYearFor, taxYearName } from "@/lib/tax-year";
 import { openGiveScreen } from "@/lib/give-entry";
+import { homeNextStep } from "@/lib/home-next-step";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
 import { loadIncome } from "@/lib/income-store";
@@ -106,6 +107,9 @@ export default function Home() {
   const initial = (account.email ?? (preview ? "Sarah" : "?")).slice(0, 1).toUpperCase();
   // News from the charities they gave to (08/11/2026): only when there is some, so Home never shows an empty box.
   const gaveTo = charitiesGivenTo(gifts, monthlyList);
+  // "Your first gift" only when we know there are none (firstGift); "give again" once their gifts are here; otherwise
+  // a plain way to a cause, never a wrong claim while their giving loads.
+  const next = firstGift ? ({ kind: "first" } as const) : homeNextStep(gifts, givingState === "ready" && gifts.length > 0);
   const charityNews = useCharityNews(gaveTo.map((c) => c.slug));
   const news = charityNews.news && !(preview && demoState !== "ready") ? newsFeed(gaveTo, charityNews.news, jhbToday(), charityNews.live ? undefined : Infinity) : [];
   // Live campaign bars from the charities they gave to or saved (11/11/2026): real campaigns only, and only when there are some.
@@ -137,21 +141,44 @@ export default function Home() {
         {/* The hello, in the For charities page's look (30/10/2026): a soft card, the key word in blue,
             people giving, and dots and rings drifting round them. */}
         <View style={styles.gutter}>
+          {/* One next step for this donor (22/11/2026): their first cause, or giving again to the charity they gave to last.
+              The splashes stay clear of the words and the button. */}
           <View style={styles.hero}>
             <Bubbles
               items={[
                 { size: 150, color: colors.peach, at: { right: -50, top: -40 } },
-                { size: 14, color: colors.orange, float: true, at: { right: 34, top: 26 } },
-                { size: 26, color: colors.blue, ring: true, float: true, at: { left: 18, bottom: 28 } },
-                { size: 10, color: colors.blue, float: true, at: { right: 120, bottom: 54 } },
+                { size: 12, color: colors.orange, float: true, at: { right: 14, top: 14 } },
               ]}
             />
-            <View style={{ gap: 6 }}>
-              <Text variant="h1" accessibilityRole="header">
-                {firstGift ? <>Welcome in. Ready for your <Text variant="h1" style={styles.key}>first gift</Text>?</> : <>Ready to do some <Text variant="h1" style={styles.key}>good</Text>?</>}
-              </Text>
+            <Text variant="h1" accessibilityRole="header" style={styles.heroTitle}>
+              {next.kind === "browse" ? (
+                <>Ready to do some <Text variant="h1" style={styles.key}>good</Text>?</>
+              ) : next.kind === "first" ? (
+                <>Ready for your <Text variant="h1" style={styles.key}>first gift</Text>?</>
+              ) : (
+                <>Ready to give <Text variant="h1" style={styles.key}>again</Text>?</>
+              )}
+            </Text>
+            <View style={styles.heroRow}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.heroLine}>
+                  {next.kind !== "again"
+                    ? "Find a checked charity you care about and give in a few taps."
+                    : `Your last gift was ${rand(next.cents)} to ${next.charityName} on ${ddmmyyyy(next.date)}.`}
+                </Text>
+              </View>
+              <People name="workingTogether" width={Math.min(120, Math.round(width * 0.3))} float={false} style={styles.heroArt} />
             </View>
-            <People name="workingTogether" width={Math.min(300, width - space.gutter * 2 - 40)} style={styles.heroArt} />
+            {next.kind !== "again" ? (
+              <Button variant="cta" label="Find a cause" onPress={() => router.push("/discover")} />
+            ) : (
+              <View style={{ gap: 4 }}>
+                <Button variant="cta" label="Give again" accessibilityLabel={`Give again to ${next.charityName}`} onPress={() => openGiveScreen(next.slug)} />
+                <Pressable onPress={() => router.push("/discover")} accessibilityRole="link" hitSlop={8} style={styles.heroLink}>
+                  <Text style={styles.heroLinkText}>Or find another cause</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </View>
 
@@ -330,8 +357,13 @@ const styles = StyleSheet.create({
   goalSub: { fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 21, color: colors.lilacSoft },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   seeAll: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue },
-  hero: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, paddingTop: 22, paddingHorizontal: 20, overflow: "hidden", gap: 8 },
-  heroArt: { alignSelf: "center", marginTop: 4, marginBottom: -2 },
+  hero: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, paddingTop: 22, paddingBottom: 18, paddingHorizontal: 20, overflow: "hidden", gap: 16 },
+  heroTitle: { paddingRight: 28 },
+  heroRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  heroArt: { marginBottom: -4 },
+  heroLine: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.ink },
+  heroLink: { minHeight: 44, alignItems: "center", justifyContent: "center" },
+  heroLinkText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.blue },
   key: { color: colors.blue },
   receiptsCard: { backgroundColor: colors.blue, borderRadius: radius.card, padding: 22, overflow: "hidden", gap: 8 },
   receiptsIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 6 },
