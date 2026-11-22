@@ -1,4 +1,10 @@
-const { chromium } = require('playwright');
+// Store screenshots from the app's web build (sample data). Serve the build first:
+//   cd apps/mobile && npx expo export --platform web --output-dir /tmp/store-web && npx serve -s /tmp/store-web -l 8711
+// then run: node docs/app-store/take-screens.mjs (writes to /tmp/claude-0/store/ios and /android).
+import { createRequire } from "node:module";
+// Playwright is installed globally on the build machine, which only CommonJS loading finds.
+const load = createRequire(import.meta.url);
+const { chromium } = load("playwright");
 const BREAD = 'hf_20261011_002939_f36bd191-cf6e-4347-a046-ffb5def7c7af';
 const VEG = 'https://d8j0ntlcm91z4.cloudfront.net/user_3JMbY89afWySU23FksuSQhKkNXQ/hf_20261011_003002_378081f3-914c-4b04-96e8-d2314e88ea3e.png';
 (async () => {
