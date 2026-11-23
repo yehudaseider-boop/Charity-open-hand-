@@ -293,7 +293,7 @@ export default function Home() {
           </View>
           {(preview && demoState === "error") || (directory.failed && !causes.length) ? (
             <View style={styles.gutter}>
-              <ErrorState body="We can't load charities right now. Check your connection, then try again." onRetry={directory.retry} />
+              <ErrorState body="We couldn't load the charities. Check your connection and try again." onRetry={directory.retry} />
             </View>
           ) : (preview && demoState === "loading") || (!directory.data && !directory.failed) ? (
             <View style={[styles.gutter, { gap: 10 }]}><LoadingNote /><SkeletonBlock height={260} /></View>
