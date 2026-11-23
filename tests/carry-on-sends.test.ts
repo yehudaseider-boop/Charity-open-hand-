@@ -235,6 +235,27 @@ describe("the daily job carries on unfinished emails to donors", () => {
     expect(Object.fromEntries(tables.charity_appeal_recipients.map((x) => [x.donor_id, x.status]))).toMatchObject({ ben: "sent", cat: "skipped" });
   });
 
+  it("a donor who gave again since a 'gave last year, not since' or lapsed email was made is left off it, and a plain email is not affected (review 23/11/2026)", async () => {
+    for (const value of ["keeping:lybunt", "group:lapsed"]) {
+      unfinishedAppeal();
+      tables.charity_appeals[0].audience = { value };
+      // Ben gave again this morning, after the email was made on 11/11.
+      tables.donations.push({ id: "g-ben-new", charity_id: C, donor_id: "ben", status: "paid", gateway: "card", paid_at: "2026-11-12T07:00:00+02:00", amount_cents: 5000, refunded_cents: 0, donation_checkout_details: { email: "ben@x.co", first_name: "ben", erased_at: null } });
+      sent.length = 0;
+      await job();
+      expect(to()).toEqual(["cat@x.co"]);
+      expect(Object.fromEntries(tables.charity_appeal_recipients.map((x) => [x.donor_id, x.status]))).toMatchObject({ ben: "skipped", cat: "sent" });
+      tables.donations = tables.donations.filter((g) => g.id !== "g-ben-new");
+    }
+    // The same gift does not stop an email to everyone.
+    unfinishedAppeal();
+    tables.charity_appeals[0].audience = { value: "all" };
+    tables.donations.push({ id: "g-ben-new", charity_id: C, donor_id: "ben", status: "paid", gateway: "card", paid_at: "2026-11-12T07:00:00+02:00", amount_cents: 5000, refunded_cents: 0, donation_checkout_details: { email: "ben@x.co", first_name: "ben", erased_at: null } });
+    sent.length = 0;
+    await job();
+    expect(to()).toEqual(["ben@x.co", "cat@x.co"]);
+  });
+
   it("never emails a claimed address again, even one whose send may have gone", async () => {
     unfinishedThankYou({ benMayHaveGone: true });
     await job();

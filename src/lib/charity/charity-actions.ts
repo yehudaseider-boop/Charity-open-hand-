@@ -7,8 +7,9 @@ import { memberRole } from "./team";
 import { can, isRole, permissionForAction } from "./permissions";
 import { removeDecisions } from "@/lib/receipts/runs";
 import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
-import { readJourneyState, removeEnrolments, writeJourney, type JourneyState } from "./journey-write";
-import { GENERAL, type JourneyRef } from "./journey";
+import { findJourney, readJourneyState, removeEnrolments, writeJourney, type JourneyState } from "./journey-write";
+import { enrolmentStates } from "./journey-store";
+import { GENERAL, journeyStepsMoved, partWay, type JourneyRef } from "./journey";
 
 /**
  * Records each dashboard action (for "what just happened") and takes it back on request. Every call
@@ -171,7 +172,7 @@ export const same = (a: unknown, b: unknown) => plain(a) === plain(b);
 
 async function apply(charityId: string, undo: Undo, extra: Details = {}): Promise<UndoFailure | null> {
   const db = createAdminClient();
-  const ownPath = (p: string) => p.startsWith(`${charityId}/`) && !p.includes("..");
+  const ownPath = (p: string) => p.startsWith(`${charityId.toLowerCase()}/`) && !p.includes("..");
   switch (undo.type) {
     case "restore": {
       const key = undo.table === "charities" ? "id" : "charity_id";
@@ -205,6 +206,12 @@ async function apply(charityId: string, undo: Undo, extra: Details = {}): Promis
       const now = await readJourneyState(charityId, ref);
       // Changed again since (by this person or another admin): don't overwrite their newer work.
       if (!same(now, undo.after)) return "changed";
+      // Putting the old emails back can move an email to another number, and each donor's place goes by number: as when
+      // saving, refused while anyone is part way through (review 23/11/2026).
+      if (journeyStepsMoved(now.steps, undo.before.steps)) {
+        const row = await findJourney(charityId, ref);
+        if (row && partWay(await enrolmentStates(charityId, row)) > 0) return "changed";
+      }
       // Switching back on (taking back "switch off") counts from now: someone who first gave while it was off is an
       // existing donor, added only if the owner chooses, not a new one.
       const back = undo.before.enabled && !now.enabled ? { ...undo.before, switched_on_at: new Date().toISOString() } : undo.before;

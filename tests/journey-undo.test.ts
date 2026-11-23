@@ -15,11 +15,15 @@ vi.mock("@/lib/charity/journey-write", () => ({
   writeJourney: async (_c: string, _u: string | null, s: State) => {
     journeyNow = structuredClone(s);
   },
+  findJourney: async () => ({ id: "j1" }),
   removeEnrolments: async (_c: string, ids: string[]) => {
     removed.push(ids);
     return { removed: removable, stayed: ids.length - removable };
   },
 }));
+
+let enrolments: { status: string; next_step: number }[] = [];
+vi.mock("@/lib/charity/journey-store", () => ({ enrolmentStates: async () => enrolments }));
 
 type Row = Record<string, unknown>;
 let tables: Record<string, Row[]>;
@@ -70,6 +74,7 @@ beforeEach(() => {
   role = "owner";
   removable = 0;
   removed.length = 0;
+  enrolments = [];
 });
 
 describe("taking back a change to the donor journey", () => {
@@ -124,5 +129,23 @@ describe("taking back a change to the donor journey", () => {
     tables.charity_actions = [action("journey_existing_added", { type: "journey_enrolments", ids: ["e3"] })];
     removable = 0;
     expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: false, why: "emailed" });
+  });
+
+  it("emails that would move to other numbers are not put back while someone is part way through (review 23/11/2026)", async () => {
+    const two = { ...one, subject: "Second" };
+    const three = { ...one, subject: "Third" };
+    // Saved as three emails; the middle one was removed (allowed then, nobody was on it); now someone is part way.
+    const before: State = { ...on, steps: [one, two, three] };
+    const after: State = { ...on, steps: [one, three] };
+    journeyNow = structuredClone(after);
+    enrolments = [{ status: "active", next_step: 2 }];
+    tables.charity_actions = [action("journey_saved", { type: "journey", before, after })];
+    expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: false, why: "changed" });
+    expect(journeyNow).toEqual(after);
+    expect(tables.charity_actions[0].undone_at).toBeNull();
+    // Nobody part way: it comes back.
+    enrolments = [{ status: "finished", next_step: 3 }];
+    expect(await undoAction(C, A, "u1", "approved")).toMatchObject({ ok: true });
+    expect(journeyNow).toEqual(before);
   });
 });

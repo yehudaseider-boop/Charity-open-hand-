@@ -67,6 +67,7 @@ function from(table: string) {
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from }) }));
+vi.mock("@/lib/auth", () => ({ getViewer: async () => null }));
 vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ name: "console", send: async () => "sent" }), EmailError: class extends Error {} }));
 
 const { runJourneys } = await import("@/lib/charity/journey-store");
@@ -168,3 +169,18 @@ describe("the daily run with campaign and win-back journeys", () => {
     expect(tables.charity_journey_enrolments.find((e) => e.id === "w2")).toMatchObject({ status: "active" });
   });
 });
+
+describe("new donors are found however many new gifts there are (review 23/11/2026)", () => {
+  it("reads every page of new gifts: a donor whose first gift is beyond the first 5 000 rows still joins", async () => {
+    // 5 000 gifts from donors already on the journey, then one first gift from a new donor.
+    for (let i = 0; i < 5000; i++) {
+      const id = `old${String(i).padStart(4, "0")}`;
+      tables.donations.push(gift(id, "2026-11-05T08:00:00Z"));
+      tables.charity_journey_enrolments.push({ id: `o${i}`, charity_id: C, journey_id: GEN, donor_id: id, source: "new_gift", status: "active", enrolled_at: "2026-11-05T08:00:00Z", next_step: 1, next_due_at: "2026-11-30T08:00:00Z", attempts: 0 });
+    }
+    tables.donations.push(gift("latecomer", "2026-11-09T08:00:00Z"));
+    await runJourneys(new Date("2026-11-10T06:00:00Z"), Date.now() + 60_000);
+    expect(tables.charity_journey_enrolments.find((e) => e.donor_id === "latecomer" && e.journey_id === GEN)).toBeTruthy();
+  }, 60_000);
+});
+

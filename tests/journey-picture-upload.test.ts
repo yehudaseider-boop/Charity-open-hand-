@@ -76,6 +76,12 @@ describe("uploading a journey picture", () => {
     expect(state.audits).toEqual(["charity.journey_picture_uploaded"]);
   });
 
+  it("stores the picture under the lower-case id even when the page address has capitals (review 23/11/2026)", async () => {
+    const r = await uploadJourneyPicture(CHARITY.toUpperCase(), picture());
+    expect(r.ok).toBe(true);
+    expect(state.uploads[0].path.startsWith(`${CHARITY}/journey-`)).toBe(true);
+  });
+
   it("refuses, and stores nothing, for someone who may not message donors, before the database keeps pictures, or too many at once", async () => {
     state.refused = "Your role doesn't include emailing donors.";
     expect(await uploadJourneyPicture(CHARITY, picture())).toEqual({ ok: false, message: "Your role doesn't include emailing donors." });

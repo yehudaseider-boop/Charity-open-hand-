@@ -249,7 +249,8 @@ export async function uploadJourneyPicture(charityId: string, formData: FormData
   if (file.size > MAX_UPLOAD_BYTES) return { ok: false, message: "Pictures must be 4 MB or smaller." };
   if (!(IMAGE_MIME as readonly string[]).includes(file.type) || !(await isRealImage(file))) return { ok: false, message: "Choose a JPG, PNG or WebP picture." };
   const ext = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as Record<string, string>)[file.type];
-  const path = `${charityId}/journey-${crypto.randomUUID()}.${ext}`;
+  // The folder is the lower-case id: the picture check and the database compare it that way (review 23/11/2026).
+  const path = `${charityId.toLowerCase()}/journey-${crypto.randomUUID()}.${ext}`;
   let cleaned: Blob;
   try {
     cleaned = await cleanImage(file, PICTURE_MAX_SIDE);

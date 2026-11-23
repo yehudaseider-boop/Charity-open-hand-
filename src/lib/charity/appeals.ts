@@ -240,6 +240,40 @@ async function recipientsForJob(charityId: string, appealId: string): Promise<Ma
   return out;
 }
 
+/** Audiences defined by "has not given since": the Keeping donors lists and the lapsed group. */
+export function staysOnList(value: unknown): boolean {
+  return typeof value === "string" && (value.startsWith("keeping:") || value === "group:lapsed");
+}
+
+/**
+ * Marks as skipped everyone still waiting for this email who has given (a paid gift with something left) since the
+ * email was made. Read with the server's own client so it works for the daily job too.
+ */
+async function skipWhoGaveSince(charityId: string, appealId: string, since: string): Promise<void> {
+  const waiting: string[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db().from("charity_appeal_recipients").select("donor_id").eq("appeal_id", appealId).eq("status", "waiting").order("donor_id").range(from, from + 999);
+    if (error) throw error;
+    waiting.push(...(data ?? []).map((r) => r.donor_id as string));
+    if (!data || data.length < 1000) break;
+  }
+  const gave = new Set<string>();
+  for (let i = 0; i < waiting.length; i += 200) {
+    const chunk = waiting.slice(i, i + 200);
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db().from("donations").select("donor_id, amount_cents, refunded_cents").eq("charity_id", charityId).eq("status", "paid").gte("paid_at", since).in("donor_id", chunk).order("id").range(from, from + 999);
+      if (error) throw error;
+      for (const r of data ?? []) if (!nothingLeft(r)) gave.add(r.donor_id as string);
+      if (!data || data.length < 1000) break;
+    }
+  }
+  const out = [...gave];
+  for (let i = 0; i < out.length; i += 200) {
+    const { error } = await db().from("charity_appeal_recipients").update({ status: "skipped" }).eq("appeal_id", appealId).eq("status", "waiting").in("donor_id", out.slice(i, i + 200));
+    if (error) throw error;
+  }
+}
+
 /**
  * Send what is still waiting, until the time runs out (a web request can't run for ever). Each donor is
  * claimed in the database first, so pressing again, or two people pressing, never emails anyone twice.
@@ -250,9 +284,12 @@ async function recipientsForJob(charityId: string, appealId: string): Promise<Ma
 export async function sendAppeal(args: { charityId: string; appealId: string; charityName: string; replyTo: string | null; userId: string | null; budgetMs?: number; auto?: boolean }): Promise<AppealRun | null> {
   const started = Date.now();
   const budget = args.budgetMs ?? 40_000;
-  const { data: appeal, error } = await db().from("charity_appeals").select("id, subject, body").eq("id", args.appealId).eq("charity_id", args.charityId).maybeSingle();
+  const { data: appeal, error } = await db().from("charity_appeals").select("id, subject, body, audience, created_at").eq("id", args.appealId).eq("charity_id", args.charityId).maybeSingle();
   if (error) throw error;
   if (!appeal) return null;
+  // "Gave last year, not since" and "Lapsed" lists: a donor who has given since the list was made is no longer on it
+  // and must not be told "you haven't given since". Checked again at the start of every run (review 23/11/2026).
+  if (staysOnList((appeal.audience as { value?: unknown } | null)?.value)) await skipWhoGaveSince(args.charityId, appeal.id as string, appeal.created_at as string);
   // Before claiming anyone: a sending set-up problem must not use up a donor's place.
   const transport = getEmailTransport();
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");

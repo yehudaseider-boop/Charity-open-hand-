@@ -13,6 +13,8 @@ import {
   claimNote,
   decideDue,
   existingOutcome,
+  existingPaceSentence,
+  JOURNEY_RUN_CAP,
   firstDue,
   journeyCounts,
   journeyEmail,
@@ -250,3 +252,15 @@ describe("an email that doesn't go (review 10/11/2026)", () => {
     expect(describeUndone("journey_existing_added", { added: 2, removed: 2, stayed: 0 })).toBe("Taken back. Removed 2 donors from your donor journey. Nobody was emailed.");
   });
 });
+
+describe("how fast existing donors are emailed (review 23/11/2026)", () => {
+  it("says nothing for a list one day's run can send, and names the real daily cap, never a date, for a longer one", () => {
+    expect(existingPaceSentence(JOURNEY_RUN_CAP)).toBe("");
+    const long = existingPaceSentence(JOURNEY_RUN_CAP + 1);
+    expect(long).toContain(`no more than ${JOURNEY_RUN_CAP} a day`);
+    expect(long).toContain("several days");
+    expect(long).not.toMatch(/\d{1,2}\/\d{1,2}\/\d{4}|tomorrow|by (Monday|Friday)/i);
+    expect(existingOutcome({ added: 450, skipped: {}, firstEmail: "12/11/2026" })).toContain(long);
+  });
+});
+

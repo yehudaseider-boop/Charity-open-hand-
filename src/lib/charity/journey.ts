@@ -611,10 +611,21 @@ export function claimNote(position: number, subject: string): string {
   return `Donor journey email ${position}: ${cleanSubject(subject)}`.slice(0, 1000);
 }
 
+/**
+ * "Add my existing donors": the daily run sends at most JOURNEY_RUN_CAP journey emails across every charity, so a
+ * longer list goes out over several days. Said plainly from the real cap, never with a date it can't keep. Nothing
+ * for a list that fits in one day's run.
+ */
+export function existingPaceSentence(count: number): string {
+  if (count <= JOURNEY_RUN_CAP) return "";
+  return `Journey emails go out at no more than ${JOURNEY_RUN_CAP} a day across Givezy, so a list this long goes out over several days. Everyone still gets email 1 first, and nobody is emailed twice.`;
+}
+
 /** What the page says after "Add my existing donors". Counts only. */
 export function existingOutcome(r: { added: number; skipped: Partial<Record<ExistingSkip, number>>; firstEmail: string | null }): string {
   return [
     r.added ? `${plural(r.added, "donor")} ${r.added === 1 ? "is" : "are"} on your journey now.${r.firstEmail ? ` Their first email goes from ${r.firstEmail}, never more than one message from you a week.` : ""}` : "Nobody new was added.",
+    existingPaceSentence(r.added),
     existingSkippedSentence(r.skipped),
   ].filter(Boolean).join(" ");
 }
