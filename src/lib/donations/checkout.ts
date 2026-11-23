@@ -206,9 +206,10 @@ export async function startDonation(args: {
         }
         if (reached === "failed") {
           // The first try's charge did reach the provider and was declined: say so, as the first try would have.
-          await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", attemptId).eq("status", "pending");
-          // The first try stopped before it was counted: counted now, once (a failed gift is answered above from here on).
-          await recordDecline(attemptId);
+          const moved = await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", attemptId).eq("status", "pending").select("id");
+          // The first try stopped before it was counted: counted now, once, and only when this update moved it (the
+          // payment check counts it when it moves the gift itself; review 23/11/2026).
+          if (moved.data?.length) await recordDecline(attemptId);
           return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
         }
       }
@@ -520,10 +521,11 @@ async function chargeSavedCard(a: {
       await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", a.donationId).eq("status", "pending");
       return { ok: false, offerPaymentPage: true, message: SAVED_CARD_REFUSED };
     }
-    await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", a.donationId).eq("status", "pending");
+    const moved = await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", a.donationId).eq("status", "pending").select("id");
     // Card-testing protection counts a declined saved card like any other declined card (review 23/11/2026: marked
-    // failed here, the payment check never saw it move from pending, so it was never counted). Never throws.
-    await recordDecline(a.donationId);
+    // failed here, the payment check never saw it move from pending, so it was never counted). Only when this update
+    // moved it: if the payment check marked it failed first, it already counted it. Never throws.
+    if (moved.data?.length) await recordDecline(a.donationId);
     return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
   };
   try {

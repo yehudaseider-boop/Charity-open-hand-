@@ -42,6 +42,8 @@ export function shapeTypedDay(previous: string, next: string): string {
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
   if (/^\d{8}$/.test(v)) return `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
   if (next.length <= previous.length) return next;
+  // A separator typed straight after a slash the box added (typing "31/12/2026" key by key): not doubled.
+  if (next.length === previous.length + 1 && next.startsWith(previous) && previous.endsWith("/") && /[/.\- ]$/.test(next)) return previous;
   if (/^\d{2}$/.test(v) || /^\d{1,2}[/.\- ]\d{2}$/.test(v)) return `${v.replace(/[.\- ]/g, "/")}/`;
   return next;
 }

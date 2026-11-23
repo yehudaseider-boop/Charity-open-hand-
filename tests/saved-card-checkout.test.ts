@@ -25,6 +25,8 @@ let prior: Record<string, unknown> | null = null;
 let auditRows: { id: string }[] = [];
 /** Donation ids looked up by id (the earlier-attempt check). */
 const idLookups: string[] = [];
+/** Whether marking a gift failed moves it (false: the payment check had already marked it failed). */
+let updateMoves = true;
 
 function builder(table: string) {
   const b: Record<string, unknown> = {};
@@ -34,11 +36,13 @@ function builder(table: string) {
     return b;
   };
   b.insert = (row: Record<string, unknown>) => (ops.push({ table, op: "insert", row }), b);
-  b.update = (row: Record<string, unknown>) => (ops.push({ table, op: "update", row }), b);
+  b.update = (row: Record<string, unknown>) => (ops.push({ table, op: "update", row }), (b.updating = true), b);
   b.upsert = (row: Record<string, unknown>) => (ops.push({ table, op: "upsert", row }), b);
   b.single = async () => ({ data: { id: "donor-1" }, error: null });
   b.maybeSingle = async () => ({ data: table === "donations" ? prior : null, error: null });
-  b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === "audit_log" ? auditRows : [], error: null }).then(ok);
+  // An update to a gift answers with the rows it moved: none when the gift had already moved on (updateMoves false).
+  b.then = (ok: (v: unknown) => unknown) =>
+    Promise.resolve({ data: table === "audit_log" ? auditRows : table === "donations" && b.updating ? (updateMoves ? [{ id: "moved" }] : []) : [], error: null }).then(ok);
   return b;
 }
 
@@ -123,6 +127,7 @@ beforeEach(() => {
   auditRows = [];
   idLookups.length = 0;
   declinesCounted.length = 0;
+  updateMoves = true;
   limitsUsedUp = false;
   providerHas = "yes";
   verified.length = 0;
@@ -466,6 +471,20 @@ describe("asking twice about the same saved-card gift", () => {
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
     expect(declinesCounted).toEqual([donationId]);
+  });
+
+  it("a declined saved card the payment check already marked failed is not counted a second time (review 23/11/2026)", async () => {
+    prior = pendingPrior();
+    providerHas = "no";
+    refusal = true;
+    chargeResult = async () => {
+      providerHas = "failed";
+      throw new Error("refused");
+    };
+    updateMoves = false;
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
+    expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
+    expect(declinesCounted).toEqual([]);
   });
 
   it("a declined first try stays declined, and is not counted a second time", async () => {

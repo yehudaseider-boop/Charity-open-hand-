@@ -56,6 +56,8 @@ vi.mock("@/lib/supabase/admin", () => ({
             eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }),
             // charity_requests: .eq("notify_email").is("requested_by", null)
             is: async (c: string, v: unknown) => (calls.push(`${table}:deleted:${c1}=${v1},${c}=${v}`), { error: null }),
+            // gift starts: .eq("bucket", "checkout-start").like("key", "%|<stand-in>")
+            like: async (c: string, v: unknown) => (calls.push(`${table}:deleted:${c1}=${v1},${c}~${v}`), { error: null }),
             then: (resolve: (v: { error: null }) => void) => (calls.push(`${table}:deleted:${c1}=${v1}`), resolve({ error: null })),
           }),
         }),
@@ -87,11 +89,19 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 const { eraseDonor } = await import("@/lib/privacy/erase");
 const { hashedKey } = await import("@/lib/rate-limit");
-/** The rate limiter's two deletes for an address: its keyed stand-in exactly, and it with an internet address. */
+/**
+ * The rate limiter's three deletes for an address: its keyed stand-in exactly, it with an internet address, and the
+ * gift starts that pair one of their gifts with it (review 23/11/2026).
+ */
 const limitRows = (address: string) => {
   const key = hashedKey("email", address) as string;
   // An "_" in the stand-in is a wildcard in a pattern, so it is escaped: only this stand-in can match.
-  return [`rate_limit_events:deleted:key=${key}`, `rate_limit_events:deleted:key~${key.replace(/_/g, "\\_")}|%`];
+  const escaped = key.replace(/_/g, "\\_");
+  return [
+    `rate_limit_events:deleted:key=${key}`,
+    `rate_limit_events:deleted:key~${escaped}|%`,
+    `rate_limit_events:deleted:bucket=checkout-start,key~%|${escaped}`,
+  ];
 };
 
 beforeEach(() => {

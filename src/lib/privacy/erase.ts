@@ -199,6 +199,9 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     if (exactError) throw new Error(`Could not erase: ${exactError.message}`);
     const { error: pairError } = await db.from("rate_limit_events").delete().like("key", `${key.replace(/[\\%_]/g, (ch) => `\\${ch}`)}|%`);
     if (pairError) throw new Error(`Could not erase: ${pairError.message}`);
+    // A gift start ("<gift id>|email#…", giving-guard.ts rememberGiftStart) pairs one of their gifts with that stand-in.
+    const { error: startError } = await db.from("rate_limit_events").delete().eq("bucket", "checkout-start").like("key", `%|${key.replace(/[\\%_]/g, (ch) => `\\${ch}`)}`);
+    if (startError) throw new Error(`Could not erase: ${startError.message}`);
   }
   // Last of the database steps: their details, address and the link to their account (see the order above).
   const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });

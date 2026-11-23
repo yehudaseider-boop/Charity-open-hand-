@@ -63,6 +63,11 @@ describe("the date box helps while typing (23/11/2026)", () => {
     expect(typing("05032026")).toBe("05/03/2026");
     expect(typing("31122026")).toBe("31/12/2026");
     expect(typing("5/3/2026")).toBe("5/3/2026");
+    // Typing the slashes yourself never doubles them (review 23/11/2026: "31//12/2026").
+    expect(typing("31/12/2026")).toBe("31/12/2026");
+    expect(typing("05/03/2026")).toBe("05/03/2026");
+    expect(typing("05.03.2026")).toBe("05/03/2026");
+    expect(typedDay(typing("31/12/2026"))).toBe("2026-12-31");
   });
   it("shapes a pasted date", () => {
     expect(shapeTypedDay("", "05032026")).toBe("05/03/2026");
