@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { requireSecondStep } from "@/lib/mfa";
@@ -42,7 +43,7 @@ export type CharityDocument = {
  * Everything about one charity, read as the signed-in person. Row-level
  * security decides access: a stranger gets "not found".
  */
-export async function loadCharityForManager(id: string) {
+export const loadCharityForManager = cache(async function loadCharityForManager(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   // Admins prove their second step first: until then the database shows them nothing.
   const viewer = await getViewer();
@@ -104,7 +105,7 @@ export async function loadCharityForManager(id: string) {
     documents,
     categoryIds: (cats.data ?? []).map((c) => c.category_id as string),
   };
-}
+});
 
 export async function loadCategories() {
   // Public for everyone, so it never reads the request (the home page is served from cache).

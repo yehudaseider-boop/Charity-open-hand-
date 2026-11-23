@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { logAudit } from "@/lib/audit";
 import { getViewer } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -14,12 +15,13 @@ export type { Role } from "./permissions";
 export type Member = { userId: string; email: string; role: Role; since: string };
 
 /** The signed-in person's role at this charity ("owner" for a platform admin), or null. */
-export async function viewerRole(charityId: string): Promise<Role | null> {
+// Shared by the dashboard frame and the page within one page open (React's cache; a server action always reads afresh).
+export const viewerRole = cache(async function viewerRole(charityId: string): Promise<Role | null> {
   const viewer = await getViewer();
   if (!viewer) return null;
   if (viewer.isPlatformAdmin) return "owner";
   return memberRole(charityId, viewer.userId);
-}
+});
 
 export async function memberRole(charityId: string, userId: string): Promise<Role | null> {
   const db = createAdminClient();
