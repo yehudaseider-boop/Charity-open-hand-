@@ -27,30 +27,21 @@ export async function startApplication(_prev: FormState, formData: FormData): Pr
   const base = slugify(parsed.data.name_en);
   let charityId: string | null = null;
 
-  // Slug and QuickGive code must be unique; retry with a suffix on a clash.
+  // Slug and QuickGive code must be unique; retry with a suffix on a clash. The charity, its owner and its private row
+  // are made in one step in the database, so a failure never leaves a charity with no owner (review 23/11/2026).
   for (let attempt = 0; attempt < 5 && !charityId; attempt++) {
     const slug = attempt === 0 ? base : `${base}-${randomCode(4)}`;
-    const { data, error } = await db
-      .from("charities")
-      .insert({
-        slug,
-        quickgive_code: randomCode(),
-        name_en: parsed.data.name_en,
-        legal_name_en: parsed.data.name_en,
-        status: "draft",
-      })
-      .select("id")
-      .single();
-    if (data) charityId = data.id;
+    const { data, error } = await db.rpc("start_charity_application", {
+      p_slug: slug,
+      p_quickgive_code: randomCode(),
+      p_name: parsed.data.name_en,
+      p_user_id: viewer.userId,
+      p_email: viewer.email,
+    });
+    if (data) charityId = data as string;
     else if (error && error.code !== "23505") throw error;
   }
   if (!charityId) return { ok: false, message: "Could not create the application. Please try again." };
-
-  const links = await Promise.all([
-    db.from("charity_admins").insert({ charity_id: charityId, user_id: viewer.userId, role: "owner" }),
-    db.from("charity_private").insert({ charity_id: charityId, contact_email: viewer.email }),
-  ]);
-  for (const { error } of links) if (error) throw error;
 
   // Started from an invitation: mark it used, so the link can't start a second application.
   const invite = formData.get("invite");

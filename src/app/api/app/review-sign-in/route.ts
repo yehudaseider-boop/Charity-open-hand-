@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
   // isn't available" would wrongly tell ordinary donors to wait, and one answer for all still hides the reviewer's email.
   // No sign-in token is ever made while over a limit.
   const ip = ipKeys(clientIp(request.headers));
+  // No limit key can be made at all (no server key on the live or test site): refuse, never run without limits.
+  if (ipKeys("203.0.113.1").length === 0) return refused();
   try {
     if (await hitRateLimit("review-sign-in-ip", ip, PER_ADDRESS_PER_HOUR, 60)) return refused();
     if (await rateLimitReached("review-sign-in-wrong", ["review#all"], WRONG_CODES_PER_HOUR, 60)) return refused();

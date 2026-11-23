@@ -32,6 +32,8 @@ import {
 } from "./actions";
 import { UploadForm } from "@/app/charity-admin/[id]/application/forms";
 import { canIssue18a } from "@/lib/charities";
+import { isUuid } from "@/lib/ids";
+import { readSubmissionVersion } from "@/lib/charity/submission-version";
 import { AddAdminForm, ApproveForm, ChangeBankForm, ReasonForm, ReceiptsForm, SimpleForm } from "./forms";
 
 export const metadata: Metadata = { title: "Review charity" };
@@ -43,6 +45,8 @@ const changedRecently = (at: string) => Date.now() - new Date(at).getTime() < CO
 export default async function AdminCharityPage({ params }: PageProps<"/admin/charities/[id]">) {
   await requirePlatformAdmin();
   const { id } = await params;
+  // Read before the page's own data, so a change after it shows as a changed application when approving.
+  const submission = isUuid(id) ? await readSubmissionVersion(id) : null;
   const { charity, priv, documents } = await loadCharityForManager(id);
   const bankCheck = bankCheckLines(await loadBankCheck(id));
   const supabase = await createClient();
@@ -140,6 +144,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
               hasS18a={Boolean(charity.s18a_reference)}
               hasMandate={hasMandateDoc}
               sameNumber={sameNumber.length > 0}
+              version={submission?.version ?? ""}
             />
             <div className="border-t border-border pt-4">
               <ReasonForm action={rejectCharity.bind(null, id)} label="What needs fixing? The charity sees this."

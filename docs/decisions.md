@@ -2237,3 +2237,16 @@ A read-only security review found six things. All six are fixed in code; two nee
 - **The gateway-mismatch note is written once per gift** (`alreadyNoted`), however many times it is checked.
 - **Deposits sync reads every connected charity and every final payout**, a page at a time (`readAllPages`), not only the first 1 000 and 5 000.
 - **Review item 7 (providerCharge rounding) is unconfirmed:** a test documents today's behaviour (rounds up to the cent); fees unchanged.
+
+
+## 23/11/2026: admin, applications and sign-in fixes (area C)
+
+- **Connecting a charity checks the bank account is unchanged.** `connectToGateway` saves the provider's reference through `set_charity_gateway_ref`, which holds the charity and its private row and refuses unless the encrypted account number and "checked" time are what was sent. Otherwise: "The bank details changed while connecting. Nothing was connected. Connect again." (The account made at the provider is left unused; go-live list.)
+- **Approving checks the application is what the admin opened.** The approve form carries a hidden version (the charity's and its private row's `updated_at`, `src/lib/charity/submission-version.ts`); a mismatch refuses with "This application changed since you opened it. Reload and check it again." The charity update and the bank "checked" stamp are also conditional on those versions, so a bank account changed in between is never marked checked unseen.
+- **An invitation whose email did not go says so.** The admin sees "We couldn't email ...", never "Invitation sent", with the invitation link to copy (shown once, in that message).
+- **Admin lists no longer stop at 1 000 rows.** The overview counts each status with an exact count (`countCharitiesByStatus`); the charities list, cause of the week and charity requests read every page (`readAllPages`).
+- **Closing charity requests someone else already closed changes nothing and says so** ("Someone else already closed these requests. Nothing was changed."); "It joined" then emails nobody.
+- **Starting an application is one database step** (`start_charity_application`: charity, owner and private row, or none).
+- **People can be added to a charity's team only once it is approved** (website action and `addMember`), with the reason in plain words.
+- **Sign-in fails closed without a limit key.** With no `ENCRYPTION_KEY` on the live or test site, the sign-in email, the code check and the app reviewer's code refuse with a plain message instead of running unlimited.
+- **A browser can no longer record a policy agreement.** `agree_to_policy` is for the server only; account agreements are unique per person and version (duplicates removed first, earliest kept). The index covers `kind = 'account'` only: a charity's declarations legitimately repeat for one person (one per charity), so a unique index on every kind would refuse real rows. Migration `20261123000009_admin_apply_consent_guards.sql`.

@@ -23,6 +23,7 @@ const state = vi.hoisted(() => ({
   wrongCounted: 0,
   ipCounted: 0,
   links: [] as string[],
+  noKeys: false,
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: { action: string }) => void state.audits.push(a.action) }));
@@ -34,7 +35,7 @@ vi.mock("@/lib/rate-limit", () => ({
     return bucket === "review-sign-in-ip" ? state.limitedIp : false;
   },
   rateLimitReached: async () => state.wrongCodesFull,
-  ipKeys: (ip: string) => [`ip:${ip}`],
+  ipKeys: (ip: string) => (state.noKeys ? [] : [`ip:${ip}`]),
 }));
 const err = { message: "timeout" };
 vi.mock("@/lib/supabase/admin", () => ({
@@ -71,7 +72,7 @@ const CODE = "48213907";
 beforeEach(() => {
   vi.stubEnv("REVIEW_SIGN_IN_EMAIL", EMAIL);
   vi.stubEnv("REVIEW_SIGN_IN_CODE", CODE);
-  Object.assign(state, { limitedIp: false, wrongCodesFull: false, role: "user", profileId: "u-review", linkUserId: "u-review", verificationType: "magiclink", charities: 0, donors: [], gifts: 0, fail: null, audits: [], wrongCounted: 0, ipCounted: 0, links: [] });
+  Object.assign(state, { limitedIp: false, wrongCodesFull: false, role: "user", profileId: "u-review", linkUserId: "u-review", verificationType: "magiclink", charities: 0, donors: [], gifts: 0, fail: null, audits: [], wrongCounted: 0, ipCounted: 0, links: [], noKeys: false });
 });
 
 describe("the reviewer's settings", () => {
@@ -145,6 +146,12 @@ describe("the reviewer's sign-in", () => {
     state.fail = "limits";
     expect((await ask({ email: EMAIL, code: CODE })).status).toBe(401);
     expect(state.links).toEqual([]);
+  });
+  it("refuses, not open, when no limit key can be made at all (no server key on the live site) (review 23/11/2026)", async () => {
+    state.noKeys = true;
+    expect((await ask({ email: EMAIL, code: CODE })).status).toBe(401);
+    expect(state.links).toEqual([]);
+    expect(state.ipCounted).toBe(0);
   });
   it("counts every try per address and answers any email the same way, so the reviewer's email can't be found (23/11/2026)", async () => {
     // Every try from an address counts, whichever email it names.

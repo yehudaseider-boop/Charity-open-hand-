@@ -31,6 +31,8 @@ export async function agreeToPolicy(formData: FormData) {
   if (readError) throw readError;
   if (already) redirect(next);
   const { error } = await db.from("consents").insert({ kind: "account", policy_version: legalConfig.policyVersion, user_id: user.id });
+  // A second press at the same moment hits the once-per-version index (23505): already recorded, carry on.
+  if (error && error.code === "23505") redirect(next);
   if (error) throw error;
   await logAudit({ actorUserId: user.id, action: "consent.account", entityType: "user", entityId: user.id, details: { version: legalConfig.policyVersion } });
   redirect(next);

@@ -10,6 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const validKey = (k: unknown): k is string => typeof k === "string" && k.length > 0 && k.length <= 120;
 const done = () => revalidatePath("/admin/charity-requests");
+/** Nothing matched: another admin closed or moved these requests first (review 23/11/2026). */
+const ALREADY_CLOSED = "Someone else already closed these requests. Nothing was changed.";
 
 /** We've asked the charity to join (or "Mark as new" again: the undo). Open requests only. */
 export async function setInvited(nameKey: string, invited: boolean): Promise<FormState> {
@@ -22,6 +24,10 @@ export async function setInvited(nameKey: string, invited: boolean): Promise<For
     .eq("status", invited ? "new" : "invited")
     .select("id");
   if (error) return { ok: false, message: "We couldn't save that. Nothing was changed. Please try again." };
+  if (!data?.length) {
+    done();
+    return { ok: false, message: ALREADY_CLOSED };
+  }
   await logAudit({ actorUserId: admin.userId, action: invited ? "charity_request.invited" : "charity_request.reopened", entityType: "charity_request", entityId: null, details: { name_key: nameKey, count: data?.length ?? 0 } });
   done();
   return { ok: true, message: invited ? "Marked as invited." : "Marked as new again." };
@@ -46,6 +52,10 @@ export async function markJoined(nameKey: string, _prev: FormState, formData: Fo
     .in("status", ["new", "invited"])
     .select("id");
   if (error) return { ok: false, message: "We couldn't save that. Nothing was changed or sent. Please try again." };
+  if (!data?.length) {
+    done();
+    return { ok: false, message: ALREADY_CLOSED };
+  }
   const sent = await notifyJoined(charityId).catch((e) => {
     console.error("[charity-request] could not send the joined emails", e);
     return null;
@@ -81,6 +91,10 @@ export async function decline(nameKey: string): Promise<FormState> {
     .in("status", ["new", "invited"])
     .select("id");
   if (error) return { ok: false, message: "We couldn't save that. Nothing was changed. Please try again." };
+  if (!data?.length) {
+    done();
+    return { ok: false, message: ALREADY_CLOSED };
+  }
   await logAudit({ actorUserId: admin.userId, action: "charity_request.declined", entityType: "charity_request", entityId: null, details: { name_key: nameKey, count: data?.length ?? 0 } });
   done();
   return { ok: true, message: "Closed. Any email addresses on these requests were deleted." };

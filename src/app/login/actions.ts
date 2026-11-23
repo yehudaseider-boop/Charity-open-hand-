@@ -7,7 +7,7 @@ import { clientIp } from "@/lib/client-ip";
 import { forgetAttempts, hitRateLimit, takeAttempt } from "@/lib/rate-limit";
 import { siteOrigin } from "@/lib/request-origin";
 import { safeNextPath } from "@/lib/safe-path";
-import { looksLikeEmail, sentPageUrl, signInKeys } from "@/lib/sign-in";
+import { looksLikeEmail, sentPageUrl, signInKeys, signInLimitsWork } from "@/lib/sign-in";
 import { SIGN_IN_CODE } from "@/lib/sign-in-code";
 import { createClient } from "@/lib/supabase/server";
 import { linkDonorsToUser } from "@/lib/donors/link";
@@ -52,6 +52,8 @@ export async function sendLoginLink(formData: FormData) {
   // Counted per email on this connection, so a stranger asking for links to someone's email cannot stop that person
   // asking from their own phone; each email and each address also has a ceiling of its own (platformConfig.signInGuard).
   // If the check itself fails (a database hiccup), send them back with what they typed, not to an error page.
+  // No limit key can be made (no server key on the live or test site): refuse, never send unlimited emails.
+  if (!signInLimitsWork()) redirect(back("unavailable"));
   const keys = signInKeys(email, ip);
   let limited: boolean;
   try {
@@ -90,8 +92,10 @@ export async function verifyLoginCode(formData: FormData) {
   const next = safeNext(formData.get("next"));
   // Back to the code box: the address stays only with the proof the page already had (never a new one from here).
   const proof = String(formData.get("s") ?? "");
-  const back = (error: "code" | "tries") => sentPageUrl(email, next, { error }, proof);
+  const back = (error: "code" | "tries" | "unavailable") => sentPageUrl(email, next, { error }, proof);
   if (email.length > 254 || !looksLikeEmail(email) || !SIGN_IN_CODE.test(code)) redirect(back("code"));
+  // No limit key can be made: wrong codes couldn't be counted, so no code is checked.
+  if (!signInLimitsWork()) redirect(back("unavailable"));
   const keys = signInKeys(email, clientIp(await headers()));
   // Counted before the code is checked, so parallel guesses can't all slip under the limit; a right code takes its
   // count back below, so only wrong codes use up the allowance (review 12/11/2026).
