@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
+import { DonorJourneyTabs } from "@/components/donor-journey-tabs";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { ActionLink, blueAction, EmptyState, MiniStat, PageHeader, secondaryAction, Tabs } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import {
@@ -72,8 +72,8 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
 
   return (
     <div className="space-y-5">
+      <DonorJourneyTabs id={id} current="/keeping" />
       <PageHeader
-        back={<BackLink href={`${base}/donors`}>← Donors</BackLink>}
         title="Keeping donors"
         intro={
           <>

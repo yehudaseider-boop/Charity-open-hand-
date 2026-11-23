@@ -130,6 +130,11 @@ export const PAGE_PERMISSION: Record<string, Permission> = {
   "/activity": "view",
 };
 
+/** The menu's pages this role can't use (none for someone with no role yet: the server refuses them anyway). */
+export function hiddenPages(role: Role | null | undefined): string[] {
+  return Object.entries(PAGE_PERMISSION).filter(([, p]) => !can(role, p)).map(([href]) => href);
+}
+
 /**
  * What taking a dashboard action back needs: the same as doing it. Unknown kinds need the owner, the safe default.
  * (Kinds are the dashboard's ActionKind, src/lib/charity/done.ts.)

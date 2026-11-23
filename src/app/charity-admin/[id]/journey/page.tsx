@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DonorJourneyTabs } from "@/components/donor-journey-tabs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Notice } from "@/components/card";
@@ -90,6 +91,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="space-y-5">
+      <DonorJourneyTabs id={id} current="/journey" />
       <PageHeader
         title="Donor journeys"
         intro={

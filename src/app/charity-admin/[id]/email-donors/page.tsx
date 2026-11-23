@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DonorJourneyTabs } from "@/components/donor-journey-tabs";
 import { videoFrom } from "@/lib/charity/video";
 import { Card, Notice } from "@/components/card";
 import { DonePanel } from "@/components/done-panel";
@@ -74,6 +75,7 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
 
   return (
     <div className="space-y-5">
+      <DonorJourneyTabs id={id} current="/email-donors" />
       <PageHeader
         title="Email donors"
         intro={

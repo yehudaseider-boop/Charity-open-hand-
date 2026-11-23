@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DonorJourneyTabsView } from "@/components/donor-journey-tabs";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { assistantDemoOn } from "@/config/assistant";
 import { OverviewView } from "@/app/charity-admin/[id]/overview-view";
@@ -13,6 +14,16 @@ import { DemoReset } from "../reset";
  * the emails new donors get, who on the team did what), so made-up figures would show nothing true about them.
  */
 const DEMO_HIDDEN_TABS = ["/keeping", "/journey", "/activity"];
+
+/** The "Donor journeys" tab row above the demo's thank and email pages (the demo leaves out journeys and keeping). */
+function DemoDonorJourneys({ current, children }: { current: "/thank-donors" | "/email-donors"; children: React.ReactNode }) {
+  return (
+    <div className="space-y-5">
+      <DonorJourneyTabsView base={DEMO_BASE} current={current} hidden={DEMO_HIDDEN_TABS} />
+      {children}
+    </div>
+  );
+}
 
 export const metadata: Metadata = { title: "Charity dashboard demo", robots: { index: false, follow: false } };
 
@@ -38,8 +49,8 @@ export default async function DemoDashboard({ params, searchParams }: PageProps<
   else if (first === "campaigns") body = <DemoCampaigns data={data} />;
   else if (first === "receipts") body = <DemoReceipts data={data} />;
   else if (first === "report") body = <DemoReport data={data} sp={sp} />;
-  else if (first === "thank-donors" && !second) body = <DemoThankDonorsPage data={data} />;
-  else if (first === "email-donors" && !second) body = <DemoEmailDonorsPage data={data} />;
+  else if (first === "thank-donors" && !second) body = <DemoDonorJourneys current="/thank-donors"><DemoThankDonorsPage data={data} /></DemoDonorJourneys>;
+  else if (first === "email-donors" && !second) body = <DemoDonorJourneys current="/email-donors"><DemoEmailDonorsPage data={data} /></DemoDonorJourneys>;
   else if (first === "team" && !second) body = <DemoTeam />;
   else if (first === "profile" && !second) body = <DemoProfile />;
   else if (first === "updates" && !second) body = <DemoUpdates />;

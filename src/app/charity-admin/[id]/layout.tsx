@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { assistantOn } from "@/config/assistant";
 import { getViewer, requireViewer } from "@/lib/auth";
-import { PAGE_PERMISSION, can } from "@/lib/charity/permissions";
+import { hiddenPages } from "@/lib/charity/permissions";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { viewerRole } from "@/lib/charity/team";
 
@@ -17,7 +17,7 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
   const viewer = await getViewer();
   const asGivezy = Boolean(viewer?.isPlatformAdmin && !viewer.managedCharityIds.includes(id));
   const role = await viewerRole(id);
-  const hiddenTabs = Object.entries(PAGE_PERMISSION).filter(([, p]) => !can(role, p)).map(([href]) => href);
+  const hiddenTabs = hiddenPages(role);
   return (
     <DashboardShell id={id} charity={charity} asGivezy={asGivezy} hiddenTabs={hiddenTabs} help={assistantOn() ? { who: viewer?.userId } : null}>
       {children}
