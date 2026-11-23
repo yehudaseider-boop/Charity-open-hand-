@@ -69,8 +69,11 @@ vi.mock("@/lib/charity/winback-lists", () => ({ winbackListDonors: async () => [
 let saved: JourneyStep[] = [];
 let active = 0;
 const written: unknown[] = [];
+/** Whether the database keeps pictures yet (migration 20261123000008). */
+let picturesReady = true;
 vi.mock("@/lib/charity/journey-write", () => ({
   journeysV2: async () => true,
+  journeyPicturesReady: async () => picturesReady,
   findJourney: async () => ({ id: "j1" }),
   readJourneyState: async () => ({ enabled: true, switched_on_at: null, steps: saved }),
   writeJourney: async (_c: string, _u: string, state: unknown) => void written.push(state),
@@ -99,6 +102,32 @@ beforeEach(() => {
   saved = [A, B, C];
   active = 2;
   written.length = 0;
+  picturesReady = true;
+});
+
+describe("a picture is saved only once the database keeps pictures (23/11/2026)", () => {
+  const CHARITY = "11111111-2222-4333-8444-555555555555";
+  const picture = `${CHARITY}/journey-aaaaaaaa-1111-4111-8111-111111111111.jpg`;
+  const withPicture = () => {
+    const f = form([A, B, C]);
+    f.set("image_path_1", picture);
+    f.set("image_alt_1", "Children at our club");
+    return f;
+  };
+  it("refuses a save with a picture before then, and saves nothing", async () => {
+    picturesReady = false;
+    expect(await saveJourney(CHARITY, "general", { ok: false }, withPicture())).toMatchObject({ ok: false, message: expect.stringMatching(/Pictures can't be saved/) });
+    expect(written).toEqual([]);
+  });
+  it("saves a journey without pictures as before", async () => {
+    picturesReady = false;
+    await expect(saveJourney(CHARITY, "general", { ok: false }, form([A, { ...B, body: "New words for the second email, thank you." }, C]))).rejects.toThrow(/redirect:/);
+    expect(written).toHaveLength(1);
+  });
+  it("keeps the picture with its email once the database is ready", async () => {
+    await expect(saveJourney(CHARITY, "general", { ok: false }, withPicture())).rejects.toThrow(/redirect:/);
+    expect((written[0] as { steps: JourneyStep[] }).steps[0]).toMatchObject({ imagePath: picture, imageAlt: "Children at our club" });
+  });
 });
 
 describe("saving a journey while donors are part way through it", () => {

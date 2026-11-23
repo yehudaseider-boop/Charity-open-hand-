@@ -29,9 +29,24 @@ export async function journeysV2(): Promise<boolean> {
   return v2Cache.v2;
 }
 
+let picturesCache: { at: number; ready: boolean } | null = null;
+
+/**
+ * Has migration 20261123000008 run (journey emails can keep a picture)? Until it has, the builder offers no picture
+ * and a save with one is refused, so nobody adds a picture that quietly isn't kept. Checked at most once a minute.
+ */
+export async function journeyPicturesReady(): Promise<boolean> {
+  if (picturesCache && (picturesCache.ready || Date.now() - picturesCache.at < 60_000)) return picturesCache.ready;
+  const { error } = await db().from("charity_journey_steps").select("image_path, image_alt").limit(1);
+  if (error && !isMissingColumn(error)) throw error;
+  picturesCache = { at: Date.now(), ready: !error };
+  return picturesCache.ready;
+}
+
 /** For tests: forget what was found. */
 export function forgetJourneysV2(): void {
   v2Cache = null;
+  picturesCache = null;
 }
 
 /** A journey's row: its id (null before the migration, when the charity's journey is keyed by the charity) and switch. */

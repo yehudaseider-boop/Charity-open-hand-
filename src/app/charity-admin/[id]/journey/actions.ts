@@ -25,7 +25,7 @@ import {
   type JourneyRef,
 } from "@/lib/charity/journey";
 import { addExistingDonors, addWinbackDonors, enrolmentStates } from "@/lib/charity/journey-store";
-import { findJourney, journeysV2, readJourneyState, writeJourney } from "@/lib/charity/journey-write";
+import { findJourney, journeyPicturesReady, journeysV2, readJourneyState, writeJourney } from "@/lib/charity/journey-write";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { isOwner, refusal } from "@/lib/charity/team";
 import { formatDate } from "@/lib/dates";
@@ -94,6 +94,10 @@ export async function saveJourney(charityId: string, key: string, _prev: FormSta
       if (e.imageAlt) fieldErrors[`image_alt_${i + 1}`] = e.imageAlt;
     });
     return { ok: false, message: checked.message, fieldErrors };
+  }
+  // Pictures before the database can keep them: refused, never saved without the picture.
+  if (checked.steps.some((s) => s.imagePath) && !(await journeyPicturesReady())) {
+    return { ok: false, message: "Pictures can't be saved with journey emails yet. Remove the picture to save, or try again later. Nothing was saved." };
   }
   const before = await readJourneyState(charityId, which.ref);
   if (same(before.steps, checked.steps)) return { ok: true, message: "These are the emails already saved. Nothing changed." };
@@ -237,6 +241,7 @@ export async function uploadJourneyPicture(charityId: string, formData: FormData
   await loadCharityForManager(charityId);
   const notAllowed = await refusal(charityId, "message");
   if (notAllowed) return { ok: false, message: notAllowed };
+  if (!(await journeyPicturesReady())) return { ok: false, message: "Pictures can't be added to journey emails yet. Nothing was uploaded." };
   // A few a minute is plenty for a person; this stops a script filling the charity's folder.
   if (await hitRateLimit("journey-picture", [`user:${viewer.userId}`], 20, 10)) return { ok: false, message: "That's a lot of pictures at once. Please wait a few minutes and try again." };
   const file = formData.get("file");

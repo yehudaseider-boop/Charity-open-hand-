@@ -9,6 +9,7 @@ import { ActionForm } from "@/components/forms/action-form";
 import { requireViewer } from "@/lib/auth";
 import { enrolmentLabel, existingSkippedSentence, journeyCounts, journeyTitle, parseRefKey, journeyStartWords, campaignJourneyWords, partWay, refKey, sameRef, starterSteps, type JourneyRef } from "@/lib/charity/journey";
 import { enrolmentStates, journeyPeople, journeysV2, listJourneys, loadJourney, planExistingDonors } from "@/lib/charity/journey-store";
+import { journeyPicturesReady } from "@/lib/charity/journey-write";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
@@ -72,6 +73,8 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
   // A campaign's journey follows the campaign's dates (23/11/2026).
   const campaign = ref.kind === "campaign" ? campaigns.find((c) => c.id === ref.campaignId) ?? null : null;
   const datesWords = campaign ? campaignJourneyWords(campaign, new Date(), formatDate) : null;
+  // Pictures only once the database keeps them (migration 20261123000008).
+  const picturesReady = await journeyPicturesReady().catch(() => false);
 
   const journey = await loadJourney(id, ref);
   // A journey not made yet has nobody on it (before the migration, the charity's one journey is keyed by the charity).
@@ -198,7 +201,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
             siteUrl={process.env.SITE_URL}
             starter={starterSteps(ref.kind, campaignTitle)}
             start={journeyStartWords(ref.kind, campaignTitle)}
-            uploadPicture={uploadJourneyPicture.bind(null, id)}
+            uploadPicture={picturesReady ? uploadJourneyPicture.bind(null, id) : undefined}
             onIt={partWay(states)}
           />
         </div>
