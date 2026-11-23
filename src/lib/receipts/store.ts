@@ -240,10 +240,13 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       if (maybeSent?.length) return false;
       // The claim is a lock for the minutes a send takes. One older than that was cut off mid-send: take it over.
       const stale = new Date(Date.now() - EMAIL_CLAIM_MINUTES * 60_000).toISOString();
+      // Only an issued receipt: one withdrawn since it was listed (a refund, or Withdraw in Admin) is left alone, as
+      // guard_receipt_immutable refuses any change to a void row (review 23/11/2026). The same for the writes below.
       const { data, error } = await db
         .from("s18a_receipts")
         .update({ email_claimed_at: new Date().toISOString() })
         .eq("id", receipt.id)
+        .eq("status", "issued")
         .is("emailed_at", null)
         .or(`email_claimed_at.is.null,email_claimed_at.lt.${stale}`)
         .select("id");
@@ -252,12 +255,12 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
     },
 
     async markEmailed(receipt) {
-      const { error } = await db.from("s18a_receipts").update({ emailed_at: new Date().toISOString() }).eq("id", receipt.id);
+      const { error } = await db.from("s18a_receipts").update({ emailed_at: new Date().toISOString() }).eq("id", receipt.id).eq("status", "issued");
       if (error) throw new Error(error.message);
     },
 
     async releaseEmail(receipt) {
-      const { error } = await db.from("s18a_receipts").update({ email_claimed_at: null }).eq("id", receipt.id).is("emailed_at", null);
+      const { error } = await db.from("s18a_receipts").update({ email_claimed_at: null }).eq("id", receipt.id).eq("status", "issued").is("emailed_at", null);
       if (error) throw new Error(error.message);
     },
 
@@ -265,7 +268,7 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       const path = `${receipt.charityId}/${receipt.id}.pdf`;
       const up = await db.storage.from("receipts").upload(path, pdf, { contentType: "application/pdf", upsert: false });
       if (up.error && !/already exists|Duplicate/i.test(up.error.message)) throw new Error(`Upload failed: ${up.error.message}`);
-      const { error } = await db.from("s18a_receipts").update({ pdf_path: path }).eq("id", receipt.id).is("pdf_path", null);
+      const { error } = await db.from("s18a_receipts").update({ pdf_path: path }).eq("id", receipt.id).eq("status", "issued").is("pdf_path", null);
       if (error) throw new Error(error.message);
     },
   };

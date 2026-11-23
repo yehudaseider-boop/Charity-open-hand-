@@ -455,13 +455,28 @@ export async function signOffRun(args: { runId: string; userId: string; now?: Da
       return { ok: false, why: "changed" };
     }
     // The job stopped before or between receipts. Receipts it issued stay issued (they are safe to
-    // finish), so the run is marked done with the error, and "Finish" makes the rest.
-    summary = { taxYear: run.tax_year, mode: "issue", planned: run.receipts_planned, issued: 0, pdfsMade: 0, emailed: 0, emailFailed: 0, skippedByReason: {}, needsAttention: [], checkIdentities: [], failed: [{ what: "the run", message: e instanceof Error ? e.message : String(e) }] };
+    // finish), so the run is marked done with the error, and "Finish" makes the rest. What it issued and made is
+    // counted from the receipts themselves, as markRunStopped does, never written as none (review 23/11/2026).
+    const made = await issuedSince(run.charity_id, run.tax_year, now.toISOString()).catch((countError: unknown) => {
+      console.error("[receipts] could not count what the stopped run issued", run.id, countError instanceof Error ? countError.message : countError);
+      return { issued: 0, pdfsMade: 0 };
+    });
+    summary = { taxYear: run.tax_year, mode: "issue", planned: run.receipts_planned, ...made, emailed: 0, emailFailed: 0, skippedByReason: {}, needsAttention: [], checkIdentities: [], failed: [{ what: "the run", message: e instanceof Error ? e.message : String(e) }] };
   }
   const { error: doneError } = await db.from("receipt_runs").update({ status: "done", finished_at: new Date().toISOString(), summary }).eq("id", run.id);
   // Left as "issuing", the run shows as stuck on the admin page, where it can be marked stopped (see below).
   if (doneError) console.error("[receipts] could not mark the run done", run.id, doneError.message);
   return { ok: true, summary, emailed: Boolean(j.mailer) };
+}
+
+/** Receipts a run issued (still issued, from its sign-off on), and how many of them have their PDF. */
+async function issuedSince(charityId: string, taxYear: number, signedOffAt: string): Promise<{ issued: number; pdfsMade: number }> {
+  const db = createAdminClient();
+  const base = () => db.from("s18a_receipts").select("id", { count: "exact", head: true }).eq("charity_id", charityId).eq("tax_year", taxYear).eq("status", "issued").gte("issued_at", signedOffAt);
+  const [all, withPdf] = await Promise.all([base(), base().not("pdf_path", "is", null)]);
+  if (all.error) throw all.error;
+  if (withPdf.error) throw withPdf.error;
+  return { issued: all.count ?? 0, pdfsMade: withPdf.count ?? 0 };
 }
 
 class PlanChanged extends Error {}
