@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { platformConfig } from "@/config/platform";
-import { buttonTextFit, footerAmountLine, giftAmountError, givableTotal, loadingLine, STILL_CONNECTING, waitingGiftLine } from "../apps/mobile/src/lib/give-checks";
+import { buttonTextFit, footerAmountLine, giftAmountError, giftTotalWords, givableTotal, loadingLine, STILL_CONNECTING, waitingGiftLine } from "../apps/mobile/src/lib/give-checks";
+import { afterPaymentMade, leavePrompt, type LeaveState } from "../apps/mobile/src/lib/give-leave";
 import { nextFirstOfMonth, recurring, sampleContributionMaxCents } from "../apps/mobile/src/data/giving";
 import { nextChargeText } from "../apps/mobile/src/lib/live-giving";
 import { fieldErrorsForTheSwitch, forTheSwitch } from "../apps/mobile/src/lib/charity-request";
@@ -47,6 +48,15 @@ describe("a waiting gift, named", () => {
   it("says the amount with the contribution, the charity, and when it started, in Johannesburg time", () => {
     const g = { charityName: "Demo Charity", sentAt: "2026-11-22T14:39:00Z", summary: { cents: 3_000, contributionCents: 100 } };
     expect(waitingGiftLine(g)).toBe("R31 to Demo Charity, started at 16:39 on 22/11/2026.");
+  });
+  it("names the total the Give button charged, card charge included (23/11/2026)", () => {
+    const summary = { cents: 10_000, contributionCents: 1_000, cardChargeCents: 230 };
+    // The same total as the Give button for that gift.
+    expect(giftTotalWords(summary)).toBe(`R112.30, including the R2.30 card charge,`);
+    expect(givableTotal(10_000, null, 1_000, 230)).toBe(11_230);
+    expect(waitingGiftLine({ charityName: "Demo Charity", sentAt: "2026-11-22T14:39:00Z", summary })).toBe("R112.30, including the R2.30 card charge, to Demo Charity, started at 16:39 on 22/11/2026.");
+    // A gift saved before the card charge was kept reads as before.
+    expect(waitingGiftLine({ charityName: "Demo Charity", sentAt: "2026-11-22T14:39:00Z", summary: { cents: 10_000, contributionCents: 1_000 } })).toBe("R110 to Demo Charity, started at 16:39 on 22/11/2026.");
   });
   it("an unreadable time leaves the time out rather than showing nonsense", () => {
     expect(waitingGiftLine({ charityName: "Demo Charity", sentAt: "not a date", summary: { cents: 18_050, contributionCents: 0 } })).toBe("R180.50 to Demo Charity.");
@@ -110,5 +120,38 @@ describe("request a charity: the switch, not a box", () => {
       email: 'Enter your email address, or switch off "Email me when it joins".',
       name: "Enter the charity's name.",
     });
+  });
+});
+
+describe("leaving the give screen (23/11/2026)", () => {
+  const base: LeaveState = { done: false, typed: false, busy: false, held: false, waiting: false };
+
+  it("asks first while a payment is being started, before any other question", () => {
+    for (const busy of ["securing", "opening"] as const) {
+      expect(leavePrompt({ ...base, busy, typed: true })).toMatchObject({ title: "Your payment is being started", leave: "Leave", stay: "Stay" });
+      expect(leavePrompt({ ...base, busy, held: true })?.title).toBe("Your payment is being started");
+    }
+  });
+
+  it("keeps the other questions, and lets an untouched or finished screen close", () => {
+    expect(leavePrompt({ ...base, waiting: true })?.title).toBe("Your gift may still be going through");
+    expect(leavePrompt({ ...base, busy: "checking" })?.title).toBe("We're still checking your payment");
+    expect(leavePrompt({ ...base, typed: true })?.title).toBe("Leave and lose what you typed?");
+    expect(leavePrompt(base)).toBeNull();
+    expect(leavePrompt({ ...base, done: true, busy: "securing", typed: true })).toBeNull();
+  });
+
+  it("never opens the payment page, or follows up a charge, once the donor has left", () => {
+    expect(afterPaymentMade(true, false)).toBe("stop");
+    expect(afterPaymentMade(true, true)).toBe("stop");
+    expect(afterPaymentMade(false, false)).toBe("open-page");
+    expect(afterPaymentMade(false, true)).toBe("check");
+  });
+
+  it("uses no exclamation marks", () => {
+    for (const s of [{ ...base, busy: "securing" as const }, { ...base, waiting: true }, { ...base, busy: "checking" as const }, { ...base, typed: true }]) {
+      const p = leavePrompt(s)!;
+      expect(`${p.title} ${p.body} ${p.leave} ${p.stay}`).not.toContain("!");
+    }
   });
 });

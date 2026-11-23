@@ -10,7 +10,7 @@ vi.mock("../apps/mobile/src/lib/secure-storage", () => ({
     removeItem: async (k: string) => void store.delete(k),
   },
 }));
-const { cleanPendingGift, cleanPendingGifts, inHistory, settles, PENDING_KEEP_MS } = await import("../apps/mobile/src/lib/pending-gift");
+const { adoptSignedOut, cleanPendingGift, cleanPendingGifts, dropsRecord, inHistory, settles, snapshotTotal, PENDING_KEEP_MS } = await import("../apps/mobile/src/lib/pending-gift");
 const { clearDetailsLater, dropPendingGift, keepPendingGift, loadDetailsLater, loadPendingGift, loadPendingGifts, markDetailsLater, onPendingGiftsChange } = await import(
   "../apps/mobile/src/lib/pending-gift-store"
 );
@@ -57,6 +57,48 @@ describe("a gift waiting for its answer", () => {
   });
 });
 
+describe("forgetting the right gift", () => {
+  it("drops a record only for the payment that made it", () => {
+    expect(dropsRecord({ reference: "d1" }, "d1")).toBe(true);
+    expect(dropsRecord({ reference: "d2" }, "d1")).toBe(false);
+    expect(dropsRecord({ reference: null }, "d1")).toBe(false);
+    expect(dropsRecord(undefined, "d1")).toBe(false);
+  });
+});
+
+describe("a gift left waiting while signed out", () => {
+  const ann = cleanPendingGift(gift(), now)!;
+  const bens = cleanPendingGift(gift({ slug: "hall", reference: "d2", summary: { cents: 5_000, contributionCents: 0, email: "ben@example.co.za", monthly: false, label: null } }), now)!;
+
+  it("moves to the signed-in person only when it was given with their account's email", () => {
+    const r = adoptSignedOut({ meals: ann, hall: bens }, {}, "ANN@example.co.za");
+    expect(r.moved).toBe(1);
+    expect(Object.keys(r.own)).toEqual(["meals"]);
+    expect(Object.keys(r.shared)).toEqual(["hall"]);
+  });
+
+  it("stays where it is with no email, someone else's email, or a gift already theirs for that charity", () => {
+    expect(adoptSignedOut({ meals: ann }, {}, null).moved).toBe(0);
+    expect(adoptSignedOut({ meals: ann }, {}, "ben@example.co.za").moved).toBe(0);
+    const mine = cleanPendingGift(gift({ reference: "d9" }), now)!;
+    const r = adoptSignedOut({ meals: ann }, { meals: mine }, "ann@example.co.za");
+    expect(r.moved).toBe(0);
+    expect(r.own.meals.reference).toBe("d9");
+    expect(r.shared.meals.reference).toBe("d1");
+  });
+});
+
+describe("what a waiting gift charged", () => {
+  it("keeps the card charge, and reads an older gift without one as none", () => {
+    const withCharge = cleanPendingGift(gift({ summary: { cents: 10_000, contributionCents: 1_000, cardChargeCents: 230, email: "a@b.co", monthly: false, label: null } }), now)!;
+    expect(withCharge.summary.cardChargeCents).toBe(230);
+    expect(snapshotTotal(withCharge.summary)).toBe(11_230);
+    const older = cleanPendingGift(gift({ summary: { cents: 10_000, contributionCents: 1_000, email: "a@b.co", monthly: false, label: null } }), now)!;
+    expect(older.summary.cardChargeCents).toBeUndefined();
+    expect(snapshotTotal(older.summary)).toBe(11_000);
+  });
+});
+
 describe("counting a gift once", () => {
   it("knows when the refreshed history already has the gift, and when it is the only one", () => {
     expect(inHistory([], "d1")).toEqual({ counted: false, firstOnly: false });
@@ -92,10 +134,30 @@ describe("kept on the phone, per person", () => {
     await keepPendingGift("ann", gift() as never);
     await keepPendingGift("ann", gift({ slug: "hall", reference: "d2", sentAt: "2026-11-12T09:59:00Z" }) as never);
     expect((await loadPendingGifts("ann")).map((g) => g.slug)).toEqual(["hall", "meals"]);
-    await dropPendingGift("ann", "meals");
+    await dropPendingGift("ann", "meals", "d1");
     expect((await loadPendingGifts("ann")).map((g) => g.slug)).toEqual(["hall"]);
     expect(changed).toHaveBeenCalledTimes(3);
     off();
+  });
+
+  it("forgets only the payment it was asked to: another attempt's record for the charity stays (23/11/2026)", async () => {
+    await keepPendingGift("ann", gift({ reference: "d2" }) as never);
+    // The first attempt's page failed to open after the second had replaced its record: the second's is kept.
+    await dropPendingGift("ann", "meals", "d1");
+    expect(await loadPendingGift("ann", "meals")).toMatchObject({ reference: "d2" });
+    await dropPendingGift("ann", "meals", "d2");
+    expect(await loadPendingGift("ann", "meals")).toBeNull();
+  });
+
+  it("moves a gift left waiting while signed out to the person who gave it, on sign-in (23/11/2026)", async () => {
+    await keepPendingGift(null, gift() as never);
+    await keepPendingGift(null, gift({ slug: "hall", reference: "d2", summary: { cents: 5_000, contributionCents: 0, email: "ben@example.co.za", monthly: false, label: null } }) as never);
+    // Without the account's email nothing moves (as before).
+    expect(await loadPendingGift("ann", "meals")).toBeNull();
+    expect(await loadPendingGift("ann", "meals", " Ann@Example.co.za ")).toMatchObject({ reference: "d1" });
+    // Gone from the signed-out record; someone else's gift stays there, never handed over.
+    expect((await loadPendingGifts(null)).map((g) => g.slug)).toEqual(["hall"]);
+    expect(await loadPendingGifts("ann", "ann@example.co.za")).toHaveLength(1);
   });
 
   it("reads a damaged record as nothing waiting, never a crash", async () => {

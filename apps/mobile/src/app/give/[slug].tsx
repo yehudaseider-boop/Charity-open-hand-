@@ -54,7 +54,8 @@ import { celebrates, stageLabel, TICK_MS, type GiveStage } from "@/lib/give-stag
 import { confirmThen, openSite, openUrl } from "@/lib/open-site";
 import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
-import { inHistory, settles, type GiftSnapshot, type PendingGift } from "@/lib/pending-gift";
+import { inHistory, settles, snapshotTotal, type GiftSnapshot, type PendingGift } from "@/lib/pending-gift";
+import { afterPaymentMade, leavePrompt } from "@/lib/give-leave";
 import { dropPendingAttempt, dropPendingGift, keepPendingGift, loadPendingGift, markDetailsLater } from "@/lib/pending-gift-store";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { colors, fonts, radius, space } from "@/theme/tokens";
@@ -274,17 +275,25 @@ export default function Give() {
   const heldOne = heldAttempt !== null;
   const waitingOne = unsettled !== null;
   const isDone = done !== null;
-  // Leaving by the back gesture or the hardware button: ask first when something typed would be lost,
-  // when we are still checking a payment, or when a gift is waiting for its answer. A waiting gift is kept on
-  // the phone (pending-gift-store), so leaving loses nothing: Progress and this screen go on asking.
-  usePreventRemove(!isDone && (typedSomething || busy !== false || heldOne || waitingOne), ({ repeat }) => {
-    if (heldOne || waitingOne) {
-      confirmThen("Your gift may still be going through", "If you leave, we'll keep checking.", "Leave", repeat, "Stay");
-    } else if (busy === "checking") {
-      confirmThen("We're still checking your payment", "Leaving now may lose the result. It takes a few seconds.", "Leave anyway", repeat, "Wait");
-    } else {
-      confirmThen("Leave and lose what you typed?", "", "Leave", repeat, "Keep editing");
-    }
+  // Leaving by the back gesture or the hardware button: ask first when something typed would be lost, while a
+  // payment is being started or checked, or when a gift is waiting for its answer (lib/give-leave). A waiting gift is
+  // kept on the phone (pending-gift-store), so leaving loses nothing: Progress and this screen go on asking.
+  // `leftRef`: the donor has left (or this screen has closed), so a payment being started never opens its page over
+  // another screen (review 23/11/2026).
+  const leftRef = useRef(false);
+  useEffect(() => {
+    leftRef.current = false;
+    return () => {
+      leftRef.current = true;
+    };
+  }, []);
+  const leaveAsk = leavePrompt({ done: isDone, typed: typedSomething, busy, held: heldOne, waiting: waitingOne });
+  usePreventRemove(leaveAsk !== null, ({ repeat }) => {
+    if (!leaveAsk) return repeat();
+    confirmThen(leaveAsk.title, leaveAsk.body, leaveAsk.leave, () => {
+      leftRef.current = true;
+      repeat();
+    }, leaveAsk.stay);
   });
   // Preview of the after-gift screen for design review: ?demo=sent.
   const [demoShown, setDemoShown] = useState(false);
@@ -295,12 +304,14 @@ export default function Give() {
   const [resumed, setResumed] = useState<{ outcome: string; gift: PendingGift; at: Date } | null>(null);
   const restoredFor = useRef<string | null>(null);
   const { refresh: refreshGiving } = account;
+  // A gift left waiting before signing in, given with this account's email, is this person's too (pending-gift-store).
+  const accountEmail = account.status === "signed-in" ? account.email : null;
   useEffect(() => {
     if (preview || !ownerKnown || !slug || !site) return;
     const who = `${owner ?? "-"}:${slug}`;
     if (restoredFor.current === who) return;
     let live = true;
-    loadPendingGift(owner, slug).then(async (p) => {
+    loadPendingGift(owner, slug, accountEmail).then(async (p) => {
       if (!live || restoredFor.current === who) return;
       restoredFor.current = who;
       // A gift started on this screen in the meantime is the one that counts.
@@ -328,12 +339,14 @@ export default function Give() {
       setBusy("checking");
       const outcome = await paymentStatus(site, p.reference, p.token);
       busyRef.current = false;
-      if (!live) return;
+      // Cleared even when this effect has run again meanwhile (the person or the site changed): the new run returns
+      // early, so otherwise the button would stay on "Checking your payment…" for good (review 23/11/2026).
       setBusy(false);
+      if (!live) return;
       if (settles(outcome)) {
         attemptRef.current = null;
         setHeldAttempt(null);
-        void dropPendingGift(owner, slug);
+        void dropPendingGift(owner, slug, p.reference);
       }
       if (outcome === "paid") {
         haptic.success();
@@ -344,7 +357,7 @@ export default function Give() {
     return () => {
       live = false;
     };
-  }, [preview, ownerKnown, owner, slug, site, refreshGiving]);
+  }, [preview, ownerKnown, owner, slug, site, refreshGiving, accountEmail]);
 
   // The proud screen says thank you here, so the tabs' "a donation arrived" thank-you doesn't pop up again over it.
   const { arrived, dismissArrived } = account;
@@ -743,7 +756,7 @@ export default function Give() {
       age_confirmed: agreed,
       popia_consent: agreed,
     };
-    const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extraChoice === "other" ? extraAmount : "", extraChoice };
+    const sent: Snapshot = { cents: gift!, contributionCents: contribution ?? 0, ...(cardCharge > 0 ? { cardChargeCents: cardCharge } : {}), email: details.email, monthly: isMonthly, label, amountText: amount, extraText: extraChoice === "other" ? extraAmount : "", extraChoice };
     // A saved-card charge is kept on the phone under its attempt id *before* it is sent (review 16/11/2026): if the app
     // is closed or the phone dies while the charge is on its way, the next visit asks about that same attempt instead of
     // starting a new one, so the card can never be charged twice. A storage failure doesn't stop the gift (as before).
@@ -847,7 +860,7 @@ export default function Give() {
         setEmail(held.email);
         setMonthly(false);
         setMessage(
-          `We're still checking your earlier gift of ${rand(held.cents + held.contributionCents)} from your saved card, so it has been put back as it was. Hold to give again: we check first, and never charge twice.`,
+          `We're still checking your earlier gift of ${rand(snapshotTotal(held))} from your saved card, so it has been put back as it was. Hold to give again: we check first, and never charge twice.`,
           "wait",
           true,
         );
@@ -897,14 +910,20 @@ export default function Give() {
     if (remember) await saveDetails(account.userId, mine);
     else if (remembered) await forgetDetails(account.userId);
 
+    // Left while it was being started: kept on the phone (above), so Progress asks about it, but nothing opens now.
+    const next = afterPaymentMade(leftRef.current, Boolean(r.charged));
+    if (next === "stop") {
+      setBusy(false);
+      return;
+    }
     let shown: "returned" | "closed" = "returned";
     // Paid with the saved card: there is no payment page, only the check below.
-    if (!r.charged) {
+    if (next === "open-page" && !r.charged) {
       try {
         shown = await openGivingPage(r.redirectUrl, (u, returnTo) => WebBrowser.openAuthSessionAsync(u, returnTo, { preferEphemeralSession: true }), paymentPageOrigins(site));
       } catch {
         setBusy(false);
-        void dropPendingGift(owner, charity!.slug);
+        void dropPendingGift(owner, charity!.slug, r.reference);
         setMessage("We couldn't open the payment page, so nothing was charged. Your details are still here. Hold to give when you're ready to try again.", "error", true);
         return;
       }
@@ -938,7 +957,7 @@ export default function Give() {
       const waiting = o === "pending" || o === "review";
       setUnsettled(waiting ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent, charityName: charity!.nameEn, sentAt: sentAtNow } : null);
       // Declined or not found: nothing to wait for. Still waiting: kept on the phone (above) until we hear.
-      if (!waiting) void dropPendingGift(owner, charity!.slug);
+      if (!waiting) void dropPendingGift(owner, charity!.slug, r.reference);
       setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date(), signedIn), afterPaymentTone(o), true, o === "expired" && !signedIn);
       return;
     }
@@ -949,7 +968,7 @@ export default function Give() {
     // Paid, or back from a finished payment page: the thank-you shows now and the history catches up. A gift the
     // server still calls pending stays kept on the phone, so Progress keeps checking it until it is paid, didn't go
     // through, or isn't found: a late decline is then still shown (review 12/11/2026).
-    if (outcome === "paid") void dropPendingGift(owner, charity!.slug);
+    if (outcome === "paid") void dropPendingGift(owner, charity!.slug, r.reference);
     void refreshAfterGiving(account.refresh);
     if (celebrates(outcome)) {
       setConfirmed(true);
@@ -969,7 +988,7 @@ export default function Give() {
       setBusy(false);
       if (settles(outcome)) {
         setUnsettled(null);
-        void dropPendingGift(owner, charity!.slug);
+        void dropPendingGift(owner, charity!.slug, unsettled.reference);
         if (unsettled.charged) {
           attemptRef.current = null;
           setHeldAttempt(null);
@@ -1486,7 +1505,7 @@ export default function Give() {
                     setAskingStartAgain(false);
                     setUnsettled(null);
                     setMessage(null);
-                    void dropPendingGift(owner, charity.slug);
+                    void dropPendingGift(owner, charity.slug, unsettled.reference);
                   }}
                 />
               </View>
