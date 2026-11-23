@@ -13,6 +13,8 @@
 export type GiftSnapshot = {
   cents: number;
   contributionCents: number;
+  /** The card charge the donor chose to cover (23/11/2026). Missing on gifts saved before then, which read as none. */
+  cardChargeCents?: number;
   email: string;
   monthly: boolean;
   label: string | null;
@@ -54,6 +56,7 @@ function cleanSnapshot(v: unknown): GiftSnapshot | null {
   return {
     cents: c,
     contributionCents: extra,
+    ...(cents(o.cardChargeCents) ? { cardChargeCents: cents(o.cardChargeCents)! } : {}),
     email: o.email.slice(0, 320),
     monthly: o.monthly === true,
     label: str(o.label, 80),
@@ -99,6 +102,44 @@ export function cleanPendingGifts(v: unknown, now = new Date()): Record<string, 
     if (p) out[p.slug] = p;
   }
   return out;
+}
+
+/** Everything the donor was charged for one gift: the gift, the contribution to Givezy and any card charge (the Give button's total). */
+export function snapshotTotal(s: { cents: number; contributionCents: number; cardChargeCents?: number }): number {
+  return s.cents + s.contributionCents + (s.cardChargeCents ?? 0);
+}
+
+/**
+ * Whether forgetting the waiting gift for a charity may remove the one stored: only when it is the payment this
+ * attempt made (same reference). A newer or older attempt's record, for the same charity, is never dropped by
+ * mistake (review 23/11/2026: a second give whose page failed to open dropped the first gift's record).
+ */
+export function dropsRecord(stored: { reference: string | null } | undefined, reference: string): boolean {
+  return stored !== undefined && stored.reference === reference;
+}
+
+/**
+ * On sign-in, the gifts waiting in the signed-out record that belong to this person move to their own record
+ * (review 23/11/2026: a gift left waiting while signed out vanished after signing in). Only a gift given with the
+ * account's own email moves; anyone else's stays where it was, so nothing of someone else's is handed over. A
+ * gift the person already has waiting for that charity is kept, not replaced.
+ */
+export function adoptSignedOut(
+  shared: Record<string, PendingGift>,
+  own: Record<string, PendingGift>,
+  accountEmail: string | null,
+): { own: Record<string, PendingGift>; shared: Record<string, PendingGift>; moved: number } {
+  const mail = accountEmail?.trim().toLowerCase();
+  const nextOwn = { ...own };
+  const nextShared: Record<string, PendingGift> = {};
+  let moved = 0;
+  for (const [slug, g] of Object.entries(shared)) {
+    if (mail && g.summary.email.trim().toLowerCase() === mail && !(slug in own)) {
+      nextOwn[slug] = g;
+      moved++;
+    } else nextShared[slug] = g;
+  }
+  return { own: nextOwn, shared: nextShared, moved };
 }
 
 /** What the server's answer does to a stored gift: settled (forget it) or still waiting (keep it). */

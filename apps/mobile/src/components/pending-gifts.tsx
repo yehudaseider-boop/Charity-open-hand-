@@ -4,7 +4,8 @@ import { StyleSheet, View } from "react-native";
 import { Button, TextLink } from "@/components/button";
 import { Text } from "@/components/text";
 import { useAccount } from "@/lib/account";
-import { ddmmyyyy, hhmm, jhbDay, rand } from "@/lib/format";
+import { ddmmyyyy, hhmm, jhbDay } from "@/lib/format";
+import { giftTotalWords } from "@/lib/give-checks";
 import { refreshAfterGiving } from "@/lib/give-flow";
 import { haptic } from "@/lib/haptics";
 import { helpLine } from "@/lib/help";
@@ -32,6 +33,8 @@ export function PendingGifts() {
   const preview = account.status === "preview";
   const known = !preview && account.status !== "loading" && account.status !== "agreeing";
   const owner = account.status === "signed-in" ? account.userId : null;
+  // A gift left waiting before signing in, given with this account's email, is shown here too (pending-gift-store).
+  const accountEmail = account.status === "signed-in" ? account.email : null;
   const [gifts, setGifts] = useState<PendingGift[]>([]);
   // What each gift shows, by charity. A settled one stays on screen (paid, didn't go through) until dismissed.
   const [shown, setShown] = useState<Record<string, Shown>>({});
@@ -41,11 +44,12 @@ export function PendingGifts() {
 
   const ask = useCallback(
     async (g: PendingGift) => {
-      if (!g.reference || !g.token || !SITE_URL) return;
+      const reference = g.reference;
+      if (!reference || !g.token || !SITE_URL) return;
       setShown((s) => ({ ...s, [g.slug]: { kind: "checking" } }));
-      const outcome = await paymentStatus(SITE_URL, g.reference, g.token);
+      const outcome = await paymentStatus(SITE_URL, reference, g.token);
       if (settles(outcome)) {
-        await dropPendingGift(owner, g.slug);
+        await dropPendingGift(owner, g.slug, reference);
         setSettled((list) => [...list.filter((x) => x.slug !== g.slug), g]);
         setShown((s) => ({ ...s, [g.slug]: { kind: "done", outcome: outcome as "paid" | "failed" | "not_found" | "reversed" | "expired" } }));
         if (outcome === "paid") {
@@ -64,7 +68,7 @@ export function PendingGifts() {
     if (!known) return;
     let live = true;
     const load = (askNow: boolean) =>
-      loadPendingGifts(owner).then((list) => {
+      loadPendingGifts(owner, accountEmail).then((list) => {
         if (!live) return;
         setGifts(list);
         if (!askNow) return;
@@ -81,7 +85,7 @@ export function PendingGifts() {
       live = false;
       off();
     };
-  }, [known, owner, ask]);
+  }, [known, owner, accountEmail, ask]);
 
   const open = (g: PendingGift) => router.push({ pathname: "/give/[slug]", params: { slug: g.slug } });
   const dismiss = (slug: string) => {
@@ -100,7 +104,8 @@ export function PendingGifts() {
     <View style={{ gap: 12 }}>
       {cards.map((g) => {
         const s: Shown = shown[g.slug] ?? { kind: "waiting", outcome: "pending" };
-        const total = rand(g.summary.cents + g.summary.contributionCents);
+        // What the Give button charged, with the card charge named when there was one (older saved gifts have none).
+        const total = giftTotalWords(g.summary);
         const sent = new Date(g.sentAt);
         const when = `${hhmm(sent)} on ${ddmmyyyy(jhbDay(sent))}`;
         if (s.kind === "done" && s.outcome === "expired") {
@@ -171,7 +176,7 @@ export function PendingGifts() {
                       "Remove this gift?",
                       "Only if you closed the payment page without paying. If you did pay, the gift still arrives and you'll get an email.",
                       "Remove",
-                      () => void dropPendingGift(owner, g.slug),
+                      () => void (g.reference ? dropPendingGift(owner, g.slug, g.reference) : undefined),
                       "Keep it",
                     )
                   }

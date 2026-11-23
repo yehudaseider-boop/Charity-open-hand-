@@ -1,9 +1,11 @@
 import { loadOwned, saveOwned } from "./owned-storage";
-import { cleanPendingGifts, type PendingGift } from "./pending-gift";
+import { adoptSignedOut, cleanPendingGifts, dropsRecord, type PendingGift } from "./pending-gift";
 
 /**
  * Gifts we haven't heard the end of (see pending-gift.ts), in the phone's secure storage, one record per person.
  * Never handed to whoever signs in next (`adoptShared: false`): the check token and the email are the giver's own.
+ * The one exception (23/11/2026): a gift waiting in the signed-out record that was given with the signed-in
+ * account's own email moves to that person's record when their gifts are read (see adoptSignedOut).
  * A read that fails reads as "nothing waiting": the server still records the gift, and its email still arrives.
  */
 const KEY = "nediv-lev.pending-gifts";
@@ -36,12 +38,31 @@ async function readAll(userId: string | null): Promise<Record<string, PendingGif
   }
 }
 
-export function loadPendingGifts(userId: string | null): Promise<PendingGift[]> {
-  return serial(async () => Object.values(await readAll(userId)).sort((a, b) => b.sentAt.localeCompare(a.sentAt)));
+/** The signed-in person's gifts, with any of theirs left waiting from before they signed in moved over first. */
+async function readMine(userId: string | null, accountEmail: string | null | undefined): Promise<Record<string, PendingGift>> {
+  const own = await readAll(userId);
+  if (!userId || !accountEmail) return own;
+  const shared = await readAll(null);
+  const next = adoptSignedOut(shared, own, accountEmail);
+  if (!next.moved) return own;
+  try {
+    // Theirs first, then off the shared record: a failure in between leaves it in both, never in neither.
+    await saveOwned(KEY, userId, JSON.stringify(next.own));
+    await saveOwned(KEY, null, JSON.stringify(next.shared));
+  } catch {
+    // Not moved this time: it is still in the signed-out record, and is tried again on the next read.
+    return own;
+  }
+  return next.own;
 }
 
-export async function loadPendingGift(userId: string | null, slug: string): Promise<PendingGift | null> {
-  return serial(async () => (await readAll(userId))[slug] ?? null);
+/** `accountEmail`: the signed-in account's email, so a gift they left waiting while signed out is theirs again. */
+export function loadPendingGifts(userId: string | null, accountEmail?: string | null): Promise<PendingGift[]> {
+  return serial(async () => Object.values(await readMine(userId, accountEmail)).sort((a, b) => b.sentAt.localeCompare(a.sentAt)));
+}
+
+export async function loadPendingGift(userId: string | null, slug: string, accountEmail?: string | null): Promise<PendingGift | null> {
+  return serial(async () => (await readMine(userId, accountEmail))[slug] ?? null);
 }
 
 /** Keep (or replace) the waiting gift for its charity. Resolves false if the phone couldn't save it. */
@@ -77,12 +98,15 @@ export function dropPendingAttempt(userId: string | null, slug: string, attemptI
   });
 }
 
-/** Forget the waiting gift for this charity: paid, declined, not found, or the donor started again. */
-export function dropPendingGift(userId: string | null, slug: string): Promise<void> {
+/**
+ * Forget the waiting gift for this charity (paid, declined, not found, or the donor said they didn't pay), but only
+ * if it is still the payment `reference` names: another attempt's record for the same charity is left alone.
+ */
+export function dropPendingGift(userId: string | null, slug: string, reference: string): Promise<void> {
   return serial(async () => {
     try {
       const all = await readAll(userId);
-      if (!(slug in all)) return;
+      if (!dropsRecord(all[slug], reference)) return;
       delete all[slug];
       await saveOwned(KEY, userId, JSON.stringify(all));
       listeners.forEach((l) => l());

@@ -30,11 +30,24 @@ export function givableTotal(giftCents: number | null, amountError: string | nul
   return giftCents + contributionCents + cardChargeCents;
 }
 
+type Charged = { cents: number; contributionCents: number; cardChargeCents?: number };
+
+/**
+ * What one gift charged, as the Give button names it (gift, contribution and card charge), with the card charge
+ * named the way the footer does: "R112.30, including the R2.30 card charge," (23/11/2026). A gift saved before
+ * the card charge was kept, or with none, reads as before: "R110".
+ */
+export function giftTotalWords(s: Charged): string {
+  const card = s.cardChargeCents ?? 0;
+  const total = rand(s.cents + s.contributionCents + card);
+  return card > 0 ? `${total}, including the ${rand(card)} card charge,` : total;
+}
+
 /** "R31 to Demo Charity, started at 16:39 on 22/11/2026": the same words as the Progress card for a waiting gift. */
-export function waitingGiftLine(g: { charityName: string; sentAt: string; summary: { cents: number; contributionCents: number } }): string {
+export function waitingGiftLine(g: { charityName: string; sentAt: string; summary: Charged }): string {
   const sent = new Date(g.sentAt);
   const when = Number.isNaN(sent.getTime()) ? "" : `, started at ${hhmm(sent)} on ${ddmmyyyy(jhbDay(sent))}`;
-  return `${rand(g.summary.cents + g.summary.contributionCents)} to ${g.charityName}${when}.`;
+  return `${giftTotalWords(g.summary)} to ${g.charityName}${when}.`;
 }
 
 /**
