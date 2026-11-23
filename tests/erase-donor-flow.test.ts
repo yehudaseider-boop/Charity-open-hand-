@@ -22,6 +22,12 @@ const audits: Record<string, unknown>[] = [];
 const updateFilters: string[] = [];
 const emails: { to: string; text: string }[] = [];
 let mailFails = false;
+/** Rows the receipt-check scan finds: the donor's gifts, their receipt decisions, and the charity's certificate actions. */
+let giftRows: Record<string, unknown>[];
+let decisionRows: Record<string, unknown>[];
+let certificateActionRows: Record<string, unknown>[];
+/** Tables a bulk delete by donor id ran on. */
+const deletedByDonor: string[] = [];
 
 vi.mock("@/lib/audit", () => ({ logAudit: async (e: Record<string, unknown>) => void (calls.push("audit"), audits.push(e)) }));
 vi.mock("@/lib/email", () => ({
@@ -44,11 +50,18 @@ vi.mock("@/lib/supabase/admin", () => ({
         ilike: (c: string, v: unknown) => ((f[c] = v), q),
         order: () => q,
         // Pages of the history scans: nothing on the page past the first.
-        range: async (from: number) => ({ data: from === 0 && table === "donors" ? (f.user_id ? donorsByUser : donorsByEmail).map((id) => ({ id })) : [], error: null }),
+        range: async (from: number) => {
+          if (from !== 0) return { data: [], error: null };
+          if (table === "donors") return { data: (f.user_id ? donorsByUser : donorsByEmail).map((id) => ({ id })), error: null };
+          if (table === "donations") return { data: giftRows, error: null };
+          if (table === "receipt_plan_decisions") return { data: decisionRows, error: null };
+          if (table === "charity_actions" && Array.isArray(f.kind) && (f.kind as string[]).includes("certificate_approved")) return { data: certificateActionRows, error: null };
+          return { data: [], error: null };
+        },
         maybeSingle: async () => ({ data: profile, error: null }),
         delete: () => ({
           // The charities' personal thank-yous to the erased donors: .in("donor_id", ids)
-          in: async () => ({ error: null }),
+          in: async (c: string) => (c === "donor_id" && deletedByDonor.push(table), { error: null }),
           // The rate limiter's rows for an email together with an internet address: .like("key", "<stand-in>|%")
           like: async (c: string, v: unknown) => (calls.push(`${table}:deleted:${c}~${v}`), { error: null }),
           eq: (c1: string, v1: unknown) => ({
@@ -62,6 +75,8 @@ vi.mock("@/lib/supabase/admin", () => ({
           }),
         }),
         update: (patch: Record<string, unknown>) => ({
+          // receipt_plan_decisions: the private note cleared for all their donor records
+          in: async (c: string, v: unknown) => (calls.push(`${table}:update:${JSON.stringify(patch)}`), updateFilters.push(`${table}:${c}=${JSON.stringify(v)}`), { error: null }),
           eq: async (c: string, v: unknown) => (calls.push(`${table}:update:${JSON.stringify(patch)}`), updateFilters.push(`${table}:${c}=${v}`), { error: null }),
         }),
         then: (resolve: (v: { data: unknown[]; error: null }) => void) => {
@@ -118,6 +133,10 @@ beforeEach(() => {
   deleteUserError = null;
   rpcIds = null;
   mailFails = false;
+  giftRows = [];
+  decisionRows = [];
+  certificateActionRows = [];
+  deletedByDonor.length = 0;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -126,6 +145,8 @@ describe("erasing a donor by their account", () => {
     const s = await eraseDonor({ userId: USER, actorUserId: "admin1" });
     expect(rpcIds?.sort()).toEqual(["d1", "d2"]);
     expect(calls).toEqual([
+      // What a charity wrote on a receipt decision about them: its private note is cleared (review 23/11/2026).
+      'receipt_plan_decisions:update:{"note":null}',
       // Their email on the landing page's launch list goes too (10/11/2026).
       "launch_list:deleted:email=erin@example.co.za",
       // Their "Request a charity" asks, by account and by the email left to hear back (15/11/2026).
@@ -299,5 +320,30 @@ describe("erasing a donor with no account", () => {
   it("ignores an id that is not a user id", async () => {
     await eraseDonor({ userId: "not-a-uuid", email: "guest@example.co.za", actorUserId: "admin1" });
     expect(calls).not.toContain("deleteUser");
+  });
+});
+
+describe("what charities kept about them (review 23/11/2026)", () => {
+  it("clears the private note on their receipt decisions and removes them from appeal send lists, before the database erasure", async () => {
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    expect(updateFilters).toContain('receipt_plan_decisions:donor_id=["d1","d2"]');
+    expect(deletedByDonor).toContain("charity_appeal_recipients");
+    expect(calls.indexOf('receipt_plan_decisions:update:{"note":null}')).toBeLessThan(calls.indexOf("rpc"));
+  });
+
+  it("removes their name from a receipt-check record by its certificate key, also when an earlier gift spelt the name differently", async () => {
+    const { certificateKey } = await import("@/lib/receipts/review");
+    const key = certificateKey("c1", 2026, "d1", "fp");
+    // The gifts now say "Erin Smith"; the record was made when the name was "Erin Smyth".
+    giftRows = [{ id: "g1", charity_id: "c1" }];
+    decisionRows = [{ id: "x1", charity_id: "c1", tax_year: 2026, donor_id: "d1", donor_identity: "fp" }];
+    certificateActionRows = [
+      { id: "a1", details: { key, name: "Erin Smyth", total: "R100" } },
+      { id: "a2", details: { key: "f".repeat(32), name: "Someone Else" } },
+    ];
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    expect(updateFilters).toContain("charity_actions:id=a1");
+    expect(updateFilters).not.toContain("charity_actions:id=a2");
+    expect(calls.some((c) => c.startsWith("charity_actions:update:") && c.includes('"name":"a donor"') && c.includes('"total":"R100"'))).toBe(true);
   });
 });

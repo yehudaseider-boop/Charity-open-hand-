@@ -83,6 +83,22 @@ describe("Appendix J, SA ID number (BRS p.266)", () => {
     expect(dateOfBirthFromSaId("2703015009080", today)).toBe("1927-03-01");
     expect(dateOfBirthFromSaId("8013015009087", today)).toBe(null);
   });
+  // Documents the rule as it stands (review 23/11/2026, left unchanged on purpose: docs/sars/it3d-decisions.md).
+  it("century rule, as it stands: a two-digit year equal to this year's is the 2000s, so someone born in 1926 reads as 2026 (the ID number holds no century)", () => {
+    const today = new Date("2026-11-03T10:00:00Z");
+    expect(dateOfBirthFromSaId("2603015009080", today)).toBe("2026-03-01");
+    // Not "1926-03-01": a person aged 100 or more can't be told apart from a baby born this year.
+    expect(dateOfBirthFromSaId("2603015009080", today)).not.toBe("1926-03-01");
+    // A person born later this year (a date still ahead) is read as the 2000s too; only a year after this one is the 1900s.
+    expect(dateOfBirthFromSaId("2612315009080", today)).toBe("2026-12-31");
+    expect(dateOfBirthFromSaId("2701015009080", today)).toBe("1927-01-01");
+  });
+  it("century rule, as it stands: the year is the caller's Johannesburg year when given, else the UTC year", () => {
+    // 00:30 on 1 January 2027 in Johannesburg is still 31 December 2026 in UTC.
+    const today = new Date("2026-12-31T22:30:00Z");
+    expect(dateOfBirthFromSaId("2701015009080", today)).toBe("1927-01-01");
+    expect(dateOfBirthFromSaId("2701015009080", today, 2027)).toBe("2027-01-01");
+  });
 });
 
 describe("Appendix K, company registration number (BRS p.267)", () => {

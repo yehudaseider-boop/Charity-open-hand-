@@ -8,6 +8,20 @@ import { signedInWithPassword } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+const FAILED = "We couldn't put your information together just now. Please try again in a few minutes.";
+
+/** Every row of a read, page by page: the database returns at most 1 000 rows at a time and a silent cut would look complete. */
+async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<{ data: T[]; error: { message: string } | null }> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await page(from, from + 999);
+    if (error) return { data: [], error };
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return { data: out, error: null };
+}
+
 /**
  * "Download my information" (POPIA section 23): everything we hold about the
  * signed-in person, read through row-level security so it can only ever be
@@ -25,10 +39,9 @@ export async function GET(request: Request) {
     return new NextResponse("Too many downloads. Please try again in an hour.", { status: 429 });
   }
 
-  const [profile, donors, kinds, consents, requests, favourites, givingTarget, income, external, notes] = await Promise.all([
+  const [profile, donors, consents, requests, favourites, givingTarget, income, external, notes] = await Promise.all([
     supabase.from("profiles").select("email, full_name, giver_type, created_at").eq("id", user.id).maybeSingle(),
     supabase.from("donors").select("id, email, donor_type, first_name, last_name, phone, organisation_name, registration_number, contact_person, id_number_last4, tax_reference_last4, address_line1, address_line2, suburb, city, postal_code, age_confirmed_18_at, popia_consent_at, created_at").eq("user_id", user.id),
-    supabase.from("donation_giving_kinds").select("donation_id, kind, label"),
     supabase.from("consents").select("kind, policy_version, accepted_at").eq("user_id", user.id).order("accepted_at"),
     supabase.from("data_requests").select("kind, details, status, response, created_at, closed_at").eq("user_id", user.id),
     supabase.from("favourites").select("created_at, charities(name_en)").eq("user_id", user.id),
@@ -39,7 +52,7 @@ export async function GET(request: Request) {
   ]);
 
   // A download with a missing part would look complete, so any read that fails stops it.
-  const failed = [profile, donors, kinds, consents, requests, favourites, givingTarget, income, external, notes].find((r) => r.error);
+  const failed = [profile, donors, consents, requests, favourites, givingTarget, income, external, notes].find((r) => r.error);
   if (failed) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
 
   // Filter by this person's own donor records: a platform admin's access to
@@ -60,7 +73,7 @@ export async function GET(request: Request) {
   }
   // Charities' personal thank-you notes and s18A details reminders to this person (a server-only table; `kind` says which).
   const thanks = donorIds.length
-    ? await createAdminClient().from("charity_donor_thanks").select("kind, body, sent_at, charities(name_en)").in("donor_id", donorIds).order("sent_at")
+    ? await readAll((from, to) => createAdminClient().from("charity_donor_thanks").select("kind, body, sent_at, charities(name_en)").in("donor_id", donorIds).order("sent_at").order("id").range(from, to))
     : { data: [], error: null };
   if (thanks.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   // Charities' donor journeys this person is on (a server-only table), with each email's step and dates: their own
@@ -80,11 +93,15 @@ export async function GET(request: Request) {
   if (journeys.error && !journeysMissing) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
   const [myReceipts, monthly] = donorIds.length
     ? await Promise.all([
-        supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, donor_as_printed:details->donor").in("donor_id", donorIds),
-        supabase
-          .from("recurring_donations")
-          .select("id, created_at, status, amount_cents, contribution_cents, charge_day, next_charge_at, card_brand, card_last4, card_exp, wants_18a, is_anonymous, message, dedication_kind, dedication_name, ended_reason, charities(name_en)")
-          .in("donor_id", donorIds),
+        readAll((from, to) => supabase.from("s18a_receipts").select("id, tax_year, amount_cents, issued_at, status, reference:details->>receipt_reference, donor_as_printed:details->donor").in("donor_id", donorIds).order("id").range(from, to)),
+        readAll((from, to) =>
+          supabase
+            .from("recurring_donations")
+            .select("id, created_at, status, amount_cents, contribution_cents, charge_day, next_charge_at, card_brand, card_last4, card_exp, wants_18a, is_anonymous, message, dedication_kind, dedication_name, ended_reason, charities(name_en)")
+            .in("donor_id", donorIds)
+            .order("id")
+            .range(from, to),
+        ),
       ])
     : [{ data: [], error: null }, { data: [], error: null }];
   if (myReceipts.error || monthly.error) return new NextResponse("We couldn't put your information together just now. Please try again in a few minutes.", { status: 503 });
@@ -109,6 +126,14 @@ export async function GET(request: Request) {
     checkoutDetails.push(...((details.data ?? []) as Record<string, unknown>[]));
     checkoutAgreements.push(...((agreements.data ?? []) as Record<string, unknown>[]));
   }
+  // Their private giving-kind choices, for their own donations, in pages of donation ids.
+  const kinds: Record<string, unknown>[] = [];
+  for (let i = 0; i < donationIds.length; i += 500) {
+    const ids = donationIds.slice(i, i + 500);
+    const r = await readAll((from, to) => supabase.from("donation_giving_kinds").select("donation_id, kind, label").in("donation_id", ids).order("donation_id").range(from, to));
+    if (r.error) return new NextResponse(FAILED, { status: 503 });
+    kinds.push(...(r.data as Record<string, unknown>[]));
+  }
   const open = (v: string | null) => {
     if (!v) return null;
     try {
@@ -123,10 +148,10 @@ export async function GET(request: Request) {
   // own list (found by the account's email). Server-only tables, read with the service role for this person only.
   const accountEmailForCharities = (profile.data?.email as string | undefined)?.toLowerCase() ?? user.email?.toLowerCase() ?? null;
   const fromCharities = await Promise.all([
-    donorIds.length ? admin.from("charity_donor_notes").select("body, created_at, edited_at, charities(name_en)").in("donor_id", donorIds).order("created_at") : { data: [], error: null },
-    donorIds.length ? admin.from("charity_donor_reminders").select("what, due_on, created_at, done_at, charities(name_en)").in("donor_id", donorIds).order("created_at") : { data: [], error: null },
-    donorIds.length ? admin.from("charity_donor_tags").select("created_at, tag:charity_tags(name), charities(name_en)").in("donor_id", donorIds) : { data: [], error: null },
-    donorIds.length ? admin.from("charity_appeal_recipients").select("status, sent_at, appeal:charity_appeals(subject, body, created_at), charities(name_en)").in("donor_id", donorIds) : { data: [], error: null },
+    donorIds.length ? readAll((from, to) => admin.from("charity_donor_notes").select("body, created_at, edited_at, charities(name_en)").in("donor_id", donorIds).order("created_at").order("id").range(from, to)) : { data: [], error: null },
+    donorIds.length ? readAll((from, to) => admin.from("charity_donor_reminders").select("what, due_on, created_at, done_at, charities(name_en)").in("donor_id", donorIds).order("created_at").order("id").range(from, to)) : { data: [], error: null },
+    donorIds.length ? readAll((from, to) => admin.from("charity_donor_tags").select("created_at, tag:charity_tags(name), charities(name_en)").in("donor_id", donorIds).order("tag_id").order("donor_id").range(from, to)) : { data: [], error: null },
+    donorIds.length ? readAll((from, to) => admin.from("charity_appeal_recipients").select("status, sent_at, appeal:charity_appeals(subject, body, created_at), charities(name_en)").in("donor_id", donorIds).order("appeal_id").order("donor_id").range(from, to)) : { data: [], error: null },
     accountEmailForCharities
       ? admin.from("charity_contacts").select("first_name, last_name, organisation_name, email, phone, address_line1, address_line2, suburb, city, postal_code, note, created_at, charities(name_en)").eq("email", accountEmailForCharities) // imports store addresses in lower case (contacts.ts); exact, so "_" or "%" in an address never matches anyone else
       : { data: [], error: null },
@@ -186,7 +211,7 @@ export async function GET(request: Request) {
     donation_details: checkoutDetails,
     monthly_donations: monthly.data ?? [],
     saved_card: savedCard,
-    giving_kinds: kinds.data ?? [],
+    giving_kinds: kinds,
     s18a_receipts: myReceipts.data ?? [],
     agreements: [...(consents.data ?? []), ...checkoutAgreements],
     thank_you_notes_from_charities: thanks.data ?? [],

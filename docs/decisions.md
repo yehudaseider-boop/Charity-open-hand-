@@ -2250,3 +2250,11 @@ A read-only security review found six things. All six are fixed in code; two nee
 - **People can be added to a charity's team only once it is approved** (website action and `addMember`), with the reason in plain words.
 - **Sign-in fails closed without a limit key.** With no `ENCRYPTION_KEY` on the live or test site, the sign-in email, the code check and the app reviewer's code refuse with a plain message instead of running unlimited.
 - **A browser can no longer record a policy agreement.** `agree_to_policy` is for the server only; account agreements are unique per person and version (duplicates removed first, earliest kept). The index covers `kind = 'account'` only: a charity's declarations legitimately repeat for one person (one per charity), so a unique index on every kind would refuse real rows. Migration `20261123000009_admin_apply_consent_guards.sql`.
+
+## 23/11/2026: erasure and data download (area D)
+
+- **Erasure locks the donor's gifts first** (migration `20261123000010_erasure_lock_and_notes.sql`): `erase_donor_data` now locks the donor's donations in id order, as `issue_s18a_receipt` does, so "is this gift on an issued s18A receipt?" cannot change between the two statements that use it.
+- **Erasure also clears** the private note on the donor's receipt decisions (`receipt_plan_decisions.note`; the decision stays) and removes them from charities' appeal send lists (`charity_appeal_recipients`; the appeal stays). Done in the function and in `eraseDonor` before it.
+- **Receipt-check records are found by certificate key** (`details.key`, worked out from each receipt decision) as well as by name, so a name spelt differently on an earlier gift is removed too.
+- **The data download pages every read** (giving choices, thank-you notes, s18A receipts, monthly donations, charities' notes, follow-ups, tags and appeal emails), like donations. Giving choices are now read for the person's own donations only.
+- **Date of birth from an ID number: rule unchanged** (a two-digit year equal to this year's is the 2000s, so someone aged 100 or more reads as a baby); a test now documents it. `emailHash` left as it is: it needs a decision.
