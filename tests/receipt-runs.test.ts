@@ -53,7 +53,7 @@ describe("a finished run that still has work", () => {
 
 describe("finishing never issues a receipt nobody approved", () => {
   const charity: PlanCharity & CharityRow = {
-    id: "c1", isS18a: true, mandateSignedAt: "2025-03-09T00:00:00+02:00", quickgive_code: "LTC",
+    id: "c1", isS18a: true, mandateSignedAt: "2025-03-09T00:00:00+02:00", s18aPeriods: [{ startedAt: "2025-03-09T00:00:00+02:00", endedAt: null }], quickgive_code: "LTC",
     legal_name_en: "Test Charity NPC", legal_name_he: null, npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "18A/1",
     address_line1: "1 Test Road", address_line2: null, suburb: null, city: "Johannesburg", postal_code: "2192",
   };
@@ -109,7 +109,7 @@ describe("the dashboard's words for an approval", () => {
 describe("a sign-off never issues more than was approved", () => {
   it("stops before writing anything when the list changed at the last moment", async () => {
     const issue = vi.fn();
-    const charity = { id: "c1", isS18a: true, mandateSignedAt: "2025-03-09T00:00:00+02:00", quickgive_code: "LTC", legal_name_en: "T NPC", legal_name_he: null, npo_number: "1", pbo_number: "1", s18a_reference: "1", address_line1: "1 Rd", address_line2: null, suburb: null, city: "Jhb", postal_code: "2000" };
+    const charity = { id: "c1", isS18a: true, mandateSignedAt: "2025-03-09T00:00:00+02:00", s18aPeriods: [{ startedAt: "2025-03-09T00:00:00+02:00", endedAt: null }], quickgive_code: "LTC", legal_name_en: "T NPC", legal_name_he: null, npo_number: "1", pbo_number: "1", s18a_reference: "1", address_line1: "1 Rd", address_line2: null, suburb: null, city: "Jhb", postal_code: "2000" };
     const gift = { id: "d1", charityId: "c1", donorId: "u1", donorIdentity: "", taxYear: 2026, amountCents: 50_000, status: "paid", wants18a: true, paidAt: "2025-10-01T10:00:00Z" };
     const store = {
       listDonations: async () => [gift], listCharities: async () => [charity], receiptedDonationIds: async () => new Set<string>(), listDecisions: async () => [],

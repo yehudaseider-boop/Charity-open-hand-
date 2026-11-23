@@ -32,6 +32,7 @@ vi.mock("@/lib/app-auth", () => ({ appAccount: async () => null }));
 vi.mock("@/lib/donations/saved-id", () => ({ savedIdLast4: async () => "9087" }));
 
 const ready = (await import("@/app/api/app/ready/route")).POST;
+const { lateDetailsDeadlineForGiftOn } = await import("@/lib/donations/s18a-details");
 const status = (await import("@/app/api/app/status/route")).POST;
 const req = (body: unknown) => new Request("https://site.test/x", { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } }) as never;
 const REF = "6f1c2a52-3b7e-4d0a-9c41-2f6e8d5b7a10";
@@ -53,7 +54,10 @@ describe("app ready check", () => {
   it("says whether the charity can take a payment, the campaign is open, and the minimums", async () => {
     campaignOpen = true;
     const r = await (await ready(req({ slug: "a", campaignId: REF }))).json();
-    expect(r).toEqual({ ok: true, accepting: true, paused: false, receiptsAvailable: true, campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxContributionCents: 500_000, contributionPresetsCents: [1_000, 1_500, 2_000], contributionDefaultCents: 1_000, maxGiftCents: 100_000_000, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: { percentPpm: 29_000, fixedCents: 100, vatOnTopPpm: 150_000, coverGiftOnly: true } });
+    // The last day to add s18A details after paying, from the same setting as the confirmation email.
+    expect(r.s18aDetailsBy).toBe(lateDetailsDeadlineForGiftOn());
+    expect(r.s18aDetailsBy).toMatch(/^31\/05\/\d{4}$/);
+    expect(r).toEqual({ ok: true, accepting: true, paused: false, receiptsAvailable: true, s18aDetailsBy: lateDetailsDeadlineForGiftOn(), campaignOpen: true, minGiftCents: 3_000, minContributionCents: 1_000, maxContributionCents: 500_000, contributionPresetsCents: [1_000, 1_500, 2_000], contributionDefaultCents: 1_000, maxGiftCents: 100_000_000, savedIdLast4: null, suggestedCents: [], savedCardsOpen: false, savedCard: null, cardChargeRates: { percentPpm: 29_000, fixedCents: 100, vatOnTopPpm: 150_000, coverGiftOnly: true } });
   });
   it("a charity not connected for payments is not accepting", async () => {
     charity = { id: "c1", acceptingPayments: false, receiptsAvailable: false };

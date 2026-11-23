@@ -17,6 +17,7 @@ import { getViewer } from "@/lib/auth";
 import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { sourceTag, withSource } from "@/lib/donations/source";
 import { cardChargeRates } from "@/lib/donations/card-charge";
+import { lateDetailsDeadlineForGiftOn } from "@/lib/donations/s18a-details";
 import { DonateFlow } from "./donate-flow";
 
 /**
@@ -84,6 +85,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           slug={charity.slug}
           charityName={charity.name_en}
           receiptsAvailable={charity.receiptsAvailable}
+          s18aDetailsBy={lateDetailsDeadlineForGiftOn()}
           minimumLabel={formatRand(platformConfig.minDonationCents)}
           suggestedCents={charity.suggestedCents}
           impactUnit={charity.impactUnit}

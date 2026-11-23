@@ -2,7 +2,7 @@
 
 import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
 import { GIVE_GAVE_UP_MESSAGE, GIVE_GIVE_UP_MS, giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
-import { startTransition, useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useFormDraft } from "@/components/forms/use-form-draft";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
@@ -17,11 +17,14 @@ import { platformConfig } from "@/config/platform";
 import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
 import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionLabel, startingChoice, type ContributionChoice } from "@/lib/donations/contribution";
 import { LABEL_MAX } from "@/lib/donations/labels";
+import { registrationNumberProblem } from "@/lib/donations/validation";
 
 type Props = {
   slug: string;
   charityName: string;
   receiptsAvailable: boolean;
+  /** The last day to add s18A details after paying for a gift given today (dd/mm/yyyy, from the platform config). */
+  s18aDetailsBy?: string;
   minimumLabel: string;
   /** The charity's own suggested amounts, in cents (it may have none). */
   suggestedCents?: number[];
@@ -99,7 +102,7 @@ function offlineOrDown(e: unknown): { ok: false; message: string } {
 }
 
 export function DonateFlow({
-  slug, charityName, receiptsAvailable, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, initialMonthly = false,
+  slug, charityName, receiptsAvailable, s18aDetailsBy, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, initialMonthly = false,
   fromApp, campaign, account, source, impactUnit, cardChargeAvailable = false, singleAgreementTick = false,
 }: Props) {
   // The amount, the contribution and the card charge box decide the live total, worked out as the donor types.
@@ -186,6 +189,9 @@ export function DonateFlow({
     return () => window.removeEventListener("pageshow", shown);
   }, [state.redirectUrl]);
   const [donorType, setDonorType] = useState<"individual" | "company" | "trust">("individual");
+  // Messages from the last press of Give that a later change has made stale, by field (null: no longer shown). Only
+  // for that answer: the next press of Give starts afresh.
+  const [rechecked, setRechecked] = useState<{ answer: CheckoutState; errors: Record<string, string | null> } | null>(null);
   const [want18a, setWant18a] = useState(false);
   // Take the gift first, the s18A details after (decided 04/11/2026). With a saved ID number, "now" is one tap less.
   const [s18aWhen, setS18aWhen] = useState<"now" | "later">(account?.savedIdLast4 ? "now" : "later");
@@ -195,6 +201,26 @@ export function DonateFlow({
   const detailsNow = want18a && s18aWhen === "now";
   const idBoxesShown = org || !(account?.savedIdLast4 && useSavedId);
   const formRef = useRef<HTMLFormElement>(null);
+  /**
+   * Switching between "A company" and "A trust" checks the registration number again for the new choice (tester,
+   * 23/11/2026): a company's "Use the company's CIPC number" stayed on a trust's number until the next press of Give.
+   */
+  const chooseDonorType = (t: "individual" | "company" | "trust") => {
+    setDonorType(t);
+    if (!state.fieldErrors?.registration_number) return;
+    const typed = formRef.current?.querySelector<HTMLInputElement>('input[name="registration_number"]')?.value ?? "";
+    const problem = registrationNumberProblem(t, typed, { want18a, detailsNow });
+    setRechecked((r) => ({ answer: state, errors: { ...(r?.answer === state ? r.errors : {}), registration_number: problem } }));
+  };
+  const shownState: CheckoutState = useMemo(() => {
+    if (!rechecked || rechecked.answer !== state || !state.fieldErrors) return state;
+    const fieldErrors: Record<string, string> = { ...state.fieldErrors };
+    for (const [k, m] of Object.entries(rechecked.errors)) {
+      if (m) fieldErrors[k] = m;
+      else delete fieldErrors[k];
+    }
+    return { ...state, fieldErrors };
+  }, [rechecked, state]);
   // Coming back from the payment provider (declined, Try again, Back) finds the details still filled in.
   useFormDraft(formRef, `donate:${slug}`);
   // Give works once the page has loaded: before that a press would send the form the browser's own way.
@@ -217,7 +243,7 @@ export function DonateFlow({
   const total = quote ? formatRand(quote.totalCents) : null;
 
   return (
-    <FormStateProvider state={state}>
+    <FormStateProvider state={shownState}>
       <form
         ref={formRef}
         noValidate
@@ -423,7 +449,7 @@ export function DonateFlow({
           <div className="flex flex-wrap gap-2">
             {(["individual", "company", "trust"] as const).map((t) => (
               <label key={t} className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-outline px-4 py-2 text-sm font-semibold has-checked:border-brand has-checked:bg-honey-soft has-checked:text-brand">
-                <input type="radio" name="donor_type" value={t} checked={donorType === t} onChange={() => setDonorType(t)} />
+                <input type="radio" name="donor_type" value={t} checked={donorType === t} onChange={() => chooseDonorType(t)} />
                 {t === "individual" ? "Myself" : t === "company" ? "A company" : "A trust"}
               </label>
             ))}
@@ -469,7 +495,7 @@ export function DonateFlow({
               </fieldset>
               {s18aWhen === "later" ? (
                 <p className="rounded-control bg-surface p-3 text-sm text-navy">
-                  After paying, you add {org ? "the registration number" : "your SA ID number"} and address on the thank-you page, or later from your Givezy account. Until then this gift can&apos;t go on your s18A receipt.
+                  After paying, you add {org ? "the registration number" : "your SA ID number"} and address on the thank-you page, or later from your Givezy account{s18aDetailsBy ? <>, by <span className="font-semibold">{s18aDetailsBy}</span></> : null}. Until then this gift can&apos;t go on your s18A receipt.
                 </p>
               ) : null}
               <fieldset hidden={!detailsNow} disabled={!detailsNow} className="space-y-3">

@@ -6,7 +6,8 @@
  * donation that asked for an s18A receipt. The amount is the donations' gift
  * amounts only, never a contribution to Givezy, less any part of a gift that was refunded (20/11/2026). A gift
  * held for a person (an open dispute, a refund being reviewed) or refunded in full is left out, as
- * issue_s18a_receipt does.
+ * issue_s18a_receipt does. A gift paid while the charity couldn't issue s18A receipts (outside every one of its
+ * approval periods) never goes on one, even once the charity can again (Yehuda, 23/11/2026).
  */
 
 export type PlanDonation = {
@@ -32,10 +33,15 @@ export type PlanDonation = {
   detailsMissing?: string[];
 };
 
+/** A stretch of time the charity could issue s18A receipts: from startedAt, up to (not including) endedAt; null while it still can. */
+export type S18aPeriod = { startedAt: string; endedAt: string | null };
+
 export type PlanCharity = {
   id: string;
   isS18a: boolean;
   mandateSignedAt: string | null;
+  /** When the charity could issue s18A receipts (charity_s18a_periods). */
+  s18aPeriods: S18aPeriod[];
 };
 
 export type PlannedReceipt = {
@@ -62,7 +68,9 @@ export type Skipped = { donationId: string; reason: "not_paid" | "no_18a_request
   /** Held for a person (an open dispute, a refund being reviewed, 20/11/2026): left out until they release it. */
   | "on_hold"
   /** Every cent of the gift was refunded in parts: nothing left to receipt. */
-  | "fully_refunded" };
+  | "fully_refunded"
+  /** Paid while the charity couldn't issue s18A receipts (23/11/2026): never receipted, whatever happens later. */
+  | "paid_outside_approval" };
 
 /** What a receipt counts for one gift: the gift less any part of it that was refunded. Never below 0. */
 export function receiptableCents(d: Pick<PlanDonation, "amountCents" | "refundedCents">): number {
@@ -72,6 +80,16 @@ export function receiptableCents(d: Pick<PlanDonation, "amountCents" | "refunded
 /** Can this charity issue s18A receipts: approval confirmed and a signed mandate. */
 export function charityCanIssue(c: PlanCharity): boolean {
   return c.isS18a && c.mandateSignedAt !== null;
+}
+
+/**
+ * Could the charity issue s18A receipts at this moment: inside one of its approval periods (the first moment
+ * counts, the last doesn't), as charity_could_issue_18a_at in the database.
+ */
+export function paidInApprovalPeriod(periods: readonly S18aPeriod[], paidAt: string): boolean {
+  const t = new Date(paidAt).getTime();
+  if (Number.isNaN(t)) return false;
+  return periods.some((p) => new Date(p.startedAt).getTime() <= t && (p.endedAt === null || t < new Date(p.endedAt).getTime()));
 }
 
 /** Is a SARS tax year over, so its receipts can be issued? `today` is yyyy-mm-dd in Johannesburg time. */
@@ -105,8 +123,12 @@ export function planReceipts(args: {
     if (d.receiptHold) { skip("on_hold"); continue; }
     if (receiptableCents(d) <= 0) { skip("fully_refunded"); continue; }
     const charity = charityById.get(d.charityId);
-    if (!charity || !charityCanIssue(charity)) { skip("charity_cannot_issue"); continue; }
-    if (new Date(charity.mandateSignedAt!).getTime() > new Date(d.paidAt).getTime()) { skip("mandate_after_payment"); continue; }
+    if (!charity) { skip("charity_cannot_issue"); continue; }
+    if (charity.mandateSignedAt && new Date(charity.mandateSignedAt).getTime() > new Date(d.paidAt).getTime()) { skip("mandate_after_payment"); continue; }
+    // Paid while the charity couldn't issue: never on a receipt (checked before today's state, so such a gift is
+    // never said to be "waiting" for the charity's approval).
+    if (!paidInApprovalPeriod(charity.s18aPeriods, d.paidAt)) { skip("paid_outside_approval"); continue; }
+    if (!charityCanIssue(charity)) { skip("charity_cannot_issue"); continue; }
     // Never a receipt without the required particulars: listed for the charity and Givezy as "details missing".
     if (d.detailsMissing?.length) { skip("details_missing"); continue; }
     if (receiptedGroups.has(groupKey(d))) { skip("late_after_receipt"); continue; }

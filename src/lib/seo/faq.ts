@@ -38,7 +38,7 @@ export const donorFaqs: Faq[] = [
   },
   {
     q: "How do s18A receipts work?",
-    a: "If the charity is approved to issue s18A receipts, tick \"I want an s18A receipt\" when you give. You get one s18A receipt for all your donations to that charity each tax year (1 March to the end of February), kept in your account for your tax return.",
+    a: "If the charity is approved to issue s18A receipts, tick \"I'd like an s18A receipt\" when you give. You get one s18A receipt for all your donations to that charity each tax year (1 March to the end of February), kept in your account for your tax return.",
   },
   {
     q: "Who sees my details?",

@@ -130,7 +130,7 @@ export function startPayment(
 
 /** What the give screen needs to know before the donor fills anything in. */
 export type ReadyReply =
-  | { ok: true; accepting: boolean; paused: boolean; receiptsAvailable: boolean; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; /** The most a donor can add for Givezy (platform config); null from an older server that doesn't say. */ maxContributionCents: number | null; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null; contributionPresetsCents: number[]; contributionDefaultCents: number }
+  | { ok: true; accepting: boolean; paused: boolean; receiptsAvailable: boolean; /** The last day to add s18A details after paying (dd/mm/yyyy); null from an older server. */ s18aDetailsBy: string | null; campaignOpen: boolean; minGiftCents: number; minContributionCents: number; /** The most a donor can add for Givezy (platform config); null from an older server that doesn't say. */ maxContributionCents: number | null; maxGiftCents: number | null; savedIdLast4: string | null; suggestedCents: number[]; savedCardsOpen: boolean; savedCard: SavedCard | null; cardChargeRates: CardChargeRates | null; contributionPresetsCents: number[]; contributionDefaultCents: number }
   /** Giving in the app is switched off on the server: give on the website instead. */
   | { ok: false; closed: true }
   | { ok: false; closed?: false; message: string };
@@ -147,6 +147,7 @@ export async function checkReady(site: string, slug: string, campaignId: string 
         accepting: j.accepting === true,
         paused: j.paused === true,
         receiptsAvailable: j.receiptsAvailable === true,
+        s18aDetailsBy: typeof j.s18aDetailsBy === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(j.s18aDetailsBy) ? j.s18aDetailsBy : null,
         campaignOpen: j.campaignOpen === true,
         minGiftCents: j.minGiftCents,
         minContributionCents: j.minContributionCents,

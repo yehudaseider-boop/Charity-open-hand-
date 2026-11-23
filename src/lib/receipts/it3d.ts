@@ -9,6 +9,7 @@
  * Nothing is ever shortened or changed silently: a value SARS's file can't hold is a problem to fix.
  */
 import { centsToRandDecimal, formatRand } from "@/lib/money";
+import { sarsFileBadCharacter } from "@/lib/donations/s18a-rules";
 import { isoDateInJhb, taxYearRange, zonedParts } from "@/lib/dates";
 import {
   DONOR_TAX_REFERENCE_FIRST_DIGITS,
@@ -198,14 +199,11 @@ const last4 = (v: string | null | undefined) => (v ? v.replace(/\s/g, "").slice(
 type Field = { no: number; value: string; max: number; label: string; /** Where this one field is fixed, when not where the record's other fields are. */ fix?: FixAt };
 type Who = { receiptNumber?: string | null; donorName?: string; idLast4?: string | null; fix?: FixAt };
 
-/** Characters the file can't hold: outside Latin-1, or control characters that would break a line. */
-function badCharacter(v: string): string | null {
-  for (const ch of v) {
-    const c = ch.codePointAt(0)!;
-    if (c > 0xff || c < 0x20 || (c >= 0x7f && c <= 0x9f)) return ch;
-  }
-  return null;
-}
+/**
+ * Characters the file can't hold: outside Latin-1, or control characters that would break a line. The same rule
+ * checks the donor's s18A details where they are typed (src/lib/donations/s18a-rules.ts, 23/11/2026).
+ */
+const badCharacter = sarsFileBadCharacter;
 
 /** What the charity is told about a receipt left out because the donor was erased before the SARS details were kept. */
 export const ERASED_LEFT_OUT =

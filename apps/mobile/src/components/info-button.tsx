@@ -9,9 +9,10 @@ import { Text } from "./text";
 /**
  * A small "i" button that explains a term (such as s18A) in plain
  * English, for donors who don't know it. Opens a card over whatever screen or
- * sheet it sits in.
+ * sheet it sits in. With `question`, the "i" carries the words "What is {label}?", as the website's Info does
+ * (the s18A switch on the give screen, 23/11/2026).
  */
-export function InfoButton({ terms, label }: { terms: GlossaryTerm[]; label?: string }) {
+export function InfoButton({ terms, label, question = false }: { terms: GlossaryTerm[]; label?: string; question?: boolean }) {
   const [open, setOpen] = useState(false);
   const name = label ?? glossary[terms[0]].title;
   return (
@@ -19,11 +20,12 @@ export function InfoButton({ terms, label }: { terms: GlossaryTerm[]; label?: st
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`More about ${name}`}
+        accessibilityLabel={question ? `What is ${name}?` : `More about ${name}`}
         hitSlop={12}
-        style={styles.button}
+        style={question ? styles.question : styles.button}
       >
         <InfoIcon size={18} color={colors.blue} />
+        {question ? <Text style={styles.questionText}>What is {name}?</Text> : null}
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Close" accessibilityRole="button" />
@@ -49,6 +51,8 @@ export function InfoButton({ terms, label }: { terms: GlossaryTerm[]; label?: st
 
 const styles = StyleSheet.create({
   button: { minWidth: touch * 0.6, minHeight: touch * 0.6, alignItems: "center", justifyContent: "center" },
+  question: { minHeight: touch, flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" },
+  questionText: { color: colors.blue, textDecorationLine: "underline", fontSize: 15 },
   backdrop: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.scrim },
   center: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, justifyContent: "center", padding: space.gutter },
   card: { gap: 18, padding: 22, borderRadius: radius.card, backgroundColor: colors.surface, maxWidth: 480, width: "100%", alignSelf: "center" },

@@ -4,7 +4,9 @@ import { cardChargeToCover } from "@shared/fees";
 import { impactLine, impactSource } from "@shared/charity/impact";
 import { AMOUNT_MAX_LENGTH } from "@/lib/amount-input";
 import { footerAmountLine, GIVE_STILL_CONNECTING_MS, giftAmountError, givableTotal, waitingGiftLine } from "@/lib/give-checks";
-import { isValidSaIdNumber } from "@shared/sa-id";
+import { saIdProblem } from "@shared/sa-id";
+import { InfoButton } from "@/components/info-button";
+import { ADDRESS_MESSAGES, postalCodeProblem, sarsAddressProblems, sarsTextProblem } from "@shared/donations/s18a-rules";
 import { router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
@@ -631,17 +633,30 @@ export default function Give() {
     const e: Record<string, string> = {};
     if (amountError) e.amount = amountError;
     if (!extraResult.ok) e.extra = extraResult.message;
+    // With an s18A receipt, names go on the receipt and in the charity's SARS file: only what that file can hold (the
+    // website's rule, shared, 23/11/2026). Without one, names stay as typed.
+    const wants = s18aAvailable && want18a;
     if (!first.trim()) e.first_name = "Enter your first name";
+    else if (wants && sarsTextProblem(first.trim(), "name")) e.first_name = sarsTextProblem(first.trim(), "name")!;
     if (!last.trim()) e.last_name = "Enter your surname";
+    else if (wants && sarsTextProblem(last.trim(), "name")) e.last_name = sarsTextProblem(last.trim(), "name")!;
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email address";
     if (detailsLater) {
       // Nothing to check now: the details are added after paying, from the account on our website.
-    } else if (s18aAvailable && want18a && !usingSavedId && !idNumber.trim()) e.id_number = "Enter your SA ID number for the s18A receipt";
-    else if (s18aAvailable && want18a && !usingSavedId && !isValidSaIdNumber(idNumber)) e.id_number = "That doesn't look like a valid SA ID number. Check the 13 digits";
-    if (s18aAvailable && want18a && !usingSavedId && !detailsLater) {
-      if (!street.trim()) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
-      if (!town.trim()) e.city = "Enter your city or town";
-      if (!/^\d{4}$/.test(postal.trim())) e.postal_code = "Enter your 4-digit postal code";
+    } else if (wants && !usingSavedId) {
+      // What is wrong with the number, in the website's words.
+      const id = saIdProblem(idNumber);
+      if (id) e.id_number = id;
+    }
+    if (wants && !detailsLater) {
+      if (!usingSavedId) {
+        if (!street.trim()) e.address_line1 = ADDRESS_MESSAGES.streetEmpty;
+        if (!town.trim()) e.city = ADDRESS_MESSAGES.cityEmpty;
+        const postalWrong = postalCodeProblem(postal);
+        if (postalWrong) e.postal_code = postalWrong;
+      }
+      // Too long for SARS's file, or a character it can't hold: the website's check.
+      for (const [k, m] of Object.entries(sarsAddressProblems({ address_line1: street.trim(), suburb: suburb.trim(), city: town.trim() }))) e[k] ??= m;
     }
     if (usingSavedId && email.trim().toLowerCase() !== (account.email ?? "").toLowerCase()) e.id_number = `Your saved ID number goes with ${account.email}. Give with that email, or use a different number.`;
     if (dedicating && !dedicate) e.dedication_kind = "Choose in honour of or in memory of";
@@ -1221,6 +1236,8 @@ export default function Give() {
           {s18aAvailable ? (
             <View style={[styles.softCard, { gap: 18 }]} onLayout={at("s18a")}>
               <SwitchRow label="I'd like an s18A receipt" description="For your tax return. This charity can issue them." value={want18a} onChange={setWant18a} />
+              {/* The website's "What is an s18A receipt?", in the app's own info card (23/11/2026). */}
+              <InfoButton terms={["s18a"]} label="an s18A receipt" question />
               {want18a ? (
                 <View style={{ gap: 8 }}>
                   <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="When to add your s18A details">
@@ -1234,7 +1251,7 @@ export default function Give() {
                       );
                     })}
                   </View>
-                  {detailsLater ? <Text variant="label">After paying, add your SA ID number and address from your Givezy account on our website. Until then this gift can&apos;t go on your s18A receipt.</Text> : null}
+                  {detailsLater ? <Text variant="label">After paying, add your SA ID number and address from your Givezy account on our website{server?.s18aDetailsBy ? `, by ${server.s18aDetailsBy}` : ""}. Until then this gift can&apos;t go on your s18A receipt.</Text> : null}
                 </View>
               ) : null}
               {want18a && !detailsLater && savedLast4 ? (
@@ -1261,7 +1278,7 @@ export default function Give() {
                     Your address. SARS needs it on the receipt.{usingSavedId ? " Leave it empty to use the address from your last s18A gift." : ""}
                   </Text>
                   <Field label="Street address" value={street} onChangeText={setStreet} maxLength={200} autoComplete="street-address" error={err("address_line1")} />
-                  <Field label="Suburb" value={suburb} onChangeText={setSuburb} maxLength={80} error={err("suburb")} />
+                  <Field label="Suburb (optional)" value={suburb} onChangeText={setSuburb} maxLength={80} error={err("suburb")} />
                   <Field label="City or town" value={town} onChangeText={setTown} maxLength={80} autoComplete="postal-address-locality" error={err("city")} />
                   <Field label="Postal code" value={postal} onChangeText={setPostal} keyboardType="number-pad" autoComplete="postal-code" maxLength={4} error={err("postal_code")} />
                 </View>

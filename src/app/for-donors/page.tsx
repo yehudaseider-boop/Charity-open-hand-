@@ -74,7 +74,7 @@ export default function ForDonorsPage() {
         n={3}
         kicker="s18A receipts"
         title={<>Tax time, <Key>without the hunt</Key>.</>}
-        body="If a charity is approved to issue s18A receipts, tick “I want an s18A receipt” when you give. You get one receipt for all your gifts to that charity each tax year (1 March to the end of February), kept in your account for your tax return."
+        body="If a charity is approved to issue s18A receipts, tick “I'd like an s18A receipt” when you give. You get one receipt for all your gifts to that charity each tax year (1 March to the end of February), kept in your account for your tax return."
         points={[
           { icon: "receipt", title: "One receipt a year from each charity", body: "Not a pile of slips. One clear receipt per charity, per tax year." },
           { icon: "download", title: "Ready when you need it", body: "Download it from your account, any time after the tax year ends." },

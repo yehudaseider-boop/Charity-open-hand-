@@ -13,7 +13,7 @@ vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/config/receipts", async (orig) => ({ ...(await orig<object>()), receiptsEnabled: () => true }));
 
 const charityBase: PlanCharity & CharityRow = {
-  id: "c1", isS18a: true, mandateSignedAt: "2026-04-01T00:00:00+02:00", quickgive_code: "NMF",
+  id: "c1", isS18a: true, mandateSignedAt: "2026-04-01T00:00:00+02:00", s18aPeriods: [{ startedAt: "2026-04-01T00:00:00+02:00", endedAt: null }], quickgive_code: "NMF",
   legal_name_en: "Northcliff Meals Fund NPC", npo_number: "1", pbo_number: "930012345", s18a_reference: "18A/1",
   address_line1: "1 Main Road", address_line2: null, suburb: null, city: "Johannesburg", postal_code: "2192",
 };

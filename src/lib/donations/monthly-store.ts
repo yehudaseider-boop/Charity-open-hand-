@@ -16,6 +16,7 @@ import { wasCutOff } from "@/lib/email/retry-plan";
 import { newCardPendingFor } from "./new-card";
 import { DECLINED_REASON } from "./monthly-reasons";
 import { monthlyCardCharge } from "./card-charge";
+import { canIssue18a } from "@/lib/charities";
 
 type DueRow = {
   id: string;
@@ -190,6 +191,11 @@ export async function createMonthlyGift(recurringId: string, donationId: string,
   const db = createAdminClient();
   const rec = must(await db.from("recurring_donations").select("donor_id, charity_id, campaign_id, wants_18a, is_anonymous, message, dedication_kind, dedication_name, gateway, first_donation_id, id_number_carry_encrypted, id_number_carry_last4, receipt_identity_carry").eq("id", recurringId).maybeSingle(), "read the monthly donation");
   const first = must(await db.from("donations").select("popia_consent_at, age_confirmed_at, came_from").eq("id", rec.first_donation_id).maybeSingle(), "read the first donation");
+  // A month counts towards an s18A receipt only if the charity can issue them now (23/11/2026): a monthly donation set
+  // up while it could keeps asking, but a month given while its s18A status is removed never goes on a receipt, so the
+  // donor is never told it does. The month after it is approved again asks again.
+  const charity = must(await db.from("charities").select("is_s18a, mandate_signed_at").eq("id", rec.charity_id).maybeSingle(), "read the charity");
+  const wants18a = Boolean(rec.wants_18a) && canIssue18a({ is_verified: true, ...charity });
   const ins = await db.from("donations").insert({
     id: donationId,
     donor_id: rec.donor_id,
@@ -205,7 +211,7 @@ export async function createMonthlyGift(recurringId: string, donationId: string,
     status: "pending",
     gateway: rec.gateway,
     gateway_ref: donationId,
-    wants_18a: rec.wants_18a,
+    wants_18a: wants18a,
     is_anonymous: rec.is_anonymous,
     message: rec.message,
     // Each month carries the dedication the donor chose when they set it up.

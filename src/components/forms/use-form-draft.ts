@@ -9,6 +9,8 @@ const KEEP_FOR_MS = 2 * 60 * 60 * 1000;
 /** The few choices that decide which boxes show (who is giving, whether they want an s18A receipt, a dedication),
  * and the contribution to Givezy the donor chose (so "No thanks" is still chosen after a declined card). */
 const CHOICES = /^(donor_type|wants_18a|s18a_when|dedication_kind|contribution_choice)$/;
+/** How many turns restoring choices may take: one per section a choice opens, with room to spare. */
+const MAX_RESTORE_TURNS = 5;
 
 /** A box whose value React holds (`data-draft-controlled`): set it the way typing does, so the page's own state follows. */
 function setControlled(f: HTMLInputElement | HTMLTextAreaElement, v: string) {
@@ -51,6 +53,7 @@ export function useFormDraft(form: RefObject<HTMLFormElement | null>, key: strin
   useEffect(() => {
     const el = form.current;
     if (!el) return;
+    let live = true;
     const storeKey = draftStoreKey(key);
     const fields = () =>
       [...el.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input[name], textarea[name]")].filter(
@@ -70,16 +73,33 @@ export function useFormDraft(form: RefObject<HTMLFormElement | null>, key: strin
             }
           }
         };
-        restoreText();
         // A click, so the page's own state follows (the matching boxes appear); then fill the boxes that just appeared.
-        for (const f of choiceInputs()) {
-          const want = saved.choices?.[f.name]?.includes(f.value) ?? false;
-          if (f.type === "radio" ? want && !f.checked : f.checked !== want) f.click();
-        }
-        restoreText();
-        // A click made inside this effect is rendered just after it, so boxes it opens (the contribution's
-        // Other amount) are filled once more on the next turn.
-        setTimeout(restoreText, 0);
+        // A choice can sit in a section another choice opens ("Add them now" is inside "I'd like an s18A receipt"):
+        // until that click is rendered, the section is disabled and ignores a click, so the choice would quietly fall
+        // back to its default (tester, 23/11/2026). Choices are made again on the next turns, in the order the
+        // sections open, until each one is as it was (a few turns at most).
+        const wanted = (f: HTMLInputElement) => saved.choices?.[f.name]?.includes(f.value) ?? false;
+        const differs = (f: HTMLInputElement) => (f.type === "radio" ? wanted(f) && !f.checked : f.checked !== wanted(f));
+        let turns = 0;
+        const restoreChoices = () => {
+          if (!live) return;
+          restoreText();
+          let waiting = false;
+          for (const f of choiceInputs()) {
+            if (!differs(f)) continue;
+            if (f.matches(":disabled")) waiting = true;
+            else {
+              f.click();
+              waiting = true;
+            }
+          }
+          restoreText();
+          // A click made here is rendered just after this turn, so boxes it opens (the contribution's Other amount,
+          // the s18A details) are filled, and choices inside them made, on the next one.
+          if (waiting && ++turns < MAX_RESTORE_TURNS) setTimeout(restoreChoices, 0);
+          else setTimeout(() => live && restoreText(), 0);
+        };
+        restoreChoices();
       }
     } catch {
       // Storage blocked or a broken draft: start with an empty form, as before.
@@ -98,6 +118,7 @@ export function useFormDraft(form: RefObject<HTMLFormElement | null>, key: strin
     el.addEventListener("input", save);
     el.addEventListener("change", save);
     return () => {
+      live = false;
       el.removeEventListener("input", save);
       el.removeEventListener("change", save);
     };

@@ -37,3 +37,32 @@ export function isValidSaIdNumber(raw: string): boolean {
 export function saIdDigits(raw: string): string {
   return raw.replace(/[\s-]/g, "");
 }
+
+/** What to say when no SA ID number was typed (the website and the app say the same, 23/11/2026). */
+export const SA_ID_EMPTY = "Enter your SA ID number. SARS needs it for an s18A receipt";
+
+/**
+ * What is wrong with a typed SA ID number, in plain words, or null when it passes isValidSaIdNumber (23/11/2026: a
+ * tester typing one wrong digit was only told it "doesn't look valid"). Checked in the order a person would look:
+ * the characters, the length, the date of birth, the citizenship digit, then the check digit. The website and the
+ * app show the same words. An empty box is SA_ID_EMPTY.
+ */
+export function saIdProblem(raw: string): string | null {
+  const id = saIdDigits(raw);
+  if (!id) return SA_ID_EMPTY;
+  if (!/^\d+$/.test(id)) return "An SA ID number has digits only. Check for a letter or another character";
+  if (id.length !== 13) return `An SA ID number has 13 digits. This one has ${id.length}`;
+  const yy = Number(id.slice(0, 2));
+  const mm = Number(id.slice(2, 4));
+  const dd = Number(id.slice(4, 6));
+  const realDate =
+    mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31 &&
+    [1900, 2000].some((c) => {
+      const d = new Date(Date.UTC(c + yy, mm - 1, dd));
+      return d.getUTCMonth() === mm - 1 && d.getUTCDate() === dd;
+    });
+  if (!realDate) return "The first 6 digits are your date of birth (yymmdd), and these aren't a real date. Check them";
+  if (id[10] !== "0" && id[10] !== "1") return "The 11th digit is 0 or 1 on every SA ID number. Check for a typo";
+  if (!isValidSaIdNumber(id)) return "The last digit doesn't match: check for a typo";
+  return null;
+}

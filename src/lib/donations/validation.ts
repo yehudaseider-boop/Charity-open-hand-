@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
-import { isValidSaIdNumber, saIdDigits } from "@/lib/sa-id";
+import { saIdDigits, saIdProblem } from "@/lib/sa-id";
 import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
 import { plainPunctuation } from "@/lib/plain-text";
 import { normaliseLineBreaks } from "@/lib/text";
 import { cleanDedicationName, parseDedication } from "./dedication";
 import { cleanLabel, LABEL_MAX } from "./labels";
+import { ADDRESS_MESSAGES, postalCodeProblem, SARS_LIMITS, sarsAddressProblems, sarsLengthProblem, sarsTextProblem, trustNumberProblem } from "./s18a-rules";
 
 /** An optional text field, with a plain message when it is too long. */
 const str = (max: number, what: string) => z.string().max(max, `Please keep ${what} to ${max} characters or fewer`).optional();
@@ -13,11 +14,12 @@ const str = (max: number, what: string) => z.string().max(max, `Please keep ${wh
  * A one-line field (a name, an address line): line breaks, control and direction characters become
  * spaces. These are printed in emails and on receipts, where a typed line break could pass off extra text.
  * Typographic quotes, dashes and odd spaces become plain ones first (20/11/2026): a phone's O’Brien would
- * otherwise block the charity's SARS file, which holds Latin-1 only. Made plain before the length is checked.
+ * otherwise block the charity's SARS file, which holds Latin-1 only. Made plain before the length is checked, and
+ * composed (NFC: an "é" typed as e plus an accent is kept as the one letter "é", which the file can hold).
  */
 const line = (max: number, what: string) =>
   z
-    .preprocess((v) => (typeof v === "string" ? plainPunctuation(v) : v), z.string().max(max, `Please keep ${what} to ${max} characters or fewer`))
+    .preprocess((v) => (typeof v === "string" ? plainPunctuation(v).normalize("NFC") : v), z.string().max(max, `Please keep ${what} to ${max} characters or fewer`))
     .optional()
     .transform((v) => (v === undefined ? v : cleanDedicationName(v)));
 /** A text box (more than one line): a line break counts as one character, as the browser's maxLength counts it. */
@@ -77,20 +79,31 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   // "Add my details after paying": the gift goes ahead without them (the receipt waits until they are added).
   const detailsNow = want18a && !s18aDetailsLater(v, receiptsAvailable);
 
+  // With an s18A receipt, the names go on the receipt and in the charity's SARS file: only what that file can hold
+  // is taken (23/11/2026). Without one, names stay exactly as typed.
   if (v.donor_type === "individual") {
     if (!v.first_name) e.first_name = "Enter your first name";
     else if (!hasLetter(v.first_name)) e.first_name = "Enter your first name in letters";
+    else if (want18a) {
+      const odd = sarsTextProblem(v.first_name, "name");
+      if (odd) e.first_name = odd;
+    }
     if (!v.last_name) e.last_name = "Enter your surname";
     else if (!hasLetter(v.last_name)) e.last_name = "Enter your surname in letters";
+    else if (want18a) {
+      const odd = sarsTextProblem(v.last_name, "name");
+      if (odd) e.last_name = odd;
+    }
   } else {
     if (!v.organisation_name) e.organisation_name = "Enter the registered name";
+    else if (want18a) {
+      const odd = sarsLengthProblem(v.organisation_name, SARS_LIMITS.organisationName, "the registered name") ?? sarsTextProblem(v.organisation_name, "organisation");
+      if (odd) e.organisation_name = odd;
+    }
     if (!v.contact_person) e.contact_person = "Enter a contact person";
     else if (!hasLetter(v.contact_person)) e.contact_person = "Enter the contact person's name in letters";
-    // SARS reports a company by its CIPC number (Appendix K) and a trust by its Master's number (decided 03/11/2026).
-    if (detailsNow && !v.registration_number?.trim()) e.registration_number = "Needed for an s18A receipt";
-    else if (want18a && v.registration_number?.trim() && v.donor_type === "company" && !isValidCompanyRegistration(v.registration_number, new Date())) {
-      e.registration_number = "Use the company's CIPC number, for example 2015/123456/07";
-    }
+    const reg = registrationNumberProblem(v.donor_type, v.registration_number, { want18a, detailsNow });
+    if (reg) e.registration_number = reg;
   }
 
   if (v.phone && !SA_PHONE.test(v.phone)) e.phone = "Use a South African number, e.g. 082 123 4567";
@@ -99,13 +112,16 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   // receipt job refuses one without it), and a person's SA ID number, which SARS needs to report the receipt
   // (decided 03/11/2026: the ID number is required, the income tax number optional).
   if (detailsNow) {
-    if (!v.address_line1) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
-    if (!v.city) e.city = "Enter your city or town";
-    if (!v.postal_code) e.postal_code = "Enter your postal code";
-    else if (!/^\d{4}$/.test(v.postal_code)) e.postal_code = "Postal codes are 4 digits";
+    if (!v.address_line1) e.address_line1 = ADDRESS_MESSAGES.streetEmpty;
+    if (!v.city) e.city = ADDRESS_MESSAGES.cityEmpty;
+    const postal = postalCodeProblem(v.postal_code);
+    if (postal) e.postal_code = postal;
+    // What SARS's file can't hold: too long, or a character it can't hold (23/11/2026).
+    for (const [k, m] of Object.entries(sarsAddressProblems(v))) e[k] ??= m;
     if (v.donor_type === "individual") {
-      if (!v.id_number) e.id_number = "Enter your SA ID number. SARS needs it for an s18A receipt";
-      else if (!isValidSaIdNumber(v.id_number)) e.id_number = "That doesn't look like a valid SA ID number";
+      // What is wrong with the number, in plain words (23/11/2026), the same as in the app.
+      const id = saIdProblem(v.id_number ?? "");
+      if (id) e.id_number = id;
     }
     const tax = v.tax_reference?.replace(/\s/g, "");
     if (tax && !/^\d{10}$/.test(tax)) e.tax_reference = "Income tax numbers are 10 digits";
@@ -119,6 +135,26 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";
   if (v.popia_consent !== "on") e.popia_consent = "Please agree so we can record your donation";
   return e;
+}
+
+/**
+ * What is wrong with a company's or trust's registration number at checkout, or null. SARS reports a company by its
+ * CIPC number (Appendix K) and a trust by its Master's number (decided 03/11/2026), at most 15 characters
+ * (23/11/2026). The give form runs it again when the donor switches between "A company" and "A trust", so a
+ * company's message never stays on a trust's number (tester, 23/11/2026).
+ */
+export function registrationNumberProblem(
+  donorType: CheckoutInput["donor_type"],
+  value: string | null | undefined,
+  s18a: { want18a: boolean; detailsNow: boolean },
+  today: Date = new Date(),
+): string | null {
+  if (donorType === "individual") return null;
+  const reg = value?.trim() ?? "";
+  if (s18a.detailsNow && !reg) return "Needed for an s18A receipt";
+  if (s18a.want18a && reg && donorType === "company" && !isValidCompanyRegistration(reg, today)) return "Use the company's CIPC number, for example 2015/123456/07";
+  if (s18a.detailsNow && donorType === "trust") return trustNumberProblem(reg);
+  return null;
 }
 
 /**

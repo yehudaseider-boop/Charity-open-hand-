@@ -91,7 +91,12 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         )
         .in("id", ids);
       if (error) throw new Error(error.message);
-      return (data ?? []).map((c) => ({ ...(c as unknown as CharityRow), id: c.id, isS18a: c.is_s18a, mandateSignedAt: c.mandate_signed_at }) as PlanCharity & CharityRow);
+      // When each charity could issue s18A receipts: a gift paid outside these never goes on one (23/11/2026).
+      const periods = await db.from("charity_s18a_periods").select("charity_id, started_at, ended_at").in("charity_id", ids);
+      if (periods.error) throw new Error(periods.error.message);
+      const periodsOf = (id: string) =>
+        (periods.data ?? []).filter((p) => p.charity_id === id).map((p) => ({ startedAt: p.started_at as string, endedAt: (p.ended_at as string | null) ?? null }));
+      return (data ?? []).map((c) => ({ ...(c as unknown as CharityRow), id: c.id, isS18a: c.is_s18a, mandateSignedAt: c.mandate_signed_at, s18aPeriods: periodsOf(c.id) }) as PlanCharity & CharityRow);
     },
 
     async receiptedDonationIds(taxYear) {

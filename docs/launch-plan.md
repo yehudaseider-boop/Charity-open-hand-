@@ -12,7 +12,7 @@ Nothing here costs money until a step says **Approval needed**. Claude stops at 
 
 ## How s18A receipts work (start to finish)
 
-1. **At the gift.** The donor ticks "I want an s18A receipt" and gives their ID number (or tax number) and address. The website and app ask for these only when the box is ticked. The ID number is kept encrypted; only the last 4 digits are ever shown.
+1. **At the gift.** The donor ticks "I'd like an s18A receipt" and gives their ID number (or tax number) and address. The website and app ask for these only when the box is ticked. The ID number is kept encrypted; only the last 4 digits are ever shown.
 2. **During the tax year** (1 March to end February). Nothing is issued. The donor sees each gift in their account and app; the charity sees the gift and that a receipt was asked for.
 3. **After the tax year closes** (from 1 March). One receipt per donor, per charity, per tax year, adding up all that donor's s18A gifts to that charity (online gifts plus any EFT or cash gifts the charity recorded).
    - The **charity approves** its list on its dashboard (s18A receipts): donor, number of gifts, amount, total.

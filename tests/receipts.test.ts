@@ -8,11 +8,11 @@ import { buildReceiptEmail } from "@/lib/receipts/email";
 import { EmailMaybeSent, getEmailTransport, maskEmail, type EmailMessage } from "@/lib/email";
 import { buildReceiptHtml, esc } from "@/lib/receipts/html";
 import { previewReceipts, runReceiptsJob, type IssuedReceipt, type ReceiptStore } from "@/lib/receipts/issue";
-import { planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } from "@/lib/receipts/plan";
+import { paidInApprovalPeriod, planReceipts, taxYearIsClosed, type PlanCharity, type PlanDonation } from "@/lib/receipts/plan";
 import { certificateFingerprint, type StoredDecision } from "@/lib/receipts/review";
 
 const charity: PlanCharity & CharityRow = {
-  id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", quickgive_code: "LTC",
+  id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", s18aPeriods: [{ startedAt: "2026-03-09T00:00:00+02:00", endedAt: null }], quickgive_code: "LTC",
   legal_name_en: "Linksfield Learning Centre NPC", legal_name_he: "מרכז לימוד תורה",
   npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "18A/2026/1",
   address_line1: "1 Test Road", address_line2: null, suburb: "Linksfield", city: "Johannesburg", postal_code: "2192",
@@ -93,6 +93,38 @@ describe("who gets a receipt", () => {
   it("issues nothing for a charity without s18A approval or a signed mandate", () => {
     expect(plan([don({})], [{ ...charity, isS18a: false }]).skipped[0].reason).toBe("charity_cannot_issue");
     expect(plan([don({})], [{ ...charity, mandateSignedAt: null }]).skipped[0].reason).toBe("charity_cannot_issue");
+  });
+
+  it("never receipts a gift paid while the charity couldn't issue, even once it can again (approval periods, 23/11/2026)", () => {
+    const twice = { ...charity, s18aPeriods: [
+      { startedAt: "2026-03-09T00:00:00+02:00", endedAt: "2026-06-01T00:00:00+02:00" },
+      { startedAt: "2026-09-01T00:00:00+02:00", endedAt: null },
+    ] };
+    const { receipts, skipped } = plan([
+      don({ id: "first", paidAt: "2026-05-01T10:00:00Z" }),
+      don({ id: "gap", paidAt: "2026-07-15T10:00:00Z" }),
+      don({ id: "endMoment", paidAt: "2026-05-31T22:00:00Z" }), // 00:00 on 01/06/2026 in Johannesburg: the period's end
+      don({ id: "second", paidAt: "2026-10-01T10:00:00Z" }),
+    ], [twice]);
+    expect(receipts.map((r) => r.donationIds)).toEqual([["first", "second"]]);
+    expect(Object.fromEntries(skipped.map((s) => [s.donationId, s.reason]))).toEqual({ gap: "paid_outside_approval", endMoment: "paid_outside_approval" });
+  });
+
+  it("says a gift paid in an earlier period waits for the charity, and one paid outside every period never goes on a receipt", () => {
+    const removed = { ...charity, isS18a: false, s18aPeriods: [{ startedAt: "2026-03-09T00:00:00+02:00", endedAt: "2026-06-01T00:00:00+02:00" }] };
+    const { skipped } = plan([don({ id: "inside", paidAt: "2026-05-01T10:00:00Z" }), don({ id: "after", paidAt: "2026-10-01T10:00:00Z" })], [removed]);
+    expect(Object.fromEntries(skipped.map((s) => [s.donationId, s.reason]))).toEqual({ inside: "charity_cannot_issue", after: "paid_outside_approval" });
+    // A charity with no period at all (never able to issue): nothing it was paid is receipted.
+    expect(plan([don({})], [{ ...charity, s18aPeriods: [] }]).skipped[0].reason).toBe("paid_outside_approval");
+  });
+
+  it("paidInApprovalPeriod counts a period's first moment, not its last", () => {
+    const p = [{ startedAt: "2026-04-01T00:00:00Z", endedAt: "2026-05-01T00:00:00Z" }];
+    expect(paidInApprovalPeriod(p, "2026-03-31T23:59:59Z")).toBe(false);
+    expect(paidInApprovalPeriod(p, "2026-04-01T00:00:00Z")).toBe(true);
+    expect(paidInApprovalPeriod(p, "2026-05-01T00:00:00Z")).toBe(false);
+    expect(paidInApprovalPeriod(p, "not a date")).toBe(false);
+    expect(paidInApprovalPeriod([{ startedAt: "2026-04-01T00:00:00Z", endedAt: null }], "2030-01-01T00:00:00Z")).toBe(true);
   });
 
   it("only treats a tax year as closed the day after it ends", () => {
@@ -418,7 +450,7 @@ describe("one donor record with more than one identity at a charity", () => {
     const base = { charityId: "c1", donorId: "donor1", taxYear: 2027, status: "paid", wants18a: true, paidAt: "2026-06-01T08:00:00Z" };
     const { receipts, severalIdentities } = planReceipts({
       taxYear: 2027,
-      charities: [{ id: "c1", isS18a: true, mandateSignedAt: "2026-01-01T00:00:00Z" }],
+      charities: [{ id: "c1", isS18a: true, mandateSignedAt: "2026-01-01T00:00:00Z", s18aPeriods: [{ startedAt: "2026-01-01T00:00:00Z", endedAt: null }] }],
       alreadyReceipted: new Set(),
       donations: [
         { ...base, id: "a", donorIdentity: "id-fingerprint", amountCents: 50_000 },

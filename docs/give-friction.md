@@ -15,7 +15,7 @@ tick. "Typed" are boxes the donor types into. Optional boxes are those on screen
 |---|---|---|
 | Screens before the provider's page | 1 page in 2 steps (Amount, then Your details below it) | 1 page in 2 steps |
 | Presses | 3 (R250, Continue, Pay R250) | 3 |
-| Required ticks | 2 (18 or older; Terms, Privacy and sharing with the charity) | 3 (also "I want an s18A receipt") |
+| Required ticks | 2 (18 or older; Terms, Privacy and sharing with the charity) | 3 (also "I'd like an s18A receipt") |
 | Typed boxes | 3 (first name, surname, email) | 7 (also SA ID number, street address, city, postal code) |
 | Required boxes on screen | 4 (amount, first name, surname, email) | 5 marked required, plus 3 the server requires but the page marks "(optional)": street address, city, postal code |
 | Optional boxes on screen | 1 (phone) | 4 (phone, income tax number, unit, suburb) |

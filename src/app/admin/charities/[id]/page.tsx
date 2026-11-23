@@ -326,7 +326,7 @@ export default async function AdminCharityPage({ params }: PageProps<"/admin/cha
       {charity.is_s18a ? (
         <Card title="Remove s18A status">
           <ReasonForm action={revokeS18a.bind(null, id)} label="Reason (kept on record)" submitLabel="Remove s18A"
-            confirm="Remove s18A status? No new receipts will be issued for this charity." />
+            confirm="Remove s18A status? No new receipts will be issued for this charity, and gifts paid while it is removed never get one, even if s18A is confirmed again." />
         </Card>
       ) : null}
 

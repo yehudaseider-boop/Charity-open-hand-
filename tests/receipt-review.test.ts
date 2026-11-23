@@ -18,7 +18,7 @@ import { fingerprintPlan } from "@/lib/receipts/runs";
 import { ASK_FIRST, describeDone, describeUndone, isActionKind, pageOf } from "@/lib/charity/done";
 
 const charity: PlanCharity & CharityRow = {
-  id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", quickgive_code: "NMF",
+  id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", s18aPeriods: [{ startedAt: "2026-03-09T00:00:00+02:00", endedAt: null }], quickgive_code: "NMF",
   legal_name_en: "Northcliff Meals Fund NPC", npo_number: "123-456 NPO", pbo_number: "930012345", s18a_reference: "18A/2026/1",
   address_line1: "1 Test Road", address_line2: null, suburb: "Northcliff", city: "Johannesburg", postal_code: "2195",
 };

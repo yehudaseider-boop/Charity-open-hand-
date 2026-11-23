@@ -11,7 +11,7 @@ import { supabaseReceiptStore } from "@/lib/receipts/store";
 
 vi.mock("server-only", () => ({}));
 
-const charity: PlanCharity = { id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00" };
+const charity: PlanCharity = { id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", s18aPeriods: [{ startedAt: "2026-03-09T00:00:00+02:00", endedAt: null }] };
 const don = (o: Partial<PlanDonation>): PlanDonation => ({
   id: "d1", charityId: "c1", donorId: "u1", donorIdentity: "", taxYear: 2027, amountCents: 100_000, status: "paid", wants18a: true,
   paidAt: "2026-10-01T10:00:00Z", ...o,

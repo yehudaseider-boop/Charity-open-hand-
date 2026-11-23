@@ -14,6 +14,7 @@ import { isValidCompanyRegistration } from "@/lib/sars-numbers";
 import { plainPunctuation } from "@/lib/plain-text";
 import { cleanDedicationName } from "./dedication";
 import { cleanSaIdNumber } from "./monthly-id-nudge";
+import { ADDRESS_MESSAGES, postalCodeProblem, sarsAddressProblems, trustNumberProblem } from "./s18a-rules";
 
 /** A gift's checkout details, as far as the s18A particulars go. */
 export type S18aDetailsRow = {
@@ -100,6 +101,14 @@ export function lateDetailsDeadline(closedTaxYear: number): string {
 }
 
 /**
+ * The last day to add the details for a gift paid now (dd/mm/yyyy): the give forms say it next to "Add my details
+ * after paying" (23/11/2026), from the same setting as the confirmation email, so the date is never written twice.
+ */
+export function lateDetailsDeadlineForGiftOn(now: Date = new Date()): string {
+  return lateDetailsDeadline(taxYearFor(now));
+}
+
+/**
  * May this gift's s18A details be completed now: a paid gift that asked for an s18A receipt, inside the completion
  * window (see `completionWindow`), not on an issued s18A receipt, with details that are not erased and still lack
  * something. With `donorIds`, only the signed-in person's own gifts.
@@ -154,7 +163,7 @@ export type S18aCompletion = {
 
 /** Typographic quotes, dashes and odd spaces made plain, as at checkout, so SARS's file can hold it (20/11/2026). */
 const text = (v: unknown, max: number) => {
-  const s = typeof v === "string" ? cleanDedicationName(plainPunctuation(v)).trim() : "";
+  const s = typeof v === "string" ? cleanDedicationName(plainPunctuation(v).normalize("NFC")).trim() : "";
   return s.length > max ? null : s;
 };
 
@@ -189,6 +198,7 @@ export function checkS18aCompletion(
       if (reg === null) e.registration_number = "Please keep the registration number to 40 characters or fewer";
       else if (!reg) e.registration_number = "Needed for an s18A receipt";
       else if (donorType === "company" && !isValidCompanyRegistration(reg, today)) e.registration_number = "Use the company's CIPC number, for example 2015/123456/07";
+      else if (donorType === "trust" && trustNumberProblem(reg)) e.registration_number = trustNumberProblem(reg)!;
       else value.registrationNumber = reg;
     }
   }
@@ -199,13 +209,16 @@ export function checkS18aCompletion(
     const city = text(raw.city, 80);
     const postal = typeof raw.postal_code === "string" ? raw.postal_code.trim() : "";
     if (street === null) e.address_line1 = "Please keep the street address to 200 characters or fewer";
-    else if (!street) e.address_line1 = "Enter your street address. SARS needs it on the receipt";
+    else if (!street) e.address_line1 = ADDRESS_MESSAGES.streetEmpty;
     if (line2 === null) e.address_line2 = "Please keep this line to 200 characters or fewer";
     if (suburb === null) e.suburb = "Please keep the suburb to 80 characters or fewer";
     if (city === null) e.city = "Please keep the city or town to 80 characters or fewer";
-    else if (!city) e.city = "Enter your city or town";
-    if (!postal) e.postal_code = "Enter your postal code";
-    else if (!/^\d{4}$/.test(postal)) e.postal_code = "Postal codes are 4 digits";
+    else if (!city) e.city = ADDRESS_MESSAGES.cityEmpty;
+    const postalWrong = postalCodeProblem(postal);
+    if (postalWrong) e.postal_code = postalWrong;
+    // What SARS's file can't hold, as at checkout: longer than it takes, or a character it can't hold (23/11/2026).
+    const sars = sarsAddressProblems({ address_line1: street, address_line2: line2, suburb, city });
+    for (const [k, m] of Object.entries(sars)) e[k] ??= m;
     if (!Object.keys(e).length) value.address = { address_line1: street!, address_line2: line2 || null, suburb: suburb || null, city: city!, postal_code: postal };
   }
   if (Object.keys(e).length) return { ok: false, fieldErrors: e };

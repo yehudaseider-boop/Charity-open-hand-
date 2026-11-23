@@ -6,6 +6,7 @@ import { requireViewer } from "@/lib/auth";
 import { recordAction } from "@/lib/charity/charity-actions";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { canIssue18a } from "@/lib/charities";
+import { paidInApprovalPeriod } from "@/lib/receipts/plan";
 import {
   alreadyRecorded,
   checkFile,
@@ -147,6 +148,13 @@ export async function checkImport(charityId: string, _prev: ImportPreview, formD
       const mandate = charity.mandate_signed_at ? new Date(charity.mandate_signed_at).getTime() : null;
       const before = mandate ? wanting.filter((g) => new Date(paidAtOf(g.date)).getTime() < mandate).length : 0;
       if (before) warnings.push(`${before} s18A ${before === 1 ? "gift is" : "gifts are"} dated before your receipting mandate was signed (${formatDate(charity.mandate_signed_at!)}), so Givezy can't put ${before === 1 ? "it" : "them"} on a receipt.`);
+      // The same rule again: a gift dated while the charity couldn't issue s18A receipts never goes on one (23/11/2026).
+      const periods = await createAdminClient().from("charity_s18a_periods").select("started_at, ended_at").eq("charity_id", charityId);
+      if (!periods.error) {
+        const spans = (periods.data ?? []).map((p) => ({ startedAt: p.started_at as string, endedAt: (p.ended_at as string | null) ?? null }));
+        const outside = wanting.filter((g) => (!mandate || new Date(paidAtOf(g.date)).getTime() >= mandate) && !paidInApprovalPeriod(spans, paidAtOf(g.date))).length;
+        if (outside) warnings.push(`${outside} s18A ${outside === 1 ? "gift is" : "gifts are"} dated before your charity could issue s18A receipts through Givezy, or while it couldn't, so Givezy can't put ${outside === 1 ? "it" : "them"} on a receipt.`);
+      }
     }
     const current = taxYearFor(new Date());
     const past = wanting.filter((g) => taxYearOfGift(g.date) < current).length;

@@ -80,7 +80,9 @@ describe("recorded gifts", () => {
       await expect(run("delete from public.donations where id = $1", [a])).resolves.toMatchObject({ rowCount: 1 });
       const b = (await recorded(d, { wants: true })).rows[0].id;
       await run("update public.charities set is_s18a = true, mandate_signed_at = '2025-01-01' where id = $1", [charity]);
-      
+      // The charity could issue s18A receipts when the gift was paid (approval periods, 23/11/2026).
+      await run("update public.charity_s18a_periods set started_at = '2025-01-01' where charity_id = $1 and ended_at is null", [charity]);
+
       await run("select * from public.issue_s18a_receipt($1, $2, 2027, $3::uuid[], 'MEALS', '{}'::jsonb)", [charity, d, [b]]);
       await refused("delete from public.donations where id = $1", [b], /cannot be deleted/);
       const online = (await recorded(d, { gateway: "test", method: null, came: "website" })).rows[0].id;

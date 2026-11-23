@@ -40,7 +40,7 @@ vi.mock("@/lib/receipts/runs", () => ({
 }));
 vi.mock("@/lib/receipts/store", () => ({
   supabaseReceiptStore: () => ({
-    listCharities: async () => [{ id: "c1", isS18a: true, mandateSignedAt: "2026-03-01T00:00:00Z", quickgive_code: "NMF", legal_name_en: "Northcliff Meals Fund NPC", npo_number: "1", pbo_number: "2", s18a_reference: "3", address_line1: "1 Rd", address_line2: null, suburb: null, city: "Jhb", postal_code: "2000" }],
+    listCharities: async () => [{ id: "c1", isS18a: true, mandateSignedAt: "2026-03-01T00:00:00Z", s18aPeriods: [{ startedAt: "2026-03-01T00:00:00Z", endedAt: null }], quickgive_code: "NMF", legal_name_en: "Northcliff Meals Fund NPC", npo_number: "1", pbo_number: "2", s18a_reference: "3", address_line1: "1 Rd", address_line2: null, suburb: null, city: "Jhb", postal_code: "2000" }],
     donorDetailsFor: async (ids: string[]) => ids.map((id, i) => ({ id, paidAt: `2026-0${i + 5}-01T10:00:00Z`, amountCents: i ? 25_000 : 50_000, recordedMethod: null, donor })),
   }),
 }));

@@ -9,6 +9,7 @@ import { loadOpenCampaign } from "@/lib/donations/checkout";
 import { appAccount } from "@/lib/app-auth";
 import { savedIdLast4 as savedIdLast4For } from "@/lib/donations/saved-id";
 import { cardChargeRates } from "@/lib/donations/card-charge";
+import { lateDetailsDeadlineForGiftOn } from "@/lib/donations/s18a-details";
 
 /**
  * Asked by the app's give screen before the donor fills anything in: is giving in the app open,
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
     // The pause switch (GIVING_PAUSED=yes): the app says so, instead of "not taking donations yet".
     paused: Boolean(charity?.givingPaused),
     receiptsAvailable: Boolean(charity?.receiptsAvailable),
+    // The last day to add s18A details after paying for a gift given today (dd/mm/yyyy), as the confirmation email says it.
+    s18aDetailsBy: charity?.receiptsAvailable ? lateDetailsDeadlineForGiftOn() : null,
     campaignOpen,
     minGiftCents: platformConfig.minDonationCents,
     minContributionCents: platformConfig.minContributionCents,

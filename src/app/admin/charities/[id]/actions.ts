@@ -177,6 +177,9 @@ export async function revokeS18a(id: string, _prev: FormState, formData: FormDat
   if (!charity.is_s18a) return { ok: false, message: "This charity is not marked s18A." };
   const reason = reasonFrom(formData);
   if (!reason) return { ok: false, fieldErrors: { reason: "Give a reason for the record, at least 5 characters" } };
+  // Closes the charity's s18A approval period (the charities_s18a_period trigger, in the same write): gifts paid from
+  // now on never go on an s18A receipt, even if s18A is confirmed again later (Yehuda, 23/11/2026). Confirming it
+  // again (setUpReceipts) opens a new period from then.
   const { error } = await createAdminClient()
     .from("charities")
     .update({ is_s18a: false, s18a_confirmed_at: null })
@@ -184,7 +187,7 @@ export async function revokeS18a(id: string, _prev: FormState, formData: FormDat
   if (error) return failed(error);
   await logAudit({ actorUserId: admin.userId, action: "charity.s18a_revoked", entityType: "charity", entityId: id, details: { reason } });
   refresh(id, charity.slug);
-  return { ok: true, message: "s18A status removed. No new receipts will be issued." };
+  return { ok: true, message: "s18A status removed. No new receipts will be issued, and gifts paid from now on never get one, even if s18A is confirmed again." };
 }
 
 export async function revealBankAccount(id: string, _prev: FormState): Promise<FormState> {
@@ -509,6 +512,8 @@ export async function setUpReceipts(id: string, _prev: FormState, formData: Form
     update.mandate_signed_at = saMidnight(mandate.signed_on);
     update.mandate_document_path = mandate.storage_path;
   }
+  // Once both are confirmed, the charities_s18a_period trigger opens an approval period in the same write: only gifts
+  // paid from then on (or in an earlier period) go on s18A receipts (23/11/2026).
   const { error } = await createAdminClient().from("charities").update(update).eq("id", id);
   if (error) return failed(error);
   await logAudit({
