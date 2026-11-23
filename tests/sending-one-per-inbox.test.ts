@@ -125,6 +125,12 @@ vi.mock("@/lib/audit", () => ({ logAudit: async () => undefined }));
 vi.mock("@/lib/charity/charity-actions", () => ({ recordAction: async () => "act1" }));
 vi.mock("@/lib/charity/weekly-limit", () => ({ WEEKLY_LIMIT: "One a week.", messagedThisWeek: async () => new Set<string>() }));
 vi.mock("@/lib/charity/dashboard-queries", () => ({ loadDonors: async () => donorList }));
+/** The Keeping donors rows the database would answer (23/11/2026: emailing a "not since" list). */
+let keepingRows: Row[] = [];
+const keepingAsked: { taxYear: number }[] = [];
+vi.mock("@/lib/charity/keeping-donors-queries", () => ({
+  loadKeepingDonors: async (_c: string, w: { taxYear: number }) => (keepingAsked.push({ taxYear: w.taxYear }), keepingRows),
+}));
 vi.mock("@/lib/charity/donor-care", () => ({ lapsedDaysFor: async () => 365, listSegments: async () => [], listTags: async () => [], tagsByDonor: async () => new Map() }));
 vi.mock("@/lib/email", () => {
   class EmailError extends Error {
@@ -172,6 +178,45 @@ beforeEach(() => {
   process.env.SITE_URL = "https://g.test";
   tables = { donations: [], charity_email_opt_outs: [], thank_you_opt_outs: [] };
   donorList = [];
+});
+
+describe("emailing a Keeping donors list (23/11/2026)", () => {
+  const keeping = (donor_id: string, cents: { this?: number; last?: number; earlier?: number; after?: number }) => ({
+    donor_id, this_cents: cents.this ?? 0, last_cents: cents.last ?? 0, earlier_cents: cents.earlier ?? 0, after_cents: cents.after ?? 0,
+    last_paid_at: "2025-06-01T10:00:00+02:00", recorded_only: false, display_name: donor_id, email: `${donor_id}@x.co`, phone: null, erased: false,
+  });
+  beforeEach(() => {
+    keepingAsked.length = 0;
+    donorList = [donor("ann", "ann@x.co"), donor("ben", "ben@x.co"), donor("cat", "cat@x.co")];
+    tables.donations.push(
+      gift("g1", "ann", "2025-06-01T10:00:00+02:00", "ann@x.co"),
+      gift("g2", "ben", "2026-10-01T10:00:00+02:00", "ben@x.co"),
+      gift("g3", "cat", "2023-06-01T10:00:00+02:00", "cat@x.co"),
+    );
+    // Ann gave last tax year and not since; Ben gave again this year; Cat gave only in an earlier year.
+    keepingRows = [keeping("ann", { last: 5_000 }), keeping("ben", { last: 5_000, this: 2_000 }), keeping("cat", { earlier: 3_000 })];
+  });
+
+  it("reaches only the donors on that list, and names it the way the page does", async () => {
+    const lybunt = await pickAudience(C, { kind: "keeping", list: "lybunt", year: "this" }, NOW);
+    expect(lybunt?.donors.map((d) => d.donor_id)).toEqual(["ann"]);
+    expect(lybunt?.label).toBe("Gave last tax year, not since");
+    const sybunt = await pickAudience(C, { kind: "keeping", list: "sybunt", year: "this" }, NOW);
+    expect(sybunt?.donors.map((d) => d.donor_id)).toEqual(["cat"]);
+    // The tax year that ends in February 2027 (this one, on 12/11/2026), as on the page.
+    expect(keepingAsked[0]).toEqual({ taxYear: 2027 });
+  });
+
+  it("looks back from last tax year when the page did", async () => {
+    const pick = await pickAudience(C, { kind: "keeping", list: "lybunt", year: "last" }, NOW);
+    expect(keepingAsked.at(-1)).toEqual({ taxYear: 2026 });
+    expect(pick?.label).toBe("Gave the tax year before last, not since");
+  });
+
+  it("leaves out someone who gave again after the list was opened", async () => {
+    keepingRows = [keeping("ann", { last: 5_000, this: 1_000 })];
+    expect((await pickAudience(C, { kind: "keeping", list: "lybunt", year: "this" }, NOW))?.donors).toEqual([]);
+  });
 });
 
 describe("an appeal reaches each inbox once", () => {

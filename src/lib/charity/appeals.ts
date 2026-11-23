@@ -5,7 +5,9 @@ import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { JOB_SEND_TIMEOUT_MS, mayHaveSent } from "@/lib/email/retry-plan";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { appealEmail, audienceValue, greetingName, type Audience } from "./appeals-rules";
+import { appealEmail, audienceValue, greetingName, keepingAudienceLabel, type Audience } from "./appeals-rules";
+import { keepingListRows, keepingWindow } from "./keeping-donors";
+import { loadKeepingDonors } from "./keeping-donors-queries";
 import { donorMatches, isErasedEmail } from "./dashboard";
 import { loadDonors, type DonorRow } from "./dashboard-queries";
 import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "./donor-care";
@@ -93,6 +95,14 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
       }
       donors = all.filter((d) => gave.has(d.donor_id));
       label = `Gave to "${campaign.title}"`;
+      break;
+    }
+    case "keeping": {
+      // The same list as the Keeping donors page shows, worked out again now (someone may have given since).
+      const rows = await loadKeepingDonors(charityId, keepingWindow(audience.year, now));
+      const listed = new Set(keepingListRows(rows, audience.list).flatMap((r) => (r.donor_id ? [r.donor_id] : [])));
+      donors = all.filter((d) => listed.has(d.donor_id));
+      label = keepingAudienceLabel(audience.list, audience.year);
       break;
     }
   }

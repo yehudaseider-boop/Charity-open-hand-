@@ -36,6 +36,8 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
   await requireViewer(`/charity-admin/${id}/keeping`);
   await loadCharityForManager(id);
   const canDownload = await viewerCan(id, "export");
+  // Emailing donors is the "message" permission, as on Email donors.
+  const canEmail = await viewerCan(id, "message");
   // The owner can add donors who haven't given since to the win-back journey (CRM step 7).
   const winBackOn = (await isOwner(id)) && (await journeysV2().catch(() => false));
   const sp = await searchParams;
@@ -121,7 +123,15 @@ export default async function KeepingDonorsPage({ params, searchParams }: PagePr
             ))}
           </ul>
 
-          <h2 className="font-display text-lg font-bold text-indigo">{meta.label}{w.running ? " (so far)" : ""}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-bold text-indigo">{meta.label}{w.running ? " (so far)" : ""}</h2>
+            {/* A personal email to everyone on a "not since" list (23/11/2026, Yehuda's meeting), written on Email donors. */}
+            {canEmail && listed.length > 0 && (list === "lybunt" || list === "sybunt") ? (
+              <Link href={`${base}/email-donors?to=keeping:${list}${w.key === "last" ? ":last" : ""}`} className={blueAction}>
+                Email these donors
+              </Link>
+            ) : null}
+          </div>
 
           {listed.length === 0 ? (
             <p className="rounded-card border-2 border-border bg-surface p-4 text-sm text-muted">{meta.empty}</p>

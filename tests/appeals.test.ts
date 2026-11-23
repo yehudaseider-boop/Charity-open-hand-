@@ -21,6 +21,10 @@ describe("emails to donors: what was typed", () => {
     for (const v of ["all", "group:lapsed", `tag:${id.toLowerCase()}`, `segment:${id.toLowerCase()}`, `campaign:${id.toLowerCase()}`]) expect(audienceValue(parseAudience(v)!)).toBe(v);
     expect(parseAudience(`tag:${id}`)).toEqual({ kind: "tag", tagId: id.toLowerCase() });
     for (const bad of ["", "everyone", "group:vip", "tag:1", "campaign:x' or 1=1", "segment:"]) expect(parseAudience(bad)).toBeNull();
+    // Keeping donors lists (23/11/2026): only the two "not since" lists, this year or looking back from last year.
+    for (const v of ["keeping:lybunt", "keeping:sybunt", "keeping:lybunt:last", "keeping:sybunt:last"]) expect(audienceValue(parseAudience(v)!)).toBe(v);
+    expect(parseAudience("keeping:lybunt:last")).toEqual({ kind: "keeping", list: "lybunt", year: "last" });
+    for (const bad of ["keeping:", "keeping:more", "keeping:less", "keeping:lybunt:this", "keeping:lybunt:last:x"]) expect(parseAudience(bad)).toBeNull();
   });
   it("greets a person by first name, a company without one", () => {
     expect(greetingName({ donor_type: "individual", display_name: "Dana Levi" })).toBe("Dana");

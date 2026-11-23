@@ -38,16 +38,32 @@ export type Audience =
   | { kind: "group"; group: DonorGroup }
   | { kind: "tag"; tagId: string }
   | { kind: "segment"; segmentId: string }
-  | { kind: "campaign"; campaignId: string };
+  | { kind: "campaign"; campaignId: string }
+  /** A Keeping donors list (23/11/2026): who gave in the year before the chosen tax year, or earlier, and not since. */
+  | { kind: "keeping"; list: KeepingAudienceList; year: "this" | "last" };
+
+/** The Keeping donors lists that can be emailed: the donors who haven't given since. */
+export type KeepingAudienceList = "lybunt" | "sybunt";
+
+/** What a Keeping donors audience is called in the form and on the sent email's line. */
+export function keepingAudienceLabel(list: KeepingAudienceList, year: "this" | "last"): string {
+  if (list === "sybunt") return year === "this" ? "Gave in an earlier year, not since" : "Gave before the tax year before last, not since";
+  return year === "this" ? "Gave last tax year, not since" : "Gave the tax year before last, not since";
+}
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** The audience as chosen in the form ("all", "group:lapsed", "tag:<id>", "segment:<id>", "campaign:<id>"). */
+/**
+ * The audience as chosen in the form ("all", "group:lapsed", "tag:<id>", "segment:<id>", "campaign:<id>",
+ * "keeping:lybunt" or "keeping:sybunt", with ":last" when looking back from last tax year).
+ */
 export function parseAudience(v: unknown): Audience | null {
   const s = String(v ?? "");
   if (s === "all") return { kind: "all" };
-  const [kind, id] = s.split(":");
+  const parts = s.split(":");
+  const [kind, id, extra] = parts;
   if (kind === "group" && isDonorGroup(id)) return { kind: "group", group: id };
+  if (kind === "keeping" && parts.length <= 3 && (id === "lybunt" || id === "sybunt") && (extra === undefined || extra === "last")) return { kind: "keeping", list: id, year: extra ? "last" : "this" };
   if (!uuid.test(id ?? "")) return null;
   if (kind === "tag") return { kind: "tag", tagId: id.toLowerCase() };
   if (kind === "segment") return { kind: "segment", segmentId: id.toLowerCase() };
@@ -62,6 +78,7 @@ export function audienceValue(a: Audience): string {
     case "tag": return `tag:${a.tagId}`;
     case "segment": return `segment:${a.segmentId}`;
     case "campaign": return `campaign:${a.campaignId}`;
+    case "keeping": return `keeping:${a.list}${a.year === "last" ? ":last" : ""}`;
   }
 }
 

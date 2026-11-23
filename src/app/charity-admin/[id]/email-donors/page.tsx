@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { appealsThisMonth, listAppeals } from "@/lib/charity/appeals";
 import { carryOnLine, carryOnState, type CarryOnState } from "@/lib/charity/carry-on-sends";
-import { audienceValue, parseAudience } from "@/lib/charity/appeals-rules";
+import { audienceValue, keepingAudienceLabel, parseAudience } from "@/lib/charity/appeals-rules";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { lapsedDaysFor, listSegments, listTags } from "@/lib/charity/donor-care";
 import { donorGroupsFor } from "@/lib/charity/insights";
@@ -52,6 +52,15 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
   const audiences = [
     { group: "Everyone", options: [{ value: "all", label: "All your donors" }] },
     { group: "Donor groups", options: donorGroupsFor(lapsedDays).map((g) => ({ value: `group:${g.key}`, label: g.label })) },
+    // Keeping donors: who hasn't given since (23/11/2026). Looking back from last tax year comes only from that page's button.
+    {
+      group: "Keeping donors",
+      options: [
+        { value: "keeping:lybunt", label: keepingAudienceLabel("lybunt", "this") },
+        { value: "keeping:sybunt", label: keepingAudienceLabel("sybunt", "this") },
+        ...(asked?.kind === "keeping" && asked.year === "last" ? [{ value: audienceValue(asked), label: keepingAudienceLabel(asked.list, "last") }] : []),
+      ],
+    },
     ...(segments.length ? [{ group: "Your saved lists", options: segments.map((s) => ({ value: `segment:${s.id}`, label: s.name })) }] : []),
     ...(tags.length ? [{ group: "Tags", options: tags.map((t) => ({ value: `tag:${t.id}`, label: `Tagged "${t.name}"` })) }] : []),
     ...(campaigns.length ? [{ group: "People who gave to a campaign", options: campaigns.filter((c) => c.status !== "draft").map((c) => ({ value: `campaign:${c.id}`, label: c.title })) }] : []),
