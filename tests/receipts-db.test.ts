@@ -155,8 +155,13 @@ describe("issue_s18a_receipt", () => {
   });
 });
 
-async function user(email: string) {
-  const { id } = await one("insert into auth.users (id, email, aud, role) values (gen_random_uuid(), $1, 'authenticated', 'authenticated') returning id", [email]);
+// A signed-up account with its email confirmed (link_donors_to_user links only to the account's own confirmed email,
+// security review 23/11/2026); { confirmed: false } for one that never confirmed it.
+async function user(email: string, { confirmed = true }: { confirmed?: boolean } = {}) {
+  const { id } = await one(
+    "insert into auth.users (id, email, aud, role, email_confirmed_at) values (gen_random_uuid(), $1, 'authenticated', 'authenticated', case when $2 then now() end) returning id",
+    [email, confirmed],
+  );
   return id as string;
 }
 const asUser = async (id: string) => {
@@ -176,6 +181,18 @@ describe("link_donors_to_user", () => {
       const linked = await run("select user_id, email_verified_at from public.donors where user_id = $1", [u]);
       expect(linked.rows).toHaveLength(2);
       expect(linked.rows.every((r) => r.email_verified_at)).toBe(true);
+    });
+  });
+
+  it("links nothing to an account that never confirmed its email, or to an email that isn't the account's own", async () => {
+    await tx(async () => {
+      const email = `unconfirmed-${Date.now()}@example.co.za`;
+      const unconfirmed = await user(email, { confirmed: false });
+      const other = await user(`other-${Date.now()}@example.co.za`);
+      await run(`insert into public.donors (email, donor_type, age_confirmed_18_at, popia_consent_at) values ($1, 'individual', now(), now())`, [email]);
+      expect((await one("select public.link_donors_to_user($1, $2) as n", [unconfirmed, email])).n).toBe(0);
+      expect((await one("select public.link_donors_to_user($1, $2) as n", [other, email])).n).toBe(0);
+      expect((await one("select user_id from public.donors where email = $1", [email])).user_id).toBeNull();
     });
   });
 
