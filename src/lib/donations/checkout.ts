@@ -9,7 +9,7 @@ import { savedAddress, savedIdNumber } from "./saved-id";
 import { savedCardsOpen } from "./app-api";
 import { loadSavedCardToken, requestCardSave } from "./saved-card";
 import { checkGivingAllowed, rememberGiftStart } from "./giving-guard";
-import { linkDonorsToUser } from "@/lib/donors/link";
+import { linkDonorsForSession } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
@@ -213,21 +213,18 @@ export async function startDonation(args: {
   // Card-testing protection: only new attempts that would reach the payment page count (limits per email and per
   // address, a wait after several declined cards). Asking again about an attempt already recorded (above) is never
   // refused: that gift may already be charged. See giving-guard.ts; the values are in platformConfig.givingGuard.
-  const refused = await checkGivingAllowed({ email: v.email, ip: args.ip, charityId: charity.id });
-  if (refused) return { ok: false, message: refused.message, limited: true };
   // The account that started this gift: one signed in with this same email (checked by the caller), else none.
   // Guest gifts and gifts given with another email are never a source for that account's saved ID or address.
   const sameEmail = (a?: { email: string }) => Boolean(a?.email) && a!.email.trim().toLowerCase() === v.email.trim().toLowerCase();
+  // Signed in with this same email: never counted against the email's own ceiling (security review 23/11/2026).
+  const refused = await checkGivingAllowed({ email: v.email, ip: args.ip, charityId: charity.id, signedInSameEmail: sameEmail(args.signedInAs) });
+  if (refused) return { ok: false, message: refused.message, limited: true };
   const startedBy = [args.signedInAs, args.useSavedIdOf, args.saveCardFor, args.useSavedCardOf].find(sameEmail)?.userId ?? null;
   const donorId = await findOrCreateDonor(v, detailsNow, startedBy);
-  // Signed in with this same (confirmed) email: the donation joins their account now,
-  // not at their next sign-in. Never for a different address.
+  // Signed in with this same (confirmed) email by an emailed link or code: the donation joins their account now,
+  // not at their next sign-in. Never for a different address, never for a password session (23/11/2026).
   try {
-    const { data } = await (await createClient()).auth.getUser();
-    const user = data.user;
-    if (user?.email && user.email_confirmed_at && user.email.toLowerCase() === v.email.toLowerCase()) {
-      await linkDonorsToUser(user.id, user.email);
-    }
+    await linkDonorsForSession(await createClient(), { onlyEmail: v.email });
   } catch (e) {
     console.error(e);
   }

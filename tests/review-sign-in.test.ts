@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
   fail: null as Fail,
   audits: [] as string[],
   wrongCounted: 0,
+  ipCounted: 0,
   links: [] as string[],
 }));
 vi.mock("server-only", () => ({}));
@@ -29,6 +30,7 @@ vi.mock("@/lib/rate-limit", () => ({
   hitRateLimit: async (bucket: string) => {
     if (state.fail === "limits") throw new Error("db down");
     if (bucket === "review-sign-in-wrong") state.wrongCounted += 1;
+    if (bucket === "review-sign-in-ip") state.ipCounted += 1;
     return bucket === "review-sign-in-ip" ? state.limitedIp : false;
   },
   rateLimitReached: async () => state.wrongCodesFull,
@@ -69,7 +71,7 @@ const CODE = "48213907";
 beforeEach(() => {
   vi.stubEnv("REVIEW_SIGN_IN_EMAIL", EMAIL);
   vi.stubEnv("REVIEW_SIGN_IN_CODE", CODE);
-  Object.assign(state, { limitedIp: false, wrongCodesFull: false, role: "user", profileId: "u-review", linkUserId: "u-review", verificationType: "magiclink", charities: 0, donors: [], gifts: 0, fail: null, audits: [], wrongCounted: 0, links: [] });
+  Object.assign(state, { limitedIp: false, wrongCodesFull: false, role: "user", profileId: "u-review", linkUserId: "u-review", verificationType: "magiclink", charities: 0, donors: [], gifts: 0, fail: null, audits: [], wrongCounted: 0, ipCounted: 0, links: [] });
 });
 
 describe("the reviewer's settings", () => {
@@ -142,6 +144,28 @@ describe("the reviewer's sign-in", () => {
   it("is unavailable, not open, when the limits can't be checked", async () => {
     state.fail = "limits";
     expect((await ask({ email: EMAIL, code: CODE })).status).toBe(503);
+  });
+  it("counts every try per address and answers any email the same way, so the reviewer's email can't be found (23/11/2026)", async () => {
+    // Every try from an address counts, whichever email it names.
+    await ask({ email: "someone@x.co", code: "00000000" });
+    await ask({ email: EMAIL, code: "00000000" });
+    await ask({ email: "", code: "" });
+    expect(state.ipCounted).toBe(3);
+    // Over the address limit: every email is told the same.
+    state.limitedIp = true;
+    const answers = await Promise.all([EMAIL, "someone@x.co", "other@y.co"].map((email) => ask({ email, code: "00000000" })));
+    for (const r of answers) expect(r.status).toBe(429);
+    const bodies = await Promise.all(answers.map((r) => r.json()));
+    expect(new Set(bodies.map((b) => JSON.stringify(b))).size).toBe(1);
+    // Too many wrong codes in all: the same for every email too.
+    state.limitedIp = false;
+    state.wrongCodesFull = true;
+    for (const email of [EMAIL, "someone@x.co"]) expect((await ask({ email, code: "00000000" })).status).toBe(429);
+    // A limit that can't be checked: unavailable for every email alike.
+    state.wrongCodesFull = false;
+    state.fail = "limits";
+    for (const email of [EMAIL, "someone@x.co"]) expect((await ask({ email, code: "00000000" })).status).toBe(503);
+    expect(state.links).toEqual([]);
   });
   it("asks for Send code first when the account doesn't exist yet, without making one", async () => {
     state.profileId = null;

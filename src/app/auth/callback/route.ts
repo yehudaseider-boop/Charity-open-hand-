@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNextPath } from "@/lib/safe-path";
-import { linkDonorsToUser } from "@/lib/donors/link";
+import { linkDonorsForSession } from "@/lib/donors/link";
 import { requestOrigin } from "@/lib/request-origin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,14 +16,12 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // Signing in proves they own this email address: attach their past donations.
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        try {
-          await linkDonorsToUser(user.id, user.email);
-        } catch (e) {
-          console.error(e instanceof Error ? e.message : e); // never block signing in
-        }
+      // Signing in with the emailed link proves they own this email address: attach their past donations. Only for an
+      // emailed sign-in with a confirmed email, never a password session (security review 23/11/2026).
+      try {
+        await linkDonorsForSession(supabase);
+      } catch (e) {
+        console.error(e instanceof Error ? e.message : e); // never block signing in
       }
       return NextResponse.redirect(`${origin}${next}`);
     }

@@ -22,7 +22,7 @@ const answer = (status: number, message: string) => NextResponse.json({ ok: fals
 const refused = () => answer(401, "That code didn't work or has expired. Check it, or tap Send a new code.");
 const unavailable = () => answer(503, "Sign-in isn't available just now. Please try again in a minute.");
 
-// Per address, every try counts. In all, only wrong codes count, and the allowance is wide, so someone who knows the
+// Per address, every try counts, whatever the email. In all, only the reviewer's wrong codes count, and the allowance is wide, so someone who knows the
 // reviewer's email can't easily lock the reviewer out; a code of 8 or more digits still can't be guessed at this rate.
 const PER_ADDRESS_PER_HOUR = 10;
 const WRONG_CODES_PER_HOUR = 50;
@@ -32,9 +32,10 @@ export async function POST(request: NextRequest) {
   if (!setting) return answer(404, "Not available.");
   const body = (await request.json().catch(() => null)) as { email?: unknown; code?: unknown } | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  // Everyone else's mistyped code is simply refused, without counting against the reviewer's tries.
-  if (email !== setting.email) return refused();
 
+  // Every try is counted per address, and the limits are checked, before the email is compared (security review
+  // 23/11/2026): any email gets the same answers at the same point, so nobody can find the reviewer's email by which
+  // one is ever told "too many tries".
   const ip = ipKeys(clientIp(request.headers));
   try {
     if (await hitRateLimit("review-sign-in-ip", ip, PER_ADDRESS_PER_HOUR, 60)) return answer(429, "Too many tries. Please wait an hour and try again.");
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
     console.error("[review sign-in] limit check failed", e);
     return unavailable();
   }
+  // Everyone else's mistyped code is refused, without counting against the reviewer's wrong codes in all.
+  if (email !== setting.email) return refused();
 
   if (!isReviewSignIn(setting, body?.email, body?.code)) {
     try {

@@ -26,6 +26,7 @@ import { checkFocus } from "@/lib/charity/focus-check";
 import { checkThankYouNote } from "@/lib/charity/thank-you-note";
 import { focusDay, focusStatus, jhbToday } from "@/lib/charity/focus";
 import { refusal } from "@/lib/charity/team";
+import { siteChanges } from "@/lib/charity/profile-changes";
 
 /** An approved charity is public with a "Verified" badge: tell us when its name or pictures change, so we can look. */
 async function tellReviewer(charity: { id: string; status: string; name_en: string }, what: string) {
@@ -112,7 +113,9 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     action: "charity.profile_updated",
     entityType: "charity",
     entityId: charityId,
-    details: renamed ? { name_from: charity.name_en, name_to: v.name_en } : undefined,
+    // site_changes: the database records this change too; the daily email leaves out the ones a website save made
+    // (src/lib/charity/profile-changes.ts, 23/11/2026).
+    details: { ...(renamed ? { name_from: charity.name_en, name_to: v.name_en } : {}), site_changes: siteChanges(before, after) },
   });
   const figureBefore = [charity.impact_unit_cents, charity.impact_unit_one, charity.impact_unit_many].map((x) => (x == null ? "" : String(x))).join("|");
   const figureAfter = [impact.unit?.cents, impact.unit?.one, impact.unit?.many].map((x) => (x == null ? "" : String(x))).join("|");
@@ -156,7 +159,7 @@ export async function uploadImage(
 
   // The previous image file is kept, so "Undo" can put it back.
   const old = kind === "logo" ? charity.logo_path : charity.cover_path;
-  await logAudit({ actorUserId: viewer.userId, action: `charity.${kind}_changed`, entityType: "charity", entityId: charityId });
+  await logAudit({ actorUserId: viewer.userId, action: `charity.${kind}_changed`, entityType: "charity", entityId: charityId, details: { site_changes: siteChanges({ [column]: old ?? null }, { [column]: path }) } });
   await tellReviewer(charity, kind === "logo" ? "its logo" : "its cover image");
   const done = await recordAction(charityId, viewer.userId, kind === "logo" ? "logo_changed" : "cover_changed", {}, {
     type: "restore", table: "charities", before: { [column]: old ?? null }, after: { [column]: path }, dropFile: { bucket: "charity-public", path },

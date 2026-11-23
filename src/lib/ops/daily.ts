@@ -10,6 +10,7 @@ import { retryReceiptEmail } from "@/lib/receipts/email-retry";
 import { auditRetry, recordFailedConfirmations, runEmailRetries, supabaseRetryStore, type RetryHandler, type RetrySummary } from "@/lib/email/retry";
 import { emailIsOn, RETRY_DELAYS_HOURS, retryDigestLines, type RetryKind } from "@/lib/email/retry-plan";
 import { heldLabel } from "./held";
+import { changesOutsideWebsite, outsideWebsiteLines, WEBSITE_SAVE_WINDOW_MS, type AuditRow } from "@/lib/charity/profile-changes";
 import { formatRand } from "@/lib/money";
 import { formatDate } from "@/lib/dates";
 
@@ -79,6 +80,11 @@ export type DailyChecks = {
   privacyRequests?: { open: number; oldestAt: string | null };
   /** "Request a charity" (15/11/2026): asks in the last day, and charities still asked for and not yet handled. */
   charityRequests?: { lastDay: number; waiting: number };
+  /**
+   * Changes to an approved charity's public profile in the last day that no website save accounts for (made straight
+   * through the database, 23/11/2026): one plain line per charity, for the reviewer. Charity names only, never donors.
+   */
+  profileChangesOutsideWebsite?: string[];
 };
 
 const HOUR = 3_600_000;
@@ -253,7 +259,35 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity, opts
     const e = lastDay.error ?? waiting.error;
     if (!missing(e?.code)) console.error("[daily] could not count charity requests", e?.message);
   } else out.charityRequests = { lastDay: lastDay.count ?? 0, waiting: waiting.count ?? 0 };
+
+  // 7. Public profile changes made outside the website (security review 23/11/2026): the database records each one
+  // (charity.profile_changed); the website's own saves carry the same fingerprints, so only the others are listed.
+  try {
+    out.profileChangesOutsideWebsite = await profileChangesOutsideWebsite(db, now);
+  } catch (e) {
+    console.error("[daily] could not check profile changes made outside the website", e instanceof Error ? e.message : e);
+  }
   return out;
+}
+
+/** The last day's profile changes no website save accounts for, as lines for the daily email. */
+async function profileChangesOutsideWebsite(db: ReturnType<typeof createAdminClient>, now: Date): Promise<string[]> {
+  const since = new Date(now.getTime() - 24 * HOUR).toISOString();
+  const cols = "actor_user_id, entity_id, created_at, details";
+  const [changes, saves] = await Promise.all([
+    db.from("audit_log").select(cols).eq("action", "charity.profile_changed").gte("created_at", since).order("created_at").limit(500),
+    db
+      .from("audit_log")
+      .select(cols)
+      .in("action", ["charity.profile_updated", "charity.logo_changed", "charity.cover_changed"])
+      .gte("created_at", since)
+      .lte("created_at", new Date(now.getTime() + WEBSITE_SAVE_WINDOW_MS).toISOString())
+      .order("created_at")
+      .limit(2000),
+  ]);
+  if (changes.error) throw changes.error;
+  if (saves.error) throw saves.error;
+  return outsideWebsiteLines(changesOutsideWebsite((changes.data ?? []) as AuditRow[], (saves.data ?? []) as AuditRow[]));
 }
 
 /** Each kind's sender for a try again. */
@@ -413,6 +447,7 @@ export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   if (c.charityRequests?.lastDay) {
     lines.push(`${n(c.charityRequests.lastDay, "donor asked", "donors asked")} for a charity that isn't on Givezy yet. ${n(c.charityRequests.waiting, "request waits", "requests wait")} for a look in Admin: Overview, then Charity requests.`);
   }
+  lines.push(...(c.profileChangesOutsideWebsite ?? []));
   if (c.unhandledEvents) lines.push(`${n(c.unhandledEvents, "message from the payment provider was", "messages from the payment provider were")} not handled within an hour.`);
   if (c.emailRetries) lines.push(...retryDigestLines(c.emailRetries));
   if (c.confirmations.failedAgain) lines.push(`${n(c.confirmations.failedAgain, "confirmation email", "confirmation emails")} to donors still could not be sent.`);

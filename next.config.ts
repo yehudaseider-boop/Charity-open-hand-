@@ -43,7 +43,9 @@ const previewCsp = [
   "img-src 'self' blob: data: https:",
   "font-src 'self' data:",
   "frame-src 'self'",
-  "connect-src 'self' https:",
+  // The preview is built with no database or website address (scripts/build-app-preview.sh), so it fetches nothing
+  // from elsewhere: its own files only (security review 23/11/2026; was any https address).
+  "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'self'",
@@ -91,8 +93,9 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      // Everything except the app's browser preview (below).
-      { source: "/((?!app-preview).*)", headers: securityHeaders },
+      // Everything except the app's browser preview (below): /app-preview itself and what is inside that folder only.
+      // (Until 23/11/2026 any address starting with "app-preview", such as /app-previewz, got no headers at all.)
+      { source: "/((?!app-preview/|app-preview$).*)", headers: securityHeaders },
       // The app's browser preview (19/11/2026, public/app-preview): the app's own pages, shown in a frame on the same
       // address, with its made-up charity photos from the web. Never listed by search engines.
       {

@@ -33,7 +33,7 @@ function builder(table: string) {
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: builder }) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) }));
 vi.mock("@/lib/donations/giving-guard", () => ({ checkGivingAllowed: async () => null, rememberGiftStart: async () => {} }));
-vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
+vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {}, linkDonorsForSession: async () => 0 }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
 vi.mock("@/lib/donations/saved-card", () => ({ loadSavedCardToken: async () => ({ code: "AUTH_SECRET", gateway: "test" }), requestCardSave: async () => {} }));

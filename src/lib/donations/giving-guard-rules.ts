@@ -4,12 +4,13 @@
  */
 
 /** Why a gift start was refused. Counted (never with an email or address) for Admin, Payments. */
-export type GuardReason = "email" | "address" | "email-day" | "address-day" | "declines" | "bot";
+export type GuardReason = "email" | "email-many" | "address" | "email-day" | "address-day" | "declines" | "bot";
 
 export const GUARD_REASON_LABEL: Record<GuardReason, string> = {
-  email: "Too many tries from one email",
+  email: "Too many tries from one email on one internet address",
+  "email-many": "Too many tries for one email from many internet addresses",
   address: "Too many tries from one internet address",
-  "email-day": "Daily limit for one email",
+  "email-day": "Daily limit for one email on one internet address",
   "address-day": "Daily limit for one internet address",
   declines: "Waiting after several declined cards",
   bot: "Looked like a bot (form filled in too fast, or the hidden field filled)",

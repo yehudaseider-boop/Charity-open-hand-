@@ -98,9 +98,22 @@ export const platformConfig = {
    * An address is shared by many donors (an office, a school hall, a mobile network), so it gets more than an email.
    */
   givingGuard: {
-    /** Gift starts per email address. */
+    /**
+     * Gift starts per email on one internet address (changed 23/11/2026, security review: these used to count per
+     * email alone, so anyone could stop a named donor giving for a day by starting unpaid gifts with their email).
+     * The values are unchanged; they now count an email together with the address it came from, like sign-in.
+     */
     perEmail: { tries: 5, minutes: 10 },
     perEmailDay: { tries: 20, minutes: 1_440 },
+    /**
+     * Each email's own ceiling across all addresses (23/11/2026): ten times the limits above, so locking a donor out
+     * needs starts from at least ten different internet addresses at once (each address is held to the limits above
+     * for that email), and a donor signed in with that same email is never counted here at all. Card testing with
+     * one email from many addresses still meets the per-address limits below and the wait after declined cards.
+     * Starting values for Yehuda to confirm (go-live list).
+     */
+    perEmailAnyAddress: { tries: 50, minutes: 10 },
+    perEmailAnyAddressDay: { tries: 200, minutes: 1_440 },
     /**
      * Gift starts per internet address. Raised on 12/11/2026 (from 30 and 150): South African mobile networks put
      * very many phones behind one shared address, so a busy campaign evening must not stop real donors. Starting

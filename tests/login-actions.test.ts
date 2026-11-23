@@ -54,7 +54,7 @@ vi.mock("@/lib/supabase/server", () => ({
     },
   }),
 }));
-vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
+vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {}, linkDonorsForSession: async () => 0 }));
 
 const { sendLoginLink, verifyLoginCode } = await import("@/app/login/actions");
 const { sentProofMatches, sentProof, signInMessages } = await import("@/lib/sign-in");

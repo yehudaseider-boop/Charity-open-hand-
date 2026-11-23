@@ -49,7 +49,7 @@ vi.mock("@/lib/rate-limit", () => ({
   ipKeys: (ip: string) => [`ip:${ip}`],
   hashedKey: (kind: string, value: string) => `${kind}#${value}`,
 }));
-vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
+vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {}, linkDonorsForSession: async () => 0 }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
 vi.mock("@/lib/donations/saved-id", () => ({ savedIdNumber: async () => "8001015009087", savedIdLast4: async () => "9087" }));

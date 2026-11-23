@@ -11,7 +11,7 @@ import { tooManyTriesMessage, type GuardReason } from "./giving-guard-rules";
 /**
  * Card-testing protection (11/11/2026). Criminals use donation forms to try stolen card numbers, many small gifts
  * in a short time. Every way a gift starts (website, monthly sign-up, phone app) passes through checkGivingAllowed:
- * limits per email and per internet address, a wait after several declined cards, and an alarm to the Givezy team
+ * limits per email on one internet address, per email overall (much higher) and per internet address, a wait after several declined cards, and an alarm to the Givezy team
  * when one charity suddenly gets far more gift starts or declines than usual.
  *
  * If the limits store can't be read, the gift goes ahead (and the server log says so): our own outage must never
@@ -26,12 +26,23 @@ export type GuardRefusal = { reason: GuardReason; message: string };
 
 const keysOf = (key: string | null): string[] => (key ? [key] : []);
 
-/** One gift start: allowed (null) or refused with the plain message to show. Counts this start. */
-export async function checkGivingAllowed(args: { email: string; ip: string; charityId: string }): Promise<GuardRefusal | null> {
+/**
+ * One gift start: allowed (null) or refused with the plain message to show. Counts this start.
+ * `signedInSameEmail`: the server checked that the donor is signed in with this same email (never what the form says).
+ */
+export async function checkGivingAllowed(args: { email: string; ip: string; charityId: string; signedInSameEmail?: boolean }): Promise<GuardRefusal | null> {
   try {
     const email = args.email.trim().toLowerCase();
     const addressKeys = ipKeys(args.ip);
-    const emailKeys = keysOf(hashedKey("email", email));
+    const emailKey = hashedKey("email", email);
+    const emailKeys = keysOf(emailKey);
+    // The tight email limits count an email together with the address it came from (security review 23/11/2026), so a
+    // stranger starting unpaid gifts with someone's email can't stop that person giving from their own phone. Starts
+    // with no known address share one count per email, as before.
+    const pairKeys = emailKey ? [`${emailKey}|${addressKeys[0] ?? "ip#unknown"}`] : [];
+    // Each email's own, much higher ceiling across all addresses. A start made while signed in with this same email is
+    // never counted in it, so nobody else's starts can lock a signed-in donor out of their own giving.
+    const ceilingKeys = args.signedInSameEmail ? [] : emailKeys;
 
     // The checks run side by side, not one after another (12/11/2026: pressing Give took about 3 seconds before the
     // payment page, most of it these checks waiting on each other). The answer is read in the same order as before,
@@ -47,16 +58,18 @@ export async function checkGivingAllowed(args: { email: string; ip: string; char
     if (declinedEmail) return refuse("declines", guard.declinesPerEmail.minutes);
     if (declinedAddress) return refuse("declines", guard.declinesPerAddress.minutes);
 
-    // The existing short limits (the email bucket keeps the address as typed, so erasing a donor clears it), in the
-    // order they are answered, and a sudden rush on one charity (attackers change addresses and emails): the team is
+    // The short limits (email with address, each email's own ceiling, address), then the day's, in the order they are
+    // answered, and a sudden rush on one charity (attackers change addresses and emails): the team is
     // told, donors are never blocked. Each counts this start, side by side. A start refused by one limit stays counted
     // only in that limit and the ones before it, as when they were checked in turn (13/11/2026: counting it in every
     // limit could turn a 10-minute wait into a day's), and never in the charity's rush count. A limit that couldn't be
     // checked never lets a refusal from another one through.
     const limits: { bucket: string; keys: string[]; tries: number; minutes: number; reason: GuardReason }[] = [
-      { bucket: "checkout", keys: [`email:${email}`], ...guard.perEmail, reason: "email" },
+      { bucket: "checkout-pair", keys: pairKeys, ...guard.perEmail, reason: "email" },
+      { bucket: "checkout-email", keys: ceilingKeys, ...guard.perEmailAnyAddress, reason: "email-many" },
       { bucket: "checkout-ip", keys: addressKeys, ...guard.perAddress, reason: "address" },
-      { bucket: "checkout-day", keys: emailKeys, ...guard.perEmailDay, reason: "email-day" },
+      { bucket: "checkout-pair-day", keys: pairKeys, ...guard.perEmailDay, reason: "email-day" },
+      { bucket: "checkout-email-day", keys: ceilingKeys, ...guard.perEmailAnyAddressDay, reason: "email-many" },
       { bucket: "checkout-ip-day", keys: addressKeys, ...guard.perAddressDay, reason: "address-day" },
     ];
     const [rush, ...counted] = await Promise.allSettled([
@@ -189,7 +202,7 @@ export async function givingGuardSummary(now = new Date()): Promise<GuardSummary
   const db = createAdminClient();
   const dayAgo = new Date(now.getTime() - 24 * 3_600_000).toISOString();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 3_600_000).toISOString();
-  const reasons: GuardReason[] = ["email", "address", "email-day", "address-day", "declines", "bot"];
+  const reasons: GuardReason[] = ["email", "email-many", "address", "email-day", "address-day", "declines", "bot"];
   const counts = await Promise.all(
     reasons.map(async (reason) => {
       const { count, error } = await db.from("rate_limit_events").select("id", { count: "exact", head: true }).eq("bucket", "giving-blocked").eq("key", `reason:${reason}`).gte("created_at", dayAgo);

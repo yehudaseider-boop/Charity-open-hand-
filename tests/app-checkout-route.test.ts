@@ -42,7 +42,7 @@ vi.mock("@/lib/rate-limit", () => ({
   ipKeys: (ip: string) => [`ip:${ip}`],
   hashedKey: (kind: string, value: string) => `${kind}#${value}`,
 }));
-vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {} }));
+vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {}, linkDonorsForSession: async () => 0 }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
 vi.mock("@/lib/donations/saved-id", () => ({
@@ -127,20 +127,34 @@ describe("app checkout endpoint", () => {
     expect(checkouts[0]).toMatchObject({ saveCard: false });
   });
 
-  it("counts only tries that would reach the payment page: per email and per address, short and daily", async () => {
+  it("counts only tries that would reach the payment page: per email on one address, per email overall and per address, short and daily", async () => {
     await call({ ...gift, giftCents: 100, shownTotalCents: 1_100, details });
     expect(limits).toHaveLength(0);
     await call({ ...gift, details });
     // Counted side by side (13/11/2026), so in no particular order.
     expect(limits.map((l) => [l.bucket, l.limit]).sort()).toEqual(
       [
-        ["checkout", 5],
+        ["checkout-pair", 5],
+        ["checkout-email", 50],
         ["checkout-ip", 60],
-        ["checkout-day", 20],
+        ["checkout-pair-day", 20],
+        ["checkout-email-day", 200],
         ["checkout-ip-day", 300],
         ["checkout-charity", 60],
       ].sort(),
     );
+  });
+
+  it("a donor signed in with the gift's own email is never counted against that email's ceiling; anyone else is (23/11/2026)", async () => {
+    signedIn = { userId: "u1", email: "A@example.com" };
+    await call({ ...gift, details });
+    expect(limits.find((l) => l.bucket === "checkout-email")?.keys).toEqual([]);
+    expect(limits.find((l) => l.bucket === "checkout-email-day")?.keys).toEqual([]);
+    expect(limits.find((l) => l.bucket === "checkout-pair")?.keys).toHaveLength(1);
+    limits.length = 0;
+    signedIn = { userId: "u1", email: "someone.else@example.com" };
+    await call({ ...gift, details });
+    expect(limits.find((l) => l.bucket === "checkout-email")?.keys).toHaveLength(1);
   });
 
   it("fills in the saved ID number for the signed-in donor giving with their own email", async () => {

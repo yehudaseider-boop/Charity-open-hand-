@@ -24,7 +24,8 @@ vi.mock("@/lib/rate-limit", () => ({
     // Written but not counted: the rows written come back on the error, as takeAttempt does.
     if (failing.has(bucket)) throw Object.assign(new Error("count failed"), { attemptIds: keys.map((k) => `${bucket}|${k}`) });
     calls.push({ fn: "hit", bucket, keys, limit, minutes });
-    return { limited: over.has(bucket), ids: keys.map((k) => `${bucket}|${k}`) };
+    // As the real one: no keys, nothing counted and never limited.
+    return { limited: keys.length > 0 && over.has(bucket), ids: keys.map((k) => `${bucket}|${k}`) };
   },
   forgetAttempts: async (ids: string[]) => void forgotten.push(...ids),
   clearOldAttempts: async () => {},
@@ -117,22 +118,27 @@ describe("checkGivingAllowed", () => {
       ["reached", "checkout-declined", 3, 60],
       ["reached", "checkout-declined", 30, 60],
       ["hit", "checkout-charity", 60, 10],
-      ["hit", "checkout", 5, 10],
+      ["hit", "checkout-pair", 5, 10],
+      ["hit", "checkout-email", 50, 10],
       ["hit", "checkout-ip", 60, 10],
-      ["hit", "checkout-day", 20, 1_440],
+      ["hit", "checkout-pair-day", 20, 1_440],
+      ["hit", "checkout-email-day", 200, 1_440],
       ["hit", "checkout-ip-day", 300, 1_440],
     ]);
     expect(forgotten).toEqual([]);
-    // The email is compared without spaces or capitals; addresses only ever as stand-ins.
-    expect(calls[3].keys).toEqual(["email:donor@example.com"]);
+    // The email is compared without spaces or capitals, and only ever as a stand-in, as are addresses.
+    expect(calls[3].keys).toEqual(["email#donor@example.com|ip#196.1.2.3"]);
+    expect(calls[4].keys).toEqual(["email#donor@example.com"]);
     expect(calls[0].keys).toEqual(["email#donor@example.com"]);
     expect(calls[1].keys).toEqual(["ip#196.1.2.3"]);
   });
 
   it.each([
-    ["checkout", "email", /in 10 minutes/],
+    ["checkout-pair", "email", /in 10 minutes/],
+    ["checkout-email", "email-many", /in 10 minutes/],
     ["checkout-ip", "address", /in 10 minutes/],
-    ["checkout-day", "email-day", /tomorrow/],
+    ["checkout-pair-day", "email-day", /tomorrow/],
+    ["checkout-email-day", "email-many", /tomorrow/],
     ["checkout-ip-day", "address-day", /tomorrow/],
   ])("refuses once the %s limit is used up, says nothing was charged, and counts the reason", async (bucket, reason, wait) => {
     over.add(bucket);
@@ -203,29 +209,38 @@ describe("checkGivingAllowed", () => {
   it("a start refused by one limit stays counted only there and in the limits before it, never in the rush count (13/11/2026)", async () => {
     // Over the 10-minute email limit: the day's email limit and both address limits don't count this press,
     // so pressing on while told to wait can't turn the 10 minutes into a day.
-    over.add("checkout");
+    over.add("checkout-pair");
     expect((await checkGivingAllowed(start))?.reason).toBe("email");
     expect(forgotten.sort()).toEqual(
-      ["checkout-charity|charity:c1", "checkout-ip|ip#196.1.2.3", "checkout-day|email#donor@example.com", "checkout-ip-day|ip#196.1.2.3"].sort(),
+      [
+        "checkout-charity|charity:c1",
+        "checkout-email|email#donor@example.com",
+        "checkout-ip|ip#196.1.2.3",
+        "checkout-pair-day|email#donor@example.com|ip#196.1.2.3",
+        "checkout-email-day|email#donor@example.com",
+        "checkout-ip-day|ip#196.1.2.3",
+      ].sort(),
     );
-    // Refused by the address limit: the email limit before it keeps the press, as when they were checked in turn.
+    // Refused by the address limit: the email limits before it keep the press, as when they were checked in turn.
     forgotten.length = 0;
     over = new Set(["checkout-ip"]);
     expect((await checkGivingAllowed(start))?.reason).toBe("address");
-    expect(forgotten.sort()).toEqual(["checkout-charity|charity:c1", "checkout-day|email#donor@example.com", "checkout-ip-day|ip#196.1.2.3"].sort());
+    expect(forgotten.sort()).toEqual(
+      ["checkout-charity|charity:c1", "checkout-pair-day|email#donor@example.com|ip#196.1.2.3", "checkout-email-day|email#donor@example.com", "checkout-ip-day|ip#196.1.2.3"].sort(),
+    );
   });
 
   it("when two limits are used up, the first in order answers, as before", async () => {
-    over = new Set(["checkout-ip-day", "checkout"]);
+    over = new Set(["checkout-ip-day", "checkout-pair"]);
     expect((await checkGivingAllowed(start))?.reason).toBe("email");
-    over = new Set(["checkout-ip-day", "checkout-day"]);
+    over = new Set(["checkout-ip-day", "checkout-pair-day"]);
     expect((await checkGivingAllowed(start))?.reason).toBe("email-day");
   });
 
   it("a limit that couldn't be checked never lets another limit's refusal through", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     failing = new Set(["checkout-charity", "checkout-ip"]);
-    over.add("checkout-day");
+    over.add("checkout-pair-day");
     expect((await checkGivingAllowed(start))?.reason).toBe("email-day");
     // With nothing used up, a failed check still lets the donor give (our outage never stops a donor), and says so.
     over = new Set();
@@ -236,23 +251,58 @@ describe("checkGivingAllowed", () => {
 
   it("a limit written but not counted is still taken back after a refusal, so it never counts a refused start", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    over.add("checkout");
-    failing = new Set(["checkout-day"]);
+    over.add("checkout-pair");
+    failing = new Set(["checkout-pair-day"]);
     expect((await checkGivingAllowed(start))?.reason).toBe("email");
-    expect(forgotten).toContain("checkout-day|email#donor@example.com");
+    expect(forgotten).toContain("checkout-pair-day|email#donor@example.com|ip#196.1.2.3");
     err.mockRestore();
   });
 
   it("a refused start never raises the charity's rush alarm", async () => {
-    over = new Set(["checkout", "checkout-charity"]);
+    over = new Set(["checkout-pair", "checkout-charity"]);
     expect((await checkGivingAllowed(start))?.reason).toBe("email");
     await runLater();
     expect(alerts).toHaveLength(0);
   });
 
-  it("with no known address, still limits the email", async () => {
-    over.add("checkout");
+  it("with no known address, still limits the email (all such starts share one count per email)", async () => {
+    over.add("checkout-pair");
     expect((await checkGivingAllowed({ ...start, ip: "unknown" }))?.reason).toBe("email");
+    expect(calls.find((c) => c.bucket === "checkout-pair")?.keys).toEqual(["email#donor@example.com|ip#unknown"]);
+  });
+
+  it("a stranger using a donor's email from their own address can't stop the donor giving from theirs (23/11/2026)", async () => {
+    // Each email-and-address pair has its own count: the stranger's address and the donor's address never share one.
+    await checkGivingAllowed({ ...start, ip: "41.0.0.9" });
+    await checkGivingAllowed(start);
+    const pairs = calls.filter((c) => c.bucket === "checkout-pair" || c.bucket === "checkout-pair-day").map((c) => c.keys[0]);
+    expect(new Set(pairs)).toEqual(new Set(["email#donor@example.com|ip#41.0.0.9", "email#donor@example.com|ip#196.1.2.3"]));
+    // The email's own ceiling is ten times the pair's: a lockout needs at least ten addresses at once.
+    const email = calls.find((c) => c.bucket === "checkout-email")!;
+    const pair = calls.find((c) => c.bucket === "checkout-pair")!;
+    expect(email.limit).toBeGreaterThanOrEqual(10 * pair.limit);
+    expect(calls.find((c) => c.bucket === "checkout-email-day")!.limit).toBeGreaterThanOrEqual(10 * calls.find((c) => c.bucket === "checkout-pair-day")!.limit);
+  });
+
+  it("a donor signed in with the same email is never counted against, or stopped by, the email's own ceiling", async () => {
+    over = new Set(["checkout-email", "checkout-email-day"]);
+    // A guest start with that email meets the ceiling.
+    expect((await checkGivingAllowed(start))?.reason).toBe("email-many");
+    // Signed in with that email: not counted there at all, so it goes ahead; the pair and address limits still count.
+    calls.length = 0;
+    expect(await checkGivingAllowed({ ...start, signedInSameEmail: true })).toBeNull();
+    expect(calls.find((c) => c.bucket === "checkout-email")?.keys).toEqual([]);
+    expect(calls.find((c) => c.bucket === "checkout-email-day")?.keys).toEqual([]);
+    expect(calls.find((c) => c.bucket === "checkout-pair")?.keys).toEqual(["email#donor@example.com|ip#196.1.2.3"]);
+  });
+
+  it("the waits after declined cards are unchanged: per email and per address, whether signed in or not", async () => {
+    declines = { "email#donor@example.com": 3 };
+    expect((await checkGivingAllowed({ ...start, signedInSameEmail: true }))?.reason).toBe("declines");
+    expect(calls.filter((c) => c.fn === "reached").map((c) => [c.bucket, c.keys, c.limit, c.minutes])).toEqual([
+      ["checkout-declined", ["email#donor@example.com"], 3, 60],
+      ["checkout-declined", ["ip#196.1.2.3"], 30, 60],
+    ]);
   });
 });
 
