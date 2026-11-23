@@ -45,6 +45,7 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/updates`} />
 
       {sp.refused === "profile" ? <Notice>{refusedFor("profile")}</Notice> : null}
+      {sp.refused === "gone" ? <Notice>That was already removed, perhaps by someone else on your team. Nothing else was changed.</Notice> : null}
 
       {canEdit ? (
         <Card title="Post an update">

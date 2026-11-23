@@ -87,20 +87,26 @@ export async function postUpdate(charityId: string, _prev: FormState, formData: 
   redirect(`/charity-admin/${charityId}/updates?done=${done}`);
 }
 
+/** Never a "Remove" that does nothing: back to the page with the plain reason (nothing was changed). */
+function gone(charityId: string): never {
+  revalidatePath(`/charity-admin/${charityId}/updates`);
+  redirect(`/charity-admin/${charityId}/updates?refused=gone`);
+}
+
 export async function removeUpdate(charityId: string, updateId: string): Promise<void> {
   const viewer = await requireViewer();
-  if (!isUuid(updateId)) return;
+  if (!isUuid(updateId)) return gone(charityId);
   const { charity } = await loadCharityForManager(charityId);
   // Back to the page with the plain refusal shown there (nothing was changed).
   if (await refusal(charityId, "profile")) redirect(`/charity-admin/${charityId}/updates?refused=profile`);
   // The whole row, so "Undo" can put it back exactly; its photo file is kept for the same reason.
   const { data: row, error: readError } = await createAdminClient().from("charity_updates").select("*").eq("id", updateId).eq("charity_id", charityId).maybeSingle();
   if (readError) throw readError;
-  if (!row) return;
+  if (!row) return gone(charityId);
   const supabase = await createClient();
   const { data, error } = await supabase.from("charity_updates").delete().eq("id", updateId).eq("charity_id", charityId).select("id");
   if (error) throw error;
-  if (!data?.length) return;
+  if (!data?.length) return gone(charityId);
   await logAudit({ actorUserId: viewer.userId, action: "charity.update_removed", entityType: "charity", entityId: charityId });
   const done = await recordAction(charityId, viewer.userId, "update_removed", {}, { type: "reinsert", table: "charity_updates", row });
   revalidate(charityId, charity.slug);
@@ -135,18 +141,18 @@ export async function addPhoto(charityId: string, _prev: FormState, formData: Fo
 
 export async function removePhoto(charityId: string, photoId: string): Promise<void> {
   const viewer = await requireViewer();
-  if (!isUuid(photoId)) return;
+  if (!isUuid(photoId)) return gone(charityId);
   const { charity } = await loadCharityForManager(charityId);
   // Back to the page with the plain refusal shown there (nothing was changed).
   if (await refusal(charityId, "profile")) redirect(`/charity-admin/${charityId}/updates?refused=profile`);
   // The whole row, so "Undo" can put it back exactly; the file is kept for the same reason.
   const { data: row, error: readError } = await createAdminClient().from("charity_photos").select("*").eq("id", photoId).eq("charity_id", charityId).maybeSingle();
   if (readError) throw readError;
-  if (!row) return;
+  if (!row) return gone(charityId);
   const supabase = await createClient();
   const { data, error } = await supabase.from("charity_photos").delete().eq("id", photoId).eq("charity_id", charityId).select("id");
   if (error) throw error;
-  if (!data?.length) return;
+  if (!data?.length) return gone(charityId);
   await logAudit({ actorUserId: viewer.userId, action: "charity.photo_removed", entityType: "charity", entityId: charityId });
   const done = await recordAction(charityId, viewer.userId, "photo_removed", {}, { type: "reinsert", table: "charity_photos", row });
   revalidate(charityId, charity.slug);

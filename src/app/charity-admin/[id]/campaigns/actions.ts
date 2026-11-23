@@ -46,14 +46,19 @@ export async function startCampaign(charityId: string, _prev: FormState, formDat
 
 export async function endCampaign(charityId: string, campaignId: string): Promise<void> {
   const viewer = await requireViewer();
-  if (!isUuid(campaignId)) return;
+  // Never a button that does nothing: back to the page with the plain reason (nothing was changed).
+  const gone = () => {
+    revalidatePath(`/charity-admin/${charityId}/campaigns`);
+    redirect(`/charity-admin/${charityId}/campaigns?refused=gone`);
+  };
+  if (!isUuid(campaignId)) return gone();
   const { charity } = await loadCharityForManager(charityId);
   // Back to the page with the plain refusal shown there (nothing was changed).
   if (await refusal(charityId, "profile")) redirect(`/charity-admin/${charityId}/campaigns?refused=profile`);
   const supabase = await createClient();
   const { data, error } = await supabase.from("campaigns").update({ status: "ended" }).eq("id", campaignId).eq("charity_id", charityId).eq("status", "active").select("id, title");
   if (error) throw error;
-  if (!data?.length) return;
+  if (!data?.length) return gone();
   await logAudit({ actorUserId: viewer.userId, action: "charity.campaign_ended", entityType: "charity", entityId: charityId });
   const done = await recordAction(charityId, viewer.userId, "campaign_ended", { title: data[0].title as string }, { type: "reopen_campaign", id: campaignId });
   revalidatePath(`/charity-admin/${charityId}/campaigns`);
