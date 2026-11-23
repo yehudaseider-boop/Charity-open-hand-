@@ -122,7 +122,7 @@ export function JourneyEditor({
   // Which email's picture is uploading, and what went wrong with one (by the email's key).
   const [uploading, setUploading] = useState<number | null>(null);
   const [pictureError, setPictureError] = useState<{ key: number; message: string } | null>(null);
-  const addPicture = async (i: number, d: Draft, file: File | undefined) => {
+  const addPicture = async (d: Draft, file: File | undefined) => {
     if (!file || !uploadPicture) return;
     setPictureError(null);
     setUploading(d.key);
@@ -130,7 +130,8 @@ export function JourneyEditor({
       const fd = new FormData();
       fd.set("file", file);
       const r = await uploadPicture(fd);
-      if (r.ok) change(i, { imagePath: r.path, imageUrl: r.url });
+      // By the email's key, not its place: an email removed or put back while this uploaded must not get the picture.
+      if (r.ok) setDrafts((all) => all.map((x) => (x.key === d.key ? { ...x, imagePath: r.path, imageUrl: r.url } : x)));
       else setPictureError({ key: d.key, message: r.message });
     } catch {
       const offline = typeof navigator !== "undefined" && navigator.onLine === false;
@@ -214,7 +215,7 @@ export function JourneyEditor({
         <ol aria-label="Your journey, step by step" className="relative space-y-3 border-l-2 border-honey pl-5">
           <li className="relative">
             <span aria-hidden="true" className="absolute -left-[1.95rem] top-2.5 size-4 rounded-full border-2 border-surface bg-brand" />
-            <p className="inline-flex min-h-11 items-center rounded-full bg-brand px-4 text-sm font-semibold text-brand-contrast [overflow-wrap:anywhere]">{start}</p>
+            <p dir="auto" className="inline-flex min-h-11 items-center rounded-full bg-brand px-4 text-sm font-semibold text-brand-contrast [overflow-wrap:anywhere]">{start}</p>
           </li>
 
           {drafts.map((d, i) => {
@@ -267,7 +268,7 @@ export function JourneyEditor({
                       dir="auto"
                       value={d.subject}
                       placeholder={hint.subject}
-                      onChange={(e) => change(i, { subject: e.target.value })}
+                      onChange={(e) => change(i, { subject: e.target.value, before: undefined })}
                       aria-invalid={err(`subject_${i + 1}`) || subjectLen > SUBJECT_MAX ? true : undefined}
                       className={field}
                     />
@@ -282,7 +283,7 @@ export function JourneyEditor({
                       dir="auto"
                       value={d.body}
                       placeholder={hint.body}
-                      onChange={(e) => change(i, { body: e.target.value })}
+                      onChange={(e) => change(i, { body: e.target.value, before: undefined })}
                       aria-invalid={err(`body_${i + 1}`) || bodyLen > BODY_MAX || link ? true : undefined}
                       className={field}
                     />
@@ -333,7 +334,7 @@ export function JourneyEditor({
                           accept="image/jpeg,image/png,image/webp"
                           disabled={uploading !== null}
                           onChange={(e) => {
-                            void addPicture(i, d, e.currentTarget.files?.[0]);
+                            void addPicture(d, e.currentTarget.files?.[0]);
                             e.currentTarget.value = "";
                           }}
                           className="block w-full text-sm file:mr-3 file:min-h-11 file:rounded-control file:border-2 file:border-outline file:bg-surface file:px-4 file:font-semibold file:text-brand"
@@ -379,7 +380,7 @@ export function JourneyEditor({
                       </button>
                     ) : null}
                   </div>
-                  {d.before ? <p className="text-xs text-muted">Our example is in. Change it so it sounds like you, or undo it.</p> : null}
+                  {d.before ? <p className="text-xs text-muted">Our example is in. Change it so it sounds like you, or undo it. Once you start changing it, it&apos;s yours.</p> : null}
                   {canRemoveStep(i, drafts.length, onIt) ? null : <p className="text-xs text-muted">{middleStepWords(onIt)}</p>}
                 </fieldset>
                 </div>

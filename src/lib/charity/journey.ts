@@ -151,7 +151,8 @@ export function checkJourneySteps(
     }
     // A picture: ours (this charity's folder, a name we made), with a few words saying what it shows.
     const path = typeof r.imagePath === "string" ? r.imagePath.trim() : "";
-    const alt = typeof r.imageAlt === "string" ? r.imageAlt.replace(/\s+/g, " ").trim() : "";
+    // Cleaned like a subject: control and text-direction characters out (the database refuses control characters).
+    const alt = cleanSubject(typeof r.imageAlt === "string" ? r.imageAlt : "");
     if (path) {
       if (!charityId || !journeyPicturePathOk(charityId, path)) e.image = "That picture couldn't be used. Remove it and add it again.";
       if (alt.length < PICTURE_ALT_MIN) e.imageAlt = "Describe the picture in a few words, for people who can't see it.";

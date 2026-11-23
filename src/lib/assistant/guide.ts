@@ -47,11 +47,11 @@ If a code doesn't work, check it and try again. After too many tries the page as
     roles: "Everyone in the team",
     body: `The menu is down the side on a laptop and one scrolling row on a phone. It has four groups:
 - Giving: "Overview", "Donations", "Monthly donations", "Campaigns", "s18A receipts", "Annual report".
-- People: "Donors", "Keeping donors", "Thank donors", "Donor journey", "Email donors", "Team", "Activity".
+- People: "Donors", "Donor journeys", "Team", "Activity". "Donor journeys" has four tabs along the top of its pages: "Journeys", "Keeping donors", "Thank donors" and "Email donors".
 - Your page: "Public profile", "Photos and updates".
 - Set-up: "Application".
 
-Pages your role can't use are left out of the menu: "Thank donors", "Donor journey" and "Email donors" need a role that may message donors; "Public profile" and "Photos and updates" need a role that may change your page; "Application" is for the owner and admins.
+Pages your role can't use are left out of the menu and the tabs: "Journeys", "Thank donors" and "Email donors" need a role that may message donors (without it, "Donor journeys" opens on "Keeping donors"); "Public profile" and "Photos and updates" need a role that may change your page; "Application" is for the owner and admins.
 
 At the top there is a search box ("Search donations by name or email") and "See your public page" once you are approved. The "QR poster", "Website button", "Record a gift" and "Deposits" pages are reached from buttons on the Overview and Donations pages.
 
@@ -641,8 +641,8 @@ From Photos and updates, "Email this to your donors" starts an email from that u
 
 Journeys: the "Donor journey" (everyone's first gift), the "Win-back journey" (donors you add), and one per campaign ("Give a campaign its own journey").
 
-To set one up:
-1. Under "Your emails", write up to five emails. For each, set the days: the first goes 0 to 30 days after someone joins, each next one 7 to 180 days after the one before. Plain words, no web addresses: Givezy adds a button to your page and the stop link. Use "Preview this email" to check it.
+To set one up (Donor journeys, then the "Journeys" tab):
+1. Under "Your emails", the journey starts where the donor joins and asks "What would you like to happen first?". Press "Send an email", choose how many days to wait, and write it; every box starts empty with a grey hint, and "Show me an example" fills in sample wording you can change. Each email can have one picture (optional, once pictures are switched on for journeys), with a few words saying what it shows. Then "What would you like next?" adds the next email. Up to five emails. For each, set the days: the first goes 0 to 30 days after someone joins, each next one 7 to 180 days after the one before. Plain words, no web addresses: Givezy adds a button to your page and the stop link. Use "Preview this email" to check it.
 2. Press "Save emails". Changes apply from each donor's next email.
 3. Under "On or off", press "Switch it on" (once your page is live).
 
@@ -657,7 +657,7 @@ Once it is on, the owner can "Add your existing donors" (those who gave before),
     roles: "Owner, admin and fundraiser write it; only the owner adds donors",
     body: `Emails for donors you'd like to come back. Donors join only when you add them, and anyone who gives again leaves it.
 
-1. On Donor journey, open "Win-back journey". Write its emails, "Save emails", then "Switch it on".
+1. On Donor journeys, "Journeys" tab, open "Win-back journey". Write its emails, "Save emails", then "Switch it on".
 2. Go to "Monthly donors who stopped" or "Keeping donors" (the lists "Gave last tax year, not since" or "Gave in an earlier year, not since").
 3. Tick the donors, or "add everyone on this list", and press "Add ticked donors to win-back journey".
 4. The next page shows who will be added and who is left out. Press "Add N donors", then "Yes, add them".

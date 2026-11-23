@@ -39,6 +39,9 @@ describe("which pictures a journey email can have", () => {
     expect(foreign.ok).toBe(false);
     if (!foreign.ok) expect(foreign.errors[0].image).toMatch(/couldn't be used/);
     // Without a picture the saved email is exactly as before pictures existed.
+    // Control and text-direction characters are taken out of the description (the database refuses control characters).
+    const odd = checkJourneySteps([{ ...step, imagePath: path, imageAlt: "Children\u0001 at our\u202e club\u0085" }], C);
+    expect(odd).toMatchObject({ ok: true, steps: [{ imageAlt: "Children at our club" }] });
     const plain = checkJourneySteps([{ ...step, imagePath: "", imageAlt: "left over" }], C);
     expect(plain).toEqual({ ok: true, steps: [{ subject: "Thank you", body: "Thank you for your gift to us.", waitDays: 2 }] });
   });
