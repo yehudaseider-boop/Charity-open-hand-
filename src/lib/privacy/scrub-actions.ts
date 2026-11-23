@@ -26,10 +26,11 @@ export function namesFrom(rows: { first_name?: string | null; last_name?: string
  * A certificate action's details with the erased donor's name replaced by "a donor", or null when nothing names them.
  * Matching by name can also blank another donor with the very same name: that only loses a name, never shows one.
  */
-export function scrubCertificateDetails(details: Record<string, unknown>, names: Set<string>): Record<string, unknown> | null {
+export function scrubCertificateDetails(details: Record<string, unknown>, names: Set<string>, keys: Set<string> = new Set()): Record<string, unknown> | null {
   let changed = false;
   const out = { ...details };
-  if (names.has(norm(details.name))) {
+  // The certificate key on the record is the donor's own, whatever name was shown at the time.
+  if ((typeof details.key === "string" && keys.has(details.key) && details.name !== "a donor") || names.has(norm(details.name))) {
     out.name = "a donor";
     changed = true;
   }

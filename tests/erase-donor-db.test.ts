@@ -132,6 +132,38 @@ describe("erase_donor_data", () => {
     });
   });
 
+  it("clears a charity's private note on a receipt decision and removes the donor from appeal send lists (review 23/11/2026)", async () => {
+    await tx(async () => {
+      const w = await world();
+      await run(
+        `insert into public.receipt_plan_decisions (charity_id, tax_year, donor_id, decision, certificate_fingerprint, note)
+         values ($1, 2027, $2, 'declined', repeat('a', 64), 'Erin says she moved to Cape Town')`,
+        [ids.meals, w.donor],
+      );
+      const appeal = (
+        await run(
+          `insert into public.charity_appeals (charity_id, subject, body, audience, audience_label) values ($1, 'Winter appeal', 'Please help us this winter.', '{"all":true}', 'Everyone') returning id`,
+          [ids.meals],
+        )
+      ).rows[0].id as string;
+      await run("insert into public.charity_appeal_recipients (appeal_id, charity_id, donor_id) values ($1, $2, $3)", [appeal, ids.meals, w.donor]);
+      await run("select public.erase_donor_data(array[$1]::uuid[])", [w.donor]);
+      // The decision stays (tax records); only the note goes.
+      const d = (await run("select decision, note from public.receipt_plan_decisions where donor_id = $1", [w.donor])).rows[0];
+      expect(d).toMatchObject({ decision: "declined", note: null });
+      expect((await run("select 1 from public.charity_appeal_recipients where donor_id = $1", [w.donor])).rowCount).toBe(0);
+      expect((await run("select 1 from public.charity_appeals where id = $1", [appeal])).rowCount).toBe(1);
+    });
+  });
+
+  it("locks the donor's donations first, in id order like issue_s18a_receipt, so an issued receipt cannot appear halfway (review 23/11/2026)", async () => {
+    const src = (await run("select pg_get_functiondef('public.erase_donor_data(uuid[])'::regprocedure) as d")).rows[0].d as string;
+    const lockAt = src.search(/from public\.donations where donor_id = any \(p_donor_ids\) order by id for update/);
+    expect(lockAt).toBeGreaterThan(-1);
+    // Before the first statement that decides on an issued receipt.
+    expect(lockAt).toBeLessThan(src.indexOf("s18a_receipt_donations"));
+  });
+
   it("a charity's signed declarations survive the signer's account being deleted", async () => {
     await tx(async () => {
       await run("reset role");

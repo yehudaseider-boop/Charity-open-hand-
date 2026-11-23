@@ -3,6 +3,7 @@ import { logAudit } from "@/lib/audit";
 import { getEmailTransport } from "@/lib/email";
 import { hashedKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { certificateKey } from "@/lib/receipts/review";
 import { CERTIFICATE_KINDS, TEAM_KINDS, namesFrom, scrubCertificateDetails } from "./scrub-actions";
 
 export type EraseSummary = {
@@ -88,10 +89,14 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
 
   if (ids.size) {
     // What charities wrote or set about this person (notes, follow-ups, tags) goes with them.
-    for (const table of ["charity_donor_notes", "charity_donor_reminders", "charity_donor_tags"] as const) {
+    // Their place on charities' appeal send lists goes too (review 23/11/2026); the appeal itself stays.
+    for (const table of ["charity_donor_notes", "charity_donor_reminders", "charity_donor_tags", "charity_appeal_recipients"] as const) {
       const { error: careError } = await db.from(table).delete().in("donor_id", [...ids]);
       if (careError) throw careError;
     }
+    // The private note a charity wrote on a receipt decision about them (review 23/11/2026). The decision stays.
+    const { error: noteError } = await db.from("receipt_plan_decisions").update({ note: null }).in("donor_id", [...ids]);
+    if (noteError) throw new Error(`Could not erase: ${noteError.message}`);
     // Their place on charities' donor journeys (the send log goes with it). Until the journey's migration has run there
     // is no such table, and that must never stop an erasure.
     const { error: journeyError } = await db.from("charity_journey_enrolments").delete().in("donor_id", [...ids]);
@@ -127,13 +132,23 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       }
     }
   }
-  // Their name on the s18A receipt check's records, in the charities they gave to.
-  if (theirNames.size && theirCharities.size) {
+  // Their name on the s18A receipt check's records, in the charities they gave to. Found by the certificate key
+  // already on each record (details.key, worked out from the charity, tax year, donor record and identity of each
+  // decision), so a name spelt differently on an earlier gift is removed too; the names on their gifts still catch
+  // a record whose decision has since been removed (a reopened certificate).
+  const certKeys = new Set<string>();
+  if (ids.size) {
+    const decisions = await allPages((from) =>
+      db.from("receipt_plan_decisions").select("id, charity_id, tax_year, donor_id, donor_identity").in("donor_id", [...ids]).order("id").range(from, from + 999),
+    );
+    for (const d of decisions) certKeys.add(certificateKey(d.charity_id as string, d.tax_year as number, d.donor_id as string, (d.donor_identity as string | null) ?? ""));
+  }
+  if ((theirNames.size || certKeys.size) && theirCharities.size) {
     const certs = await allPages((from) =>
       db.from("charity_actions").select("id, details").in("kind", [...CERTIFICATE_KINDS]).in("charity_id", [...theirCharities]).order("id").range(from, from + 999),
     );
     for (const a of certs) {
-      const scrubbed = scrubCertificateDetails((a.details ?? {}) as Record<string, unknown>, theirNames);
+      const scrubbed = scrubCertificateDetails((a.details ?? {}) as Record<string, unknown>, theirNames, certKeys);
       if (scrubbed) {
         // The undo of an edited certificate holds the old and new name and address, so it goes too (13/11/2026).
         const { error: e } = await db.from("charity_actions").update({ details: scrubbed, undo: null }).eq("id", a.id);
