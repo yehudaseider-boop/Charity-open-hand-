@@ -57,6 +57,9 @@ export async function listTeam(charityId: string): Promise<Member[]> {
   return (data ?? []).map((m) => ({ userId: m.user_id as string, email: emailOf.get(m.user_id as string) ?? "", role: isRole(m.role) ? m.role : "viewer", since: m.created_at as string }));
 }
 
+/** Adding people creates sign-ins and sends email in Givezy's name: only once Givezy has approved the charity. */
+export const NOT_APPROVED_YET = "You can add people once Givezy has approved your charity. Until then, adding people is switched off, because it sends them an email in Givezy's name. Nothing was changed.";
+
 export type AddResult = { ok: true; userId: string; email: string; already: boolean } | { ok: false; message: string };
 
 /** Give someone access as an admin. A new address gets a Givezy sign-in; an unconfirmed one is refused. */
@@ -64,6 +67,10 @@ export async function addMember(charityId: string, actorId: string, rawEmail: st
   if (role === "owner") return { ok: false, message: "There is one owner. Add them in another role." };
   const email = rawEmail.trim().toLowerCase();
   const db = createAdminClient();
+  // Checked here too, so no other way in can add people to a charity that isn't approved.
+  const { data: charity, error: statusError } = await db.from("charities").select("status").eq("id", charityId).maybeSingle();
+  if (statusError) throw statusError;
+  if (charity?.status !== "approved") return { ok: false, message: NOT_APPROVED_YET };
   let { data: profile } = await db.from("profiles").select("id").eq("email", email).maybeSingle();
   if (profile) {
     // An account someone registered but never confirmed could belong to anyone who typed this email.

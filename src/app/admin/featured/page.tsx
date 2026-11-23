@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Card, Notice } from "@/components/card";
 import { requirePlatformAdmin } from "@/lib/auth";
+import { readAllPages } from "@/lib/charity/read-pages";
 import { weekStart } from "@/lib/charity/thank-you";
 import { formatDate } from "@/lib/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -29,11 +30,12 @@ export default async function FeaturedPage({ searchParams }: PageProps<"/admin/f
   const first = weekStart(new Date());
   const weeks = Array.from({ length: WEEKS }, (_, i) => plusDays(first, i * 7));
   const db = createAdminClient();
-  const [{ data: charities, error }, { data: picks, error: pickError }] = await Promise.all([
-    db.from("charities").select("id, name_en").eq("status", "approved").order("name_en"),
+  const [charities, { data: picks, error: pickError }] = await Promise.all([
+    readAllPages<{ id: string; name_en: string }>((from, to, count) =>
+      db.from("charities").select("id, name_en", count ? { count: "exact" } : undefined).eq("status", "approved").order("name_en").order("id").range(from, to),
+    ),
     db.from("featured_charities").select("week_start, charity_id").gte("week_start", first).lte("week_start", weeks[WEEKS - 1]),
   ]);
-  if (error) throw error;
   if (pickError) throw pickError;
   const nameOf = new Map((charities ?? []).map((c) => [c.id as string, c.name_en as string]));
   const pickOf = new Map((picks ?? []).map((p) => [p.week_start as string, p.charity_id as string]));

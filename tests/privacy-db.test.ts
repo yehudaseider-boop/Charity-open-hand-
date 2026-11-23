@@ -332,9 +332,6 @@ describe("signing in from the app", () => {
       await expect(run("select * from public.charity_donor_list($1)", [ids.meals])).rejects.toThrow(/Not allowed/);
       await run("rollback to savepoint d");
       expect((await run("select count(*)::int as n from public.charity_donations where charity_id = $1", [ids.meals])).rows[0].n).toBe(0);
-      await run("savepoint e");
-      await expect(run("select public.agree_to_policy('2026-10')")).rejects.toThrow(/emailed code/);
-      await run("rollback to savepoint e");
     });
   });
 
@@ -360,17 +357,18 @@ describe("signing in from the app", () => {
     });
   });
 
-  it("records the app's agreement for the signed-in person only, and not for visitors", async () => {
+  it("no longer lets a browser record an agreement itself (the server does, with the current version), and keeps one per person and version", async () => {
     await tx(async () => {
       await as(ids.donorUser);
-      await run("select public.agree_to_policy('2026-10-08-draft')");
-      expect((await run("select count(*)::int as n from public.consents where user_id = $1 and policy_version = '2026-10-08-draft'", [ids.donorUser])).rows[0].n).toBeGreaterThan(0);
-      await run("savepoint p");
-      await expect(run("select public.agree_to_policy('<script>')")).rejects.toThrow(/Unknown policy version/);
-      await run("rollback to savepoint p");
+      await denied("select public.agree_to_policy('2026-10-08-draft')");
       await as("anon");
       await denied("select public.agree_to_policy('2026-10-08-draft')");
       await denied("select public.link_my_donations()");
+      await run("reset role");
+      await run("insert into public.consents (kind, policy_version, user_id) values ('account', 'v-once', $1)", [ids.donorUser]);
+      await run("savepoint twice");
+      await expect(run("insert into public.consents (kind, policy_version, user_id) values ('account', 'v-once', $1)", [ids.donorUser])).rejects.toThrow(/duplicate key/);
+      await run("rollback to savepoint twice");
     });
   });
 });

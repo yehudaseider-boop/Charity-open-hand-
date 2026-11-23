@@ -2,6 +2,7 @@
 
 import { ActionForm } from "@/components/forms/action-form";
 import { SelectField, TextArea, TextField } from "@/components/forms/fields";
+import { VERSION_FIELD } from "@/lib/charity/submission-version-field";
 import { bankNames } from "@/lib/charity/validation";
 import { SAME_NUMBER_FIELD, SAME_NUMBER_MAX, SAME_NUMBER_MIN, SPOKE_TO_FIELD, SPOKE_TO_MAX, vettingChecks, vettingField } from "@/lib/charity/vetting";
 import type { FormState } from "@/lib/form";
@@ -17,9 +18,10 @@ function Check({ name, children }: { name: string; children: React.ReactNode }) 
   );
 }
 
-export function ApproveForm({ action, hasS18a, hasMandate, sameNumber = false }: { action: Action; hasS18a: boolean; hasMandate: boolean; sameNumber?: boolean }) {
+export function ApproveForm({ action, hasS18a, hasMandate, sameNumber = false, version }: { action: Action; hasS18a: boolean; hasMandate: boolean; sameNumber?: boolean; version: string }) {
   return (
     <ActionForm action={action} submitLabel="Approve" confirm="Approve this charity and make it public?">
+      <input type="hidden" name={VERSION_FIELD} value={version} />
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Vetting: tick each one only when you have done it. (Gives the &quot;Verified&quot; badge.)</legend>
         {vettingChecks.map((c) => (

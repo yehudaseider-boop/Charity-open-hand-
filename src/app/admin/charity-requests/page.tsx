@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/forms/action-form";
 import { SelectField } from "@/components/forms/fields";
 import { charityRequestsOpen } from "@/config/app-links";
 import { requirePlatformAdmin } from "@/lib/auth";
+import { readAllPages } from "@/lib/charity/read-pages";
 import { groupRequests, requestKey, REQUEST_STATUS_LABEL, type RequestRow } from "@/lib/charity-requests";
 import { notSetUp } from "@/lib/charity-requests-store";
 import { formatDate } from "@/lib/dates";
@@ -20,12 +21,26 @@ export const metadata: Metadata = { title: "Charity requests" };
 export default async function CharityRequestsPage() {
   await requirePlatformAdmin();
   const db = createAdminClient();
-  const [open, owed, live] = await Promise.all([
-    db.from("charity_requests").select("name, name_key, town, link, note, notify_email, status, created_at").in("status", ["new", "invited"]).order("created_at", { ascending: false }).limit(1000),
-    db.from("charity_requests").select("charity_id").eq("status", "joined").not("notify_email", "is", null).is("notified_at", null).limit(1000),
-    db.from("charities").select("id, name_en").eq("status", "approved").order("name_en").limit(2000),
+  // Every row, in pages: a plain read stops at the database's 1 000 rows (review 23/11/2026). A first read that fails
+  // keeps its error code, so "not set up yet" is still told apart from a real failure.
+  type Req = { name: string; name_key: string; town: string | null; link: string | null; note: string | null; notify_email: string | null; status: string; created_at: string };
+  let firstError: { code?: string; message: string } | null = null;
+  const [openRows, owedRows, liveRows] = await Promise.all([
+    readAllPages<Req>((from, to, count) =>
+      db.from("charity_requests").select("name, name_key, town, link, note, notify_email, status, created_at", count ? { count: "exact" } : undefined).in("status", ["new", "invited"]).order("created_at", { ascending: false }).order("id").range(from, to).then((r) => {
+        if (r.error) firstError ??= r.error;
+        return r;
+      }),
+    ).catch(() => null),
+    readAllPages<{ charity_id: string }>((from, to, count) =>
+      db.from("charity_requests").select("charity_id", count ? { count: "exact" } : undefined).eq("status", "joined").not("notify_email", "is", null).is("notified_at", null).order("id").range(from, to),
+    ).catch(() => null),
+    readAllPages<{ id: string; name_en: string }>((from, to, count) =>
+      db.from("charities").select("id, name_en", count ? { count: "exact" } : undefined).eq("status", "approved").order("name_en").order("id").range(from, to),
+    ).catch(() => null),
   ]);
-  if (open.error && notSetUp(open.error.code)) {
+  const openError = openRows ? null : (firstError as { code?: string; message: string } | null);
+  if (openError && notSetUp(openError.code)) {
     return (
       <div className="space-y-4">
         <h1 className="font-display text-2xl text-indigo">Charity requests</h1>
@@ -35,9 +50,10 @@ export default async function CharityRequestsPage() {
       </div>
     );
   }
-  if (open.error) throw open.error;
-  if (owed.error) throw owed.error;
-  if (live.error) throw live.error;
+  if (!openRows || !owedRows || !liveRows) throw new Error(openError?.message ?? "Could not read the charity requests");
+  const open = { data: openRows };
+  const owed = { data: owedRows };
+  const live = { data: liveRows };
 
   const rows: RequestRow[] = (open.data ?? []).map((r) => ({
     name: r.name as string,

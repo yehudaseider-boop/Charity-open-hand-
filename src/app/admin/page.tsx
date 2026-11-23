@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card } from "@/components/card";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
+import { countCharitiesByStatus } from "@/lib/charity/status-counts";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Givezy admin" };
@@ -10,10 +11,7 @@ export const metadata: Metadata = { title: "Givezy admin" };
 export default async function AdminPage() {
   await requirePlatformAdmin();
   const supabase = await createClient();
-  const { data: charities } = await supabase.from("charities").select("status");
-
-  const counts = new Map<string, number>();
-  for (const c of charities ?? []) counts.set(c.status, (counts.get(c.status) ?? 0) + 1);
+  const counts = await countCharitiesByStatus(supabase);
   const waiting = counts.get("pending_review") ?? 0;
 
   return (

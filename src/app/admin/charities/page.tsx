@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { BilingualName } from "@/components/bilingual-name";
 import { requirePlatformAdmin } from "@/lib/auth";
+import { readAllPages } from "@/lib/charity/read-pages";
 import { statusLabels, type CharityStatus } from "@/lib/charity/status";
 import { formatDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
@@ -22,12 +23,16 @@ export default async function AdminCharitiesPage({ searchParams }: PageProps<"/a
   const status = tabs.includes(raw as CharityStatus) ? (raw as CharityStatus) : "pending_review";
 
   const supabase = await createClient();
-  const { data: charities, error } = await supabase
-    .from("charities")
-    .select("id, name_en, s18a_reference, updated_at")
-    .eq("status", status)
-    .order("updated_at", { ascending: status !== "pending_review" ? false : true });
-  if (error) throw error;
+  // Every charity in this tab, in pages (the database gives at most 1 000 rows a time); "id" breaks ties so pages never overlap.
+  const charities = await readAllPages<{ id: string; name_en: string; s18a_reference: string | null; updated_at: string }>((from, to, count) =>
+    supabase
+      .from("charities")
+      .select("id, name_en, s18a_reference, updated_at", count ? { count: "exact" } : undefined)
+      .eq("status", status)
+      .order("updated_at", { ascending: status !== "pending_review" ? false : true })
+      .order("id")
+      .range(from, to),
+  );
   const { data: invites } = await supabase
     .from("charity_invites")
     .select("id, charity_name, contact_email, created_at, expires_at, used_at, charity_id")

@@ -19,6 +19,8 @@ export const signInMessages: Record<string, string> = {
   // The bot check (23/11/2026): no token or a refused one, and Cloudflare unreachable (sign-in waits rather than sends).
   check: botCheckRefusedMessage("sign-in", "the button"),
   "check-down": botCheckUnreachableMessage(),
+  // The limits can't be kept (no server key on the live or test site): sign-in refuses rather than run without limits.
+  unavailable: "Sign-in isn't available just now, so no email was sent. Please try again in a few minutes, or contact us if it keeps happening.",
 };
 
 export const signInMessage = (code: unknown): string | undefined => (typeof code === "string" && Object.hasOwn(signInMessages, code) ? signInMessages[code] : undefined);
@@ -36,6 +38,12 @@ export function signInKeys(email: string, ip: string): { pair: string[]; email: 
   const address = ipKeys(ip);
   return { pair: e && address[0] ? [`${e}|${address[0]}`] : [], email: e ? [e] : [], address };
 }
+
+/**
+ * Whether sign-in's limits can be kept. On the live or test site without ENCRYPTION_KEY no limit key can be made, and
+ * every limit would be skipped: sign-in then fails closed (review 23/11/2026), as the demo assistant does.
+ */
+export const signInLimitsWork = (): boolean => hashedKey("email", "limits-probe@givezy.invalid") !== null;
 
 // Without ENCRYPTION_KEY: a secret for this server process only on a developer's machine; on the live or test site
 // none, so the address is simply not shown (never an unkeyed value anyone could make).

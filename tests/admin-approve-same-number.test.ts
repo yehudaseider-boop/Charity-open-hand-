@@ -3,6 +3,7 @@
  * the audit trail (22/11/2026: it was only a warning). The database, checklist and emails are stand-ins.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { VERSION_FIELD } from "@/lib/charity/submission-version-field";
 import { SAME_NUMBER_FIELD, SPOKE_TO_FIELD, vettingChecks, vettingField } from "@/lib/charity/vetting";
 
 vi.mock("server-only", () => ({}));
@@ -17,6 +18,12 @@ vi.mock("@/lib/charity/emails", async (orig) => ({ ...(await orig<object>()), no
 let mailOk = true;
 vi.mock("@/lib/charity/checklist", () => ({ applicationChecklist: () => [], isComplete: () => true }));
 vi.mock("@/lib/charity/same-number", () => ({ charitiesWithSameNumber: async () => same }));
+/** What the application looks like now in the database (a change since the page was opened shows as another version). */
+let currentVersion = "v1";
+vi.mock("@/lib/charity/submission-version", async (orig) => ({
+  ...(await orig<object>()),
+  readSubmissionVersion: async () => ({ version: currentVersion, charityUpdatedAt: "c-time", privUpdatedAt: "p-time" }),
+}));
 vi.mock("@/lib/charity/queries", () => ({
   loadCharityForManager: async () => ({
     charity: { id: "c1", slug: "meals", status: "pending_review", npo_number: "930-012", pbo_number: null, s18a_reference: null },
@@ -41,6 +48,7 @@ const { approveCharity } = await import("@/app/admin/charities/[id]/actions");
 const form = (extra: Record<string, string> = {}) => {
   const f = new FormData();
   for (const c of vettingChecks) f.set(vettingField(c.key), "on");
+  f.set(VERSION_FIELD, "v1");
   f.set(SPOKE_TO_FIELD, "Jo Smith, treasurer, by phone on 22/11/2026");
   for (const [k, v] of Object.entries(extra)) f.set(k, v);
   return f;
@@ -51,6 +59,7 @@ beforeEach(() => {
   updates = 0;
   same = [];
   mailOk = true;
+  currentVersion = "v1";
 });
 
 describe("approving a charity whose number another charity here also has", () => {
@@ -82,5 +91,22 @@ describe("approving says the charity was emailed only when the email went (revie
     expect((await approveCharity("c1", { ok: false }, form())).message).toBe("Approved. The charity has been emailed.");
     mailOk = false;
     expect(await approveCharity("c1", { ok: false }, form())).toEqual({ ok: true, message: "Approved. We couldn't email the charity, so please let them know." });
+  });
+});
+
+describe("approving an application that changed since it was opened (review 23/11/2026)", () => {
+  it("refuses, changes nothing and records nothing, so a changed bank account is never marked as checked unseen", async () => {
+    currentVersion = "v2";
+    const r = await approveCharity("c1", { ok: false }, form());
+    expect(r).toEqual({ ok: false, message: "This application changed since you opened it. Reload and check it again." });
+    expect(updates).toBe(0);
+    expect(audits).toHaveLength(0);
+  });
+
+  it("refuses a form that carries no version at all", async () => {
+    const f = form();
+    f.delete(VERSION_FIELD);
+    expect((await approveCharity("c1", { ok: false }, f)).ok).toBe(false);
+    expect(updates).toBe(0);
   });
 });

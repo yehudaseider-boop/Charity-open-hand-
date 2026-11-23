@@ -9,6 +9,7 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { applicationChecklist, isComplete } from "@/lib/charity/checklist";
 import { adminRemovedEmail, approvedEmail, ownerChangedEmail, bankChangedEmail, connectedEmail, notifyCharity, receiptsReadyEmail, reinstatedEmail, secondStepResetEmail, sentBackEmail, suspendedEmail } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { CHANGED_SINCE_OPENED, readSubmissionVersion, VERSION_FIELD } from "@/lib/charity/submission-version";
 import { decrypt, encrypt, last4 } from "@/lib/crypto";
 import { bankSchema, DOCUMENT_MIME, documentTypes, MAX_UPLOAD_BYTES, type DocumentType } from "@/lib/charity/validation";
 import { isRealDocument } from "@/lib/charity/file-check";
@@ -47,6 +48,10 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
   const admin = await requirePlatformAdmin();
   const { charity, priv, documents } = await loadCharityForManager(id);
   if (charity.status !== "pending_review") return { ok: false, message: "Only applications waiting for review can be approved." };
+  // What the admin looked at must still be what is saved: a changed application (or bank account) is checked again,
+  // so approving never marks an account nobody looked at as checked (review 23/11/2026).
+  const seen = await readSubmissionVersion(id);
+  if (String(formData.get(VERSION_FIELD) ?? "") !== seen.version) return { ok: false, message: CHANGED_SINCE_OPENED };
   const contactEmail = priv?.contact_email ?? null;
 
   const checklist = applicationChecklist({ charity, priv, documentTypes: documents.map((d) => d.document_type) });
@@ -85,11 +90,12 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
   }
 
   // Only if nobody else decided in the meantime.
-  const { data, error } = await createAdminClient().from("charities").update(update).eq("id", id).eq("status", "pending_review").select("id");
+  const { data, error } = await createAdminClient().from("charities").update(update).eq("id", id).eq("status", "pending_review").eq("updated_at", seen.charityUpdatedAt).select("id");
   if (error) return failed(error);
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
-  // The vetting tick covers the bank confirmation letter too: record it, so the charity can be connected.
-  const { error: bankError } = await createAdminClient().from("charity_private").update({ bank_verified_at: now }).eq("charity_id", id).is("bank_verified_at", null);
+  // The vetting tick covers the bank confirmation letter too: record it, so the charity can be connected. Only for the
+  // private details that were seen: if the bank account changed in the meantime it stays unchecked.
+  const { error: bankError } = await createAdminClient().from("charity_private").update({ bank_verified_at: now }).eq("charity_id", id).eq("updated_at", seen.privUpdatedAt).is("bank_verified_at", null);
   if (bankError) return failed(bankError);
   await logAudit({
     actorUserId: admin.userId,
@@ -106,6 +112,7 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
   });
   const emailed = contactEmail ? await notifyCharity(approvedEmail(contactEmail, charity.name_en, id, confirmS18a && confirmMandate ? "ready" : confirmS18a ? "mandate" : "none")) : false;
   refresh(id, charity.slug);
+  // If the bank details changed while approving, nothing was stamped: connecting then says to check them first.
   return {
     ok: true,
     message: !contactEmail ? "Approved. (No contact email on file, so nobody was emailed.)" : emailed ? "Approved. The charity has been emailed." : `Approved. ${NOT_EMAILED}`,
@@ -276,11 +283,17 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
       branchCode: priv.bank_branch_code,
       accountHolder: priv.bank_account_holder ?? charity.legal_name_en,
     });
-    const { error } = await db
-      .from("charities")
-      .update({ gateway: gateway.name, gateway_subaccount_ref: accountRef })
-      .eq("id", id);
+    // Saved only if the bank account is still the one that was sent (the database holds the charity while it checks):
+    // otherwise the reference belongs to an account that is no longer the charity's (review 23/11/2026).
+    const { data: saved, error } = await db.rpc("set_charity_gateway_ref", {
+      p_charity_id: id,
+      p_gateway: gateway.name,
+      p_account_ref: accountRef,
+      p_account_number_encrypted: priv.bank_account_number_encrypted,
+      p_bank_verified_at: priv.bank_verified_at,
+    });
     if (error) return failed(error);
+    if (saved !== true) return { ok: false, message: "The bank details changed while connecting. Nothing was connected. Connect again." };
     await logAudit({
       actorUserId: admin.userId,
       action: "charity.gateway_connected",

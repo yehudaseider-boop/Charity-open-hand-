@@ -7,7 +7,7 @@ import { recordAction } from "@/lib/charity/charity-actions";
 import { adminRemovedEmail, memberAddedEmail, notifyCharity } from "@/lib/charity/emails";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { isRole } from "@/lib/charity/permissions";
-import { addMember, isOwner, removeMember, setMemberRole } from "@/lib/charity/team";
+import { addMember, isOwner, NOT_APPROVED_YET, removeMember, setMemberRole } from "@/lib/charity/team";
 import type { FormState } from "@/lib/form";
 import { hitRateLimit } from "@/lib/rate-limit";
 
@@ -20,11 +20,9 @@ export async function addTeamMember(charityId: string, _prev: FormState, formDat
   if (!(await isOwner(charityId))) return NOT_OWNER;
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return { ok: false, fieldErrors: { email: "Enter their email address, for example sam@yourcharity.org.za" } };
-  // Adding someone creates a sign-in and emails them in Givezy's name, so only for a charity Givezy is
-  // reviewing or has approved: a draft anyone can start must not become a way to email strangers.
-  if (charity.status === "draft" || charity.status === "rejected") {
-    return { ok: false, message: "You can add people once your application is sent to Givezy. Nothing was changed." };
-  }
+  // Adding someone creates a sign-in and emails them in Givezy's name, so only for a charity Givezy has approved: a
+  // draft anyone can start, or one still being reviewed, must not become a way to email strangers (review 23/11/2026).
+  if (charity.status !== "approved") return { ok: false, message: NOT_APPROVED_YET };
   // Adding people creates sign-ins: a handful an hour is plenty for a real team.
   if (await hitRateLimit("team-add", [`charity:${charityId}`, `user:${viewer.userId}`], 10, 60)) return { ok: false, message: "That's a lot of people in one go. Please wait an hour and try again. Nothing was changed." };
   const role = String(formData.get("role") ?? "admin");
