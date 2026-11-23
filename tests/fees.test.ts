@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { platformConfig } from "@/config/platform";
-import { FeeError, priceDonation } from "@/lib/fees";
+import { FeeError, cardChargeToCover, priceDonation, providerCharge } from "@/lib/fees";
 
 const mins = {
   minDonationCents: platformConfig.minDonationCents,
@@ -62,5 +62,27 @@ describe("priceDonation", () => {
     }
     // Past the safe-integer range the sum itself is unsafe (no ceiling given here).
     expect(code(() => priceDonation(Number.MAX_SAFE_INTEGER, 1_000, { minDonationCents: 3_000, minContributionCents: 1_000 }))).toBe("invalid_amount");
+  });
+});
+
+/**
+ * Documents what providerCharge does today (23/11/2026, review item 7, unconfirmed): it rounds the provider's charge UP to
+ * the cent on the whole payment, so a cover is never a cent short. Test-only numbers (not a real rate); nothing changed.
+ */
+describe("providerCharge rounding, as it is today", () => {
+  const rates = { percentPpm: 100_000, fixedCents: 0, vatOnTopPpm: 0 };
+  it("rounds up to the next cent, and an exact cent stays", () => {
+    expect(providerCharge(10, rates)).toBe(1);
+    expect(providerCharge(11, rates)).toBe(2);
+    expect(providerCharge(15, rates)).toBe(2);
+  });
+  it("adds the fixed part and then VAT on top before rounding up", () => {
+    expect(providerCharge(1_000, { percentPpm: 100_000, fixedCents: 100, vatOnTopPpm: 150_000 })).toBe(230);
+  });
+  it("a cover is never a cent short of the charge on the payment it makes up", () => {
+    for (const base of [3_000, 3_001, 12_345, 99_999]) {
+      const cover = cardChargeToCover(base, rates);
+      expect(cover).toBeGreaterThanOrEqual(providerCharge(base + cover, rates));
+    }
   });
 });

@@ -89,13 +89,16 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
   // After a gateway change, an old pending payment can't be checked any more: a person decides.
   if (donation.gateway !== getGateway().name) {
     console.warn(`[confirm] donation ${donation.id} is on gateway "${donation.gateway}", not the active one`);
-    await logAudit({
-      actorUserId: null,
-      action: "donation.gateway_mismatch",
-      entityType: "donation",
-      entityId: donation.id,
-      details: { gateway: donation.gateway, active: getGateway().name },
-    });
+    // Held once: every later check (webhook, return page, daily) finds it already noted.
+    if (!(await alreadyNoted("donation.gateway_mismatch", donation.id))) {
+      await logAudit({
+        actorUserId: null,
+        action: "donation.gateway_mismatch",
+        entityType: "donation",
+        entityId: donation.id,
+        details: { gateway: donation.gateway, active: getGateway().name },
+      });
+    }
     return "review";
   }
   let tx: VerifiedTransaction;

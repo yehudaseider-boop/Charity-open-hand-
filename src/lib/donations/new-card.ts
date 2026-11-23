@@ -360,14 +360,20 @@ const monthStart = (period: string) => {
 };
 
 /** What a paid new card does to the monthly donation. Pure, so it can be checked on its own. */
-export function newCardPatch(r: Pick<Row, "charge_day" | "last_paid_period">, period: string, auth: VerifiedTransaction["authorization"] | undefined, encryptCode: (code: string) => string) {
+export function newCardPatch(r: Pick<Row, "charge_day" | "last_paid_period"> & { status?: string }, period: string, auth: VerifiedTransaction["authorization"] | undefined, encryptCode: (code: string) => string) {
   // A later month already paid (the page was opened before midnight and paid after it): never move it backwards.
   const keepPeriod = r.last_paid_period !== null && r.last_paid_period > period;
   const periodFields = keepPeriod ? {} : { last_paid_period: period, attempt_period: null, failed_attempts: 0, next_charge_at: chargeTime(addMonths(period, 1), r.charge_day).toISOString() };
+  // A paused monthly donation stays paused (23/11/2026): the payment still counts for the month and the new card is
+  // kept, but pausing is the donor's (or Givezy's) choice and a card update never undoes it.
+  const paused = r.status === "paused";
+  if (paused && !(auth && auth.reusable)) {
+    return { reusable: false as const, patch: keepPeriod ? {} : { last_paid_period: period } };
+  }
   if (auth && auth.reusable) {
     return {
       reusable: true as const,
-      patch: { status: "active" as const, ended_reason: null, cancelled_at: null, authorization_encrypted: encryptCode(auth.code), card_brand: auth.brand, card_last4: auth.last4, card_exp: auth.expires, ...periodFields },
+      patch: { ...(paused ? {} : { status: "active" as const, ended_reason: null, cancelled_at: null }), authorization_encrypted: encryptCode(auth.code), card_brand: auth.brand, card_last4: auth.last4, card_exp: auth.expires, ...periodFields },
     };
   }
   // The month is paid, but this card can't be charged again, and the old one was declined: stop, so nothing more
@@ -391,7 +397,7 @@ export async function finishNewCard(donationId: string, tx: VerifiedTransaction)
   if (!upd) return { result: "none", finishedHere: false };
   const r = await readMonthly(upd.recurring_id);
   let result: "updated" | "not_reusable" | "none" = "none";
-  if (r && (r.status === "active" || r.status === "failed")) {
+  if (r && (r.status === "active" || r.status === "failed" || r.status === "paused")) {
     // Paid twice for one month: another paid gift of this monthly donation in the same Johannesburg month (the old
     // card went through after all, or two pages were paid). Worked out from the gifts themselves, so a repeat of
     // this step can never raise a false alarm.
@@ -414,7 +420,7 @@ export async function finishNewCard(donationId: string, tx: VerifiedTransaction)
       ]);
     }
     const { reusable, patch } = newCardPatch(r, upd.period, tx.authorization, encrypt);
-    const saved = await db.from("recurring_donations").update(patch).eq("id", r.id).in("status", ["active", "failed"]);
+    const saved = await db.from("recurring_donations").update(patch).eq("id", r.id).in("status", ["active", "failed", "paused"]);
     if (saved.error) throw new Error(`Could not keep the new card: ${saved.error.message}`);
     result = reusable ? "updated" : "not_reusable";
   }

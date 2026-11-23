@@ -1,7 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { confirmPayment } from "@/lib/donations/confirm";
-import { GatewayError, gatewayByName } from "@/lib/gateway";
+import { GatewayError, gatewayForEvents } from "@/lib/gateway";
 import { alertGivezy } from "@/lib/ops/alert";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -238,7 +238,7 @@ export async function handleRefund(reference: string | null, amountCents: number
     // runs only when the provider says the payment succeeded. A provider that answers "no such payment" or turns
     // the check down won't answer differently on a repeat: held for a person. Anything else that fails (an
     // outage, our database) is thrown, so the event is sent again.
-    const seen = await gatewayByName(d.gateway).verifyTransaction(reference).catch((e) => {
+    const seen = await gatewayForEvents(d.gateway).verifyTransaction(reference).catch((e) => {
       if (e instanceof GatewayError && (e.notFound || e.refused)) return null;
       throw e;
     });

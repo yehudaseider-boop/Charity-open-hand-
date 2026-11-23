@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { confirmPayment } from "@/lib/donations/confirm";
 import { handleDispute, handleRefund } from "@/lib/donations/reverse";
 import { logAudit } from "@/lib/audit";
-import { gatewayByName } from "@/lib/gateway";
+import { gatewayForEvents } from "@/lib/gateway";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/webhook
   const { gateway: name } = await ctx.params;
   let gateway;
   try {
-    gateway = gatewayByName(name);
+    gateway = gatewayForEvents(name);
   } catch {
     return new NextResponse("Unknown gateway", { status: 404 });
   }
