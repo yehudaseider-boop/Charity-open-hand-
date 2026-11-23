@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<title>Givezy store screenshot</title>
+<!-- One captioned store screenshot. compose-screens.mjs opens this file with the shot's settings in the
+     address (#{json}), waits for the fonts, and saves it at the exact store size. Givezy v2.1 look. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=block">
+<style>
+:root {
+  --white: #FFFFFF; --ink: #0E1B3D; --blue: #1749B5; --blue-edge: #0B2A73; --orange: #FF8A3D;
+  --lavender: #C9B4FA; --light-purple: #ECE8F6; --lilac: #F4F1FF; --peach: #FFEBDD; --slate: #4A5878;
+  --display: "Bricolage Grotesque", "DM Sans", sans-serif;
+  --body: "DM Sans", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: var(--w); height: var(--h); overflow: hidden; }
+body { background: var(--ground); color: var(--text); font-family: var(--body); -webkit-font-smoothing: antialiased; }
+.canvas { position: relative; width: var(--w); height: var(--h); overflow: hidden; background: var(--ground); }
+
+/* Grounds: blue colour-block (white words, orange key word), white or pale lilac (ink words, blue key word). */
+.blue  { --ground: var(--blue);  --text: #FFFFFF; --key: var(--orange); --sub: rgba(255,255,255,0.86); --note: rgba(255,255,255,0.72); }
+.white { --ground: var(--white); --text: var(--ink); --key: var(--blue); --sub: var(--slate); --note: var(--slate); }
+.lilac { --ground: var(--lilac); --text: var(--ink); --key: var(--blue); --sub: var(--slate); --note: var(--slate); }
+
+/* Splashes bleed off the edges, behind everything, like the app's headers. Placed per shot by the script. */
+.splash { position: absolute; border-radius: 50%; z-index: 0; }
+.ring { position: absolute; border-radius: 50%; border-style: solid; background: transparent; z-index: 0; }
+.mark { position: absolute; z-index: 0; }
+
+.top { position: absolute; left: var(--side); right: var(--side); top: var(--top); z-index: 2; }
+.eyebrow { display: inline-flex; align-items: center; gap: calc(var(--u) * 0.45); height: calc(var(--u) * 2.1); padding: 0 calc(var(--u) * 0.95);
+  border-radius: 999px; font: 700 calc(var(--u) * 0.9) / 1 var(--body); letter-spacing: 0.01em; }
+.blue .eyebrow { background: rgba(255,255,255,0.14); color: #FFFFFF; }
+.white .eyebrow, .lilac .eyebrow { background: var(--light-purple); color: var(--blue); }
+.lilac .eyebrow { background: #FFFFFF; }
+.eyebrow i { width: calc(var(--u) * 0.5); height: calc(var(--u) * 0.5); border-radius: 50%; background: var(--orange); display: block; }
+.logo { display: block; height: calc(var(--u) * 2.1); width: auto; }
+
+h1 { font-family: var(--display); font-weight: 800; color: var(--text); letter-spacing: -0.025em; line-height: 1.02;
+  margin-top: calc(var(--u) * 1.25); text-wrap: balance; font-size: var(--hs); max-width: var(--hmax); }
+h1 .key { color: var(--key); position: relative; white-space: nowrap; }
+/* On light grounds the key word is blue with an orange swash under it (orange as the one accent). */
+.white h1 .key::after, .lilac h1 .key::after { content: ""; position: absolute; left: 0.02em; right: 0.02em; bottom: -0.04em; height: 0.11em;
+  border-radius: 0.1em; background: var(--orange); z-index: -1; }
+.sub { margin-top: calc(var(--u) * 0.95); font: 500 var(--ss) / 1.35 var(--body); color: var(--sub); max-width: var(--hmax); text-wrap: pretty; }
+
+/* The phone: a plain modern frame drawn in CSS (no maker's marks), with the app screen inside. */
+.phone { position: absolute; left: 50%; transform: translateX(-50%); top: var(--py); width: var(--pw); z-index: 1;
+  padding: var(--bz); border-radius: var(--pr); background: #0B1124;
+  box-shadow: 0 0 0 calc(var(--bz) * 0.16) #2A3150 inset, 0 calc(var(--u) * 1.4) calc(var(--u) * 2.6) rgba(14, 27, 61, 0.16), 0 calc(var(--u) * 0.35) calc(var(--u) * 0.8) rgba(14, 27, 61, 0.14); }
+.blue .phone { box-shadow: 0 0 0 calc(var(--bz) * 0.16) #2A3150 inset, 0 calc(var(--u) * 1.4) calc(var(--u) * 2.6) rgba(4, 14, 50, 0.38), 0 calc(var(--u) * 0.35) calc(var(--u) * 0.8) rgba(4, 14, 50, 0.25); }
+.screen { position: relative; width: 100%; border-radius: calc(var(--pr) - var(--bz)); overflow: hidden; background: #FFFFFF; }
+.screen img { display: block; width: 100%; height: auto; }
+.island { position: absolute; top: calc(var(--sw) * 0.026); left: 50%; transform: translateX(-50%); width: calc(var(--sw) * 0.29); height: calc(var(--sw) * 0.084); border-radius: 999px; background: #05070F; }
+.android .island { width: calc(var(--sw) * 0.046); height: calc(var(--sw) * 0.046); top: calc(var(--sw) * 0.034); }
+.side-btn { position: absolute; width: calc(var(--bz) * 0.42); border-radius: 4px; background: #1A2140; }
+
+.note { position: absolute; left: 0; right: 0; bottom: var(--nb); text-align: center; z-index: 2;
+  font: 600 calc(var(--u) * 0.8) / 1 var(--body); color: var(--note); letter-spacing: 0.01em; }
+</style>
+</head>
+<body>
+<div class="canvas" id="c"></div>
+<script>
+// Settings come in the address: #{"os":"ios","w":1290,"h":2796,"ground":"blue",...}. See compose-screens.mjs.
+const s = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+const c = document.getElementById("c");
+const W = s.w, H = s.h;
+const u = W / 27; // one layout unit: about 48px on the iPhone image, 40px on Android
+const L = s.layout; // sizes worked out per store size in the script
+const root = document.documentElement.style;
+root.setProperty("--w", W + "px"); root.setProperty("--h", H + "px"); root.setProperty("--u", u + "px");
+root.setProperty("--side", L.side + "px"); root.setProperty("--top", L.top + "px");
+root.setProperty("--hs", L.headline + "px"); root.setProperty("--ss", L.sub + "px"); root.setProperty("--hmax", L.textWidth + "px");
+c.className = "canvas " + s.ground + " " + s.os;
+
+const esc = (t) => t.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+// The headline marks its key word with [square brackets].
+// A "/" asks for a line break there.
+const headline = esc(s.headline).replace(/\[(.+?)\]/, '<span class="key">$1</span>').replace(" / ", "<br>");
+
+let html = "";
+for (const sp of s.splashes) {
+  const pos = Object.entries(sp.at).map(([k, v]) => `${k}:${v * u}px`).join(";");
+  if (sp.kind === "ring") html += `<div class="ring" style="${pos};width:${sp.size * u}px;height:${sp.size * u}px;border-width:${sp.stroke * u}px;border-color:${sp.color}"></div>`;
+  else if (sp.kind === "mark") html += `<img class="mark" src="${s.brand}/splash.png" alt="" style="${pos};width:${sp.size * u}px;transform:rotate(${sp.rotate || 0}deg)">`;
+  else html += `<div class="splash" style="${pos};width:${sp.size * u}px;height:${sp.size * u}px;background:${sp.color}"></div>`;
+}
+html += `<div class="top">`;
+html += s.logo ? `<img class="logo" src="${s.brand}/logo-400.png" alt="Givezy">` : `<span class="eyebrow"><i></i>${esc(s.eyebrow)}</span>`;
+html += `<h1>${headline}</h1>`;
+if (s.sub) html += `<p class="sub">${esc(s.sub)}</p>`;
+html += `</div>`;
+html += `<div class="phone" id="phone"><div class="screen" id="screen"><img id="shot" src="${s.screen}" alt=""><div class="island"></div></div></div>`;
+html += `<p class="note">${esc(s.note)}</p>`;
+c.innerHTML = html;
+
+// Fit the phone in the space left under the words, so it is never cut off and never sits on the words.
+async function layout() {
+  await document.fonts.ready;
+  const img = document.getElementById("shot");
+  if (!img.complete) await new Promise((r) => { img.onload = r; img.onerror = r; });
+  const h1 = c.querySelector("h1");
+  // At most two lines: step the size down if the words would need a third.
+  let size = L.headline;
+  const lh = () => parseFloat(getComputedStyle(h1).lineHeight);
+  while (h1.getBoundingClientRect().height > lh() * 2 + 2 && size > L.headline * 0.7) { size -= 2; h1.style.fontSize = size + "px"; }
+  const textBottom = c.querySelector(".top").getBoundingClientRect().bottom;
+  // The phone starts at the same height on every image: room for two headline lines and one subline,
+  // so the set reads as one sequence. (A taller block than that pushes it down, and is reported.)
+  const first = c.querySelector(".top").firstElementChild;
+  const sub = c.querySelector(".sub");
+  const reserved = L.top + first.getBoundingClientRect().height + parseFloat(getComputedStyle(h1).marginTop) + 2 * L.headline * 1.02
+    + (sub ? parseFloat(getComputedStyle(sub).marginTop) + L.sub * 1.35 : 0);
+  const textEdge = Math.max(textBottom, reserved);
+  const ratio = img.naturalHeight / img.naturalWidth;
+  const noteSpace = L.noteSpace;
+  const avail = H - textEdge - L.gap - noteSpace;
+  // Phone outer height = screen height + 2 bezels; bezel scales with the phone.
+  const bzRatio = 0.026;
+  let pw = Math.min(L.maxPhone, avail / (ratio * (1 - 2 * bzRatio) + 2 * bzRatio));
+  const bz = pw * bzRatio;
+  const sw = pw - 2 * bz;
+  root.setProperty("--pw", pw + "px");
+  root.setProperty("--bz", bz + "px");
+  root.setProperty("--sw", sw + "px");
+  root.setProperty("--pr", (s.os === "ios" ? sw * 0.135 : sw * 0.09) + bz + "px");
+  const ph = sw * ratio + 2 * bz;
+  const py = textEdge + L.gap + (avail - ph) / 2;
+  root.setProperty("--py", py + "px");
+  root.setProperty("--nb", (noteSpace - L.noteSize) / 2 + "px");
+  // Side buttons, drawn as part of the frame.
+  const phone = document.getElementById("phone");
+  const btn = (side, top, h) => { const b = document.createElement("div"); b.className = "side-btn"; b.style[side] = -bz * 0.32 + "px"; b.style.top = top * ph + "px"; b.style.height = h * ph + "px"; b.style.zIndex = -1; phone.appendChild(b); };
+  if (s.os === "ios") { btn("left", 0.16, 0.04); btn("left", 0.23, 0.07); btn("left", 0.315, 0.07); btn("right", 0.25, 0.11); }
+  else { btn("right", 0.2, 0.12); btn("right", 0.36, 0.06); }
+  document.body.dataset.ready = JSON.stringify({ textBottom, reserved, overflows: textBottom > reserved + 1, phoneTop: py, phoneBottom: py + ph, pw, headlineSize: size, headlineLines: Math.round(h1.getBoundingClientRect().height / lh()) });
+}
+layout();
+</script>
+</body>
+</html>
