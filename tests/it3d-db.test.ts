@@ -51,8 +51,9 @@ describe("charity SARS details", () => {
     await tx(async () => {
       await run("update public.charity_private set tax_reference_number = null, legal_form = null where charity_id = $1", [charity]);
       await as(admin);
-      await refused("update public.charity_private set tax_reference_number = '0001339050' where charity_id = $1", [charity], /only be changed through the website/);
-      await refused("update public.charity_private set legal_form = 'OTHER_CO' where charity_id = $1", [charity], /only be changed through the website/);
+      // Refused outright since 23/11/2026 (browsers may only update the contact and donation emails columns).
+      await refused("update public.charity_private set tax_reference_number = '0001339050' where charity_id = $1", [charity], /permission denied|only be changed through the website/);
+      await refused("update public.charity_private set legal_form = 'OTHER_CO' where charity_id = $1", [charity], /permission denied|only be changed through the website/);
       const ok = await run("update public.charity_private set contact_name = 'Changed Name' where charity_id = $1 returning charity_id", [charity]);
       expect(ok.rowCount).toBe(1);
       await run("reset role");

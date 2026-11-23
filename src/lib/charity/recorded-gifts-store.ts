@@ -99,6 +99,16 @@ export async function recordGifts(args: {
     if (/gift_imports_once/.test(error.message)) return { ok: false, message: "You've already imported this exact file, so nothing was recorded again. It's under Earlier imports below." };
     if (/approved charity/.test(error.message)) return { ok: false, message: "Gifts can be recorded once Givezy has approved your charity. Nothing was recorded." };
     if (/donations_recorded_ref/.test(error.message)) return { ok: false, message: "One of these references is already on a gift you recorded, so nothing was recorded. Check the references and try again." };
+    // The database's own look for the same gift (two saves at once, or a quick second press): the same words as the
+    // website's look before saving (record-actions.ts).
+    if (/recorded_gift_twice/.test(error.message)) {
+      return {
+        ok: false,
+        message: args.gifts.length === 1
+          ? "You've already recorded a gift from this email for this amount on this date. If it's a second gift, add a reference (for example the bank reference) and record it again."
+          : "One of these gifts is already recorded (the same email, amount and date), so nothing was recorded. Check the file again to see which.",
+      };
+    }
     console.error("[recorded-gifts]", error.message);
     return { ok: false, message: "Something went wrong while saving, so nothing was recorded. Please try again." };
   }

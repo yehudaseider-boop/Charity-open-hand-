@@ -78,9 +78,10 @@ describe("approved charity", () => {
 
   it("can't change its bank account", async () => {
     await scenario(noop, async () => {
+      // No browser session may write the bank columns at all since 23/11/2026; the trigger refused it before.
       await expect(
         run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals]),
-      ).rejects.toThrow(/Bank details/);
+      ).rejects.toThrow(/permission denied|Bank details/);
     });
   });
 
@@ -140,28 +141,21 @@ describe("draft charity", () => {
     await run("update public.charities set status = 'draft' where id = $1", [meals]);
   };
 
-  it("can change its bank account and legal details", async () => {
+  it("can change its legal details, and its contact, from the browser", async () => {
     await scenario(toDraft, async () => {
-      await run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals]);
       await run("update public.charities set legal_name_en = 'Changed' where id = $1", [meals]);
       await run("update public.charities set city = 'Changed' where id = $1", [meals]);
+      await run("update public.charity_private set contact_name = 'New', notify_donations = false where charity_id = $1", [meals]);
     });
   });
 
-  it("loses the bank-verified stamp when it changes its bank details", async () => {
-    await scenario(
-      async () => {
-        await toDraft();
-        await run("update public.charity_private set bank_verified_at = now() where charity_id = $1", [meals]);
-      },
-      async () => {
-        const before = await asServer("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
-        expect(before.rows[0].bank_verified_at).not.toBeNull();
-        await run("update public.charity_private set bank_account_holder = 'SOMEONE ELSE' where charity_id = $1", [meals]);
-        const after = await asServer("select bank_verified_at from public.charity_private where charity_id = $1", [meals]);
-        expect(after.rows[0].bank_verified_at).toBeNull();
-      },
-    );
+  it("can't write its bank account straight through the database API, not even its owner (review 23/11/2026)", async () => {
+    // The website saves it on the server after its own checks (encryption, audit, bank check, Undo).
+    for (const column of ["bank_name = 'Other Bank'", "bank_account_holder = 'SOMEONE ELSE'", "bank_account_number_encrypted = 'x'", "bank_account_last4 = '9999'", "bank_branch_code = '123456'", "bank_verified_at = null"]) {
+      await scenario(toDraft, async () => {
+        await expect(run(`update public.charity_private set ${column} where charity_id = $1`, [meals])).rejects.toThrow(/permission denied/);
+      });
+    }
   });
 
   it("keeps the stamp when an edit does not touch the bank details", async () => {
@@ -182,7 +176,7 @@ describe("draft charity", () => {
     await scenario(toDraft, async () => {
       await expect(
         run("update public.charity_private set bank_verified_at = now() where charity_id = $1", [meals]),
-      ).rejects.toThrow(/Only the platform/);
+      ).rejects.toThrow(/permission denied|Only the platform/);
     });
   });
 
@@ -215,7 +209,7 @@ describe("draft charity", () => {
 });
 
 describe("bank details are the owner's (review 22/10/2026)", () => {
-  it("in a draft, an admin who is not the owner can't change them; the owner can", async () => {
+  it("in a draft, neither an admin nor the owner can change them from the browser: the website saves the owner's on the server (23/11/2026)", async () => {
     // The meals charity back in draft, with the meals admin made a plain admin of it.
     await scenario(
       async () => {
@@ -223,7 +217,7 @@ describe("bank details are the owner's (review 22/10/2026)", () => {
         await run("update public.charity_admins set role = 'admin' where charity_id = $1 and user_id = $2", [meals, mealsAdmin]);
       },
       async () => {
-        await expect(run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals])).rejects.toThrow(/owner/);
+        await expect(run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals])).rejects.toThrow(/permission denied|owner/);
       },
     );
     await scenario(
@@ -231,9 +225,24 @@ describe("bank details are the owner's (review 22/10/2026)", () => {
         await run("update public.charities set status = 'draft' where id = $1", [meals]);
       },
       async () => {
-        await expect(run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals])).resolves.toBeTruthy();
+        await expect(run("update public.charity_private set bank_branch_code = '123456' where charity_id = $1", [meals])).rejects.toThrow(/permission denied/);
       },
     );
+  });
+
+  it("the server can save them after Givezy stamped them checked, clearing the stamp (an owner sent back could never save before)", async () => {
+    await client.query("begin");
+    try {
+      await run("update public.charities set status = 'rejected' where id = $1", [meals]);
+      await run("update public.charity_private set bank_verified_at = now() where charity_id = $1", [meals]);
+      await run("set local role service_role");
+      await run("update public.charity_private set bank_branch_code = '654321', bank_verified_at = null where charity_id = $1", [meals]);
+      await run("reset role");
+      const r = await run("select bank_branch_code, bank_verified_at from public.charity_private where charity_id = $1", [meals]);
+      expect(r.rows[0]).toEqual({ bank_branch_code: "654321", bank_verified_at: null });
+    } finally {
+      await client.query("rollback");
+    }
   });
 });
 

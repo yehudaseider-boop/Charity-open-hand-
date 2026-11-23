@@ -11,6 +11,7 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { isOwner, viewerCan } from "@/lib/charity/team";
 import { statusLabels } from "@/lib/charity/status";
 import { reviewWithin } from "@/lib/charity/review-time";
+import { refusedFor } from "@/lib/charity/permissions";
 import {
   removeDocument,
   saveAddress,
@@ -23,6 +24,13 @@ import {
 import { AddressForm, BankForm, ContactForm, ContactReadOnly, OrganisationForm, SubmitForm, UploadForm } from "./forms";
 
 export const metadata: Metadata = { title: "Application" };
+
+/** Why "Remove" on a document changed nothing (removeDocument sends the person back with one of these). */
+const removeRefused: Record<string, string> = {
+  application: refusedFor("application"),
+  locked: "Your application has been submitted, so its documents are locked while we review them. Nothing was changed.",
+  gone: "That document was already removed, perhaps by someone else on your team. Nothing else was changed.",
+};
 
 /** What each document must show (the same words as the apply page). DRAFT WORDING for Yehuda to approve. */
 const documentHelp: Record<string, string> = {
@@ -60,6 +68,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
       />
 
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/application?step=${step.key}`} />
+      {typeof sp.refused === "string" && Object.hasOwn(removeRefused, sp.refused) ? <Notice>{removeRefused[sp.refused]}</Notice> : null}
 
       {charity.status === "suspended" ? (
         <Notice tone="danger">
@@ -177,7 +186,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
                 ) : null}
                 <DocumentList docs={documents} removeAction={(docId) => removeDocument.bind(null, id, docId)} />
                 <div className="mt-4 border-t border-border pt-4">
-                  <UploadForm action={uploadDocument.bind(null, id)} showMandateDate={Boolean(charity.s18a_reference)} />
+                  <UploadForm action={uploadDocument.bind(null, id)} showMandateDate={Boolean(charity.s18a_reference)} canBank={canBank} />
                 </div>
               </>
             ) : null}
