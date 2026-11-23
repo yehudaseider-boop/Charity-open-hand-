@@ -12,7 +12,9 @@ let updates = 0;
 let same: { id: string; name: string; status: string }[] = [];
 vi.mock("@/lib/auth", () => ({ requirePlatformAdmin: async () => ({ userId: "admin1" }) }));
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: { action: string; details?: Record<string, unknown> }) => void audits.push(a) }));
-vi.mock("@/lib/charity/emails", async (orig) => ({ ...(await orig<object>()), notifyCharity: async () => {} }));
+vi.mock("@/lib/charity/emails", async (orig) => ({ ...(await orig<object>()), notifyCharity: async () => mailOk }));
+/** Whether the charity's email goes (false: it failed, or email isn't switched on here). */
+let mailOk = true;
 vi.mock("@/lib/charity/checklist", () => ({ applicationChecklist: () => [], isComplete: () => true }));
 vi.mock("@/lib/charity/same-number", () => ({ charitiesWithSameNumber: async () => same }));
 vi.mock("@/lib/charity/queries", () => ({
@@ -48,6 +50,7 @@ beforeEach(() => {
   audits.length = 0;
   updates = 0;
   same = [];
+  mailOk = true;
 });
 
 describe("approving a charity whose number another charity here also has", () => {
@@ -71,5 +74,13 @@ describe("approving a charity whose number another charity here also has", () =>
     const r = await approveCharity("c1", { ok: false }, form({ [SAME_NUMBER_FIELD]: "The other listing was their first try, sent back and closed." }));
     expect(r.ok).toBe(true);
     expect(audits[0]).toMatchObject({ action: "charity.approved", details: { same_number_as: ["c2"], same_number_note: "The other listing was their first try, sent back and closed." } });
+  });
+});
+
+describe("approving says the charity was emailed only when the email went (review 23/11/2026)", () => {
+  it("still approves when the email didn't go, and says so plainly", async () => {
+    expect((await approveCharity("c1", { ok: false }, form())).message).toBe("Approved. The charity has been emailed.");
+    mailOk = false;
+    expect(await approveCharity("c1", { ok: false }, form())).toEqual({ ok: true, message: "Approved. We couldn't email the charity, so please let them know." });
   });
 });

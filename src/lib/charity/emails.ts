@@ -265,13 +265,18 @@ export function donationReceivedEmail(
   };
 }
 
-/** Send, and never let a failed email undo or block what already happened. */
-export async function notifyCharity(message: EmailMessage | null): Promise<void> {
-  if (!message?.to) return;
+/**
+ * Send, and never let a failed email undo or block what already happened. True only when the email went: false when
+ * there was no address, the send failed, or it was skipped (email not switched on here), so a page never says
+ * "emailed" when nothing went (review 23/11/2026).
+ */
+export async function notifyCharity(message: EmailMessage | null): Promise<boolean> {
+  if (!message?.to) return false;
   try {
-    await getEmailTransport().send(message);
+    return (await getEmailTransport().send(message)) === "sent";
   } catch (e) {
     console.error("[charity email] not sent", e);
+    return false;
   }
 }
 

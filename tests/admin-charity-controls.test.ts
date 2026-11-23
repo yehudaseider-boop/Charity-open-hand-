@@ -23,7 +23,9 @@ const OLD_OWNER = "44444444-4444-4444-8444-444444444444";
 
 vi.mock("@/lib/auth", () => ({ requirePlatformAdmin: async () => ({ userId: ADMIN }) }));
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: { action: string; details?: Record<string, unknown> }) => void audits.push(a) }));
-vi.mock("@/lib/charity/emails", async (orig) => ({ ...(await orig<object>()), notifyCharity: async (m: { to: string; subject: string }) => void mails.push(m) }));
+vi.mock("@/lib/charity/emails", async (orig) => ({ ...(await orig<object>()), notifyCharity: async (m: { to: string; subject: string }) => (mails.push(m), mailOk) }));
+/** Whether the emails go (false: they failed, or email isn't switched on here). */
+let mailOk = true;
 vi.mock("@/lib/charity/queries", () => ({
   loadCharityForManager: async () => ({ charity, priv: { contact_email: "charity@x.co" }, documents }),
 }));
@@ -86,6 +88,32 @@ beforeEach(() => {
   factors = [{ id: "f1" }];
   charity = { status: "approved", name_en: "Meals Fund", slug: "meals", is_s18a: false, mandate_signed_at: null, s18a_reference: null };
   documents = [];
+  mailOk = true;
+});
+
+describe("the admin page says 'emailed' only when the email went (review 23/11/2026)", () => {
+  it("each action still succeeds, and says plainly the person wasn't emailed", async () => {
+    expect((await removeCharityAdmin(CH, U2, { ok: false })).message).toBe("p@x.co can no longer manage this charity.");
+    expect((await makeCharityOwner(CH, U2, { ok: false })).message).toBe("p@x.co now own this charity. The previous owner stays on the team as an admin. Both have been emailed.");
+    mailOk = false;
+    expect(await removeCharityAdmin(CH, U2, { ok: false })).toEqual({ ok: true, message: "p@x.co can no longer manage this charity. We couldn't email them, so please let them know." });
+    expect(await makeCharityOwner(CH, U2, { ok: false })).toEqual({
+      ok: true,
+      message: "p@x.co now own this charity. The previous owner stays on the team as an admin. We couldn't email p@x.co or old@x.co, so please let them both know.",
+    });
+    expect(await resetSecondStep(CH, U2, { ok: false }, form({ reason: "Called them on the number from the application" }))).toEqual({
+      ok: true,
+      message: "Reset. They'll set up a new authenticator app next time they sign in. We couldn't email them, so please let them know.",
+    });
+    documents = [
+      { document_type: "s18a_approval", storage_path: "c/s.pdf" },
+      { document_type: "receipting_mandate", signed_on: "2026-10-01", storage_path: "c/m.pdf" },
+    ];
+    expect(await setUpReceipts(CH, { ok: false }, form({ s18a_reference: "930/123/45/6", confirm_s18a: "on", confirm_mandate: "on" }))).toEqual({
+      ok: true,
+      message: "s18A receipts are set up. We couldn't email the charity, so please let them know.",
+    });
+  });
 });
 
 describe("remove a charity admin", () => {
