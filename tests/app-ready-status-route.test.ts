@@ -1,7 +1,7 @@
 /**
  * The two calls around the app's payment page: "can I take this gift?" before, and "did it go
- * through?" after. Both are closed with the server switch off, and the status needs the
- * donor's own credential.
+ * through?" after. The first is closed with the server switch off; the status stays open (23/11/2026: a donor
+ * who already paid must still learn the outcome), and needs the donor's own credential.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -107,8 +107,9 @@ describe("app payment status", () => {
     expect((await res.json()).message).toMatch(/check again/);
     expect(confirmed).toBe(0);
   });
-  it("is closed with the server switch off", async () => {
+  it("stays open with the server switch off, so a gift already started still learns its outcome", async () => {
     delete process.env.APP_GIVING;
-    expect((await status(req({ reference: REF, token: "a".repeat(43) }))).status).toBe(404);
+    expect((await status(req({ reference: REF, token: "a".repeat(43) }))).status).not.toBe(404);
+    expect((await status(req({ reference: REF, token: "z".repeat(43) }))).status).not.toBe(200);
   });
 });

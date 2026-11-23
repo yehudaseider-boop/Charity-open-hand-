@@ -2232,7 +2232,6 @@ A read-only security review found six things. All six are fixed in code; two nee
 - **Stitch refunds and disputes are not built** (the Stitch API details are not known); noted in the go-live checklist as blocking the switch.
 - **The daily safety net asks again about gifts closed as failed in the last 7 days** (50 a run, newest first); `confirmPayment` already turns failed into paid when the provider says so.
 - **A saved-card charge that stopped before anything was sent** (missing key, a split we would not start, a feature not built: `GatewayError.beforeSend`) closes the gift at once as "nothing was charged" and is held for a person. Only errors that may have reached the provider (outage, timeout, an unflagged answer) still leave it pending.
-- **A saved-card gift whose details or consent did not save is closed** (noted `donation.checkout_closed`), so no dead pending row stays and a retry says "nothing was charged" and offers the payment page.
 - **"Update my card" on a paused monthly donation** keeps the new card and counts the month as paid, and it stays paused.
 - **The gateway-mismatch note is written once per gift** (`alreadyNoted`), however many times it is checked.
 - **Deposits sync reads every connected charity and every final payout**, a page at a time (`readAllPages`), not only the first 1 000 and 5 000.
@@ -2275,3 +2274,4 @@ A read-only security review found six things. All six are fixed in code; two nee
 - `apps/mobile/eas.json`: the production profile pins `EXPO_PUBLIC_IN_APP_GIVING` and `EXPO_PUBLIC_SAVED_CARDS` to empty.
 - Giving tab: pausing, resuming or cancelling a monthly donation shows the database's own reason when it is one of the passed-through ones (payment looked into, no card to charge), not always "Check your connection".
 - The after-reply decisions of the give screen (`giveOnce`, `checkAgain`) are a pure function in `apps/mobile/src/lib/give-after.ts`, with a table test; behaviour unchanged apart from the "no answer" wording.
+- **Saved-card attempt whose records did not save is left as it is (23/11/2026, merge of the review fixes).** A fix that closed such a gift was backed out: the 13/11/2026 decision (a saved-card attempt is never closed on an error, so the app keeps the same attempt and can never charge twice) stands. The dead pending row ages out at 48 hours. Question for Yehuda if wanted: close it instead and show 'nothing was charged'.

@@ -317,13 +317,12 @@ describe("paying with the saved card", () => {
     expect(declinesCounted).toEqual([]);
   });
 
-  it("details that could not be saved after the gift row close the gift: no dead pending row, nothing sent", async () => {
+  it("details that could not be saved after the gift row leave the attempt as it is (13/11/2026): nothing sent, never closed", async () => {
     failInsertOn = "donation_checkout_details";
     vi.spyOn(console, "error").mockImplementation(() => {});
     await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details }).catch(() => {});
     expect(charges).toHaveLength(0);
-    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
-    expect(ops.find((o) => o.table === "audit_log" && o.op === "insert")?.row).toMatchObject({ action: "donation.checkout_closed" });
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);
   });
 
   it("a timeout or outage leaves the gift pending, because the charge may have gone through", async () => {
