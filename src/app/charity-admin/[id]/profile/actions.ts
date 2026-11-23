@@ -171,7 +171,7 @@ export async function uploadImage(
   if (!(await isRealImage(file))) return { ok: false, fieldErrors: { file: "That file isn't a JPG, PNG or WebP image" } };
 
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
-  const path = `${charityId}/${kind}-${crypto.randomUUID()}.${ext}`;
+  const path = `${charityId.toLowerCase()}/${kind}-${crypto.randomUUID()}.${ext}`;
   const supabase = await createClient();
   // Uploaded by the server, after the checks above (who, which role, a real image): a browser has no direct write to storage (18/11/2026).
   const up = await createAdminClient().storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details

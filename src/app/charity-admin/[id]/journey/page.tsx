@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { ActionForm } from "@/components/forms/action-form";
 import { requireViewer } from "@/lib/auth";
-import { enrolmentLabel, existingSkippedSentence, journeyCounts, journeyTitle, parseRefKey, journeyStartWords, campaignJourneyWords, partWay, refKey, sameRef, starterSteps, type JourneyRef } from "@/lib/charity/journey";
+import { enrolmentLabel, existingSkippedSentence, existingPaceSentence, journeyCounts, journeyTitle, parseRefKey, journeyStartWords, campaignJourneyWords, partWay, refKey, sameRef, starterSteps, type JourneyRef } from "@/lib/charity/journey";
 import { enrolmentStates, journeyPeople, journeysV2, listJourneys, loadJourney, planExistingDonors } from "@/lib/charity/journey-store";
 import { journeyPicturesReady } from "@/lib/charity/journey-write";
 import { loadCharityForManager } from "@/lib/charity/queries";
@@ -273,14 +273,14 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
               <>
                 <p>
                   {plural(existing.add.length, "donor")} who first gave before your journey was switched on can join it. They begin at email 1, and never get more than one
-                  message from you a week. {existingSkippedSentence(existing.skipped)}
+                  message from you a week. {existingPaceSentence(existing.add.length)} {existingSkippedSentence(existing.skipped)}
                 </p>
                 <ActionForm
                   key={formKey(sp, "existing")}
                   action={addExisting.bind(null, id)}
                   submitLabel={`Add ${plural(existing.add.length, "donor")}`}
                   pendingLabel="Adding…"
-                  confirm={`Add ${plural(existing.add.length, "donor")} to your journey? Their first email goes ${firstWait === 0 ? "from the next morning" : `about ${plural(firstWait, "day")} from now, in the morning`}. You can take this back for 30 minutes, and only for those who haven't had an email yet.`}
+                  confirm={`Add ${plural(existing.add.length, "donor")} to your journey? Their first email goes ${firstWait === 0 ? "from the next morning" : `about ${plural(firstWait, "day")} from now, in the morning`}. ${existingPaceSentence(existing.add.length)} You can take this back for 30 minutes, and only for those who haven't had an email yet.`.replace("  ", " ")}
                   confirmLabel="Yes, add them"
                 />
               </>

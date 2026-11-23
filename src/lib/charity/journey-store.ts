@@ -508,7 +508,8 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
       dates = { startsAt: c.starts_at as string, endsAt: (c.ends_at as string | null) ?? null };
     }
     const first = new Map<string, Date>();
-    for (let from = 0; from < 5000; from += 1000) {
+    // Until a short page: a busy charity's new gifts must not be cut off after the first 5 000 (review 23/11/2026).
+    for (let from = 0; ; from += 1000) {
       let q = db()
         .from("donations")
         .select("donor_id, paid_at, created_at, amount_cents, refunded_cents")

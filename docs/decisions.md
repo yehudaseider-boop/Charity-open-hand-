@@ -2258,3 +2258,11 @@ A read-only security review found six things. All six are fixed in code; two nee
 - **Receipt-check records are found by certificate key** (`details.key`, worked out from each receipt decision) as well as by name, so a name spelt differently on an earlier gift is removed too.
 - **The data download pages every read** (giving choices, thank-you notes, s18A receipts, monthly donations, charities' notes, follow-ups, tags and appeal emails), like donations. Giving choices are now read for the person's own donations only.
 - **Date of birth from an ID number: rule unchanged** (a two-digit year equal to this year's is the 2000s, so someone aged 100 or more reads as a baby); a test now documents it. `emailHash` left as it is: it needs a decision.
+
+## Review fixes, area E: charity dashboard emails and journeys (23/11/2026)
+
+- News emails to "gave last year, not since" (Keeping donors lists) and the lapsed group check again at the start of every send run (including the daily job's) and skip anyone who has given since the email was made: nobody is told "you haven't given since" after giving again. Done by looking for a paid gift since the email was made, so it works for the daily job too.
+- The daily run now reads new gifts page by page until a short page, not only the first 5 000 rows: a busy charity's new donors are no longer missed.
+- Pictures for journey emails and profile images are stored under the lower-case charity id (the check and the database compare it lower-case), so a page address with capital letters no longer breaks the upload; the undo's own-folder check matches.
+- Taking back a journey save (Undo) applies the same "someone is part way" check as saving: if putting the old emails back would move an email to another number while anyone is part way through, Undo says the journey has changed and changes nothing.
+- "Add my existing donors" says, for a list longer than the daily cap (JOURNEY_RUN_CAP), that emails go out at no more than that many a day across Givezy, over several days; it names no date. The cap is unchanged. The double-welcome behaviour is unchanged and still a decision for Yehuda.
