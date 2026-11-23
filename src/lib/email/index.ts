@@ -17,6 +17,11 @@ export type EmailMessage = {
    * in their place, in their own box, escaped, with no links. Never sent to the provider as a field.
    */
   quoted?: { heading: string; body: string; inText: string };
+  /**
+   * A picture the HTML version shows above the words (a charity's photo on a journey email, 23/11/2026), with its
+   * description as the alt text. Never sent to the provider as a field.
+   */
+  picture?: { url: string; alt: string };
   /** Where a reply goes (for example the charity, on a thank-you sent in its name). */
   replyTo?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
@@ -129,7 +134,7 @@ function withHtml(inner: EmailTransport, siteUrl: string | undefined): EmailTran
   return {
     name: inner.name,
     async send(m) {
-      return inner.send(m.html ? m : { ...m, html: textEmailHtml({ subject: m.subject, text: m.text, siteUrl, quoted: m.quoted }) });
+      return inner.send(m.html ? m : { ...m, html: textEmailHtml({ subject: m.subject, text: m.text, siteUrl, quoted: m.quoted, picture: m.picture }) });
     },
   };
 }

@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isMissingColumn } from "./video";
-import { GENERAL, type JourneyKind, type JourneyRef, type JourneyStep } from "./journey";
+import { GENERAL, withPicture, type JourneyKind, type JourneyRef, type JourneyStep } from "./journey";
 
 /**
  * The donor journeys' writes that Undo also needs (CRM steps 6a, 6b and 7): put a journey back as it was, and take off
@@ -66,10 +66,17 @@ export function rowOf(d: Record<string, unknown>): JourneyRow {
 /** A journey's emails, in order. */
 export async function journeySteps(charityId: string, row: Pick<JourneyRow, "id"> | null): Promise<JourneyStep[]> {
   if (!row) return [];
-  const q = db().from("charity_journey_steps").select("position, subject, body, wait_days");
-  const { data, error } = await (row.id ? q.eq("journey_id", row.id) : q.eq("charity_id", charityId)).order("position");
+  const read = (cols: string) => {
+    const q = db().from("charity_journey_steps").select(cols);
+    return (row.id ? q.eq("journey_id", row.id) : q.eq("charity_id", charityId)).order("position");
+  };
+  let { data, error } = await read("position, subject, body, wait_days, image_path, image_alt");
+  // Before migration 20261123000008 the emails have no pictures: read them without (never a broken page).
+  if (error && isMissingColumn(error)) ({ data, error } = await read("position, subject, body, wait_days"));
   if (error) throw error;
-  return (data ?? []).map((r) => ({ subject: r.subject as string, body: r.body as string, waitDays: Number(r.wait_days) }));
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) =>
+    withPicture({ subject: r.subject as string, body: r.body as string, waitDays: Number(r.wait_days) }, r.image_path as string | null, r.image_alt as string | null),
+  );
 }
 
 /**
@@ -77,7 +84,7 @@ export async function journeySteps(charityId: string, row: Pick<JourneyRow, "id"
  * the general journey, save_journey for the others), so the daily run never sees half a save.
  */
 export async function writeJourney(charityId: string, userId: string | null, state: JourneyState, ref: JourneyRef = GENERAL): Promise<void> {
-  const steps = state.steps.map((s) => ({ subject: s.subject, body: s.body, waitDays: s.waitDays }));
+  const steps = state.steps.map((s) => ({ subject: s.subject, body: s.body, waitDays: s.waitDays, imagePath: s.imagePath ?? null, imageAlt: s.imagePath ? (s.imageAlt ?? null) : null }));
   const enabled = state.enabled && state.steps.length > 0;
   if (ref.kind === "general") {
     const { error } = await db().rpc("save_charity_journey", { p_charity_id: charityId, p_enabled: enabled, p_switched_on_at: state.switched_on_at, p_steps: steps, p_user: userId });

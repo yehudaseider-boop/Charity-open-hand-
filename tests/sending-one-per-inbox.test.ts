@@ -111,7 +111,7 @@ async function rpc(name: string, args: { p_appeal_id: string; p_limit: number })
   return { data: rows.map((r) => ({ donor_id: r.donor_id })), error: null };
 }
 
-const sent: { to: string; subject: string }[] = [];
+const sent: { to: string; subject: string; picture?: { url: string; alt: string } }[] = [];
 /** Addresses whose send throws as a dropped connection would (fetch's "fetch failed"). */
 let dropFor = new Set<string>();
 /** Addresses for which the email service answers "too many, slow down" (429): nothing goes. */
@@ -145,10 +145,10 @@ vi.mock("@/lib/email", () => {
     isTemporaryRefusal: (e: unknown) => e instanceof EmailError && (e.status === 429 || (e.status ?? 0) >= 500),
     getEmailTransport: () => ({
       name: "resend",
-      send: async (m: { to: string; subject: string }) => {
+      send: async (m: { to: string; subject: string; picture?: { url: string; alt: string } }) => {
         if (dropFor.has(m.to.toLowerCase())) throw new EmailMaybeSent("fetch failed");
         if (busyFor.has(m.to.toLowerCase())) throw new EmailError("Resend refused the email (429).", 429);
-        sent.push({ to: m.to, subject: m.subject });
+        sent.push({ to: m.to, subject: m.subject, ...(m.picture ? { picture: m.picture } : {}) });
         return "sent";
       },
     }),
@@ -287,6 +287,19 @@ describe("a journey email reaches each inbox once a run", () => {
     expect(e2).toMatchObject({ status: "active", next_step: 1 });
     // From the next Monday, as any second message in a week.
     expect(new Date(String(e2.next_due_at)).getTime()).toBe(new Date("2026-11-16T00:00:00+02:00").getTime());
+  });
+
+  it("an email with a picture goes out with it (23/11/2026)", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://proj.supabase.test";
+    const path = `${C}/journey-aaaaaaaa-1111-4111-8111-111111111111.jpg`;
+    tables.charity_journeys = [{ id: J, kind: "general", campaign_id: null, charity_id: C, enabled: true, switched_on_at: "2026-11-01T00:00:00+02:00" }];
+    tables.charity_journey_steps = [{ ...steps[0], image_path: path, image_alt: "Children at our club" }, steps[1]];
+    tables.charity_journey_enrolments = [enrol("e1", "ben")];
+    tables.donations.push(gift("g3", "ben", "2026-11-05T10:00:00+02:00", "ben@x.co"));
+    await runJourneys(NOW, Date.now() + 10_000);
+    expect(sent).toEqual([
+      { to: "ben@x.co", subject: "Email 1", picture: { url: `https://proj.supabase.test/storage/v1/object/public/charity-public/${path}`, alt: "Children at our club" } },
+    ]);
   });
 
   it("a long-standing donor is never enrolled as new because another donor's many gifts filled the read", async () => {

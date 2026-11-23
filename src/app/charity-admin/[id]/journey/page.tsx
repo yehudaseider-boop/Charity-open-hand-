@@ -16,7 +16,7 @@ import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { plural } from "@/lib/text";
-import { addExisting, saveJourney, switchJourney } from "./actions";
+import { addExisting, saveJourney, switchJourney, uploadJourneyPicture } from "./actions";
 import { JourneyEditor } from "./editor";
 
 export const metadata: Metadata = { title: "Donor journeys" };
@@ -198,6 +198,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
             siteUrl={process.env.SITE_URL}
             starter={starterSteps(ref.kind, campaignTitle)}
             start={journeyStartWords(ref.kind, campaignTitle)}
+            uploadPicture={uploadJourneyPicture.bind(null, id)}
             onIt={partWay(states)}
           />
         </div>

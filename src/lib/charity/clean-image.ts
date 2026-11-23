@@ -13,10 +13,12 @@ import sharp from "sharp";
 export const MAX_IMAGE_PIXELS = 30_000_000;
 export const MAX_IMAGE_SIDE = 2_400;
 
-export async function cleanImage(file: File): Promise<Blob> {
+/** `maxSide`: a smaller limit for a picture that only goes in emails (journey pictures, 1 200 px). */
+export async function cleanImage(file: File, maxSide: number = MAX_IMAGE_SIDE): Promise<Blob> {
+  const side = Math.min(maxSide, MAX_IMAGE_SIDE);
   const image = sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: MAX_IMAGE_PIXELS })
     .rotate()
-    .resize({ width: MAX_IMAGE_SIDE, height: MAX_IMAGE_SIDE, fit: "inside", withoutEnlargement: true });
+    .resize({ width: side, height: side, fit: "inside", withoutEnlargement: true });
   const out =
     file.type === "image/png" ? await image.png().toBuffer()
     : file.type === "image/webp" ? await image.webp({ quality: 88 }).toBuffer()

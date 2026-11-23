@@ -109,7 +109,13 @@ function isCardBlock(lines: string[]): boolean {
  * blue button, labelled with the words already in front of it; every other address is a plain link.
  * The sign-off and the "you're getting this because" lines are set smaller, in slate.
  */
-export function textEmailHtml(args: { subject: string; text: string; siteUrl?: string; quoted?: { heading: string; body: string; inText: string } }): string {
+export function textEmailHtml(args: {
+  subject: string;
+  text: string;
+  siteUrl?: string;
+  quoted?: { heading: string; body: string; inText: string };
+  picture?: { url: string; alt: string };
+}): string {
   const text = args.text.replace(/\r\n/g, "\n");
   const state = { buttonUsed: false };
   // Someone else's words inside our email (a charity's note): found exactly as the text has them, and set apart.
@@ -122,7 +128,16 @@ export function textEmailHtml(args: { subject: string; text: string; siteUrl?: s
         quotedHtml(args.quoted.heading, args.quoted.body),
         blocksHtml(text.slice(at + marker.length), state, args.siteUrl, true),
       ].filter(Boolean).join("\n");
-  return emailLayout({ title: args.subject, siteUrl: args.siteUrl, bodyHtml });
+  return emailLayout({ title: args.subject, siteUrl: args.siteUrl, bodyHtml: args.picture ? `${pictureHtml(args.picture)}\n${bodyHtml}` : bodyHtml });
+}
+
+/**
+ * A picture above an email's words: only from a web address we serve over https (or this machine, for previews), as
+ * wide as the email, with its description as the alt text. Anything else is left out, never shown broken.
+ */
+export function pictureHtml(p: { url: string; alt: string }): string {
+  if (!/^https:\/\/[^\s"'<>]+$/.test(p.url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s"'<>]+$/.test(p.url)) return "";
+  return `<img src="${escHtml(p.url)}" alt="${escHtml(p.alt)}" width="520" style="display:block;width:100%;max-width:520px;height:auto;border:0;outline:none;border-radius:14px;margin:0 0 20px">`;
 }
 
 /**

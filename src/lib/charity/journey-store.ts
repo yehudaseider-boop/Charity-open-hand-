@@ -29,6 +29,8 @@ import {
   planExisting,
   planWinback,
   startedInCampaign,
+  withPicture,
+  charityPictureUrl,
   type CampaignDates,
   type ExistingSkip,
   type JourneyStep,
@@ -40,6 +42,7 @@ import { messagedThisWeek } from "./weekly-limit";
 import { readPages } from "./paged";
 import { nothingLeft } from "@/lib/donations/what-is-left";
 import { inboxKey } from "./one-per-address";
+import { isMissingColumn } from "./video";
 
 /**
  * The donor journey's database side (CRM step 6a, 10/11/2026). The tables are server-only: every call here comes after
@@ -355,15 +358,16 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
   for (const [col, list] of [["journey_id", journeyIds], ["charity_id", charityIds]] as const) {
     for (let i = 0; i < list.length; i += 200) {
       if (Date.now() >= deadline) return out;
-      const { data, error: e } = await db()
-        .from("charity_journey_steps")
-        .select(col === "journey_id" ? "journey_id, charity_id, position, subject, body, wait_days" : "charity_id, position, subject, body, wait_days")
-        .in(col, list.slice(i, i + 200))
-        .order("position");
+      const base = col === "journey_id" ? "journey_id, charity_id, position, subject, body, wait_days" : "charity_id, position, subject, body, wait_days";
+      const read = (cols: string) => db().from("charity_journey_steps").select(cols).in(col, list.slice(i, i + 200)).order("position");
+      let { data, error: e } = await read(`${base}, image_path, image_alt`);
+      // Before migration 20261123000008 the emails have no pictures: send them without.
+      if (e && isMissingColumn(e)) ({ data, error: e } = await read(base));
       if (e) throw e;
       for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
         const k = col === "journey_id" ? (r.journey_id as string) : `charity:${r.charity_id as string}`;
-        stepsBy.set(k, [...(stepsBy.get(k) ?? []), { subject: r.subject as string, body: r.body as string, waitDays: Number(r.wait_days), position: Number(r.position) } as JourneyStep & { position: number }]);
+        const one = withPicture({ subject: r.subject as string, body: r.body as string, waitDays: Number(r.wait_days) }, r.image_path as string | null, r.image_alt as string | null);
+        stepsBy.set(k, [...(stepsBy.get(k) ?? []), { ...one, position: Number(r.position) } as JourneyStep & { position: number }]);
       }
     }
   }
@@ -371,7 +375,7 @@ export async function runJourneys(now: Date, deadline: number): Promise<JourneyR
   for (const x of candidates) {
     const steps = ((stepsBy.get(keyOf(x.charityId, x.row)) ?? []) as (JourneyStep & { position: number })[])
       .sort((a, b) => a.position - b.position)
-      .map(({ subject, body, waitDays }) => ({ subject, body, waitDays }));
+      .map(({ position: _position, ...step }) => step);
     if (steps.length) live.push({ charityId: x.charityId, id: x.row.id, kind: x.row.kind, campaignId: x.row.campaignId, switchedOnAt: x.switchedOnAt, name: x.name, slug: x.slug, steps });
   }
   // Win-back donors who have given again leave it before anything is sent.
@@ -685,6 +689,7 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
           stopUrl: `${site}/news/stop?t=${token}`,
           oneClickUrl: oneClickStopUrl(site, "news", token),
           replyTo,
+          picture: step.imagePath ? { url: charityPictureUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, step.imagePath), alt: step.imageAlt ?? "" } : null,
         }),
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });

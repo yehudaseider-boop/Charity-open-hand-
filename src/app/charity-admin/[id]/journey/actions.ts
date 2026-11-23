@@ -11,6 +11,8 @@ import {
   WINBACK,
   WINBACK_PRESSES_PER_DAY,
   WINBACK_SCREEN_CAP,
+  PICTURE_MAX_SIDE,
+  charityPictureUrl,
   checkJourneySteps,
   chosenDonors,
   existingOutcome,
@@ -30,6 +32,9 @@ import { formatDate } from "@/lib/dates";
 import type { FormState } from "@/lib/form";
 import { hitRateLimit, rateLimitReached } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/charity/validation";
+import { isRealImage } from "@/lib/charity/file-check";
+import { cleanImage } from "@/lib/charity/clean-image";
 import { winbackListDonors, type WinbackSource } from "@/lib/charity/winback-lists";
 
 /**
@@ -71,14 +76,22 @@ export async function saveJourney(charityId: string, key: string, _prev: FormSta
   const which = await journeyFor(charityId, key);
   if (!which) return UNKNOWN;
   const count = Math.min(JOURNEY_MAX_STEPS + 1, Math.max(0, Number(formData.get("steps") ?? 0) || 0));
-  const raw = Array.from({ length: count }, (_, i) => ({ subject: formData.get(`subject_${i + 1}`), body: formData.get(`body_${i + 1}`), waitDays: formData.get(`wait_${i + 1}`) }));
-  const checked = checkJourneySteps(raw);
+  const raw = Array.from({ length: count }, (_, i) => ({
+    subject: formData.get(`subject_${i + 1}`),
+    body: formData.get(`body_${i + 1}`),
+    waitDays: formData.get(`wait_${i + 1}`),
+    imagePath: formData.get(`image_path_${i + 1}`),
+    imageAlt: formData.get(`image_alt_${i + 1}`),
+  }));
+  const checked = checkJourneySteps(raw, charityId);
   if (!checked.ok) {
     const fieldErrors: Record<string, string> = {};
     checked.errors.forEach((e, i) => {
       if (e.subject) fieldErrors[`subject_${i + 1}`] = e.subject;
       if (e.body) fieldErrors[`body_${i + 1}`] = e.body;
       if (e.waitDays) fieldErrors[`wait_${i + 1}`] = e.waitDays;
+      if (e.image) fieldErrors[`image_${i + 1}`] = e.image;
+      if (e.imageAlt) fieldErrors[`image_alt_${i + 1}`] = e.imageAlt;
     });
     return { ok: false, message: checked.message, fieldErrors };
   }
@@ -209,4 +222,40 @@ export async function addWinback(charityId: string, source: WinbackSource, donor
   );
   revalidatePath(page(charityId, WINBACK));
   redirect(withDone(charityId, WINBACK, done));
+}
+
+export type PictureUpload = { ok: true; path: string; url: string } | { ok: false; message: string };
+
+/**
+ * A picture for a journey email (23/11/2026): checked (who, their role, a real JPG, PNG or WebP of 4 MB or less),
+ * re-encoded without hidden details such as where the photo was taken, made at most 1 200 px on a side, and put in
+ * the charity's own public folder. Nothing in the journey changes until its emails are saved with it. A picture that
+ * is never saved stays in the folder, as a logo replaced on the profile does (kept for Undo there).
+ */
+export async function uploadJourneyPicture(charityId: string, formData: FormData): Promise<PictureUpload> {
+  const viewer = await requireViewer();
+  await loadCharityForManager(charityId);
+  const notAllowed = await refusal(charityId, "message");
+  if (notAllowed) return { ok: false, message: notAllowed };
+  // A few a minute is plenty for a person; this stops a script filling the charity's folder.
+  if (await hitRateLimit("journey-picture", [`user:${viewer.userId}`], 20, 10)) return { ok: false, message: "That's a lot of pictures at once. Please wait a few minutes and try again." };
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a picture." };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, message: "Pictures must be 4 MB or smaller." };
+  if (!(IMAGE_MIME as readonly string[]).includes(file.type) || !(await isRealImage(file))) return { ok: false, message: "Choose a JPG, PNG or WebP picture." };
+  const ext = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as Record<string, string>)[file.type];
+  const path = `${charityId}/journey-${crypto.randomUUID()}.${ext}`;
+  let cleaned: Blob;
+  try {
+    cleaned = await cleanImage(file, PICTURE_MAX_SIDE);
+  } catch {
+    return { ok: false, message: "We couldn't read that picture. Try another, or save it again as a JPG." };
+  }
+  const up = await createAdminClient().storage.from("charity-public").upload(path, cleaned, { contentType: file.type });
+  if (up.error) {
+    console.error("[journey] picture not uploaded", up.error.message);
+    return { ok: false, message: "That picture didn't upload, so nothing changed. Please try again." };
+  }
+  await logAudit({ actorUserId: viewer.userId, action: "charity.journey_picture_uploaded", entityType: "charity", entityId: charityId, details: { path } });
+  return { ok: true, path, url: charityPictureUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, path) };
 }

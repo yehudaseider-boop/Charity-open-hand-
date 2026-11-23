@@ -80,7 +80,33 @@ export function fairShares(due: ReadonlyMap<string, number>, cap: number): Map<s
   return out;
 }
 
-export type JourneyStep = { subject: string; body: string; waitDays: number };
+/**
+ * One email of a journey. A picture (23/11/2026) is optional: its file in the charity's public folder and a short
+ * description for people who can't see it. Both keys are left out, not null, when there is no picture, so a saved
+ * email without one compares the same as before pictures existed.
+ */
+export type JourneyStep = { subject: string; body: string; waitDays: number; imagePath?: string; imageAlt?: string };
+
+export const PICTURE_ALT_MIN = 3;
+export const PICTURE_ALT_MAX = 150;
+/** The widest a journey picture is stored (an email is about 600 px wide; twice that stays sharp on a phone). */
+export const PICTURE_MAX_SIDE = 1_200;
+
+/** A journey picture's file: in this charity's own folder, a name we made ("journey-<uuid>.jpg"). */
+export function journeyPicturePathOk(charityId: string, path: string): boolean {
+  const id = charityId.toLowerCase();
+  return /^[0-9a-f-]{36}$/.test(id) && new RegExp(`^${id}/journey-[0-9a-f-]{36}\\.(jpg|png|webp)$`).test(path);
+}
+
+/** Where a picture in the charity's public folder is served from (the same address as its logo and photos). */
+export function charityPictureUrl(supabaseUrl: string | undefined, path: string): string {
+  return `${supabaseUrl ?? ""}/storage/v1/object/public/charity-public/${path}`;
+}
+
+/** The step with its picture, or without the picture keys at all. */
+export function withPicture(step: Omit<JourneyStep, "imagePath" | "imageAlt">, path: string | null | undefined, alt: string | null | undefined): JourneyStep {
+  return path ? { ...step, imagePath: path, imageAlt: (alt ?? "").trim() } : { ...step };
+}
 
 /** Waits allowed for the step at this position (1-based). */
 export function waitRange(position: number): { min: number; max: number } {
@@ -92,14 +118,17 @@ export function cleanSubject(raw: string | null | undefined): string {
   return (raw ?? "").replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠⁦-⁩﻿]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export type StepErrors = Partial<Record<"subject" | "body" | "waitDays", string>>;
+export type StepErrors = Partial<Record<"subject" | "body" | "waitDays" | "image" | "imageAlt", string>>;
 export type CheckedJourney = { ok: true; steps: JourneyStep[] } | { ok: false; message: string; errors: StepErrors[] };
 
 /**
  * What the editor accepts: one to five emails, each with a subject, a few words and a wait in range, and no web
  * address anywhere (the button to the charity's page is Givezy's). The words are cleaned as the thank-you note is.
  */
-export function checkJourneySteps(raw: { subject?: unknown; body?: unknown; waitDays?: unknown }[]): CheckedJourney {
+export function checkJourneySteps(
+  raw: { subject?: unknown; body?: unknown; waitDays?: unknown; imagePath?: unknown; imageAlt?: unknown }[],
+  charityId?: string,
+): CheckedJourney {
   if (raw.length === 0) return { ok: false, message: "Add at least one email. Nothing was saved.", errors: [] };
   if (raw.length > JOURNEY_MAX_STEPS) return { ok: false, message: `A journey has at most ${JOURNEY_MAX_STEPS} emails. Nothing was saved.`, errors: [] };
   const errors: StepErrors[] = [];
@@ -120,8 +149,17 @@ export function checkJourneySteps(raw: { subject?: unknown; body?: unknown; wait
     if (!Number.isInteger(wait) || wait < range.min || wait > range.max) {
       e.waitDays = i === 0 ? `Choose ${range.min} to ${range.max} days after they join.` : `Choose ${range.min} to ${range.max} days after the email before.`;
     }
+    // A picture: ours (this charity's folder, a name we made), with a few words saying what it shows.
+    const path = typeof r.imagePath === "string" ? r.imagePath.trim() : "";
+    const alt = typeof r.imageAlt === "string" ? r.imageAlt.replace(/\s+/g, " ").trim() : "";
+    if (path) {
+      if (!charityId || !journeyPicturePathOk(charityId, path)) e.image = "That picture couldn't be used. Remove it and add it again.";
+      if (alt.length < PICTURE_ALT_MIN) e.imageAlt = "Describe the picture in a few words, for people who can't see it.";
+      else if (alt.length > PICTURE_ALT_MAX) e.imageAlt = `Keep the description to ${PICTURE_ALT_MAX} characters or fewer. It is ${alt.length} now.`;
+      else if (hasWebAddress(alt)) e.imageAlt = "Leave out web addresses.";
+    }
     errors.push(e);
-    steps.push({ subject, body, waitDays: wait });
+    steps.push(withPicture({ subject, body, waitDays: wait }, path || null, alt));
   });
   if (errors.some((e) => Object.keys(e).length)) {
     const bad = errors.map((e, i) => (Object.keys(e).length ? i + 1 : 0)).filter(Boolean);
@@ -531,7 +569,18 @@ export function journeyHeading(charityName: string): string {
  */
 export function journeyEmail(
   to: string,
-  v: { charityName: string; firstName: string | null; subject: string; body: string; pageUrl: string; stopUrl: string; replyTo: string | null; oneClickUrl?: string },
+  v: {
+    charityName: string;
+    firstName: string | null;
+    subject: string;
+    body: string;
+    pageUrl: string;
+    stopUrl: string;
+    replyTo: string | null;
+    oneClickUrl?: string;
+    /** The email's picture, shown above the charity's words in the HTML version (the plain-text one has none). */
+    picture?: { url: string; alt: string } | null;
+  },
 ): EmailMessage {
   const name = cleanDedicationName(v.firstName);
   const body = cleanThankYouNote(v.body) ?? "";
@@ -541,6 +590,7 @@ export function journeyEmail(
     ...(v.replyTo ? { replyTo: v.replyTo } : {}),
     ...(v.oneClickUrl ? { headers: oneClickStopHeaders(v.oneClickUrl) } : {}),
     quoted: { heading: journeyHeading(v.charityName), body, inText: body },
+    ...(v.picture ? { picture: v.picture } : {}),
     text: [
       name ? `Dear ${name},` : "Hello,",
       "",
