@@ -8,6 +8,8 @@ import {
   SUBJECT_MAX,
   canRemoveStep,
   charityPageUrl,
+  exampleFor,
+  stepHints,
   middleStepWords,
   stepsShifted,
   cleanSubject,
@@ -20,7 +22,7 @@ import { textEmailHtml } from "@/lib/email/html";
 import { initialFormState, type FormState } from "@/lib/form";
 
 /** `from`: the email's place when the page was opened (0-based), or null for one added since. */
-type Draft = { key: number; subject: string; body: string; wait: string; from: number | null };
+type Draft = { key: number; subject: string; body: string; wait: string; from: number | null; before?: { subject: string; body: string } };
 const toDraft = (s: JourneyStep, key: number, from: number | null): Draft => ({ key, subject: s.subject, body: s.body, wait: String(s.waitDays), from });
 /** A fresh key for a new or reset email (only in event handlers, never while drawing). */
 const freshKey = () => Date.now() + Math.random();
@@ -52,6 +54,7 @@ export function JourneyEditor({
   canEdit,
   siteUrl,
   starter = STARTER_STEPS,
+  start = "A donor gives for the first time",
   onIt = 0,
 }: {
   action: (s: FormState, f: FormData) => Promise<FormState>;
@@ -60,8 +63,10 @@ export function JourneyEditor({
   saved: JourneyStep[];
   canEdit: boolean;
   siteUrl?: string;
-  /** The suggested wording for this kind of journey (DRAFT for Yosef). */
+  /** Our example wording for this kind of journey, one email at a time (DRAFT for Yosef). */
   starter?: JourneyStep[];
+  /** Where this journey starts, in the charity's words: "A donor gives for the first time". */
+  start?: string;
   /** People part way through the journey: while there are any, only the last email can be removed. */
   onIt?: number;
 }) {
@@ -138,6 +143,10 @@ export function JourneyEditor({
     );
   }
 
+  const field =
+    "w-full rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition placeholder:text-muted/80 focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger";
+  const canAdd = drafts.length < JOURNEY_MAX_STEPS;
+
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <form
@@ -151,110 +160,149 @@ export function JourneyEditor({
         <input type="hidden" name="steps" value={drafts.length} />
         {/* Tells the server a saved email would move to another number, so it can refuse while people are part way. */}
         <input type="hidden" name="shifted" value={stepsShifted(drafts.map((d) => d.from)) ? "yes" : ""} />
-        {drafts.length === 0 ? (
-          <div className="space-y-3 rounded-control border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm">
-            <p className="font-semibold text-navy">No emails yet.</p>
-            <p className="text-muted">Start from our suggested wording and make it your own, or write your first email from scratch.</p>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setDrafts(starter.map((s, i) => toDraft(s, freshKey(), i < saved.length ? i : null)));
-                  setShowing(0);
-                }}
-                className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast"
-              >
-                Start from our suggested wording
-              </button>
-              <button type="button" onClick={add} className="inline-flex min-h-11 items-center rounded-control border-2 border-outline px-4 text-sm font-semibold text-brand">
-                Write my own
-              </button>
-            </div>
-          </div>
-        ) : null}
 
-        {drafts.map((d, i) => {
-          const range = waitRange(i + 1);
-          const subjectLen = cleanSubject(d.subject).length;
-          const bodyLen = (cleanThankYouNote(d.body) ?? "").length;
-          const link = hasWebAddress(d.body) || hasWebAddress(d.subject);
-          return (
-            <fieldset key={d.key} className="min-w-0 space-y-3 rounded-card border-2 border-border p-4" onFocus={() => setShowing(i)}>
-              <legend className="px-1 font-display text-base font-bold text-indigo">
-                Email {i + 1}
-                {days[i] !== null ? <span className="ml-2 font-sans text-sm font-normal text-muted">around day {days[i]}</span> : null}
-              </legend>
-              <div className="space-y-1">
-                <label htmlFor={`${id}-wait-${i}`} className="block text-sm font-semibold">
-                  {i === 0 ? "Days after they join" : `Days after email ${i}`}
-                </label>
-                <input
-                  id={`${id}-wait-${i}`}
-                  name={`wait_${i + 1}`}
-                  inputMode="numeric"
-                  value={d.wait}
-                  onChange={(e) => change(i, { wait: e.target.value.replace(/[^\d]/g, "").slice(0, 3) })}
-                  aria-invalid={err(`wait_${i + 1}`) ? true : undefined}
-                  aria-describedby={`${id}-wait-${i}-hint`}
-                  className="w-28 rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger"
-                />
-                <p id={`${id}-wait-${i}-hint`} className={`text-xs ${err(`wait_${i + 1}`) ? "font-semibold text-danger" : "text-muted"}`}>
-                  {err(`wait_${i + 1}`) ?? `${range.min} to ${range.max} days.`}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <label htmlFor={`${id}-subject-${i}`} className="block text-sm font-semibold">Subject</label>
-                <input
-                  id={`${id}-subject-${i}`}
-                  name={`subject_${i + 1}`}
-                  dir="auto"
-                  value={d.subject}
-                  onChange={(e) => change(i, { subject: e.target.value })}
-                  aria-invalid={err(`subject_${i + 1}`) || subjectLen > SUBJECT_MAX ? true : undefined}
-                  className="w-full rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger"
-                />
-                {err(`subject_${i + 1}`) ? <p role="alert" className="text-sm font-semibold text-danger">{err(`subject_${i + 1}`)}</p> : null}
-              </div>
-              <div className="space-y-1">
-                <label htmlFor={`${id}-body-${i}`} className="block text-sm font-semibold">Your words</label>
-                <textarea
-                  id={`${id}-body-${i}`}
-                  name={`body_${i + 1}`}
-                  rows={6}
-                  dir="auto"
-                  value={d.body}
-                  onChange={(e) => change(i, { body: e.target.value })}
-                  aria-invalid={err(`body_${i + 1}`) || bodyLen > BODY_MAX || link ? true : undefined}
-                  className="w-full rounded-[0.875rem] border-2 border-border bg-surface px-3.5 py-2.5 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger"
-                />
-                <p className={`text-xs tabular-nums ${bodyLen > BODY_MAX ? "font-semibold text-danger" : "text-muted"}`}>
-                  {bodyLen} of {BODY_MAX} characters{bodyLen > BODY_MAX ? `: ${bodyLen - BODY_MAX} too many` : ""}
-                </p>
-                {link ? <p className="text-sm font-semibold text-danger">Leave out web addresses: we add a button to your page on Givezy ourselves.</p> : null}
-                {err(`body_${i + 1}`) ? <p role="alert" className="text-sm font-semibold text-danger">{err(`body_${i + 1}`)}</p> : null}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={() => setShowing(i)} className="px-1 py-2 text-sm font-medium text-brand underline">
-                  Preview this email
-                </button>
-                {canRemoveStep(i, drafts.length, onIt) ? (
-                  <button type="button" onClick={() => remove(i)} className="px-1 py-2 text-sm font-medium text-danger underline">
-                    Remove email {i + 1}
+        {/* The journey, step by step (23/11/2026): it starts when a donor gives, then each step is a wait and an email. */}
+        <ol aria-label="Your journey, step by step" className="relative space-y-3 border-l-2 border-honey pl-5">
+          <li className="relative">
+            <span aria-hidden="true" className="absolute -left-[1.95rem] top-2.5 size-4 rounded-full border-2 border-surface bg-brand" />
+            <p className="inline-flex min-h-11 items-center rounded-full bg-brand px-4 text-sm font-semibold text-brand-contrast [overflow-wrap:anywhere]">{start}</p>
+          </li>
+
+          {drafts.map((d, i) => {
+            const range = waitRange(i + 1);
+            const subjectLen = cleanSubject(d.subject).length;
+            const bodyLen = (cleanThankYouNote(d.body) ?? "").length;
+            const link = hasWebAddress(d.body) || hasWebAddress(d.subject);
+            const hint = stepHints(i);
+            const example = exampleFor(starter, i);
+            return (
+              <li key={d.key} className="relative space-y-3">
+                {/* The wait before this email. */}
+                <div className="relative space-y-1">
+                  <span aria-hidden="true" className="absolute -left-[1.85rem] top-3 size-3 rounded-full border-2 border-honey bg-surface" />
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <label htmlFor={`${id}-wait-${i}`} className="font-semibold">
+                      {i === 0 ? "Then wait" : `After email ${i}, wait`}
+                    </label>
+                    <input
+                      id={`${id}-wait-${i}`}
+                      name={`wait_${i + 1}`}
+                      inputMode="numeric"
+                      value={d.wait}
+                      placeholder={String(range.min)}
+                      onChange={(e) => change(i, { wait: e.target.value.replace(/[^\d]/g, "").slice(0, 3) })}
+                      aria-invalid={err(`wait_${i + 1}`) ? true : undefined}
+                      aria-describedby={`${id}-wait-${i}-hint`}
+                      className="w-20 rounded-[0.875rem] border-2 border-border bg-surface px-3 py-2 text-center tabular-nums outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger"
+                    />
+                    <span className="font-semibold">days</span>
+                  </div>
+                  <p id={`${id}-wait-${i}-hint`} className={`text-xs ${err(`wait_${i + 1}`) ? "font-semibold text-danger" : "text-muted"}`}>
+                    {err(`wait_${i + 1}`) ?? `${range.min} to ${range.max} days${i === 0 ? " after they join" : ""}.`}
+                  </p>
+                </div>
+
+                {/* The email. */}
+                <fieldset className="relative min-w-0 space-y-3 rounded-card border-2 border-border bg-surface p-4" onFocus={() => setShowing(i)}>
+                  <span aria-hidden="true" className="absolute -left-[2.2rem] top-4 size-4 rounded-full border-2 border-surface bg-coral" />
+                  <legend className="px-1 font-display text-base font-bold text-indigo">
+                    Send email {i + 1}
+                    {days[i] !== null ? <span className="ml-2 font-sans text-sm font-normal text-muted">around day {days[i]}</span> : null}
+                  </legend>
+                  <div className="space-y-1">
+                    <label htmlFor={`${id}-subject-${i}`} className="block text-sm font-semibold">Subject</label>
+                    <input
+                      id={`${id}-subject-${i}`}
+                      name={`subject_${i + 1}`}
+                      dir="auto"
+                      value={d.subject}
+                      placeholder={hint.subject}
+                      onChange={(e) => change(i, { subject: e.target.value })}
+                      aria-invalid={err(`subject_${i + 1}`) || subjectLen > SUBJECT_MAX ? true : undefined}
+                      className={field}
+                    />
+                    {err(`subject_${i + 1}`) ? <p role="alert" className="text-sm font-semibold text-danger">{err(`subject_${i + 1}`)}</p> : null}
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor={`${id}-body-${i}`} className="block text-sm font-semibold">Your words</label>
+                    <textarea
+                      id={`${id}-body-${i}`}
+                      name={`body_${i + 1}`}
+                      rows={6}
+                      dir="auto"
+                      value={d.body}
+                      placeholder={hint.body}
+                      onChange={(e) => change(i, { body: e.target.value })}
+                      aria-invalid={err(`body_${i + 1}`) || bodyLen > BODY_MAX || link ? true : undefined}
+                      className={field}
+                    />
+                    <p className={`text-xs tabular-nums ${bodyLen > BODY_MAX ? "font-semibold text-danger" : "text-muted"}`}>
+                      {bodyLen} of {BODY_MAX} characters{bodyLen > BODY_MAX ? `: ${bodyLen - BODY_MAX} too many` : ""}
+                    </p>
+                    {link ? <p className="text-sm font-semibold text-danger">Leave out web addresses: we add a button to your page on Givezy ourselves.</p> : null}
+                    {err(`body_${i + 1}`) ? <p role="alert" className="text-sm font-semibold text-danger">{err(`body_${i + 1}`)}</p> : null}
+                  </div>
+                  <div className="flex flex-wrap gap-x-3">
+                    {/* Only on an empty email, so it never replaces words the charity has written. */}
+                    {example && !d.before && !d.subject.trim() && !d.body.trim() ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          change(i, { subject: example.subject, body: example.body, before: { subject: d.subject, body: d.body } });
+                          setShowing(i);
+                        }}
+                        className="min-h-11 px-1 text-sm font-medium text-brand underline"
+                      >
+                        Show me an example
+                      </button>
+                    ) : null}
+                    {d.before ? (
+                      <button
+                        type="button"
+                        onClick={() => change(i, { subject: d.before!.subject, body: d.before!.body, before: undefined })}
+                        className="min-h-11 px-1 text-sm font-medium text-brand underline"
+                      >
+                        Undo the example
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => setShowing(i)} className="min-h-11 px-1 text-sm font-medium text-brand underline">
+                      Preview this email
+                    </button>
+                    {canRemoveStep(i, drafts.length, onIt) ? (
+                      <button type="button" onClick={() => remove(i)} className="min-h-11 px-1 text-sm font-medium text-danger underline">
+                        Remove email {i + 1}
+                      </button>
+                    ) : null}
+                  </div>
+                  {d.before ? <p className="text-xs text-muted">Our example is in. Change it so it sounds like you, or undo it.</p> : null}
+                  {canRemoveStep(i, drafts.length, onIt) ? null : <p className="text-xs text-muted">{middleStepWords(onIt)}</p>}
+                </fieldset>
+              </li>
+            );
+          })}
+
+          {/* What next: the prompt at the end of the journey. */}
+          <li className="relative">
+            <span aria-hidden="true" className="absolute -left-[1.85rem] top-4 size-3 rounded-full border-2 border-honey bg-surface" />
+            <div className="space-y-2 rounded-card border-2 border-dashed border-honey bg-honey-soft/60 p-4 text-sm">
+              <p className="font-display text-base font-bold text-indigo">{drafts.length === 0 ? "What would you like to happen first?" : "What would you like next?"}</p>
+              {canAdd ? (
+                <>
+                  <p className="text-muted">
+                    {drafts.length === 0
+                      ? "Most charities start with a thank-you a day or two after someone gives."
+                      : "Another email a few weeks later keeps them close: some news, a moment from your work, a way to help. Or stop here."}
+                  </p>
+                  <button type="button" onClick={add} className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast">
+                    {drafts.length === 0 ? "Send an email" : "Wait, then send another email"}
                   </button>
-                ) : null}
-              </div>
-              {canRemoveStep(i, drafts.length, onIt) ? null : <p className="text-xs text-muted">{middleStepWords(onIt)}</p>}
-            </fieldset>
-          );
-        })}
-
-        {drafts.length > 0 && drafts.length < JOURNEY_MAX_STEPS ? (
-          <button type="button" onClick={add} className="inline-flex min-h-11 items-center rounded-control border-2 border-outline px-4 text-sm font-semibold text-brand">
-            Add email {drafts.length + 1}
-          </button>
-        ) : drafts.length >= JOURNEY_MAX_STEPS ? (
-          <p className="text-sm text-muted">{JOURNEY_MAX_STEPS} emails is the most a journey has.</p>
-        ) : null}
+                </>
+              ) : (
+                <p className="text-muted">{JOURNEY_MAX_STEPS} emails is the most a journey has. Your journey ends here.</p>
+              )}
+            </div>
+          </li>
+        </ol>
 
         {drafts.length > 0 || saved.length > 0 ? (
           <div className="flex flex-wrap items-center gap-3">

@@ -233,6 +233,29 @@ export const WINBACK_STARTER_STEPS: JourneyStep[] = [
   },
 ];
 
+/**
+ * The journey builder (23/11/2026, Yehuda's meeting: "we want them to create a journey, but we want the system to
+ * prompt them"). Every email starts empty with a grey hint; "Show me an example" fills in our sample wording for that
+ * email, which the charity then makes its own. Hints never claim numbers or impact.
+ */
+export function journeyStartWords(kind: JourneyKind, campaignTitle?: string | null): string {
+  if (kind === "winback") return "You add a donor to this journey";
+  if (kind === "campaign") return campaignTitle?.trim() ? `A donor gives to "${campaignTitle.trim()}" for the first time` : "A donor gives to this campaign for the first time";
+  return "A donor gives for the first time";
+}
+
+/** The grey hints in an empty email: what the first email is usually for, and what later ones can be. */
+export function stepHints(position: number): { subject: string; body: string } {
+  return position === 0
+    ? { subject: "For example: Thank you for your gift", body: "Say thank you in your own words: what their gift helps you do, and that you're glad to have them with you." }
+    : { subject: "For example: A little news from us", body: "Share some news, a moment from your work, or a way they can get involved. Write it the way you'd say it." };
+}
+
+/** Our sample wording for an email in this place, or null when there is none for it (the button isn't shown then). */
+export function exampleFor(starter: readonly JourneyStep[], position: number): JourneyStep | null {
+  return starter[position] ?? null;
+}
+
 /** The starter for a kind of journey. */
 export function starterSteps(kind: JourneyKind, campaignTitle?: string | null): JourneyStep[] {
   if (kind === "winback") return WINBACK_STARTER_STEPS;
