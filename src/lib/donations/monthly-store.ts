@@ -112,12 +112,13 @@ export function supabaseMonthlyStore(): MonthlyStore {
     },
 
     async attemptStatus(donationId) {
-      const { data, error } = await db.from("donations").select("status, created_at, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents").eq("id", donationId).maybeSingle();
+      const { data, error } = await db.from("donations").select("status, created_at, recurring_id, amount_cents, contribution_cents, processing_charge_cents, total_charged_cents").eq("id", donationId).maybeSingle();
       if (error) throw new Error(`Could not read a collection attempt: ${error.message}`);
       if (!data) return null;
       return {
         status: data.status as string,
         createdAt: new Date(data.created_at as string),
+        recurringId: (data.recurring_id as string | null) ?? null,
         saved: {
           amountCents: Number(data.amount_cents),
           contributionCents: Number(data.contribution_cents ?? 0),
