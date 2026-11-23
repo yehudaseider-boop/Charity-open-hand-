@@ -199,7 +199,7 @@ export function OverviewView(p: OverviewProps) {
                         {isErasedEmail(d.email) ? "?" : initials(d.display_name) || "D"}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate font-semibold group-hover:text-brand">{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</span>
+                        <span className="block truncate font-semibold group-hover:text-brand"><bdi>{isErasedEmail(d.email) ? ERASED_DONOR : d.display_name}</bdi></span>
                         <span className="block text-xs text-muted">{plural(d.donation_count, "donation")}</span>
                       </span>
                     </span>

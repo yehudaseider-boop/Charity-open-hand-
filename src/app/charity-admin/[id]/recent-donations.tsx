@@ -112,7 +112,7 @@ export function RecentDonations({ rows, donationsHref }: { rows: RecentRow[]; do
                   <td className="py-2.5 pr-3">
                     <Link href={r.href} className="flex min-w-0 items-center gap-2.5 font-semibold text-indigo group-hover:text-brand group-hover:underline">
                       <span aria-hidden className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold text-navy transition-transform motion-safe:group-hover:scale-110 ${tints[i % tints.length]}`}>{r.initials}</span>
-                      <span className="min-w-0 truncate">{r.donor}</span>
+                      <span className="min-w-0 truncate"><bdi>{r.donor}</bdi></span>
                     </Link>
                   </td>
                   <td className="max-w-[11rem] truncate py-2.5 pr-3" title={r.forWhat}>{r.forWhat}</td>

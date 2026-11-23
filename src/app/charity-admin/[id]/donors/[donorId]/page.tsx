@@ -70,7 +70,7 @@ export default async function DonorPage({ params, searchParams }: PageProps<"/ch
     <div className="space-y-5">
       <PageHeader
         back={<BackLink href={`${base}/donors`}>← Donors</BackLink>}
-        title={name}
+        title={<bdi>{name}</bdi>}
         intro={
           <>
             {shownEmail(donor.email) ? <p className="break-all">{donor.email}</p> : null}
