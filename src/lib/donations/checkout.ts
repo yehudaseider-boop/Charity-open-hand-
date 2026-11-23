@@ -385,6 +385,7 @@ export async function startDonation(args: {
     ]);
   } catch (e) {
     if (!savedToken) await closeUnstarted();
+    else await closeUnstartedSavedCard(donationId);
     throw e;
   }
 
@@ -411,6 +412,22 @@ export async function startDonation(args: {
       return { ok: false, message: "We couldn't reach the payment provider, so nothing was charged. What you typed is still here. Please try again in a minute.", providerDown: true };
     }
     throw e;
+  }
+}
+
+/**
+ * A saved-card gift whose records could not be completed (details or consent did not save) never reached the provider:
+ * it is closed as "nothing was sent", noted so a retry under the same id says "nothing was charged" and offers the
+ * payment page instead of "declined" (23/11/2026). Never throws: the caller is already failing, and the daily check
+ * closes what is left.
+ */
+async function closeUnstartedSavedCard(donationId: string): Promise<void> {
+  try {
+    await logAudit({ actorUserId: null, action: "donation.checkout_closed", entityType: "donation", entityId: donationId, details: { why: "never_received" } });
+    const { error } = await createAdminClient().from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", donationId).eq("status", "pending");
+    if (error) throw error;
+  } catch (e) {
+    console.error("[checkout] could not close a saved-card gift that never started; the daily check closes it later", e);
   }
 }
 
@@ -544,6 +561,12 @@ async function chargeSavedCard(a: {
   } catch (e) {
     if (isGatewayDecline(e)) return await failGift("declined");
     if (isGatewayRefusal(e)) return await failGift("refused", e instanceof GatewayError ? e.said : null);
+    // Stopped before anything was sent (a missing key, a split we would not start): nothing can have been charged, so
+    // the gift is closed at once and a person looks at it, instead of waiting as "may have been charged".
+    if (e instanceof GatewayError && e.beforeSend) {
+      console.error(e);
+      return await failGift("refused", e.message);
+    }
     console.error(e);
   }
   return { ok: true, charged: true, reference: a.donationId, token: a.token };

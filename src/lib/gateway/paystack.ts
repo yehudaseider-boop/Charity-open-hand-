@@ -51,7 +51,7 @@ const API = "https://api.paystack.co";
 
 function secretKey(): string {
   const k = process.env.PAYSTACK_SECRET_KEY;
-  if (!k) throw new Error("Missing PAYSTACK_SECRET_KEY. See .env.example.");
+  if (!k) throw new GatewayError("Missing PAYSTACK_SECRET_KEY. See .env.example.", { beforeSend: true });
   return k;
 }
 
@@ -105,15 +105,15 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 /** The split part of a checkout: the charity's subaccount, our flat share, and who bears Paystack's fee. */
 function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines" | "totalCents">) {
-  if (!req.feeBearer) throw new GatewayError("Who pays the gateway charge is not decided, so a split payment cannot start.");
-  if (!Number.isSafeInteger(req.lines.contributionCents) || req.lines.contributionCents < 0) throw new GatewayError("The contribution must be a whole number of cents.");
+  if (!req.feeBearer) throw new GatewayError("Who pays the gateway charge is not decided, so a split payment cannot start.", { beforeSend: true });
+  if (!Number.isSafeInteger(req.lines.contributionCents) || req.lines.contributionCents < 0) throw new GatewayError("The contribution must be a whole number of cents.", { beforeSend: true });
   // The two lines must make up the whole payment: with a flat split, anything left over would sit with Givezy.
-  if (req.lines.charityCents + req.lines.contributionCents !== req.totalCents) throw new GatewayError("The charity's line and the contribution do not add up to the total, so the payment was not started.");
+  if (req.lines.charityCents + req.lines.contributionCents !== req.totalCents) throw new GatewayError("The charity's line and the contribution do not add up to the total, so the payment was not started.", { beforeSend: true });
   if (req.feeBearer === "each") {
     // Each side pays Paystack's charge on its own share: an inline split (Paystack's API spec, SplitCreate, accepted
     // by initialize and by charge_authorization) of type flat, the charity's line to its subaccount and the rest (the
     // contribution) to Givezy's main account, with bearer_type "all-proportional". Shares are in cents.
-    if (!Number.isSafeInteger(req.lines.charityCents) || req.lines.charityCents <= 0) throw new GatewayError("The charity's share must be a whole number of cents.");
+    if (!Number.isSafeInteger(req.lines.charityCents) || req.lines.charityCents <= 0) throw new GatewayError("The charity's share must be a whole number of cents.", { beforeSend: true });
     return {
       split: {
         name: "Givezy gift",
@@ -138,7 +138,7 @@ function splitFields(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountR
  */
 function splitOrNone(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountRef" | "feeBearer" | "lines" | "totalCents">, splitting: boolean) {
   if (req.charityAccountRef) return splitFields(req);
-  if (splitting) throw new GatewayError("This charity has no gateway account, so the payment was not started (it would not reach the charity).");
+  if (splitting) throw new GatewayError("This charity has no gateway account, so the payment was not started (it would not reach the charity).", { beforeSend: true });
   return {};
 }
 

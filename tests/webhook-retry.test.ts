@@ -18,7 +18,7 @@ vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: (ref: string) => con
 vi.mock("@/lib/audit", () => ({ logAudit: async (e: unknown) => void audits.push(e) }));
 vi.mock("@/lib/gateway", () => ({
   getGateway: () => ({ name: "test" }),
-  gatewayByName: () => ({
+  gatewayForEvents: () => ({
     name: "test",
     parseWebhook: async (raw: string) => {
       if (!validSignature) return null;

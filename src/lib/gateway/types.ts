@@ -228,13 +228,19 @@ export class GatewayError extends Error {
    * couldn't make) is our problem or the gateway's, never the donor's card: it is not a decline.
    */
   readonly declined: boolean;
-  constructor(message: string, opts: { notFound?: boolean; refused?: boolean; said?: string | null; unreachable?: boolean; declined?: boolean } = {}) {
+  /**
+   * True when this error was raised before anything was sent to the gateway (a missing key, a payment we would not
+   * start, a feature not built yet): nothing can have been charged. False for every error that came from a call.
+   */
+  readonly beforeSend: boolean;
+  constructor(message: string, opts: { notFound?: boolean; refused?: boolean; said?: string | null; unreachable?: boolean; declined?: boolean; beforeSend?: boolean } = {}) {
     super(message);
     this.notFound = opts.notFound ?? false;
     this.refused = opts.refused ?? false;
     this.said = opts.said ?? null;
     this.unreachable = opts.unreachable ?? false;
     this.declined = (opts.declined ?? false) && this.refused;
+    this.beforeSend = opts.beforeSend ?? false;
   }
 }
 

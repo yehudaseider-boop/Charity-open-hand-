@@ -94,6 +94,8 @@ const HOUR = 3_600_000;
  * provider is really still working on. A closed checkout can still become paid if the provider says so later.
  */
 export const ABANDONED_AFTER_HOURS = 48;
+/** Gifts closed as failed in the last week that each daily run asks the provider about again. */
+export const RECHECK_FAILED_PER_RUN = 50;
 
 /** What the email retries, run on their own first (see runImportantEmailRetries), hand to the checks. */
 export type RetriesDone = Pick<DailyChecks, "confirmations" | "emailRetries"> & { incomplete: boolean };
@@ -182,6 +184,29 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity, opts
     out.pending.checked += 1;
     try {
       await check(p.gateway_ref as string);
+    } catch {
+      out.pending.errors += 1;
+    }
+  }
+  // 1c. Gifts closed as failed in the last 7 days: ask the provider once more, newest first and at most 50 a run. A
+  // gift can be closed as failed (an abandoned checkout, a try the provider seemed not to have received) and then
+  // paid after all; confirmPayment turns failed into paid when the provider says so and changes nothing otherwise.
+  const { data: closedFailed, error: fErr } = await db
+    .from("donations")
+    .select("gateway_ref")
+    .eq("status", "failed")
+    .neq("gateway", "recorded")
+    .gte("failed_at", new Date(now.getTime() - 7 * 24 * HOUR).toISOString())
+    .order("failed_at", { ascending: false })
+    .limit(RECHECK_FAILED_PER_RUN);
+  if (fErr) throw new Error(`Could not list recently failed payments: ${fErr.message}`);
+  for (const f of closedFailed ?? []) {
+    if (Date.now() > deadline) {
+      out.incomplete = true;
+      break;
+    }
+    try {
+      if ((await confirmPayment(f.gateway_ref as string)) === "paid") out.pending.paid += 1;
     } catch {
       out.pending.errors += 1;
     }

@@ -2224,3 +2224,16 @@ A read-only security review found six things. All six are fixed in code; two nee
 - **A stale email claim (older than 15 minutes) is no longer taken over and resent.** It is flagged "may have gone" in the email retries (as a cut-off send is) for a person to check.
 - **Admin, Receipts: "It arrived" and "Send again"** for each receipt email marked unknown (platform admin with the second step; both audited as `receipt.email_confirmed_arrived` and `receipt.email_send_again_allowed`). "It arrived" sets `emailed_at`; "Send again" clears the unknown row and the claim, and the next Finish or daily job emails it.
 - **Finish checks the result of its final save** and says so plainly if it fails (it used to ignore it).
+
+## 23/11/2026: money and payment provider fixes (review area B)
+
+- **Webhooks for a former payment provider are handled.** `gatewayForEvents(name)` (src/lib/gateway/index.ts) finds any adapter by name; the webhook route and the refund and dispute lookup use it. Checkout still uses only the active gateway (`getGateway`, `gatewayByName`). A late charge on a former provider is held for a person (`donation.gateway_mismatch`); a refund or dispute is handled as usual.
+- **Monthly donations on a former provider are listed for Admin** (`monthly.other_gateway`, once a day each, from the collection run) instead of silently never being collected.
+- **Stitch refunds and disputes are not built** (the Stitch API details are not known); noted in the go-live checklist as blocking the switch.
+- **The daily safety net asks again about gifts closed as failed in the last 7 days** (50 a run, newest first); `confirmPayment` already turns failed into paid when the provider says so.
+- **A saved-card charge that stopped before anything was sent** (missing key, a split we would not start, a feature not built: `GatewayError.beforeSend`) closes the gift at once as "nothing was charged" and is held for a person. Only errors that may have reached the provider (outage, timeout, an unflagged answer) still leave it pending.
+- **A saved-card gift whose details or consent did not save is closed** (noted `donation.checkout_closed`), so no dead pending row stays and a retry says "nothing was charged" and offers the payment page.
+- **"Update my card" on a paused monthly donation** keeps the new card and counts the month as paid, and it stays paused.
+- **The gateway-mismatch note is written once per gift** (`alreadyNoted`), however many times it is checked.
+- **Deposits sync reads every connected charity and every final payout**, a page at a time (`readAllPages`), not only the first 1 000 and 5 000.
+- **Review item 7 (providerCharge rounding) is unconfirmed:** a test documents today's behaviour (rounds up to the cent); fees unchanged.

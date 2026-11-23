@@ -13,8 +13,13 @@ const confirmPayment = vi.fn(async (_ref: string) => "paid");
 vi.mock("@/lib/donations/confirm", () => ({ confirmPayment: (ref: string) => confirmPayment(ref) }));
 vi.mock("@/lib/gateway", () => ({
   getGateway: () => ({ name: "test" }),
-  gatewayByName: () => ({
-    name: "test",
+  // Checkout's own lookup: only the active gateway ("test" here), like the real one.
+  gatewayByName: (n: string) => {
+    if (n !== "test") throw new Error("not the active gateway");
+    return { name: n };
+  },
+  gatewayForEvents: (n: string) => ({
+    name: n,
     parseWebhook: async (raw: string) => {
       const body = JSON.parse(raw) as { id: string; reference: string };
       return { eventId: body.id, type: "payment_succeeded", reference: body.reference, raw: body };
@@ -55,14 +60,14 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-async function deliver(id: string, reference = "ref-1") {
+async function deliver(id: string, reference = "ref-1", gatewayName = "test") {
   const { POST } = await import("@/app/api/webhooks/[gateway]/route");
-  const request = new Request("http://localhost/api/webhooks/test", {
+  const request = new Request("http://localhost/api/webhooks/" + gatewayName, {
     method: "POST",
     body: JSON.stringify({ id, reference }),
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return POST(request as any, { params: Promise.resolve({ gateway: "test" }) } as any);
+  return POST(request as any, { params: Promise.resolve({ gateway: gatewayName }) } as any);
 }
 
 beforeEach(() => {
@@ -75,6 +80,11 @@ describe("payment webhook", () => {
   it("processes a new event once and ignores a finished repeat", async () => {
     expect((await deliver("evt-1")).status).toBe(200);
     expect(await (await deliver("evt-1")).json()).toEqual({ ok: true, duplicate: true });
+    expect(confirmPayment).toHaveBeenCalledTimes(1);
+  });
+
+  it("still handles an event from a former gateway: only checkout is limited to the active one (23/11/2026)", async () => {
+    expect((await deliver("evt-old", "ref-1", "paystack")).status).toBe(200);
     expect(confirmPayment).toHaveBeenCalledTimes(1);
   });
 

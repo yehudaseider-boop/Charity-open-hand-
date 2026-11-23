@@ -247,7 +247,7 @@ export const stitchGateway: PaymentGateway = {
 
   async chargeAuthorization() {
     // Charging a saved card later: not built yet (see the note at the top).
-    throw new GatewayError("Charging a saved card is not set up on this payment provider yet, so nothing was charged.");
+    throw new GatewayError("Charging a saved card is not set up on this payment provider yet, so nothing was charged.", { beforeSend: true });
   },
 
   async verifyTransaction(reference): Promise<VerifiedTransaction> {

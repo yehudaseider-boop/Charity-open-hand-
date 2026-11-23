@@ -159,3 +159,13 @@ describe("a month paid with the new card and then by a late old-card try", () =>
     expect(alerts).toEqual([]);
   });
 });
+
+describe("a payment on a gateway that is no longer the active one", () => {
+  it("is held for a person once, however many times it is checked (23/11/2026)", async () => {
+    donation.gateway = "paystack";
+    expect(await confirmPayment(REF)).toBe("review");
+    expect(await confirmPayment(REF)).toBe("review");
+    expect(await confirmPayment(REF)).toBe("review");
+    expect(audits.filter((a) => a.action === "donation.gateway_mismatch")).toHaveLength(1);
+  });
+});

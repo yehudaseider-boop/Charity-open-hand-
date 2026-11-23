@@ -39,6 +39,34 @@ function must<T>(r: { data: T; error: { message: string } | null }, what: string
   return r.data as NonNullable<T>;
 }
 
+/**
+ * Active monthly donations whose card belongs to a payment provider that is no longer the active one cannot be
+ * collected (the saved card only works at its own provider). They are listed for a person in Admin, Payments
+ * (once a day each) instead of silently never being collected.
+ */
+export async function holdOtherGateway(db: ReturnType<typeof createAdminClient>, activeName: string, now: Date): Promise<void> {
+  const { data: other, error } = await db
+    .from("recurring_donations")
+    .select("id, gateway")
+    .eq("status", "active")
+    .neq("gateway", activeName)
+    .lte("next_charge_at", now.toISOString())
+    .limit(100);
+  if (error || !other?.length) return;
+  const since = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+  const { data: noted } = await db
+    .from("audit_log")
+    .select("entity_id")
+    .eq("action", "monthly.other_gateway")
+    .in("entity_id", other.map((r) => r.id as string))
+    .gte("created_at", since);
+  const done = new Set((noted ?? []).map((r) => r.entity_id as string));
+  for (const r of other) {
+    if (done.has(r.id as string)) continue;
+    await logAudit({ actorUserId: null, action: "monthly.other_gateway", entityType: "recurring_donation", entityId: r.id as string, details: { gateway: r.gateway, active: activeName } });
+  }
+}
+
 export function supabaseMonthlyStore(): MonthlyStore {
   const db = createAdminClient();
   return {
@@ -60,6 +88,7 @@ export function supabaseMonthlyStore(): MonthlyStore {
           .limit(limit),
         "list the monthly donations that are due",
       ) as unknown as DueRow[];
+      await holdOtherGateway(db, gateway.name, now);
       const out: DueMonthly[] = [];
       const unreadable: { id: string; message: string }[] = [];
       for (const r of rows) {

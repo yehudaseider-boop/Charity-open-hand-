@@ -102,7 +102,7 @@ class FakeGatewayError extends Error {
 }
 vi.mock("@/lib/gateway", () => ({
   GatewayError: FakeGatewayError,
-  gatewayByName: () => ({
+  gatewayForEvents: () => ({
     verifyTransaction: async (reference: string) => {
       verified.push(reference);
       if (providerSays instanceof Error) throw providerSays;

@@ -3,6 +3,7 @@ import { getGateway } from "@/lib/gateway";
 import type { Payout } from "@/lib/gateway/types";
 import { isoDateInJhb } from "@/lib/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { readAllPages } from "@/lib/charity/read-pages";
 
 /**
  * Reads each connected charity's payouts from the payment provider and keeps them, with their lines, so the
@@ -35,15 +36,18 @@ export async function syncPayouts(now = new Date(), opts: { deadline?: number } 
   const gateway = getGateway();
   const db = createAdminClient();
   const since = isoDateInJhb(new Date(now.getTime() - LOOK_BACK_DAYS * 86_400_000));
-  const { data: charities, error } = await db
-    .from("charities")
-    .select("id, gateway, gateway_subaccount_ref")
-    .eq("gateway", gateway.name)
-    .not("gateway_subaccount_ref", "is", null)
-    .order("id");
-  if (error) throw error;
+  // Every connected charity, not just the first 1 000 the database gives in one request.
+  const charities = await readAllPages<{ id: string; gateway: string; gateway_subaccount_ref: string | null }>((from, to, count) =>
+    db
+      .from("charities")
+      .select("id, gateway, gateway_subaccount_ref", count ? { count: "exact" } : undefined)
+      .eq("gateway", gateway.name)
+      .not("gateway_subaccount_ref", "is", null)
+      .order("id")
+      .range(from, to),
+  );
   const summary: PayoutSyncSummary = { charities: 0, payouts: 0, lines: 0, unmatched: 0, failed: [] };
-  const list = charities ?? [];
+  const list = charities;
   const shift = list.length ? Math.floor(now.getTime() / 86_400_000) % list.length : 0;
   const ordered = [...list.slice(shift), ...list.slice(0, shift)];
   const outOfTime = () => opts.deadline !== undefined && Date.now() > opts.deadline;
@@ -76,15 +80,19 @@ export async function syncPayouts(now = new Date(), opts: { deadline?: number } 
 
 /** This charity's payouts already kept as paid out or failed: their lines don't change, so they aren't read again. */
 async function finalPayoutRefs(charityId: string, gatewayName: string): Promise<Set<string>> {
-  const { data, error } = await createAdminClient()
-    .from("payouts")
-    .select("gateway_payout_ref")
-    .eq("charity_id", charityId)
-    .eq("gateway", gatewayName)
-    .in("status", ["paid", "failed"])
-    .limit(5000);
-  if (error) throw error;
-  return new Set((data ?? []).map((p) => String(p.gateway_payout_ref)));
+  const db = createAdminClient();
+  // All of them, a page at a time: a silent cap would read the rest again every day.
+  const rows = await readAllPages<{ gateway_payout_ref: string }>((from, to, count) =>
+    db
+      .from("payouts")
+      .select("gateway_payout_ref", count ? { count: "exact" } : undefined)
+      .eq("charity_id", charityId)
+      .eq("gateway", gatewayName)
+      .in("status", ["paid", "failed"])
+      .order("gateway_payout_ref")
+      .range(from, to),
+  );
+  return new Set(rows.map((p) => String(p.gateway_payout_ref)));
 }
 
 /** Keep one payout and replace its lines. Lines are matched to this charity's own gifts by reference only. */

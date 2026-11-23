@@ -9,7 +9,10 @@ export { GatewayError, isGatewayDecline, isGatewayRefusal } from "./types";
 
 /** The gateway in use, chosen by the PAYMENT_GATEWAY environment variable. */
 export function getGateway(): PaymentGateway {
-  const name = process.env.PAYMENT_GATEWAY ?? "test";
+  return adapterFor(process.env.PAYMENT_GATEWAY ?? "test");
+}
+
+function adapterFor(name: string): PaymentGateway {
   if (name === "paystack") return paystackGateway;
   if (name === "stitch") return stitchGateway;
   if (name === "test") {
@@ -22,6 +25,15 @@ export function getGateway(): PaymentGateway {
     return testGateway;
   }
   throw new Error(`Unknown PAYMENT_GATEWAY "${name}".`);
+}
+
+/**
+ * The adapter for a gateway name even when it is no longer the one used for new checkouts (23/11/2026): a refund,
+ * a dispute or a late charge on a former gateway is still verified and handled by that gateway's own adapter.
+ * Checkout itself never uses this: it stays on getGateway().
+ */
+export function gatewayForEvents(name: string): PaymentGateway {
+  return adapterFor(name);
 }
 
 /** The adapter for a gateway name stored on a donation or charity. */

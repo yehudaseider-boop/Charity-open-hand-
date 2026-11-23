@@ -14,16 +14,22 @@ vi.mock("@/lib/gateway", () => ({
     },
   }),
 }));
+/** The rows the stand-in database holds; it answers like the real one: at most the page asked for through range(). */
+let charityRows: { id: string; gateway_subaccount_ref: string }[] = [];
+let payoutRows: { gateway_payout_ref: string }[] = [];
+const rangesAsked: string[] = [];
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
+      const all = () => (table === "payouts" ? payoutRows : charityRows);
       const q = {
         select: () => q,
         eq: () => q,
         not: () => q,
         in: () => q,
-        order: async () => ({ data: [{ id: "c1", gateway_subaccount_ref: "A1" }, { id: "c2", gateway_subaccount_ref: "A2" }, { id: "c3", gateway_subaccount_ref: "A3" }], error: null }),
-        limit: async () => ({ data: table === "payouts" ? [{ gateway_payout_ref: "P1" }, { gateway_payout_ref: "P2" }] : [], error: null }),
+        order: () => q,
+        // Without range() the real database would stop at 1 000 rows.
+        range: async (from: number, to: number) => (rangesAsked.push(`${table}:${from}-${to}`), { data: all().slice(from, to + 1), count: all().length, error: null }),
       };
       return q;
     },
@@ -34,6 +40,9 @@ const { syncPayouts } = await import("@/lib/donations/payouts");
 const DAY0 = new Date(Date.UTC(2026, 10, 12, 6) - (Math.floor(Date.UTC(2026, 10, 12, 6) / 86_400_000) % 3) * 86_400_000);
 
 beforeEach(() => {
+  charityRows = [{ id: "c1", gateway_subaccount_ref: "A1" }, { id: "c2", gateway_subaccount_ref: "A2" }, { id: "c3", gateway_subaccount_ref: "A3" }];
+  payoutRows = [{ gateway_payout_ref: "P1" }, { gateway_payout_ref: "P2" }];
+  rangesAsked.length = 0;
   asked.length = 0;
   slow = 0;
 });
@@ -67,5 +76,18 @@ describe("payouts in a time budget", () => {
     await syncPayouts(new Date(DAY0.getTime() + 86_400_000));
     expect(first).toEqual(["c1", "c2", "c3"]);
     expect(asked.map((a) => a.charityId)).toEqual(["c2", "c3", "c1"]);
+  });
+});
+
+describe("more rows than one request gives (23/11/2026)", () => {
+  it("reads every connected charity and every final payout, not just the first 1 000", async () => {
+    charityRows = Array.from({ length: 1500 }, (_, i) => ({ id: `c${String(i).padStart(4, "0")}`, gateway_subaccount_ref: `A${i}` }));
+    payoutRows = Array.from({ length: 2300 }, (_, i) => ({ gateway_payout_ref: `P${i}` }));
+    const s = await syncPayouts(DAY0);
+    expect(s.charities).toBe(1500);
+    expect(asked).toHaveLength(1500);
+    expect(asked[0].skipRefs!.size).toBe(2300);
+    expect(rangesAsked).toContain("charities:1000-1999");
+    expect(rangesAsked).toContain("payouts:2000-2999");
   });
 });

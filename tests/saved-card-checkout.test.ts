@@ -27,6 +27,8 @@ let auditRows: { id: string }[] = [];
 const idLookups: string[] = [];
 /** Whether marking a gift failed moves it (false: the payment check had already marked it failed). */
 let updateMoves = true;
+/** A table whose insert fails (a record that could not be saved). */
+let failInsertOn: string | null = null;
 
 function builder(table: string) {
   const b: Record<string, unknown> = {};
@@ -35,14 +37,14 @@ function builder(table: string) {
     if (table === "donations" && column === "id") idLookups.push(String(value));
     return b;
   };
-  b.insert = (row: Record<string, unknown>) => (ops.push({ table, op: "insert", row }), b);
+  b.insert = (row: Record<string, unknown>) => (ops.push({ table, op: "insert", row }), (b.failing = table === failInsertOn), b);
   b.update = (row: Record<string, unknown>) => (ops.push({ table, op: "update", row }), (b.updating = true), b);
   b.upsert = (row: Record<string, unknown>) => (ops.push({ table, op: "upsert", row }), b);
   b.single = async () => ({ data: { id: "donor-1" }, error: null });
   b.maybeSingle = async () => ({ data: table === "donations" ? prior : null, error: null });
   // An update to a gift answers with the rows it moved: none when the gift had already moved on (updateMoves false).
   b.then = (ok: (v: unknown) => unknown) =>
-    Promise.resolve({ data: table === "audit_log" ? auditRows : table === "donations" && b.updating ? (updateMoves ? [{ id: "moved" }] : []) : [], error: null }).then(ok);
+    Promise.resolve(b.failing ? { data: null, error: { message: "insert refused" } } : { data: table === "audit_log" ? auditRows : table === "donations" && b.updating ? (updateMoves ? [{ id: "moved" }] : []) : [], error: null }).then(ok);
   return b;
 }
 
@@ -128,6 +130,7 @@ beforeEach(() => {
   idLookups.length = 0;
   declinesCounted.length = 0;
   updateMoves = true;
+  failInsertOn = null;
   limitsUsedUp = false;
   providerHas = "yes";
   verified.length = 0;
@@ -298,6 +301,29 @@ describe("paying with the saved card", () => {
     expect(noted?.row).toMatchObject({ action: "donation.saved_card_refused", details: { said: "Invalid split configuration" } });
     // Not the card: never counted as a declined card.
     expect(declinesCounted).toEqual([]);
+  });
+
+  it("an error raised before anything was sent (a missing key, a split we won't start) closes the gift at once: nothing was charged", async () => {
+    chargeResult = async () => {
+      throw Object.assign(new FakeGatewayError("Missing key"), { beforeSend: true });
+    };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, offerPaymentPage: true });
+    expect(body.charged).toBeUndefined();
+    expect(body.message).toMatch(/nothing was charged/);
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+    expect(declinesCounted).toEqual([]);
+  });
+
+  it("details that could not be saved after the gift row close the gift: no dead pending row, nothing sent", async () => {
+    failInsertOn = "donation_checkout_details";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details }).catch(() => {});
+    expect(charges).toHaveLength(0);
+    expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+    expect(ops.find((o) => o.table === "audit_log" && o.op === "insert")?.row).toMatchObject({ action: "donation.checkout_closed" });
   });
 
   it("a timeout or outage leaves the gift pending, because the charge may have gone through", async () => {
