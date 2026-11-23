@@ -86,7 +86,9 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
   switch (kind) {
     case "profile_saved":
       return {
-        what: c.approved ? "Your public profile is saved. Donors see the changes now." : "Your public profile is saved. Donors see it once your application is approved.",
+        what: d.categoriesNotSaved
+          ? "Your public profile is saved, but your categories didn't all save. Check them below and save again."
+          : c.approved ? "Your public profile is saved. Donors see the changes now." : "Your public profile is saved. Donors see it once your application is approved.",
         next: seePage(c, { label: "Next: add photos and an update", href: `${c.base}/updates` }),
       };
     case "thank_you_wording_saved":
