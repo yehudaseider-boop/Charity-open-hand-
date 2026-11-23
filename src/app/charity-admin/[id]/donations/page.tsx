@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
+import { timed } from "@/lib/timing";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { donationStatus, donorName } from "@/lib/charity/dashboard";
 import { applyDonationFilters, filtersToQuery, parseDonationFilters, periodOptions, periodText, type PeriodKey } from "@/lib/charity/donation-filters";
@@ -30,8 +31,8 @@ const statusTabs = ["all", "paid", "refunded", "charged_back"] as const;
 
 export default async function DonationsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/donations">) {
   const { id } = await params;
-  await requireViewer(`/charity-admin/${id}/donations`);
-  const { charity } = await loadCharityForManager(id);
+  await timed("donations", "requireViewer", requireViewer(`/charity-admin/${id}/donations`));
+  const { charity } = await timed("donations", "loadCharityForManager", loadCharityForManager(id));
   const sp = await searchParams;
   const filters = parseDonationFilters(sp);
   // "Choose dates" with dates we couldn't read: say so, and keep what was typed, rather than quietly showing everything.
@@ -54,7 +55,11 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
       .range((page - 1) * PAGE, page * PAGE - 1),
     filters,
   );
-  const [{ data, count, error }, totals, campaigns] = await Promise.all([query, loadTotals(supabase, id, filters), loadCampaignTitles(id)]);
+  const [{ data, count, error }, totals, campaigns] = await timed(
+    "donations",
+    "all reads",
+    Promise.all([timed("donations", "list", query), timed("donations", "loadTotals", loadTotals(supabase, id, filters)), timed("donations", "loadCampaignTitles", loadCampaignTitles(id))]),
+  );
   // A page past the end (an old link, a typed number) is the database saying "out of range": show page 1's link instead of an error.
   if (error && error.code !== "PGRST103") throw error;
   // Every filter is kept (custom dates too), so the totals don't quietly change.
@@ -63,7 +68,7 @@ export default async function DonationsPage({ params, searchParams }: PageProps<
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
 
   const base = `/charity-admin/${id}/donations`;
-  const role = await viewerRole(id);
+  const role = await timed("donations", "viewerRole", viewerRole(id));
   const href = (over: { status?: typeof status; page?: number; period?: PeriodKey }) => {
     const f = { ...filters, ...(over.status ? { status: over.status } : {}), ...(over.period ? { period: over.period } : {}) };
     const s = filtersToQuery(f, over.page && over.page > 1 ? { page: String(over.page) } : {});

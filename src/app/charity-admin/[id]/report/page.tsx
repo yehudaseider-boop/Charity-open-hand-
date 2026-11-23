@@ -3,6 +3,7 @@ import { Card } from "@/components/card";
 import { ActionLink, PageHeader, Tabs } from "@/components/dash";
 import { PrintButton } from "../poster/print-button";
 import { requireViewer } from "@/lib/auth";
+import { timed } from "@/lib/timing";
 import { annualReport, reportYears } from "@/lib/charity/annual-report";
 import { loadReportData } from "@/lib/charity/dashboard-queries";
 import { saDate } from "@/lib/charity/dashboard";
@@ -33,12 +34,12 @@ function Figure({ label, value, note, strong = false }: { label: string; value: 
  */
 export default async function AnnualReportPage({ params, searchParams }: PageProps<"/charity-admin/[id]/report">) {
   const { id } = await params;
-  await requireViewer(`/charity-admin/${id}/report`);
-  const { charity } = await loadCharityForManager(id);
-  const canDownload = await viewerCan(id, "export");
+  await timed("report", "requireViewer", requireViewer(`/charity-admin/${id}/report`));
+  const { charity } = await timed("report", "loadCharityForManager", loadCharityForManager(id));
+  const canDownload = await timed("report", "viewerCan", viewerCan(id, "export"));
   const sp = await searchParams;
   const now = new Date();
-  const { gifts, campaignTitles, onIssued } = await loadReportData(id);
+  const { gifts, campaignTitles, onIssued } = await timed("report", "loadReportData", loadReportData(id));
   const years = reportYears(gifts, now);
   const asked = Number(typeof sp.year === "string" ? sp.year : NaN);
   const year = years.includes(asked) ? asked : years[0];

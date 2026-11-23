@@ -91,6 +91,22 @@ describe("the builder's picture controls", () => {
     expect(html).toContain('value="Children at our club"');
     expect(html).toContain("Remove the picture");
   });
+  it("shows the picture and its description to a team member who can't edit (23/11/2026)", () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://proj.supabase.co";
+    const html = renderToStaticMarkup(
+      createElement(JourneyEditor, {
+        action: async () => ({ ok: true }) as never,
+        charityName: "Meals",
+        slug: "meals",
+        saved: [{ subject: "Thank you", body: "Thank you for your gift to us.", waitDays: 2, imagePath: path, imageAlt: "Children at our club" }],
+        canEdit: false,
+      }),
+    );
+    expect(html).toContain(`src="https://proj.supabase.co/storage/v1/object/public/charity-public/${path}" alt="Children at our club"`);
+    expect(html).toContain("Picture: Children at our club");
+    expect(html).not.toContain('type="file"');
+  });
+
   it("has no upload where pictures can't be added", () => {
     expect(render([{ subject: "Thank you", body: "Thank you for your gift to us.", waitDays: 2 }], false)).not.toContain('type="file"');
   });

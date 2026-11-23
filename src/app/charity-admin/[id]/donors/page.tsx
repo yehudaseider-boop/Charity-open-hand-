@@ -11,6 +11,7 @@ import { thankOneDonor } from "./actions";
 import { ThankOneForm } from "./thank-form";
 import { DonorPeekLink } from "./donor-peek";
 import { requireViewer } from "@/lib/auth";
+import { timed } from "@/lib/timing";
 import { ERASED_DONOR, donorMatches, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
 import { loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager } from "@/lib/charity/queries";
@@ -47,9 +48,9 @@ const PAGE = 25;
 
 export default async function DonorsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/donors">) {
   const { id } = await params;
-  await requireViewer(`/charity-admin/${id}/donors`);
-  const { charity } = await loadCharityForManager(id);
-  const canDownload = await viewerCan(id, "export");
+  await timed("donors", "requireViewer", requireViewer(`/charity-admin/${id}/donors`));
+  const { charity } = await timed("donors", "loadCharityForManager", loadCharityForManager(id));
+  const canDownload = await timed("donors", "viewerCan", viewerCan(id, "export"));
   const sp = await searchParams;
   const q = safeSearch(typeof sp.q === "string" ? sp.q : "");
   const asked = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
@@ -60,15 +61,17 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   // An unknown ?sort= keeps the usual order (most given first).
   const sort = parseDonorSort(sp.sort);
 
-  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays, contacts, missingRead, owner] = await Promise.all([
-    loadDonors(id), loadMonthlyGifts(id), loadMonthlyDonations(id), listTags(id), tagsByDonor(id), listSegments(id), lapsedDaysFor(id), loadContacts(id),
+  const t = <T,>(read: string, work: PromiseLike<T>) => timed("donors", read, work);
+  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays, contacts, missingRead, owner] = await t("all reads", Promise.all([
+    t("loadDonors", loadDonors(id)), t("loadMonthlyGifts", loadMonthlyGifts(id)), t("loadMonthlyDonations", loadMonthlyDonations(id)), t("listTags", listTags(id)),
+    t("tagsByDonor", tagsByDonor(id)), t("listSegments", listSegments(id)), t("lapsedDaysFor", lapsedDaysFor(id)), t("loadContacts", loadContacts(id)),
     // Read with the service role now that loadCharityForManager has checked access. Only what is missing comes back, never a number.
-    loadS18aMissing(id).catch((e: unknown) => {
+    t("loadS18aMissing", loadS18aMissing(id)).catch((e: unknown) => {
       console.error("[donors] s18A details check failed", e instanceof Error ? e.message : e);
       return null;
     }),
-    isOwner(id),
-  ]);
+    t("isOwner", isOwner(id)),
+  ]));
   const missing: ReadonlyMap<string, MissingDetail[]> = missingRead ?? new Map();
   const donorGroups = donorGroupsFor(lapsedDays);
   const tagName = new Map(tags.map((t) => [t.id, t.name]));

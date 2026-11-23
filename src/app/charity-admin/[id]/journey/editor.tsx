@@ -185,6 +185,13 @@ export function JourneyEditor({
             </p>
             <p dir="auto" className="font-semibold [overflow-wrap:anywhere]">{s.subject}</p>
             <p dir="auto" className="whitespace-pre-line text-muted [overflow-wrap:anywhere]">{s.body}</p>
+            {s.imagePath ? (
+              <figure className="space-y-1 pt-1">
+                {/* eslint-disable-next-line @next/next/no-img-element -- the charity's own picture, as the email shows it */}
+                <img src={charityPictureUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, s.imagePath)} alt={s.imageAlt ?? ""} className="max-h-40 w-auto max-w-full rounded-control border-2 border-border object-contain" />
+                <figcaption dir="auto" className="text-xs text-muted [overflow-wrap:anywhere]">Picture: {s.imageAlt}</figcaption>
+              </figure>
+            ) : null}
           </li>
         ))}
       </ol>
