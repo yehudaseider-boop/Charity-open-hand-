@@ -1,7 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { logAudit } from "@/lib/audit";
-import { onIssuedReceipt } from "@/lib/donations/s18a-complete";
 import { canCompleteS18a, completionWindow, lateDetailsDeadline, s18aDetailsMissing, type MissingDetail, type S18aDetailsRow } from "@/lib/donations/s18a-details";
 import { getEmailTransport } from "@/lib/email";
 import { mayHaveSent } from "@/lib/email/retry-plan";
@@ -13,7 +12,7 @@ import { emailHash, weekStart } from "./thank-you";
 import { messagedThisWeek } from "./weekly-limit";
 import { recordAction } from "./charity-actions";
 import { readPages } from "./paged";
-import { inTurns, readAllPages } from "./read-pages";
+import { readAllPages } from "./read-pages";
 import { nothingLeft } from "@/lib/donations/what-is-left";
 
 /**
@@ -40,8 +39,9 @@ export const REMINDER_KIND = "s18a_details_reminder";
 export async function loadS18aMissing(charityId: string, now = new Date(), earliestYear?: Map<string, number>): Promise<Map<string, MissingDetail[]>> {
   const window = completionWindow(now);
   type Gift = { id: string; status: string; wants_18a: boolean; tax_year: number | null; donor_id: string; amount_cents: number; refunded_cents: number | null; donation_checkout_details: unknown };
-  // Read four batches of 1 000 at a time, and check receipts four lots of 200 at a time (19/11/2026: one after
-  // another, a charity with 10 000 receipt gifts waited about 5 seconds on its overview and donors pages).
+  // Only the tax years whose details can still be added (23/11/2026: last year's gifts were read and then all dropped
+  // once its late window had closed, half the rows for nothing). Read four batches of 1 000 at a time.
+  const years = window.closedYearOpen ? [window.taxYear, window.taxYear - 1] : [window.taxYear];
   const gifts = await readAllPages<Gift>((from, to, count) =>
     db()
       .from("donations")
@@ -49,7 +49,7 @@ export async function loadS18aMissing(charityId: string, now = new Date(), earli
       .eq("charity_id", charityId)
       .eq("status", "paid")
       .eq("wants_18a", true)
-      .in("tax_year", [window.taxYear, window.taxYear - 1])
+      .in("tax_year", years)
       .order("id")
       .range(from, to) as unknown as PromiseLike<{ data: Gift[] | null; error: { message: string } | null; count?: number | null }>,
   );
@@ -62,9 +62,10 @@ export async function loadS18aMissing(charityId: string, now = new Date(), earli
     // Only gifts that lack something are worth checking against issued receipts.
     if (details && !details.erased_at && s18aDetailsMissing(details).length) rows.push({ id: g.id, status: g.status, wants_18a: g.wants_18a, tax_year: g.tax_year, donor_id: g.donor_id, details });
   }
-  const lots: string[][] = [];
-  for (let i = 0; i < rows.length; i += 200) lots.push(rows.slice(i, i + 200).map((r) => r.id));
-  const issued = new Set<string>((await inTurns(lots, (ids) => onIssuedReceipt(db(), ids))).flatMap((s) => [...s]));
+  // Gifts already on an issued receipt: the charity's issued receipts for those years, in one read (23/11/2026: was
+  // checked 200 gifts at a time, about 28 trips for 5 500 gifts). A gift is only ever on its own charity's receipt for
+  // its own tax year, so this is the same answer; before a year's receipts are issued there are none to read.
+  const issued = rows.length ? await issuedReceiptGifts(charityId, years) : new Set<string>();
   const out = new Map<string, MissingDetail[]>();
   for (const r of rows) {
     if (!canCompleteS18a(r, r.details, { window, onIssuedReceipt: issued })) continue;
@@ -72,6 +73,21 @@ export async function loadS18aMissing(charityId: string, now = new Date(), earli
     if (earliestYear && r.tax_year !== null) earliestYear.set(r.donor_id, Math.min(earliestYear.get(r.donor_id) ?? r.tax_year, r.tax_year));
   }
   return out;
+}
+
+/** The gifts on this charity's issued s18A receipts for these tax years. */
+export async function issuedReceiptGifts(charityId: string, years: number[]): Promise<Set<string>> {
+  const links = await readAllPages<{ donation_id: string }>((from, to, count) =>
+    db()
+      .from("s18a_receipt_donations")
+      .select("donation_id, s18a_receipts!inner(charity_id, tax_year, status)", count ? { count: "exact" } : undefined)
+      .eq("s18a_receipts.charity_id", charityId)
+      .eq("s18a_receipts.status", "issued")
+      .in("s18a_receipts.tax_year", years)
+      .order("donation_id")
+      .range(from, to) as unknown as PromiseLike<{ data: { donation_id: string }[] | null; error: { message: string } | null; count?: number | null }>,
+  );
+  return new Set(links.map((l) => l.donation_id));
 }
 
 /** When each of these donors was last sent an s18A reminder by this charity. */

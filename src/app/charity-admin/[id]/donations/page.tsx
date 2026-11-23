@@ -6,6 +6,7 @@ import { NoMatch } from "@/components/no-match";
 import { Badge } from "@/components/badge";
 import { requireViewer } from "@/lib/auth";
 import { timed } from "@/lib/timing";
+import { readAllPages } from "@/lib/charity/read-pages";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { donationStatus, donorName } from "@/lib/charity/dashboard";
 import { applyDonationFilters, filtersToQuery, parseDonationFilters, periodOptions, periodText, type PeriodKey } from "@/lib/charity/donation-filters";
@@ -248,13 +249,21 @@ type Totals = { paidCents: number; paidCount: number; reversedCents: number; rev
 async function loadTotals(supabase: Awaited<ReturnType<typeof createClient>>, charityId: string, filters: ReturnType<typeof parseDonationFilters>): Promise<Totals> {
   const t: Totals = { paidCents: 0, paidCount: 0, reversedCents: 0, reversedCount: 0, donorCount: 0 };
   const donors = new Set<string>();
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await applyDonationFilters(
-      supabase.from("charity_donations").select("id, donor_id, status, amount_cents, refunded_cents").eq("charity_id", charityId).order("id").range(from, from + 999),
+  // Read four batches of 1 000 side by side (23/11/2026: one after another, 20 000 gifts took 1.5 to 2.2 seconds).
+  type Row = { id: string; donor_id: string; status: string; amount_cents: number | string; refunded_cents: number | string | null };
+  const rows = await readAllPages<Row>((from, to, count) =>
+    applyDonationFilters(
+      supabase
+        .from("charity_donations")
+        .select("id, donor_id, status, amount_cents, refunded_cents", count ? { count: "exact" } : undefined)
+        .eq("charity_id", charityId)
+        .order("id")
+        .range(from, to),
       filters,
-    );
-    if (error) throw error;
-    for (const r of data ?? []) {
+    ) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null; count?: number | null }>,
+  );
+  {
+    for (const r of rows) {
       if (countsAsGift(r)) {
         t.paidCents += leftCents(r);
         t.paidCount++;
@@ -268,7 +277,6 @@ async function loadTotals(supabase: Awaited<ReturnType<typeof createClient>>, ch
         t.reversedCount++;
       }
     }
-    if (!data || data.length < 1000) break;
   }
   t.donorCount = donors.size;
   return t;

@@ -191,9 +191,11 @@ function query(table: string) {
   };
   const b: Record<string, unknown> = {};
   b.select = () => b;
-  b.eq = (col: string, v: unknown) => (col.includes(".") ? b : (filters.push((r) => r[col] === v), b));
+  // An embedded table's column ("s18a_receipts.status") is read from the row's embedded record, as PostgREST filters it.
+  const at = (r: Row, col: string): unknown => col.split(".").reduce<unknown>((v, k) => (v && typeof v === "object" ? (v as Row)[k] : undefined), r);
+  b.eq = (col: string, v: unknown) => (filters.push((r) => at(r, col) === v), b);
   b.neq = (col: string, v: unknown) => (filters.push((r) => r[col] !== v), b);
-  b.in = (col: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[col])), b);
+  b.in = (col: string, vs: unknown[]) => (filters.push((r) => vs.includes(at(r, col))), b);
   b.gte = (col: string, v: string) => (filters.push((r) => new Date(String(r[col])).getTime() >= new Date(v).getTime()), b);
   b.is = (col: string, v: unknown) => (filters.push((r) => (r[col] ?? null) === v), b);
   b.order = (col: string, o?: { ascending?: boolean }) => (sorts.push({ col, asc: o?.ascending !== false }), b);
@@ -429,8 +431,24 @@ describe("sending reminders", () => {
   });
 
   it("a gift already on an issued s18A receipt isn't asked about", async () => {
-    tables.s18a_receipt_donations = [{ donation_id: "g1" }];
+    tables.s18a_receipt_donations = [{ donation_id: "g1", s18a_receipts: { charity_id: "c1", tax_year: 2027, status: "issued" } }];
     expect((await sendS18aReminders(args(["sarah"]))).skipped.complete).toBe(1);
     expect(sent).toHaveLength(0);
+  });
+
+  it("only counts this charity's issued receipts for the open tax years (23/11/2026: read in one go, not 200 gifts at a time)", async () => {
+    tables.s18a_receipt_donations = [
+      { donation_id: "g1", s18a_receipts: { charity_id: "c1", tax_year: 2027, status: "void" } },
+      { donation_id: "g1", s18a_receipts: { charity_id: "c2", tax_year: 2027, status: "issued" } },
+      { donation_id: "g1", s18a_receipts: { charity_id: "c1", tax_year: 2025, status: "issued" } },
+    ];
+    expect((await loadS18aMissing("c1", NOW)).has("sarah")).toBe(true);
+  });
+
+  it("reads last year's gifts only while their late window is open", async () => {
+    // A gift of the tax year that ended in February 2026 (2026): its details could be added until 31 May 2026.
+    tables.donations = [gift("old", "late", { tax_year: 2026 }, { email: "late@x.co" })];
+    expect((await loadS18aMissing("c1", new Date("2026-05-20T10:00:00+02:00"))).has("late")).toBe(true);
+    expect((await loadS18aMissing("c1", NOW)).has("late")).toBe(false);
   });
 });
