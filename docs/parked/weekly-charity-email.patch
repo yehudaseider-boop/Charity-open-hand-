@@ -1,0 +1,1924 @@
+From edf34f098347b924fe074ed175b4f4ae2e26f37a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 22 Nov 2026 18:52:25 +0000
+Subject: [PATCH] Weekly email to charity teams: last week's figures every
+ Monday for owners and admins, a nudge in quiet weeks, never twice, off by
+ default
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017rPwppTTqDpBoT8H54c1xZ
+---
+ .env.example                                  |   3 +
+ docs/decisions.md                             |  12 +
+ docs/go-live-checklist.md                     |   1 +
+ src/app/api/jobs/daily/route.ts               |  19 +
+ src/app/api/stop/weekly/route.ts              |  13 +
+ src/app/charity-admin/[id]/team/actions.ts    |  18 +
+ src/app/charity-admin/[id]/team/forms.tsx     |   9 +
+ src/app/charity-admin/[id]/team/page.tsx      |  29 +-
+ src/app/weekly-email/stop/actions.ts          |  14 +
+ src/app/weekly-email/stop/page.tsx            |  41 ++
+ src/lib/charity/weekly-summary-store.ts       | 387 ++++++++++++++++++
+ src/lib/charity/weekly-summary.ts             | 322 +++++++++++++++
+ src/lib/email/headers.ts                      |   7 +-
+ src/lib/email/one-click-stop.ts               |   2 +-
+ src/lib/email/samples.ts                      |  13 +
+ src/lib/ops/settings-check.ts                 |   2 +
+ .../20261122000003_charity_weekly_email.sql   |  52 +++
+ tests/stop-done.test.ts                       |  12 +-
+ tests/weekly-summary-db.test.ts               | 127 ++++++
+ tests/weekly-summary-run.test.ts              | 247 +++++++++++
+ tests/weekly-summary.test.ts                  | 287 +++++++++++++
+ 21 files changed, 1609 insertions(+), 8 deletions(-)
+ create mode 100644 src/app/api/stop/weekly/route.ts
+ create mode 100644 src/app/weekly-email/stop/actions.ts
+ create mode 100644 src/app/weekly-email/stop/page.tsx
+ create mode 100644 src/lib/charity/weekly-summary-store.ts
+ create mode 100644 src/lib/charity/weekly-summary.ts
+ create mode 100644 supabase/migrations/20261122000003_charity_weekly_email.sql
+ create mode 100644 tests/weekly-summary-db.test.ts
+ create mode 100644 tests/weekly-summary-run.test.ts
+ create mode 100644 tests/weekly-summary.test.ts
+
+diff --git a/.env.example b/.env.example
+index e9f6515..facb580 100644
+--- a/.env.example
++++ b/.env.example
+@@ -81,6 +81,9 @@ COMING_SOON_HOSTS=
+ CHARITY_REQUESTS=
+ # "Notify me at launch" sign-up list. Off unless "yes" (src/config/app-links.ts).
+ LAUNCH_LIST=
++# The Monday email to charities' owners and admins with last week's figures (sent by the daily job). Off unless "yes".
++# Needs migration 20261122000003_charity_weekly_email.sql on the database first. EMAIL_ALLOWLIST still applies.
++WEEKLY_CHARITY_EMAIL=
+ 
+ # The pause switch: "yes" stops new gifts everywhere (website and app) while the rest of the site keeps working.
+ # Monthly collections wait and are taken after it is switched off. Off unless exactly "yes". See docs/incident-plan.md.
+diff --git a/docs/decisions.md b/docs/decisions.md
+index af2e25a..abde62f 100644
+--- a/docs/decisions.md
++++ b/docs/decisions.md
+@@ -2152,3 +2152,15 @@ Yehuda chose a fixed reviewer code over codes emailed to him (Apple reviews at n
+ - **Names** need at least one letter, in any script (not "---", "1234" or emoji alone). A typed name that reaches its length limit says so under the box.
+ - **Stop emails pages** say "Done" only when the link's email really is on the stop list, never for "?done=1" on its own.
+ - **Give links to a campaign** say "We couldn't find that campaign" for an unknown one; "has ended" only for a campaign that really ended.
++
++## 22/11/2026: a weekly email to charities' teams, every Monday
++
++Yehuda chose (22/11/2026):
++- **Who:** a charity's owners and admins, unless they switch it off for themselves. Other team members (finance, fundraiser, viewer) only when they switch it on for themselves. Each person's choice is per charity, stored on their team row (`charity_admins.weekly_email`; empty means the role decides). Only approved (live) charities: never a draft, one waiting for review, one sent back or one suspended.
++- **When:** Monday morning, from the existing daily job (08:15 Johannesburg), no new scheduled job. It covers Monday 00:00 to Sunday 23:59 Johannesburg time of the week before. The daily job has one minute for everything, so the weekly email goes last in it; anyone it had no time for gets the same week's email on Tuesday or Wednesday (Claude's choice, so a cut-off Monday never silently drops a charity). From Thursday that week is left.
++- **What:** subject "Your week on Givezy: R3 400 from 12 gifts" ("Your week on Givezy" in a quiet week). Received, paid gifts, donors, new monthly donations, monthly donations stopped or paused, and gifts waiting for an s18A receipt (only for charities that issue them), counted exactly as the dashboard counts them: what is left of each paid gift after part refunds, a gift refunded in full is no gift, and never the contribution to Givezy or the card charge. The week before, only when it had gifts, as plain figures ("The week before: R2 100 from 8 gifts."), never a percentage or "up/down". One button, "Open your dashboard". Never a donor's name, address, ID number or amount per donor.
++- **Quiet weeks:** still sent, short: "No gifts came in last week." with one next step (add a logo and cover photo, then tell donors what you do, then share your page). No guilt wording, no impact figure.
++- **Stopping it:** the footer says why they get it and links to "Switch off the weekly email" (`/weekly-email/stop`, a single-purpose link that asks first and switches off only that person's email for that charity; a mail app's own Unsubscribe does the same through `/api/stop/weekly`). Anyone on the team switches theirs on or off on the dashboard's Team page ("Your weekly email"); pressing it again is the undo.
++- **Never twice:** each email's row in `charity_weekly_emails` (charity, person, the week's Monday) is written before it is sent; the database refuses a second one. A send that surely didn't go is released and tried the next day; one that may have gone is never repeated.
++- **Switch:** `WEEKLY_CHARITY_EMAIL=yes` on the server, off by default; `EMAIL_ALLOWLIST` still applies on the test site. Migration `20261122000003_charity_weekly_email.sql`; without it nothing is sent and one log line says so.
++- Built in `src/lib/charity/weekly-summary.ts` (week, figures, words) and `weekly-summary-store.ts` (reads, send log, stop link). Wording is DRAFT for Yehuda to read in a real inbox (it is in the sample emails, Admin, Settings).
+diff --git a/docs/go-live-checklist.md b/docs/go-live-checklist.md
+index 8350ce6..0eca8a6 100644
+--- a/docs/go-live-checklist.md
++++ b/docs/go-live-checklist.md
+@@ -70,6 +70,7 @@ Started 12/10/2026. Nothing here has been done on the real (live) systems yet. T
+ - [ ] **Fees and fee wording (11/11/2026, Yehuda: "not sure, hide it").** Every "free" and "no fee" claim was taken off the website, the app, emails, llms.txt and the charity onboarding pack until Yehuda decides. The 08/10/2026 no-fee setting in `src/config/platform.ts` is on hold, not changed. Before launch: (1) decide what Givezy charges donors and charities; (2) write the wording; (3) Terms: the Donating clause now says "Any charge is shown before you pay" in place of "does not charge a fee on donations", for Yosef and the attorney to approve; (4) rebuild the onboarding pack PDF (`docs/charity-onboarding`, needs pdf-lib) so it matches the new words.
+ - [ ] **Launch list on the landing page (built 10/11/2026, off).** (1) Yehuda's yes, then apply migration `20261110000012_launch_list.sql` (new personal data: emails only, server-only table) on the TEST project, then switch `appLinks.launchListOpen` to true in `src/config/app-links.ts`. (2) Yosef approves the consent line (`LAUNCH_LIST_CONSENT` in `src/lib/launch-list.ts`, DRAFT). (3) Nothing is emailed from the list until launch, and only with Yehuda's yes; the launch email must carry the one-tap stop link (`/launch-list/stop/<stop_token>`). (4) Live: same migration with the code.
+ - [ ] **Request a charity (built 15/11/2026, off).** (1) Yehuda's yes, then apply migration `20261115000001_charity_requests.sql` (new personal data: an email only when the donor ticks "Email me when it joins"; server-only table) on the TEST project, then set `CHARITY_REQUESTS=yes` on the test site to try it (or switch `appLinks.charityRequestsOpen` to true for everyone). (2) Yosef approves the consent line (`CHARITY_REQUEST_CONSENT` in `src/lib/charity-requests.ts`, DRAFT) and the Privacy Policy mentions it. (3) Decided 15/11/2026: an unused email is deleted after one calendar month by the daily job. Still open: how long the request itself (name, town, link, note, account) is kept once closed. (4) Try it: a request with and without the tick, then Admin, Charity requests: Mark as invited, It joined (one email arrives, the address is gone), Not adding. (5) Live: same migration with the code.
++- [ ] **Weekly email to charities' teams (built 22/11/2026, off).** (1) Yehuda's yes, then apply migration `20261122000003_charity_weekly_email.sql` on the TEST project (a new server-only send log and one new column on `charity_admins`; the code runs without it and sends nothing). (2) Set `WEEKLY_CHARITY_EMAIL=yes` on the test site (Vercel, Environment Variables), with `EMAIL_ALLOWLIST` still set. (3) On the next Monday (or Tuesday or Wednesday), check one real email arrives at the allowlisted address: the figures match the dashboard's Donations page for that week, the button opens the dashboard, and "Switch off the weekly email" works (then switch it back on from the Team page). (4) Yehuda reads the DRAFT wording in the sample emails (Admin, Settings). (5) Watch the daily job's answer on Mondays (`weekly.leftOver`): it has only the last seconds of the job's minute, so with many charities some emails move to Tuesday or Wednesday; if `leftOver` stays above 0 on Wednesday, it needs its own time (a decision, as it would mean a second scheduled job). (6) Live: the same migration with the code, then the switch.
+ - [ ] **Campaign journeys and win-back (CRM steps 6b and 7, built 10/11/2026).** TEST project: migration `20261110000011_more_journeys.sql` applied 11/11/2026 (Yehuda's yes; checked: three new columns, tables and functions closed to browsers). Live: (1) Order matters: deploy the code first, then apply migration `20261110000011_more_journeys.sql` (TEST project with Yehuda's yes; on live the same order) (it keeps existing journeys; checked on a throwaway database that one journey, its email, enrolment and send record carry over). Then click through: a campaign's journey (switch on, a gift to the campaign joins), win-back (tick donors on Monthly donors who stopped and on Keeping donors, the ask-first page, Undo). (2) Yosef: approve the DRAFT starter wording for campaign and win-back journeys (`campaignStarterSteps`, `WINBACK_STARTER_STEPS` in `src/lib/charity/journey.ts`). (3) On live, the same migration with the code.
+ - [ ] **Security and compliance for payments and personal data (raised by Yossi, 10/11/2026).** (1) POPIA: register Givezy's Information Officer with the Information Regulator. (2) POPIA section 72 cross-border transfer: the database (Supabase, eu-central-1, Frankfurt) and the website servers (Vercel, fra1, Frankfurt) are in Germany; the attorney confirms the ground relied on and the wording in the privacy policy. (3) Operator agreements (data-processing terms) with Supabase, Vercel and the email provider on file; the email provider's data location chosen and recorded when it is set up. (4) An independent security test of the site before real donors use it. Paystack's PCI certificate is not needed on file (Yehuda, 10/11/2026).
+ - [ ] **Team roles (CRM step 9, built 10/11/2026).** TEST project: code deployed first, then migration `20261110000009_team_roles.sql` applied 10/11/2026 (Yehuda's yes; checked: the *_full functions closed to browsers, both guard triggers on, no bank column readable by browsers, five roles). Live: (1) Order matters: the code first, then the migration. Older code reads the bank columns as the signed-in person, which the migration closes, so deploy this code to the test site, then (Yehuda's yes) apply migration `20261110000009_team_roles.sql` to the TEST project; check with one person in each role (Owner, Admin, Finance, Fundraiser, Viewer) on the test site at 375px: the menu, a refused action's message, a viewer seeing no email, phone or address, finance seeing the bank account read-only, and the Activity page. Until it runs, the code acts as before (owner and admin only; adding someone in another role says it isn't switched on yet). (2) Then on live in the same order: the code, then the migration. (3) Tell existing charities: their admins stay admins (everything except the team and the bank account); admins can now email donors, run the donor journey and download the SARS files, which were the owner's alone before (Yehuda's table, 10/11/2026); Admins no longer see the bank account or deposits.
+diff --git a/src/app/api/jobs/daily/route.ts b/src/app/api/jobs/daily/route.ts
+index a32a3ae..5c9f3dc 100644
+--- a/src/app/api/jobs/daily/route.ts
++++ b/src/app/api/jobs/daily/route.ts
+@@ -7,6 +7,7 @@ import { collectMonthlyWithin, dailyDigest, payoutsAlertLines, runDailyChecks, r
+ import { runJourneys } from "@/lib/charity/journey-store";
+ import { runCarryOnSends, type CarryOnSummary } from "@/lib/charity/carry-on-sends";
+ import { withGatewayTimeout } from "@/lib/gateway/timeout";
++import { runWeeklySummaries, type WeeklyRun } from "@/lib/charity/weekly-summary-store";
+ 
+ /** Each call to the payment provider inside this job waits at most this long, so one slow call can't push the job past its minute. */
+ export const DAILY_GATEWAY_TIMEOUT_MS = 10_000;
+@@ -20,6 +21,14 @@ export const CARRY_ON_START_BY_MS = 40_000;
+ export const CARRY_ON_MAX_MS = 12_000;
+ export const CARRY_ON_END_BY_MS = 44_000;
+ 
++/**
++ * The weekly email to charities' teams (22/11/2026): Monday (and, for what Monday had no time for, Tuesday and
++ * Wednesday), last in the minute so it never takes time from anything above. Started only before 52 seconds, no new
++ * email after 55, each email at most 4 seconds (WEEKLY_SEND_TIMEOUT_MS). Off unless WEEKLY_CHARITY_EMAIL=yes.
++ */
++export const WEEKLY_START_BY_MS = 52_000;
++export const WEEKLY_END_BY_MS = 55_000;
++
+ /**
+  * Everything that runs once a day, in order: collect the monthly donations that are due, the safety net (pending
+  * payments, failed confirmation emails, held items), the Givezy team's email when something needs a person and the
+@@ -123,6 +132,14 @@ async function run(request: NextRequest) {
+   if (payoutLines.length && Date.now() < started + 58_000) {
+     await alertGivezy("the deposit report wasn't fully updated today", payoutLines).catch(() => undefined);
+   }
++  // Last: the weekly email to charities' teams, in what time is left. Never sent twice (each email's row is claimed
++  // first); what isn't reached goes tomorrow, up to Wednesday. Counts only in the answer, no names or addresses.
++  const weekly: WeeklyRun | null | undefined = Date.now() < started + WEEKLY_START_BY_MS
++    ? await runWeeklySummaries(new Date(), started + WEEKLY_END_BY_MS).catch((e) => {
++        console.error("[daily] weekly emails to charities failed", e instanceof Error ? e.message : e);
++        return null;
++      })
++    : undefined;
+   // Only counts come back: no donor details.
+   const counts = (a: unknown[]) => a.length;
+   return NextResponse.json(
+@@ -133,6 +150,8 @@ async function run(request: NextRequest) {
+       // Counts only. Undefined: no time left to start it today (it carries on tomorrow).
+       sends: sends === undefined ? { notStarted: true } : sends,
+       journeys,
++      // Undefined: no time left to start it today (Monday's carry on the next day, up to Wednesday).
++      weekly: weekly === undefined ? { notStarted: true } : weekly,
+       attention: lines.length,
+     },
+     { headers: { "Cache-Control": "no-store" } },
+diff --git a/src/app/api/stop/weekly/route.ts b/src/app/api/stop/weekly/route.ts
+new file mode 100644
+index 0000000..021b915
+--- /dev/null
++++ b/src/app/api/stop/weekly/route.ts
+@@ -0,0 +1,13 @@
++import type { NextRequest } from "next/server";
++import { stopWeeklyEmail } from "@/lib/charity/weekly-summary-store";
++import { oneClickStop, toStopPage } from "@/lib/email/one-click-stop";
++
++/** One-click stop for the weekly email to a charity's team (List-Unsubscribe-Post), as the stop page's button. */
++export async function POST(request: NextRequest) {
++  return oneClickStop(request, stopWeeklyEmail);
++}
++
++/** Never acts: opening the address goes to the page that asks first. */
++export async function GET(request: NextRequest) {
++  return toStopPage(request, "/weekly-email/stop");
++}
+diff --git a/src/app/charity-admin/[id]/team/actions.ts b/src/app/charity-admin/[id]/team/actions.ts
+index 13dbdb6..2a5dd24 100644
+--- a/src/app/charity-admin/[id]/team/actions.ts
++++ b/src/app/charity-admin/[id]/team/actions.ts
+@@ -10,6 +10,7 @@ import { isRole } from "@/lib/charity/permissions";
+ import { addMember, isOwner, removeMember, setMemberRole } from "@/lib/charity/team";
+ import type { FormState } from "@/lib/form";
+ import { hitRateLimit } from "@/lib/rate-limit";
++import { setOwnWeeklyEmail } from "@/lib/charity/weekly-summary-store";
+ 
+ const NOT_OWNER: FormState = { ok: false, message: "Only your charity's owner can add or remove people or change their roles. Nothing was changed." };
+ 
+@@ -71,3 +72,20 @@ export async function changeMemberRole(charityId: string, userId: string, _prev:
+   const done = await recordAction(charityId, viewer.userId, "role_changed", { email: r.email, from: r.before, to: r.after }, { type: "set_role", userId, from: r.before, to: r.after });
+   redirect(`/charity-admin/${charityId}/team?done=${done}`);
+ }
++
++/**
++ * The signed-in person's own weekly email for this charity (22/11/2026): anyone on the team, for themselves only.
++ * Pressing it again is the undo.
++ */
++export async function setWeeklyEmail(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
++  const viewer = await requireViewer();
++  await loadCharityForManager(charityId);
++  const on = String(formData.get("on") ?? "") === "yes";
++  const r = await setOwnWeeklyEmail(charityId, viewer.userId, on);
++  if (r === "not_member") return { ok: false, message: "The weekly email is for people on this charity's team, and you aren't on it. Nothing was changed." };
++  if (r === "not_set_up") return { ok: false, message: "The weekly email isn't switched on yet. Nothing was changed. Please try again later." };
++  revalidatePath(`/charity-admin/${charityId}/team`);
++  return on
++    ? { ok: true, message: "Done. Your weekly email starts next Monday. To stop it, press Switch off." }
++    : { ok: true, message: "Done. You won't get the weekly email any more. To have it again, press Switch on." };
++}
+diff --git a/src/app/charity-admin/[id]/team/forms.tsx b/src/app/charity-admin/[id]/team/forms.tsx
+index 3ce819e..803efd9 100644
+--- a/src/app/charity-admin/[id]/team/forms.tsx
++++ b/src/app/charity-admin/[id]/team/forms.tsx
+@@ -37,3 +37,12 @@ export function RoleForm({ action, current }: { action: (s: FormState, f: FormDa
+     </ActionForm>
+   );
+ }
++
++/** The person's own weekly email: one button that switches it the other way (and back again). */
++export function WeeklyEmailForm({ action, on }: { action: (s: FormState, f: FormData) => Promise<FormState>; on: boolean }) {
++  return (
++    <ActionForm action={action} submitLabel={on ? "Switch off" : "Switch on"} pendingLabel={on ? "Switching off…" : "Switching on…"}>
++      <input type="hidden" name="on" value={on ? "no" : "yes"} />
++    </ActionForm>
++  );
++}
+diff --git a/src/app/charity-admin/[id]/team/page.tsx b/src/app/charity-admin/[id]/team/page.tsx
+index 129c39d..c2c6aa4 100644
+--- a/src/app/charity-admin/[id]/team/page.tsx
++++ b/src/app/charity-admin/[id]/team/page.tsx
+@@ -8,8 +8,9 @@ import { loadCharityForManager } from "@/lib/charity/queries";
+ import { ROLE_LABEL, ROLE_SUMMARY, ROLES } from "@/lib/charity/permissions";
+ import { listTeam, viewerRole } from "@/lib/charity/team";
+ import { formatDate } from "@/lib/dates";
+-import { addTeamMember, changeMemberRole, removeTeamMember } from "./actions";
+-import { AddMemberForm, RemoveMemberForm, RoleForm } from "./forms";
++import { ownWeeklyEmail } from "@/lib/charity/weekly-summary-store";
++import { addTeamMember, changeMemberRole, removeTeamMember, setWeeklyEmail } from "./actions";
++import { AddMemberForm, RemoveMemberForm, RoleForm, WeeklyEmailForm } from "./forms";
+ 
+ export const metadata: Metadata = { title: "Team" };
+ 
+@@ -19,7 +20,15 @@ export default async function TeamPage({ params, searchParams }: PageProps<"/cha
+   const sp = await searchParams;
+   const viewer = await requireViewer(`/charity-admin/${id}/team`);
+   const { charity } = await loadCharityForManager(id);
+-  const [team, role] = await Promise.all([listTeam(id), viewerRole(id)]);
++  const [team, role, weekly] = await Promise.all([
++    listTeam(id),
++    viewerRole(id),
++    // A bonus: if it can't be read, the rest of the page still shows, without this card.
++    ownWeeklyEmail(id, viewer.userId).catch((e: unknown) => {
++      console.error("[team] weekly email setting couldn't load", e instanceof Error ? e.message : e);
++      return null;
++    }),
++  ]);
+   const owner = role === "owner";
+ 
+   return (
+@@ -55,6 +64,20 @@ export default async function TeamPage({ params, searchParams }: PageProps<"/cha
+         </ul>
+       </Card>
+ 
++      {weekly ? (
++        <Card title="Your weekly email">
++          <p className="mb-3 text-sm text-muted">
++            {weekly.on
++              ? "You get a short email every Monday morning with last week's figures: gifts received, donors, monthly donations and s18A receipts waiting. Only for you: the rest of the team has their own setting."
++              : "You don't get the Monday email with last week's figures (gifts received, donors, monthly donations and s18A receipts waiting). Only for you: the rest of the team has their own setting."}
++            {weekly.byDefault && weekly.on ? " Owners and admins get it unless they switch it off." : null}
++            {weekly.byDefault && !weekly.on ? " Owners and admins get it; anyone else can switch it on." : null}
++          </p>
++          {charity.status === "approved" ? null : <p className="mb-3 text-sm text-muted">It starts once your charity is approved.</p>}
++          <WeeklyEmailForm action={setWeeklyEmail.bind(null, id)} on={weekly.on} />
++        </Card>
++      ) : null}
++
+       <Card title="What each role can do">
+         <ul className="space-y-2 text-sm">
+           {ROLES.map((r) => (
+diff --git a/src/app/weekly-email/stop/actions.ts b/src/app/weekly-email/stop/actions.ts
+new file mode 100644
+index 0000000..b8c317a
+--- /dev/null
++++ b/src/app/weekly-email/stop/actions.ts
+@@ -0,0 +1,14 @@
++"use server";
++
++import { redirect } from "next/navigation";
++import { stopWeeklyEmail } from "@/lib/charity/weekly-summary-store";
++
++export async function confirmStopWeekly(formData: FormData) {
++  const token = String(formData.get("t") ?? "");
++  const ok = await stopWeeklyEmail(token).catch((e) => {
++    console.error(e);
++    return false;
++  });
++  // "Done" keeps the link's token, and the page checks it really is off before saying so.
++  redirect(ok ? `/weekly-email/stop?t=${encodeURIComponent(token)}&done=1` : `/weekly-email/stop?t=${encodeURIComponent(token)}&error=1`);
++}
+diff --git a/src/app/weekly-email/stop/page.tsx b/src/app/weekly-email/stop/page.tsx
+new file mode 100644
+index 0000000..46f8e53
+--- /dev/null
++++ b/src/app/weekly-email/stop/page.tsx
+@@ -0,0 +1,41 @@
++import type { Metadata } from "next";
++import Link from "next/link";
++import { confirmStopWeekly } from "./actions";
++import { SafeForm } from "@/components/forms/safe-form";
++import { PendingButton } from "@/components/forms/pending-button";
++import { weeklyEmailStopped } from "@/lib/charity/weekly-summary-store";
++
++// The address carries the person's link: never pass it on in a Referer header.
++export const metadata: Metadata = { title: "Switch off the weekly email", referrer: "no-referrer" };
++
++/**
++ * From the link at the bottom of the weekly email to a charity's team. Asks first, so an email scanner opening the
++ * link changes nothing. It switches off that person's weekly email for that one charity, and nothing else.
++ */
++export default async function StopWeeklyPage({ searchParams }: PageProps<"/weekly-email/stop">) {
++  const sp = await searchParams;
++  const token = typeof sp.t === "string" ? sp.t : "";
++  // "Done" only after a real stop: "?done=1" alone, or with a link that hasn't stopped anything, asks again instead.
++  const done = sp.done === "1" && token ? await weeklyEmailStopped(token).catch((e) => {
++    console.error(e);
++    return false;
++  }) : false;
++  return (
++    <div className="mx-auto max-w-sm rounded-card border border-border bg-surface p-6">
++      <h1 className="text-xl font-semibold">The weekly email</h1>
++      {done ? (
++        <p className="mt-3 text-sm">Done. You won&apos;t get the Monday email for this charity any more. Everything else stays as it was. You can switch it back on from your dashboard&apos;s Team page.</p>
++      ) : token ? (
++        <SafeForm nothingTyped action={confirmStopWeekly} className="mt-4 space-y-3">
++          <p className="text-sm">Switch off the Monday email with last week&apos;s figures for this charity? Only for you: the rest of your team keeps theirs, and nothing else changes.</p>
++          <input type="hidden" name="t" value={token} />
++          {sp.error === "1" ? <p role="alert" className="text-sm text-danger">That link didn&apos;t work, and nothing was changed. Use the link in your most recent weekly email, or switch it off on your dashboard&apos;s Team page.</p> : null}
++          <PendingButton pendingLabel="Switching off…" className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Switch off the weekly email</PendingButton>
++        </SafeForm>
++      ) : (
++        <p className="mt-3 text-sm text-muted">Open the link at the bottom of a weekly email to switch it off, or use your dashboard&apos;s Team page.</p>
++      )}
++      <Link href="/" className="mt-4 inline-block text-sm text-brand underline">Givezy home</Link>
++    </div>
++  );
++}
+diff --git a/src/lib/charity/weekly-summary-store.ts b/src/lib/charity/weekly-summary-store.ts
+new file mode 100644
+index 0000000..54a71aa
+--- /dev/null
++++ b/src/lib/charity/weekly-summary-store.ts
+@@ -0,0 +1,387 @@
++import "server-only";
++import { createHash, randomBytes } from "node:crypto";
++import { thisTaxYear } from "@/lib/charity/dashboard";
++import { EmailMaybeSent, getEmailTransport, maskEmail } from "@/lib/email";
++import { oneClickStopUrl } from "@/lib/email/headers";
++import { createAdminClient } from "@/lib/supabase/admin";
++import { readPages } from "./paged";
++import { isRole, type Role } from "./permissions";
++import {
++  firstPayments,
++  giftTotals,
++  isSendDay,
++  monthlyMoves,
++  quietNextStep,
++  reportWeek,
++  s18aWaiting,
++  weeklyEmail,
++  weeklyEmailSwitchedOn,
++  weeklyRecipients,
++  wantsWeekly,
++  type GiftRow,
++  type MonthlyMoveRow,
++  type ReportWeek,
++  type WeekFigures,
++  type WeeklyMember,
++} from "./weekly-summary";
++
++/**
++ * The weekly email's database side (Yehuda, 22/11/2026; the rules and words are in ./weekly-summary.ts). Run by the
++ * daily job; reads and writes with the service role, always filtered by the charity. Never sends twice for the same
++ * charity, person and week: each email's row in charity_weekly_emails is claimed (inserted) before it is sent, and the
++ * primary key refuses a second claim. Tolerates migration 20261122000003 not having run yet: then nothing is sent and
++ * one line is logged.
++ */
++
++const db = () => createAdminClient();
++const sha = (s: string) => createHash("sha256").update(s).digest("hex");
++
++/** Each email waits at most this long for the email service, so the daily job ends inside its minute. */
++export const WEEKLY_SEND_TIMEOUT_MS = 4_000;
++
++/** The table or column isn't there yet (the migration hasn't run). */
++export const notSetUp = (e: { code?: string } | null | undefined) => ["PGRST205", "42P01", "PGRST204", "42703"].includes(e?.code ?? "");
++
++export type WeeklyRun = {
++  /** Why nothing was tried today: the switch is off, it isn't a send day, email isn't set up, or the migration hasn't run. */
++  off?: "switch" | "not_today" | "email" | "not_set_up";
++  week?: string;
++  sent: number;
++  /** The email service may have taken it (cut off mid-send): counted once, never sent again. */
++  maybeSent: number;
++  /** Nothing left (not on the test site's allowed list, an erased address): not tried again this week. */
++  skipped: number;
++  /** Surely not sent: released, so a later run (the next day, up to Wednesday) tries again. */
++  failed: number;
++  /** People not reached before the deadline: tried by tomorrow's run (up to Wednesday). */
++  leftOver: number;
++};
++
++type CharityRow = {
++  id: string;
++  name_en: string;
++  slug: string;
++  is_s18a: boolean;
++  mandate_signed_at: string | null;
++  logo_path: string | null;
++  cover_path: string | null;
++  description_en: string | null;
++  funds_use_en: string | null;
++};
++
++/**
++ * The daily job's part, last in its minute: on a send day, every approved charity's team members who want the email
++ * and haven't had it for last week. Starts nothing new after `deadline`. Never throws for one charity or person.
++ */
++export async function runWeeklySummaries(now: Date, deadline: number, env: Record<string, string | undefined> = process.env): Promise<WeeklyRun> {
++  const out: WeeklyRun = { sent: 0, maybeSent: 0, skipped: 0, failed: 0, leftOver: 0 };
++  if (!weeklyEmailSwitchedOn(env)) return { ...out, off: "switch" };
++  if (!isSendDay(now)) return { ...out, off: "not_today" };
++  const transport = getEmailTransport(env);
++  // With email not set up nothing would leave: claim nothing, so the week is still there once it is.
++  if (transport.name === "console") return { ...out, off: "email" };
++  const week = reportWeek(now);
++  out.week = week.start;
++
++  const done = await alreadyClaimed(week.start);
++  if (done === null) {
++    console.info("[weekly email] not set up yet (migration 20261122000003_charity_weekly_email.sql): nothing sent");
++    return { ...out, off: "not_set_up" };
++  }
++  const charities = await readPages<CharityRow>((from, to) =>
++    db()
++      .from("charities")
++      .select("id, name_en, slug, is_s18a, mandate_signed_at, logo_path, cover_path, description_en, funds_use_en")
++      // Only charities whose page is live: never a draft, one waiting for review, sent back or suspended.
++      .eq("status", "approved")
++      .order("id")
++      .range(from, to),
++  );
++  const site = (env.SITE_URL ?? "").replace(/\/+$/, "");
++
++  for (const charity of charities) {
++    let members: (WeeklyMember & { userId: string })[];
++    try {
++      members = await teamFor(charity.id);
++    } catch (e) {
++      if (notSetUp(e as { code?: string })) {
++        console.info("[weekly email] not set up yet (charity_admins.weekly_email missing): nothing sent");
++        return { ...out, off: "not_set_up" };
++      }
++      console.error("[weekly email] couldn't read a charity's team", e instanceof Error ? e.message : e);
++      out.failed += 1;
++      continue;
++    }
++    const due = weeklyRecipients(members).filter((m) => !done.has(`${charity.id}:${m.userId}`));
++    if (!due.length) continue;
++    if (Date.now() >= deadline) {
++      out.leftOver += due.length;
++      continue;
++    }
++    let figures: WeekFigures;
++    try {
++      figures = await loadFigures(charity, week, now);
++    } catch (e) {
++      // Nothing claimed for this charity: tomorrow's run (up to Wednesday) tries again.
++      console.error("[weekly email] couldn't read a charity's week", e instanceof Error ? e.message : e);
++      out.failed += due.length;
++      continue;
++    }
++    const dashboardUrl = `${site}/charity-admin/${charity.id}`;
++    const nextStep = quietNextStep(charity, dashboardUrl, `${site}/c/${charity.slug}`);
++    for (const m of due) {
++      if (Date.now() >= deadline) {
++        out.leftOver += 1;
++        continue;
++      }
++      const token = randomBytes(32).toString("base64url");
++      // The claim comes first: a second run, or one after a crash, finds the row and sends nothing.
++      const claim = await db().from("charity_weekly_emails").insert({ charity_id: charity.id, user_id: m.userId, week_start: week.start, stop_token_hash: sha(token) });
++      if (claim.error) {
++        if (claim.error.code === "23505") continue; // already claimed by another run
++        if (notSetUp(claim.error)) return { ...out, off: "not_set_up" };
++        console.error("[weekly email] couldn't claim a send", claim.error.message);
++        out.failed += 1;
++        continue;
++      }
++      const message = weeklyEmail({
++        to: m.email!,
++        charityName: charity.name_en,
++        week,
++        figures,
++        nextStep,
++        dashboardUrl,
++        stopUrl: `${site}/weekly-email/stop?t=${encodeURIComponent(token)}`,
++        oneClickUrl: site ? oneClickStopUrl(site, "weekly", token) : undefined,
++        siteUrl: site || undefined,
++      });
++      const key = { charity_id: charity.id, user_id: m.userId, week_start: week.start };
++      try {
++        const outcome = await transport.send({ ...message, signal: AbortSignal.timeout(WEEKLY_SEND_TIMEOUT_MS) });
++        await finish(key, outcome === "sent" ? "sent" : "skipped");
++        if (outcome === "sent") out.sent += 1;
++        else out.skipped += 1;
++      } catch (e) {
++        if (e instanceof EmailMaybeSent) {
++          // It may have gone: the row stays, so it is never sent again.
++          out.maybeSent += 1;
++          console.error(`[weekly email] may or may not have gone to ${maskEmail(m.email!)}; not sending again`);
++          await finish(key, "maybe_sent");
++          continue;
++        }
++        // Surely not sent: release the claim so a later run can try again.
++        out.failed += 1;
++        console.error("[weekly email] not sent", e instanceof Error ? e.message : e);
++        const { error } = await db().from("charity_weekly_emails").delete().match(key).eq("outcome", "sending");
++        if (error) console.error("[weekly email] couldn't release a claim (it won't be sent this week)", error.message);
++      }
++    }
++  }
++  return out;
++}
++
++async function finish(key: Record<string, string>, outcome: "sent" | "skipped" | "maybe_sent"): Promise<void> {
++  const { error } = await db().from("charity_weekly_emails").update({ outcome, finished_at: new Date().toISOString() }).match(key);
++  // The claim stays "sending" either way, which is never sent again: nothing is lost but the record of how it went.
++  if (error) console.error("[weekly email] couldn't record a send", error.message);
++}
++
++/** "charity:user" for every email already claimed for this week; null when the send log isn't there yet. */
++async function alreadyClaimed(weekStart: string): Promise<Set<string> | null> {
++  try {
++    const rows = await readPages<{ charity_id: string; user_id: string }>((from, to) =>
++      db().from("charity_weekly_emails").select("charity_id, user_id").eq("week_start", weekStart).order("charity_id").order("user_id").range(from, to),
++    );
++    return new Set(rows.map((r) => `${r.charity_id}:${r.user_id}`));
++  } catch (e) {
++    if (notSetUp(e as { code?: string })) return null;
++    throw e;
++  }
++}
++
++/** The team with each person's role, their own choice and their sign-in email. Throws the database error as it came. */
++async function teamFor(charityId: string): Promise<WeeklyMember[]> {
++  const { data, error } = await db().from("charity_admins").select("user_id, role, weekly_email").eq("charity_id", charityId);
++  if (error) throw error;
++  const ids = (data ?? []).map((m) => m.user_id as string);
++  if (!ids.length) return [];
++  const { data: profiles, error: pError } = await db().from("profiles").select("id, email").in("id", ids);
++  if (pError) throw pError;
++  const emailOf = new Map((profiles ?? []).map((p) => [p.id as string, (p.email as string | null) ?? null]));
++  return (data ?? []).map((m) => ({
++    userId: m.user_id as string,
++    // A role this code doesn't know gets the least, as on the dashboard.
++    role: (isRole(m.role) ? m.role : "viewer") as Role,
++    weeklyEmail: (m.weekly_email as boolean | null) ?? null,
++    email: emailOf.get(m.user_id as string) ?? null,
++  }));
++}
++
++/** Last week's figures and the week before, as the dashboard counts them. */
++export async function loadFigures(charity: Pick<CharityRow, "id" | "is_s18a" | "mandate_signed_at">, week: ReportWeek, now: Date): Promise<WeekFigures> {
++  const id = charity.id;
++  const tax = thisTaxYear(now);
++  const [gifts, monthlyRows, weekPayments, s18a] = await Promise.all([
++    readPages<GiftRow>((from, to) =>
++      db()
++        .from("donations")
++        .select("donor_id, status, amount_cents, refunded_cents, paid_at")
++        .eq("charity_id", id)
++        .eq("status", "paid")
++        .gte("paid_at", week.prevFrom)
++        .lt("paid_at", week.to)
++        .order("id")
++        .range(from, to),
++    ),
++    // Stopped or paused ones changed since the week began (a pause or stop updates the row), so this is a superset.
++    readPages<MonthlyMoveRow>((from, to) =>
++      db()
++        .from("recurring_donations")
++        .select("id, status, paused_at, cancelled_at, updated_at")
++        .eq("charity_id", id)
++        .in("status", ["paused", "cancelled", "failed"])
++        .gte("updated_at", week.from)
++        .order("id")
++        .range(from, to),
++    ),
++    readPages<{ recurring_id: string | null; status: string; paid_at: string | null }>((from, to) =>
++      db()
++        .from("donations")
++        .select("recurring_id, status, paid_at")
++        .eq("charity_id", id)
++        .not("recurring_id", "is", null)
++        .in("status", ["paid", "refunded", "charged_back"])
++        .gte("paid_at", week.from)
++        .lt("paid_at", week.to)
++        .order("id")
++        .range(from, to),
++    ),
++    // The same rule as canIssue18a: confirmed s18A approval and a signed mandate.
++    charity.is_s18a && charity.mandate_signed_at !== null ? loadS18aWaiting(id, tax.taxYear) : Promise.resolve(null),
++  ]);
++  // Every monthly donation that moved: its first payment decides "started", and whether it counts at all.
++  const ids = [...new Set([...monthlyRows.map((r) => r.id), ...weekPayments.map((p) => p.recurring_id!)])];
++  const statusRows = await loadMonthlyStatus(id, weekPayments.map((p) => p.recurring_id!));
++  const payments: { recurring_id: string | null; status: string; paid_at: string | null }[] = [];
++  for (let i = 0; i < ids.length; i += 200) {
++    payments.push(
++      ...(await readPages<{ recurring_id: string | null; status: string; paid_at: string | null }>((from, to) =>
++        db()
++          .from("donations")
++          .select("recurring_id, status, paid_at")
++          .eq("charity_id", id)
++          .in("recurring_id", ids.slice(i, i + 200))
++          .in("status", ["paid", "refunded", "charged_back"])
++          .lt("paid_at", week.to)
++          .order("id")
++          .range(from, to),
++      )),
++    );
++  }
++  const rows = new Map<string, MonthlyMoveRow>();
++  for (const r of [...statusRows, ...monthlyRows]) rows.set(r.id, r);
++  return {
++    week: giftTotals(gifts, week.from, week.to),
++    before: giftTotals(gifts, week.prevFrom, week.from),
++    monthly: monthlyMoves([...rows.values()], firstPayments(payments), week.from, week.to),
++    s18a,
++    taxYearEnd: tax.end,
++  };
++}
++
++/** The status of the monthly donations paid in the week (to count those that started). */
++async function loadMonthlyStatus(charityId: string, ids: string[]): Promise<MonthlyMoveRow[]> {
++  const unique = [...new Set(ids)];
++  const out: MonthlyMoveRow[] = [];
++  for (let i = 0; i < unique.length; i += 200) {
++    const { data, error } = await db().from("recurring_donations").select("id, status, paused_at, cancelled_at, updated_at").eq("charity_id", charityId).in("id", unique.slice(i, i + 200));
++    if (error) throw error;
++    out.push(...((data ?? []) as MonthlyMoveRow[]));
++  }
++  return out;
++}
++
++/** Paid gifts that asked for an s18A receipt and aren't on an issued one, as the s18A receipts page counts them. */
++async function loadS18aWaiting(charityId: string, currentTaxYear: number) {
++  const gifts = await readPages<{ id: string; status: string; wants_18a: boolean; tax_year: number | null; amount_cents: number; refunded_cents: number | null }>((from, to) =>
++    db()
++      .from("donations")
++      .select("id, status, wants_18a, tax_year, amount_cents, refunded_cents")
++      .eq("charity_id", charityId)
++      .eq("status", "paid")
++      .eq("wants_18a", true)
++      .order("id")
++      .range(from, to),
++  );
++  const onIssued = new Set<string>();
++  for (let i = 0; i < gifts.length; i += 200) {
++    const { data, error } = await db()
++      .from("s18a_receipt_donations")
++      .select("donation_id, s18a_receipts!inner(status)")
++      .in("donation_id", gifts.slice(i, i + 200).map((g) => g.id))
++      .eq("s18a_receipts.status", "issued");
++    if (error) throw error;
++    for (const r of data ?? []) onIssued.add(r.donation_id as string);
++  }
++  return s18aWaiting(gifts, onIssued, currentTaxYear);
++}
++
++// --- The person's own setting --------------------------------------------------------------------------------------
++
++/**
++ * Whether the person gets this charity's weekly email, and whether they can change it here. Null: they aren't on the
++ * team (a Givezy admin looking in), or the setting isn't set up yet (the migration hasn't run).
++ */
++export async function ownWeeklyEmail(charityId: string, userId: string): Promise<{ on: boolean; byDefault: boolean } | null> {
++  const { data, error } = await db().from("charity_admins").select("role, weekly_email").eq("charity_id", charityId).eq("user_id", userId).maybeSingle();
++  if (error) {
++    if (notSetUp(error)) return null;
++    throw error;
++  }
++  if (!data) return null;
++  const role: Role = isRole(data.role) ? data.role : "viewer";
++  const choice = (data.weekly_email as boolean | null) ?? null;
++  return { on: wantsWeekly(role, choice), byDefault: choice === null };
++}
++
++export type SetResult = "done" | "not_member" | "not_set_up";
++
++/** The person's own choice for this charity. Only ever their own row: the caller passes the signed-in person's id. */
++export async function setOwnWeeklyEmail(charityId: string, userId: string, on: boolean): Promise<SetResult> {
++  const { data, error } = await db().from("charity_admins").update({ weekly_email: on }).eq("charity_id", charityId).eq("user_id", userId).select("user_id");
++  if (error) {
++    if (notSetUp(error)) return "not_set_up";
++    throw error;
++  }
++  return data?.length ? "done" : "not_member";
++}
++
++const TOKEN = /^[A-Za-z0-9_-]{43}$/;
++
++/**
++ * The stop link (and a mail app's one-click stop): switches off the weekly email for the person and charity that
++ * email went to, and nothing else. False for a link that was never ours.
++ */
++export async function stopWeeklyEmail(token: string): Promise<boolean> {
++  if (!TOKEN.test(token)) return false;
++  const { data, error } = await db().from("charity_weekly_emails").select("charity_id, user_id").eq("stop_token_hash", sha(token)).maybeSingle();
++  if (error) {
++    if (notSetUp(error)) return false;
++    throw error;
++  }
++  if (!data) return false;
++  const { error: uError } = await db().from("charity_admins").update({ weekly_email: false }).eq("charity_id", data.charity_id).eq("user_id", data.user_id);
++  if (uError) throw uError;
++  // Someone no longer on the team gets no weekly email anyway: the link still says done.
++  return true;
++}
++
++/** For the stop page's "Done": the link's person really has it off for that charity (or has left the team). */
++export async function weeklyEmailStopped(token: string): Promise<boolean> {
++  if (!TOKEN.test(token)) return false;
++  const { data, error } = await db().from("charity_weekly_emails").select("charity_id, user_id").eq("stop_token_hash", sha(token)).maybeSingle();
++  if (error || !data) return false;
++  const { data: member, error: mError } = await db().from("charity_admins").select("weekly_email").eq("charity_id", data.charity_id).eq("user_id", data.user_id).maybeSingle();
++  if (mError) return false;
++  return !member || member.weekly_email === false;
++}
+diff --git a/src/lib/charity/weekly-summary.ts b/src/lib/charity/weekly-summary.ts
+new file mode 100644
+index 0000000..04bafcd
+--- /dev/null
++++ b/src/lib/charity/weekly-summary.ts
+@@ -0,0 +1,322 @@
++/**
++ * The weekly email to a charity's team (Yehuda, 22/11/2026): every Monday morning, last week's figures in a few lines,
++ * with one button to the dashboard. Pure and dependency-free: no database, no clock (the caller passes "now"), so the
++ * week, the figures and the words are tested in one place. The daily job reads the rows and sends
++ * (./weekly-summary-store.ts).
++ *
++ * - The week is Monday 00:00 to Sunday 23:59:59, Johannesburg time (no daylight saving, so always +02:00).
++ * - Figures count gifts the way the dashboard's Overview does (charity_overview): a paid gift counts what is left after
++ *   part refunds, a gift with nothing left or refunded in full is not a gift, and the contribution to Givezy and the
++ *   card charge are never in it. Monthly donations started, stopped and paused follow the Monthly page's own dates
++ *   (charity_monthly_list_full). s18A receipts waiting follow the s18A receipts page (receiptProgress).
++ * - A quiet week (no gifts) still gets a short email with one useful next step. Never guilt wording, never an impact
++ *   figure, never a donor's name, address or amount per donor.
++ */
++import { brandColors as c } from "@/lib/brand-colors";
++import { isoDateInJhb } from "@/lib/dates";
++import { buttonHtml, cardHtml, emailFonts, emailLayout, escHtml, linkify, paragraphHtml } from "@/lib/email/html";
++import type { EmailMessage } from "@/lib/email";
++import { oneClickStopHeaders } from "@/lib/email/headers";
++import { formatRand } from "@/lib/money";
++import { plural } from "@/lib/text";
++import { countsAsGift, leftCents } from "@/lib/donations/what-is-left";
++import type { Role } from "./permissions";
++
++/** The switch: nothing is sent unless WEEKLY_CHARITY_EMAIL is exactly "yes" on the server. */
++export function weeklyEmailSwitchedOn(env: Record<string, string | undefined>): boolean {
++  return env.WEEKLY_CHARITY_EMAIL === "yes";
++}
++
++/**
++ * Monday is the day. The daily job has one minute for everything, so emails it had no time for carry on on Tuesday
++ * and Wednesday (the same week's figures, and never twice: the send log decides). From Thursday that week is left.
++ */
++export const SEND_DAYS = 3;
++
++/** Monday 0 to Sunday 6, for a Johannesburg calendar date (yyyy-mm-dd). */
++export function weekdayOf(isoDate: string): number {
++  const [y, m, d] = isoDate.split("-").map(Number);
++  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
++}
++
++export function addDays(isoDate: string, days: number): string {
++  const [y, m, d] = isoDate.split("-").map(Number);
++  const t = new Date(Date.UTC(y, m - 1, d));
++  t.setUTCDate(t.getUTCDate() + days);
++  return t.toISOString().slice(0, 10);
++}
++
++/** Johannesburg midnight at the start of a calendar date, as a UTC timestamp for the database. */
++export function jhbMidnight(isoDate: string): string {
++  return new Date(`${isoDate}T00:00:00+02:00`).toISOString();
++}
++
++export type ReportWeek = {
++  /** The Monday the week starts on (yyyy-mm-dd, Johannesburg): also the send log's key. */
++  start: string;
++  /** The Sunday it ends on. */
++  end: string;
++  /** From this moment (inclusive) ... */
++  from: string;
++  /** ... to this one (exclusive): the next Monday's midnight. */
++  to: string;
++  /** The week before starts here (and ends at `from`). */
++  prevFrom: string;
++};
++
++/** The last full week (Monday to Sunday) before today in Johannesburg. */
++export function reportWeek(now: Date): ReportWeek {
++  const today = isoDateInJhb(now);
++  const thisMonday = addDays(today, -weekdayOf(today));
++  const start = addDays(thisMonday, -7);
++  return { start, end: addDays(thisMonday, -1), from: jhbMidnight(start), to: jhbMidnight(thisMonday), prevFrom: jhbMidnight(addDays(start, -7)) };
++}
++
++/** Whether the daily job sends today: Monday, or the two days after for what Monday had no time for. */
++export function isSendDay(now: Date): boolean {
++  return weekdayOf(isoDateInJhb(now)) < SEND_DAYS;
++}
++
++/** "16/11/2026" from "2026-11-16". */
++export const dmy = (isoDate: string) => isoDate.split("-").reverse().join("/");
++
++// --- Who gets it ---------------------------------------------------------------------------------------------------
++
++/** Owners and admins get it unless they switch it off; anyone else in the team only if they switch it on. */
++export function weeklyOnByDefault(role: Role): boolean {
++  return role === "owner" || role === "admin";
++}
++
++/** `choice` is the person's own setting: null when they never chose, so their role decides. */
++export function wantsWeekly(role: Role, choice: boolean | null): boolean {
++  return choice ?? weeklyOnByDefault(role);
++}
++
++export type WeeklyMember = { userId: string; role: Role; weeklyEmail: boolean | null; email: string | null };
++
++/** The team members who get this charity's weekly email: wanted, with an address. */
++export function weeklyRecipients<T extends WeeklyMember>(members: T[]): T[] {
++  return members.filter((m) => wantsWeekly(m.role, m.weeklyEmail) && Boolean(m.email?.trim()));
++}
++
++// --- The figures ---------------------------------------------------------------------------------------------------
++
++const within = (iso: string | null | undefined, from: string, to: string) => {
++  if (!iso) return false;
++  const t = Date.parse(iso);
++  return t >= Date.parse(from) && t < Date.parse(to);
++};
++
++export type GiftRow = { donor_id: string | null; status: string; amount_cents: number | string; refunded_cents?: number | string | null; paid_at: string | null };
++export type GiftTotals = { cents: number; gifts: number; donors: number };
++
++/** Paid gifts in [from, to), as the Overview counts them: what is left of each, and only gifts with something left. */
++export function giftTotals(rows: GiftRow[], from: string, to: string): GiftTotals {
++  let cents = 0;
++  let gifts = 0;
++  const donors = new Set<string>();
++  for (const g of rows) {
++    if (!countsAsGift(g) || !within(g.paid_at, from, to)) continue;
++    cents += leftCents(g);
++    gifts += 1;
++    if (g.donor_id) donors.add(g.donor_id);
++  }
++  return { cents, gifts, donors: donors.size };
++}
++
++/** Each monthly donation's first payment (paid, refunded or charged back), as the Monthly page dates "started". */
++export function firstPayments(rows: { recurring_id: string | null; status: string; paid_at: string | null }[]): Map<string, string> {
++  const out = new Map<string, string>();
++  for (const r of rows) {
++    if (!r.recurring_id || !r.paid_at || !["paid", "refunded", "charged_back"].includes(r.status)) continue;
++    const had = out.get(r.recurring_id);
++    if (!had || Date.parse(r.paid_at) < Date.parse(had)) out.set(r.recurring_id, r.paid_at);
++  }
++  return out;
++}
++
++export type MonthlyMoveRow = { id: string; status: string; paused_at: string | null; cancelled_at: string | null; updated_at: string | null };
++export type MonthlyMoves = { started: number; stopped: number; paused: number };
++
++/**
++ * Monthly donations that started (first payment), stopped (cancelled or failed for good) or paused in [from, to).
++ * Only monthly donations with a payment count, as on the Monthly page; a stop is dated as the page dates it.
++ */
++export function monthlyMoves(rows: MonthlyMoveRow[], firstPaid: Map<string, string>, from: string, to: string): MonthlyMoves {
++  const out: MonthlyMoves = { started: 0, stopped: 0, paused: 0 };
++  for (const r of rows) {
++    const first = firstPaid.get(r.id);
++    if (!first) continue;
++    if (within(first, from, to) && ["active", "paused", "failed", "cancelled"].includes(r.status)) out.started += 1;
++    if ((r.status === "cancelled" || r.status === "failed") && within(r.cancelled_at ?? r.updated_at, from, to)) out.stopped += 1;
++    if (r.status === "paused" && within(r.paused_at, from, to)) out.paused += 1;
++  }
++  return out;
++}
++
++export type S18aWaiting = { gifts: number; pastYears: number };
++
++/**
++ * Paid gifts that asked for an s18A receipt and aren't on an issued one yet (as the s18A receipts page counts them:
++ * what is left, a gift with nothing left needs none). `pastYears`: of those, from tax years that have ended, so they
++ * are ready for the yearly run; this year's wait until the tax year ends.
++ */
++export function s18aWaiting(
++  gifts: { id: string; status: string; wants_18a: boolean; tax_year: number | null; amount_cents: number | string; refunded_cents?: number | string | null }[],
++  onIssued: Set<string>,
++  currentTaxYear: number,
++): S18aWaiting {
++  const out: S18aWaiting = { gifts: 0, pastYears: 0 };
++  for (const g of gifts) {
++    if (!countsAsGift(g) || !g.wants_18a || g.tax_year === null || onIssued.has(g.id)) continue;
++    out.gifts += 1;
++    if (g.tax_year < currentTaxYear) out.pastYears += 1;
++  }
++  return out;
++}
++
++export type WeekFigures = {
++  week: GiftTotals;
++  before: GiftTotals;
++  monthly: MonthlyMoves;
++  /** Null when the charity doesn't issue s18A receipts through Givezy. */
++  s18a: S18aWaiting | null;
++  /** The last day of this tax year (yyyy-mm-dd): when this year's receipts can be issued after. */
++  taxYearEnd: string;
++};
++
++// --- A quiet week's next step ----------------------------------------------------------------------------------------
++
++export type PageFacts = {
++  logo_path: string | null;
++  cover_path: string | null;
++  description_en: string | null;
++  funds_use_en: string | null;
++};
++export type NextStep = { text: string; url: string };
++
++/** One useful thing to do in a quiet week: finish the page first, otherwise share it. Never a guilt line. */
++export function quietNextStep(page: PageFacts, dashboardUrl: string, publicUrl: string): NextStep {
++  if (!page.logo_path || !page.cover_path) return { text: "Add your logo and a cover photo, so donors recognise you faster", url: `${dashboardUrl}/profile` };
++  if (!page.description_en?.trim() || !page.funds_use_en?.trim()) return { text: "Tell donors what you do and where gifts go, on your page", url: `${dashboardUrl}/profile` };
++  return { text: "Share your Givezy page with your supporters, for example in a WhatsApp group or your newsletter", url: publicUrl };
++}
++
++// --- The email -------------------------------------------------------------------------------------------------------
++
++export const WEEKLY_BUTTON = "Open your dashboard";
++
++/** "Your week on Givezy: R3 400 from 12 gifts", or "Your week on Givezy" when nothing came in. */
++export function weeklySubject(week: GiftTotals): string {
++  return week.gifts > 0 ? `Your week on Givezy: ${formatRand(week.cents)} from ${plural(week.gifts, "gift")}` : "Your week on Givezy";
++}
++
++/** The week before, in plain words, only when it had gifts (no percentages, no "down" to read into). */
++export function beforeLine(before: GiftTotals): string | null {
++  return before.gifts > 0 ? `The week before: ${formatRand(before.cents)} from ${plural(before.gifts, "gift")}.` : null;
++}
++
++export function s18aLine(s: S18aWaiting | null, taxYearEnd: string): string | null {
++  if (!s || s.gifts === 0) return null;
++  if (s.pastYears > 0) return `${plural(s.pastYears, "gift")} from a tax year that has ended ${s.pastYears === 1 ? "is" : "are"} ready for its s18A receipt. Check and approve the list on your s18A receipts page.`;
++  return `This tax year's s18A receipts are issued after it ends on ${dmy(taxYearEnd)}.`;
++}
++
++export type WeeklyEmailArgs = {
++  to: string;
++  charityName: string;
++  week: ReportWeek;
++  figures: WeekFigures;
++  /** Shown only in a quiet week. */
++  nextStep: NextStep;
++  dashboardUrl: string;
++  stopUrl: string;
++  /** The address a mail app's own Unsubscribe posts to (List-Unsubscribe). */
++  oneClickUrl?: string;
++  siteUrl?: string;
++};
++
++/** The rows of the figures card, label and value, in the order they read. */
++export function figureRows(f: WeekFigures): { label: string; value: string }[] {
++  const rows = [
++    { label: "Received", value: formatRand(f.week.cents) },
++    { label: "Paid gifts", value: String(f.week.gifts) },
++    { label: "Donors", value: String(f.week.donors) },
++    { label: "New monthly donations", value: String(f.monthly.started) },
++    { label: "Monthly donations stopped or paused", value: String(f.monthly.stopped + f.monthly.paused) },
++  ];
++  if (f.s18a && f.s18a.gifts > 0) rows.push({ label: "Waiting for an s18A receipt", value: plural(f.s18a.gifts, "gift") });
++  return rows;
++}
++
++/** The plain-text email, and the same words laid out as HTML. */
++export function weeklyEmail(a: WeeklyEmailArgs): EmailMessage {
++  const f = a.figures;
++  const quiet = f.week.gifts === 0;
++  const period = `Monday ${dmy(a.week.start)} to Sunday ${dmy(a.week.end)}`;
++  const intro = `For ${a.charityName}, ${period}.`;
++  const quietLine = "No gifts came in last week.";
++  const before = beforeLine(f.before);
++  const s18a = s18aLine(f.s18a, f.taxYearEnd);
++  const onlyGifts = "Gifts only: contributions to Givezy and card charges aren't included, and refunded gifts are left out.";
++  const footer = `You get this every Monday because you're on the team for ${a.charityName} on Givezy.`;
++  const stopText = `Switch off the weekly email: ${a.stopUrl}`;
++  const button = `${WEEKLY_BUTTON}: ${a.dashboardUrl}`;
++
++  // A quiet week shows only what moved (monthly donations, s18A receipts), not a card of zeros.
++  const quietRows = [
++    ...(f.monthly.started ? [`New monthly donations: ${f.monthly.started}`] : []),
++    ...(f.monthly.stopped + f.monthly.paused ? [`Monthly donations stopped or paused: ${f.monthly.stopped + f.monthly.paused}`] : []),
++    ...(f.s18a && f.s18a.gifts ? [`Waiting for an s18A receipt: ${plural(f.s18a.gifts, "gift")}`] : []),
++  ];
++
++  const text = [
++    intro,
++    "",
++    ...(quiet
++      ? [quietLine, ...(before ? [before] : []), "", ...(quietRows.length ? [...quietRows, ""] : []), ...(s18a ? [s18a, ""] : []), `A next step: ${a.nextStep.text}.`, a.nextStep.url, ""]
++      : [...figureRows(f).map((r) => `${r.label}: ${r.value}`), "", ...(before ? [before] : []), ...(s18a ? [s18a] : []), onlyGifts, ""]),
++    button,
++    "",
++    "The Givezy team",
++    "",
++    footer,
++    stopText,
++  ].join("\n");
++
++  const name = `<span dir="auto" style="font-weight:700">${escHtml(a.charityName)}</span>`;
++  const small = (inner: string) => `<p style="margin:0 0 8px;color:${c.muted};font-size:14px;line-height:1.5">${inner}</p>`;
++  const blocks: string[] = [paragraphHtml(`For ${name}, ${escHtml(period)}.`)];
++  if (quiet) {
++    blocks.push(paragraphHtml(escHtml(quietLine) + (before ? `<br>${linkify(before)}` : "")));
++    if (quietRows.length) blocks.push(cardHtml(quietRows.map((r) => ({ label: r.split(": ")[0], value: r.split(": ").slice(1).join(": ") }))));
++    if (s18a) blocks.push(paragraphHtml(linkify(s18a)));
++    blocks.push(
++      `<p style="margin:0 0 20px;color:${c.ink};font-size:16px;line-height:1.55"><span style="font-family:${emailFonts.heading};font-weight:700">A next step:</span> ${escHtml(a.nextStep.text)}. <a href="${escHtml(a.nextStep.url)}" style="color:${c.blue};text-decoration:underline;word-break:break-word;overflow-wrap:anywhere">${escHtml(nextStepLinkWords(a.nextStep, a.dashboardUrl))}</a></p>`,
++    );
++  } else {
++    blocks.push(cardHtml(figureRows(f)));
++    if (before) blocks.push(paragraphHtml(linkify(before)));
++    if (s18a) blocks.push(paragraphHtml(linkify(s18a)));
++    blocks.push(paragraphHtml(escHtml(onlyGifts), { muted: true }));
++  }
++  blocks.push(buttonHtml(WEEKLY_BUTTON, a.dashboardUrl));
++  blocks.push(paragraphHtml("The Givezy team", { muted: true }));
++  blocks.push(`<hr style="border:0;border-top:1px solid ${c.hairline};margin:8px 0 16px">`);
++  blocks.push(small(`You get this every Monday because you're on the team for ${name} on Givezy.`));
++  blocks.push(small(`<a href="${escHtml(a.stopUrl)}" style="color:${c.muted};text-decoration:underline">Switch off the weekly email</a>. You can switch it back on from your dashboard's Team page.`));
++
++  const subject = weeklySubject(f.week);
++  return {
++    to: a.to,
++    subject,
++    text,
++    html: emailLayout({ title: "Your week on Givezy", siteUrl: a.siteUrl, bodyHtml: blocks.join("\n") }),
++    ...(a.oneClickUrl ? { headers: oneClickStopHeaders(a.oneClickUrl) } : {}),
++  };
++}
++
++/** The link's own words in a quiet week's next step. */
++function nextStepLinkWords(step: NextStep, dashboardUrl: string): string {
++  return step.url.startsWith(`${dashboardUrl}/`) ? "Edit your page" : "See your page";
++}
+diff --git a/src/lib/email/headers.ts b/src/lib/email/headers.ts
+index a600139..99bd883 100644
+--- a/src/lib/email/headers.ts
++++ b/src/lib/email/headers.ts
+@@ -1,12 +1,13 @@
+ /**
+  * One-click stop (RFC 8058), which Gmail and Yahoo ask of bulk mail: the mail app shows its own
+  * "Unsubscribe" and POSTs to this address, with no page and no second step. Only on charities' emails
+- * to donors (news and appeals, thank-yous), never on sign-in codes or receipts. The address carries
+- * the same token as the stop link in the email; see /api/stop/news and /api/stop/thanks.
++ * to donors (news and appeals, thank-yous) and the weekly email to charities' teams, never on sign-in codes or
++ * receipts. The address carries the same token as the stop link in the email; see /api/stop/news, /api/stop/thanks
++ * and /api/stop/weekly.
+  */
+ 
+ /** The address a mail app POSTs to, for the stop link's token. */
+-export function oneClickStopUrl(site: string, kind: "news" | "thanks", token: string): string {
++export function oneClickStopUrl(site: string, kind: "news" | "thanks" | "weekly", token: string): string {
+   return `${site.replace(/\/+$/, "")}/api/stop/${kind}?t=${encodeURIComponent(token)}`;
+ }
+ 
+diff --git a/src/lib/email/one-click-stop.ts b/src/lib/email/one-click-stop.ts
+index 15dc543..89d6998 100644
+--- a/src/lib/email/one-click-stop.ts
++++ b/src/lib/email/one-click-stop.ts
+@@ -47,7 +47,7 @@ async function hasOneClickBody(request: NextRequest): Promise<boolean> {
+ }
+ 
+ /** Opening the address in a browser: the page that asks first, with the same token. */
+-export function toStopPage(request: NextRequest, page: "/news/stop" | "/thanks/stop"): NextResponse {
++export function toStopPage(request: NextRequest, page: "/news/stop" | "/thanks/stop" | "/weekly-email/stop"): NextResponse {
+   const token = request.nextUrl.searchParams.get("t") ?? "";
+   const url = new URL(page, process.env.SITE_URL || request.nextUrl.origin);
+   if (token) url.searchParams.set("t", token);
+diff --git a/src/lib/email/samples.ts b/src/lib/email/samples.ts
+index a4833ab..6a9f0d7 100644
+--- a/src/lib/email/samples.ts
++++ b/src/lib/email/samples.ts
+@@ -14,6 +14,7 @@ import { oneDonorThankYouEmail, thankYouEmail } from "@/lib/charity/thank-you";
+ import { journeyEmail } from "@/lib/charity/journey";
+ import { appealEmail } from "@/lib/charity/appeals-rules";
+ import { joinedEmail } from "@/lib/charity-requests";
++import { weeklyEmail, type WeekFigures } from "@/lib/charity/weekly-summary";
+ import {
+   adminRemovedEmail,
+   applicationReceivedEmail,
+@@ -69,6 +70,16 @@ export function sampleReceiptDetails(): ReceiptDetails {
+   };
+ }
+ 
++/** The weekly email's sample week and figures (made up). */
++const SAMPLE_WEEK = { start: "2026-11-16", end: "2026-11-22", from: "2026-11-15T22:00:00.000Z", to: "2026-11-22T22:00:00.000Z", prevFrom: "2026-11-08T22:00:00.000Z" };
++const SAMPLE_BUSY_WEEK: WeekFigures = {
++  week: { cents: 340_000, gifts: 12, donors: 9 },
++  before: { cents: 210_000, gifts: 8, donors: 7 },
++  monthly: { started: 2, stopped: 0, paused: 1 },
++  s18a: { gifts: 23, pastYears: 0 },
++  taxYearEnd: "2027-02-28",
++};
++
+ /** Every email, addressed to `to`, with "[Sample]" in front of its subject. `base` is the site address in links. */
+ export function sampleEmails(to: string, base: string): EmailMessage[] {
+   const c = SAMPLE.charity;
+@@ -108,6 +119,8 @@ export function sampleEmails(to: string, base: string): EmailMessage[] {
+     contactPhoneChangedEmail(to, c, "082 000 0000"),
+     secondStepResetEmail(to),
+     adminRemovedEmail(to, c),
++    weeklyEmail({ to, charityName: c, week: SAMPLE_WEEK, figures: SAMPLE_BUSY_WEEK, nextStep: { text: "Share your Givezy page with your supporters", url: `${base}/c/demo-charity` }, dashboardUrl: `${base}/charity-admin/${id}`, stopUrl: `${base}/weekly-email/stop`, siteUrl: base }),
++    weeklyEmail({ to, charityName: c, week: SAMPLE_WEEK, figures: { ...SAMPLE_BUSY_WEEK, week: { cents: 0, gifts: 0, donors: 0 }, monthly: { started: 0, stopped: 1, paused: 0 } }, nextStep: { text: "Share your Givezy page with your supporters", url: `${base}/c/demo-charity` }, dashboardUrl: `${base}/charity-admin/${id}`, stopUrl: `${base}/weekly-email/stop`, siteUrl: base }),
+     suspendedEmail(to, c, id, "We could not confirm your registration.", base),
+     reinstatedEmail(to, c, id, true, base),
+     // Givezy's own team
+diff --git a/src/lib/ops/settings-check.ts b/src/lib/ops/settings-check.ts
+index 12897c4..aa54da1 100644
+--- a/src/lib/ops/settings-check.ts
++++ b/src/lib/ops/settings-check.ts
+@@ -90,6 +90,8 @@ export function settingsCheck(env: Env): SettingCheck[] {
+   add("GIVING_PAUSED", env.GIVING_PAUSED === "yes" ? "fix" : "ok", env.GIVING_PAUSED === "yes" ? "ON: giving is paused everywhere and nobody can give. Remove it in Vercel (Settings, Environment Variables) and redeploy to open giving again." : "Off: giving is open.");
+   add("APP_GIVING", env.APP_GIVING === "yes" ? "later" : "ok", env.APP_GIVING === "yes" ? "On: the app can take gifts. Keep it off until Apple and Google confirm in writing." : "Off: the app sends people to the website to give.");
+   add("SAVED_CARDS", env.SAVED_CARDS === "yes" ? "later" : "ok", env.SAVED_CARDS === "yes" ? "On. Off for launch until the consent wording is agreed." : "Off.");
++  // The weekly email to charities' teams (22/11/2026): needs migration 20261122000003 on the database first.
++  add("WEEKLY_CHARITY_EMAIL", env.WEEKLY_CHARITY_EMAIL === "yes" ? "ok" : "later", env.WEEKLY_CHARITY_EMAIL === "yes" ? "On: charities' owners and admins get last week's figures every Monday morning." : "Off: charities' teams don't get the Monday email with last week's figures. Set it to yes once its migration is on the database (docs/go-live-checklist.md).");
+   const receipts = env.RECEIPTS_ENABLED === "yes" && env.RECEIPT_WORDING_CONFIRMED === "yes";
+   add("RECEIPTS_ENABLED", receipts ? "ok" : "later", receipts ? "On: s18A receipts are issued." : "Off: s18A receipts stay drafts until Yosef approves the wording.");
+   return out;
+diff --git a/supabase/migrations/20261122000003_charity_weekly_email.sql b/supabase/migrations/20261122000003_charity_weekly_email.sql
+new file mode 100644
+index 0000000..71eb4eb
+--- /dev/null
++++ b/supabase/migrations/20261122000003_charity_weekly_email.sql
+@@ -0,0 +1,52 @@
++-- Givezy: the weekly email to a charity's team (Yehuda, 22/11/2026).
++--
++-- Every Monday morning the daily job emails a charity's owners and admins last week's figures (gifts received, gifts,
++-- donors, monthly donations started, stopped or paused, gifts waiting for an s18A receipt) with one button to the
++-- dashboard. Other team members can switch it on for themselves; owners and admins can switch it off for themselves.
++-- Only approved charities. Off unless WEEKLY_CHARITY_EMAIL=yes on the server. The code runs without this migration
++-- (it then sends nothing and logs one line).
++--
++-- 1. charity_admins.weekly_email: the person's own choice for this charity. Null means they never chose, so their role
++--    decides (on for owner and admin, off for the rest). Written only by the server (service role) after it checked
++--    the signed-in person is changing their own row, or by the stop link in the email. Browsers already can't update
++--    charity_admins (only the platform-admin policy allows it), and this adds no policy.
++-- 2. charity_weekly_emails: the send log. One row per charity, person and week (the Monday it starts), written BEFORE
++--    the email is sent, so a second run of the daily job (or one after a crash part-way) never emails anyone twice
++--    for the same week: the primary key refuses the second claim. A send that surely didn't go deletes its row so a
++--    later run can try again; one that may have gone stays and is never repeated. stop_token_hash is the sha256 of the
++--    random token in that email's "Switch off the weekly email" link, which switches off exactly that person's weekly
++--    email for exactly that charity, and nothing else. No email address, name or amount is stored here.
++--    Server-only: row-level security on, no browser policy, every browser privilege revoked.
++
++-- 1 -----------------------------------------------------------------------------------------------------------
++alter table public.charity_admins add column if not exists weekly_email boolean;
++
++comment on column public.charity_admins.weekly_email is
++  'The person''s own choice for the weekly email (22/11/2026). Null: never chose, so the role decides (on for owner and admin). Server-only writes.';
++
++-- 2 -----------------------------------------------------------------------------------------------------------
++create table public.charity_weekly_emails (
++  charity_id uuid not null references public.charities (id) on delete cascade,
++  user_id uuid not null references auth.users (id) on delete cascade,
++  -- The Monday (Johannesburg) the reported week starts on.
++  week_start date not null constraint charity_weekly_emails_monday check (extract(isodow from week_start) = 1),
++  -- sending: claimed, the send started (if it stays so, it may have gone and is never repeated).
++  outcome text not null default 'sending'
++    constraint charity_weekly_emails_outcome check (outcome in ('sending', 'sent', 'skipped', 'maybe_sent')),
++  stop_token_hash text not null constraint charity_weekly_emails_token check (stop_token_hash ~ '^[0-9a-f]{64}$'),
++  claimed_at timestamptz not null default now(),
++  finished_at timestamptz,
++  primary key (charity_id, user_id, week_start)
++);
++
++create unique index charity_weekly_emails_token on public.charity_weekly_emails (stop_token_hash);
++create index charity_weekly_emails_week on public.charity_weekly_emails (week_start);
++
++alter table public.charity_weekly_emails enable row level security;
++-- No policies: only the service role reaches it.
++revoke all on public.charity_weekly_emails from anon, authenticated;
++create policy no_password_sessions on public.charity_weekly_emails as restrictive for all to authenticated
++  using (public.signed_in_without_password()) with check (public.signed_in_without_password());
++
++comment on table public.charity_weekly_emails is
++  'The weekly email to charities'' teams, one row per charity, person and week, claimed before sending so nobody gets it twice (22/11/2026). Server-only.';
+diff --git a/tests/stop-done.test.ts b/tests/stop-done.test.ts
+index f954db4..0a11cd0 100644
+--- a/tests/stop-done.test.ts
++++ b/tests/stop-done.test.ts
+@@ -5,7 +5,7 @@
+ import { renderToStaticMarkup } from "react-dom/server";
+ import { beforeEach, describe, expect, it, vi } from "vitest";
+ 
+-const stopped = vi.hoisted(() => ({ thanks: false, news: false, fail: false }));
++const stopped = vi.hoisted(() => ({ thanks: false, news: false, weekly: false, fail: false }));
+ vi.mock("@/lib/charity/thank-you-send", () => ({
+   thankYousStopped: async () => {
+     if (stopped.fail) throw new Error("database down");
+@@ -18,11 +18,19 @@ vi.mock("@/lib/charity/appeals", () => ({
+     return stopped.news;
+   },
+ }));
++vi.mock("@/lib/charity/weekly-summary-store", () => ({
++  weeklyEmailStopped: async () => {
++    if (stopped.fail) throw new Error("database down");
++    return stopped.weekly;
++  },
++}));
++vi.mock("@/app/weekly-email/stop/actions", () => ({ confirmStopWeekly: async () => {} }));
+ vi.mock("@/app/thanks/stop/actions", () => ({ confirmStop: async () => {} }));
+ vi.mock("@/app/news/stop/actions", () => ({ confirmStopNews: async () => {} }));
+ 
+ const { default: StopThanksPage } = await import("@/app/thanks/stop/page");
+ const { default: StopNewsPage } = await import("@/app/news/stop/page");
++const { default: StopWeeklyPage } = await import("@/app/weekly-email/stop/page");
+ 
+ const props = (sp: Record<string, string>) => ({ searchParams: Promise.resolve(sp), params: Promise.resolve({}) }) as never;
+ const TOKEN = "a".repeat(43);
+@@ -30,6 +38,7 @@ const TOKEN = "a".repeat(43);
+ beforeEach(() => {
+   stopped.thanks = false;
+   stopped.news = false;
++  stopped.weekly = false;
+   stopped.fail = false;
+ });
+ 
+@@ -37,6 +46,7 @@ describe("Stop emails: Done only after a real stop", () => {
+   for (const [name, Page, button, flag] of [
+     ["thanks/stop", StopThanksPage, "Stop emails from charities", "thanks"],
+     ["news/stop", StopNewsPage, "Stop these emails", "news"],
++    ["weekly-email/stop", StopWeeklyPage, "Switch off the weekly email", "weekly"],
+   ] as const) {
+     it(`${name}: ?done=1 on its own says nothing was stopped`, async () => {
+       const html = renderToStaticMarkup(await Page(props({ done: "1" })));
+diff --git a/tests/weekly-summary-db.test.ts b/tests/weekly-summary-db.test.ts
+new file mode 100644
+index 0000000..9259810
+--- /dev/null
++++ b/tests/weekly-summary-db.test.ts
+@@ -0,0 +1,127 @@
++/**
++ * The weekly email's tables (migration 20261122000003, 22/11/2026): one row per charity, person and week, so the same
++ * email can never be claimed twice; only Mondays as a week's start; server-only (no browser reads or writes the send
++ * log); the person's own choice on charity_admins can't be changed from a browser; and the role rule the daily job
++ * applies (owners and admins unless they chose off, others only when they chose on), checked against real rows.
++ * Needs the local Supabase, seeded, with the migration applied.
++ */
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import pg from "pg";
++import { wantsWeekly } from "@/lib/charity/weekly-summary";
++import { isRole } from "@/lib/charity/permissions";
++
++const client = new pg.Client({ connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres" });
++const run = (sql: string, args: unknown[] = []) => client.query(sql, args);
++let ids: Record<string, string>;
++beforeAll(async () => {
++  await client.connect();
++  const one = async (sql: string, a: unknown[]) => (await run(sql, a)).rows[0].id as string;
++  ids = {
++    mealsAdmin: await one("select id from auth.users where email = $1", ["meals.admin@nedivlev.test"]),
++    hallAdmin: await one("select id from auth.users where email = $1", ["hall.admin@nedivlev.test"]),
++    meals: await one("select id from public.charities where slug = $1", ["northcliff-meals-fund"]),
++  };
++});
++afterAll(() => client.end());
++
++async function tx(fn: () => Promise<void>) {
++  await run("begin");
++  try {
++    await fn();
++  } finally {
++    await run("rollback");
++  }
++}
++async function as(who: string | null) {
++  await run("reset role");
++  if (!who) return run("set local role anon");
++  await run("set local role authenticated");
++  await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: who, role: "authenticated", aal: "aal2", amr: [{ method: "otp" }] })]);
++}
++async function refused(sql: string, args: unknown[], pattern: RegExp) {
++  await run("savepoint s");
++  await expect(run(sql, args)).rejects.toThrow(pattern);
++  await run("rollback to savepoint s");
++}
++const claim = "insert into public.charity_weekly_emails (charity_id, user_id, week_start, stop_token_hash) values ($1, $2, $3, $4)";
++
++describe("the weekly email's send log", () => {
++  it("one claim per charity, person and week: a second claim is refused, the next week is fine", async () => {
++    await tx(async () => {
++      await run(claim, [ids.meals, ids.mealsAdmin, "2026-11-16", "a".repeat(64)]);
++      await refused(claim, [ids.meals, ids.mealsAdmin, "2026-11-16", "b".repeat(64)], /duplicate key/);
++      await run(claim, [ids.meals, ids.mealsAdmin, "2026-11-23", "c".repeat(64)]);
++      await run(claim, [ids.meals, ids.hallAdmin, "2026-11-16", "d".repeat(64)]);
++      // A stop token belongs to one email only.
++      await refused(claim, [ids.meals, ids.hallAdmin, "2026-11-23", "a".repeat(64)], /duplicate key/);
++    });
++  });
++
++  it("a week starts on a Monday, and the outcome and token are in shape", async () => {
++    await tx(async () => {
++      await refused(claim, [ids.meals, ids.mealsAdmin, "2026-11-17", "a".repeat(64)], /charity_weekly_emails_monday/);
++      await refused(claim, [ids.meals, ids.mealsAdmin, "2026-11-16", "not-a-hash"], /charity_weekly_emails_token/);
++      await run(claim, [ids.meals, ids.mealsAdmin, "2026-11-16", "a".repeat(64)]);
++      await refused("update public.charity_weekly_emails set outcome = 'maybe' where charity_id = $1", [ids.meals], /charity_weekly_emails_outcome/);
++    });
++  });
++
++  it("is closed to every browser: visitors and the charity's own team can neither read nor write it", async () => {
++    await tx(async () => {
++      await run(claim, [ids.meals, ids.mealsAdmin, "2026-11-16", "a".repeat(64)]);
++      for (const who of [null, ids.mealsAdmin]) {
++        await as(who);
++        await refused("select * from public.charity_weekly_emails", [], /permission denied/);
++        await refused(claim, [ids.meals, ids.mealsAdmin, "2026-11-23", "b".repeat(64)], /permission denied/);
++        await refused("delete from public.charity_weekly_emails", [], /permission denied/);
++        await run("reset role");
++      }
++    });
++  });
++
++  it("has row-level security on and no policy that lets a browser in", async () => {
++    const t = (await run("select relrowsecurity from pg_class where oid = 'public.charity_weekly_emails'::regclass")).rows[0];
++    expect(t.relrowsecurity).toBe(true);
++    const policies = (await run("select policyname, permissive from pg_policies where schemaname = 'public' and tablename = 'charity_weekly_emails'")).rows;
++    expect(policies).toEqual([{ policyname: "no_password_sessions", permissive: "RESTRICTIVE" }]);
++  });
++});
++
++describe("the person's own choice", () => {
++  it("starts unset (the role decides) and can't be changed from a browser, even by that person", async () => {
++    await tx(async () => {
++      const before = (await run("select weekly_email from public.charity_admins where charity_id = $1 and user_id = $2", [ids.meals, ids.mealsAdmin])).rows[0];
++      expect(before.weekly_email).toBeNull();
++      await as(ids.mealsAdmin);
++      // Either refused outright or no row changed: browsers have no update policy on charity_admins.
++      await run("savepoint u");
++      const changed = await run("update public.charity_admins set weekly_email = false where charity_id = $1 and user_id = $2", [ids.meals, ids.mealsAdmin]).then(
++        (r) => r.rowCount,
++        () => 0,
++      );
++      await run("rollback to savepoint u");
++      expect(changed).toBe(0);
++    });
++  });
++
++  it("the daily job's rule on real rows: owners and admins unless off, other roles only when on", async () => {
++    await tx(async () => {
++      const team = (await run("select role::text as role, weekly_email from public.charity_admins where charity_id = $1", [ids.meals])).rows as { role: string; weekly_email: boolean | null }[];
++      expect(team.length).toBeGreaterThan(0);
++      for (const m of team) {
++        const role = isRole(m.role) ? m.role : "viewer";
++        expect(wantsWeekly(role, m.weekly_email)).toBe(m.weekly_email ?? (role === "owner" || role === "admin"));
++      }
++      await run("update public.charity_admins set weekly_email = false where charity_id = $1 and user_id = $2", [ids.meals, ids.mealsAdmin]);
++      const after = (await run("select role::text as role, weekly_email from public.charity_admins where charity_id = $1 and user_id = $2", [ids.meals, ids.mealsAdmin])).rows[0];
++      expect(wantsWeekly(isRole(after.role) ? after.role : "viewer", after.weekly_email)).toBe(false);
++    });
++  });
++
++  it("deleting a charity or a person's sign-in removes their send log rows with them", async () => {
++    const fk = (await run(
++      "select confdeltype from pg_constraint where conrelid = 'public.charity_weekly_emails'::regclass and contype = 'f' order by conname",
++    )).rows.map((r) => r.confdeltype);
++    expect(fk).toEqual(["c", "c"]);
++  });
++});
+diff --git a/tests/weekly-summary-run.test.ts b/tests/weekly-summary-run.test.ts
+new file mode 100644
+index 0000000..8da0e19
+--- /dev/null
++++ b/tests/weekly-summary-run.test.ts
+@@ -0,0 +1,247 @@
++/**
++ * The weekly email's run (22/11/2026), with the database and email faked: only approved charities, owners and admins by
++ * default (others when they switch it on, anyone can switch theirs off), never twice for the same charity, person and
++ * week (a second run, a run after a crash part-way, two runs at once), a send that surely didn't go is tried again,
++ * one that may have gone is not, the switch and the missing migration send nothing, and the stop link switches off
++ * exactly one person's email for one charity.
++ */
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++vi.mock("server-only", () => ({}));
++
++type Row = Record<string, unknown>;
++let tables: Record<string, Row[]> = {};
++let missing: { table?: string; column?: string } = {};
++let sendMode: "ok" | "surely" | "maybe" | "skipped" = "ok";
++let transportName = "resend";
++const sent: { to: string; subject: string; text: string; headers?: Record<string, string> }[] = [];
++
++function q(table: string) {
++  const filters: ((r: Row) => boolean)[] = [];
++  let op: "select" | "update" | "delete" = "select";
++  let patch: Row = {};
++  let cols = "";
++  let range: [number, number] | null = null;
++  const b: Record<string, unknown> = {};
++  const rows = () => (tables[table] ??= []);
++  const err = () => {
++    if (missing.table === table) return { code: "PGRST205", message: "not in the schema cache" };
++    if (missing.column && table === "charity_admins" && (cols.includes(missing.column) || missing.column in patch)) return { code: "42703", message: "column does not exist" };
++    return null;
++  };
++  b.select = (c = "") => ((cols = op === "select" ? c : cols), b);
++  b.eq = (c: string, v: unknown) => (filters.push((r) => r[c] === v), b);
++  b.in = (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), b);
++  b.gte = (c: string, v: string) => (filters.push((r) => typeof r[c] === "string" && Date.parse(r[c] as string) >= Date.parse(v)), b);
++  b.lt = (c: string, v: string) => (filters.push((r) => typeof r[c] === "string" && Date.parse(r[c] as string) < Date.parse(v)), b);
++  b.not = (c: string) => (filters.push((r) => r[c] !== null && r[c] !== undefined), b);
++  b.match = (m: Row) => (filters.push((r) => Object.entries(m).every(([k, v]) => r[k] === v)), b);
++  b.order = () => b;
++  b.limit = () => b;
++  b.range = (from: number, to: number) => ((range = [from, to]), b);
++  b.update = (p: Row) => ((op = "update"), (patch = p), b);
++  b.delete = () => ((op = "delete"), b);
++  b.insert = async (row: Row) => {
++    if (missing.table === table) return { error: { code: "PGRST205", message: "missing" } };
++    if (table === "charity_weekly_emails" && rows().some((r) => r.charity_id === row.charity_id && r.user_id === row.user_id && r.week_start === row.week_start)) {
++      return { error: { code: "23505", message: "duplicate key" } };
++    }
++    rows().push({ outcome: "sending", ...row });
++    return { error: null };
++  };
++  const run = () => {
++    const e = err();
++    if (e) return { data: null, error: e };
++    const hit = rows().filter((r) => filters.every((f) => f(r)));
++    if (op === "update") for (const r of hit) Object.assign(r, patch);
++    if (op === "delete") tables[table] = rows().filter((r) => !hit.includes(r));
++    const data = range ? hit.slice(range[0], range[1] + 1) : hit;
++    return { data: data.map((r) => ({ ...r })), error: null };
++  };
++  b.maybeSingle = async () => {
++    const r = run();
++    return { data: r.data?.[0] ?? null, error: r.error };
++  };
++  b.then = (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve(run()).then(ok, bad);
++  return b;
++}
++
++vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: q }) }));
++vi.mock("@/lib/email", () => {
++  class EmailMaybeSent extends Error {}
++  return {
++    EmailMaybeSent,
++    maskEmail: (s: string) => s,
++    getEmailTransport: () => ({
++      name: transportName,
++      send: async (m: { to: string; subject: string; text: string; headers?: Record<string, string> }) => {
++        if (sendMode === "surely") throw new Error("refused");
++        if (sendMode === "skipped") return "skipped";
++        sent.push(m);
++        if (sendMode === "maybe") throw new EmailMaybeSent("cut off");
++        return "sent";
++      },
++    }),
++  };
++});
++
++const { runWeeklySummaries, stopWeeklyEmail, weeklyEmailStopped, setOwnWeeklyEmail, ownWeeklyEmail } = await import("@/lib/charity/weekly-summary-store");
++
++const MONDAY = new Date("2026-11-23T06:15:00Z"); // 08:15 in Johannesburg
++const TUESDAY = new Date("2026-11-24T06:15:00Z");
++const ON = { WEEKLY_CHARITY_EMAIL: "yes", SITE_URL: "https://test.givezy.co.za" };
++const later = () => Date.now() + 60_000;
++const charity = (id: string, status: string, name = `Charity ${id}`) => ({ id, status, name_en: name, slug: id, is_s18a: false, mandate_signed_at: null, logo_path: "l", cover_path: "c", description_en: "d", funds_use_en: "f" });
++const member = (charity_id: string, user_id: string, role: string, weekly_email: boolean | null = null) => ({ charity_id, user_id, role, weekly_email });
++const gift = (charity_id: string, donor_id: string, amount_cents: number, paid_at: string, extra: Row = {}) => ({ id: `${charity_id}-${donor_id}-${paid_at}`, charity_id, donor_id, status: "paid", amount_cents, refunded_cents: 0, paid_at, recurring_id: null, ...extra });
++
++beforeEach(() => {
++  tables = {
++    charities: [charity("c1", "approved", "Hope House"), charity("c2", "suspended"), charity("c3", "draft"), charity("c4", "pending_review"), charity("c5", "approved", "Quiet Trust")],
++    charity_admins: [
++      member("c1", "owner1", "owner"),
++      member("c1", "admin1", "admin"),
++      member("c1", "admin2", "admin", false),
++      member("c1", "fin1", "finance"),
++      member("c1", "fund1", "fundraiser", true),
++      member("c1", "view1", "viewer"),
++      member("c2", "owner2", "owner"),
++      member("c3", "owner3", "owner"),
++      member("c4", "owner4", "owner"),
++      member("c5", "owner5", "owner"),
++    ],
++    profiles: ["owner1", "admin1", "admin2", "fin1", "fund1", "view1", "owner2", "owner3", "owner4", "owner5"].map((id) => ({ id, email: `${id}@example.org` })),
++    donations: [
++      gift("c1", "d1", 100_000, "2026-11-17T09:00:00Z"),
++      gift("c1", "d2", 240_000, "2026-11-20T09:00:00Z"),
++      gift("c1", "d3", 50_000, "2026-11-10T09:00:00Z"), // the week before
++      gift("c1", "d4", 70_000, "2026-11-23T05:00:00Z"), // this week: not in last week's figures
++    ],
++    recurring_donations: [],
++    charity_weekly_emails: [],
++  };
++  missing = {};
++  sendMode = "ok";
++  transportName = "resend";
++  sent.length = 0;
++  vi.spyOn(console, "error").mockImplementation(() => {});
++  vi.spyOn(console, "info").mockImplementation(() => {});
++});
++
++const to = () => sent.map((m) => m.to).sort();
++
++describe("who gets it", () => {
++  it("owners and admins of approved charities, plus those who switched it on; never drafts, reviews or suspended", async () => {
++    const r = await runWeeklySummaries(MONDAY, later(), ON);
++    expect(r).toMatchObject({ week: "2026-11-16", sent: 4, failed: 0, leftOver: 0 });
++    expect(to()).toEqual(["admin1@example.org", "fund1@example.org", "owner1@example.org", "owner5@example.org"]);
++    const hope = sent.find((m) => m.to === "owner1@example.org")!;
++    expect(hope.subject).toBe("Your week on Givezy: R3 400 from 2 gifts");
++    expect(hope.text).toContain("The week before: R500 from 1 gift.");
++    expect(hope.headers?.["List-Unsubscribe"]).toMatch(/^<https:\/\/test\.givezy\.co\.za\/api\/stop\/weekly\?t=[A-Za-z0-9_-]{43}>$/);
++    expect(sent.find((m) => m.to === "owner5@example.org")!.subject).toBe("Your week on Givezy");
++  });
++});
++
++describe("never twice", () => {
++  it("a second run the same day, or the next day, sends nothing more", async () => {
++    await runWeeklySummaries(MONDAY, later(), ON);
++    expect(await runWeeklySummaries(MONDAY, later(), ON)).toMatchObject({ sent: 0, failed: 0 });
++    expect(await runWeeklySummaries(TUESDAY, later(), ON)).toMatchObject({ sent: 0, failed: 0 });
++    expect(sent).toHaveLength(4);
++    expect(tables.charity_weekly_emails).toHaveLength(4);
++    expect(tables.charity_weekly_emails.every((r) => r.outcome === "sent" && r.week_start === "2026-11-16")).toBe(true);
++  });
++
++  it("a claim left by a run that crashed mid-send is never sent again", async () => {
++    tables.charity_weekly_emails.push({ charity_id: "c1", user_id: "owner1", week_start: "2026-11-16", outcome: "sending", stop_token_hash: "0".repeat(64) });
++    await runWeeklySummaries(MONDAY, later(), ON);
++    expect(to()).not.toContain("owner1@example.org");
++    expect(sent).toHaveLength(3);
++  });
++
++  it("two runs at once: the one whose claim loses sends nothing", async () => {
++    // Both read an empty send log first; the database's key lets only one claim each email.
++    const [a, b] = await Promise.all([runWeeklySummaries(MONDAY, later(), ON), runWeeklySummaries(MONDAY, later(), ON)]);
++    expect(a.sent + b.sent).toBe(4);
++    expect(sent).toHaveLength(4);
++  });
++
++  it("an email that may have gone is not sent again; one that surely didn't is tried again the next day", async () => {
++    sendMode = "maybe";
++    const first = await runWeeklySummaries(MONDAY, later(), ON);
++    expect(first).toMatchObject({ maybeSent: 4, sent: 0 });
++    sendMode = "ok";
++    await runWeeklySummaries(TUESDAY, later(), ON);
++    expect(sent).toHaveLength(4);
++
++    tables.charity_weekly_emails = [];
++    sent.length = 0;
++    sendMode = "surely";
++    expect(await runWeeklySummaries(MONDAY, later(), ON)).toMatchObject({ failed: 4, sent: 0 });
++    expect(tables.charity_weekly_emails).toHaveLength(0);
++    sendMode = "ok";
++    expect(await runWeeklySummaries(TUESDAY, later(), ON)).toMatchObject({ sent: 4 });
++  });
++
++  it("past the deadline nothing is claimed, and it goes the next day", async () => {
++    const r = await runWeeklySummaries(MONDAY, Date.now() - 1, ON);
++    expect(r).toMatchObject({ sent: 0, leftOver: 4 });
++    expect(tables.charity_weekly_emails).toHaveLength(0);
++    expect(await runWeeklySummaries(TUESDAY, later(), ON)).toMatchObject({ sent: 4 });
++  });
++
++  it("an address not on the test site's list is skipped once, not every day", async () => {
++    sendMode = "skipped";
++    expect(await runWeeklySummaries(MONDAY, later(), ON)).toMatchObject({ skipped: 4, sent: 0 });
++    sendMode = "ok";
++    expect(await runWeeklySummaries(TUESDAY, later(), ON)).toMatchObject({ sent: 0 });
++  });
++});
++
++describe("off switches", () => {
++  it("sends nothing without WEEKLY_CHARITY_EMAIL=yes, on Thursday to Sunday, or with email not set up", async () => {
++    expect((await runWeeklySummaries(MONDAY, later(), { SITE_URL: "x" })).off).toBe("switch");
++    expect((await runWeeklySummaries(new Date("2026-11-26T06:15:00Z"), later(), ON)).off).toBe("not_today");
++    transportName = "console";
++    expect((await runWeeklySummaries(MONDAY, later(), ON)).off).toBe("email");
++    expect(sent).toHaveLength(0);
++    expect(tables.charity_weekly_emails).toHaveLength(0);
++  });
++
++  it("before the migration (no send log, or no weekly_email column) sends nothing and says so in one log line", async () => {
++    missing = { table: "charity_weekly_emails" };
++    expect((await runWeeklySummaries(MONDAY, later(), ON)).off).toBe("not_set_up");
++    missing = { column: "weekly_email" };
++    expect((await runWeeklySummaries(MONDAY, later(), ON)).off).toBe("not_set_up");
++    expect(sent).toHaveLength(0);
++  });
++});
++
++describe("switching it off and on", () => {
++  it("the stop link switches off exactly that person's email for that charity, and a made-up link does nothing", async () => {
++    tables.charity_admins.push(member("c5", "owner1", "admin"));
++    await runWeeklySummaries(MONDAY, later(), ON);
++    const link = sent.find((m) => m.to === "owner1@example.org" && m.subject.includes("R3 400"))!.text.match(/weekly-email\/stop\?t=([A-Za-z0-9_-]{43})/)![1];
++    expect(await weeklyEmailStopped(link)).toBe(false);
++    expect(await stopWeeklyEmail(link)).toBe(true);
++    expect(await weeklyEmailStopped(link)).toBe(true);
++    expect(tables.charity_admins.find((m) => m.charity_id === "c1" && m.user_id === "owner1")!.weekly_email).toBe(false);
++    // Their other charity, and the rest of the team, are untouched.
++    expect(tables.charity_admins.find((m) => m.charity_id === "c5" && m.user_id === "owner1")!.weekly_email).toBeNull();
++    expect(tables.charity_admins.find((m) => m.user_id === "admin1")!.weekly_email).toBeNull();
++    expect(await stopWeeklyEmail("x".repeat(43))).toBe(false);
++    expect(await stopWeeklyEmail("not a token")).toBe(false);
++  });
++
++  it("the Team page's switch changes only the person's own row, and the role decides until they choose", async () => {
++    expect(await ownWeeklyEmail("c1", "fin1")).toEqual({ on: false, byDefault: true });
++    expect(await setOwnWeeklyEmail("c1", "fin1", true)).toBe("done");
++    expect(await ownWeeklyEmail("c1", "fin1")).toEqual({ on: true, byDefault: false });
++    expect(await setOwnWeeklyEmail("c1", "stranger", true)).toBe("not_member");
++    expect(await ownWeeklyEmail("c1", "stranger")).toBeNull();
++    missing = { column: "weekly_email" };
++    expect(await setOwnWeeklyEmail("c1", "fin1", false)).toBe("not_set_up");
++    expect(await ownWeeklyEmail("c1", "fin1")).toBeNull();
++  });
++});
+diff --git a/tests/weekly-summary.test.ts b/tests/weekly-summary.test.ts
+new file mode 100644
+index 0000000..be566b6
+--- /dev/null
++++ b/tests/weekly-summary.test.ts
+@@ -0,0 +1,287 @@
++/**
++ * The weekly email to a charity's team (Yehuda, 22/11/2026): the week in Johannesburg time, who gets it, the figures
++ * counted as the dashboard counts them, and the words (busy and quiet weeks). Pure: no database, no clock.
++ */
++import { describe, expect, it } from "vitest";
++import {
++  addDays,
++  beforeLine,
++  figureRows,
++  firstPayments,
++  giftTotals,
++  isSendDay,
++  monthlyMoves,
++  quietNextStep,
++  reportWeek,
++  s18aLine,
++  s18aWaiting,
++  weekdayOf,
++  weeklyEmail,
++  weeklyEmailSwitchedOn,
++  weeklyOnByDefault,
++  weeklyRecipients,
++  weeklySubject,
++  wantsWeekly,
++  type WeekFigures,
++} from "@/lib/charity/weekly-summary";
++
++const week = reportWeek(new Date("2026-11-23T06:15:00Z")); // Monday 08:15 in Johannesburg
++const busy: WeekFigures = {
++  week: { cents: 340_000, gifts: 12, donors: 9 },
++  before: { cents: 210_000, gifts: 8, donors: 7 },
++  monthly: { started: 2, stopped: 1, paused: 1 },
++  s18a: { gifts: 23, pastYears: 0 },
++  taxYearEnd: "2027-02-28",
++};
++const quiet: WeekFigures = { week: { cents: 0, gifts: 0, donors: 0 }, before: { cents: 0, gifts: 0, donors: 0 }, monthly: { started: 0, stopped: 0, paused: 0 }, s18a: null, taxYearEnd: "2027-02-28" };
++const base = "https://test.givezy.co.za";
++const args = (figures: WeekFigures, over: Partial<Parameters<typeof weeklyEmail>[0]> = {}) =>
++  weeklyEmail({
++    to: "owner@example.org",
++    charityName: "Hope House",
++    week,
++    figures,
++    nextStep: quietNextStep({ logo_path: "l", cover_path: "c", description_en: "d", funds_use_en: "f" }, `${base}/charity-admin/c1`, `${base}/c/hope-house`),
++    dashboardUrl: `${base}/charity-admin/c1`,
++    stopUrl: `${base}/weekly-email/stop?t=abc`,
++    oneClickUrl: `${base}/api/stop/weekly?t=abc`,
++    siteUrl: base,
++    ...over,
++  });
++
++describe("the week, in Johannesburg time", () => {
++  it("is last Monday 00:00 to Sunday 23:59, as UTC boundaries (+02:00, no daylight saving)", () => {
++    expect(week).toEqual({
++      start: "2026-11-16",
++      end: "2026-11-22",
++      from: "2026-11-15T22:00:00.000Z",
++      to: "2026-11-22T22:00:00.000Z",
++      prevFrom: "2026-11-08T22:00:00.000Z",
++    });
++  });
++
++  it("is the same week whatever time on Monday, Tuesday or Wednesday the job runs", () => {
++    // Monday 00:30 in Johannesburg is still Sunday in UTC.
++    for (const t of ["2026-11-22T22:30:00Z", "2026-11-23T21:59:59Z", "2026-11-24T06:15:00Z", "2026-11-25T06:15:00Z"]) {
++      expect(reportWeek(new Date(t)).start).toBe("2026-11-16");
++    }
++    // Sunday 23:59 in Johannesburg is still the week of the 16th, so the week reported is the one before.
++    expect(reportWeek(new Date("2026-11-22T21:59:00Z")).start).toBe("2026-11-09");
++  });
++
++  it("sends on Monday, carries on Tuesday and Wednesday, and not from Thursday", () => {
++    expect(isSendDay(new Date("2026-11-22T22:00:00Z"))).toBe(true); // Monday 00:00 SAST
++    expect(isSendDay(new Date("2026-11-22T21:59:59Z"))).toBe(false); // Sunday 23:59 SAST
++    expect(isSendDay(new Date("2026-11-24T06:15:00Z"))).toBe(true);
++    expect(isSendDay(new Date("2026-11-25T06:15:00Z"))).toBe(true);
++    for (const d of ["2026-11-26", "2026-11-27", "2026-11-28", "2026-11-29"]) expect(isSendDay(new Date(`${d}T06:15:00Z`))).toBe(false);
++  });
++
++  it("crosses a month end and a year end", () => {
++    const dec = reportWeek(new Date("2026-12-01T06:15:00Z")); // Tuesday 01/12
++    expect(dec).toMatchObject({ start: "2026-11-23", end: "2026-11-29", to: "2026-11-29T22:00:00.000Z" });
++    const jan = reportWeek(new Date("2027-01-04T06:15:00Z")); // Monday 04/01/2027
++    expect(jan).toMatchObject({ start: "2026-12-28", end: "2027-01-03", from: "2026-12-27T22:00:00.000Z", to: "2027-01-03T22:00:00.000Z" });
++    expect(addDays("2028-02-28", 1)).toBe("2028-02-29");
++    expect(weekdayOf("2026-11-16")).toBe(0);
++    expect(weekdayOf("2026-11-22")).toBe(6);
++  });
++});
++
++describe("who gets it", () => {
++  it("owners and admins by default, others only when they switch it on; anyone can switch theirs off", () => {
++    expect(weeklyOnByDefault("owner")).toBe(true);
++    expect(weeklyOnByDefault("admin")).toBe(true);
++    for (const r of ["finance", "fundraiser", "viewer"] as const) expect(weeklyOnByDefault(r)).toBe(false);
++    expect(wantsWeekly("owner", false)).toBe(false);
++    expect(wantsWeekly("viewer", true)).toBe(true);
++    expect(wantsWeekly("finance", null)).toBe(false);
++  });
++
++  it("leaves out people without an address", () => {
++    const team = [
++      { userId: "o", role: "owner" as const, weeklyEmail: null, email: "o@example.org" },
++      { userId: "a", role: "admin" as const, weeklyEmail: false, email: "a@example.org" },
++      { userId: "f", role: "finance" as const, weeklyEmail: true, email: "f@example.org" },
++      { userId: "v", role: "viewer" as const, weeklyEmail: null, email: "v@example.org" },
++      { userId: "x", role: "admin" as const, weeklyEmail: null, email: "  " },
++    ];
++    expect(weeklyRecipients(team).map((m) => m.userId)).toEqual(["o", "f"]);
++  });
++
++  it("is off unless the switch is exactly yes", () => {
++    expect(weeklyEmailSwitchedOn({})).toBe(false);
++    expect(weeklyEmailSwitchedOn({ WEEKLY_CHARITY_EMAIL: "true" })).toBe(false);
++    expect(weeklyEmailSwitchedOn({ WEEKLY_CHARITY_EMAIL: "yes" })).toBe(true);
++  });
++});
++
++describe("the figures, as the dashboard counts them", () => {
++  const gift = (over: Partial<{ donor_id: string | null; status: string; amount_cents: number; refunded_cents: number; paid_at: string }>) => ({
++    donor_id: "d1",
++    status: "paid",
++    amount_cents: 10_000,
++    refunded_cents: 0,
++    paid_at: "2026-11-18T10:00:00Z",
++    ...over,
++  });
++
++  it("counts what is left after part refunds, leaves out gifts with nothing left, and counts each donor once", () => {
++    const rows = [
++      gift({}),
++      gift({ donor_id: "d1", amount_cents: 5_000 }),
++      gift({ donor_id: "d2", amount_cents: 100_000, refunded_cents: 40_000 }),
++      gift({ donor_id: "d3", amount_cents: 2_000, refunded_cents: 2_000 }), // refunded in full in parts: a refund
++      gift({ donor_id: "d4", status: "refunded" }),
++      gift({ donor_id: "d5", status: "charged_back" }),
++      gift({ donor_id: null, amount_cents: 3_457 }), // recorded gift with no donor record
++    ];
++    expect(giftTotals(rows, week.from, week.to)).toEqual({ cents: 10_000 + 5_000 + 60_000 + 3_457, gifts: 4, donors: 2 });
++  });
++
++  it("uses the Johannesburg week's edges: Monday 00:00 in, next Monday 00:00 out", () => {
++    const rows = [
++      gift({ paid_at: "2026-11-15T21:59:59.999Z" }), // Sunday 23:59 the week before
++      gift({ paid_at: "2026-11-15T22:00:00Z" }), // Monday 00:00
++      gift({ paid_at: "2026-11-22T21:59:59Z" }), // Sunday 23:59:59
++      gift({ paid_at: "2026-11-22T22:00:00Z" }), // this Monday: next week's
++    ];
++    expect(giftTotals(rows, week.from, week.to).gifts).toBe(2);
++    expect(giftTotals(rows, week.prevFrom, week.from).gifts).toBe(1);
++  });
++
++  it("zero gifts, one gift and a huge amount, in integer cents", () => {
++    expect(giftTotals([], week.from, week.to)).toEqual({ cents: 0, gifts: 0, donors: 0 });
++    expect(giftTotals([gift({ amount_cents: 3_457 })], week.from, week.to)).toEqual({ cents: 3_457, gifts: 1, donors: 1 });
++    const huge = giftTotals([gift({ amount_cents: 99_999_999_900 }), gift({ donor_id: "d2", amount_cents: 99_999_999_900 })], week.from, week.to);
++    expect(huge.cents).toBe(199_999_999_800);
++    expect(weeklySubject(huge)).toBe("Your week on Givezy: R1 999 999 998 from 2 gifts");
++  });
++
++  it("monthly donations started (first payment), stopped and paused in the week, as the Monthly page dates them", () => {
++    const first = firstPayments([
++      { recurring_id: "new", status: "paid", paid_at: "2026-11-17T08:00:00Z" },
++      { recurring_id: "old", status: "paid", paid_at: "2026-10-17T08:00:00Z" },
++      { recurring_id: "old", status: "paid", paid_at: "2026-11-17T08:00:00Z" },
++      { recurring_id: "stopped", status: "refunded", paid_at: "2026-09-01T08:00:00Z" },
++      { recurring_id: "paused", status: "paid", paid_at: "2026-09-01T08:00:00Z" },
++      { recurring_id: "pending", status: "pending", paid_at: null },
++      { recurring_id: null, status: "paid", paid_at: "2026-11-17T08:00:00Z" },
++    ]);
++    expect(first.get("old")).toBe("2026-10-17T08:00:00Z");
++    const rows = [
++      { id: "new", status: "active", paused_at: null, cancelled_at: null, updated_at: null },
++      { id: "old", status: "active", paused_at: null, cancelled_at: null, updated_at: null },
++      { id: "stopped", status: "cancelled", paused_at: null, cancelled_at: "2026-11-20T08:00:00Z", updated_at: "2026-11-20T08:00:00Z" },
++      { id: "failedForGood", status: "failed", paused_at: null, cancelled_at: null, updated_at: "2026-11-20T08:00:00Z" },
++      { id: "paused", status: "paused", paused_at: "2026-11-19T08:00:00Z", cancelled_at: null, updated_at: "2026-11-19T08:00:00Z" },
++      { id: "pausedEarlier", status: "paused", paused_at: "2026-11-01T08:00:00Z", cancelled_at: null, updated_at: "2026-11-19T08:00:00Z" },
++    ];
++    // "failedForGood" never had a payment, so the Monthly page doesn't list it: not counted.
++    expect(monthlyMoves(rows, new Map([...first, ["pausedEarlier", "2026-10-01T00:00:00Z"]]), week.from, week.to)).toEqual({ started: 1, stopped: 1, paused: 1 });
++  });
++
++  it("s18A receipts waiting: paid gifts that asked, not on an issued receipt, with something left; past years apart", () => {
++    const g = (id: string, over: Partial<{ status: string; wants_18a: boolean; tax_year: number | null; amount_cents: number; refunded_cents: number }> = {}) => ({ id, status: "paid", wants_18a: true, tax_year: 2027, amount_cents: 1000, refunded_cents: 0, ...over });
++    const gifts = [g("a"), g("b"), g("c", { tax_year: 2026 }), g("d", { wants_18a: false }), g("e", { refunded_cents: 1000 }), g("f", { status: "refunded" }), g("g", { tax_year: null }), g("h", { tax_year: 2026 })];
++    expect(s18aWaiting(gifts, new Set(["b", "h"]), 2027)).toEqual({ gifts: 2, pastYears: 1 });
++  });
++});
++
++describe("the words", () => {
++  it("subject: total and gifts in a busy week, plain in a quiet one", () => {
++    expect(weeklySubject(busy.week)).toBe("Your week on Givezy: R3 400 from 12 gifts");
++    expect(weeklySubject({ cents: 25_000, gifts: 1, donors: 1 })).toBe("Your week on Givezy: R250 from 1 gift");
++    expect(weeklySubject({ cents: 3_457, gifts: 1, donors: 1 })).toBe("Your week on Givezy: R34.57 from 1 gift");
++    expect(weeklySubject(quiet.week)).toBe("Your week on Givezy");
++  });
++
++  it("compares with the week before only when it had gifts, with no percentages or up and down", () => {
++    expect(beforeLine(busy.before)).toBe("The week before: R2 100 from 8 gifts.");
++    expect(beforeLine(quiet.before)).toBeNull();
++    expect(beforeLine({ cents: 100, gifts: 1, donors: 1 })).toBe("The week before: R1 from 1 gift.");
++  });
++
++  it("s18A line: ready for the yearly run, or when this year's are issued", () => {
++    expect(s18aLine(null, "2027-02-28")).toBeNull();
++    expect(s18aLine({ gifts: 0, pastYears: 0 }, "2027-02-28")).toBeNull();
++    expect(s18aLine({ gifts: 5, pastYears: 0 }, "2027-02-28")).toBe("This tax year's s18A receipts are issued after it ends on 28/02/2027.");
++    expect(s18aLine({ gifts: 5, pastYears: 1 }, "2027-02-28")).toMatch(/^1 gift from a tax year that has ended is ready for its s18A receipt\./);
++  });
++
++  it("busy week: the figures card, one button to the dashboard, the stop link, and never a donor's details", () => {
++    const m = args(busy);
++    expect(m.subject).toBe("Your week on Givezy: R3 400 from 12 gifts");
++    expect(m.text).toContain("For Hope House, Monday 16/11/2026 to Sunday 22/11/2026.");
++    expect(figureRows(busy).map((r) => `${r.label}: ${r.value}`)).toEqual([
++      "Received: R3 400",
++      "Paid gifts: 12",
++      "Donors: 9",
++      "New monthly donations: 2",
++      "Monthly donations stopped or paused: 2",
++      "Waiting for an s18A receipt: 23 gifts",
++    ]);
++    expect(m.text).toContain("Open your dashboard: https://test.givezy.co.za/charity-admin/c1");
++    expect(m.text).toContain("Switch off the weekly email: https://test.givezy.co.za/weekly-email/stop?t=abc");
++    expect(m.text).toContain("contributions to Givezy and card charges aren't included");
++    const html = m.html!;
++    expect(html.match(/border-bottom:4px solid/g)).toHaveLength(1); // exactly one button
++    expect(html).toContain(">Open your dashboard</a>");
++    expect(html).toContain('href="https://test.givezy.co.za/weekly-email/stop?t=abc"');
++    expect(html).toContain("R3 400"); // never broken over two lines
++    expect(m.headers).toEqual({ "List-Unsubscribe": "<https://test.givezy.co.za/api/stop/weekly?t=abc>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" });
++    expect(m.to).toBe("owner@example.org");
++  });
++
++  it("quiet week: short, no card of zeros, one next step, no guilt and no invented figure", () => {
++    const m = args(quiet);
++    expect(m.subject).toBe("Your week on Givezy");
++    expect(m.text).toContain("No gifts came in last week.");
++    expect(m.text).toContain("A next step: Share your Givezy page with your supporters");
++    expect(m.text).toContain("https://test.givezy.co.za/c/hope-house");
++    expect(m.text).not.toMatch(/Received:|Paid gifts:|Donors:/);
++    expect(m.text).not.toMatch(/miss|sorry|unfortunately|only|disappoint|could have|lives|meals|children/i);
++    expect(m.html!.match(/border-bottom:4px solid/g)).toHaveLength(1);
++    // A quiet week that still had monthly moves says so.
++    const moved = args({ ...quiet, monthly: { started: 0, stopped: 1, paused: 0 } });
++    expect(moved.text).toContain("Monthly donations stopped or paused: 1");
++  });
++
++  it("a quiet week's next step: finish the page first, then share it", () => {
++    const d = `${base}/charity-admin/c1`;
++    expect(quietNextStep({ logo_path: null, cover_path: "c", description_en: "d", funds_use_en: "f" }, d, "p").url).toBe(`${d}/profile`);
++    expect(quietNextStep({ logo_path: "l", cover_path: "c", description_en: " ", funds_use_en: "f" }, d, "p").text).toMatch(/what you do/);
++    expect(quietNextStep({ logo_path: "l", cover_path: "c", description_en: "d", funds_use_en: "f" }, d, "p").url).toBe("p");
++  });
++
++  it("a 120-character name, a right-to-left name and HTML in a name are shown safely", () => {
++    const long = "A".repeat(60) + " " + "B".repeat(59);
++    expect(long).toHaveLength(120);
++    const m = args(busy, { charityName: long });
++    expect(m.text).toContain(`For ${long},`);
++    expect(m.html).toContain(long);
++    expect(m.subject).not.toContain(long); // the subject stays short whatever the name
++
++    const rtl = args(busy, { charityName: "جمعية الأمل" });
++    expect(rtl.html).toContain('<span dir="auto" style="font-weight:700">جمعية الأمل</span>');
++
++    const evil = args(busy, { charityName: '<script>alert(1)</script> & "Co"' });
++    expect(evil.html).not.toContain("<script>");
++    expect(evil.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;Co&quot;");
++  });
++
++  it("house style: no exclamation marks, no em dashes, SA Rand and dates, the email fonts' fallbacks", () => {
++    for (const m of [args(busy), args(quiet), args({ ...busy, s18a: { gifts: 3, pastYears: 2 } })]) {
++      expect(m.text).not.toMatch(/[!—–]/);
++      expect(m.html!).not.toMatch(/—|–/);
++      expect(m.text).not.toMatch(/R\d{1,3},\d{3}|R\d+\.00\b|\d{4}-\d{2}-\d{2}/);
++      expect(m.html!).toContain("Arial");
++    }
++  });
++
++  it("the email never carries a donor's name, address or amount per donor (it is given none)", () => {
++    const m = args(busy);
++    expect(Object.keys(busy)).toEqual(["week", "before", "monthly", "s18a", "taxYearEnd"]);
++    expect(m.text).not.toContain("@");
++  });
++});
+-- 
+2.43.0
+
