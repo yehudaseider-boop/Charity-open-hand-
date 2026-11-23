@@ -29,3 +29,22 @@ export function showDay(iso: string | null | undefined): string {
 
 /** The one wording for a date we couldn't read. */
 export const TYPED_DAY_MESSAGE = "Write the date as dd/mm/yyyy, for example 31/12/2026";
+
+/**
+ * Helps a date box while someone types (23/11/2026): after a complete day or month the slash goes in by itself, so
+ * "05" becomes "05/", "05/03" becomes "05/03/", and a pasted "05032026" or "2026-12-31" becomes "05/03/2026" or
+ * "31/12/2026". Deleting is never interfered with (the new text is longer than the old only when typing or pasting).
+ * Anything else, including words, is left exactly as typed: the server still says what it couldn't read.
+ */
+export function shapeTypedDay(previous: string, next: string): string {
+  const v = next.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  if (/^\d{8}$/.test(v)) return `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
+  if (next.length <= previous.length) return next;
+  if (/^\d{2}$/.test(v) || /^\d{1,2}[/.\- ]\d{2}$/.test(v)) return `${v.replace(/[.\- ]/g, "/")}/`;
+  return next;
+}
+
+/** What a date box shows while it is empty. */
+export const TYPED_DAY_PLACEHOLDER = "dd/mm/yyyy";

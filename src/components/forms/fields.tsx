@@ -1,8 +1,8 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useFieldError } from "./action-form";
-import { showDay } from "@/lib/typed-date";
+import { shapeTypedDay, showDay, TYPED_DAY_PLACEHOLDER } from "@/lib/typed-date";
 
 /** A page-unique id, so two forms with the same field name never share a label. */
 export function useFieldId(name: string) {
@@ -47,10 +47,16 @@ export function TextField({
   inputMode,
   autoComplete,
   maxLength,
+  placeholder,
+  shape,
   ...base
 }: Base & {
   defaultValue?: string | null;
   type?: "text" | "email" | "tel" | "url";
+  /** What the box shows while it is empty (the shape of what to type). */
+  placeholder?: string;
+  /** Tidies what is typed as it goes in (given the old and the new text). Only applied when the cursor is at the end. */
+  shape?: (previous: string, next: string) => string;
   /** The box follows the direction of what is typed (left to right or right to left). */
   autoDirection?: boolean;
   inputMode?: "numeric" | "decimal" | "tel" | "email" | "url";
@@ -63,6 +69,7 @@ export function TextField({
   // A typed name (a free-text box) that reaches its limit says so, rather than stop taking letters with no word why
   // (22/11/2026). Not for boxes of a fixed size (a postal code is full at 4 digits).
   const [full, setFull] = useState(false);
+  const before = useRef(defaultValue ?? "");
   const watchLimit = Boolean(autoDirection && maxLength);
   const hint = watchLimit && full ? `That's the most this box takes: ${maxLength} characters.` : base.hint;
   return (
@@ -78,7 +85,20 @@ export function TextField({
         inputMode={inputMode}
         autoComplete={autoComplete}
         maxLength={maxLength}
-        {...(watchLimit ? { onInput: (e: React.FormEvent<HTMLInputElement>) => setFull(e.currentTarget.value.length >= (maxLength ?? 0)) } : {})}
+        placeholder={placeholder}
+        {...(watchLimit || shape
+          ? {
+              onInput: (e: React.FormEvent<HTMLInputElement>) => {
+                const el = e.currentTarget;
+                if (shape && el.selectionStart === el.value.length) {
+                  const shaped = shape(before.current, el.value);
+                  if (shaped !== el.value) el.value = shaped;
+                }
+                before.current = el.value;
+                if (watchLimit) setFull(el.value.length >= (maxLength ?? 0));
+              },
+            }
+          : {})}
         {...(autoDirection ? { dir: "auto" } : {})}
         className={inputClass}
       />
@@ -97,6 +117,9 @@ export function DateField({ defaultValue, hint, ...base }: Base & { defaultValue
       defaultValue={showDay(defaultValue)}
       autoComplete="off"
       maxLength={10}
+      inputMode="numeric"
+      placeholder={TYPED_DAY_PLACEHOLDER}
+      shape={shapeTypedDay}
       hint={hint ? `${hint} Write it as dd/mm/yyyy.` : "Write it as dd/mm/yyyy, for example 31/12/2026."}
     />
   );

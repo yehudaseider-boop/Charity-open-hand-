@@ -1,6 +1,9 @@
 /** Dates typed into the dashboard are read the South African way, never mm/dd. */
 import { describe, expect, it } from "vitest";
-import { showDay, typedDay } from "@/lib/typed-date";
+import { shapeTypedDay, showDay, typedDay } from "@/lib/typed-date";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { DateField } from "@/components/forms/fields";
 import { checkReminder } from "@/lib/charity/donor-care-rules";
 import { checkCampaign } from "@/lib/charity/campaigns";
 import { parseDonationFilters } from "@/lib/charity/donation-filters";
@@ -51,5 +54,33 @@ describe("the dashboard's date fields", () => {
     expect(parseDonationFilters({ period: "custom", from: "01/03/2026", to: "28/02/2027" })).toMatchObject({ period: "custom", fromDate: "2026-03-01", toDate: "2027-02-28" });
     expect(parseDonationFilters({ period: "custom", from: "2026-03-01", to: "2026-03-31" })).toMatchObject({ fromDate: "2026-03-01", toDate: "2026-03-31" });
     expect(parseDonationFilters({ period: "custom", from: "03/31/2026", to: "04/30/2026" })).toMatchObject({ period: "all", fromDate: null });
+  });
+});
+
+describe("the date box helps while typing (23/11/2026)", () => {
+  const typing = (text: string) => [...text].reduce((shown, ch) => shapeTypedDay(shown, shown + ch), "");
+  it("puts the slashes in by itself", () => {
+    expect(typing("05032026")).toBe("05/03/2026");
+    expect(typing("31122026")).toBe("31/12/2026");
+    expect(typing("5/3/2026")).toBe("5/3/2026");
+  });
+  it("shapes a pasted date", () => {
+    expect(shapeTypedDay("", "05032026")).toBe("05/03/2026");
+    expect(shapeTypedDay("", "2026-12-31")).toBe("31/12/2026");
+    expect(shapeTypedDay("", "31/12/2026")).toBe("31/12/2026");
+  });
+  it("never interferes with deleting, and leaves words and mistakes as typed", () => {
+    expect(shapeTypedDay("05/03/", "05/03")).toBe("05/03");
+    expect(shapeTypedDay("05/", "05")).toBe("05");
+    expect(shapeTypedDay("", "december")).toBe("december");
+    expect(shapeTypedDay("dec", "dece")).toBe("dece");
+  });
+  it("what it makes is what the server reads", () => {
+    expect(typedDay(typing("05032026"))).toBe("2026-03-05");
+  });
+  it("shows the format inside the box, and a number pad on a phone", () => {
+    const html = renderToStaticMarkup(createElement(DateField, { name: "ends_on", label: "Last day" }));
+    expect(html).toContain('placeholder="dd/mm/yyyy"');
+    expect(html).toContain('inputMode="numeric"');
   });
 });
