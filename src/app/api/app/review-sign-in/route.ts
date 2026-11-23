@@ -34,15 +34,17 @@ export async function POST(request: NextRequest) {
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
 
   // Every try is counted per address, and the limits are checked, before the email is compared (security review
-  // 23/11/2026): any email gets the same answers at the same point, so nobody can find the reviewer's email by which
-  // one is ever told "too many tries".
+  // 23/11/2026). Over a limit, or when the limits can't be checked, every email gets the same plain "that code didn't
+  // work" (review 23/11/2026): the app asks here after every donor's mistyped code, so a "too many tries" or "sign-in
+  // isn't available" would wrongly tell ordinary donors to wait, and one answer for all still hides the reviewer's email.
+  // No sign-in token is ever made while over a limit.
   const ip = ipKeys(clientIp(request.headers));
   try {
-    if (await hitRateLimit("review-sign-in-ip", ip, PER_ADDRESS_PER_HOUR, 60)) return answer(429, "Too many tries. Please wait an hour and try again.");
-    if (await rateLimitReached("review-sign-in-wrong", ["review#all"], WRONG_CODES_PER_HOUR, 60)) return answer(429, "Too many tries. Please wait an hour and try again.");
+    if (await hitRateLimit("review-sign-in-ip", ip, PER_ADDRESS_PER_HOUR, 60)) return refused();
+    if (await rateLimitReached("review-sign-in-wrong", ["review#all"], WRONG_CODES_PER_HOUR, 60)) return refused();
   } catch (e) {
     console.error("[review sign-in] limit check failed", e);
-    return unavailable();
+    return refused();
   }
   // Everyone else's mistyped code is refused, without counting against the reviewer's wrong codes in all.
   if (email !== setting.email) return refused();

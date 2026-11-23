@@ -68,7 +68,6 @@ async function world() {
        ('test', 'e2', 'other', jsonb_build_object('event', 'charge.success', 'data', jsonb_build_object('reference', $1::text, 'customer', jsonb_build_object('email', 'erase-me@example.co.za'))))`,
     [ref],
   );
-  await run("insert into public.rate_limit_events (bucket, key) values ('checkout', 'email:erase-me@example.co.za'), ('checkout', 'email:someone-else@example.co.za')");
   // A receipt needs a fully set-up charity (mandate, s18A): try, and carry on without one if the charity isn't set up.
   await run("savepoint receipt");
   const receipt = await run(
@@ -155,15 +154,8 @@ describe("erase_donor_data", () => {
     });
   });
 
-  it("clears their address from the rate limiter and nobody else's", async () => {
-    await tx(async () => {
-      const w = await world();
-      await run("select public.erase_donor_data(array[$1]::uuid[])", [w.donor]);
-      const keys = (await run("select key from public.rate_limit_events where key like 'email:%@example.co.za'")).rows.map((r) => r.key);
-      expect(keys).not.toContain("email:erase-me@example.co.za");
-      expect(keys).toContain("email:someone-else@example.co.za");
-    });
-  });
+  // Their address in the rate limiter is cleared by eraseDonor, with the limiter's keyed stand-in, which the database
+  // can't work out (review 23/11/2026): see tests/erase-donor-flow.test.ts.
 
   it("leaves other donors alone, and is safe to run again", async () => {
     await tx(async () => {

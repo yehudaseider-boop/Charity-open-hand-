@@ -131,19 +131,20 @@ describe("the reviewer's sign-in", () => {
     expect(state.wrongCounted).toBe(1);
     expect(state.audits).toEqual(["auth.review_sign_in_refused", "auth.review_sign_in"]);
   });
-  it("stops after a few tries from one address, or too many wrong codes in all, and says so", async () => {
+  it("stops after a few tries from one address, or too many wrong codes in all, with the plain refusal and no token", async () => {
     state.limitedIp = true;
     const one = await ask({ email: EMAIL, code: CODE });
-    expect(one.status).toBe(429);
-    expect((await one.json()).message).toMatch(/Too many tries/);
+    expect(one.status).toBe(401);
+    expect((await one.json()).message).toMatch(/That code didn't work/);
     state.limitedIp = false;
     state.wrongCodesFull = true;
-    expect((await ask({ email: EMAIL, code: CODE })).status).toBe(429);
+    expect((await ask({ email: EMAIL, code: CODE })).status).toBe(401);
     expect(state.links).toEqual([]);
   });
-  it("is unavailable, not open, when the limits can't be checked", async () => {
+  it("refuses plainly, not open, when the limits can't be checked", async () => {
     state.fail = "limits";
-    expect((await ask({ email: EMAIL, code: CODE })).status).toBe(503);
+    expect((await ask({ email: EMAIL, code: CODE })).status).toBe(401);
+    expect(state.links).toEqual([]);
   });
   it("counts every try per address and answers any email the same way, so the reviewer's email can't be found (23/11/2026)", async () => {
     // Every try from an address counts, whichever email it names.
@@ -151,20 +152,23 @@ describe("the reviewer's sign-in", () => {
     await ask({ email: EMAIL, code: "00000000" });
     await ask({ email: "", code: "" });
     expect(state.ipCounted).toBe(3);
-    // Over the address limit: every email is told the same.
+    const plain = JSON.stringify(await (await ask({ email: "someone@x.co", code: "00000000" })).json());
+    const sameForAll = async () => {
+      const answers = await Promise.all([EMAIL, "someone@x.co", "other@y.co"].map((email) => ask({ email, code: "00000000" })));
+      for (const r of answers) expect(r.status).toBe(401);
+      const bodies = await Promise.all(answers.map((r) => r.json()));
+      // The same plain refusal an ordinary donor's wrong code gets, never "too many tries" or "not available".
+      for (const b of bodies) expect(JSON.stringify(b)).toBe(plain);
+    };
+    // Over the address limit, too many wrong codes in all, or a limit that can't be checked: the same for every email.
     state.limitedIp = true;
-    const answers = await Promise.all([EMAIL, "someone@x.co", "other@y.co"].map((email) => ask({ email, code: "00000000" })));
-    for (const r of answers) expect(r.status).toBe(429);
-    const bodies = await Promise.all(answers.map((r) => r.json()));
-    expect(new Set(bodies.map((b) => JSON.stringify(b))).size).toBe(1);
-    // Too many wrong codes in all: the same for every email too.
+    await sameForAll();
     state.limitedIp = false;
     state.wrongCodesFull = true;
-    for (const email of [EMAIL, "someone@x.co"]) expect((await ask({ email, code: "00000000" })).status).toBe(429);
-    // A limit that can't be checked: unavailable for every email alike.
+    await sameForAll();
     state.wrongCodesFull = false;
     state.fail = "limits";
-    for (const email of [EMAIL, "someone@x.co"]) expect((await ask({ email, code: "00000000" })).status).toBe(503);
+    await sameForAll();
     expect(state.links).toEqual([]);
   });
   it("asks for Send code first when the account doesn't exist yet, without making one", async () => {

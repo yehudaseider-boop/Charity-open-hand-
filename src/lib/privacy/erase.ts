@@ -1,6 +1,7 @@
 import "server-only";
 import { logAudit } from "@/lib/audit";
 import { getEmailTransport } from "@/lib/email";
+import { hashedKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CERTIFICATE_KINDS, TEAM_KINDS, namesFrom, scrubCertificateDetails } from "./scrub-actions";
 
@@ -70,15 +71,18 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
   // check's action records (shown on each charity's Activity page) name them.
   const theirNames = new Set<string>();
   const theirCharities = new Set<string>();
+  // Every address they used, also those typed at a checkout, for the rate limiter's records (see below).
+  const limitEmails = new Set<string>(theirEmails);
   if (ids.size) {
     const gifts = await allPages((from) => db.from("donations").select("id, charity_id").in("donor_id", [...ids]).order("id").range(from, from + 999));
     for (const g of gifts) if (typeof g.charity_id === "string") theirCharities.add(g.charity_id);
     const giftIdList = gifts.map((g) => g.id as string);
     for (let i = 0; i < giftIdList.length; i += 500) {
       const rows = await allPages((from) =>
-        db.from("donation_checkout_details").select("donation_id, first_name, last_name, organisation_name").in("donation_id", giftIdList.slice(i, i + 500)).order("donation_id").range(from, from + 999),
+        db.from("donation_checkout_details").select("donation_id, email, first_name, last_name, organisation_name").in("donation_id", giftIdList.slice(i, i + 500)).order("donation_id").range(from, from + 999),
       );
       for (const n of namesFrom(rows as { first_name?: string | null; last_name?: string | null; organisation_name?: string | null }[])) theirNames.add(n);
+      for (const r of rows) if (typeof r.email === "string") limitEmails.add(r.email.trim().toLowerCase());
     }
   }
 
@@ -153,8 +157,13 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       if (e && !gone(e.code)) throw new Error(`Could not erase: ${e.message}`);
     }
     if (email) {
-      const { error: e } = await db.from("charity_requests").delete().eq("notify_email", email);
+      // A request made without signing in, with their address, is all theirs and goes.
+      const { error: e } = await db.from("charity_requests").delete().eq("notify_email", email).is("requested_by", null);
       if (e && !gone(e.code)) throw new Error(`Could not erase: ${e.message}`);
+      // A request another signed-in donor made, with this address to hear back (review 23/11/2026), stays theirs: only
+      // this person's address and the agreement that went with it are cleared (the same split as the data download).
+      const { error: e2 } = await db.from("charity_requests").update({ notify_email: null, consent_version: null }).eq("notify_email", email);
+      if (e2 && !gone(e2.code)) throw new Error(`Could not erase: ${e2.message}`);
     }
   }
   // A charity's own imported copy of them (its contact list, 02/11/2026), and that contact's tags, which go with it
@@ -178,6 +187,18 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
         if (e) throw new Error(`Could not erase: ${e.message}`);
       }
     }
+  }
+  // Their address in the rate limiter's short-lived records (review 23/11/2026). The limiter keeps a keyed one-way
+  // stand-in, never the address ("email#…", or "email#…|ip#…" for an email together with an internet address), so it
+  // is worked out here with the limiter's own key; the database can't. An exact match, or that stand-in and a "|".
+  for (const address of limitEmails) {
+    if (address.endsWith("@erased.invalid")) continue;
+    const key = hashedKey("email", address);
+    if (!key) continue;
+    const { error: exactError } = await db.from("rate_limit_events").delete().eq("key", key);
+    if (exactError) throw new Error(`Could not erase: ${exactError.message}`);
+    const { error: pairError } = await db.from("rate_limit_events").delete().like("key", `${key.replace(/[\\%_]/g, (ch) => `\\${ch}`)}|%`);
+    if (pairError) throw new Error(`Could not erase: ${pairError.message}`);
   }
   // Last of the database steps: their details, address and the link to their account (see the order above).
   const { data: counts, error } = await db.rpc("erase_donor_data", { p_donor_ids: [...ids] });
