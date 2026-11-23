@@ -12,8 +12,8 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_SUPPORT_EMAIL": "hello@givezy.co.za",
-        "EXPO_PUBLIC_IN_APP_GIVING": "",
-        "EXPO_PUBLIC_SAVED_CARDS": ""
+        "EXPO_PUBLIC_IN_APP_GIVING": "no",
+        "EXPO_PUBLIC_SAVED_CARDS": "no"
       }
     }
   },
