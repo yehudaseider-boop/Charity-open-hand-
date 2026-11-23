@@ -38,13 +38,17 @@ export default async function DonationPage({ params }: PageProps<"/charity-admin
   if (!/^[0-9a-f-]{36}$/i.test(donationId)) notFound();
 
   const supabase = await createClient();
-  const { data } = await supabase.from("charity_donations").select(DONATION_FIELDS).eq("charity_id", id).eq("id", donationId).maybeSingle();
+  // A failed read goes to the error page ("Try again"), never to "not found".
+  const { data, error } = await supabase.from("charity_donations").select(DONATION_FIELDS).eq("charity_id", id).eq("id", donationId).maybeSingle();
+  if (error) throw new Error(`Donation not read: ${error.message}`);
   if (!data) notFound();
   const d = data as unknown as DonationRow;
   const s = donationStatus[d.status];
 
   // The receipt this donation is on, if one has been issued (a narrow view: no donor ID or tax digits).
-  const { data: links } = await supabase.from("charity_receipt_donations").select("receipt_id, status, reference").eq("donation_id", donationId);
+  // If it can't be read, the page doesn't guess: "Not issued yet" (and "Remove") would be wrong for a receipted gift.
+  const { data: links, error: linkError } = await supabase.from("charity_receipt_donations").select("receipt_id, status, reference").eq("donation_id", donationId);
+  if (linkError) throw new Error(`Receipt not read: ${linkError.message}`);
   const campaign = d.campaign_id ? (await supabase.from("campaigns").select("title").eq("id", d.campaign_id).eq("charity_id", id).maybeSingle()).data : null;
   const receipts = (links ?? []).map((l) => ({ id: l.receipt_id as string, status: l.status as string, reference: l.reference as string }));
 
