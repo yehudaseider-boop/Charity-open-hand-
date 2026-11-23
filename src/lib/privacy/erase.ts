@@ -153,8 +153,13 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       if (e && !gone(e.code)) throw new Error(`Could not erase: ${e.message}`);
     }
     if (email) {
-      const { error: e } = await db.from("charity_requests").delete().eq("notify_email", email);
+      // A request made without signing in, with their address, is all theirs and goes.
+      const { error: e } = await db.from("charity_requests").delete().eq("notify_email", email).is("requested_by", null);
       if (e && !gone(e.code)) throw new Error(`Could not erase: ${e.message}`);
+      // A request another signed-in donor made, with this address to hear back (review 23/11/2026), stays theirs: only
+      // this person's address and the agreement that went with it are cleared (the same split as the data download).
+      const { error: e2 } = await db.from("charity_requests").update({ notify_email: null, consent_version: null }).eq("notify_email", email);
+      if (e2 && !gone(e2.code)) throw new Error(`Could not erase: ${e2.message}`);
     }
   }
   // A charity's own imported copy of them (its contact list, 02/11/2026), and that contact's tags, which go with it

@@ -18,6 +18,8 @@ let rpcError: { message: string } | null;
 let deleteUserError: { message: string } | null;
 let rpcIds: string[] | null;
 const audits: Record<string, unknown>[] = [];
+/** Which rows each update was for ("table:column=value"). */
+const updateFilters: string[] = [];
 const emails: { to: string; text: string }[] = [];
 let mailFails = false;
 
@@ -50,10 +52,14 @@ vi.mock("@/lib/supabase/admin", () => ({
           eq: (c1: string, v1: unknown) => ({
             // consents: .eq("user_id").eq("kind"); the person's own tables: one .eq("user_id")
             eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }),
+            // charity_requests: .eq("notify_email").is("requested_by", null)
+            is: async (c: string, v: unknown) => (calls.push(`${table}:deleted:${c1}=${v1},${c}=${v}`), { error: null }),
             then: (resolve: (v: { error: null }) => void) => (calls.push(`${table}:deleted:${c1}=${v1}`), resolve({ error: null })),
           }),
         }),
-        update: (patch: Record<string, unknown>) => ({ eq: async () => (calls.push(`${table}:update:${JSON.stringify(patch)}`), { error: null }) }),
+        update: (patch: Record<string, unknown>) => ({
+          eq: async (c: string, v: unknown) => (calls.push(`${table}:update:${JSON.stringify(patch)}`), updateFilters.push(`${table}:${c}=${v}`), { error: null }),
+        }),
         then: (resolve: (v: { data: unknown[]; error: null }) => void) => {
           const ids = table === "donors" ? (f.user_id ? donorsByUser : donorsByEmail) : [];
           resolve({ data: ids.map((id) => ({ id, ...(donorEmails[id] ? { email: donorEmails[id] } : {}) })), error: null });
@@ -82,6 +88,7 @@ const { eraseDonor } = await import("@/lib/privacy/erase");
 beforeEach(() => {
   calls.length = 0;
   audits.length = 0;
+  updateFilters.length = 0;
   emails.length = 0;
   donorsByUser = ["d1"];
   donorsByEmail = ["d1", "d2"];
@@ -104,7 +111,10 @@ describe("erasing a donor by their account", () => {
       "launch_list:deleted:email=erin@example.co.za",
       // Their "Request a charity" asks, by account and by the email left to hear back (15/11/2026).
       "charity_requests:deleted:requested_by=11111111-1111-1111-1111-111111111111",
-      "charity_requests:deleted:notify_email=erin@example.co.za",
+      // By the email: only a request made without signing in goes; one another signed-in donor made keeps their
+      // part, and only this person's address and agreement are cleared (review 23/11/2026).
+      "charity_requests:deleted:notify_email=erin@example.co.za,requested_by=null",
+      'charity_requests:update:{"notify_email":null,"consent_version":null}',
       // A charity's imported copy of them (its contact list) goes too, with its tags (20/11/2026).
       "charity_contacts:deleted:email=erin@example.co.za",
       // The database erasure comes after everything that finds them by address or donor record (13/11/2026), so an
@@ -180,6 +190,17 @@ describe("erasing a donor by their account", () => {
     await expect(eraseDonor({ userId: USER, actorUserId: "admin1" })).rejects.toThrow(/Could not erase/);
     expect(calls).not.toContain("deleteUser");
     expect(audits).toHaveLength(0);
+  });
+});
+
+describe("their \"Request a charity\" asks (review 23/11/2026)", () => {
+  it("never deletes a request another signed-in donor made with their address: it clears only the address and its agreement", async () => {
+    await eraseDonor({ email: "Guest@Example.co.za", actorUserId: "admin1" });
+    const requests = calls.filter((c) => c.startsWith("charity_requests:"));
+    expect(requests).toEqual(["charity_requests:deleted:notify_email=guest@example.co.za,requested_by=null", 'charity_requests:update:{"notify_email":null,"consent_version":null}']);
+    // No delete by the email alone, which would take other people's requests with it.
+    expect(calls).not.toContain("charity_requests:deleted:notify_email=guest@example.co.za");
+    expect(updateFilters).toContain("charity_requests:notify_email=guest@example.co.za");
   });
 });
 
