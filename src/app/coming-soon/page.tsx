@@ -14,7 +14,8 @@ import { appLinks, charitySignUpOpen, launchListOpen } from "@/config/app-links"
 import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 import { whatsAppChat } from "@/lib/whatsapp";
-import { comingSoonHosts } from "@/lib/coming-soon";
+import { headers } from "next/headers";
+import { comingSoonHosts, comingSoonListable } from "@/lib/coming-soon";
 
 // The public address's page until launch (givezy.co.za; see lib/coming-soon.ts and proxy.ts). Rebuilt 19/11/2026
 // (Yehuda: "make it awesome and super legit"), from what the best pre-launch pages do: show the product in the first
@@ -23,7 +24,8 @@ import { comingSoonHosts } from "@/lib/coming-soon";
 // "Apply to list your charity" (CHARITY_SIGNUP=yes; WhatsApp until then). Nothing else on the site opens from here unless
 // one of those is on (lib/coming-soon.ts). No charity list,
 // no giving. Nothing about fees or invented numbers; every screen is the dashboard demo's made-up sample data.
-// DRAFT WORDING for Yehuda to approve. Never listed by search engines: robots below is set on the page itself.
+// Wording approved by Yehuda (23/11/2026: "lets do 1"). Search engines may list this page, but only on the coming-soon
+// address itself (givezy.co.za): on any other address (the test site) it stays hidden, as every page there does.
 
 const appName = platformConfig.appName;
 const charity = DEMO_CHARITY.name_en;
@@ -32,12 +34,15 @@ const launch = appLinks.launchMonth;
 /** The public address this page is shown on, so the share picture and links point at it, never at the test site. */
 const publicHost = comingSoonHosts(process.env.COMING_SOON_HOSTS)[0];
 
-export const metadata: Metadata = {
-  ...(publicHost ? { metadataBase: new URL(`https://${publicHost}`) } : {}),
-  title: { absolute: `${appName}: giving, made easy` },
-  description: `${appName} is a South African giving platform, launching ${launch ?? "soon"}. Give to checked charities and keep every s18A receipt in one place. For charities: s18A receipts, thank-yous and the tools to keep their donors.`,
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const listable = comingSoonListable((await headers()).get("host") ?? "", process.env.COMING_SOON_HOSTS);
+  return {
+    ...(publicHost ? { metadataBase: new URL(`https://${publicHost}`), alternates: { canonical: "/" } } : {}),
+    title: { absolute: `${appName}: giving, made easy` },
+    description: `${appName} is a South African giving platform, launching ${launch ?? "soon"}. Give to checked charities and keep every s18A receipt in one place. For charities: s18A receipts, thank-yous and the tools to keep their donors.`,
+    robots: listable ? { index: true, follow: false } : { index: false, follow: false },
+  };
+}
 
 const orangeBtn = "pressable inline-flex min-h-13 items-center justify-center rounded-[1.125rem] bg-coral px-7 text-[17px] font-bold text-navy";
 const lineBtnDark = "whitespace-nowrap inline-flex min-h-13 items-center justify-center gap-1.5 rounded-[1.125rem] border-[1.5px] border-white/40 px-7 text-[17px] font-bold text-white transition-colors hover:border-white";

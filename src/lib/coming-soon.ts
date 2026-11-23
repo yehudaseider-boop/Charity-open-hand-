@@ -119,3 +119,11 @@ export function comingSoonAction(url: URL, method: string, setting: string | und
 export function staysOnComingSoonHost(url: URL, setting: string | undefined, deployed: boolean): boolean {
   return deployed && isComingSoonHost(url.hostname, setting);
 }
+
+/**
+ * Whether search engines may list the coming-soon page on this address (Yehuda, 23/11/2026): only on the coming-soon
+ * address itself (givezy.co.za), never on the test site or any other address the same deployment answers on.
+ */
+export function comingSoonListable(host: string, setting: string | undefined): boolean {
+  return isComingSoonHost(host.replace(/:\d+$/, ""), setting);
+}
