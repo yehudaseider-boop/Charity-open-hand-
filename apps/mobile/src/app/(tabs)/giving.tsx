@@ -48,7 +48,7 @@ import { colors, fonts, radius, space, touch, type } from "@/theme/tokens";
 /** Progress (was Giving): the main goal as a big ring on blue, month by month, then the donor's records and history. */
 export default function Giving() {
   const insets = useSafeAreaInsets();
-  const status = useStatusCover();
+  const status = useStatusCover({ onBlue: true });
   const { width } = useWindowDimensions();
   const account = useAccount();
   const preview = account.status === "preview";

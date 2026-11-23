@@ -1,17 +1,19 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, type NativeScrollEvent, type NativeSyntheticEvent, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { rand } from "@/lib/format";
 import { colors, fonts, radius, space } from "@/theme/tokens";
 import type { Goal } from "@/lib/goals";
+import { photoLightUntil, statusBarStyle, type BarStyle } from "@/lib/status-bar";
 import { Button, TextLink } from "./button";
 import { DropBurst } from "./drop-burst";
 import { GoalEditor } from "./goal-editor";
 import { GoalRing } from "./goal-ring";
 import { Bubbles, People } from "./people";
 import { CheckIcon } from "./icons";
+import { ScreenStatusBar } from "./screen-status-bar";
 import { ShareButton } from "./share-button";
 import { Text } from "./text";
 
@@ -110,12 +112,18 @@ export function GiftSent({
   // The one question after a gift: the goal invitation (first gift) comes before the monthly one, and sharing steps aside for it.
   const offer = !invite && !gift.confirming ? monthlyOffer : null;
   const celebrate = !gift.confirming && hero !== null;
+  // White clock over the photo at the top of the thank-you; dark once it has scrolled away and white is under it.
+  const [heroHeight, setHeroHeight] = useState<number | null>(null);
+  const [clock, setClock] = useState<BarStyle>("light");
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => setClock(statusBarStyle(true, e.nativeEvent.contentOffset.y, photoLightUntil(heroHeight, insets.top)));
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.cream }} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+    <>
+    <ScreenStatusBar style={celebrate ? clock : "dark"} />
+    <ScrollView style={{ flex: 1, backgroundColor: colors.cream }} onScroll={celebrate ? onScroll : undefined} scrollEventThrottle={16} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
       {/* The thank-you moment, in the For charities page's look (30/10/2026): white, people giving,
           soft bubbles drifting round them, the words in deep ink with the amount line in blue. */}
       {celebrate ? (
-        <View style={[styles.hero, { minHeight: 380 + insets.top }]}>
+        <View style={[styles.hero, { minHeight: 380 + insets.top }]} onLayout={(e) => setHeroHeight(e.nativeEvent.layout.height)}>
           {hero}
           <LinearGradient colors={[colors.inkClear, colors.inkVeil]} locations={[0.15, 0.9]} style={StyleSheet.absoluteFill} pointerEvents="none" />
           <DropBurst />
@@ -272,6 +280,7 @@ export function GiftSent({
         <TextLink label="See your giving" onPress={() => router.dismissTo("/giving")} />
       </View>
     </ScrollView>
+    </>
   );
 }
 

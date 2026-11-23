@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Animated, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Animated, Image, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { BackIcon, CheckIcon, HeartIcon } from "@/components/icons";
@@ -20,6 +20,8 @@ import { GIVE_IN_APP, openGiveScreen } from "@/lib/give-entry";
 import { openUrl } from "@/lib/open-site";
 import { campaignShareText, charityShareText } from "@/lib/share";
 import { ShareButton } from "@/components/share-button";
+import { ScreenStatusBar } from "@/components/screen-status-bar";
+import { CHARITY_LIGHT_UNTIL, statusBarStyle, type BarStyle } from "@/lib/status-bar";
 import { donateUrl, SITE_URL } from "@/lib/website";
 import { EmptyState, ErrorState, LoadingNote, SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
@@ -54,6 +56,8 @@ export default function CharityDetail() {
   const savedList = useSaved();
   const [pop] = useState(() => new Animated.Value(1));
   const [scrollY] = useState(() => new Animated.Value(0));
+  // The clock's colour as the page scrolls (it opens at the top, over the photo).
+  const [clock, setClock] = useState<BarStyle>("light");
 
   // Back to where this page was opened from, or Discover when there is nothing behind it.
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/discover"));
@@ -92,6 +96,8 @@ export default function CharityDetail() {
   const firstPct = firstCampaign?.targetCents ? campaignPercent(firstCampaign) : null;
   // Only the charity's own words: a bracketed placeholder (sample data) is never shown, and the block hides.
   const impact = realImpactLine(charity.impact);
+  // A photo, or the blue block a live charity without one shows, is under the clock at the top of the page.
+  const onDark = Boolean(charity.coverUrl) || live;
   const focusTo = charity.focus ? focusGive(charity.focus, charity.campaigns) : null;
   const giveFromFocus = () => {
     if (focusTo?.campaignId) return GIVE_IN_APP ? openGiveScreen(charity.slug, { campaign: focusTo.campaignId }) : openUrl(donateUrl(SITE_URL, charity.slug, null, focusTo.campaignId));
@@ -99,7 +105,7 @@ export default function CharityDetail() {
   };
   return (
     <View style={styles.screen}>
-      <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}>
+      <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true, listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => setClock(statusBarStyle(onDark, e.nativeEvent.contentOffset.y, CHARITY_LIGHT_UNTIL)) })}>
         <View style={styles.cover}>
           <CharityImage charity={charity} live={live} rounded={false} bare={Boolean(charity.coverUrl)} style={StyleSheet.absoluteFill} />
           <CheckedBadge issues18a={charity.issues18a} style={styles.badgeOnCover} />
@@ -227,6 +233,9 @@ export default function CharityDetail() {
         </View>
       </Animated.ScrollView>
 
+      {/* White clock over the photo (or the blue block), dark once the white bar has slid in. Sample charities
+          without a photo show a light placeholder, so they keep the dark clock. */}
+      <ScreenStatusBar style={onDark ? clock : "dark"} />
       {/* Once the photo has scrolled away, a white bar slides in behind the round buttons. */}
       <Animated.View pointerEvents="none" style={[styles.headerBar, { height: insets.top + touch + 20, opacity: scrollY.interpolate({ inputRange: [220, 300], outputRange: [0, 1], extrapolate: "clamp" }) }]} />
 

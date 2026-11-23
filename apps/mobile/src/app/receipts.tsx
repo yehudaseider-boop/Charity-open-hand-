@@ -30,7 +30,7 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
 export default function Receipts() {
   const insets = useSafeAreaInsets();
   // A white strip behind the phone's clock once the page scrolls under it, as on the other pages.
-  const status = useStatusCover();
+  const status = useStatusCover({ onBlue: true });
   const account = useAccount();
   const preview = account.status === "preview";
   const signedIn = account.status === "signed-in";

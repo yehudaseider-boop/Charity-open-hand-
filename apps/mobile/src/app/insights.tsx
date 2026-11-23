@@ -31,7 +31,7 @@ const sliceColour = (s: Share, i: number) => (s.key === "other" ? colors.chartOt
  */
 export default function Insights() {
   const insets = useSafeAreaInsets();
-  const status = useStatusCover();
+  const status = useStatusCover({ onBlue: true });
   const account = useAccount();
   const directory = useDirectory();
   const preview = account.status === "preview";
