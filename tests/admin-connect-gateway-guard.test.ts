@@ -13,6 +13,9 @@ const CIPHER = encrypt("1234567890");
 let rpcAnswer: boolean | null;
 let rpcArgs: Record<string, unknown> | null;
 let directCharityWrites = 0;
+let rpcMissing = false;
+let reads = 0;
+let laterCipher: string | null = null;
 const audits: Record<string, unknown>[] = [];
 const emails: string[] = [];
 
@@ -32,12 +35,13 @@ vi.mock("@/lib/supabase/admin", () => ({
     rpc: async (name: string, args: Record<string, unknown>) => {
       if (name !== "set_charity_gateway_ref") throw new Error(`unexpected ${name}`);
       rpcArgs = args;
+      if (rpcMissing) return { data: null, error: { code: "PGRST202", message: "Could not find the function public.set_charity_gateway_ref" } };
       return { data: rpcAnswer, error: null };
     },
     from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          single: async () => ({ data: { bank_name: "FNB", bank_account_holder: "Meals Fund NPC", bank_account_number_encrypted: CIPHER, bank_branch_code: "250655", bank_verified_at: "2026-11-20T08:00:00Z" }, error: null }),
+          single: async () => ({ data: { bank_name: "FNB", bank_account_holder: "Meals Fund NPC", bank_account_number_encrypted: reads++ > 0 && laterCipher ? laterCipher : CIPHER, bank_branch_code: "250655", bank_verified_at: "2026-11-20T08:00:00Z" }, error: null }),
         }),
       }),
       update: () => {
@@ -54,6 +58,9 @@ beforeEach(() => {
   rpcAnswer = true;
   rpcArgs = null;
   directCharityWrites = 0;
+  rpcMissing = false;
+  reads = 0;
+  laterCipher = null;
   audits.length = 0;
   emails.length = 0;
 });
@@ -73,5 +80,22 @@ describe("connecting a charity to the payment provider", () => {
     expect(r).toEqual({ ok: false, message: "The bank details changed while connecting. Nothing was connected. Connect again." });
     expect(audits).toHaveLength(0);
     expect(emails).toHaveLength(0);
+  });
+
+  it("before database change 000009 is in, it checks the account again and saves the reference directly", async () => {
+    rpcMissing = true;
+    const r = await connectToGateway(CHARITY, { ok: false });
+    expect(r.ok).toBe(true);
+    expect(directCharityWrites).toBe(1);
+    expect(audits).toHaveLength(1);
+  });
+
+  it("before database change 000009 is in, a bank account changed meanwhile is still refused, and nothing is saved", async () => {
+    rpcMissing = true;
+    laterCipher = encrypt("9999999999");
+    const r = await connectToGateway(CHARITY, { ok: false });
+    expect(r).toEqual({ ok: false, message: "The bank details changed while connecting. Nothing was connected. Connect again." });
+    expect(directCharityWrites).toBe(0);
+    expect(audits).toHaveLength(0);
   });
 });

@@ -19,6 +19,8 @@ import { formToObject, zodErrors } from "@/lib/form";
 import { getGateway, GatewayError } from "@/lib/gateway";
 import type { FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
+import type { PostgrestError } from "@supabase/supabase-js";
+import { isMissingFunction } from "@/lib/charity/keeping-donors-queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function refresh(id: string, slug?: string) {
@@ -285,13 +287,16 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
     });
     // Saved only if the bank account is still the one that was sent (the database holds the charity while it checks):
     // otherwise the reference belongs to an account that is no longer the charity's (review 23/11/2026).
-    const { data: saved, error } = await db.rpc("set_charity_gateway_ref", {
+    const refArgs = {
       p_charity_id: id,
       p_gateway: gateway.name,
       p_account_ref: accountRef,
       p_account_number_encrypted: priv.bank_account_number_encrypted,
       p_bank_verified_at: priv.bank_verified_at,
-    });
+    };
+    let { data: saved, error } = await db.rpc("set_charity_gateway_ref", refArgs);
+    // Until database change 20261123000009 is in: check the account again, then save (not held, but checked).
+    if (isMissingFunction(error)) ({ data: saved, error } = await saveRefChecked(refArgs));
     if (error) return failed(error);
     if (saved !== true) return { ok: false, message: "The bank details changed while connecting. Nothing was connected. Connect again." };
     await logAudit({
@@ -600,4 +605,18 @@ function connectProblem(e: GatewayError): string {
   }
   // A wrong or changed key, or the provider failing: never its own message, which names the gateway.
   return "The payment provider answered with an error, so the charity isn't connected yet. Nothing was changed. Try again in a minute; if it keeps happening, check the payment settings on the Settings check page.";
+}
+
+/**
+ * Before database change 20261123000009 (`set_charity_gateway_ref`): the bank account is read again and the reference is
+ * saved only if it is still the one sent to the payment provider. The function, once in, does the same while holding the
+ * charity, so nothing can change in between.
+ */
+async function saveRefChecked(a: { p_charity_id: string; p_gateway: string; p_account_ref: string; p_account_number_encrypted: string; p_bank_verified_at: string }): Promise<{ data: boolean | null; error: PostgrestError | null }> {
+  const db = createAdminClient();
+  const { data: now, error: readError } = await db.from("charity_private").select("bank_account_number_encrypted, bank_verified_at").eq("charity_id", a.p_charity_id).single();
+  if (readError) return { data: null, error: readError };
+  if (now.bank_account_number_encrypted !== a.p_account_number_encrypted || now.bank_verified_at !== a.p_bank_verified_at) return { data: false, error: null };
+  const { error } = await db.from("charities").update({ gateway: a.p_gateway, gateway_subaccount_ref: a.p_account_ref }).eq("id", a.p_charity_id);
+  return error ? { data: null, error } : { data: true, error: null };
 }

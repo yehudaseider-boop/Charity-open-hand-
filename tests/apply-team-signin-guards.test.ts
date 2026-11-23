@@ -34,7 +34,8 @@ vi.mock("@/lib/supabase/admin", () => ({
       const q: Record<string, unknown> = {};
       q.insert = () => (written.push(`insert ${table}`), q);
       for (const m of ["select", "eq"]) q[m] = () => q;
-      q.maybeSingle = async () => ({ data: table === "charities" ? { status: charityStatus } : null, error: null });
+      q.delete = () => (written.push(`delete ${table}`), q);
+      q.maybeSingle = async () => ({ data: table === "charities" ? { status: charityStatus, id: "33333333-3333-3333-3333-333333333333" } : null, error: null });
       q.single = q.maybeSingle;
       return q;
     },
@@ -89,6 +90,17 @@ describe("starting an application", () => {
     rpcResults = [{ data: null, error: { code: "08006", message: "connection lost" } }];
     await expect(startApplication({ ok: false }, form())).rejects.toMatchObject({ message: "connection lost" });
     expect(written).toEqual([]);
+  });
+});
+
+describe("starting an application before database change 000009 is in", () => {
+  it("makes the three rows one by one, as before, and opens the application", async () => {
+    rpcResults = [{ data: null, error: { code: "PGRST202", message: "Could not find the function public.start_charity_application" } }];
+    const f = new FormData();
+    f.set("name_en", "Meals Fund");
+    const url = await whereTo(startApplication({ ok: false }, f));
+    expect(url).toBe("/charity-admin/33333333-3333-3333-3333-333333333333/application");
+    expect(written).toEqual(["insert charities", "insert charity_admins", "insert charity_private"]);
   });
 });
 
