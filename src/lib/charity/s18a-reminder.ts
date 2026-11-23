@@ -14,6 +14,7 @@ import { missingWords, type MissingDetail } from "@/lib/donations/s18a-details";
 import type { EmailMessage } from "@/lib/email";
 import { oneClickStopHeaders } from "@/lib/email/headers";
 import { plural } from "@/lib/text";
+import { inboxKey } from "./one-per-address";
 
 export const S18A_FILTERS = {
   asked: "Asked for an s18A receipt",
@@ -81,10 +82,15 @@ export type ReminderCandidate = {
 
 export type ReminderPlan<T extends ReminderCandidate> = { send: T[]; skipped: Record<ReminderSkip, number> };
 
-/** Who gets a reminder, and why each other donor doesn't. One reason per donor, the first that applies. */
+/**
+ * Who gets a reminder, and why each other donor doesn't. One reason per donor, the first that applies. One reminder
+ * per inbox (review 23/11/2026): a person who gave as themselves and for their company is two donors with one
+ * address, so the second waits a week ("this_week"), as for appeals.
+ */
 export function planReminders<T extends ReminderCandidate>(candidates: T[]): ReminderPlan<T> {
   const skipped: Record<ReminderSkip, number> = { not_found: 0, erased: 0, complete: 0, recorded_only: 0, opted_out: 0, this_week: 0 };
   const send: T[] = [];
+  const inbox = new Set<string>();
   for (const c of candidates) {
     const reason: ReminderSkip | null = !c.found
       ? "not_found"
@@ -96,11 +102,14 @@ export function planReminders<T extends ReminderCandidate>(candidates: T[]): Rem
             ? "recorded_only"
             : c.optedOut
               ? "opted_out"
-              : c.messagedThisWeek
+              : c.messagedThisWeek || inbox.has(inboxKey(c.email))
                 ? "this_week"
                 : null;
     if (reason) skipped[reason]++;
-    else send.push(c);
+    else {
+      inbox.add(inboxKey(c.email!));
+      send.push(c);
+    }
   }
   return { send, skipped };
 }

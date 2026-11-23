@@ -70,6 +70,19 @@ describe("who gets a reminder", () => {
     expect(plan.send.map((c) => c.donorId)).toEqual(["send"]);
     expect(plan.skipped).toEqual({ not_found: 1, erased: 1, complete: 1, recorded_only: 1, opted_out: 1, this_week: 1 });
   });
+  it("one reminder per inbox: someone who gave as themselves and for their company gets one, the second waits a week (review 23/11/2026)", () => {
+    const plan = planReminders([
+      cand({ donorId: "sarah", email: "sarah@x.co" }),
+      cand({ donorId: "sarah-ltd", email: " SARAH@x.co " }),
+      cand({ donorId: "david", email: "david@x.co" }),
+    ]);
+    expect(plan.send.map((c) => c.donorId)).toEqual(["sarah", "david"]);
+    expect(plan.skipped.this_week).toBe(1);
+  });
+  it("an address left out for another reason doesn't use up the inbox for the next donor with it", () => {
+    const plan = planReminders([cand({ donorId: "done", missing: [] }), cand({ donorId: "sarah-ltd" })]);
+    expect(plan.send.map((c) => c.donorId)).toEqual(["sarah-ltd"]);
+  });
   it("says how many were skipped and why, in plain words", () => {
     expect(skippedSentence({ this_week: 2, opted_out: 1 })).toBe(
       "3 weren't sent: 2 already had a message from you this week. They can get one from Monday; 1 turned off emails from you.",

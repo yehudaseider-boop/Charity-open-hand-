@@ -28,6 +28,19 @@ describe("what just happened, and what next", () => {
     expect(describeDone("bank_saved", { last4: "1234" }, ctx).what).toContain("ending 1234");
   });
 
+  it("a monthly thank-you whose emails were cut off says plainly they may have gone, never 'nobody was left' (review 23/11/2026)", () => {
+    expect(describeDone("thank_you_sent", { month: "October 2026", sent: 0, failed: 2, maybeSent: 2, remaining: 0 }, ctx).what).toBe(
+      "Your thank-you for October 2026 is saved, but no email was confirmed as sent. We couldn't confirm 2 emails: the connection dropped before the email service answered, so they may have gone. They won't be sent again, so nobody gets it twice.",
+    );
+    expect(describeDone("thank_you_sent", { month: "October 2026", sent: 3, failed: 2, maybeSent: 1, remaining: 0 }, ctx).what).toBe(
+      "Your thank-you for October 2026 went to 3 donors. 1 email could not be sent. We couldn't confirm 1 email: the connection dropped before the email service answered, so it may have gone. It won't be sent again, so nobody gets it twice.",
+    );
+    const rest = describeDone("thank_you_sent", { month: "October 2026", sent: 0, failed: 1, maybeSent: 1, remaining: 4 }, ctx);
+    expect(rest.what).toContain("press Send the rest to send them");
+    expect(rest.what).toContain("may have gone");
+    expect(rest.next!.label).toBe("Send the rest");
+  });
+
   it("before approval, says when donors will see it, and doesn't link to a page that isn't public yet", () => {
     const early = { ...ctx, approved: false };
     expect(describeDone("campaign_started", { title: "Roof" }, early).what).toContain("once your application is approved");

@@ -194,8 +194,11 @@ export async function runReceiptsJob(args: {
   // email never stops the others; it is tried again on the next run.
   if (args.mailer) {
     for (const r of await store.listToEmail(taxYear, charityId)) {
-      if (!(await store.claimEmail(r))) continue;
+      // The claim is inside the try (review 23/11/2026): one receipt whose claim fails never stops the others' emails.
+      let claimed = false;
       try {
+        claimed = await store.claimEmail(r);
+        if (!claimed) continue;
         const pdf = await store.readPdf(r);
         const mail = buildReceiptEmail({ details: r.details, reference: r.reference, siteUrl: args.mailer.siteUrl, platformName: args.mailer.platformName });
         const sent = await args.mailer.transport.send({
@@ -214,9 +217,10 @@ export async function runReceiptsJob(args: {
         // A send cut off at the time limit, or a dropped connection, may have gone (13/11/2026): the claim stays, so
         // nothing sends it again by itself, and onEmailFailed flags it for a person. Only a refusal from the email
         // service (sure not to have gone) frees it for the next run or the daily retry.
-        if (!wasCutOff(e)) await store.releaseEmail(r).catch(() => undefined);
+        // A claim that failed holds nothing to free, and nothing was sent: it is tried again on the next run.
+        if (claimed && !wasCutOff(e)) await store.releaseEmail(r).catch(() => undefined);
         summary.emailFailed += 1;
-        await args.mailer.onEmailFailed?.(r, e).catch(() => undefined);
+        if (claimed) await args.mailer.onEmailFailed?.(r, e).catch(() => undefined);
         console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);
       }
     }

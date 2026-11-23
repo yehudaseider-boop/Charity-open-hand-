@@ -41,7 +41,7 @@ export async function sendThankDonors(charityId: string, month: string, _prev: F
   revalidatePath(`/charity-admin/${charityId}/thank-donors`);
   if (!r.ok) return { ok: false, message: r.message };
   // Sent emails can't be called back, so there is no undo: the page asked first.
-  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null, byItself: await goesByItself(charityId, month, r.remaining) }, null);
+  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, maybeSent: r.maybeSent ?? 0, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null, byItself: await goesByItself(charityId, month, r.remaining) }, null);
   redirect(`/charity-admin/${charityId}/thank-donors?done=${done}`);
 }
 
@@ -55,7 +55,7 @@ export async function sendRestOfThankYou(charityId: string, month: string, _prev
   const r = await continueThankYou({ charityId, charityName: charity.name_en, month, userId: viewer.userId, replyTo: priv?.contact_email ?? null });
   revalidatePath(`/charity-admin/${charityId}/thank-donors`);
   if (!r.ok) return { ok: false, message: r.message };
-  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null, byItself: await goesByItself(charityId, month, r.remaining) }, null);
+  const done = await recordAction(charityId, viewer.userId, "thank_you_sent", { month: monthLabel(month), sent: r.sent, failed: r.failed, maybeSent: r.maybeSent ?? 0, remaining: r.remaining, thisWeek: r.thisWeek ?? 0, from: r.from ?? null, byItself: await goesByItself(charityId, month, r.remaining) }, null);
   redirect(`/charity-admin/${charityId}/thank-donors?done=${done}`);
 }
 
