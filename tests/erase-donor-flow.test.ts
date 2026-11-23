@@ -49,6 +49,8 @@ vi.mock("@/lib/supabase/admin", () => ({
         delete: () => ({
           // The charities' personal thank-yous to the erased donors: .in("donor_id", ids)
           in: async () => ({ error: null }),
+          // The rate limiter's rows for an email together with an internet address: .like("key", "<stand-in>|%")
+          like: async (c: string, v: unknown) => (calls.push(`${table}:deleted:${c}~${v}`), { error: null }),
           eq: (c1: string, v1: unknown) => ({
             // consents: .eq("user_id").eq("kind"); the person's own tables: one .eq("user_id")
             eq: async (c: string, v: unknown) => (calls.push(`consents:${c}=${v}`), { error: null }),
@@ -84,6 +86,13 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 const { eraseDonor } = await import("@/lib/privacy/erase");
+const { hashedKey } = await import("@/lib/rate-limit");
+/** The rate limiter's two deletes for an address: its keyed stand-in exactly, and it with an internet address. */
+const limitRows = (address: string) => {
+  const key = hashedKey("email", address) as string;
+  // An "_" in the stand-in is a wildcard in a pattern, so it is escaped: only this stand-in can match.
+  return [`rate_limit_events:deleted:key=${key}`, `rate_limit_events:deleted:key~${key.replace(/_/g, "\\_")}|%`];
+};
 
 beforeEach(() => {
   calls.length = 0;
@@ -117,6 +126,8 @@ describe("erasing a donor by their account", () => {
       'charity_requests:update:{"notify_email":null,"consent_version":null}',
       // A charity's imported copy of them (its contact list) goes too, with its tags (20/11/2026).
       "charity_contacts:deleted:email=erin@example.co.za",
+      // Their address in the rate limiter, by the limiter's own keyed stand-in (review 23/11/2026).
+      ...limitRows("erin@example.co.za"),
       // The database erasure comes after everything that finds them by address or donor record (13/11/2026), so an
       // erasure that stops part way can be finished by running it again.
       "rpc",
@@ -190,6 +201,34 @@ describe("erasing a donor by their account", () => {
     await expect(eraseDonor({ userId: USER, actorUserId: "admin1" })).rejects.toThrow(/Could not erase/);
     expect(calls).not.toContain("deleteUser");
     expect(audits).toHaveLength(0);
+  });
+});
+
+describe("their address in the rate limiter (review 23/11/2026)", () => {
+  it("is found by the limiter's keyed stand-in, never the address itself, alone or with an internet address", async () => {
+    vi.stubEnv("ENCRYPTION_KEY", Buffer.alloc(32, 7).toString("base64"));
+    try {
+      await eraseDonor({ email: "Guest@Example.co.za", actorUserId: "admin1" });
+      const rows = calls.filter((c) => c.startsWith("rate_limit_events:"));
+      expect(rows).toEqual(limitRows("guest@example.co.za"));
+      expect(rows[0]).toMatch(/^rate_limit_events:deleted:key=email#/);
+      expect(rows[1]).toMatch(/\|%$/);
+      expect(rows.join()).not.toMatch(/guest|example/i);
+      expect(calls.indexOf(rows[1])).toBeLessThan(calls.indexOf("rpc"));
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("covers every address linked to their account, once each, and skips ones already erased", async () => {
+    donorEmails = { d1: "Erin.Work@Example.co.za" };
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    const rows = calls.filter((c) => c.startsWith("rate_limit_events:"));
+    expect(rows.sort()).toEqual([...limitRows("erin@example.co.za"), ...limitRows("erin.work@example.co.za")].sort());
+    calls.length = 0;
+    donorEmails = { d1: "erased+d1@erased.invalid" };
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    expect(calls.filter((c) => c.startsWith("rate_limit_events:"))).toEqual(limitRows("erin@example.co.za"));
   });
 });
 
