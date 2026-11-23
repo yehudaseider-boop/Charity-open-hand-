@@ -116,15 +116,15 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   // One message a week per donor from the charity (09/11/2026): anyone who had any this week (a thank-you, a
   // reminder, a news email or appeal, the monthly thank-you) isn't offered "Say thank you" until Monday.
   const [thanked, stopped, thisWeek] = canThank
-    ? await Promise.all([
-        lastThanked(id, shownDonors.map((d) => d.donor_id)),
-        optedOut(emailed.map((d) => d.email), id),
+    ? await t("thank-you checks", Promise.all([
+        t("lastThanked", lastThanked(id, shownDonors.map((d) => d.donor_id))),
+        t("optedOut", optedOut(emailed.map((d) => d.email), id)),
         // If this check fails the button still shows: sending checks again and says plainly if it's this week.
-        messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) }))).catch((e: unknown) => {
+        t("messagedThisWeek", messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) })))).catch((e: unknown) => {
           console.error("[donors] weekly check failed", e instanceof Error ? e.message : e);
           return new Set<string>();
         }),
-      ])
+      ]))
     : [new Map<string, string>(), new Set<string>(), new Set<string>()];
   const here = href(page);
   const key = formKey(sp);
