@@ -100,11 +100,13 @@ export function BankForm({ action, priv }: {
   );
 }
 
-export function UploadForm({ action, showMandateDate }: { action: Action; showMandateDate: boolean }) {
+export function UploadForm({ action, showMandateDate, canBank = true }: { action: Action; showMandateDate: boolean; canBank?: boolean }) {
   return (
     <ActionForm action={action} submitLabel="Upload" pendingLabel="Uploading…" resetOnSuccess>
+      {/* The bank confirmation letter is the owner's and finance's, like the account itself. */}
       <SelectField name="document_type" label="Document" required
-        options={Object.entries(documentTypes).map(([value, label]) => ({ value, label }))} />
+        hint={canBank ? undefined : "Your charity's owner adds the bank confirmation letter."}
+        options={Object.entries(documentTypes).filter(([value]) => canBank || value !== "bank_confirmation").map(([value, label]) => ({ value, label }))} />
       <FileField name="file" label="File" required accept="application/pdf,image/jpeg,image/png" hint="PDF, JPG or PNG, up to 4 MB." />
       {showMandateDate ? (
         <DateField name="signed_on" label="Date the mandate was signed"

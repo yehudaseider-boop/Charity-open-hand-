@@ -52,7 +52,7 @@ export function DonorPeekLink({ charityId, donorId, href, children, stretch = fa
           load();
         }}
       >
-        {children}
+        <bdi>{children}</bdi>
       </Link>
       {open ? (
         <div className="fixed inset-0 z-50 flex justify-end" role="presentation">

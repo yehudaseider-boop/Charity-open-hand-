@@ -156,6 +156,21 @@ describe("recorded gifts", () => {
     });
   });
 
+  it("record_gifts refuses the same gift twice without a reference, as the website's look does (review 23/11/2026)", async () => {
+    await tx(async () => {
+      const gift = (o: Record<string, unknown> = {}) => ({ donor_type: "individual", email: "twice@x.test", first_name: "A", last_name: "B", amount_cents: 2500, paid_at: "2026-03-05T12:00:00+02:00", tax_year: 2027, method: "eft", wants_18a: false, campaign_id: null, reference: null, ...o });
+      await run("select public.record_gifts($1, $2, null, $3)", [charity, admin, JSON.stringify([gift()])]);
+      // A quick second press: the same email (in other capitals), amount and date.
+      await refused("select public.record_gifts($1, $2, null, $3)", [charity, admin, JSON.stringify([gift({ email: "Twice@X.test" })])], /recorded_gift_twice/);
+      // A whole file with that gift in it saves nothing.
+      const before = Number((await run("select count(*) from public.donations where charity_id = $1", [charity])).rows[0].count);
+      await refused("select public.record_gifts($1, $2, null, $3)", [charity, admin, JSON.stringify([gift({ email: "new@x.test" }), gift()])], /recorded_gift_twice/);
+      expect(Number((await run("select count(*) from public.donations where charity_id = $1", [charity])).rows[0].count)).toBe(before);
+      // Another amount, another day, or a reference: a different gift.
+      await expect(run("select public.record_gifts($1, $2, null, $3)", [charity, admin, JSON.stringify([gift({ amount_cents: 2600 }), gift({ paid_at: "2026-03-06T12:00:00+02:00" }), gift({ reference: "EFT-2" })])])).resolves.toBeTruthy();
+    });
+  });
+
   it("only the server may call record_gifts", async () => {
     await tx(async () => {
       await run("set local role authenticated");

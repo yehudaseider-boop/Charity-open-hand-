@@ -157,7 +157,6 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
   if (!parsed.success) return zodErrors(parsed.error);
   const v = parsed.data;
 
-  const supabase = await createClient();
   const after = {
     bank_name: v.bank_name,
     bank_account_holder: v.bank_account_holder,
@@ -168,7 +167,11 @@ export async function saveBank(charityId: string, _prev: FormState, formData: Fo
   // The details as they were (the account number stays encrypted), for "Undo". Never sent to the browser.
   const { data: was, error: readError } = await createAdminClient().from("charity_private").select(Object.keys(after).join(", ")).eq("charity_id", charityId).maybeSingle();
   if (readError) return { ok: false, message: "That didn't save. Please try again." };
-  const { data, error } = await supabase
+  // Saved by the server, after the owner and open-application checks above (23/11/2026): a browser session can no
+  // longer write the bank columns at all, so encryption, the audit log, the bank check and "Undo" always come with it.
+  // The server's write skips the database's bank guard, so the "checked by Givezy" stamp is cleared here: a new
+  // account is checked again before going live. (From a browser, sending it was refused once Givezy had stamped it.)
+  const { data, error } = await createAdminClient()
     .from("charity_private")
     .update({ ...after, bank_verified_at: null })
     .eq("charity_id", charityId)
@@ -205,6 +208,11 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
   const signedOn = typedDay(signedTyped);
 
   if (!Object.hasOwn(documentTypes, type)) return { ok: false, fieldErrors: { document_type: "Choose a document type" } };
+  // The bank confirmation letter shows the bank account: the owner's and finance's, like the account itself.
+  if (type === "bank_confirmation") {
+    const noBank = await roleRefusal(charityId, "bank_view");
+    if (noBank) return { ok: false, message: noBank, fieldErrors: { document_type: "Your role can't add the bank confirmation letter. Ask your charity's owner to add it." } };
+  }
   if (!(file instanceof File) || file.size === 0) return { ok: false, fieldErrors: { file: "Choose a file" } };
   if (file.size > MAX_UPLOAD_BYTES) return { ok: false, fieldErrors: { file: "Files must be 4 MB or smaller" } };
   if (!(DOCUMENT_MIME as readonly string[]).includes(file.type)) {
@@ -257,16 +265,22 @@ export async function uploadDocument(charityId: string, _prev: FormState, formDa
 export async function removeDocument(charityId: string, documentId: string): Promise<void> {
   const viewer = await requireViewer();
   const { data, locked } = await loadEditable(charityId);
-  if (locked) return;
+  // Never a button that does nothing: back to the page with the plain reason (nothing was changed).
+  const refusedTo = (why: "application" | "locked" | "gone") => {
+    revalidatePath(`/charity-admin/${charityId}/application`);
+    redirect(`/charity-admin/${charityId}/application?step=documents&refused=${why}`);
+  };
+  if (locked) return refusedTo(editable(data.charity.status) ? "application" : "locked");
   const doc = data.documents.find((d) => d.id === documentId);
-  if (!doc) return;
+  if (!doc) return refusedTo("gone");
   // The whole row, so "Undo" can put it back exactly; the file is kept for the same reason.
   const { data: row, error: readError } = await createAdminClient().from("charity_documents").select("*").eq("id", documentId).eq("charity_id", charityId).maybeSingle();
   if (readError) throw readError;
-  if (!row) return;
+  if (!row) return refusedTo("gone");
   const supabase = await createClient();
-  const { error } = await supabase.from("charity_documents").delete().eq("id", documentId);
+  const { data: gone, error } = await supabase.from("charity_documents").delete().eq("id", documentId).select("id");
   if (error) throw error;
+  if (!gone?.length) return refusedTo("gone");
   const done = await recordAction(charityId, viewer.userId, "document_removed", { fileName: doc.file_name }, { type: "reinsert", table: "charity_documents", row });
   revalidatePath(`/charity-admin/${charityId}/application`);
   redirect(back(charityId, "documents", done));
@@ -288,8 +302,16 @@ export async function submitApplication(charityId: string, _prev: FormState, for
   if (!isComplete(checklist)) {
     return { ok: false, message: "Some sections are still incomplete. See the checklist." };
   }
-  // Only this server action can submit (the database no longer lets a browser change a charity's status),
-  // so the four declarations and the consent record below always come with a submission.
+  // Only this server action can submit (the database no longer lets a browser change a charity's status). The
+  // consent record for the four declarations is written first (23/11/2026), so a submission never stands without
+  // one: if the status change below then fails, the extra record is harmless and a second try simply adds another.
+  const consent = await createAdminClient()
+    .from("consents")
+    .insert({ kind: "charity_declarations", policy_version: legalConfig.policyVersion, user_id: viewer.userId, charity_id: charityId });
+  if (consent.error) {
+    console.error("[application] consent", consent.error.message);
+    return { ok: false, message: "That didn't go through, so your application wasn't submitted. Your details are all kept. Please try again." };
+  }
   const { data: rows, error } = await createAdminClient()
     .from("charities")
     .update({ status: "pending_review" })
@@ -298,10 +320,6 @@ export async function submitApplication(charityId: string, _prev: FormState, for
     .select("id");
   const fail = refusal(error, rows);
   if (fail) return fail;
-  const consent = await createAdminClient()
-    .from("consents")
-    .insert({ kind: "charity_declarations", policy_version: legalConfig.policyVersion, user_id: viewer.userId, charity_id: charityId });
-  if (consent.error) throw consent.error;
   await logAudit({
     actorUserId: viewer.userId,
     action: "charity.application_submitted",

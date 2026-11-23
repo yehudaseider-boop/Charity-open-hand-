@@ -52,6 +52,7 @@ export default async function CampaignsPage({ params, searchParams }: PageProps<
       <DonePanel charity={charity} sp={sp} here={`/charity-admin/${id}/campaigns`} />
 
       {sp.refused === "profile" ? <Notice>{refusedFor("profile")}</Notice> : null}
+      {sp.refused === "gone" ? <Notice>That campaign had already ended or been removed, perhaps by someone else on your team. Nothing else was changed.</Notice> : null}
 
       {!(await viewerCan(id, "profile")) ? <Notice>Your role doesn&apos;t include starting or ending campaigns. You can see them here.</Notice> : null}
 

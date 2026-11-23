@@ -12,6 +12,7 @@ import { initials } from "@/lib/charity/initials";
 import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
 import { weekStart } from "@/lib/charity/thank-you";
 import { createPublicClient } from "@/lib/supabase/public";
+import { readPublicCharities } from "@/lib/charity/public-list";
 
 /** What was typed, as typed (spaces tidied, at most 60 characters): kept in the search box and shown in the results line. */
 export function typedQuery(q: unknown): string {
@@ -65,25 +66,12 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
   // Typed signs only ("%%%") leave no words: nothing is searched for, and nothing is found.
   const search = searchWords(cleanQuery(q)).length ? cleanQuery(q) : "";
 
-  // Row-level security only returns approved charities to the public.
-  let query = supabase
-    .from("charities")
-    .select("id, slug, name_en, description_en, logo_path, cover_path, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(category_id)")
-    .eq("status", "approved")
-    .order("name_en");
-  if (search) {
-    // search_text is the name, legal name, description, suburb and city in lower case without accents (migration
-    // 20261121000001). cleanQuery has already removed quotes, commas, % and _, so the only wildcards are ours.
-    query = query.like("search_text", searchPattern(search));
-  }
-  if (category) {
-    const { data: links } = await supabase.from("charity_categories").select("charity_id").eq("category_id", category.id);
-    query = query.in("id", (links ?? []).map((l) => l.charity_id));
-  }
+  // Row-level security only returns approved charities to the public. Read in pages of 1 000 (the database's most
+  // at a time), so a long list is never cut short (review 23/11/2026).
   // Typed something, but nothing in it can be searched for: nothing matches (and there's no need to ask).
-  const { data, error } = q && !search ? { data: [], error: null } : await query;
-  if (error) throw error;
-  const charities = data as Row[];
+  const charities: Row[] = q && !search
+    ? []
+    : await readPublicCharities<Row>(supabase, { pattern: search ? searchPattern(search) : null, categoryId: category?.id ?? null });
 
   // The cause of the week (picked in Admin, the same one the app shows), on the plain list only. It is a bonus: if it
   // can't be read, the list shows without it. Only an approved charity can be it, as it must be in this list.

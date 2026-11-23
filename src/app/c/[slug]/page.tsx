@@ -26,6 +26,7 @@ import { charityData } from "@/lib/seo/structured-data";
 import { ProfileVideo } from "@/components/profile-video";
 import { focusCampaign, jhbToday } from "@/lib/charity/focus";
 import { loadPublicFocus, loadVideo } from "@/lib/charity/profile-extras";
+import { webLink } from "@/lib/charity/web-link";
 import { FocusCard } from "./focus-card";
 
 const loadCharity = cache(async (slug: string) => {
@@ -259,10 +260,10 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
               <Row label="Registered name" value={charity.legal_name_en} />
               {charity.npo_number ? <Row label="NPO number" value={charity.npo_number} /> : null}
               {charity.pbo_number ? <Row label="PBO number" value={charity.pbo_number} /> : null}
-              {charity.website ? (
+              {webLink(charity.website) ? (
                 <Row
                   label="Website"
-                  value={<a href={charity.website} rel="noopener noreferrer nofollow" target="_blank" className="break-all font-semibold text-brand underline">{charity.website.replace(/^https?:\/\//, "")}</a>}
+                  value={<a href={webLink(charity.website)!} rel="noopener noreferrer nofollow" target="_blank" className="break-all font-semibold text-brand underline">{webLink(charity.website)!.replace(/^https?:\/\//i, "")}</a>}
                 />
               ) : null}
             </dl>

@@ -74,7 +74,16 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
     };
   }
   const v = parsed.data;
-  const categoryIds = formData.getAll("category_ids").map(String).filter(isUuid);
+  const categoryIds = [...new Set(formData.getAll("category_ids").map(String).filter(isUuid))];
+  // Every category must be one of Givezy's, checked before anything is saved (23/11/2026): an unknown one used to be
+  // refused only after the profile itself had saved, and the page then said nothing had.
+  if (categoryIds.length) {
+    const known = await createAdminClient().from("categories").select("id").in("id", categoryIds);
+    if (known.error) return failed(known.error);
+    if ((known.data ?? []).length !== categoryIds.length) {
+      return { ok: false, message: "Please fix the highlighted fields. Nothing was saved.", fieldErrors: { category_ids: "One of these categories no longer exists. Reload the page and choose again." } };
+    }
+  }
 
   const supabase = await createClient();
   const after = {
@@ -96,16 +105,27 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
 
   // Categories: add the new ones first, then drop the rest, so a failure never
   // leaves the charity with none (RLS limits this to the charity's own rows).
+  // The profile above is saved by now: if the categories don't save, the page says so, and the audit, the reviewer's
+  // email and "Undo" still cover what did save (23/11/2026).
+  let categoriesSaved = true;
   if (categoryIds.length) {
     const ins = await supabase
       .from("charity_categories")
       .upsert(categoryIds.map((category_id) => ({ charity_id: charityId, category_id })), { onConflict: "charity_id,category_id", ignoreDuplicates: true });
-    if (ins.error) return failed(ins.error);
+    if (ins.error) {
+      console.error("[profile] categories", ins.error.message);
+      categoriesSaved = false;
+    }
   }
-  let del = supabase.from("charity_categories").delete().eq("charity_id", charityId);
-  if (categoryIds.length) del = del.not("category_id", "in", `(${categoryIds.join(",")})`);
-  const removed = await del;
-  if (removed.error) return failed(removed.error);
+  if (categoriesSaved) {
+    let del = supabase.from("charity_categories").delete().eq("charity_id", charityId);
+    if (categoryIds.length) del = del.not("category_id", "in", `(${categoryIds.join(",")})`);
+    const removed = await del;
+    if (removed.error) {
+      console.error("[profile] categories", removed.error.message);
+      categoriesSaved = false;
+    }
+  }
 
   const renamed = v.name_en !== charity.name_en;
   await logAudit({
@@ -122,7 +142,11 @@ export async function saveProfile(charityId: string, _prev: FormState, formData:
   // The figure sits under the "Verified" badge and is a claim, so a change to it is told to the reviewer too.
   if (figureBefore !== figureAfter) await tellReviewer(charity, "its \"what one gift pays for\" figure");
   if (renamed) await tellReviewer(charity, `its name, from "${charity.name_en}" to "${v.name_en}"`);
-  const done = await recordAction(charityId, viewer.userId, "profile_saved", {}, { type: "restore", table: "charities", before, after, categories: categoriesBefore, categoriesAfter: categoryIds });
+  // Undo takes back what saved: with the categories when they saved, without them when they didn't.
+  const done = await recordAction(
+    charityId, viewer.userId, "profile_saved", categoriesSaved ? {} : { categoriesNotSaved: true },
+    categoriesSaved ? { type: "restore", table: "charities", before, after, categories: categoriesBefore, categoriesAfter: categoryIds } : { type: "restore", table: "charities", before, after },
+  );
   revalidate(charityId, charity.slug);
   redirect(`/charity-admin/${charityId}/profile?done=${done}`);
 }
