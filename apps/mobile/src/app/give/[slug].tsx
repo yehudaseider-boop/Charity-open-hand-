@@ -52,6 +52,7 @@ import { GIVE_IN_APP } from "@/lib/give-entry";
 import { haptic } from "@/lib/haptics";
 import { celebrates, stageLabel, TICK_MS, type GiveStage } from "@/lib/give-stage";
 import { confirmThen, openSite, openUrl } from "@/lib/open-site";
+import { afterCheckAgain, afterReply, messageOutcome } from "@/lib/give-after";
 import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
 import { inHistory, settles, snapshotTotal, type GiftSnapshot, type PendingGift } from "@/lib/pending-gift";
@@ -639,8 +640,8 @@ export default function Give() {
       setMessage(null);
       setDone(sentSummary(g.summary, false, g.reference));
     } else {
-      const o = outcome === "failed" || outcome === "not_found" || outcome === "reversed" || outcome === "review" || outcome === "expired" ? outcome : "pending";
-      setMessage(`Your gift of ${waitingGiftLine(g)} ${afterPaymentMessage(o, g.charged, checkedAt, signedIn)}`, afterPaymentTone(o), true, o === "expired" && !signedIn);
+      const o = messageOutcome(outcome);
+      setMessage(`Your gift of ${waitingGiftLine(g)} ${afterPaymentMessage(o, g.charged, o === "unknown" ? undefined : checkedAt, signedIn)}`, afterPaymentTone(o), true, o === "expired" && !signedIn);
     }
   }
 
@@ -884,7 +885,11 @@ export default function Give() {
         return;
       }
       setMessage(r.message, r.stillChecking ? "wait" : "error", !r.quote);
-      if (r.quote) setAuthorisedTotal(null);
+      if (r.quote) {
+        setAuthorisedTotal(null);
+        // The server's total differs from the one shown: ask again for the charity's limits and rates, so the button shows the new total.
+        setReadyAttempt((n) => n + 1);
+      }
       return;
     }
     // Our server has made the payment: the payment page is next (a saved-card gift has no page, only the check below).
@@ -940,25 +945,25 @@ export default function Give() {
       outcome = await paymentStatus(site, r.reference, r.token);
     }
     setBusy(false);
-    // Back from the payment page with our server saying the provider is still catching up counts as given.
-    // No answer at all ("unknown") never does: the donor may have come back from a declined payment.
-    // A saved-card charge counts only when paid.
-    const finished = outcome === "paid" || (outcome === "pending" && shown === "returned" && !r.charged);
+    // What the answer means (give-after.ts): back from the page with the provider still catching up counts as given;
+    // no answer at all ("unknown") never does; a saved-card charge counts only when paid.
+    const after = afterReply(outcome, Boolean(r.charged), shown);
+    const finished = after.finished;
     // Paid or declined settles a saved-card attempt; anything else keeps its id, so "Give" asks again instead of charging again.
-    if (r.charged && (outcome === "paid" || outcome === "failed" || outcome === "reversed")) {
+    if (after.attempt === "clear") {
       attemptRef.current = null;
       setHeldAttempt(null);
     }
     // Still unsettled: held exactly as sent, so the amount can't change and the payment page can't replace it.
-    else if (r.charged) setHeldAttempt(sent);
+    else if (after.attempt === "hold") setHeldAttempt(sent);
     if (!finished) {
       haptic.tap();
-      const o = outcome === "paid" || outcome === "unknown" ? "pending" : outcome;
-      const waiting = o === "pending" || o === "review";
+      const o = after.say;
+      const waiting = after.waiting;
       setUnsettled(waiting ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent, charityName: charity!.nameEn, sentAt: sentAtNow } : null);
       // Declined or not found: nothing to wait for. Still waiting: kept on the phone (above) until we hear.
-      if (!waiting) void dropPendingGift(owner, charity!.slug, r.reference);
-      setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date(), signedIn), afterPaymentTone(o), true, o === "expired" && !signedIn);
+      if (after.drop) void dropPendingGift(owner, charity!.slug, r.reference);
+      setMessage(afterPaymentMessage(o, Boolean(r.charged), o === "unknown" ? undefined : new Date(), signedIn), afterPaymentTone(o), true, o === "expired" && !signedIn);
       return;
     }
     // The success moment (buzz, tick and burst on the button) is only for a gift the provider confirmed as paid. A gift
@@ -986,10 +991,11 @@ export default function Give() {
     try {
       const outcome = await paymentStatus(site, unsettled.reference, unsettled.token);
       setBusy(false);
-      if (settles(outcome)) {
+      const after = afterCheckAgain(outcome, unsettled.charged);
+      if (after.settled) {
         setUnsettled(null);
         void dropPendingGift(owner, charity!.slug, unsettled.reference);
-        if (unsettled.charged) {
+        if (after.clearAttempt) {
           attemptRef.current = null;
           setHeldAttempt(null);
         }
@@ -1002,8 +1008,8 @@ export default function Give() {
         setDone(sentSummary(unsettled.summary, false, unsettled.reference));
         return;
       }
-      const o = outcome === "unknown" ? "pending" : outcome;
-      setMessage(`Your gift of ${waitingGiftLine(unsettled)} ${afterPaymentMessage(o, unsettled.charged, new Date(), signedIn)}`, afterPaymentTone(o), true, o === "expired" && !signedIn);
+      const o = after.say;
+      setMessage(`Your gift of ${waitingGiftLine(unsettled)} ${afterPaymentMessage(o, unsettled.charged, o === "unknown" ? undefined : new Date(), signedIn)}`, afterPaymentTone(o), true, o === "expired" && !signedIn);
     } finally {
       busyRef.current = false;
     }

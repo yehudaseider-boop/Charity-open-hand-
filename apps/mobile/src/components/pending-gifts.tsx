@@ -10,7 +10,7 @@ import { refreshAfterGiving } from "@/lib/give-flow";
 import { haptic } from "@/lib/haptics";
 import { helpLine } from "@/lib/help";
 import { confirmThen } from "@/lib/open-site";
-import { expiredCheckMessage, paymentStatus } from "@/lib/pay-api";
+import { afterPaymentMessage, expiredCheckMessage, paymentStatus } from "@/lib/pay-api";
 import { settles, type PendingGift } from "@/lib/pending-gift";
 import { dropPendingGift, loadPendingGifts, onPendingGiftsChange } from "@/lib/pending-gift-store";
 import { SITE_URL } from "@/lib/website";
@@ -18,7 +18,7 @@ import { colors, fonts, radius } from "@/theme/tokens";
 
 type Shown =
   | { kind: "checking" }
-  | { kind: "waiting"; outcome: "pending" | "review"; at?: Date }
+  | { kind: "waiting"; outcome: "pending" | "review" | "unknown"; at?: Date }
   | { kind: "done"; outcome: "paid" | "failed" | "not_found" | "reversed" | "expired" };
 
 /**
@@ -59,7 +59,10 @@ export function PendingGifts() {
         }
         return;
       }
-      setShown((s) => ({ ...s, [g.slug]: { kind: "waiting", outcome: outcome === "review" ? "review" : "pending", at: new Date() } }));
+      setShown((s) => ({ ...s, [g.slug]: outcome === "unknown"
+            ? // No answer from our server: no check time, and never "still confirming".
+              { kind: "waiting", outcome: "unknown" }
+            : { kind: "waiting", outcome: outcome === "review" ? "review" : "pending", at: new Date() } }));
     },
     [owner, refresh],
   );
@@ -162,7 +165,9 @@ export function PendingGifts() {
               {`${total} to ${g.charityName}, started at ${when}. `}
               {checking
                 ? "Asking the payment provider whether it went through…"
-                : s.kind === "waiting" && s.outcome === "review"
+                : s.kind === "waiting" && s.outcome === "unknown"
+                  ? afterPaymentMessage("unknown")
+                  : s.kind === "waiting" && s.outcome === "review"
                   ? `Something about this payment needs a person to look at it. Please don't pay again. A person will look at it. To ask about it, contact us.${s.at ? ` Last checked at ${hhmm(s.at)}.` : ""}`
                   : `We haven't heard yet whether it went through. If you finished paying, please don't pay again.${s.kind === "waiting" && s.at ? ` Last checked at ${hhmm(s.at)}.` : ""}`}
             </Text>

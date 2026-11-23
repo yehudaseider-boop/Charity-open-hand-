@@ -1,3 +1,4 @@
+import { recurringChangeError } from "@/lib/recurring-error";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
@@ -248,7 +249,7 @@ export default function Giving() {
     setBusy(false);
     setConfirmCancel(false);
     const verb = status === "paused" ? "pause" : status === "active" ? "resume" : "cancel";
-    setRecurringError(r.ok ? null : `We couldn't ${verb} it, so your monthly donation is unchanged. Check your connection and try again.`);
+    setRecurringError(r.ok ? null : recurringChangeError(verb, r.message));
     if (!r.ok) return;
     setOpen(null);
     const name = which?.charityName ?? "this charity";
