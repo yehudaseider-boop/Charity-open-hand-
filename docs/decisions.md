@@ -2266,3 +2266,12 @@ A read-only security review found six things. All six are fixed in code; two nee
 - Pictures for journey emails and profile images are stored under the lower-case charity id (the check and the database compare it lower-case), so a page address with capital letters no longer breaks the upload; the undo's own-folder check matches.
 - Taking back a journey save (Undo) applies the same "someone is part way" check as saving: if putting the old emails back would move an email to another number while anyone is part way through, Undo says the journey has changed and changes nothing.
 - "Add my existing donors" says, for a list longer than the daily cap (JOURNEY_RUN_CAP), that emails go out at no more than that many a day across Givezy, over several days; it names no date. The cap is unchanged. The double-welcome behaviour is unchanged and still a decision for Yehuda.
+
+## 23/11/2026: phone app and its API (area F)
+
+- `POST /api/app/status` is no longer closed by `APP_GIVING`: a gift already started is still checked after the switch goes off (it only reads and confirms, behind the reference and token). Quote, ready and checkout stay closed.
+- "No answer from our server" (offline, timeout, busy, outage) is its own state on the give screen and Progress: "We couldn't reach Givezy to check. Nothing has changed. Check again when you're connected." with no check time; it is no longer shown as "the provider is still confirming".
+- When the server refuses a total and sends its own quote, the give screen asks again for the charity's limits and rates, so the button shows the new total.
+- `apps/mobile/eas.json`: the production profile pins `EXPO_PUBLIC_IN_APP_GIVING` and `EXPO_PUBLIC_SAVED_CARDS` to empty.
+- Giving tab: pausing, resuming or cancelling a monthly donation shows the database's own reason when it is one of the passed-through ones (payment looked into, no card to charge), not always "Check your connection".
+- The after-reply decisions of the give screen (`giveOnce`, `checkAgain`) are a pure function in `apps/mobile/src/lib/give-after.ts`, with a table test; behaviour unchanged apart from the "no answer" wording.

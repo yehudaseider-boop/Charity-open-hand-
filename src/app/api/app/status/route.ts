@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { appGivingOpen, appStatusSchema } from "@/lib/donations/app-api";
+import { appStatusSchema } from "@/lib/donations/app-api";
 import { confirmPayment } from "@/lib/donations/confirm";
 import { confirmationAccess } from "@/lib/donations/confirmation-access";
 import { clientIp } from "@/lib/client-ip";
@@ -18,7 +18,8 @@ const NEVER_RECEIVED_AFTER_MS = 15 * 60_000;
  * payment provider, the same as the website's return page.
  */
 export async function POST(request: NextRequest) {
-  if (!appGivingOpen()) return NextResponse.json({ ok: false, message: "Giving in the app isn't switched on yet." }, { status: 404 });
+  // Not closed by the APP_GIVING switch (review 23/11/2026): a gift already started must still be checked after the switch
+  // goes off, or the donor is left not knowing. This only reads and confirms, behind the reference and its token; new gifts stay closed.
   const body = appStatusSchema.safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, message: "Something went wrong." }, { status: 400 });
   const { reference, token } = body.data;

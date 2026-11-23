@@ -1,3 +1,4 @@
+import { recurringFailureMessage } from "./recurring-error";
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
@@ -494,7 +495,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
         const { error } = await supabase.rpc("set_my_recurring_status", { p_id: id, p_status: status });
         // A monthly donation held while a disputed payment is looked into, or with no card left to charge, says so (from the database).
-        if (error) return { ok: false, message: /looked into|no card to charge/.test(error.message) ? error.message : "We couldn't change that. Please try again." };
+        if (error) return { ok: false, message: recurringFailureMessage(error.message) };
         await refresh();
         return { ok: true };
       },

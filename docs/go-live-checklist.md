@@ -435,3 +435,5 @@ HTML version of the confirmation email, yahrzeit giving, real charity photos fro
 
 
 - [ ] **Apply `20261123000010_erasure_lock_and_notes.sql`** (erasure locks the donor's gifts first; clears receipt-decision notes and appeal send lists). Apply on TEST with Yehuda's yes before the code is pushed, then live with its own yes; run `tests/erase-donor-db.test.ts` against the local database first (not run when it was written: no local database was available).
+
+- [ ] **Production app build needs its variables in EAS (23/11/2026).** `apps/mobile/eas.json` pins `EXPO_PUBLIC_IN_APP_GIVING` and `EXPO_PUBLIC_SAVED_CARDS` to empty in the production profile, so a store build never gives in the app, whatever is set in the EAS environment. Before the first production build, set `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_SITE_URL` (the live values, once decided) in the EAS production environment; without them the build shows sample data. Never put a secret key in an `EXPO_PUBLIC_` variable.
