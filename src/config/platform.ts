@@ -150,6 +150,20 @@ export const platformConfig = {
     wrongCodesPerAddress: { tries: 30, minutes: 60 },
   },
 
+  /**
+   * The link a donor comes back on after paying (/donate/return, holding the gift's private credential) opens the
+   * gift's status and its "Add your s18A details" form for this many days from when it was issued (Yehuda,
+   * 23/11/2026). After that the page says the link has expired and offers "Email me a fresh link", which goes only to
+   * the email the gift was made with and works for the same number of days. A signed-in donor always has the gift on
+   * their account.
+   */
+  confirmationLink: {
+    days: 30,
+    /** "Email me a fresh link": per gift (a day) and per internet address (an hour). Counted before any lookup. */
+    freshPerGift: { tries: 3, minutes: 1_440 },
+    freshPerAddress: { tries: 10, minutes: 60 },
+  },
+
   checkout: {
     /**
      * One tick on the website's give form instead of two: "I'm 18 or older and I agree to the Terms and Privacy

@@ -10,7 +10,9 @@ import { formatRand } from "@/lib/money";
 import { labelOf } from "@/lib/donations/labels";
 import { APP_RETURN_LINK, donationReference } from "@/lib/donations/reference";
 import { cameFromApp } from "@/lib/donations/return-actions";
-import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
+import { confirmationAccess } from "@/lib/donations/confirmation-access";
+import { platformConfig } from "@/config/platform";
+import { FreshLinkForm } from "./fresh-link-form";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
@@ -66,7 +68,15 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   // Only the donor (holding the credential from their payment link) may make us ask the payment
   // provider: donation ids are not secret, and the webhook settles every payment anyway. Anyone
   // else sees the saved state only.
-  const holdsToken = ref ? await confirmationTokenMatches(ref, t) : false;
+  // The link works for platformConfig.confirmationLink.days (23/11/2026). An expired one opens nothing, not even the
+  // payment check: the donor's own account still shows the gift, and the page offers a fresh link by email.
+  const access = ref ? await confirmationAccess(ref, t) : "none";
+  const holdsToken = access === "valid";
+  if (access === "expired" && t) {
+    // Signed in as the donor who made it: the account's own access applies (row-level security decides), as before.
+    const owned = viewer ? Boolean((await (await createClient()).from("donations").select("id").eq("gateway_ref", ref).maybeSingle()).data) : false;
+    if (!owned) return <ExpiredLink reference={ref} token={t} signedIn={Boolean(viewer)} />;
+  }
   // Per donation: donors behind one shared address (a school's or an office's Wi-Fi) must not block each other.
   // A check that fails counts as limited (never as a free pass to ask the payment provider).
   const limited = holdsToken ? await hitRateLimit("return-check", [`ref:${ref}`, ...ipKeys(clientIp(await headers()))], 40, 10).catch((e) => (console.error(e), true)) : false;
@@ -297,6 +307,34 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   );
 }
 
+/**
+ * An expired donation link (decided 23/11/2026): what happened, that nothing was changed, and one way on, a fresh link
+ * sent to the email the gift was made with. Signing in is the other way, and a person to reach.
+ */
+function ExpiredLink({ reference, token, signedIn }: { reference: string; token: string; signedIn: boolean }) {
+  const days = platformConfig.confirmationLink.days;
+  return (
+    <Result tone="expired" title="This link has expired">
+      <p>
+        For your safety, the link to a donation works for {days} days. <strong className="font-semibold text-navy">Nothing was changed</strong>: your donation and its s18A details are as they were.
+      </p>
+      <FreshLinkForm reference={reference} token={token} />
+      <p className="mt-5 text-sm text-muted">
+        {signedIn ? (
+          <>This donation isn&apos;t on the account you&apos;re signed in to. Sign in with the email you gave with to see it there.</>
+        ) : (
+          <>
+            You can also{" "}
+            <Link href="/login?next=%2Faccount" className="font-semibold text-brand underline underline-offset-4">sign in</Link>{" "}
+            with the email you gave with to see all your giving and add any s18A details.
+          </>
+        )}
+      </p>
+      <p className="mt-2 text-sm text-muted">Need help: <HelpLine /></p>
+    </Result>
+  );
+}
+
 /** A person to reach: the support address once there is one. */
 function HelpLine() {
   return <><SupportContact />.</>;
@@ -307,7 +345,7 @@ function HelpLine() {
  * logo's splash and the amount in large type; a failed one a calm card icon (the words carry it, never a red
  * headline); waiting a soft clock.
  */
-function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wait" | "neutral"; title: string; lead?: React.ReactNode; children: React.ReactNode }) {
+function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wait" | "neutral" | "expired"; title: string; lead?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="relative mx-auto mt-2 max-w-xl overflow-hidden rounded-[2rem] border-2 border-border bg-surface p-6 shadow-[0_24px_48px_rgba(9,37,119,0.08)] sm:mt-6 sm:p-9">
       {tone === "paid" ? <ConfettiBurst /> : null}
@@ -318,6 +356,13 @@ function Result({ tone, title, lead, children }: { tone: "paid" | "failed" | "wa
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="stroke-brand">
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5l3 2" />
+          </svg>
+        </span>
+      ) : tone === "expired" ? (
+        <span aria-hidden className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-honey-soft">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" className="stroke-brand">
+            <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2" />
           </svg>
         </span>
       ) : tone === "failed" ? (

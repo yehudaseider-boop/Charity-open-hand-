@@ -8,6 +8,10 @@ import { COMING_SOON_ROUTE, comingSoonAction, staysOnComingSoonHost } from "@/li
 import { charitySignUpOpen, launchListOpen } from "@/config/app-links";
 import { audienceRedirect } from "@/lib/audience";
 import { hasSignInCookie } from "@/lib/header-viewer";
+import { buildCsp, cspPolicyFor, newNonce } from "@/lib/csp";
+import { checkoutOrigins } from "@/lib/gateway/checkout-origins";
+import { VIDEO_FRAME_ORIGINS } from "@/lib/charity/video";
+import { authCookieOptions, markerFix, markerForWrite } from "@/lib/supabase/auth-cookies";
 
 /** Keeps the Supabase login session fresh on every page request. */
 export async function proxy(request: NextRequest) {
@@ -46,6 +50,22 @@ export async function proxy(request: NextRequest) {
   // Tell the page which path (with its query) was asked for, so a detour via sign-in or the second
   // step can come back to it. Set here, never trusted from the browser.
   request.headers.set(CURRENT_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  // Pages that handle sign-in, money or personal data get a script policy with a one-time nonce (23/11/2026, see
+  // lib/csp.ts for which). Next.js reads the nonce from the request's own policy header and puts it on its scripts.
+  // Every other page keeps the policy from next.config.ts, which scripts built ahead of time can run under.
+  let nonceCsp: string | null = null;
+  if (cspPolicyFor(request.nextUrl.pathname) === "nonce") {
+    const nonce = newNonce();
+    nonceCsp = buildCsp({
+      nonce,
+      dev: process.env.NODE_ENV === "development",
+      supabaseOrigin: originOf(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      formActionOrigins: checkoutOrigins(process.env.PAYMENT_GATEWAY),
+      videoFrameOrigins: VIDEO_FRAME_ORIGINS,
+    });
+    request.headers.set("Content-Security-Policy", nonceCsp);
+    request.headers.set("x-nonce", nonce);
+  }
   // The plain charities list (no search, no cause) is built ahead and served from cache: the page is the same for
   // everyone, so it is sent to its cached twin. The address in the browser stays /charities. Other parameters
   // (utm_source, fbclid, a share code) change nothing on the page, so they don't stop it.
@@ -65,12 +85,16 @@ export async function proxy(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
       {
+        // httpOnly, Secure (live site), SameSite=Lax: page scripts can't read the sign-in (23/11/2026).
+        cookieOptions: authCookieOptions(),
         cookies: {
           getAll: () => request.cookies.getAll(),
           setAll: (toSet) => {
             toSet.forEach(({ name, value }) => request.cookies.set(name, value));
             response = start();
             toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+            const marker = markerForWrite(toSet);
+            if (marker) response.cookies.set(marker.name, marker.value, marker.options);
           },
         },
       },
@@ -80,6 +104,11 @@ export async function proxy(request: NextRequest) {
     await supabase.auth.getUser();
   }
 
+  // A person signed in before the sign-in cookies went httpOnly has no "signed in" marker yet (and one whose sign-in
+  // has gone should not keep it): no trip to Supabase, just the cookies as they are on this request.
+  const fix = markerFix(request.cookies.getAll());
+  if (fix) response.cookies.set(fix.name, fix.value, fix.options);
+
   // A charity's own link (button, share, QR) keeps the visit on that charity; the home page or the
   // charities list ends it.
   const focus = focusChange(request.nextUrl.pathname, request.nextUrl.searchParams.get(SOURCE_PARAM));
@@ -88,7 +117,17 @@ export async function proxy(request: NextRequest) {
   } else if (focus) {
     response.cookies.set(FOCUS_COOKIE, focus.set, { httpOnly: true, sameSite: "lax", secure: request.nextUrl.protocol === "https:", maxAge: FOCUS_SECONDS, path: "/" });
   }
+  if (nonceCsp) response.headers.set("Content-Security-Policy", nonceCsp);
   return response;
+}
+
+/** The origin of an address, or "" when it isn't one. */
+function originOf(address: string | undefined): string {
+  try {
+    return address ? new URL(address).origin : "";
+  } catch {
+    return "";
+  }
 }
 
 export const config = {

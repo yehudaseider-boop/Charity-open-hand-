@@ -38,15 +38,17 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7", "x-givezy-path": "/donate/return" }),
   cookies: async () => ({ get: (name: string) => (name === "gz_focus" && focusCookie ? { name, value: focusCookie } : undefined) }),
 }));
-vi.mock("@/lib/auth", () => ({ getViewer: async () => null }));
+let viewer: { userId: string } | null = null;
+vi.mock("@/lib/auth", () => ({ getViewer: async () => viewer }));
 vi.mock("@/lib/rate-limit", () => ({
   hitRateLimit: async () => {
     if (overLimit === "broken") throw new Error("rate limit store down");
     return overLimit;
   },
   ipKeys: (ip: string) => [`ip:${ip}`] }));
+// "old-credential" is the donor's own link, past its 30 days (23/11/2026).
 vi.mock("@/lib/donations/confirmation-access", () => ({
-  confirmationTokenMatches: async (_id: string, t?: string) => t === "good-credential",
+  confirmationAccess: async (_id: string, t?: string) => (t === "good-credential" ? "valid" : t === "old-credential" ? "expired" : "none"),
 }));
 const builder = (get: () => unknown) => {
   const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: get(), error: null }) };
@@ -74,6 +76,7 @@ beforeEach(() => {
   overLimit = false;
   sessionRow = null;
   focusCookie = undefined;
+  viewer = null;
 });
 
 describe("confirmation page privacy", () => {
@@ -210,3 +213,39 @@ describe("trying again", () => {
   });
 });
 
+
+describe("an expired link (30 days, decided 23/11/2026)", () => {
+  it("shows no details, never asks the payment provider or reads with the service role, and offers a fresh link", async () => {
+    const html = await page({ t: "old-credential" });
+    expect(html).toContain("This link has expired");
+    expect(html).toContain("Nothing was changed");
+    expect(html).toContain("Email me a fresh link");
+    expect(html).toContain("only to the email address this donation was made with");
+    for (const bit of privateBits) expect(html).not.toMatch(bit);
+    expect(html).not.toContain("Your payment went through");
+    expect(html).not.toContain("Add your s18A details");
+    expect(adminReads).toBe(0);
+    expect(confirmCalls).toBe(0);
+    // No box to type an email address into: the fresh link goes only to the one on record.
+    expect(html).not.toMatch(/type="email"|name="email"/);
+  });
+
+  it("the donor signed in to their own account still sees the gift through it", async () => {
+    viewer = { userId: "u-1" };
+    sessionRow = row;
+    const html = await page({ t: "old-credential" });
+    expect(html).not.toContain("This link has expired");
+    expect(html).toContain("R23.45");
+    // Saved state only: the account's own access never makes us ask the payment provider.
+    expect(confirmCalls).toBe(0);
+  });
+
+  it("someone else signed in gets the expired page, with a word about which account to use", async () => {
+    viewer = { userId: "u-2" };
+    sessionRow = null;
+    const html = await page({ t: "old-credential" });
+    expect(html).toContain("This link has expired");
+    expect(html).toContain("isn&#x27;t on the account you&#x27;re signed in to");
+    for (const bit of privateBits) expect(html).not.toMatch(bit);
+  });
+});

@@ -83,7 +83,10 @@ vi.mock("@/lib/crypto", () => ({
   last4: (s: string) => s.replace(/\s/g, "").slice(-4),
   receiptIdentity: (v: { donorType: string; idNumber?: string; registrationNumber?: string }) => `fp:${v.donorType}:${v.idNumber ?? v.registrationNumber}`,
 }));
-vi.mock("@/lib/donations/confirmation-access", () => ({ confirmationTokenMatches: async (_id: string, t?: string) => t === "good-credential" }));
+// "old-credential": the donor's own link, past its 30 days (23/11/2026).
+vi.mock("@/lib/donations/confirmation-access", () => ({
+  confirmationAccess: async (_id: string, t?: string) => (t === "good-credential" ? "valid" : t === "old-credential" ? "expired" : "none"),
+}));
 
 const { completeS18aDetails, listS18aToComplete } = await import("@/lib/donations/s18a-complete");
 
@@ -128,6 +131,14 @@ describe("who may add the details", () => {
   it("not with a wrong credential: nothing is written", async () => {
     const r = await run({ token: "guessed" });
     expect(r.ok).toBe(false);
+    expect(updates).toHaveLength(0);
+  });
+  it("not with an expired link: refused on the server, nothing written, and the way on is said", async () => {
+    const r = await run({ token: "old-credential" });
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain("This link has expired");
+    expect(r.message).toContain("Nothing has changed");
+    expect(r.message).toContain("Email me a fresh link");
     expect(updates).toHaveLength(0);
   });
   it("the signed-in donor, for their own gift only", async () => {

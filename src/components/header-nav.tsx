@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 import { MobileMenu } from "@/components/mobile-menu";
 import { NavLink } from "@/components/nav-link";
-import { signInFingerprint, type HeaderViewer } from "@/lib/header-viewer";
+import { signedInMarker, type HeaderViewer } from "@/lib/header-viewer";
 
 /**
  * The header's links, with Sign in or Account and the work areas for the person looking. Public pages are served
  * from cache, so the page itself never knows who is looking: it arrives with Sign in, and the browser asks
- * /api/viewer only when there is a sign-in cookie (09/11/2026). The answer is kept for this tab, so moving
+ * /api/viewer only when there is a signed-in marker cookie (09/11/2026; since 23/11/2026 the sign-in cookies themselves are httpOnly). The answer is kept for this tab, so moving
  * around the site shows Account straight away and asks again only when the sign-in changes.
  */
 
@@ -49,7 +49,7 @@ const subscribe = (l: () => void) => {
 /** The viewer for the current sign-in, or null (shown as Sign in) when nobody is signed in or we don't know yet. */
 function current(): HeaderViewer | null {
   const k = load();
-  const fp = signInFingerprint(document.cookie);
+  const fp = signedInMarker(document.cookie);
   return k && fp && k.fp === fp ? k.viewer : null;
 }
 
@@ -57,7 +57,7 @@ let asking: string | null = null;
 
 /** Checks the sign-in after each page change: nothing to ask when there's no cookie or nothing changed. */
 async function refresh() {
-  const fp = signInFingerprint(document.cookie);
+  const fp = signedInMarker(document.cookie);
   if (!fp) {
     if (load()) keep(null);
     return;

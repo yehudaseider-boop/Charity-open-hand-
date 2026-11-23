@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Splash } from "@/components/splash";
 import { ClearSignInHash } from "./clear-hash";
 
@@ -10,7 +11,10 @@ export const metadata: Metadata = { title: "Back to the app", robots: { index: f
  * The app signs in with the code from the same email, so this page only says that, plainly.
  * It signs nobody in on the website: the website's own sign-in uses /auth/callback.
  */
-export default function BackToAppPage() {
+export default async function BackToAppPage() {
+  // Built per request, not ahead of time: this page's address carries a sign-in in its hash, so it gets the strict
+  // script policy with a one-time nonce (src/lib/csp.ts), which a page built at build time cannot take.
+  await connection();
   return (
     <div className="relative mx-auto flex max-w-md flex-col items-center px-4 pb-16 pt-6 sm:pt-12">
       <ClearSignInHash />

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { checkoutOrigins } from "./src/lib/gateway/checkout-origins";
 import { VIDEO_FRAME_ORIGINS } from "./src/lib/charity/video";
+import { buildCsp } from "./src/lib/csp";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -14,27 +15,16 @@ const supabaseOrigin = (() => {
 })();
 
 /**
- * Content security policy without nonces (see the Next.js CSP guide).
- * frame-ancestors 'none' stops other sites showing our pages in a frame
- * (clickjacking on checkout). form-action: our forms only post to us, and may land on the payment
- * provider's page. Once the page has loaded, that page is reached by a script, but a tap before then is a
- * plain form post, and the browser refuses to follow our redirect unless its address is named here.
+ * Content security policy for statically built (public) pages: scripts allow 'unsafe-inline', as a page built ahead of
+ * time has no request to take a nonce from. Pages that handle sign-in, money or personal data get the nonce policy
+ * from src/proxy.ts instead (security hardening 23/11/2026; both are built in src/lib/csp.ts, with the route list).
  */
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' blob: data:${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
-  "font-src 'self'",
-  // A charity's profile video plays in a frame, only after the visitor presses play: exactly these two players, nothing wider.
-  `frame-src ${VIDEO_FRAME_ORIGINS.join(" ")}`,
-  `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
-  "object-src 'none'",
-  "base-uri 'self'",
-  ["form-action 'self'", ...checkoutOrigins(process.env.PAYMENT_GATEWAY)].join(" "),
-  "frame-ancestors 'none'",
-  ...(isDev ? [] : ["upgrade-insecure-requests"]),
-].join("; ");
+const csp = buildCsp({
+  dev: isDev,
+  supabaseOrigin,
+  formActionOrigins: checkoutOrigins(process.env.PAYMENT_GATEWAY),
+  videoFrameOrigins: VIDEO_FRAME_ORIGINS,
+});
 
 const previewCsp = [
   "default-src 'self'",

@@ -7,7 +7,7 @@ import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/ids";
 import type { FormState } from "@/lib/form";
-import { confirmationTokenMatches } from "./confirmation-access";
+import { confirmationAccess } from "./confirmation-access";
 import {
   canCompleteS18a,
   checkS18aCompletion,
@@ -129,7 +129,12 @@ export async function completeS18aDetails(args: { donationId: string; who: Compl
   // Only the person who made the donation: the credential from their payment link, or their own account.
   let donorIds: Set<string> | undefined;
   if ("token" in args.who) {
-    if (!(await confirmationTokenMatches(args.donationId, args.who.token))) {
+    // The link works for platformConfig.confirmationLink.days (23/11/2026): an expired one adds nothing.
+    const access = await confirmationAccess(args.donationId, args.who.token, now).catch(() => "none" as const);
+    if (access === "expired") {
+      return { ok: false, message: "This link has expired, so your details weren't saved. Nothing has changed. Refresh the page and press \"Email me a fresh link\", or sign in with the email you gave with and add them from your account." };
+    }
+    if (access !== "valid") {
       return { ok: false, message: "This link can't be used to add details. Sign in with the email you gave with, and add them from your account. Nothing has changed." };
     }
   } else {
